@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { compileElement, compileElementPage } from "../src/compiler.js";
+import { emitElementModule } from "../src/targets/compile-element.js";
 import { resolve } from "node:path";
 
 const fixturesDir = import.meta.dir;
@@ -373,5 +374,423 @@ describe("compileElementPage", () => {
     expect(result.html).toContain('"lit-html"');
     expect(result.html).toContain("<test-page></test-page>");
     expect(result.html).toContain('type="module"');
+  });
+
+  test("compiles .md markdown file input", async () => {
+    const { writeFileSync, mkdirSync, rmSync } = await import("node:fs");
+    const tmpDir = resolve(import.meta.dir, "__tmp_md_test__");
+    mkdirSync(tmpDir, { recursive: true });
+    const mdPath = resolve(tmpDir, "test-markdown.md");
+    writeFileSync(
+      mdPath,
+      `---
+tagName: test-markdown
+state:
+  count: 0
+---
+
+# Hello
+
+Paragraph content
+`,
+    );
+    try {
+      const result = await compileElementPage(mdPath, { title: "MD Test" });
+      expect(result.html).toContain("<!DOCTYPE html>");
+      expect(result.html).toContain("<test-markdown></test-markdown>");
+      expect(result.files.length).toBeGreaterThanOrEqual(1);
+      expect(result.files[0].tagName).toBe("test-markdown");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  test("custom resolveElementPath callback", async () => {
+    const result = await compileElement(
+      {
+        tagName: "test-resolve",
+        state: {},
+        children: [],
+        $elements: ["./components/child-el.json"],
+      },
+      {
+        resolveElementPath: (/** @type {string} */ refPath, /** @type {string} */ _dir) =>
+          refPath.replace(/\.json$/, ".bundle.js"),
+      },
+    );
+
+    const root = result.files[result.files.length - 1];
+    expect(root.content).toContain("import './components/child-el.bundle.js'");
+  });
+});
+
+// ─── extractInitialValue — $prototype edge cases ───────────────────────────
+
+describe("compileElement — extractInitialValue prototypes", () => {
+  test("LocalStorage $prototype uses default value", async () => {
+    const result = await compileElement({
+      tagName: "test-localstorage",
+      state: {
+        theme: { $prototype: "LocalStorage", default: "dark" },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain('theme: "dark"');
+  });
+
+  test("LocalStorage $prototype without default uses null", async () => {
+    const result = await compileElement({
+      tagName: "test-ls-null",
+      state: {
+        token: { $prototype: "LocalStorage" },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("token: null");
+  });
+
+  test("Request $prototype uses null as initial value", async () => {
+    const result = await compileElement({
+      tagName: "test-request",
+      state: {
+        data: { $prototype: "Request", url: "https://api.example.com/data" },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("data: null");
+  });
+});
+
+// ─── $src imports ───────────────────────────────────────────────────────────
+
+describe("compileElement — $src imports", () => {
+  test("Function with $src generates import and wrapper", async () => {
+    const result = await compileElement({
+      tagName: "test-src-fn",
+      state: {
+        handler: {
+          $prototype: "Function",
+          $src: "./utils.js",
+          $export: "handler",
+          body: "state.count++",
+        },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("import { handler } from './utils.js'");
+    expect(content).toContain("this.state.handler = (state) => handler(state)");
+  });
+
+  test("computed Function with $src generates import and computed wrapper", async () => {
+    const result = await compileElement({
+      tagName: "test-src-computed",
+      state: {
+        total: {
+          $prototype: "Function",
+          $src: "./calc.js",
+          $export: "total",
+          body: "return state.items.length",
+        },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("import { total } from './calc.js'");
+    expect(content).toContain("this.state.total = computed(() => total(this.state))");
+  });
+
+  test("multiple $src imports from same file are grouped", async () => {
+    const result = await compileElement({
+      tagName: "test-src-multi",
+      state: {
+        add: { $prototype: "Function", $src: "./math.js", body: "state.x++" },
+        sub: { $prototype: "Function", $src: "./math.js", body: "state.x--" },
+      },
+      children: [],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("import { add, sub } from './math.js'");
+  });
+});
+
+// ─── Dynamic styles on host element ─────────────────────────────────────────
+
+describe("compileElement — dynamic host styles", () => {
+  test("template strings in host style emit effect", async () => {
+    const content = emitElementModule(
+      {
+        tagName: "test-dyn-host",
+        state: { theme: "blue" },
+        style: { color: "${state.theme}", display: "flex" },
+        children: [],
+      },
+      "TestDynHost",
+      [],
+    );
+
+    expect(content).toContain("effect(() => {");
+    expect(content).toContain("this.style['color'] = `${this.state.theme}`");
+    // static 'display: flex' should NOT be in the dynamic effect
+    expect(content).not.toContain("this.style['display']");
+  });
+});
+
+// ─── Slot handling ──────────────────────────────────────────────────────────
+
+describe("compileElement — slot handling", () => {
+  test("element with slot child saves and restores slotted content", async () => {
+    const result = await compileElement({
+      tagName: "test-slot",
+      state: {},
+      children: [{ tagName: "div", children: [{ tagName: "slot" }] }],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("const _slotted = Array.from(this.childNodes)");
+    expect(content).toContain("const _slot = this.querySelector('slot')");
+    expect(content).toContain("_slot.before(n)");
+    expect(content).toContain("_slot.remove()");
+  });
+});
+
+// ─── emitLitNode — attributes and property bindings ─────────────────────────
+
+describe("compileElement — emitLitNode edge cases", () => {
+  test("dynamic attribute with template string", async () => {
+    const result = await compileElement({
+      tagName: "test-dyn-attr",
+      state: { val: "hello" },
+      children: [
+        {
+          tagName: "div",
+          attributes: { "data-x": "${state.val}" },
+        },
+      ],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain('data-x="${s.val}"');
+  });
+
+  test("property bindings with template strings on non-reserved keys", async () => {
+    const result = await compileElement({
+      tagName: "test-prop-bind",
+      state: { val: "test" },
+      children: [
+        {
+          tagName: "custom-child",
+          value: "${state.val}",
+        },
+      ],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain('.value="${s.val}"');
+  });
+
+  test("boolean/number child nodes are escaped", async () => {
+    const content = emitElementModule(
+      {
+        tagName: "test-bool-child",
+        state: {},
+        children: [{ tagName: "div", children: [42] }],
+      },
+      "TestBoolChild",
+      [],
+    );
+
+    expect(content).toContain("42");
+  });
+
+  test("innerHTML in node definition", async () => {
+    const result = await compileElement({
+      tagName: "test-innerhtml",
+      state: {},
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<b>content</b>",
+        },
+      ],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("<b>content</b>");
+    expect(content).toContain("<div");
+  });
+});
+
+// ─── emitMappedArray edge cases ─────────────────────────────────────────────
+
+describe("compileElement — emitMappedArray edge cases", () => {
+  test("$props without $ref in mapped array", async () => {
+    const result = await compileElement({
+      tagName: "test-map-props",
+      state: { items: [] },
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          tagName: "child-el",
+          $props: { title: "Static" },
+          textContent: "${$map.item}",
+        },
+      },
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain('.title="${"Static"}"');
+    expect(content).toContain(".map((item, index)");
+  });
+
+  test("event handlers in mapped array", async () => {
+    const result = await compileElement({
+      tagName: "test-map-event",
+      state: {
+        items: [],
+        handleClick: { $prototype: "Function", body: 'console.log("click")' },
+      },
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          tagName: "button",
+          onclick: { $ref: "#/state/handleClick" },
+          textContent: "${$map.item}",
+        },
+      },
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("@click=");
+    expect(content).toContain("s.handleClick(s, e)");
+  });
+
+  test("children in mapped array", async () => {
+    const result = await compileElement({
+      tagName: "test-map-children",
+      state: { items: [] },
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          tagName: "div",
+          children: [{ tagName: "span", textContent: "nested" }],
+        },
+      },
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain(".map((item, index)");
+    expect(content).toContain("<span");
+    expect(content).toContain(">nested</span>");
+  });
+});
+
+// ─── refToExpr edge cases ───────────────────────────────────────────────────
+
+describe("compileElement — refToExpr edge cases", () => {
+  test("$map/ prefix resolves to dotted path", async () => {
+    const result = await compileElement({
+      tagName: "test-map-ref",
+      state: { items: [] },
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/items" },
+        map: {
+          tagName: "span",
+          $props: { name: { $ref: "$map/item/name" } },
+        },
+      },
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("item.name");
+  });
+
+  test("unknown ref without #/state/ prefix uses s. prefix", async () => {
+    const result = await compileElement({
+      tagName: "test-unknown-ref",
+      state: { items: [] },
+      children: [
+        {
+          tagName: "div",
+          $props: { data: { $ref: "custom/path" } },
+        },
+      ],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("s.custom/path");
+  });
+
+  test("$map/ prefix ref resolves to dot path without s. prefix", async () => {
+    const result = await compileElement({
+      tagName: "test-map-ref",
+      state: { items: { type: "array", default: [] } },
+      children: [
+        {
+          tagName: "ul",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "li",
+              $props: { label: { $ref: "$map/item/title" } },
+              onclick: { $ref: "$map/item/handler" },
+            },
+          },
+        },
+      ],
+    });
+
+    const content = result.files[0].content;
+    expect(content).toContain("item.title");
+    expect(content).toContain("item.handler");
+    expect(content).not.toContain("s.$map");
+  });
+
+  test("Request prototype state initializes as null", async () => {
+    const result = await compileElement({
+      tagName: "test-request",
+      state: {
+        data: { $prototype: "Request", url: "/api/items" },
+      },
+      children: [{ tagName: "div", textContent: "loading" }],
+    });
+    const content = result.files[0].content;
+    expect(content).toContain("data: null");
+  });
+
+  test("plain string child in lit template is escaped", async () => {
+    const result = await compileElement({
+      tagName: "test-plain-text",
+      state: { items: { type: "array", default: [] } },
+      children: [
+        {
+          tagName: "ul",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "li",
+              children: ["Hello world"],
+            },
+          },
+        },
+      ],
+    });
+    const content = result.files[0].content;
+    expect(content).toContain("Hello world");
   });
 });

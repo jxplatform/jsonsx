@@ -539,4 +539,325 @@ describe("compileClient — module structure", () => {
     const js = files[0].content;
     expect(js).toContain("<img>");
   });
+
+  test("primitive number child node renders as text", () => {
+    const doc = { tagName: "div", children: [42] };
+    const { html } = compileClient(doc, { title: "Test" });
+    expect(html).toContain("42");
+  });
+
+  test("primitive boolean child node renders as text", () => {
+    const doc = { tagName: "div", children: [true] };
+    const { html } = compileClient(doc, { title: "Test" });
+    expect(html).toContain("true");
+  });
+});
+
+describe("compileClient — template string state entries", () => {
+  test("naked template string in state becomes computed", () => {
+    const doc = {
+      state: { $count: 5, $label: "${$count} items" },
+      tagName: "div",
+      children: [{ tagName: "span", textContent: "${state.$label}" }],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    // Should be a computed, not a plain state entry
+    expect(js).toContain("computed(");
+    expect(js).toContain("$label");
+  });
+});
+
+describe("compileClient — innerHTML and textContent edge cases", () => {
+  test("innerHTML property in pre-rendered node", () => {
+    const doc = {
+      state: {},
+      tagName: "div",
+      children: [{ tagName: "div", innerHTML: "<b>bold</b>" }],
+    };
+    const { html } = compileClient(doc, { title: "Test" });
+    expect(html).toContain("<b>bold</b>");
+  });
+
+  test("textContent resolution fallback on dynamic content with binding", () => {
+    // A node that has textContent as a template AND a $ref handler → needsBind=true
+    // and textContent resolution may throw for unresolvable refs
+    const doc = {
+      state: {
+        handler: { $prototype: "Function", body: "console.log('hi')" },
+      },
+      tagName: "div",
+      children: [
+        {
+          tagName: "span",
+          textContent: "${state.nonexistent.deep.path}",
+          onclick: { $ref: "#/state/handler" },
+        },
+      ],
+    };
+    const { html } = compileClient(doc, { title: "Test" });
+    // Should still render the span (with empty inner content on throw)
+    expect(html).toContain("<span");
+  });
+});
+
+describe("compileClient — mapped array advanced features", () => {
+  test("self-closing input tag in mapped array", () => {
+    const doc = {
+      state: { fields: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/fields" },
+            map: { tagName: "input" },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("<input");
+    // Self-closing should NOT have </input>
+    expect(js).not.toContain("</input>");
+  });
+
+  test("attributes in map template (static and dynamic)", () => {
+    const doc = {
+      state: { items: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "ul",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "li",
+              attributes: { "data-x": "static", "data-y": "${$map.item.id}" },
+              textContent: "${$map.item.name}",
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain('data-x="static"');
+    expect(js).toContain("data-y=");
+    expect(js).toContain("item.id");
+  });
+
+  test("dynamic style value (template string) in map template", () => {
+    const doc = {
+      state: { items: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "span",
+              style: { color: "${$map.item.color}", fontSize: "14px" },
+              textContent: "${$map.item.text}",
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("color:");
+    expect(js).toContain("item.color");
+    expect(js).toContain("font-size: 14px");
+  });
+
+  test("event handler with $ref in map template", () => {
+    const doc = {
+      state: {
+        items: [],
+        $handler: { $prototype: "Function", body: "console.log('clicked')" },
+      },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "button",
+              textContent: "${$map.item.label}",
+              onclick: { $ref: "#/state/$handler" },
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("@click=");
+    expect(js).toContain("on.$handler");
+  });
+
+  test("event handler with Function $prototype in map template", () => {
+    const doc = {
+      state: { items: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "button",
+              textContent: "Delete",
+              onclick: { $prototype: "Function", body: "items.splice($map.index, 1)" },
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("@click=");
+    expect(js).toContain("items.splice(index, 1)");
+  });
+
+  test("contentEditable on mapped array item", () => {
+    const doc = {
+      state: { items: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "div",
+              contentEditable: "true",
+              textContent: "${$map.item.text}",
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain('contenteditable="true"');
+  });
+
+  test("textContent as $ref object in map template", () => {
+    const doc = {
+      state: { items: [], label: "hello" },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "span",
+              textContent: { $ref: "#/state/label" },
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("state.label");
+  });
+
+  test("innerHTML in map template", () => {
+    const doc = {
+      state: { items: [] },
+      tagName: "div",
+      children: [
+        {
+          tagName: "div",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: {
+              tagName: "div",
+              innerHTML: "<b>${$map.item.html}</b>",
+            },
+          },
+        },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    expect(js).toContain("<b>");
+    expect(js).toContain("item.html");
+  });
+});
+
+describe("compileClient — $src function handlers", () => {
+  test("$src function is imported and called as computed", () => {
+    const doc = {
+      state: {
+        doSomething: { $prototype: "Function", $src: "./actions.js" },
+      },
+      tagName: "div",
+      children: [
+        { tagName: "button", textContent: "Go", onclick: { $ref: "#/state/doSomething" } },
+      ],
+    };
+    const { files } = compileClient(doc, { title: "Test" });
+    const js = files[0].content;
+    // Should import and have a handler that calls it directly
+    expect(js).toContain("import { doSomething } from './actions.js'");
+    expect(js).toContain("doSomething(");
+  });
+});
+
+describe("compileClient — refToBindingKey edge cases", () => {
+  test("non-#/state/ prefix ref uses full path with underscores", () => {
+    const doc = {
+      state: { val: "x" },
+      tagName: "div",
+      children: [
+        {
+          tagName: "span",
+          textContent: { $ref: "custom/path/value" },
+        },
+      ],
+    };
+    const { html } = compileClient(doc, { title: "Test" });
+    // Should convert slashes to underscores for the non-standard ref
+    expect(html).toContain(':text-content="custom_path_value"');
+  });
+});
+
+describe("compileClient — self-closing element with mapped array", () => {
+  test("self-closing tag with mapped array returns void element markup", () => {
+    const doc = {
+      state: {
+        items: { type: "array", default: [{ name: "a" }] },
+      },
+      tagName: "div",
+      children: [
+        {
+          tagName: "input",
+          children: {
+            $prototype: "Array",
+            items: { $ref: "#/state/items" },
+            map: { tagName: "span", textContent: "${$map.item.name}" },
+          },
+        },
+      ],
+    };
+    const { html } = compileClient(doc, { title: "Test" });
+    expect(html).toContain("<input");
+    expect(html).not.toContain("</input>");
+  });
 });

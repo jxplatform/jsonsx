@@ -173,6 +173,24 @@ describe("isNodeDynamic", () => {
   test("detects $switch on node", () => {
     expect(isNodeDynamic({ $switch: { $ref: "#/state/mode" } })).toBe(true);
   });
+
+  test("detects template string in attributes as dynamic", () => {
+    expect(
+      isNodeDynamic({
+        tagName: "div",
+        attributes: { "data-id": "${$item.get()}" },
+      }),
+    ).toBe(true);
+  });
+
+  test("attributes without template strings is not dynamic", () => {
+    expect(
+      isNodeDynamic({
+        tagName: "div",
+        attributes: { "data-id": "static-value" },
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("hasAnyIsland", () => {
@@ -768,6 +786,16 @@ describe("compileStyles", () => {
     const result = compileStyles(doc, {}, /** @type {any} */ (projectStyle));
     expect(result).toContain(".dark {");
     expect(result).toContain("background-color: #000");
+  });
+
+  test("emits projectStyle element selectors with object values", () => {
+    const doc = { tagName: "div", children: [] };
+    const projectStyle = { html: { margin: "0" }, "*": { boxSizing: "border-box" } };
+    const result = compileStyles(doc, {}, /** @type {any} */ (projectStyle));
+    expect(result).toContain("html {");
+    expect(result).toContain("margin: 0");
+    expect(result).toContain("* {");
+    expect(result).toContain("box-sizing: border-box");
   });
 
   test("emits base CSS rule for media-overridden properties", () => {

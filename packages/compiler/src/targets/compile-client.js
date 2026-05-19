@@ -342,12 +342,8 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
     const value = resolveStaticValue(source.textContent, nextContext.scope);
     inner = value == null ? "" : escapeHtml(String(value));
   } else if (source.textContent !== undefined && needsBind) {
-    try {
-      const value = resolveStaticValue(source.textContent, nextContext.scope);
-      inner = value == null ? "" : escapeHtml(String(value));
-    } catch {
-      inner = "";
-    }
+    const value = resolveStaticValue(source.textContent, nextContext.scope);
+    inner = value == null ? "" : escapeHtml(String(value));
   } else if (source.innerHTML) {
     // resolveStaticValue may return null if innerHTML contains `${` from rendered content
     // (e.g., code examples) that isn't an actual template expression. Fall back to raw value.
@@ -607,29 +603,21 @@ function emitClientModule(
   if (onEntries.length > 0) {
     lines.push("const on = {");
     for (const [key, def] of onEntries) {
-      if (def.imported) {
-        const argNames = def.args ?? ["state"];
-        const callArgs = argNames
-          .map((/** @type {string} */ a) => (a === "state" ? "state" : "e"))
-          .join(", ");
-        lines.push("  " + key + ": (e) => { " + key + "(" + callArgs + "); },");
-      } else {
-        const argNames = def.args ?? ["state"];
-        const callArgs = argNames
-          .map((/** @type {string} */ a) => (a === "state" ? "state" : "e"))
-          .join(", ");
-        lines.push(
-          "  " +
-            key +
-            ": (e) => { const fn = (" +
-            argNames.join(", ") +
-            ") => { " +
-            def.body +
-            " }; fn(" +
-            callArgs +
-            "); },",
-        );
-      }
+      const argNames = def.args ?? ["state"];
+      const callArgs = argNames
+        .map((/** @type {string} */ a) => (a === "state" ? "state" : "e"))
+        .join(", ");
+      lines.push(
+        "  " +
+          key +
+          ": (e) => { const fn = (" +
+          argNames.join(", ") +
+          ") => { " +
+          def.body +
+          " }; fn(" +
+          callArgs +
+          "); },",
+      );
     }
     lines.push("};");
   } else {

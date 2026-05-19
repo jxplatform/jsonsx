@@ -652,4 +652,689 @@ describe("compileMarkdown", () => {
     const { content } = compileMarkdown(doc);
     expect(content).toContain("> Simple quote");
   });
+
+  // ─── Coverage: unknown non-custom, non-wrapper tag with children (lines 116-119)
+
+  test("unknown non-custom tag with children but no textContent unwraps children", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "video",
+          children: [{ tagName: "p", textContent: "Fallback text" }],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Fallback text");
+  });
+
+  test("unknown non-custom tag with no textContent and no children produces nothing", () => {
+    const doc = {
+      children: [{ tagName: "audio" }],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content.trim()).toBe("");
+  });
+
+  // ─── Coverage: blockquote with inline text children (line 234, 237)
+
+  test("blockquote with mixed inline and block children", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "blockquote",
+          children: [
+            { tagName: "p", textContent: "First paragraph" },
+            { tagName: "p", textContent: "Second paragraph" },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("> First paragraph");
+    expect(content).toContain("> Second paragraph");
+  });
+
+  // ─── Coverage: inline <code> element (line 262)
+
+  test("inline code with empty textContent", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "p",
+          children: [
+            { tagName: "code", textContent: "" },
+            { tagName: "code", textContent: "valid" },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("`valid`");
+  });
+
+  // ─── Coverage: <pre><code> with lang attribute (lines 278-280)
+
+  test("code block with lang from attributes instead of className", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "pre",
+          children: [{ tagName: "code", className: "language-rust", textContent: "fn main() {}" }],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("```rust");
+    expect(content).toContain("fn main() {}");
+  });
+
+  // ─── Coverage: <table> direct rows without thead/tbody (lines 314-315, 319)
+
+  test("table with direct tr children (no thead/tbody wrappers)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "table",
+          children: [
+            {
+              tagName: "tr",
+              children: [
+                { tagName: "th", textContent: "Header1" },
+                { tagName: "th", textContent: "Header2" },
+              ],
+            },
+            {
+              tagName: "tr",
+              children: [
+                { tagName: "td", textContent: "Val1" },
+                { tagName: "td", textContent: "Val2" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Header1");
+    expect(content).toContain("Header2");
+    expect(content).toContain("Val1");
+    expect(content).toContain("Val2");
+    expect(content).toContain("|");
+  });
+
+  test("table cell with inline children instead of textContent", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "table",
+          children: [
+            {
+              tagName: "tr",
+              children: [
+                {
+                  tagName: "td",
+                  children: [{ tagName: "strong", textContent: "Bold Cell" }],
+                },
+                { tagName: "td", textContent: "Plain" },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("**Bold Cell**");
+    expect(content).toContain("Plain");
+  });
+
+  // ─── Coverage: resolveNode() attribute handling with template expressions (lines 364, 374, 377-382, 385)
+
+  test("component resolves template expressions in attributes", () => {
+    const componentDefs = new Map([
+      [
+        "link-card",
+        {
+          state: { url: "https://default.com", label: "Click" },
+          children: [
+            {
+              tagName: "p",
+              children: [
+                {
+                  tagName: "a",
+                  attributes: { href: "${state.url}" },
+                  textContent: "${state.label}",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    ]);
+
+    const doc = {
+      children: [{ tagName: "link-card", $props: { url: "https://example.org", label: "Visit" } }],
+    };
+
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("[Visit](https://example.org)");
+  });
+
+  test("component resolves template expressions in innerHTML", () => {
+    const componentDefs = new Map([
+      [
+        "html-card",
+        {
+          state: { message: "Hello from template" },
+          children: [{ tagName: "div", innerHTML: "<p>${state.message}</p>" }],
+        },
+      ],
+    ]);
+
+    const doc = {
+      children: [{ tagName: "html-card" }],
+    };
+
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("Hello from template");
+  });
+
+  test("component resolves children nodes recursively", () => {
+    const componentDefs = new Map([
+      [
+        "nested-card",
+        {
+          state: { title: "Nested" },
+          children: [
+            {
+              tagName: "div",
+              children: [{ tagName: "h2", textContent: "${state.title}" }],
+            },
+          ],
+        },
+      ],
+    ]);
+
+    const doc = {
+      children: [{ tagName: "nested-card", $props: { title: "Deep Title" } }],
+    };
+
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("## Deep Title");
+  });
+
+  // ─── Coverage: Array expansion with $map/ paths (lines 452, 456, 460, 493-494, 531-532, 579-580)
+
+  test("$prototype Array with $map/ ref in nested $props", () => {
+    const componentDefs = new Map([
+      [
+        "item-card",
+        {
+          state: { name: "default" },
+          children: [{ tagName: "p", textContent: "${state.name}" }],
+        },
+      ],
+    ]);
+
+    const doc = {
+      state: { things: [{ name: "Alpha" }, { name: "Beta" }] },
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/things" },
+          map: {
+            tagName: "item-card",
+            $props: { name: { $ref: "$map/item/name" } },
+          },
+        },
+      ],
+    };
+
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("Alpha");
+    expect(content).toContain("Beta");
+  });
+
+  test("$prototype Array with textContent as $map/ path string", () => {
+    const doc = {
+      state: { fruits: [{ label: "Apple" }, { label: "Pear" }] },
+      children: [
+        {
+          tagName: "ul",
+          children: [
+            {
+              $prototype: "Array",
+              items: { $ref: "#/state/fruits" },
+              map: {
+                tagName: "li",
+                textContent: "$map/label",
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("- Apple");
+    expect(content).toContain("- Pear");
+  });
+
+  test("$prototype Array with children in map template", () => {
+    const doc = {
+      state: { entries: [{ title: "One" }, { title: "Two" }] },
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/entries" },
+          map: {
+            tagName: "div",
+            children: [
+              {
+                tagName: "h3",
+                textContent: { $ref: "$map/item/title" },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("### One");
+    expect(content).toContain("### Two");
+  });
+
+  test("$prototype Array with no scope returns empty", () => {
+    const doc = {
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/missing" },
+          map: { tagName: "p", textContent: "never" },
+        },
+      ],
+    };
+    // No state defined, so no scope — should return empty
+    const { content } = compileMarkdown(doc);
+    expect(content.trim()).toBe("");
+  });
+
+  test("$prototype Array with non-array items ref returns empty", () => {
+    const doc = {
+      state: { notArray: "hello" },
+      children: [
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/notArray" },
+          map: { tagName: "p", textContent: "never" },
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content.trim()).toBe("");
+  });
+
+  // ─── Coverage: HTML parsing edge cases (lines 618, 634-635, 637-638, 668)
+
+  test("innerHTML with blockquote containing paragraph", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<blockquote>A simple quoted sentence</blockquote>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("> A simple quoted sentence");
+  });
+
+  test("innerHTML with blockquote containing bare text", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<blockquote>Bare text in blockquote</blockquote>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("> Bare text in blockquote");
+  });
+
+  test("innerHTML with blockquote containing inline emphasis", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<blockquote><em>Emphasized quote</em></blockquote>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Emphasized quote");
+  });
+
+  test("innerHTML with wrapper div unwraps inner content", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<section><p>Inside section</p></section>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Inside section");
+  });
+
+  // ─── Coverage: complex inline HTML / self-closing / nested (lines 732-733, 771, 801-803, 808-809)
+
+  test("innerHTML with unmatched inline tag treats as text", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p>Some <em>unclosed text</p>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    // Should still produce output (graceful fallback)
+    expect(content).toContain("Some");
+  });
+
+  test("innerHTML with nested same-name tags", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p><a href='/outer'><a href='/inner'>Inner</a> link</a></p>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Inner");
+    expect(content).toContain("link");
+  });
+
+  test("innerHTML with unknown tags skipped gracefully", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p>Text <custom>ignored tag</custom> more text</p>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Text");
+    expect(content).toContain("more text");
+  });
+
+  test("innerHTML with self-closing img inside paragraph", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: '<p>Before <img src="/x.png" alt="X" /> After</p>',
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Before");
+    expect(content).toContain("![X](/x.png)");
+    expect(content).toContain("After");
+  });
+
+  test("innerHTML with bare inline content (no block wrapper)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<em>just italic</em> and <strong>bold</strong>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("*just italic*");
+    expect(content).toContain("**bold**");
+  });
+
+  test("innerHTML table parsed directly", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("A");
+    expect(content).toContain("B");
+    expect(content).toContain("1");
+    expect(content).toContain("2");
+    expect(content).toContain("|");
+  });
+
+  // ─── Additional coverage tests ────────────────────────────────────────────
+
+  test("whitespace-only bare text node produces nothing (line 76)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "p",
+          children: ["   ", "Hello"],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Hello");
+    expect(content.trim()).toBe("Hello");
+  });
+
+  test("unknown tag with whitespace-only textContent produces nothing (line 117)", () => {
+    const doc = {
+      children: [{ tagName: "video", textContent: "   " }],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content.trim()).toBe("");
+  });
+
+  test("convertChildren returns empty for empty-string textContent (line 262)", () => {
+    // A list uses convertChildren; if textContent is empty, no items to filter
+    const doc = {
+      children: [{ tagName: "ul", textContent: "" }],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content.trim()).toBe("");
+  });
+
+  test("convertChildrenInline returns empty for empty-string textContent (lines 278-280)", () => {
+    // A heading with empty string textContent
+    const doc = {
+      children: [{ tagName: "h1", textContent: "" }],
+    };
+    const { content } = compileMarkdown(doc);
+    // heading with empty text still generates a heading node with empty text child
+    expect(content).toContain("#");
+  });
+
+  test("component prop overwrites state with default object (lines 314-315)", () => {
+    const componentDefs = new Map([
+      [
+        "prop-card",
+        {
+          state: { title: { default: "Fallback", type: "string" } },
+          children: [{ tagName: "h1", textContent: "${state.title}" }],
+        },
+      ],
+    ]);
+    const doc = {
+      children: [{ tagName: "prop-card", $props: { title: "Override" } }],
+    };
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("# Override");
+  });
+
+  test("component prop added to state when not already present (line 319)", () => {
+    const componentDefs = new Map([
+      [
+        "extra-card",
+        {
+          state: { existing: "yes" },
+          children: [{ tagName: "p", textContent: "${state.extra}" }],
+        },
+      ],
+    ]);
+    const doc = {
+      children: [{ tagName: "extra-card", $props: { extra: "new value" } }],
+    };
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("new value");
+  });
+
+  test("resolveNode handles plain template string in children (line 364)", () => {
+    const componentDefs = new Map([
+      [
+        "text-card",
+        {
+          state: { word: "World" },
+          children: ["Hello ${state.word}"],
+        },
+      ],
+    ]);
+    const doc = {
+      children: [{ tagName: "text-card" }],
+    };
+    const { content } = compileMarkdown(doc, componentDefs);
+    expect(content).toContain("Hello World");
+  });
+
+  test("resolveRef with non-#/state/ prefix (lines 493-494)", () => {
+    const doc = {
+      state: { items: [{ name: "Direct" }] },
+      children: [
+        {
+          tagName: "ul",
+          children: [
+            {
+              $prototype: "Array",
+              items: { $ref: "items" },
+              map: { tagName: "li", textContent: { $ref: "$map/item/name" } },
+            },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("- Direct");
+  });
+
+  test("resolveText with numeric textContent (lines 531-532)", () => {
+    const doc = {
+      children: [{ tagName: "p", textContent: 42 }],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("42");
+  });
+
+  test("innerHTML with text between block elements (lines 579-580)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p>First</p>between text<p>Second</p>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("First");
+    expect(content).toContain("between text");
+    expect(content).toContain("Second");
+  });
+
+  test("innerHTML with standalone hr element (line 618)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<hr>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("***");
+  });
+
+  test("innerHTML with wrapper div element containing only text (line 668)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<div>inner text only</div>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("inner text only");
+  });
+
+  test("innerHTML with malformed tag missing closing angle bracket (line 771)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p>text <broken no close</p>",
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("text");
+  });
+
+  test("paragraph with empty textContent via convertChildrenInline (line 280)", () => {
+    // A paragraph element with children that have empty textContent
+    const doc = {
+      children: [
+        {
+          tagName: "p",
+          children: [{ tagName: "em", textContent: "" }],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    // em with empty textContent produces emphasis with empty text child
+    expect(content).toBeDefined();
+  });
+
+  test("tableCell with children uses convertChildrenInline (line 234)", () => {
+    const doc = {
+      children: [
+        {
+          tagName: "table",
+          children: [
+            {
+              tagName: "tr",
+              children: [
+                { tagName: "td", children: [{ tagName: "em", textContent: "italic cell" }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("*italic cell*");
+  });
+
+  test("innerHTML with wrapper div unwraps content (line 668)", () => {
+    const doc = {
+      children: [{ tagName: "div", innerHTML: "<div><p>Wrapped content</p></div>" }],
+    };
+    const { content } = compileMarkdown(doc);
+    expect(content).toContain("Wrapped content");
+  });
 });

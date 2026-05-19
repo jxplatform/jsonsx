@@ -228,6 +228,91 @@ describe("resolveLayout", () => {
       cleanup();
     }
   });
+
+  test("throws on malformed layout JSON", () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "layouts", "bad.json"), "{ not valid json", "utf8");
+      const page = { $layout: "./layouts/bad.json" };
+      expect(() => resolveLayout(page, {}, FIXTURES)).toThrow("Invalid layout JSON");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("resolves nested layouts (layout extending another layout)", () => {
+    setup();
+    try {
+      writeLayout("outer.json", {
+        tagName: "html",
+        children: [{ tagName: "body", children: [{ tagName: "slot" }] }],
+      });
+      writeLayout("inner.json", {
+        $layout: "./layouts/outer.json",
+        tagName: "div",
+        className: "inner-wrapper",
+        children: [{ tagName: "slot" }],
+      });
+
+      const page = {
+        $layout: "./layouts/inner.json",
+        children: [{ tagName: "p", textContent: "Nested content" }],
+      };
+
+      const result = resolveLayout(page, {}, FIXTURES);
+      expect(result.tagName).toBe("html");
+      const body = result.children.find((/** @type {any} */ c) => c.tagName === "body");
+      expect(body).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("merges page $media onto layout $media", () => {
+    setup();
+    try {
+      writeLayout("media.json", {
+        tagName: "div",
+        $media: { "--md": "(min-width: 768px)" },
+        children: [{ tagName: "slot" }],
+      });
+
+      const page = {
+        $layout: "./layouts/media.json",
+        $media: { "--lg": "(min-width: 1024px)" },
+        children: [{ tagName: "p" }],
+      };
+
+      const result = resolveLayout(page, {}, FIXTURES);
+      expect(result.$media["--md"]).toBe("(min-width: 768px)");
+      expect(result.$media["--lg"]).toBe("(min-width: 1024px)");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("merges page style onto layout style", () => {
+    setup();
+    try {
+      writeLayout("styled.json", {
+        tagName: "div",
+        style: { color: "red" },
+        children: [{ tagName: "slot" }],
+      });
+
+      const page = {
+        $layout: "./layouts/styled.json",
+        style: { fontSize: "16px" },
+        children: [{ tagName: "p" }],
+      };
+
+      const result = resolveLayout(page, {}, FIXTURES);
+      expect(result.style.color).toBe("red");
+      expect(result.style.fontSize).toBe("16px");
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 process.on("exit", () => {

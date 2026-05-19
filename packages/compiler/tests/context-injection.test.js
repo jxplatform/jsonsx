@@ -156,4 +156,41 @@ describe("injectContext", () => {
     injectContext(doc, {}, baseRoute);
     expect(doc.state.$site.name).toBe("Jx Site");
   });
+
+  test("rebases relative project imports to page source path", () => {
+    /** @type {Record<string, any>} */
+    const doc = {};
+    const project = {
+      ...baseProject,
+      imports: { Utils: "./lib/utils.class.json" },
+    };
+    const route = { urlPattern: "/blog/post", sourcePath: "/project/pages/blog/post.json" };
+    injectContext(doc, project, route, new Map(), "/project");
+    expect(doc.imports.Utils).toContain("utils.class.json");
+    expect(doc.imports.Utils).toMatch(/^\.\//);
+  });
+
+  test("injects project $elements when page has none", () => {
+    /** @type {Record<string, any>} */
+    const doc = {};
+    const project = {
+      ...baseProject,
+      $elements: [{ $ref: "./components/card.json" }],
+    };
+    injectContext(doc, project, baseRoute);
+    expect(doc.$elements).toHaveLength(1);
+    expect(doc.$elements[0].$ref).toBe("./components/card.json");
+  });
+
+  test("resolves ContentEntry with missing collection gracefully", () => {
+    /** @type {Record<string, any>} */
+    const doc = {
+      state: {
+        post: { $prototype: "ContentEntry", collection: "nonexistent", id: "abc" },
+      },
+    };
+    const collections = new Map([["posts", [{ id: "x", data: {} }]]]);
+    injectContext(doc, baseProject, baseRoute, collections);
+    expect(doc.state.post).toBeNull();
+  });
 });

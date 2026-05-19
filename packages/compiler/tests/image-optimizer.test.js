@@ -1,15 +1,27 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { resolve, join } from "node:path";
+import { tmpdir } from "node:os";
+
+// Mock sharp module before any imports that use it
+const mockToFile = mock(() => Promise.resolve());
+const mockToFormat = mock(() => ({ toFile: mockToFile }));
+const mockResize = mock(() => ({ toFormat: mockToFormat }));
+const mockMetadata = mock(() => Promise.resolve({ width: 800, height: 600, format: "jpeg" }));
+const mockSharpInstance = { metadata: mockMetadata, resize: mockResize };
+const mockSharp = mock(() => mockSharpInstance);
+mock.module("sharp", () => ({ default: mockSharp }));
+
 import {
   contentHash,
   configHash,
   variantFilename,
   buildSrcset,
+  getImageMetadata,
+  processImage,
 } from "../src/site/image-optimizer.js";
 import { loadCache, saveCache, getCached, setCached } from "../src/site/image-cache.js";
 import { transformImageNodes } from "../src/site/image-transform.js";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { resolve, join } from "node:path";
-import { tmpdir } from "node:os";
 
 const TMP = resolve(tmpdir(), "jx-image-test-" + Date.now());
 
@@ -511,6 +523,233 @@ describe("image-transform", () => {
     await transformImageNodes(doc, defaultConfig, root, join(root, "dist"), cache);
     expect(doc.innerHTML).toContain("a-320-abc.avif");
     expect(doc.innerHTML).toContain("b-320-abc.avif");
+    teardown();
+  });
+});
+
+// ─── Sharp-dependent tests (getImageMetadata, processImage, getSharp error) ──
+// Sharp is mocked because the native binary may not load in all CI environments.
+
+describe("getImageMetadata", () => {
+  beforeEach(() => {
+    mockMetadata.mockClear();
+  });
+
+  test("returns width, height, and format via sharp", async () => {
+    const root = setup();
+    const imgPath = join(root, "test.png");
+    writeFileSync(imgPath, "fake png data");
+
+    const meta = await getImageMetadata(imgPath);
+    expect(meta.width).toBe(800);
+    expect(meta.height).toBe(600);
+    expect(meta.format).toBe("jpeg");
+    expect(mockSharp).toHaveBeenCalledWith(imgPath);
+
+    teardown();
+  });
+
+  test("returns 0 for missing width/height and 'unknown' for missing format", async () => {
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve(
+        /** @type {any} */ ({ width: undefined, height: undefined, format: undefined }),
+      ),
+    );
+    const root = setup();
+    const imgPath = join(root, "empty.png");
+    writeFileSync(imgPath, "fake");
+
+    const meta = await getImageMetadata(imgPath);
+    expect(meta.width).toBe(0);
+    expect(meta.height).toBe(0);
+    expect(meta.format).toBe("unknown");
+
+    teardown();
+  });
+});
+
+describe("processImage", () => {
+  beforeEach(() => {
+    mockSharp.mockClear();
+    mockResize.mockClear();
+    mockToFormat.mockClear();
+    mockToFile.mockClear();
+    mockMetadata.mockImplementation(() =>
+      Promise.resolve({ width: 800, height: 600, format: "jpeg" }),
+    );
+  });
+
+  test("generates variants for configured widths and formats", async () => {
+    const root = setup();
+    const outDir = join(root, "dist");
+    mkdirSync(outDir, { recursive: true });
+
+    const imgPath = join(root, "hero.jpg");
+    writeFileSync(imgPath, "fake jpeg data");
+
+    /** @type {any} */
+    const config = {
+      optimize: true,
+      widths: [320, 640],
+      formats: ["webp"],
+      quality: { webp: 80 },
+      sizes: "100vw",
+      lazyLoad: true,
+    };
+
+    const manifest = await processImage(imgPath, outDir, config);
+
+    expect(manifest.original.width).toBe(800);
+    expect(manifest.original.height).toBe(600);
+    expect(manifest.original.format).toBe("jpeg");
+    expect(manifest.contentHash).toHaveLength(8);
+    // 320, 640, and 800 (original) each in webp = 3 variants
+    expect(manifest.variants).toHaveLength(3);
+
+    const widths = manifest.variants.map((v) => v.width);
+    expect(widths).toContain(320);
+    expect(widths).toContain(640);
+    expect(widths).toContain(800); // original width added
+
+    for (const v of manifest.variants) {
+      expect(v.format).toBe("webp");
+      expect(v.outputPath).toContain("images/_optimized/hero-");
+      expect(v.absolutePath).toContain(outDir);
+    }
+
+    teardown();
+  });
+
+  test("adds original width when no configured widths are smaller", async () => {
+    const root = setup();
+    const outDir = join(root, "dist");
+    mkdirSync(outDir, { recursive: true });
+
+    // Image is only 50px wide
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve({ width: 50, height: 50, format: "png" }),
+    );
+
+    const imgPath = join(root, "small.png");
+    writeFileSync(imgPath, "small png");
+
+    /** @type {any} */
+    const config = {
+      optimize: true,
+      widths: [800, 1200, 1920],
+      formats: ["webp"],
+      quality: { webp: 80 },
+      sizes: "100vw",
+      lazyLoad: true,
+    };
+
+    const manifest = await processImage(imgPath, outDir, config);
+    const widths = manifest.variants.map((v) => v.width);
+    // All configured widths > 50, so only original width is used
+    expect(widths).toEqual([50]);
+
+    teardown();
+  });
+
+  test("skips variant generation if output file already exists", async () => {
+    const root = setup();
+    const outDir = join(root, "dist");
+    const optimizedDir = join(outDir, "images/_optimized");
+    mkdirSync(optimizedDir, { recursive: true });
+
+    // Image is 320px wide so only one width variant
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve({ width: 320, height: 240, format: "png" }),
+    );
+
+    const imgPath = join(root, "cached.png");
+    writeFileSync(imgPath, "cached png data");
+
+    const hash8 = contentHash(imgPath);
+    const filename = variantFilename("cached", 320, hash8, "webp");
+    // Pre-create the output file so processImage skips generation
+    writeFileSync(join(optimizedDir, filename), "existing");
+
+    /** @type {any} */
+    const config = {
+      optimize: true,
+      widths: [320],
+      formats: ["webp"],
+      quality: { webp: 80 },
+      sizes: "100vw",
+      lazyLoad: true,
+    };
+
+    // Clear mock call count before this specific test
+    mockToFile.mockClear();
+
+    const manifest = await processImage(imgPath, outDir, config);
+    expect(manifest.variants).toHaveLength(1);
+    // toFile should NOT have been called since file already exists
+    expect(mockToFile).not.toHaveBeenCalled();
+
+    teardown();
+  });
+
+  test("uses multiple formats", async () => {
+    const root = setup();
+    const outDir = join(root, "dist");
+    mkdirSync(outDir, { recursive: true });
+
+    // 80px wide so configured width matches original
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve({ width: 80, height: 60, format: "png" }),
+    );
+
+    const imgPath = join(root, "multi.png");
+    writeFileSync(imgPath, "multi png");
+
+    /** @type {any} */
+    const config = {
+      optimize: true,
+      widths: [80],
+      formats: ["webp", "avif"],
+      quality: { webp: 80, avif: 65 },
+      sizes: "100vw",
+      lazyLoad: true,
+    };
+
+    const manifest = await processImage(imgPath, outDir, config);
+    const formats = manifest.variants.map((v) => v.format);
+    expect(formats).toContain("webp");
+    expect(formats).toContain("avif");
+    expect(manifest.variants).toHaveLength(2);
+
+    teardown();
+  });
+
+  test("uses default quality 80 when format quality not specified", async () => {
+    const root = setup();
+    const outDir = join(root, "dist");
+    mkdirSync(outDir, { recursive: true });
+
+    mockMetadata.mockImplementationOnce(() =>
+      Promise.resolve({ width: 100, height: 100, format: "png" }),
+    );
+
+    const imgPath = join(root, "noqual.png");
+    writeFileSync(imgPath, "no qual");
+
+    /** @type {any} */
+    const config = {
+      optimize: true,
+      widths: [100],
+      formats: ["jpeg"],
+      quality: {}, // no jpeg quality specified
+      sizes: "100vw",
+      lazyLoad: true,
+    };
+
+    mockToFormat.mockClear();
+    const manifest = await processImage(imgPath, outDir, config);
+    expect(manifest.variants).toHaveLength(1);
+    expect(mockToFormat).toHaveBeenCalledWith("jpeg", { quality: 80 });
+
     teardown();
   });
 });

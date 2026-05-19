@@ -97,6 +97,30 @@ describe("mergeHead", () => {
     const result = mergeHead([], [], []);
     expect(result.length).toBeGreaterThan(0);
   });
+
+  test("deduplicates <style> tags by content", () => {
+    const site = [{ tagName: "style", children: ["body { color: red; }"] }];
+    const page = [{ tagName: "style", children: ["body { color: red; }"] }];
+    const result = mergeHead(site, [], page);
+    const styles = result.filter((e) => e.tagName === "style");
+    expect(styles).toHaveLength(1);
+  });
+
+  test("keeps distinct <style> tags with different content", () => {
+    const site = [{ tagName: "style", children: ["body { color: red; }"] }];
+    const page = [{ tagName: "style", children: [".card { padding: 1rem; }"] }];
+    const result = mergeHead(site, [], page);
+    const styles = result.filter((e) => e.tagName === "style");
+    expect(styles).toHaveLength(2);
+  });
+
+  test("deduplicates unknown/custom tags by full JSON key", () => {
+    const site = [{ tagName: "custom-tag", attributes: { foo: "bar" } }];
+    const page = [{ tagName: "custom-tag", attributes: { foo: "bar" } }];
+    const result = mergeHead(site, [], page);
+    const custom = result.filter((e) => e.tagName === "custom-tag");
+    expect(custom).toHaveLength(1);
+  });
 });
 
 // ─── renderHead ─────────────────────────────────────────────────────────────

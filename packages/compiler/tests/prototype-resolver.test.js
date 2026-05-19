@@ -270,6 +270,71 @@ describe("resolvePrototypes", () => {
       cleanup();
     }
   });
+
+  test("warns and preserves state when module does not export expected class", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "WrongExport.js"),
+        `export class DifferentName { constructor() {} }`,
+      );
+      writeFileSync(
+        join(FIXTURES, "WrongExport.class.json"),
+        JSON.stringify({
+          title: "WrongExport",
+          $implementation: "./WrongExport.js",
+          $defs: { fields: {} },
+        }),
+      );
+
+      const doc = {
+        state: {
+          result: {
+            $prototype: "WrongExport",
+            $src: "./WrongExport.class.json",
+          },
+        },
+      };
+      await resolvePrototypes(doc, { sourcePath: join(FIXTURES, "page.json") }, FIXTURES);
+      expect(doc.state.result).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns instance directly when class has no resolve method", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "Simple.js"),
+        `export class Simple {
+          constructor(config) { this.value = config.value ?? "default"; }
+        }`,
+      );
+      writeFileSync(
+        join(FIXTURES, "Simple.class.json"),
+        JSON.stringify({
+          title: "Simple",
+          $implementation: "./Simple.js",
+          $defs: { fields: {} },
+        }),
+      );
+
+      const doc = {
+        state: {
+          result: {
+            $prototype: "Simple",
+            $src: "./Simple.class.json",
+            value: "hello",
+          },
+        },
+      };
+      await resolvePrototypes(doc, { sourcePath: join(FIXTURES, "page.json") }, FIXTURES);
+      expect(doc.state.result.value).toBe("hello");
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 process.on("exit", () => {

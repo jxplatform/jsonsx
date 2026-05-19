@@ -10,7 +10,7 @@
  *   - Server               → compile-server.js   (Hono server handler)
  *
  * Usage (CLI):
- *   bun packages/compiler/compiler.js <source.json> [output.html]
+ *   bun packages/compiler/src/compile-cli.js <source.json> [output.html]
  */
 
 import { readFileSync } from "node:fs";
@@ -132,35 +132,30 @@ export async function compile(sourcePath, opts = {}) {
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
-const isMainModule = process.argv[1]?.endsWith("compiler.js");
-if (isMainModule && process.argv[2]) {
-  const [, , src, out] = process.argv;
-
-  Promise.all([compile(src), compileServer(src)])
-    .then(async ([result, server]) => {
-      const { writeFileSync, mkdirSync } = await import("node:fs");
-      const { dirname, join } = await import("node:path");
-      if (out) {
-        writeFileSync(out, result.html, "utf8");
-        console.error(`Written to ${out}`);
-        const outDir = dirname(out);
-        for (const f of result.files) {
-          const filePath = join(outDir, f.path);
-          mkdirSync(dirname(filePath), { recursive: true });
-          writeFileSync(filePath, f.content, "utf8");
-          console.error(`Written to ${filePath}`);
-        }
-      } else {
-        process.stdout.write(result.html);
-      }
-      if (server && out) {
-        const serverOut = out.replace(/(\.[^.]+)?$/, "-server.js");
-        writeFileSync(serverOut, /** @type {string} */ (server), "utf8");
-        console.error(`Server handler written to ${serverOut}`);
-      }
-    })
-    .catch((/** @type {any} */ err) => {
-      console.error(err);
-      process.exit(1);
-    });
+/**
+ * @param {string} src
+ * @param {string} [out]
+ */
+export async function runCli(src, out) {
+  const [result, server] = await Promise.all([compile(src), compileServer(src)]);
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  const { dirname, join } = await import("node:path");
+  if (out) {
+    writeFileSync(out, result.html, "utf8");
+    console.error(`Written to ${out}`);
+    const outDir = dirname(out);
+    for (const f of result.files) {
+      const filePath = join(outDir, f.path);
+      mkdirSync(dirname(filePath), { recursive: true });
+      writeFileSync(filePath, f.content, "utf8");
+      console.error(`Written to ${filePath}`);
+    }
+  } else {
+    process.stdout.write(result.html);
+  }
+  if (server && out) {
+    const serverOut = out.replace(/(\.[^.]+)?$/, "-server.js");
+    writeFileSync(serverOut, /** @type {string} */ (server), "utf8");
+    console.error(`Server handler written to ${serverOut}`);
+  }
 }

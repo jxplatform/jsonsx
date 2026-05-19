@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { compile, isDynamic } from "../src/compiler.js";
+import { describe, test, expect, spyOn } from "bun:test";
+import { compile, isDynamic, runCli } from "../src/compiler.js";
 import { isClassJsonSrc } from "../src/shared.js";
 
 // ─── isClassJsonSrc ─────────────────────────────────────────────────────────
@@ -532,6 +532,137 @@ describe("compile — file-based input", () => {
     try {
       const { html } = await compile(filePath);
       expect(html).toContain("from file");
+    } finally {
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── compile — markdown file input ───────────────────────────────────────────
+
+describe("compile — markdown file input", () => {
+  test("reads and compiles .md file by path", async () => {
+    const { writeFileSync, mkdirSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_md");
+    mkdirSync(fixDir, { recursive: true });
+    const filePath = join(fixDir, "page.md");
+    writeFileSync(filePath, "# Hello World\n\nSome paragraph text.\n");
+    try {
+      const { html } = await compile(filePath);
+      expect(html).toContain("Hello World");
+    } finally {
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── compile — CLI (runCli) ──────────────────────────────────────────────────
+
+describe("runCli", () => {
+  test("writes output file when given output path", async () => {
+    const { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_cli");
+    mkdirSync(fixDir, { recursive: true });
+    const srcPath = join(fixDir, "page.json");
+    const outPath = join(fixDir, "output.html");
+    writeFileSync(srcPath, JSON.stringify({ tagName: "div", textContent: "cli test" }));
+    try {
+      await runCli(srcPath, outPath);
+      expect(existsSync(outPath)).toBe(true);
+      const content = readFileSync(outPath, "utf8");
+      expect(content).toContain("cli test");
+    } finally {
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+
+  test("writes to stdout when no output path given", async () => {
+    const { writeFileSync, mkdirSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_cli2");
+    mkdirSync(fixDir, { recursive: true });
+    const srcPath = join(fixDir, "page.json");
+    writeFileSync(srcPath, JSON.stringify({ tagName: "p", textContent: "stdout output" }));
+    const writeSpy = spyOn(process.stdout, "write");
+    try {
+      await runCli(srcPath);
+      const output = writeSpy.mock.calls.map((c) => c[0]).join("");
+      expect(output).toContain("stdout output");
+    } finally {
+      writeSpy.mockRestore();
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+
+  test("writes module files alongside output for dynamic docs", async () => {
+    const { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_cli3");
+    mkdirSync(fixDir, { recursive: true });
+    const srcPath = join(fixDir, "app.json");
+    const outPath = join(fixDir, "index.html");
+    writeFileSync(
+      srcPath,
+      JSON.stringify({ tagName: "div", state: { $count: 0 }, textContent: "dynamic" }),
+    );
+    try {
+      await runCli(srcPath, outPath);
+      expect(existsSync(outPath)).toBe(true);
+      expect(existsSync(join(fixDir, "app.js"))).toBe(true);
+      const moduleContent = readFileSync(join(fixDir, "app.js"), "utf8");
+      expect(moduleContent).toContain("reactive");
+    } finally {
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+
+  test("writes server handler file when server entries exist", async () => {
+    const { writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_cli4");
+    mkdirSync(fixDir, { recursive: true });
+    const srcPath = join(fixDir, "app.json");
+    const outPath = join(fixDir, "index.html");
+    const handlerPath = join(fixDir, "handler.js");
+    writeFileSync(
+      handlerPath,
+      "export function saveData(ctx) { return ctx.json({ ok: true }); }\n",
+    );
+    writeFileSync(
+      srcPath,
+      JSON.stringify({
+        tagName: "div",
+        state: {
+          $save: {
+            timing: "server",
+            $src: "./handler.js",
+            $export: "saveData",
+          },
+        },
+      }),
+    );
+    try {
+      await runCli(srcPath, outPath);
+      const serverPath = join(fixDir, "index-server.js");
+      expect(existsSync(serverPath)).toBe(true);
+      const serverContent = readFileSync(serverPath, "utf8");
+      expect(serverContent).toContain("saveData");
+    } finally {
+      rmSync(fixDir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects on invalid input", async () => {
+    const { writeFileSync, mkdirSync, rmSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const fixDir = join(import.meta.dir, "_fixtures_cli5");
+    mkdirSync(fixDir, { recursive: true });
+    const srcPath = join(fixDir, "bad.json");
+    writeFileSync(srcPath, "not valid json {{{");
+    try {
+      await expect(runCli(srcPath)).rejects.toThrow();
     } finally {
       rmSync(fixDir, { recursive: true, force: true });
     }

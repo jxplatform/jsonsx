@@ -145,6 +145,15 @@ describe("compileStaticPage", () => {
     expect(html).toContain("World");
   });
 
+  test("handles numeric and boolean children", () => {
+    const doc = {
+      children: [{ tagName: "p", children: [42, true] }],
+    };
+    const { html } = compileStaticPage(doc, baseOpts);
+    expect(html).toContain("42");
+    expect(html).toContain("true");
+  });
+
   test("applies projectStyle to style output", () => {
     const doc = { children: [{ tagName: "p", textContent: "hi" }] };
     const opts = { ...baseOpts, projectStyle: { "--bg": "#000" } };

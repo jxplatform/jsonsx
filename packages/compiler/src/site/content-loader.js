@@ -30,12 +30,13 @@ function parseCSV(csv) {
   /** @type {string[]} */
   const lines = [];
 
-  // Split into rows respecting quoted newlines
+  // Split into rows respecting quoted newlines (preserve raw characters)
   for (let i = 0; i < csv.length; i++) {
     const ch = csv[i];
     if (ch === '"') {
+      current += ch;
       if (inQuotes && csv[i + 1] === '"') {
-        current += '"';
+        current += csv[i + 1];
         i++;
       } else {
         inQuotes = !inQuotes;
