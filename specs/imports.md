@@ -142,7 +142,7 @@ Content collections support `$elements` in their `project.json `collections``, c
 
 ```json
 {
-  "collections": {
+  "contentTypes": {
     "blog": {
       "source": "**/*.md",
       "$elements": ["@shoelace-style/shoelace", { "$ref": "./components/callout.json" }]

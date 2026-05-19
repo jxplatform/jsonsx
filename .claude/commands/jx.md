@@ -83,7 +83,7 @@ A Jx document is a JSON object describing a reactive web component:
 
 ```json
 "userData": { "$prototype": "Request", "url": "/api/users", "method": "GET" },
-"posts": { "$prototype": "ContentCollection", "collection": "blog", "sort": { "field": "pubDate", "order": "desc" } }
+"posts": { "$prototype": "ContentCollection", "contentType": "blog", "sort": { "field": "pubDate", "order": "desc" } }
 ```
 
 ### `$ref` bindings
@@ -217,11 +217,11 @@ Pages are component documents with additional properties:
 
 ```json
 {
-  "$paths": { "collection": "blog", "param": "slug" },
+  "$paths": { "contentType": "blog", "param": "slug" },
   "state": {
     "post": {
       "$prototype": "ContentEntry",
-      "collection": "blog",
+      "contentType": "blog",
       "id": { "$ref": "#/$params/slug" }
     }
   }
@@ -261,7 +261,7 @@ Layouts wrap page content. Use `{ "tagName": "slot" }` for the page content inse
   "imports": { "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json" },
   "$media": { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
   "style": { "fontFamily": "system-ui, sans-serif", "margin": "0" },
-  "collections": {
+  "contentTypes": {
     "blog": {
       "source": "./blog/**/*.md",
       "schema": { "type": "object", "properties": { "title": { "type": "string" } }, "required": ["title"] }

@@ -77,7 +77,7 @@ Define collections in `content/content.config.json` with JSON Schema validation:
 
 ```json
 {
-  "collections": {
+  "contentTypes": {
     "blog": {
       "source": "./blog/**/*.md",
       "schema": {
@@ -100,7 +100,7 @@ Query collections in pages via `$prototype`:
   "state": {
     "posts": {
       "$prototype": "ContentCollection",
-      "collection": "blog",
+      "contentType": "blog",
       "sort": { "field": "pubDate", "order": "desc" }
     }
   }

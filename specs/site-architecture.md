@@ -272,14 +272,14 @@ A dynamic page must declare which paths it generates. This is done via a top-lev
 {
   "$layout": "./layouts/blog-post.json",
   "$paths": {
-    "collection": "blog",
+    "contentType": "blog",
     "param": "slug",
     "field": "id"
   },
   "state": {
     "post": {
       "$prototype": "ContentEntry",
-      "collection": "blog",
+      "contentType": "blog",
       "id": { "$ref": "#/$params/slug" }
     }
   },
@@ -300,7 +300,7 @@ A dynamic page must declare which paths it generates. This is done via a top-lev
 
 ```json
 // From a content collection — one page per entry
-{ "collection": "blog", "param": "slug", "field": "id" }
+{ "contentType": "blog", "param": "slug", "field": "id" }
 
 // Explicit list
 { "values": ["en", "fr", "de"], "param": "lang" }
@@ -503,7 +503,7 @@ Collections are defined in `the `collections` key in project.json`:
 ```json
 {
   "$schema": "https://jxsuite.com/schema/project/v1",
-  "collections": {
+  "contentTypes": {
     "blog": {
       "source": "./blog/**/*.md",
       "schema": {
@@ -599,7 +599,7 @@ Pages access collection data via state entries with `$prototype: "ContentCollect
   "state": {
     "posts": {
       "$prototype": "ContentCollection",
-      "collection": "blog",
+      "contentType": "blog",
       "filter": { "draft": false },
       "sort": { "field": "pubDate", "order": "desc" },
       "limit": 10
@@ -638,7 +638,7 @@ Pages access collection data via state entries with `$prototype: "ContentCollect
   "state": {
     "post": {
       "$prototype": "ContentEntry",
-      "collection": "blog",
+      "contentType": "blog",
       "id": { "$ref": "#/$params/slug" }
     }
   }
