@@ -72,6 +72,24 @@ export interface PackageInfo {
   version: string;
 }
 
+// ─── Update types ────────────────────────────────────────────────────────────
+
+export interface UpdateLocalInfo {
+  version: string;
+  hash: string;
+  baseUrl: string;
+  channel: string;
+  name: string;
+  identifier: string;
+}
+
+export interface UpdateStatus {
+  version: string | null;
+  updateAvailable: boolean;
+  updateReady: boolean;
+  error: string | null;
+}
+
 // ─── RPC Schema ───────────────────────────────────────────────────────────────
 
 export type StudioRPC = {
@@ -195,6 +213,27 @@ export type StudioRPC = {
         params: void;
         response: PackageInfo[];
       };
+      // Updates
+      updaterGetLocalInfo: {
+        params: void;
+        response: UpdateLocalInfo;
+      };
+      updaterCheckForUpdate: {
+        params: void;
+        response: UpdateStatus;
+      };
+      updaterDownloadUpdate: {
+        params: void;
+        response: UpdateStatus;
+      };
+      updaterApplyUpdate: {
+        params: void;
+        response: void;
+      };
+      updaterGetStatus: {
+        params: void;
+        response: UpdateStatus;
+      };
     };
     messages: {};
   }>;
@@ -202,6 +241,7 @@ export type StudioRPC = {
     requests: {};
     messages: {
       fileChanged: { path: string };
+      updateReady: { version: string };
     };
   }>;
 };

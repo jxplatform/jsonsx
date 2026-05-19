@@ -33,6 +33,15 @@ import {
   gitDiscard,
 } from "./git";
 import { addPackage, removePackage, listPackages } from "./packages";
+import {
+  getLocalInfo,
+  checkForUpdate,
+  downloadUpdate,
+  applyUpdate,
+  getStatus,
+  startBackgroundChecks,
+  setNotifyWebview,
+} from "./updater";
 import { init as initUtils, openFileDialog } from "./utils";
 
 // ─── Determine project root ───────────────────────────────────────────────────
@@ -78,6 +87,11 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       addPackage: (params) => addPackage(params),
       removePackage: (params) => removePackage(params),
       listPackages: () => listPackages(),
+      updaterGetLocalInfo: () => getLocalInfo(),
+      updaterCheckForUpdate: () => checkForUpdate(),
+      updaterDownloadUpdate: () => downloadUpdate(),
+      updaterApplyUpdate: () => applyUpdate(),
+      updaterGetStatus: () => getStatus(),
     },
     messages: {},
   },
@@ -92,3 +106,6 @@ new BrowserWindow({
   navigationRules: "views://*,^*",
   rpc,
 });
+
+startBackgroundChecks();
+setNotifyWebview((version) => rpc.send.updateReady({ version }));

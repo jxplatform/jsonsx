@@ -58,6 +58,7 @@
     "@spectrum-web-components/tabs": "^1.12.1",
     "@spectrum-web-components/textfield": "^1.12.1",
     "@spectrum-web-components/theme": "^1.12.1",
+    "@spectrum-web-components/toast": "^1.12.1",
     "@spectrum-web-components/tooltip": "^1.12.1",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",

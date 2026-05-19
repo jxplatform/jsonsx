@@ -10,6 +10,9 @@ export function createDesktopPlatform() {
         fileChanged: (payload) => {
           console.log("[desktop] File changed:", payload.path);
         },
+        updateReady: (payload) => {
+          showUpdateToast(payload.version, rpc);
+        },
       },
     },
   });
@@ -161,4 +164,24 @@ export function createDesktopPlatform() {
       return rpc.request.listPackages();
     },
   };
+}
+
+function showUpdateToast(version: string, rpc: any) {
+  const toast = document.createElement("sp-toast") as any;
+  toast.open = true;
+  toast.variant = "info";
+  toast.textContent = `Version ${version} is ready`;
+
+  const btn = document.createElement("sp-button");
+  btn.setAttribute("slot", "action");
+  btn.setAttribute("variant", "overBackground");
+  btn.textContent = "Restart to update";
+  btn.addEventListener("click", () => {
+    rpc.request.updaterApplyUpdate();
+  });
+
+  toast.appendChild(btn);
+  toast.style.cssText =
+    "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999";
+  document.body.appendChild(toast);
 }

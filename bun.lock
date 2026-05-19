@@ -31,7 +31,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "bin": {
         "jx": "./src/cli.js",
       },
@@ -50,7 +50,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "@jxsuite/studio": "workspace:^",
         "dbus-ts": "^0.0.7",
@@ -62,7 +62,7 @@
     },
     "packages/parser": {
       "name": "@jxsuite/parser",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "glob": "^13.0.6",
         "hast-util-from-html": "^2.0.3",
@@ -84,7 +84,7 @@
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "@vue/reactivity": "^3.5.34",
       },
@@ -94,7 +94,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "@webref/css": "^8.5.6",
         "@webref/elements": "^2.7.1",
@@ -103,14 +103,14 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "chokidar": "^5.0.0",
       },
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "0.10.1",
+      "version": "0.10.2",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
@@ -142,6 +142,7 @@
         "@spectrum-web-components/tabs": "^1.12.1",
         "@spectrum-web-components/textfield": "^1.12.1",
         "@spectrum-web-components/theme": "^1.12.1",
+        "@spectrum-web-components/toast": "^1.12.1",
         "@spectrum-web-components/tooltip": "^1.12.1",
         "lit-html": "^3.3.3",
         "monaco-editor": "^0.55.1",
@@ -558,6 +559,8 @@
     "@spectrum-web-components/textfield": ["@spectrum-web-components/textfield@1.12.1", "", { "dependencies": { "@spectrum-web-components/base": "1.12.1", "@spectrum-web-components/help-text": "1.12.1", "@spectrum-web-components/icon": "1.12.1", "@spectrum-web-components/icons-ui": "1.12.1", "@spectrum-web-components/icons-workflow": "1.12.1", "@spectrum-web-components/overlay": "1.12.1", "@spectrum-web-components/shared": "1.12.1", "@spectrum-web-components/tooltip": "1.12.1" } }, "sha512-JrXuUUasMbqDGXomkr+QIRsShWDlgINdlWG6qzW7dmhzSaN0IGtBj+tNZH8fHdNvIocLAyDsKyC01bB3o2iuUw=="],
 
     "@spectrum-web-components/theme": ["@spectrum-web-components/theme@1.12.1", "", { "dependencies": { "@spectrum-web-components/base": "1.12.1", "@spectrum-web-components/styles": "1.12.1" } }, "sha512-zM83OQi3KcAjgvl+4A2JL3wBpdtVCB3v+zvH3MX3P11KJmPzjoUyTTQ/BnrpTWVOI7KB/ExgvUxQi3i7T2sXmQ=="],
+
+    "@spectrum-web-components/toast": ["@spectrum-web-components/toast@1.12.1", "", { "dependencies": { "@spectrum-web-components/base": "1.12.1", "@spectrum-web-components/button": "1.12.1", "@spectrum-web-components/icon": "1.12.1", "@spectrum-web-components/icons-workflow": "1.12.1", "@spectrum-web-components/shared": "1.12.1" } }, "sha512-136XWhbimpMG027zMG6UrZtVMUmSxsvw7F0T57qh6YsQtq4XRFRJP2LlOjmwo9YlaLG5ymYuARKp+wAzlQrB8A=="],
 
     "@spectrum-web-components/tooltip": ["@spectrum-web-components/tooltip@1.12.1", "", { "dependencies": { "@spectrum-web-components/base": "1.12.1", "@spectrum-web-components/overlay": "1.12.1", "@spectrum-web-components/reactive-controllers": "1.12.1", "@spectrum-web-components/shared": "1.12.1" } }, "sha512-KaU4ZkVeNdaO9qVy43imK49dwuAiCe3gzXIBgZIv8teUo7lf6uFYBKp5lxdFd8cxJXunZgGn5wRCg1SOb6TmZg=="],
 

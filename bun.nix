@@ -774,6 +774,10 @@
     url = "https://registry.npmjs.org/@spectrum-web-components/theme/-/theme-1.12.1.tgz";
     hash = "sha512-zM83OQi3KcAjgvl+4A2JL3wBpdtVCB3v+zvH3MX3P11KJmPzjoUyTTQ/BnrpTWVOI7KB/ExgvUxQi3i7T2sXmQ==";
   };
+  "@spectrum-web-components/toast@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/toast/-/toast-1.12.1.tgz";
+    hash = "sha512-136XWhbimpMG027zMG6UrZtVMUmSxsvw7F0T57qh6YsQtq4XRFRJP2LlOjmwo9YlaLG5ymYuARKp+wAzlQrB8A==";
+  };
   "@spectrum-web-components/tooltip@1.12.1" = fetchurl {
     url = "https://registry.npmjs.org/@spectrum-web-components/tooltip/-/tooltip-1.12.1.tgz";
     hash = "sha512-KaU4ZkVeNdaO9qVy43imK49dwuAiCe3gzXIBgZIv8teUo7lf6uFYBKp5lxdFd8cxJXunZgGn5wRCg1SOb6TmZg==";
