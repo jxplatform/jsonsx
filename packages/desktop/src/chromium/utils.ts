@@ -13,12 +13,13 @@ export async function openFileDialog(): Promise<string | null> {
     const handleToken = `bun_${Math.random().toString(36).substring(2, 11)}`;
 
     const options = [
-      ["directory", ["b", true]],
+      ["directory", ["b", false]],
       ["modal", ["b", true]],
       ["handle_token", ["s", handleToken]],
+      ["filters", ["a(sa(us))", [["Project files", [[0, "*.json"]]]]]],
     ];
 
-    const [handle] = await portal.OpenFile("", "Select Project", options);
+    const [handle] = await portal.OpenFile("", "Open project.json", options);
 
     const result = await new Promise<string | null>((resolve) => {
       const timeout = setTimeout(() => resolve(null), 60_000);

@@ -38,17 +38,17 @@ function assertUnderRoot(absPath: string, root: string) {
 
 export async function openProject(): Promise<OpenProjectResult | null> {
   if (!fileDialogFn) throw new Error("No file dialog configured");
-  const dirPath = await fileDialogFn();
-  if (!dirPath) return null;
+  const selectedPath = await fileDialogFn();
+  if (!selectedPath) return null;
 
-  const filePath = resolve(dirPath, "project.json");
-  if (!existsSync(filePath)) {
-    throw new Error("No project.json found in selected directory");
+  const filePath = resolve(selectedPath);
+  if (!existsSync(filePath) || basename(filePath) !== "project.json") {
+    throw new Error("Selected file is not a project.json");
   }
 
   const raw = await readFile(filePath, "utf8");
   const config = JSON.parse(raw);
-  projectRoot = dirPath;
+  projectRoot = dirname(filePath);
 
   return {
     config,

@@ -324,7 +324,7 @@ export function renderStylebookOverlays() {
   }
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
+// ─── Internal helpers (exported for testing) ─────────────────────────────────
 
 /**
  * Build a DOM element tree from a stylebook-meta.json entry.
@@ -333,7 +333,7 @@ export function renderStylebookOverlays() {
  * @param {any} rootStyle
  * @param {any} activeBreakpoints
  */
-function buildStylebookElement(entry, rootStyle, activeBreakpoints) {
+export function buildStylebookElement(entry, rootStyle, activeBreakpoints) {
   const el = document.createElement(entry.tag);
   if (entry.text) el.textContent = entry.text;
   if (entry.attributes) {
