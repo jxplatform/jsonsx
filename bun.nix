@@ -590,121 +590,121 @@
     url = "https://registry.npmjs.org/@simple-libs/stream-utils/-/stream-utils-1.2.0.tgz";
     hash = "sha512-KxXvfapcixpz6rVEB6HPjOUZT22yN6v0vI0urQSk1L8MlEWPDFCZkhw2xmkyoTGYeFw7tWTZd7e3lVzRZRN/EA==";
   };
-  "@spectrum-web-components/accordion@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/accordion/-/accordion-1.12.0.tgz";
-    hash = "sha512-BuDqNCtqyXW3kZqEkYNOLhi3MyomXFrIVLTzfmQUWk+1cx7Ikmz6TXc70GM7B9oP4FKqQS6thU3Isil6mPxRHw==";
+  "@spectrum-web-components/accordion@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/accordion/-/accordion-1.12.1.tgz";
+    hash = "sha512-nij6JCHM0IoRpCXW7Q11lIlZe5abIXobmuJxj7VOj9sQ9N0JFoeutDa7xuFl0SBB0rK/pn7T6j8B8vomWex80A==";
   };
-  "@spectrum-web-components/action-bar@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/action-bar/-/action-bar-1.12.0.tgz";
-    hash = "sha512-QvtW1LDqyilTRmQNALXuNqfBkrI05RF0p3gT7PlqqXqvdOSrwCS+2Jn8lofexxmm9+K3UeNpSPS7U+D8N8Onlg==";
+  "@spectrum-web-components/action-bar@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/action-bar/-/action-bar-1.12.1.tgz";
+    hash = "sha512-iLYg6xTehmVyyzpsNURabFetICbD/3NXtlSEa+QGXsy7zyMqNbUI5XCOhH2rmSNd7Cdqt6QB6onAFEqJZcgWuQ==";
   };
-  "@spectrum-web-components/action-button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/action-button/-/action-button-1.12.0.tgz";
-    hash = "sha512-JBjTbIqY9Tm1I5j9yUErn75GjQjQhWnbRyXHypYwMQdo5g71VCMeaD0IdggPhccs7UIO9i+Lahr9/YoU2K//VQ==";
+  "@spectrum-web-components/action-button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/action-button/-/action-button-1.12.1.tgz";
+    hash = "sha512-4NbPodLkW2C7a6Tz9r7YdFzqhKbL5yV/Tt5GFnPRVfvexawLrlAgTN7odBtaGCVDPH+HAA7bYy/eygR7uNSQ+A==";
   };
-  "@spectrum-web-components/action-group@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/action-group/-/action-group-1.12.0.tgz";
-    hash = "sha512-9esw0NYUIhT/X1jzemUTF+qNfUabQzbYHWvhKUOECFnrrmlczqK/KQQtxJMbUX3cbnVeizlzlz5k+g5qmM5Zjw==";
+  "@spectrum-web-components/action-group@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/action-group/-/action-group-1.12.1.tgz";
+    hash = "sha512-d6A4mScFyaR1c9vs6EEbV+CR8Q149fTrmn4KwOMR4JZTUdpyQ1tmDOe117RR9q98LsqW5fmqKdseFf2OO6jT2Q==";
   };
-  "@spectrum-web-components/alert-dialog@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/alert-dialog/-/alert-dialog-1.12.0.tgz";
-    hash = "sha512-ZTHW8OoF3gF0v6esNGJrNNNAV0Hvhb/LYfsYYJYOTqpRdC8RzVZjkFfqpDzKTIcLDq8yMPlojM0nfU1r0JBEEA==";
+  "@spectrum-web-components/alert-dialog@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/alert-dialog/-/alert-dialog-1.12.1.tgz";
+    hash = "sha512-dFNsgv0RJCu0+T/w5Di1fj3ecMqXg/PpcESzv7jlq/j6b9/a2MGecYj4o9NqY5eh2sBlGFqIfFOoHLT/Eb1NHw==";
   };
-  "@spectrum-web-components/base@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/base/-/base-1.12.0.tgz";
-    hash = "sha512-Wvt3PBfdPwzqnVXOfpnv8o7kzPbAAC4aCyx5Y+ordGnC/EeWi5kmzPgyusaERFsnbZPHaG264XHsKNKr+6OnUQ==";
+  "@spectrum-web-components/base@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/base/-/base-1.12.1.tgz";
+    hash = "sha512-/RYwUI/kI5Gxbp4yn7xi9UTtmx9vLdA6i786cig4QpRJflEszykURIOg1VZO24/vE2etuLhyS3ZPJmp4fB7Wgw==";
   };
-  "@spectrum-web-components/button-group@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/button-group/-/button-group-1.12.0.tgz";
-    hash = "sha512-vTc2bt0TKkQJn9V8P7qMos36k7a9st850FY/pB26ulhaH176ncmZg27U0CD4PQse+yFh4y5PJyaBaoawQi/vFQ==";
+  "@spectrum-web-components/button-group@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/button-group/-/button-group-1.12.1.tgz";
+    hash = "sha512-KH14vRLm1Aa0LCfDYVN86E/ap6bSDagleZsHW/18WFwQKTfBnkVgY5bypMivjtWsE1D79poSO+eo64kpSeukjA==";
   };
-  "@spectrum-web-components/button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/button/-/button-1.12.0.tgz";
-    hash = "sha512-P/kR7fJakaVOHtIprSA5XCtMUOyyPZwcyVZu/8Ia48GEov5zzdqPV0utoJjwbQEMotxuQPZq0e23CHrlTTp9Pg==";
+  "@spectrum-web-components/button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/button/-/button-1.12.1.tgz";
+    hash = "sha512-+SXo3bnGZsSCNA77mS2+Xfu26KQQTJD1jjcbNGkPwqVFKTLzKSfpGINY4gEiefVSIDotH1m/W+5Hb+t5ahdW9w==";
   };
-  "@spectrum-web-components/checkbox@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/checkbox/-/checkbox-1.12.0.tgz";
-    hash = "sha512-EplB6BBTG7wJgtMKclekouZ6G4ODU8Touqg0fLJl44+CpuHx/PuQaCk62LV9NQEZgxn7KSAUbEKKoQKATBP6ow==";
+  "@spectrum-web-components/checkbox@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/checkbox/-/checkbox-1.12.1.tgz";
+    hash = "sha512-o5zqSp/C033Lp2Ha6OIUIJupQMRw1exXxn75NbQPOLZuPIuE25jddnct3XJoizHgyAP7or7GPP50yiC9tbIODw==";
   };
-  "@spectrum-web-components/clear-button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/clear-button/-/clear-button-1.12.0.tgz";
-    hash = "sha512-JeTxqe/wMX3BR8g5Pe2llGFFFl5n+R6rhvKcC5yFMtiryupJLM/t3D0VeeIGpS6JgBcfyga7Aw4BZvfPxgLXVQ==";
+  "@spectrum-web-components/clear-button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/clear-button/-/clear-button-1.12.1.tgz";
+    hash = "sha512-1WqHjfyWaGYY2hqSdkilVYxvnstcIYEnIPw7P+0LW+vfKMrMCVcYWcAPiszgVOBAA3IQqXIjlD+wOAWWpJpY1w==";
   };
-  "@spectrum-web-components/close-button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/close-button/-/close-button-1.12.0.tgz";
-    hash = "sha512-RV4RYyrb3ifC6Z8rawEHS485MCLfmVeDFpwr1WDtNXssrZDAenzgfv/9z1ET379fhR2IyrciwD/BLUJQlEW4QA==";
+  "@spectrum-web-components/close-button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/close-button/-/close-button-1.12.1.tgz";
+    hash = "sha512-TjUWXrWA9Ewfu2XXaWmBAuyRiyPz5gz4Gw+4B6vyxJJUyMj9JFRhTn0HgD5wJfPd1nx/9PxwktgSkipbjH1MVQ==";
   };
-  "@spectrum-web-components/color-area@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/color-area/-/color-area-1.12.0.tgz";
-    hash = "sha512-CxcGPyhjmSD1tj0blzYOgf2wqos8sjBRQ+WIUzOuCbxEsyyQDXY00wTt+jHPbs04ic0ejKbD80V9bmmohUXLCw==";
+  "@spectrum-web-components/color-area@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/color-area/-/color-area-1.12.1.tgz";
+    hash = "sha512-/M/JzixlvBtnB5JQ0szMKcrrrqddlDbGfaLAG5J9Z+m7mtCcqAQqKM4UNyjohJHuwP4w9jFG5e9xRKaUaCbRGg==";
   };
-  "@spectrum-web-components/color-handle@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/color-handle/-/color-handle-1.12.0.tgz";
-    hash = "sha512-njIhUYCRbrrhUDQ5xEhJVEbnFJWaZRKDQjaU9Z6D6sbMQWTuqa0zRfuYE+w01+1K1m4dBkUkb/oSIOB4FaKvIQ==";
+  "@spectrum-web-components/color-handle@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/color-handle/-/color-handle-1.12.1.tgz";
+    hash = "sha512-nIeKDPIih+61dvOH1oH8HrRBhPUwbPukQkUuVhTufqlq+Tgpha8YpKMSh7CMCB3ptHgazpr13AeAe3SWGwdZ/g==";
   };
-  "@spectrum-web-components/color-loupe@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/color-loupe/-/color-loupe-1.12.0.tgz";
-    hash = "sha512-YXWGaKUaDzFfKO1raHpNnzARrlxkmNc1IGiaEO2H/drhNjZ2pHbIsd46Btkoa07nhGL8RcsrjBmkLPbSH7pAvg==";
+  "@spectrum-web-components/color-loupe@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/color-loupe/-/color-loupe-1.12.1.tgz";
+    hash = "sha512-5dvgALVy9cHSvcNVhZgrtrH8JkZchMX83SvkrhK6i05NWpWdyYEwFjRR5Y3mF/hBvHvWGOZkpFR+7Af78rqW/A==";
   };
-  "@spectrum-web-components/color-slider@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/color-slider/-/color-slider-1.12.0.tgz";
-    hash = "sha512-9b6cOxhaMlv8QJl+AcuFprGpB3cvBxG489fduBIQO7hofL4XbvpKhYSly+zItjQI8BD+nlGuBaxP8rSKZYvZTw==";
+  "@spectrum-web-components/color-slider@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/color-slider/-/color-slider-1.12.1.tgz";
+    hash = "sha512-TjrMOJcTrgfi5llkK6QJFt8T45ED3VyLXCLbIP/5v0pZRqlhbCYkXCPa9fFfO3rCBcPwprKitPHnxbWefViCrA==";
   };
-  "@spectrum-web-components/combobox@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/combobox/-/combobox-1.12.0.tgz";
-    hash = "sha512-7DIeMaWHOgQXqknkXPsbUK12kzr1cFj71bFFS6Yr3tPoZpJFl/fJoRSc354TOJ3mJ6GYYukPzPPcqWKvFCoHsA==";
+  "@spectrum-web-components/combobox@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/combobox/-/combobox-1.12.1.tgz";
+    hash = "sha512-delHWKBR7+1TerSloA2YYN1KIGwOzWvmzpdZXkaH07dVFZAbMI5L8LsBvYuGKJ60MDqEafWsg6MK/SdFXFlb7Q==";
   };
-  "@spectrum-web-components/dialog@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/dialog/-/dialog-1.12.0.tgz";
-    hash = "sha512-L3ATskdMcG/+AI67JTRFHkLpN7qnjPhnkrPWF3E7tndAFnllVk/CwJJATv3mpHIOw/dMaziGzkXIhuE6CEEPjQ==";
+  "@spectrum-web-components/dialog@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/dialog/-/dialog-1.12.1.tgz";
+    hash = "sha512-PWHniK0zl4Bw/IuHrrzGRRlixZNioeU1TksuFULFOdhjZdjdeGhuLLBG57VFoGjjS45sKQO9mctWIEE+z/c+4Q==";
   };
-  "@spectrum-web-components/divider@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/divider/-/divider-1.12.0.tgz";
-    hash = "sha512-uILZwZPIskqZNi0fwr9Z4T195zdUqSA4lF+7Uv33B9HUTPTaf4BWPR0TlKnvO3MGzUsWlSZM7fFSkfrv6Qjvtw==";
+  "@spectrum-web-components/divider@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/divider/-/divider-1.12.1.tgz";
+    hash = "sha512-h//ZlDNYLvhgAXn7HT5z6ZDxdv1zBumMiLC6+733y1JrU70oBadneBtB8DjsOTEyEY/mMW54G9T0r/rRtgGbew==";
   };
-  "@spectrum-web-components/field-label@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/field-label/-/field-label-1.12.0.tgz";
-    hash = "sha512-yo/CqHcITd+eDvd9LOH1JyTSUkeQokzQjbCFQD1yzAE7xzi5Yr2vTcyhJ10kSXEzGQbyt4u5bQ2J2rbA80jr3A==";
+  "@spectrum-web-components/field-label@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/field-label/-/field-label-1.12.1.tgz";
+    hash = "sha512-LW/3o0MBOWAkVqV49qAH/dGLRKYVkoePKxyUfwZpxseJc+2eef33kNs0rvHiLxppBSqstU3EAfiSl908NmXq9A==";
   };
-  "@spectrum-web-components/help-text@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/help-text/-/help-text-1.12.0.tgz";
-    hash = "sha512-97uthOXMC205WbY8B6XY/tLG7h9+p9hDBsWBRn6hwDcmFledNE4qBPeJnq1yLSSEPANYSNHNxEtOGnxBiF6iHg==";
+  "@spectrum-web-components/help-text@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/help-text/-/help-text-1.12.1.tgz";
+    hash = "sha512-pNZZsiK8IPHNs+esZan3C5Jx5ElZqm/2nk7KbwseXMx4VZ2mCXs3YpeUESfHKOwmAeiF4mZ90Kql/krqoANCLw==";
   };
-  "@spectrum-web-components/icon@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/icon/-/icon-1.12.0.tgz";
-    hash = "sha512-1fPT3ip0VlEARQT4KN8hFwchLnQ5fXo7Dtpduj8y/vWVPWKl6cYS45yqAWMAvVK4dZqDjP0z5zPDsi0MuZaC3g==";
+  "@spectrum-web-components/icon@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/icon/-/icon-1.12.1.tgz";
+    hash = "sha512-HsejJl/69L4eINRkuTUd/x9MeYKQN88UEXc3qBvgbfW4K0SUxZsu2dXVVfKVJUAqBnLZE6x4tIuXY8i2sT8JaA==";
   };
-  "@spectrum-web-components/icons-ui@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/icons-ui/-/icons-ui-1.12.0.tgz";
-    hash = "sha512-Tg/159xoMz9hqkBTK4iNJr0PrZuKViUFIm2jPGQZJUKAbGL7tpd29RuRC6gyuxR6VI9AK5PPwxDZLMH3bAoS8Q==";
+  "@spectrum-web-components/icons-ui@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/icons-ui/-/icons-ui-1.12.1.tgz";
+    hash = "sha512-3j/hzzl4uWrs80oseGBCCijCBO/3sMKcdlLe1ObET4A0vd1+HIeI/9NZ3qBR9Bhsu1IrCReU2GpydcNab+ok7A==";
   };
-  "@spectrum-web-components/icons-workflow@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/icons-workflow/-/icons-workflow-1.12.0.tgz";
-    hash = "sha512-jwnj/4W2P/t5Zroz5wB0qwSZjgLanEfJ2nIUaHSGYb/uoiANxIZ+IuVhCq+/ivQoi9mpxGipoMeeqQSPaU1zNw==";
+  "@spectrum-web-components/icons-workflow@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/icons-workflow/-/icons-workflow-1.12.1.tgz";
+    hash = "sha512-VyDUKFnvgawwvKy+9WWjkJNzXEC9pxAbqnDdEMM4dkByiTWhX1QXkTAZaNZlX+vZagnJ9n0oyh+AywFtyUtE/Q==";
   };
-  "@spectrum-web-components/iconset@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/iconset/-/iconset-1.12.0.tgz";
-    hash = "sha512-Stx7FRo5xBtbHqCb3n40DfiLEgM1A5FuT2ZRlBeegIgRJ3NO9m/NlnUbMpNkdDmssVNU5BZy/RhNEmkYbCuywQ==";
+  "@spectrum-web-components/iconset@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/iconset/-/iconset-1.12.1.tgz";
+    hash = "sha512-z8Ja7CEHrJM1VQF3JiFpB9i7zXLCYQqgm+xCR32GSFCCqhWZIqkTqiFlVAdt1e+gEpkv09KVHGaKWvzMBznhcg==";
   };
-  "@spectrum-web-components/infield-button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/infield-button/-/infield-button-1.12.0.tgz";
-    hash = "sha512-juoRgUxZsHc4JtTlFdIRIxPgPUMkIqyXG54Ls9u67v0a83W/JO0/pQMfPJmo126qRYIEFxuK16M3uA/eZzY/ZQ==";
+  "@spectrum-web-components/infield-button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/infield-button/-/infield-button-1.12.1.tgz";
+    hash = "sha512-rWvJ8dOlE+VznpnqrX9wIQdcs+sMBzQG7ivnOZcsKiOmSIqlzcd0js5auyrIUehw6/1xlyjn0UKQv8nKYSi2SQ==";
   };
-  "@spectrum-web-components/menu@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/menu/-/menu-1.12.0.tgz";
-    hash = "sha512-4TV0ndC09FTjXgir+y1vuHG3MH7TghETbQYLakPjygVvEMQzzPdSmY0c+ATUQGpgDvNlsluOtei+KfEaUOgsCw==";
+  "@spectrum-web-components/menu@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/menu/-/menu-1.12.1.tgz";
+    hash = "sha512-0ZNlXrMPs7b9+iNADkKDP4aKE8CRfuWp0yYJVirao653qJO6+iFLQKizOWzkCAVEPXHs+kA2O/1EfaiY+VDb2Q==";
   };
-  "@spectrum-web-components/modal@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/modal/-/modal-1.12.0.tgz";
-    hash = "sha512-RJ+nYiyzrgPBiHYNzSz5CMUkio4cQRc2KCkRBSdDGK20kIMishw2IdlhfsxYpaQCvrVAGNEpFCY6KJTpiajOQw==";
+  "@spectrum-web-components/modal@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/modal/-/modal-1.12.1.tgz";
+    hash = "sha512-J2LHMVydOuSW2E9yDGRkO1BFZv80NlJ3vM5/Jd+n5OlncUnBHC+nZxgudzLSvjxgcM1tDbq11gfjQUUDT5i3hQ==";
   };
-  "@spectrum-web-components/number-field@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/number-field/-/number-field-1.12.0.tgz";
-    hash = "sha512-UUGd7J70s5/ui7Lm98DhPymnEHDTvSIKn5b5ocMe2gVPV6uUIbxVrfTgRC4CCJ+kfXxC2C6QmEPEEn6RsRKNcw==";
+  "@spectrum-web-components/number-field@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/number-field/-/number-field-1.12.1.tgz";
+    hash = "sha512-eJuDDC8/DRGTQwpn66xg8dwUi2IxlgXMQjUzXjKEMaoA+6rmDl9xy1ANVV8/3EuVXN4cguF+H8InsJoW1XatOw==";
   };
-  "@spectrum-web-components/opacity-checkerboard@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/opacity-checkerboard/-/opacity-checkerboard-1.12.0.tgz";
-    hash = "sha512-/qf/ET7734prjuGU1MjryybENSneTvPFQ24dIjt9TedxxBjA2E8ZSZPd/Y8Q202ve7jq4fivn1NsPhleoPNSeQ==";
+  "@spectrum-web-components/opacity-checkerboard@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/opacity-checkerboard/-/opacity-checkerboard-1.12.1.tgz";
+    hash = "sha512-v3BPCqkT/ZXnGe1gsiBj4iBXrCGc1BUwFOADGHFJFrDyHLmyd+6hKNwJNJQLEOsfQfMlckv3IJCsXkjsfaD1dg==";
   };
   "@spectrum-web-components/overlay-root@0.1.7" = fetchurl {
     url = "https://registry.npmjs.org/@spectrum-web-components/overlay-root/-/overlay-root-0.1.7.tgz";
@@ -714,77 +714,77 @@
     url = "https://registry.npmjs.org/@spectrum-web-components/overlay-trigger/-/overlay-trigger-0.1.7.tgz";
     hash = "sha512-HbwL6JsUw7HghMQtTM51URyNZQfehff1kh/qhkCbBNW13/0C25idWL3+GWgNjTTgUqe9wJ4UjRHTRhS6AX0y+Q==";
   };
-  "@spectrum-web-components/overlay@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/overlay/-/overlay-1.12.0.tgz";
-    hash = "sha512-9QcTo5KDfSElq/RiQKMA3y3HL1Zw1kezcSWgR/9qAEaH1PM2Q6N89FibVav0e3Rci+QDAj2FjWmuGm6l+uMI+g==";
+  "@spectrum-web-components/overlay@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/overlay/-/overlay-1.12.1.tgz";
+    hash = "sha512-2KQUolmfMVyUMjxVZi2GWjEINaWZsCMnnvK8BV6gpY8G12XUt6uBfP5ubitWiqCXuzWmN1fDEbFdPv1G1c6l2g==";
   };
-  "@spectrum-web-components/picker-button@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/picker-button/-/picker-button-1.12.0.tgz";
-    hash = "sha512-ZojmJLWt6iV3vSDsYzY6chFC60UnNiTfOfY6OkcSCkJWzQmpRxeGbtHinxnixJSUYpVkxvg6u013gFyanVvrmQ==";
+  "@spectrum-web-components/picker-button@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/picker-button/-/picker-button-1.12.1.tgz";
+    hash = "sha512-r70rsSuZ+lrj34MH+dz2E/vr8y2PhX3B1PV3xp1psm1mE7sU944/tsV7kvnDKtUqhdcR/liSYYzjdQsRT0FzUQ==";
   };
-  "@spectrum-web-components/picker@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/picker/-/picker-1.12.0.tgz";
-    hash = "sha512-w+CWVrI2g3nBTtqQ+77yZrbdgOToww3JPc7/7GjVNIovMJ0b0//ilTlY3I5E6eWHncifR8Zeen2VpOFOrnWZeg==";
+  "@spectrum-web-components/picker@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/picker/-/picker-1.12.1.tgz";
+    hash = "sha512-woO6n9x3NDhPnRephHhVtaJllDq3Jq0qjjtkRW9iijTw5c3GtxDHsWv/OcdxNHMXgqrMhT4IDGA4nrYpjaJ+jw==";
   };
-  "@spectrum-web-components/popover@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/popover/-/popover-1.12.0.tgz";
-    hash = "sha512-nnHOETMuq2DayZPZMn3wEBRHHovAq7exNAv/XW/YJTOa5JI4ZljrYe8dKS3NI8EE0Q7jUi8PMnyme4pbmGhy7Q==";
+  "@spectrum-web-components/popover@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/popover/-/popover-1.12.1.tgz";
+    hash = "sha512-Z+/bXO5zq75h5m/phSzEIYx/lAX09WQxMs/SKgE58cjR0BIdJKT4CIodzlbNW0MXI8bcxqhdWa0suHdEtC/VJQ==";
   };
-  "@spectrum-web-components/progress-circle@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/progress-circle/-/progress-circle-1.12.0.tgz";
-    hash = "sha512-5zM/hpWFph1ayvdrAnHUjI51/n3SBgxnPCm+fSxTiugEaZMFd8DXuAiUhv8Tsa31mlTYz1Hg+wsl0ZUvfANFEA==";
+  "@spectrum-web-components/progress-circle@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/progress-circle/-/progress-circle-1.12.1.tgz";
+    hash = "sha512-VS9KaexgkM8ZGTrOsR41FFIhtNtB+TzfrxbcGIh4yDAV1KhqhFyo0BnHNtIZFdqaLfjL4recNCRd9g7jqfEaTA==";
   };
-  "@spectrum-web-components/reactive-controllers@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/reactive-controllers/-/reactive-controllers-1.12.0.tgz";
-    hash = "sha512-GAZDepIfH96D5Tdzxlcl0Czummt+i6QGuQljTA+3fQvuHylQt+pWha1bTBRCqrTTaUVzLi+AwmmJF5quZO4kFQ==";
+  "@spectrum-web-components/reactive-controllers@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/reactive-controllers/-/reactive-controllers-1.12.1.tgz";
+    hash = "sha512-yhyhl9A8qYpSxlGHrzTRPMhIC1mybtleNaRMbe1V4kldVRAT2d7iSptKX4Qe04QuXzLrx0s4vf/XeGOSXdRHNQ==";
   };
-  "@spectrum-web-components/search@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/search/-/search-1.12.0.tgz";
-    hash = "sha512-kq3S2ixfqlQ58M6n7WR4yda5Ifhkpm/qdMJy16G9QyV9BEec/0NWX4tlUNZUkw/V6XhI+d3P+odfDDQXf8c52Q==";
+  "@spectrum-web-components/search@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/search/-/search-1.12.1.tgz";
+    hash = "sha512-fFKZaxjnVEIbRaLfnRVXKNC0DEW2+BdxPuxZNwNKfCyVuSwjp05LhMmRJYKAKH4nB+QD+nsEvqob6Up1H/vAUA==";
   };
-  "@spectrum-web-components/shared@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/shared/-/shared-1.12.0.tgz";
-    hash = "sha512-cQIbVamEBlaeO3/46EjYfHgsKNSUZEJu6wQ9A298/dFFFli7JlDCCzUWt6Zyebh5JF0hCAL8EyNTMnBrPtHLyg==";
+  "@spectrum-web-components/shared@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/shared/-/shared-1.12.1.tgz";
+    hash = "sha512-eikz+xVMXKBlLPG7ImoClvwgWCtqpqBnFSRfM0hXJ1oHt9x3axOG17Oh1stZnyRAfFAwCeMPuXg8lMCSQM//Iw==";
   };
-  "@spectrum-web-components/styles@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/styles/-/styles-1.12.0.tgz";
-    hash = "sha512-jJwXOcBLUZEh1lUlydptCHT61MPHPwTjicR+onEW1QiwXx9Kmes8MVgkqCvR3HMeC1SCQ758GvRJyixNI3WuXQ==";
+  "@spectrum-web-components/styles@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/styles/-/styles-1.12.1.tgz";
+    hash = "sha512-MoTw/7D8YQnNDvUbeeLNIaT10TCFOy4++OIrwcPIoTVuZP9TjEIHbLuWXL638nl4yEKpykl22w2Gqyj2ELExbA==";
   };
-  "@spectrum-web-components/swatch@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/swatch/-/swatch-1.12.0.tgz";
-    hash = "sha512-fHaj1gooLyUDls1mQRUjcqgdol28AVSHwgQyZv/RCZw80gbfxgsjGkgPydjz7VmvNhY0bmZjKvZ9fxOlkG+5uw==";
+  "@spectrum-web-components/swatch@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/swatch/-/swatch-1.12.1.tgz";
+    hash = "sha512-qT2e4aT02sTksmzFOkKmMDwSnhRfjNywME31CFGQYza8yVIJgySXelGN0VkIcgIyvJrTFIJU88p4XCunCZ4EsQ==";
   };
-  "@spectrum-web-components/switch@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/switch/-/switch-1.12.0.tgz";
-    hash = "sha512-X9wlqUcdFsUmfVSMwbYcEzuiH/zsCvYcHIPOJRtJQ0tLm8TwgBG75lzew76VOIJnLcV8Hbkqi8OhOSkSSc1ljQ==";
+  "@spectrum-web-components/switch@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/switch/-/switch-1.12.1.tgz";
+    hash = "sha512-6XU/Pp15GyE6e9ap0DrHdwwEeqQ1GAsDrzoEY3V94huHQmRGHeSlTp6lgBUUAYl9cXEKeHLpEkECdQW3eE35Rw==";
   };
-  "@spectrum-web-components/table@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/table/-/table-1.12.0.tgz";
-    hash = "sha512-MAATuezrU9i43crD00PDqscBI06gYEe/bx1fdbNC7bCitC1ptU1ZynKGJjuQUEunn/j2Iq5y3fySwcdkU7I3/A==";
+  "@spectrum-web-components/table@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/table/-/table-1.12.1.tgz";
+    hash = "sha512-Fmm33IPir8XIO4YZhiz+J2QGTkVWINOOpzkP+9Sdsdzqhhb+J6HrOEAa4kaOk1MUOLkFc4xijwN7wVSjjuljLA==";
   };
-  "@spectrum-web-components/tabs@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/tabs/-/tabs-1.12.0.tgz";
-    hash = "sha512-5xq/SvE1BhhVT1noyDx2/JwB6Zk3S9FgH1rAb35BZrWoH4dFagqPw6yA+HAQinIIY8PH9BtTtakAfTd2a65z0w==";
+  "@spectrum-web-components/tabs@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/tabs/-/tabs-1.12.1.tgz";
+    hash = "sha512-c7IH/NYHEJKjW623wjvQW/qU60nhQrORfOBFkhaCspvIxOqAPrCMTM+cf3CLSrgoBwGpIWEn984k6rMinYIivw==";
   };
-  "@spectrum-web-components/textfield@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/textfield/-/textfield-1.12.0.tgz";
-    hash = "sha512-se8Wbuu6pt2dDkrdrNxgwe5YcNjsVWBfhP8DKyE+Kba11TjsSbol9Ue8TNW6UQA1IN2pa68iYOODVxBc9ptM4g==";
+  "@spectrum-web-components/textfield@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/textfield/-/textfield-1.12.1.tgz";
+    hash = "sha512-JrXuUUasMbqDGXomkr+QIRsShWDlgINdlWG6qzW7dmhzSaN0IGtBj+tNZH8fHdNvIocLAyDsKyC01bB3o2iuUw==";
   };
-  "@spectrum-web-components/theme@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/theme/-/theme-1.12.0.tgz";
-    hash = "sha512-5SflNvI2ymZ6gjUsZwdv4fENESz/oh4RdlCc+WmSyDzCYICsDvbEaWT/ngMk7Dyj+sTM52Vw8cqAPpygsfyF2A==";
+  "@spectrum-web-components/theme@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/theme/-/theme-1.12.1.tgz";
+    hash = "sha512-zM83OQi3KcAjgvl+4A2JL3wBpdtVCB3v+zvH3MX3P11KJmPzjoUyTTQ/BnrpTWVOI7KB/ExgvUxQi3i7T2sXmQ==";
   };
-  "@spectrum-web-components/tooltip@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/tooltip/-/tooltip-1.12.0.tgz";
-    hash = "sha512-3SXDAvi8Fu7yumHtuGocYSV47dyZ/4I3ODMqZ/0DKKroNdHApf0Xm+ctGU9V1yJz3JQva3/c/D6JCX+gqGblVQ==";
+  "@spectrum-web-components/tooltip@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/tooltip/-/tooltip-1.12.1.tgz";
+    hash = "sha512-KaU4ZkVeNdaO9qVy43imK49dwuAiCe3gzXIBgZIv8teUo7lf6uFYBKp5lxdFd8cxJXunZgGn5wRCg1SOb6TmZg==";
   };
-  "@spectrum-web-components/tray@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/tray/-/tray-1.12.0.tgz";
-    hash = "sha512-ODW1yA/7Yir+CRKqjEP/19quOqUtruqzyk/07uJOrcNsfgmEDQXoz5UBpoc/w/aBGTw7RCDDNCIy6rTRXs08/w==";
+  "@spectrum-web-components/tray@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/tray/-/tray-1.12.1.tgz";
+    hash = "sha512-eZzdNgzljQGI3cNFJIKABJ/aR0wJeix5yna6AAqALQ2zdHTnofLvWkbOBFcMxCmKFCYKrZRVcU80rgXG1r5OWQ==";
   };
-  "@spectrum-web-components/underlay@1.12.0" = fetchurl {
-    url = "https://registry.npmjs.org/@spectrum-web-components/underlay/-/underlay-1.12.0.tgz";
-    hash = "sha512-U/hjuGf11QHnCyDxUKA/hSC0aKZqCYODZjcjK0XiHk+rXAuDtddYTqAF95V2FmzlWvTUQvWP3VNrK1JKdnAxSw==";
+  "@spectrum-web-components/underlay@1.12.1" = fetchurl {
+    url = "https://registry.npmjs.org/@spectrum-web-components/underlay/-/underlay-1.12.1.tgz";
+    hash = "sha512-rKRS2D+SwXvpobJNrBH7FHX/TWAk6f/MAMsFAQmJmx1ixRQLpILgZ/fEExrYvc65FRYPW6H2xzj0a4ceZw+zog==";
   };
   "@swc/helpers@0.5.21" = fetchurl {
     url = "https://registry.npmjs.org/@swc/helpers/-/helpers-0.5.21.tgz";
