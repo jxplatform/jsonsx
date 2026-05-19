@@ -66,12 +66,15 @@ export function renderCanvas() {
   // Advance render generation so stale async renders from the previous cycle bail out
   ++view.renderGeneration;
 
-  // Always clear Lit's internal state so it builds fresh DOM. Stale async
-  // renderCanvasLive calls from a previous cycle can corrupt nested ChildPart
-  // markers (Comment nodes inside panzoom-wrap) in ways the root-only
-  // ensureLitState check cannot detect.
+  // Detect whether this is a mode transition or a content-only re-render
+  const modeChanged = canvasMode !== view.prevCanvasMode;
+
+  // Only clear Lit's internal state on mode transitions (structural panel changes).
+  // For content re-renders in the same mode, Lit's template diffing preserves
+  // the panel structure. Bailed async renders can't corrupt the DOM because
+  // renderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
   // @ts-ignore
-  if (canvasWrap["_$litPart$"]) {
+  if (modeChanged && canvasWrap["_$litPart$"]) {
     canvasWrap.textContent = "";
     // @ts-ignore
     delete canvasWrap["_$litPart$"];
@@ -101,7 +104,6 @@ export function renderCanvas() {
   }
 
   // Detect whether this is a mode transition or a content-only re-render
-  const modeChanged = canvasMode !== view.prevCanvasMode;
   view.prevCanvasMode = canvasMode;
 
   // DnD handlers are registered on inner canvas elements that get replaced on every
