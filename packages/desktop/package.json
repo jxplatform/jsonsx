@@ -13,7 +13,7 @@
     "build:release": "bunx electrobun build --env=canary",
     "build:stable": "bunx electrobun build --env=stable",
     "chromium": "bun run scripts/pre-build.ts && bun run src/chromium-mode.ts",
-    "chromium-rpc": "bun run scripts/pre-build-rpc.ts && bun run src/chromium-rpc-mode.ts",
+    "chromium-rpc": "bun run scripts/pre-build-rpc.ts && bun run src/chromium/index.ts",
     "dev": "bunx electrobun dev",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },

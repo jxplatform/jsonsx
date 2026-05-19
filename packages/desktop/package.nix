@@ -49,7 +49,7 @@ stdenv.mkDerivation {
     cp -rL node_modules $out/lib/jx-studio/
 
     makeWrapper ${bun}/bin/bun $out/bin/jx-studio \
-      --add-flags "run $out/lib/jx-studio/src/chromium-rpc-mode.ts" \
+      --add-flags "run $out/lib/jx-studio/src/chromium/index.ts" \
       --set CHROMIUM_BIN "${chromium}/bin/chromium" \
       --set JX_STUDIO_ASSETS "$out/lib/jx-studio/assets/studio"
 

@@ -18,6 +18,8 @@ const {
   handleDeleteFile,
   handleRenameFile,
   handleCreateDirectory,
+  handleUploadFile,
+  handleResolveSiteContext,
   discoverComponents,
   codeService,
   locateFile,
@@ -508,6 +510,158 @@ describe("fetchPluginSchema", () => {
       expect(schema).not.toBeNull();
       expect(schema.properties.baseField).toBeDefined();
       expect(schema.properties.childField).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("resolves via prototype name to .class.json", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "Timer.class.json"),
+        JSON.stringify({
+          title: "Timer",
+          $defs: {
+            parameters: {},
+            fields: {
+              interval: {
+                role: "field",
+                identifier: "interval",
+                type: { type: "number" },
+                default: 1000,
+              },
+            },
+          },
+        }),
+      );
+
+      const schema = (await fetchPluginSchema({
+        src: "./something.ts",
+        prototype: "Timer",
+      })) as any;
+      expect(schema).not.toBeNull();
+      expect(schema.properties.interval.default).toBe(1000);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns null for invalid base URL", async () => {
+    setup();
+    try {
+      const result = await fetchPluginSchema({ src: "./Foo.class.json", base: "not-a-url" });
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("resolves JS module with static schema property", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "MyPlugin.ts"),
+        `export class MyPlugin { static schema = { type: "object", properties: { x: { type: "number" } } }; }`,
+      );
+
+      const schema = (await fetchPluginSchema({
+        src: "./MyPlugin.ts",
+        prototype: "MyPlugin",
+      })) as any;
+      expect(schema).not.toBeNull();
+      expect(schema.type).toBe("object");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns null for module without schema", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "plain.ts"), `export function plain() { return 1; }`);
+      const result = await fetchPluginSchema({ src: "./plain.ts", prototype: "plain" });
+      // plain is a function without .schema, so returns null
+      expect(result).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── handleUploadFile ──────────────────────────────────────────────────────
+
+describe("handleUploadFile", () => {
+  test("writes base64 data as binary", async () => {
+    setup();
+    try {
+      const data = Buffer.from("hello binary").toString("base64");
+      await handleUploadFile({ path: "upload.bin", data });
+      const content = await handleReadFile({ path: "upload.bin" });
+      expect(content).toBe("hello binary");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("creates parent directories", async () => {
+    setup();
+    try {
+      const data = Buffer.from("deep upload").toString("base64");
+      await handleUploadFile({ path: "a/b/upload.bin", data });
+      const content = await handleReadFile({ path: "a/b/upload.bin" });
+      expect(content).toBe("deep upload");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("rejects path traversal", async () => {
+    setup();
+    try {
+      const data = Buffer.from("hack").toString("base64");
+      await expect(handleUploadFile({ path: "../../evil.bin", data })).rejects.toThrow(
+        "Path outside project root",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── handleResolveSiteContext ──────────────────────────────────────────────
+
+describe("handleResolveSiteContext", () => {
+  test("finds project.json in root", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), '{"name": "test"}');
+      const result = await handleResolveSiteContext({ filePath: "page.json" });
+      expect(result.sitePath).toBe(".");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("finds project.json in parent directory", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "site"), { recursive: true });
+      writeFileSync(join(FIXTURES, "site", "project.json"), '{"name": "site"}');
+      mkdirSync(join(FIXTURES, "site", "pages"), { recursive: true });
+      const result = await handleResolveSiteContext({ filePath: "site/pages/index.json" });
+      expect(result.sitePath).toBe("site");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns null when no project.json found", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "orphan"), { recursive: true });
+      const result = await handleResolveSiteContext({ filePath: "orphan/file.json" });
+      expect(result.sitePath).toBeNull();
     } finally {
       cleanup();
     }

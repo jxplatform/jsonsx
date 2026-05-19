@@ -1,4 +1,4 @@
-export function createWebSocketPlatform() {
+export function createDesktopPlatform() {
   const ws = new WebSocket(`ws://${location.host}`);
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();

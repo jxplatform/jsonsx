@@ -97,7 +97,6 @@ export function createDesktopPlatform() {
       return rpc.request.fetchPluginSchema({ src, prototype, base });
     },
 
-    // Git operations — delegate to Bun-side handlers that shell out to system git
     async gitStatus() {
       return rpc.request.gitStatus();
     },
@@ -150,7 +149,6 @@ export function createDesktopPlatform() {
       return rpc.request.gitDiscard({ files });
     },
 
-    // Package management
     async addPackage(name: string) {
       return rpc.request.addPackage({ name });
     },

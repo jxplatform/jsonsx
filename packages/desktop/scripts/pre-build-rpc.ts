@@ -11,10 +11,10 @@ const assetsDir = join(desktopDir, "assets");
 console.log("[prebuild-rpc] Building @jxsuite/studio…");
 await $`bun run build`.cwd(studioDir);
 
-// ── 2. Build chromium-rpc init script ─────────────────────────────────────
+// ── 2. Build chromium init script ────────────────────────────────────────
 
-console.log("[prebuild-rpc] Building chromium-rpc init script…");
-await $`bun build ./src/chromium-rpc-init.ts --outdir ./assets/studio/dist --target browser --sourcemap=linked`.cwd(
+console.log("[prebuild-rpc] Building chromium init script…");
+await $`bun build ./src/chromium/init.ts --outdir ./assets/studio/dist --target browser --sourcemap=linked`.cwd(
   desktopDir,
 );
 
@@ -35,7 +35,7 @@ await copyFile(
 const html = await readFile(join(studioDir, "index.html"), "utf8");
 const patched = html.replace(
   '<script type="module" src="./dist/studio.js"></script>',
-  '<script type="module" src="./dist/chromium-rpc-init.js"></script>\n  <script type="module" src="./dist/studio.js"></script>',
+  '<script type="module" src="./dist/init.js"></script>\n  <script type="module" src="./dist/studio.js"></script>',
 );
 await writeFile(join(assetsDir, "studio", "index.html"), patched, "utf8");
 

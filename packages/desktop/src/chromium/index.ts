@@ -16,7 +16,7 @@ import {
   codeService,
   locateFile,
   fetchPluginSchema,
-} from "./handlers";
+} from "../handlers";
 import {
   gitStatus,
   gitBranches,
@@ -31,8 +31,8 @@ import {
   gitCreateBranch,
   gitDiff,
   gitDiscard,
-} from "./git";
-import { addPackage, removePackage, listPackages } from "./packages";
+} from "../git";
+import { addPackage, removePackage, listPackages } from "../packages";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ const handlers: Record<string, (params: any) => Promise<any>> = {
 
 // ─── Static file serving + WebSocket RPC server ──────────────────────────────
 
-const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../assets/studio");
+const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../../assets/studio");
 
 const server = Bun.serve({
   port: 0,
@@ -85,14 +85,12 @@ const server = Bun.serve({
     const url = new URL(req.url);
     const path = url.pathname;
 
-    // Serve studio assets
     if (path.startsWith("/studio/")) {
       const assetPath = resolve(studioDir, "." + path.replace("/studio/", "/"));
       const file = Bun.file(assetPath);
       if (await file.exists()) return new Response(file);
     }
 
-    // Serve project public files
     const root = getProjectRoot();
     if (root) {
       const publicFile = Bun.file(resolve(root, "public", "." + path));
@@ -128,9 +126,9 @@ const server = Bun.serve({
 });
 
 const serverUrl = `http://localhost:${server.port}`;
-console.log(`[chromium-rpc] Studio server at ${serverUrl}`);
-console.log(`[chromium-rpc] WebSocket RPC at ws://localhost:${server.port}`);
-console.log(`[chromium-rpc] Project root: ${projectRoot}`);
+console.log(`[chromium] Studio server at ${serverUrl}`);
+console.log(`[chromium] WebSocket RPC at ws://localhost:${server.port}`);
+console.log(`[chromium] Project root: ${projectRoot}`);
 
 // ─── Launch Chromium ─────────────────────────────────────────────────────────
 
@@ -154,11 +152,11 @@ function findChromium(): string | null {
 
 const chromiumBin = findChromium();
 if (!chromiumBin) {
-  console.error("[chromium-rpc] No chromium/chrome found. Install chromium or set CHROMIUM_BIN.");
+  console.error("[chromium] No chromium/chrome found. Install chromium or set CHROMIUM_BIN.");
   process.exit(1);
 }
 
-console.log(`[chromium-rpc] Launching: ${chromiumBin}`);
+console.log(`[chromium] Launching: ${chromiumBin}`);
 
 const chromiumArgs = [
   `--app=${serverUrl}/studio/index.html`,
@@ -178,7 +176,7 @@ const chrome = spawn(chromiumBin, chromiumArgs, {
 });
 
 chrome.on("close", (code) => {
-  console.log(`[chromium-rpc] Browser closed (code ${code})`);
+  console.log(`[chromium] Browser closed (code ${code})`);
   process.exit(0);
 });
 
