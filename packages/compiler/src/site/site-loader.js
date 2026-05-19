@@ -25,7 +25,7 @@ const DEFAULTS = {
   $media: {},
   style: {},
   state: {},
-  collections: {},
+  contentTypes: {},
   redirects: {},
   images: {
     optimize: true,
@@ -85,7 +85,7 @@ export function loadProjectConfig(projectRoot) {
   if (raw.state) config.state = raw.state;
   if (raw.redirects) config.redirects = raw.redirects;
   if (raw.imports) config.imports = raw.imports;
-  if (raw.collections) config.collections = raw.collections;
+  if (raw.contentTypes) config.contentTypes = raw.contentTypes;
 
   return {
     config,

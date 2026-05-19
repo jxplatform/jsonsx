@@ -229,7 +229,7 @@ export function createState(doc) {
       stylebookTab: "elements", // "elements" | "variables"
       stylebookFilter: "", // search filter text
       stylebookCustomizedOnly: false, // show only customized elements
-      settingsTab: "stylebook", // "stylebook" | "definitions" | "collections"
+      settingsTab: "stylebook", // "stylebook" | "definitions" | "contentTypes"
       gitStatus: null, // { branch, ahead, behind, files: [] }
       gitBranches: null, // { current, branches: [] }
       gitCommitMessage: "", // commit message input

@@ -184,17 +184,17 @@ describe("expandDynamicRoutes", () => {
     cleanup();
   });
 
-  test("expands dynamic route with collection $paths", async () => {
+  test("expands dynamic route with content type $paths", async () => {
     setup();
     const pagePath = join(FIXTURES, "post.json");
     writeFileSync(
       pagePath,
       JSON.stringify({
         tagName: "div",
-        $paths: { collection: "blog", param: "slug", field: "slug" },
+        $paths: { contentType: "blog", param: "slug", field: "slug" },
       }),
     );
-    const collections = new Map([
+    const contentTypes = new Map([
       [
         "blog",
         [
@@ -214,7 +214,7 @@ describe("expandDynamicRoutes", () => {
         relativePath: "",
       },
     ];
-    const result = await expandDynamicRoutes(routes, FIXTURES, collections);
+    const result = await expandDynamicRoutes(routes, FIXTURES, contentTypes);
     expect(result.length).toBe(2);
     expect(result[0].urlPattern).toBe("/blog/hello-world");
     expect(result[1].urlPattern).toBe("/blog/second-post");
@@ -256,14 +256,14 @@ describe("expandDynamicRoutes", () => {
     cleanup();
   });
 
-  test("handles missing collection gracefully", async () => {
+  test("handles missing content type gracefully", async () => {
     setup();
     const pagePath = join(FIXTURES, "missing.json");
     writeFileSync(
       pagePath,
       JSON.stringify({
         tagName: "div",
-        $paths: { collection: "nonexistent", param: "id" },
+        $paths: { contentType: "nonexistent", param: "id" },
       }),
     );
     const routes = [

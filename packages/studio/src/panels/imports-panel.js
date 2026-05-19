@@ -3,8 +3,8 @@
  *
  * When editing project.json: shows Class Imports, Dependencies (add/remove packages), and
  * per-package component toggles for cherry-picking individual elements. When editing a
- * page/layout/component/collection: shows Component Imports ($ref picker) and per-package component
- * toggles.
+ * page/layout/component/content type: shows Component Imports ($ref picker) and per-package
+ * component toggles.
  */
 
 import { html, nothing } from "lit-html";

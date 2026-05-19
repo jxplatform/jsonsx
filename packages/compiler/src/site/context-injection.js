@@ -4,15 +4,15 @@
  * Injects project-level and page-level context variables into a page's state before compilation.
  * These are available as $site.* and $page.* in template expressions.
  *
- * Also resolves ContentCollection and ContentEntry $prototype entries against loaded content
- * collections (Phase 2, spec §6.4).
+ * Also resolves ContentCollection and ContentEntry $prototype entries against loaded content types
+ * (Phase 2, spec §6.4).
  *
  * Per site-architecture spec §10: $site.name — from project.json name $site.url — from project.json
  * url $site.state.* — site-wide reactive state $page.url — current page URL path $page.title — page
  * title $page.params — dynamic route parameters (if any)
  */
 
-import { queryCollection, findEntry } from "./content-loader.js";
+import { queryContentType, findEntry } from "./content-loader.js";
 import { resolve, dirname, relative } from "node:path";
 
 /**
@@ -21,7 +21,7 @@ import { resolve, dirname, relative } from "node:path";
  * @param {any} doc - The page document (mutated)
  * @param {any} projectConfig - Loaded project configuration
  * @param {any} route - The resolved route for this page
- * @param {Map<string, any[]>} [collections] - Loaded content collections
+ * @param {Map<string, any[]>} [contentTypes] - Loaded content types
  * @param {string | null} [projectRoot] - Absolute path to the project root (for import rebasing)
  * @returns {any} The mutated document
  */
@@ -29,7 +29,7 @@ export function injectContext(
   doc,
   projectConfig,
   route,
-  collections = new Map(),
+  contentTypes = new Map(),
   projectRoot = null,
 ) {
   if (!doc.state) doc.state = {};
@@ -49,8 +49,8 @@ export function injectContext(
   };
 
   // Resolve ContentCollection and ContentEntry $prototype entries
-  if (collections.size > 0) {
-    resolveContentPrototypes(doc.state, collections, route._pathParams ?? {});
+  if (contentTypes.size > 0) {
+    resolveContentPrototypes(doc.state, contentTypes, route._pathParams ?? {});
   }
 
   // Merge project-level state into page state (page wins on conflicts)
@@ -110,33 +110,33 @@ export function injectContext(
 /**
  * Resolve ContentCollection and ContentEntry $prototype state entries.
  *
- * Replaces state entries like: { "$prototype": "ContentCollection", "collection": "blog", ... }
- * with the actual resolved collection data.
+ * Replaces state entries like: { "$prototype": "ContentCollection", "contentType": "blog", ... }
+ * with the actual resolved content type data.
  *
  * @param {Record<string, any>} state - Page state (mutated)
- * @param {Map<string, any[]>} collections - Loaded collections
+ * @param {Map<string, any[]>} contentTypes - Loaded content types
  * @param {Record<string, any>} params - Route parameters for $ref resolution
  */
-function resolveContentPrototypes(state, collections, params) {
+function resolveContentPrototypes(state, contentTypes, params) {
   for (const [key, value] of Object.entries(state)) {
     if (!value || typeof value !== "object" || !value.$prototype) continue;
 
     if (value.$prototype === "ContentCollection") {
-      const entries = collections.get(value.collection);
+      const entries = contentTypes.get(value.contentType);
       if (!entries) {
-        console.warn(`ContentCollection: collection "${value.collection}" not found`);
+        console.warn(`ContentCollection: content type "${value.contentType}" not found`);
         state[key] = [];
         continue;
       }
-      state[key] = queryCollection(entries, {
+      state[key] = queryContentType(entries, {
         filter: value.filter,
         sort: value.sort,
         limit: value.limit,
       });
     } else if (value.$prototype === "ContentEntry") {
-      const entries = collections.get(value.collection);
+      const entries = contentTypes.get(value.contentType);
       if (!entries) {
-        console.warn(`ContentEntry: collection "${value.collection}" not found`);
+        console.warn(`ContentEntry: content type "${value.contentType}" not found`);
         state[key] = null;
         continue;
       }

@@ -3,7 +3,7 @@
  *
  * Displays pages, layouts, components, content, and media in a filterable table grid. Fills the
  * center canvas area as a parallel state to Edit/Design/Preview/Code/Settings. Includes a "New +"
- * button with type-aware entity creation (including collections from project.json).
+ * button with type-aware entity creation (including content types from project.json).
  */
 
 import { html, render as litRender } from "lit-html";
@@ -153,14 +153,14 @@ const ENTITY_TYPES = [
 ];
 
 /**
- * Build frontmatter YAML from a collection's schema properties.
+ * Build frontmatter YAML from a content type's schema properties.
  *
- * @param {string} collectionName
+ * @param {string} contentTypeName
  * @returns {string}
  */
-function buildFrontmatterYaml(collectionName) {
+function buildFrontmatterYaml(contentTypeName) {
   const config = projectState?.projectConfig;
-  const col = config?.collections?.[collectionName];
+  const col = config?.contentTypes?.[contentTypeName];
   if (!col?.schema?.properties) return "title: Untitled\n";
 
   let yaml = "";
@@ -172,22 +172,22 @@ function buildFrontmatterYaml(collectionName) {
 }
 
 /**
- * Get collection-derived entity types from project config.
+ * Get content-type-derived entity types from project config.
  *
- * @returns {{ key: string; label: string; dir: string; ext: string; collectionName: string }[]}
+ * @returns {{ key: string; label: string; dir: string; ext: string; contentTypeName: string }[]}
  */
-function getCollectionTypes() {
+function getContentTypeTypes() {
   const config = projectState?.projectConfig;
-  if (!config?.collections) return [];
-  return Object.entries(config.collections).map(([name, def]) => {
+  if (!config?.contentTypes) return [];
+  return Object.entries(config.contentTypes).map(([name, def]) => {
     const d = /** @type {any} */ (def);
     const dir = d.source ? d.source.replace(/^\.\//, "").split("/")[0] : name;
     return {
-      key: `collection:${name}`,
+      key: `contentType:${name}`,
       label: name.charAt(0).toUpperCase() + name.slice(1),
       dir,
       ext: ".md",
-      collectionName: name,
+      contentTypeName: name,
     };
   });
 }
@@ -200,9 +200,9 @@ function getCollectionTypes() {
  * @param {{ openFile: (path: string) => void }} ctx
  */
 async function handleNewEntity(typeKey, container, ctx) {
-  const isCollection = typeKey.startsWith("collection:");
-  const collectionName = isCollection ? typeKey.slice("collection:".length) : null;
-  const allTypes = [...ENTITY_TYPES, ...getCollectionTypes()];
+  const isContentType = typeKey.startsWith("contentType:");
+  const contentTypeName = isContentType ? typeKey.slice("contentType:".length) : null;
+  const allTypes = [...ENTITY_TYPES, ...getContentTypeTypes()];
   const typeInfo = allTypes.find((t) => t.key === typeKey);
   if (!typeInfo) return;
 
@@ -217,7 +217,9 @@ async function handleNewEntity(typeKey, container, ctx) {
 
   let content;
   if (typeInfo.ext === ".md") {
-    const frontmatter = collectionName ? buildFrontmatterYaml(collectionName) : "title: Untitled\n";
+    const frontmatter = contentTypeName
+      ? buildFrontmatterYaml(contentTypeName)
+      : "title: Untitled\n";
     content = `---\n${frontmatter}---\n\n`;
   } else {
     content = JSON.stringify({ tagName: "div", children: [] }, null, "\t");
@@ -278,7 +280,7 @@ export async function renderBrowse(container, ctx) {
 
   const files = filteredFiles();
 
-  const collectionTypes = getCollectionTypes();
+  const contentTypeTypes = getContentTypeTypes();
 
   const filterBar = html`
     <div class="browse-filter-bar">
@@ -317,8 +319,8 @@ export async function renderBrowse(container, ctx) {
             @change=${(/** @type {any} */ e) => handleNewEntity(e.target.value, container, ctx)}
           >
             ${ENTITY_TYPES.map((t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`)}
-            ${collectionTypes.length
-              ? html`<sp-menu-divider></sp-menu-divider> ${collectionTypes.map(
+            ${contentTypeTypes.length
+              ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
                     (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
                   )}`
               : ""}

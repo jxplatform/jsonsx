@@ -1,8 +1,8 @@
 /**
- * Collections Editor — visual schema builder for project content collections.
+ * Content Types Editor — visual schema builder for project content types.
  *
- * Renders inside the Settings view "Collections" tab. Two-column layout: left column lists
- * collection names, right column edits the selected collection's schema.
+ * Renders inside the Settings view "Content Types" tab. Two-column layout: left column lists
+ * content type names, right column edits the selected content type's schema.
  */
 
 import { html, render as litRender } from "lit-html";
@@ -13,11 +13,11 @@ import { fieldCardTpl, addFieldFormTpl, schemaForType } from "./schema-field-ui.
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 /** @type {string | null} */
-let selectedCollection = null;
+let selectedContentType = null;
 let showAddField = false;
 let newFieldState = { name: "", type: "string", required: false };
-let showNewCollection = false;
-let newCollectionName = "";
+let showNewContentType = false;
+let newContentTypeName = "";
 
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
@@ -29,17 +29,17 @@ async function saveProjectConfig() {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Get the schema object for the selected collection. */
+/** Get the schema object for the selected content type. */
 function getSelectedSchema() {
   const config = projectState?.projectConfig;
-  return config?.collections?.[/** @type {string} */ (selectedCollection)]?.schema;
+  return config?.contentTypes?.[/** @type {string} */ (selectedContentType)]?.schema;
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 /** @param {() => void} rerender */
-function handleNewCollection(rerender) {
-  const slug = newCollectionName
+function handleNewContentType(rerender) {
+  const slug = newContentTypeName
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
@@ -47,30 +47,30 @@ function handleNewCollection(rerender) {
 
   const config = projectState?.projectConfig;
   if (!config) return;
-  if (!config.collections) config.collections = {};
-  if (config.collections[slug]) return; // already exists
+  if (!config.contentTypes) config.contentTypes = {};
+  if (config.contentTypes[slug]) return; // already exists
 
-  config.collections[slug] = {
-    source: `./${slug}/**/*.md`,
+  config.contentTypes[slug] = {
+    source: `./content/${slug}/**/*.md`,
     schema: { type: "object", properties: {}, required: [] },
   };
 
-  selectedCollection = slug;
-  showNewCollection = false;
-  newCollectionName = "";
+  selectedContentType = slug;
+  showNewContentType = false;
+  newContentTypeName = "";
   rerender();
 
   // Persist in background
   saveProjectConfig().then(async () => {
     const platform = getPlatform();
-    await platform.writeFile(`${slug}/.gitkeep`, "");
+    await platform.writeFile(`content/${slug}/.gitkeep`, "");
   });
 }
 
 /** @param {() => void} rerender */
 function handleAddField(rerender) {
   const name = newFieldState.name.trim();
-  if (!name || !selectedCollection) return;
+  if (!name || !selectedContentType) return;
 
   const schema = getSelectedSchema();
   if (!schema) return;
@@ -270,13 +270,13 @@ function handleChangeNestedType(parentName, childName, newType, rerender) {
 }
 
 /** @param {() => void} rerender */
-function handleDeleteCollection(rerender) {
-  if (!selectedCollection) return;
+function handleDeleteContentType(rerender) {
+  if (!selectedContentType) return;
   const config = projectState?.projectConfig;
-  if (!config?.collections?.[selectedCollection]) return;
+  if (!config?.contentTypes?.[selectedContentType]) return;
 
-  delete config.collections[selectedCollection];
-  selectedCollection = null;
+  delete config.contentTypes[selectedContentType];
+  selectedContentType = null;
 
   rerender();
   saveProjectConfig();
@@ -285,26 +285,26 @@ function handleDeleteCollection(rerender) {
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 /**
- * Render the collections editor.
+ * Render the content types editor.
  *
  * @param {HTMLElement} container
  */
-export function renderCollectionsEditor(container) {
-  const rerender = () => renderCollectionsEditor(container);
+export function renderContentTypesEditor(container) {
+  const rerender = () => renderContentTypesEditor(container);
   const config = projectState?.projectConfig;
-  const collections = config?.collections || {};
-  const collectionNames = Object.keys(collections);
+  const contentTypes = config?.contentTypes || {};
+  const contentTypeNames = Object.keys(contentTypes);
 
-  // Left column — collection list
+  // Left column — content type list
   const listTpl = html`
     <div class="settings-list-panel">
-      ${collectionNames.map(
+      ${contentTypeNames.map(
         (name) => html`
           <sp-action-button
             size="s"
-            ?selected=${selectedCollection === name}
+            ?selected=${selectedContentType === name}
             @click=${() => {
-              selectedCollection = name;
+              selectedContentType = name;
               showAddField = false;
               rerender();
             }}
@@ -313,25 +313,25 @@ export function renderCollectionsEditor(container) {
           </sp-action-button>
         `,
       )}
-      ${showNewCollection
+      ${showNewContentType
         ? html`
             <div class="settings-inline-form">
               <sp-textfield
                 size="s"
-                placeholder="collection-name"
-                .value=${newCollectionName}
+                placeholder="content-type-name"
+                .value=${newContentTypeName}
                 @input=${(/** @type {any} */ e) => {
-                  newCollectionName = e.target.value;
+                  newContentTypeName = e.target.value;
                 }}
                 @keydown=${(/** @type {any} */ e) => {
-                  if (e.key === "Enter") handleNewCollection(rerender);
+                  if (e.key === "Enter") handleNewContentType(rerender);
                   if (e.key === "Escape") {
-                    showNewCollection = false;
+                    showNewContentType = false;
                     rerender();
                   }
                 }}
               ></sp-textfield>
-              <sp-action-button size="s" @click=${() => handleNewCollection(rerender)}>
+              <sp-action-button size="s" @click=${() => handleNewContentType(rerender)}>
                 Create
               </sp-action-button>
             </div>
@@ -341,11 +341,11 @@ export function renderCollectionsEditor(container) {
               size="s"
               quiet
               @click=${() => {
-                showNewCollection = true;
+                showNewContentType = true;
                 rerender();
               }}
             >
-              <sp-icon-add slot="icon"></sp-icon-add> New Collection
+              <sp-icon-add slot="icon"></sp-icon-add> New Content Type
             </sp-action-button>
           `}
     </div>
@@ -353,10 +353,10 @@ export function renderCollectionsEditor(container) {
 
   // Right column — schema editor
   let editorTpl;
-  if (!selectedCollection || !collections[selectedCollection]) {
-    editorTpl = html`<div class="settings-empty-state">Select or create a collection</div>`;
+  if (!selectedContentType || !contentTypes[selectedContentType]) {
+    editorTpl = html`<div class="settings-empty-state">Select or create a content type</div>`;
   } else {
-    const col = collections[selectedCollection];
+    const col = contentTypes[selectedContentType];
     const schema = col.schema || {};
     const properties = schema.properties || {};
     const required = schema.required || [];
@@ -381,13 +381,13 @@ export function renderCollectionsEditor(container) {
     editorTpl = html`
       <div class="settings-editor-panel">
         <div class="settings-editor-header">
-          <h3>${selectedCollection}</h3>
+          <h3>${selectedContentType}</h3>
           <sp-field-label size="s">Source: ${col.source || "—"}</sp-field-label>
           <sp-action-button
             size="xs"
             quiet
-            title="Delete collection"
-            @click=${() => handleDeleteCollection(rerender)}
+            title="Delete content type"
+            @click=${() => handleDeleteContentType(rerender)}
           >
             <sp-icon-delete slot="icon"></sp-icon-delete>
           </sp-action-button>

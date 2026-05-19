@@ -1,14 +1,14 @@
 {
   "title": "Blog Post",
   "$paths": {
-    "collection": "blog",
+    "contentType": "blog",
     "param": "slug",
     "field": "id"
   },
   "state": {
     "post": {
       "$prototype": "ContentEntry",
-      "collection": "blog",
+      "contentType": "blog",
       "id": { "$ref": "#/$params/slug" }
     }
   },

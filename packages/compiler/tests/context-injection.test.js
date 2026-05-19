@@ -182,15 +182,15 @@ describe("injectContext", () => {
     expect(doc.$elements[0].$ref).toBe("./components/card.json");
   });
 
-  test("resolves ContentEntry with missing collection gracefully", () => {
+  test("resolves ContentEntry with missing content type gracefully", () => {
     /** @type {Record<string, any>} */
     const doc = {
       state: {
-        post: { $prototype: "ContentEntry", collection: "nonexistent", id: "abc" },
+        post: { $prototype: "ContentEntry", contentType: "nonexistent", id: "abc" },
       },
     };
-    const collections = new Map([["posts", [{ id: "x", data: {} }]]]);
-    injectContext(doc, baseProject, baseRoute, collections);
+    const contentTypes = new Map([["posts", [{ id: "x", data: {} }]]]);
+    injectContext(doc, baseProject, baseRoute, contentTypes);
     expect(doc.state.post).toBeNull();
   });
 });

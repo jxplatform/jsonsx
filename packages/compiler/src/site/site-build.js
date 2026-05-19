@@ -40,7 +40,7 @@ import {
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
 } from "../shared.js";
-import { loadCollections, loadContentConfig, resolveCollectionRefs } from "./content-loader.js";
+import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./content-loader.js";
 import { resolvePrototypes } from "./prototype-resolver.js";
 import { compileMarkdown } from "../targets/compile-markdown.js";
 import { transformImageNodes } from "./image-transform.js";
@@ -97,20 +97,20 @@ export async function buildSite(projectRoot, options = {}) {
   const staticRoutes = discoverPages(pagesDir);
   log(`  Found ${staticRoutes.length} page(s)`);
 
-  // ── 3b. Load content collections ──────────────────────────────────────
-  log("Loading content collections...");
-  const collections = await loadCollections(projectRoot, projectConfig);
-  if (collections.size > 0) {
-    log(`  Loaded ${collections.size} collection(s): ${[...collections.keys()].join(", ")}`);
-    // Resolve cross-collection $ref references
+  // ── 3b. Load content types ─────────────────────────────────────────────
+  log("Loading content types...");
+  const contentTypes = await loadContentTypes(projectRoot, projectConfig);
+  if (contentTypes.size > 0) {
+    log(`  Loaded ${contentTypes.size} content type(s): ${[...contentTypes.keys()].join(", ")}`);
+    // Resolve cross-content-type $ref references
     const contentConfig = loadContentConfig(projectRoot, projectConfig);
     if (contentConfig) {
-      resolveCollectionRefs(collections, contentConfig.config);
+      resolveContentTypeRefs(contentTypes, contentConfig.config);
     }
   }
 
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
-  const routes = await expandDynamicRoutes(staticRoutes, projectRoot, collections);
+  const routes = await expandDynamicRoutes(staticRoutes, projectRoot, contentTypes);
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;
@@ -194,7 +194,7 @@ export async function buildSite(projectRoot, options = {}) {
         route,
         projectConfig,
         projectRoot,
-        collections,
+        contentTypes,
         imageCache,
         outDir,
         componentDefs,
@@ -339,7 +339,7 @@ export async function buildSite(projectRoot, options = {}) {
  * @param {any} route
  * @param {any} projectConfig
  * @param {string} projectRoot
- * @param {Map<string, any[]>} [collections]
+ * @param {Map<string, any[]>} [contentTypes]
  * @param {import("./image-cache.js").CacheManifest | null} [imageCache]
  * @param {string} [outDir]
  * @returns {Promise<{ html: string; files: any[]; serverHandler: string | null; doc: any }>}
@@ -348,7 +348,7 @@ async function compilePage(
   route,
   projectConfig,
   projectRoot,
-  collections = new Map(),
+  contentTypes = new Map(),
   imageCache = null,
   outDir = "",
   componentDefs = new Map(),
@@ -375,7 +375,7 @@ async function compilePage(
   delete layoutDoc._pageTitle;
 
   // Inject $site and $page context, resolve ContentCollection/ContentEntry
-  injectContext(layoutDoc, projectConfig, route, collections, projectRoot);
+  injectContext(layoutDoc, projectConfig, route, contentTypes, projectRoot);
 
   // Resolve generic $prototype entries via .class.json imports
   await resolvePrototypes(layoutDoc, route, projectRoot);

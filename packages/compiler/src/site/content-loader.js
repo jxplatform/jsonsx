@@ -1,8 +1,8 @@
 /**
- * Content-loader.js — Content collection loader
+ * Content-loader.js — Content type loader
  *
- * Loads content collections defined in project.json's `collections` key. Supports Markdown (.md),
- * JSON (.json), and CSV (.csv) source files.
+ * Loads content types defined in project.json's `contentTypes` key. Supports Markdown (.md), JSON
+ * (.json), and CSV (.csv) source files.
  *
  * Phase 2 implementation of site-architecture spec §6.
  *
@@ -99,7 +99,7 @@ let _mdModule = null;
 
 /**
  * Lazily import @jxsuite/parser for Markdown support. This avoids hard dependency — only loads when
- * MD collections exist.
+ * MD content types exist.
  *
  * @returns {Promise<any>}
  */
@@ -172,7 +172,7 @@ function loadJSONEntries(filePath) {
  * Load a CSV file into ContentEntry(s).
  *
  * @param {string} filePath - Absolute path to .csv file
- * @param {any} [schema] - Collection schema (for type coercion)
+ * @param {any} [schema] - Content type schema (for type coercion)
  * @returns {object[]} Array of ContentEntry shapes
  */
 function loadCSVEntries(filePath, schema) {
@@ -198,10 +198,10 @@ function loadCSVEntries(filePath, schema) {
 // ─── Content Config ───────────────────────────────────────────────────────────
 
 /**
- * Load and parse content collections config from project.json.
+ * Load and parse content types config from project.json.
  *
  * @param {string} projectRoot - Project root directory
- * @param {Record<string, any>} [projectConfig] - Already-loaded project config with `collections`
+ * @param {Record<string, any>} [projectConfig] - Already-loaded project config with `contentTypes`
  *   key
  * @returns {{ config: any; contentDir: string } | null} Parsed config or null if no content dir
  */
@@ -209,68 +209,68 @@ export function loadContentConfig(projectRoot, projectConfig = undefined) {
   const contentDir = resolve(projectRoot, "content");
 
   /** @type {any} */
-  const config = { collections: projectConfig?.collections ?? {} };
+  const config = { contentTypes: projectConfig?.contentTypes ?? {} };
 
   return { config, contentDir };
 }
 
-// ─── Collection Loading ───────────────────────────────────────────────────────
+// ─── Content Type Loading ────────────────────────────────────────────────────
 
 /**
- * Load all content collections defined in project.json.
+ * Load all content types defined in project.json.
  *
  * @param {string} projectRoot - Project root directory
  * @param {Record<string, any>} [projectConfig] - Already-loaded project config
- * @returns {Promise<Map<string, any[]>>} Map of collection name → array of ContentEntry
+ * @returns {Promise<Map<string, any[]>>} Map of content type name → array of ContentEntry
  */
-export async function loadCollections(projectRoot, projectConfig = undefined) {
+export async function loadContentTypes(projectRoot, projectConfig = undefined) {
   const result = loadContentConfig(projectRoot, projectConfig);
   if (!result) return new Map();
 
   const { config } = result;
   /** @type {Map<string, any[]>} */
-  const collections = new Map();
+  const contentTypes = new Map();
 
-  for (const [name, collectionDef] of Object.entries(config.collections)) {
-    const entries = await loadCollection(name, /** @type {any} */ (collectionDef), projectRoot);
-    collections.set(name, entries);
+  for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
+    const entries = await loadContentType(name, /** @type {any} */ (contentTypeDef), projectRoot);
+    contentTypes.set(name, entries);
   }
 
-  return collections;
+  return contentTypes;
 }
 
 /**
- * Get the $elements array for a specific collection, if defined in project.json collections.
+ * Get the $elements array for a specific content type, if defined in project.json contentTypes.
  *
  * @param {string} projectRoot - Project root directory
- * @param {string} collectionName - Name of the collection
+ * @param {string} contentTypeName - Name of the content type
  * @param {Record<string, any>} [projectConfig] - Already-loaded project config
  * @returns {any[] | undefined}
  */
-export function getCollectionElements(projectRoot, collectionName, projectConfig = undefined) {
+export function getContentTypeElements(projectRoot, contentTypeName, projectConfig = undefined) {
   const result = loadContentConfig(projectRoot, projectConfig);
   if (!result) return undefined;
-  const def = result.config.collections?.[collectionName];
+  const def = result.config.contentTypes?.[contentTypeName];
   return def?.$elements;
 }
 
 /**
- * Load a single collection by its definition.
+ * Load a single content type by its definition.
  *
- * @param {string} name - Collection name
- * @param {any} collectionDef - Collection definition from project.json
+ * @param {string} name - Content type name
+ * @param {any} contentTypeDef - Content type definition from project.json
  * @param {string} projectRoot - Absolute path to project root directory
  * @returns {Promise<any[]>} Array of ContentEntry
  */
-async function loadCollection(name, collectionDef, projectRoot) {
-  const source = collectionDef.source;
-  const schema = collectionDef.schema;
+async function loadContentType(name, contentTypeDef, projectRoot) {
+  const source = contentTypeDef.source;
+  const schema = contentTypeDef.schema;
 
-  // Derive directive allowedNames from collection $elements (tag names from npm packages)
+  // Derive directive allowedNames from content type $elements (tag names from npm packages)
   /** @type {any} */
-  const directiveOptions = collectionDef.$elements?.length
+  const directiveOptions = contentTypeDef.$elements?.length
     ? {
-        allowedNames: collectionDef.$elements
+        allowedNames: contentTypeDef.$elements
           .filter((/** @type {any} */ e) => typeof e === "string" || e?.$ref)
           .map((/** @type {any} */ e) => (typeof e === "string" ? e : e.$ref)),
       }
@@ -306,14 +306,14 @@ async function loadCollection(name, collectionDef, projectRoot) {
 // ─── Schema Validation ────────────────────────────────────────────────────────
 
 /**
- * Validate content entries against their collection schema. Logs warnings for missing required
+ * Validate content entries against their content type schema. Logs warnings for missing required
  * fields and type mismatches.
  *
  * @param {any[]} entries - Array of ContentEntry
- * @param {any} schema - JSON Schema for the collection
- * @param {string} collectionName - For error messages
+ * @param {any} schema - JSON Schema for the content type
+ * @param {string} contentTypeName - For error messages
  */
-function validateEntries(entries, schema, collectionName) {
+function validateEntries(entries, schema, contentTypeName) {
   const required = schema.required ?? [];
   const properties = schema.properties ?? {};
 
@@ -322,7 +322,7 @@ function validateEntries(entries, schema, collectionName) {
     for (const field of required) {
       if (!(field in entry.data) || entry.data[field] == null) {
         console.warn(
-          `Content validation: "${collectionName}/${entry.id}" missing required field "${field}"`,
+          `Content validation: "${contentTypeName}/${entry.id}" missing required field "${field}"`,
         );
       }
     }
@@ -335,36 +335,36 @@ function validateEntries(entries, schema, collectionName) {
 
       if (d.type === "string" && typeof value !== "string") {
         console.warn(
-          `Content validation: "${collectionName}/${entry.id}" field "${field}" expected string, got ${typeof value}`,
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected string, got ${typeof value}`,
         );
       } else if (d.type === "number" && typeof value !== "number") {
         console.warn(
-          `Content validation: "${collectionName}/${entry.id}" field "${field}" expected number, got ${typeof value}`,
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected number, got ${typeof value}`,
         );
       } else if (d.type === "boolean" && typeof value !== "boolean") {
         console.warn(
-          `Content validation: "${collectionName}/${entry.id}" field "${field}" expected boolean, got ${typeof value}`,
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected boolean, got ${typeof value}`,
         );
       } else if (d.type === "array" && !Array.isArray(value)) {
         console.warn(
-          `Content validation: "${collectionName}/${entry.id}" field "${field}" expected array, got ${typeof value}`,
+          `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected array, got ${typeof value}`,
         );
       }
     }
   }
 }
 
-// ─── Collection Querying ──────────────────────────────────────────────────────
+// ─── Content Type Querying ───────────────────────────────────────────────────
 
 /**
- * Query a loaded collection with filter, sort, and limit. Implements the ContentCollection
+ * Query a loaded content type with filter, sort, and limit. Implements the ContentCollection
  * $prototype resolution.
  *
- * @param {any[]} entries - Full collection entries
+ * @param {any[]} entries - Full content type entries
  * @param {any} [query] - Query options
  * @returns {any[]} Filtered, sorted, limited entries
  */
-export function queryCollection(entries, query = {}) {
+export function queryContentType(entries, query = {}) {
   let result = [...entries];
 
   // Filter
@@ -401,9 +401,9 @@ export function queryCollection(entries, query = {}) {
 }
 
 /**
- * Find a single entry by ID in a collection. Implements the ContentEntry $prototype resolution.
+ * Find a single entry by ID in a content type. Implements the ContentEntry $prototype resolution.
  *
- * @param {any[]} entries - Full collection entries
+ * @param {any[]} entries - Full content type entries
  * @param {string} id - Entry ID to find
  * @returns {any | null} The matching entry or null
  */
@@ -411,30 +411,30 @@ export function findEntry(entries, id) {
   return entries.find((/** @type {any} */ e) => e.id === id) ?? null;
 }
 
-// ─── Collection Reference Resolution ─────────────────────────────────────────
+// ─── Content Type Reference Resolution ──────────────────────────────────────
 
 /**
- * Resolve cross-collection $ref references in entry data. For example, a blog post's `author:
- * "jane-doe"` with a schema `$ref` to the authors collection gets resolved to the full author
+ * Resolve cross-content-type $ref references in entry data. For example, a blog post's `author:
+ * "jane-doe"` with a schema `$ref` to the authors content type gets resolved to the full author
  * entry.
  *
- * @param {Map<string, any[]>} collections - All loaded collections @param {any} config -
+ * @param {Map<string, any[]>} contentTypes - All loaded content types @param {any} config -
  * Content.config.json
  */
-export function resolveCollectionRefs(collections, config) {
-  for (const [name, collectionDef] of Object.entries(config.collections)) {
-    const cd = /** @type {any} */ (collectionDef);
+export function resolveContentTypeRefs(contentTypes, config) {
+  for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
+    const cd = /** @type {any} */ (contentTypeDef);
     const schema = cd.schema;
     if (!schema?.properties) continue;
 
-    const entries = collections.get(name);
+    const entries = contentTypes.get(name);
     if (!entries) continue;
 
     for (const [field, def] of Object.entries(schema.properties)) {
       const d = /** @type {any} */ (def);
-      if (!d.$ref?.startsWith("#/collections/")) continue;
-      const refCollection = d.$ref.replace("#/collections/", "");
-      const refEntries = collections.get(refCollection);
+      if (!d.$ref?.startsWith("#/contentTypes/")) continue;
+      const refContentType = d.$ref.replace("#/contentTypes/", "");
+      const refEntries = contentTypes.get(refContentType);
       if (!refEntries) continue;
 
       for (const entry of entries) {

@@ -963,9 +963,9 @@ describe("buildSite — route compilation errors", () => {
   });
 });
 
-// ── Dynamic routes with content collections ──────────────────────────────────
+// ── Dynamic routes with content types ────────────────────────────────────────
 
-describe("buildSite — dynamic routes with collections", () => {
+describe("buildSite — dynamic routes with content types", () => {
   const DYN_TMP = resolve(import.meta.dir, "__test-site-dynamic__");
 
   beforeAll(() => {
@@ -976,7 +976,7 @@ describe("buildSite — dynamic routes with collections", () => {
       JSON.stringify({
         name: "Dynamic Test",
         build: { outDir: "./dist" },
-        collections: { posts: { source: "./content/posts/*.json" } },
+        contentTypes: { posts: { source: "./content/posts/*.json" } },
       }),
       "utf8",
     );
@@ -991,7 +991,7 @@ describe("buildSite — dynamic routes with collections", () => {
       JSON.stringify({
         title: "Blog Post",
         $paths: {
-          collection: "posts",
+          contentType: "posts",
           param: "slug",
           field: "slug",
         },
@@ -1016,7 +1016,7 @@ describe("buildSite — dynamic routes with collections", () => {
     rmSync(DYN_TMP, { recursive: true, force: true });
   });
 
-  it("expands dynamic routes from content collections", async () => {
+  it("expands dynamic routes from content types", async () => {
     const result = await buildSite(DYN_TMP, { verbose: true });
     expect(result.errors).toHaveLength(0);
     // Should have home + 2 blog posts

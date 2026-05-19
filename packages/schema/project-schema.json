@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://jxsuite.com/schema/project/v1",
   "title": "Jx Project",
-  "description": "Schema for Jx project.json files. A project.json file is the root anchor file for a Jx project, declaring site metadata, default settings, global styles, content collections, and build configuration.",
+  "description": "Schema for Jx project.json files. A project.json file is the root anchor file for a Jx project, declaring site metadata, default settings, global styles, content types, and build configuration.",
   "type": "object",
   "properties": {
     "name": {
@@ -160,8 +160,8 @@
       "description": "Site-wide reactive state available to all pages.",
       "type": "object"
     },
-    "collections": {
-      "description": "Content collection definitions. Each key is a collection name; the value defines the source glob, frontmatter schema, and element dependencies.",
+    "contentTypes": {
+      "description": "Content type definitions. Each key is a content type name; the value defines the source glob, frontmatter schema, and element dependencies.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -175,11 +175,11 @@
             ]
           },
           "schema": {
-            "description": "JSON Schema for validating frontmatter of collection entries.",
+            "description": "JSON Schema for validating frontmatter of content type entries.",
             "type": "object"
           },
           "$elements": {
-            "description": "Custom elements available in markdown directives for this collection.",
+            "description": "Custom elements available in markdown directives for this content type.",
             "type": "array",
             "items": {
               "oneOf": [

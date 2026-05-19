@@ -3,7 +3,7 @@
   "state": {
     "posts": {
       "$prototype": "ContentCollection",
-      "collection": "blog",
+      "contentType": "blog",
       "filter": { "draft": false },
       "sort": { "field": "pubDate", "order": "desc" }
     }

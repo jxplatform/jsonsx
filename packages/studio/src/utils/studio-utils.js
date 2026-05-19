@@ -123,17 +123,17 @@ export function inferInputType(entry) {
 }
 
 /**
- * Match a document path to a content collection and return its schema. Uses simple directory-prefix
- * + extension matching against the collection's `source` glob.
+ * Match a document path to a content type and return its schema. Uses simple directory-prefix +
+ * extension matching against the content type's `source` glob.
  *
  * @param {string | null} documentPath — project-relative path (e.g. "blog/hello.md")
  * @param {any} projectConfig — parsed project.json
  * @returns {{ name: string; schema: any } | null}
  */
-export function findCollectionSchema(documentPath, projectConfig) {
-  if (!documentPath || !projectConfig?.collections) return null;
+export function findContentTypeSchema(documentPath, projectConfig) {
+  if (!documentPath || !projectConfig?.contentTypes) return null;
   for (const [name, def] of Object.entries(
-    /** @type {Record<string, any>} */ (projectConfig.collections),
+    /** @type {Record<string, any>} */ (projectConfig.contentTypes),
   )) {
     if (!def.source || !def.schema) continue;
     const src = def.source.replace(/^\.\//, "");

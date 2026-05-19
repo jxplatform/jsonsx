@@ -1,15 +1,15 @@
-/** Content-collections.test.js — Tests for Phase 2 content collection system */
+/** Content-types.test.js — Tests for Phase 2 content type system */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import {
   loadContentConfig,
-  loadCollections,
-  queryCollection,
+  loadContentTypes,
+  queryContentType,
   findEntry,
-  resolveCollectionRefs,
-  getCollectionElements,
+  resolveContentTypeRefs,
+  getContentTypeElements,
 } from "../src/site/content-loader.js";
 import { discoverPages, expandDynamicRoutes } from "../src/site/pages-discovery.js";
 import { injectContext } from "../src/site/context-injection.js";
@@ -39,13 +39,13 @@ function writeFile(relPath, content) {
 beforeAll(() => {
   rmSync(TMP, { recursive: true, force: true });
 
-  // project.json (includes collections definition)
+  // project.json (includes contentTypes definition)
   writeFile("project.json", {
     name: "Content Test Site",
     url: "https://test.com",
     defaults: { layout: "./layouts/base.json", lang: "en" },
     build: { outDir: "./dist" },
-    collections: {
+    contentTypes: {
       blog: {
         source: "./content/blog/**/*.md",
         schema: {
@@ -54,7 +54,7 @@ beforeAll(() => {
             title: { type: "string" },
             pubDate: { type: "string", format: "date" },
             draft: { type: "boolean", default: false },
-            author: { $ref: "#/collections/authors" },
+            author: { $ref: "#/contentTypes/authors" },
             tags: { type: "array", items: { type: "string" } },
           },
           required: ["title", "pubDate"],
@@ -173,7 +173,7 @@ WIDGET-3,Green Widget,14.99,widgets`,
     state: {
       posts: {
         $prototype: "ContentCollection",
-        collection: "blog",
+        contentType: "blog",
         filter: { draft: false },
         sort: { field: "pubDate", order: "desc" },
       },
@@ -181,18 +181,18 @@ WIDGET-3,Green Widget,14.99,widgets`,
     children: [{ tagName: "h1", children: ["Blog Posts"] }],
   });
 
-  // Dynamic blog post page — collection-based $paths
+  // Dynamic blog post page — content type-based $paths
   writeFile("pages/blog/[slug].json", {
     title: "Blog Post",
     $paths: {
-      collection: "blog",
+      contentType: "blog",
       param: "slug",
       field: "id",
     },
     state: {
       post: {
         $prototype: "ContentEntry",
-        collection: "blog",
+        contentType: "blog",
         id: { $ref: "#/$params/slug" },
       },
     },
@@ -221,23 +221,23 @@ describe("content-loader", () => {
     it("loads content.config.json", () => {
       const result = /** @type {any} */ (loadContentConfig(TMP, getProjectConfig()));
       expect(result).not.toBeNull();
-      expect(result.config.collections).toBeDefined();
-      expect(result.config.collections.blog).toBeDefined();
-      expect(result.config.collections.authors).toBeDefined();
-      expect(result.config.collections.products).toBeDefined();
+      expect(result.config.contentTypes).toBeDefined();
+      expect(result.config.contentTypes.blog).toBeDefined();
+      expect(result.config.contentTypes.authors).toBeDefined();
+      expect(result.config.contentTypes.products).toBeDefined();
     });
 
-    it("returns empty collections when no project config", () => {
+    it("returns empty contentTypes when no project config", () => {
       const result = /** @type {any} */ (loadContentConfig("/tmp/nope-" + Date.now()));
       expect(result).not.toBeNull();
-      expect(result.config.collections).toEqual({});
+      expect(result.config.contentTypes).toEqual({});
     });
   });
 
-  describe("loadCollections", () => {
-    it("loads Markdown collection entries", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
+  describe("loadContentTypes", () => {
+    it("loads Markdown content type entries", async () => {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
       expect(blog).toBeDefined();
       expect(blog.length).toBe(3); // hello-world, second-post, draft-post
 
@@ -250,18 +250,18 @@ describe("content-loader", () => {
       expect(hello.body).toContain("# Hello World");
     });
 
-    it("loads JSON collection entries", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const authors = /** @type {any[]} */ (collections.get("authors"));
+    it("loads JSON content type entries", async () => {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const authors = /** @type {any[]} */ (contentTypes.get("authors"));
       expect(authors).toBeDefined();
       expect(authors.length).toBe(1);
       expect(authors[0].id).toBe("jane");
       expect(authors[0].data.name).toBe("Jane Doe");
     });
 
-    it("loads CSV collection entries with type coercion", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const products = /** @type {any[]} */ (collections.get("products"));
+    it("loads CSV content type entries with type coercion", async () => {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const products = /** @type {any[]} */ (contentTypes.get("products"));
       expect(products).toBeDefined();
       expect(products.length).toBe(3);
 
@@ -273,35 +273,35 @@ describe("content-loader", () => {
     });
   });
 
-  describe("queryCollection", () => {
+  describe("queryContentType", () => {
     it("filters entries", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
-      const published = queryCollection(blog, { filter: { draft: false } });
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const published = queryContentType(blog, { filter: { draft: false } });
       expect(published.length).toBe(2);
       expect(published.every((e) => e.data.draft === false)).toBe(true);
     });
 
     it("sorts entries", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
-      const sorted = queryCollection(blog, {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const sorted = queryContentType(blog, {
         sort: { field: "pubDate", order: "desc" },
       });
       expect(sorted[0].data.pubDate >= sorted[1].data.pubDate).toBe(true);
     });
 
     it("limits entries", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
-      const limited = queryCollection(blog, { limit: 1 });
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const limited = queryContentType(blog, { limit: 1 });
       expect(limited.length).toBe(1);
     });
 
     it("combines filter + sort + limit", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
-      const result = queryCollection(blog, {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const result = queryContentType(blog, {
         filter: { draft: false },
         sort: { field: "pubDate", order: "desc" },
         limit: 1,
@@ -313,27 +313,27 @@ describe("content-loader", () => {
 
   describe("findEntry", () => {
     it("finds entry by ID", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
       const entry = findEntry(blog, "hello-world");
       expect(entry).not.toBeNull();
       expect(entry.data.title).toBe("Hello World");
     });
 
     it("returns null for missing ID", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (collections.get("blog"));
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
       expect(findEntry(blog, "nonexistent")).toBeNull();
     });
   });
 
-  describe("resolveCollectionRefs", () => {
-    it("resolves cross-collection $ref (author → authors)", async () => {
-      const collections = await loadCollections(TMP, getProjectConfig());
+  describe("resolveContentTypeRefs", () => {
+    it("resolves cross-content-type $ref (author → authors)", async () => {
+      const contentTypes = await loadContentTypes(TMP, getProjectConfig());
       const contentConfig = /** @type {any} */ (loadContentConfig(TMP, getProjectConfig()));
-      resolveCollectionRefs(collections, contentConfig.config);
+      resolveContentTypeRefs(contentTypes, contentConfig.config);
 
-      const blog = /** @type {any[]} */ (collections.get("blog"));
+      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
       const hello = blog.find((e) => e.id === "hello-world");
       // Author "jane" should be resolved to the full author entry
       expect(hello.data.author).toBeDefined();
@@ -346,11 +346,11 @@ describe("content-loader", () => {
 // ── $paths expansion ──────────────────────────────────────────────────────────
 
 describe("$paths expansion", () => {
-  it("expands collection-based $paths", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+  it("expands content type-based $paths", async () => {
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
     const routes = discoverPages(pagesDir);
-    const expanded = await expandDynamicRoutes(routes, TMP, collections);
+    const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const blogRoutes = expanded.filter(
       (r) => r.urlPattern.startsWith("/blog/") && r.urlPattern !== "/blog",
@@ -365,20 +365,20 @@ describe("$paths expansion", () => {
   });
 
   it("expands explicit values $paths", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
     const routes = discoverPages(pagesDir);
-    const expanded = await expandDynamicRoutes(routes, TMP, collections);
+    const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const langRoutes = expanded.filter((r) => ["/en", "/fr", "/de"].includes(r.urlPattern));
     expect(langRoutes.length).toBe(3);
   });
 
   it("preserves _pathParams on expanded routes", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
     const routes = discoverPages(pagesDir);
-    const expanded = await expandDynamicRoutes(routes, TMP, collections);
+    const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const hello = /** @type {any} */ (expanded.find((r) => r.urlPattern === "/blog/hello-world"));
     expect(hello._pathParams).toEqual({ slug: "hello-world" });
@@ -389,13 +389,13 @@ describe("$paths expansion", () => {
 
 describe("$prototype resolution in context-injection", () => {
   it("resolves ContentCollection $prototype in state", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
       state: {
         posts: {
           $prototype: "ContentCollection",
-          collection: "blog",
+          contentType: "blog",
           filter: { draft: false },
           sort: { field: "pubDate", order: "desc" },
         },
@@ -404,7 +404,7 @@ describe("$prototype resolution in context-injection", () => {
     const projectConfig = { name: "Test" };
     const route = { urlPattern: "/blog", _pathParams: {} };
 
-    injectContext(doc, projectConfig, route, collections);
+    injectContext(doc, projectConfig, route, contentTypes);
 
     expect(Array.isArray(doc.state.posts)).toBe(true);
     expect(doc.state.posts.length).toBe(2); // non-drafts
@@ -412,13 +412,13 @@ describe("$prototype resolution in context-injection", () => {
   });
 
   it("resolves ContentEntry $prototype with $params ref", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
       state: {
         post: {
           $prototype: "ContentEntry",
-          collection: "blog",
+          contentType: "blog",
           id: { $ref: "#/$params/slug" },
         },
       },
@@ -429,7 +429,7 @@ describe("$prototype resolution in context-injection", () => {
       _pathParams: { slug: "hello-world" },
     };
 
-    injectContext(doc, projectConfig, route, collections);
+    injectContext(doc, projectConfig, route, contentTypes);
 
     expect(doc.state.post).not.toBeNull();
     expect(doc.state.post.id).toBe("hello-world");
@@ -438,12 +438,12 @@ describe("$prototype resolution in context-injection", () => {
   });
 
   it("returns null for missing ContentEntry", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const doc = {
       state: {
         post: {
           $prototype: "ContentEntry",
-          collection: "blog",
+          contentType: "blog",
           id: "nonexistent",
         },
       },
@@ -451,26 +451,26 @@ describe("$prototype resolution in context-injection", () => {
     const projectConfig = { name: "Test" };
     const route = { urlPattern: "/blog/nope", _pathParams: {} };
 
-    injectContext(doc, projectConfig, route, collections);
+    injectContext(doc, projectConfig, route, contentTypes);
 
     expect(doc.state.post).toBeNull();
   });
 
-  it("returns empty array for missing collection", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
+  it("returns empty array for missing content type", async () => {
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
       state: {
         items: {
           $prototype: "ContentCollection",
-          collection: "nonexistent",
+          contentType: "nonexistent",
         },
       },
     };
     const projectConfig = { name: "Test" };
     const route = { urlPattern: "/", _pathParams: {} };
 
-    injectContext(doc, projectConfig, route, collections);
+    injectContext(doc, projectConfig, route, contentTypes);
 
     expect(doc.state.items).toEqual([]);
   });
@@ -478,7 +478,7 @@ describe("$prototype resolution in context-injection", () => {
 
 // ── Full build with content ───────────────────────────────────────────────────
 
-describe("buildSite with content collections", () => {
+describe("buildSite with content types", () => {
   it("builds site with content-driven dynamic routes", async () => {
     const result = await buildSite(TMP, { verbose: false });
 
@@ -513,7 +513,7 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        collections: {
+        contentTypes: {
           items: {
             source: "./content/items/data.csv",
             schema: {
@@ -531,11 +531,11 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const collections = await loadCollections(
+      const contentTypes = await loadContentTypes(
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (collections.get("items"));
+      const items = /** @type {any[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(2);
       // First item: multiline field preserved correctly
       expect(items[0].data.name).toBe("Line1\nLine2");
@@ -554,7 +554,7 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        collections: {
+        contentTypes: {
           items: {
             source: "./content/items/list.json",
             schema: { properties: { name: { type: "string" } } },
@@ -568,11 +568,11 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const collections = await loadCollections(
+      const contentTypes = await loadContentTypes(
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (collections.get("items"));
+      const items = /** @type {any[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(2);
       expect(items[0].id).toContain("list-0");
       expect(items[1].id).toContain("list-1");
@@ -581,13 +581,13 @@ describe("content-loader edge cases", () => {
     }
   });
 
-  it("getCollectionElements returns $elements from collection def", () => {
+  it("getContentTypeElements returns $elements from content type def", () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-elements__");
     rmSync(TMP2, { recursive: true, force: true });
     mkdirSync(TMP2, { recursive: true });
 
     const projectConfig = {
-      collections: {
+      contentTypes: {
         blog: {
           source: "./content/blog/*.md",
           $elements: ["my-component", { $ref: "./card.json" }],
@@ -595,10 +595,10 @@ describe("content-loader edge cases", () => {
       },
     };
 
-    const result = getCollectionElements(TMP2, "blog", projectConfig);
+    const result = getContentTypeElements(TMP2, "blog", projectConfig);
     expect(result).toEqual(["my-component", { $ref: "./card.json" }]);
 
-    const missing = getCollectionElements(TMP2, "nonexistent", projectConfig);
+    const missing = getContentTypeElements(TMP2, "nonexistent", projectConfig);
     expect(missing).toBeUndefined();
 
     rmSync(TMP2, { recursive: true, force: true });
@@ -612,7 +612,7 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        collections: {
+        contentTypes: {
           items: {
             source: "./content/items/*.json",
             schema: {
@@ -641,11 +641,11 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const collections = await loadCollections(
+      const contentTypes = await loadContentTypes(
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (collections.get("items"));
+      const items = /** @type {any[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(1);
       expect(items[0].id).toBe("bad");
     } finally {
@@ -654,9 +654,9 @@ describe("content-loader edge cases", () => {
   });
 
   it("sorts entries in ascending order (comparison branches)", async () => {
-    const collections = await loadCollections(TMP, getProjectConfig());
-    const blog = /** @type {any[]} */ (collections.get("blog"));
-    const sorted = queryCollection(blog, {
+    const contentTypes = await loadContentTypes(TMP, getProjectConfig());
+    const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+    const sorted = queryContentType(blog, {
       sort: { field: "pubDate", order: "asc" },
     });
     expect(sorted[0].data.pubDate <= sorted[1].data.pubDate).toBe(true);
@@ -670,7 +670,7 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        collections: {
+        contentTypes: {
           docs: {
             source: "./content/docs/*.md",
             $elements: ["my-widget", { $ref: "./card.json" }],
@@ -682,11 +682,11 @@ describe("content-loader edge cases", () => {
     writeFileSync(resolve(TMP2, "content/docs/intro.md"), "---\ntitle: Intro\n---\n\nHello docs\n");
 
     try {
-      const collections = await loadCollections(
+      const contentTypes = await loadContentTypes(
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const docs = /** @type {any[]} */ (collections.get("docs"));
+      const docs = /** @type {any[]} */ (contentTypes.get("docs"));
       expect(docs.length).toBe(1);
       expect(docs[0].data.title).toBe("Intro");
     } finally {
@@ -702,7 +702,7 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP3, "project.json"),
       JSON.stringify({
-        collections: {
+        contentTypes: {
           items: {
             source: "./content/items/*.json",
             schema: {
@@ -723,11 +723,11 @@ describe("content-loader edge cases", () => {
     const origWarn = console.warn;
     console.warn = (/** @type {any} */ msg) => warnings.push(msg);
     try {
-      const collections = await loadCollections(
+      const contentTypes = await loadContentTypes(
         TMP3,
         JSON.parse(readFileSync(resolve(TMP3, "project.json"), "utf8")),
       );
-      expect(collections.get("items")).toHaveLength(1);
+      expect(contentTypes.get("items")).toHaveLength(1);
       expect(warnings.some((w) => w.includes("missing required field"))).toBe(true);
     } finally {
       console.warn = origWarn;
@@ -741,10 +741,10 @@ describe("content-loader edge cases", () => {
       { id: "b", data: { score: 30 } },
       { id: "c", data: { score: 20 } },
     ];
-    const ascSorted = queryCollection(entries, { sort: { field: "score", order: "asc" } });
+    const ascSorted = queryContentType(entries, { sort: { field: "score", order: "asc" } });
     expect(ascSorted[0].data.score).toBe(10);
     expect(ascSorted[2].data.score).toBe(30);
-    const descSorted = queryCollection(entries, { sort: { field: "score", order: "desc" } });
+    const descSorted = queryContentType(entries, { sort: { field: "score", order: "desc" } });
     expect(descSorted[0].data.score).toBe(30);
     expect(descSorted[2].data.score).toBe(10);
   });

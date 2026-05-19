@@ -1,7 +1,7 @@
 {
   "$layout": "./layouts/docs.json",
   "$paths": {
-    "collection": "docs",
+    "contentType": "docs",
     "param": "slug",
     "field": "id"
   },
@@ -15,7 +15,7 @@
   "state": {
     "page": {
       "$prototype": "ContentEntry",
-      "collection": "docs",
+      "contentType": "docs",
       "id": { "$ref": "#/$params/slug" }
     }
   },

@@ -54,7 +54,7 @@
     "backgroundColor": "var(--color-bg-primary)",
     "color": "var(--color-text-primary)"
   },
-  "collections": {
+  "contentTypes": {
     "docs": {
       "source": "./content/docs/*.md",
       "schema": {

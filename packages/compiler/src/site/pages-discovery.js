@@ -162,17 +162,17 @@ function fileToRoute(relativePath, absolutePath) {
 /**
  * Expand dynamic routes by resolving $paths from each dynamic page.
  *
- * Supports three $paths shapes (per spec §4.3): 1. Collection-based: { collection: "blog", param:
- * "slug", field: "id" } 2. Explicit values: { values: ["en", "fr"], param: "lang" } 3. Data file
- * ref: { "$ref": "./data/products.json", param: "id", field: "sku" } 4. Legacy array: [{ slug:
+ * Supports three $paths shapes (per spec §4.3): 1. Content type-based: { contentType: "blog",
+ * param: "slug", field: "id" } 2. Explicit values: { values: ["en", "fr"], param: "lang" } 3. Data
+ * file ref: { "$ref": "./data/products.json", param: "id", field: "sku" } 4. Legacy array: [{ slug:
  * "hello" }, { slug: "world" }]
  *
  * @param {Route[]} routes - Discovered route table
  * @param {string} projectRoot - Project root for resolving $ref paths
- * @param {Map<string, any[]>} [collections] - Loaded content collections (from content-loader)
+ * @param {Map<string, any[]>} [contentTypes] - Loaded content types (from content-loader)
  * @returns {Promise<Route[]>} Expanded routes with concrete paths
  */
-export async function expandDynamicRoutes(routes, projectRoot, collections = new Map()) {
+export async function expandDynamicRoutes(routes, projectRoot, contentTypes = new Map()) {
   /** @type {Route[]} */
   const expanded = [];
 
@@ -197,7 +197,7 @@ export async function expandDynamicRoutes(routes, projectRoot, collections = new
       continue;
     }
 
-    const pathEntries = resolvePathEntries(raw.$paths, projectRoot, collections);
+    const pathEntries = resolvePathEntries(raw.$paths, projectRoot, contentTypes);
 
     for (const pathEntry of pathEntries) {
       let concreteUrl = route.urlPattern;
@@ -225,21 +225,21 @@ export async function expandDynamicRoutes(routes, projectRoot, collections = new
  *
  * @param {any} $paths - The $paths declaration
  * @param {string} projectRoot
- * @param {Map<string, any[]>} collections
+ * @param {Map<string, any[]>} contentTypes
  * @returns {Record<string, any>[]} Array of { paramName: value } objects
  */
-function resolvePathEntries($paths, projectRoot, collections) {
+function resolvePathEntries($paths, projectRoot, contentTypes) {
   // Legacy: array of param objects
   if (Array.isArray($paths)) {
     return $paths;
   }
 
-  // Collection-based: { collection: "blog", param: "slug", field: "id" }
-  if ($paths.collection) {
-    const entries = collections.get($paths.collection);
+  // Content type-based: { contentType: "blog", param: "slug", field: "id" }
+  if ($paths.contentType) {
+    const entries = contentTypes.get($paths.contentType);
     if (!entries || entries.length === 0) {
       console.warn(
-        `Warning: $paths references collection "${$paths.collection}" but it has no entries`,
+        `Warning: $paths references content type "${$paths.contentType}" but it has no entries`,
       );
       return [];
     }

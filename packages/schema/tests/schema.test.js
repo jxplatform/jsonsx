@@ -22,7 +22,7 @@ describe("generateProjectSchema", () => {
     expect(props).toContain("imports");
     expect(props).toContain("$media");
     expect(props).toContain("style");
-    expect(props).toContain("collections");
+    expect(props).toContain("contentTypes");
     expect(props).toContain("build");
     expect(props).toContain("i18n");
     expect(props).toContain("redirects");
@@ -51,8 +51,8 @@ describe("generateProjectSchema", () => {
     expect(schema.additionalProperties).toBe(false);
   });
 
-  test("collections entries have source, schema, $elements", () => {
-    const collectionEntry = schema.properties.collections.additionalProperties;
+  test("contentTypes entries have source, schema, $elements", () => {
+    const collectionEntry = schema.properties.contentTypes.additionalProperties;
     const collProps = Object.keys(collectionEntry.properties);
     expect(collProps).toContain("source");
     expect(collProps).toContain("schema");

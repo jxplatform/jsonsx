@@ -27,7 +27,7 @@ import { renderFieldRow } from "../ui/field-row.js";
 import {
   attrLabel,
   inferInputType,
-  findCollectionSchema,
+  findContentTypeSchema,
   friendlyNameToVar,
   camelToLabel,
   parseCemType,
@@ -210,7 +210,7 @@ function kvRow(
 function renderFrontmatterOnlyPanel() {
   const S = getState();
   const fm = S.content?.frontmatter || {};
-  const col = findCollectionSchema(S.documentPath, projectState?.projectConfig);
+  const col = findContentTypeSchema(S.documentPath, projectState?.projectConfig);
   const schemaProps = col?.schema?.properties;
   const requiredFields = new Set(col?.schema?.required || []);
 
@@ -1276,7 +1276,7 @@ export function renderPropertiesPanelTemplate(ctx) {
     S.mode === "content"
       ? (() => {
           const fm = S.content?.frontmatter || {};
-          const col = findCollectionSchema(S.documentPath, projectState?.projectConfig);
+          const col = findContentTypeSchema(S.documentPath, projectState?.projectConfig);
           const schemaProps = col?.schema?.properties;
           const requiredFields = new Set(col?.schema?.required || []);
 

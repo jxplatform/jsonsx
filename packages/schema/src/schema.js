@@ -1022,7 +1022,7 @@ export function generateProjectSchema() {
     description:
       "Schema for Jx project.json files. " +
       "A project.json file is the root anchor file for a Jx project, " +
-      "declaring site metadata, default settings, global styles, content collections, " +
+      "declaring site metadata, default settings, global styles, content types, " +
       "and build configuration.",
     type: "object",
 
@@ -1141,9 +1141,9 @@ export function generateProjectSchema() {
         description: "Site-wide reactive state available to all pages.",
         type: "object",
       },
-      collections: {
+      contentTypes: {
         description:
-          "Content collection definitions. Each key is a collection name; " +
+          "Content type definitions. Each key is a content type name; " +
           "the value defines the source glob, frontmatter schema, and element dependencies.",
         type: "object",
         additionalProperties: {
@@ -1155,11 +1155,12 @@ export function generateProjectSchema() {
               examples: ["./blog/**/*.md", "./docs/**/*.md"],
             },
             schema: {
-              description: "JSON Schema for validating frontmatter of collection entries.",
+              description: "JSON Schema for validating frontmatter of content type entries.",
               type: "object",
             },
             $elements: {
-              description: "Custom elements available in markdown directives for this collection.",
+              description:
+                "Custom elements available in markdown directives for this content type.",
               type: "array",
               items: {
                 oneOf: [
