@@ -35,6 +35,8 @@ import {
 import { isCustomElementDoc, collectCssParts } from "./signals-panel.js";
 import { mediaDisplayName } from "./shared.js";
 import { getCssInitialMap } from "./style-utils.js";
+import { renderMediaPicker } from "../ui/media-picker.js";
+import { getPlatform } from "../platform.js";
 import htmlMeta from "../../data/html-meta.json";
 
 /**
@@ -336,6 +338,72 @@ function renderFmFieldRow(
     });
   }
 
+  if (entry.format === "image") {
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: renderMediaPicker(field, value, (v) =>
+        update(updateFrontmatter(getState(), field, v || undefined)),
+      ),
+    });
+  }
+
+  if (entry.type === "array" && entry.items?.format === "image") {
+    const images = Array.isArray(value) ? value : [];
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: html`
+        <div class="gallery-picker">
+          <div class="gallery-picker-strip">
+            ${images.map(
+              (img, i) => html`
+                <div class="gallery-picker-item">
+                  <img src=${img} alt="" class="gallery-picker-thumb" />
+                  <sp-action-button
+                    size="xs"
+                    quiet
+                    title="Remove"
+                    @click=${() => {
+                      const next = images.filter((_, idx) => idx !== i);
+                      update(updateFrontmatter(getState(), field, next.length ? next : undefined));
+                    }}
+                  >
+                    <sp-icon-close slot="icon"></sp-icon-close>
+                  </sp-action-button>
+                </div>
+              `,
+            )}
+          </div>
+          ${renderMediaPicker(`${field}:add`, "", (v) => {
+            if (!v) return;
+            const next = [...images, v];
+            update(updateFrontmatter(getState(), field, next));
+          })}
+        </div>
+      `,
+    });
+  }
+
+  if (entry.$ref) {
+    const targetName = entry.$ref.replace("#/contentTypes/", "");
+    const targetDef = projectState?.projectConfig?.contentTypes?.[targetName];
+    const picker = renderReferencePicker(field, value, targetName, targetDef, (v) =>
+      update(updateFrontmatter(getState(), field, v || undefined)),
+    );
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: picker,
+    });
+  }
+
   if (entry.type === "number") {
     return renderFieldRow({
       prop: field,
@@ -372,6 +440,78 @@ function renderFmFieldRow(
       ></sp-textfield>
     `,
   });
+}
+
+// ─── Reference picker ────────────────────────────────────────────────────────
+
+/** @type {Map<string, { slug: string; title: string }[]>} */
+const refEntriesCache = new Map();
+
+/**
+ * Render a reference field as a picker of entries from the target content type.
+ *
+ * @param {string} field
+ * @param {any} value
+ * @param {string} targetName
+ * @param {any} targetDef
+ * @param {(val: any) => void} onCommit
+ */
+function renderReferencePicker(field, value, targetName, targetDef, onCommit) {
+  if (!targetDef?.source) {
+    return html`<sp-textfield
+      size="s"
+      placeholder="slug"
+      .value=${live(value || "")}
+      @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) =>
+        onCommit(e.target.value),
+      )}
+    ></sp-textfield>`;
+  }
+
+  const cacheKey = targetName;
+  if (!refEntriesCache.has(cacheKey)) {
+    loadRefEntries(targetName, targetDef);
+  }
+  const entries = refEntriesCache.get(cacheKey) || [];
+
+  return html`
+    <sp-picker
+      size="s"
+      label=${targetName}
+      .value=${live(value || "")}
+      @change=${(/** @type {any} */ e) => onCommit(e.target.value || undefined)}
+    >
+      <sp-menu-item value="">— none —</sp-menu-item>
+      ${entries.map(
+        (ent) => html`<sp-menu-item value=${ent.slug}>${ent.title || ent.slug}</sp-menu-item>`,
+      )}
+    </sp-picker>
+  `;
+}
+
+async function loadRefEntries(/** @type {string} */ targetName, /** @type {any} */ targetDef) {
+  const platform = getPlatform();
+  const sourceDir = targetDef.source.replace(/^\.\//, "").split("/**")[0].split("/*")[0];
+  try {
+    const listing = await platform.listDirectory(sourceDir);
+    const entries = [];
+    for (const item of listing) {
+      if (item.type === "directory") continue;
+      const slug = item.name.replace(/\.[^.]+$/, "");
+      let title = slug;
+      try {
+        const content = await platform.readFile(item.path);
+        const match = content.match(/^---[\s\S]*?title:\s*(.+?)[\r\n]/m);
+        if (match) title = match[1].trim().replace(/^["']|["']$/g, "");
+      } catch {}
+      entries.push({ slug, title });
+    }
+    refEntriesCache.set(targetName, entries);
+  } catch {}
+}
+
+export function invalidateRefCache() {
+  refEntriesCache.clear();
 }
 
 // ─── Sub-templates ──────────────────────────────────────────────────────────

@@ -5,7 +5,17 @@
 
 import { html, nothing } from "lit-html";
 
-export const FIELD_TYPES = ["string", "number", "boolean", "array", "object", "date"];
+export const FIELD_TYPES = [
+  "string",
+  "number",
+  "boolean",
+  "array",
+  "object",
+  "date",
+  "image",
+  "gallery",
+  "reference",
+];
 
 /**
  * @typedef {{
@@ -14,6 +24,7 @@ export const FIELD_TYPES = ["string", "number", "boolean", "array", "object", "d
  *   required?: string[];
  *   items?: any;
  *   format?: string;
+ *   $ref?: string;
  * }} SchemaProperty
  */
 
@@ -23,6 +34,7 @@ export const FIELD_TYPES = ["string", "number", "boolean", "array", "object", "d
  *   onToggleRequired: (name: string) => void;
  *   onRename: (oldName: string, newName: string) => void;
  *   onChangeType: (name: string, newType: string) => void;
+ *   onChangeRefTarget?: (name: string, target: string) => void;
  *   onAddNestedField?: (
  *     parentName: string,
  *     state: { name: string; type: string; required: boolean },
@@ -35,19 +47,36 @@ export const FIELD_TYPES = ["string", "number", "boolean", "array", "object", "d
  */
 
 /**
+ * Detect the studio field type from a JSON Schema property definition.
+ *
+ * @param {SchemaProperty} schema
+ * @returns {string}
+ */
+export function detectFieldType(schema) {
+  if (schema.$ref) return "reference";
+  if (schema.format === "image") return "image";
+  if (schema.format === "date") return "date";
+  if (schema.type === "array" && schema.items?.format === "image") return "gallery";
+  return schema.type || "string";
+}
+
+/**
  * Render a single schema field as an inline-editable form row.
  *
  * @param {string} fieldName
  * @param {SchemaProperty} fieldSchema — JSON Schema property definition
  * @param {boolean} isRequired
  * @param {FieldHandlers} handlers
+ * @param {string[]} [contentTypeNames] - Available content type names for reference target picker
  * @returns {any}
  */
-export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers) {
-  const type = fieldSchema.format === "date" ? "date" : fieldSchema.type || "string";
+export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, contentTypeNames = []) {
+  const type = detectFieldType(fieldSchema);
   const isNested = type === "object";
+  const isRef = type === "reference";
   const nestedProps = fieldSchema.properties || {};
   const nestedRequired = fieldSchema.required || [];
+  const refTarget = fieldSchema.$ref ? fieldSchema.$ref.replace("#/contentTypes/", "") : "";
 
   return html`
     <div class="schema-field-card">
@@ -87,6 +116,23 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers) {
           <sp-icon-delete slot="icon"></sp-icon-delete>
         </sp-action-button>
       </div>
+      ${isRef && contentTypeNames.length
+        ? html`
+            <div class="schema-field-ref-target">
+              <sp-picker
+                size="s"
+                label="Target"
+                value=${refTarget}
+                @change=${(/** @type {any} */ e) => {
+                  if (handlers.onChangeRefTarget)
+                    handlers.onChangeRefTarget(fieldName, e.target.value);
+                }}
+              >
+                ${contentTypeNames.map((n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`)}
+              </sp-picker>
+            </div>
+          `
+        : nothing}
       ${isNested
         ? html`
             <div class="schema-field-nested">
@@ -119,7 +165,7 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers) {
  * @returns {any}
  */
 function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, handlers) {
-  const type = childSchema.format === "date" ? "date" : childSchema.type || "string";
+  const type = detectFieldType(childSchema);
 
   return html`
     <div class="schema-field-card schema-field-card--nested">
@@ -300,6 +346,12 @@ export function schemaForType(type) {
       return { type: "object", properties: {}, required: [] };
     case "date":
       return { type: "string", format: "date" };
+    case "image":
+      return { type: "string", format: "image" };
+    case "gallery":
+      return { type: "array", items: { type: "string", format: "image" } };
+    case "reference":
+      return { $ref: "#/contentTypes/" };
     default:
       return { type: "string" };
   }
@@ -314,6 +366,7 @@ export function schemaForType(type) {
  */
 export function yamlDefault(type, format) {
   if (format === "date") return new Date().toISOString().split("T")[0];
+  if (format === "image") return '""';
   switch (type) {
     case "boolean":
       return "false";

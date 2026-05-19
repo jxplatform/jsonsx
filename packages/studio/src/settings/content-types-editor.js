@@ -163,6 +163,20 @@ function handleChangeType(fieldName, newType, rerender) {
   saveProjectConfig();
 }
 
+/**
+ * @param {string} fieldName
+ * @param {string} target
+ * @param {() => void} rerender
+ */
+function handleChangeRefTarget(fieldName, target, rerender) {
+  const schema = getSelectedSchema();
+  if (!schema?.properties) return;
+
+  schema.properties[fieldName] = { $ref: `#/contentTypes/${target}` };
+  rerender();
+  saveProjectConfig();
+}
+
 // ─── Nested field handlers ───────────────────────────────────────────────────
 
 /**
@@ -367,6 +381,7 @@ export function renderContentTypesEditor(container) {
       onToggleRequired: (n) => handleToggleRequired(n, rerender),
       onRename: (oldN, newN) => handleRenameField(oldN, newN, rerender),
       onChangeType: (n, t) => handleChangeType(n, t, rerender),
+      onChangeRefTarget: (n, target) => handleChangeRefTarget(n, target, rerender),
       onAddNestedField: (p, s) => handleAddNestedField(p, s, rerender),
       onDeleteNested: (p, c) => handleDeleteNested(p, c, rerender),
       onToggleNestedRequired: (p, c) => handleToggleNestedRequired(p, c, rerender),
@@ -375,7 +390,13 @@ export function renderContentTypesEditor(container) {
     };
 
     const fieldCards = Object.entries(properties).map(([name, def]) =>
-      fieldCardTpl(name, /** @type {any} */ (def), required.includes(name), handlers),
+      fieldCardTpl(
+        name,
+        /** @type {any} */ (def),
+        required.includes(name),
+        handlers,
+        contentTypeNames,
+      ),
     );
 
     editorTpl = html`
