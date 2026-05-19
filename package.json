@@ -44,13 +44,13 @@
     "@commitlint/config-conventional": "^21.0.1",
     "@release-it/bumper": "^7.0.5",
     "@release-it/conventional-changelog": "^11.0.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260518.1",
+    "@typescript/native-preview": "^7.0.0-dev.20260519.1",
     "bun2nix": "^2.1.0",
     "chrome-devtools-mcp": "^1.0.1",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.5",
-    "oxfmt": "^0.50.0",
-    "oxlint": "^1.65.0",
+    "oxfmt": "^0.51.0",
+    "oxlint": "^1.66.0",
     "release-it": "^20.0.1"
   },
   "lint-staged": {
