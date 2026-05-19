@@ -31,7 +31,7 @@ export function ensureLitState(container) {
   const start = part._$startNode;
   const end = part._$endNode;
   const startBad = start && start.parentNode !== container;
-  const endBad = end && end !== container && end.parentNode !== container;
+  const endBad = (end && end !== container && end.parentNode !== container) || (!end && start);
   if (startBad || endBad) {
     console.warn("ensureLitState: clearing corrupted Lit state on", container.id || container);
     container.textContent = "";
