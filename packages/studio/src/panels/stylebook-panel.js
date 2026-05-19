@@ -326,6 +326,7 @@ export function renderStylebookOverlays() {
  * @param {any} entry
  * @param {any} rootStyle
  * @param {any} activeBreakpoints
+ * @param {string | null} [parentTag]
  */
 export function buildStylebookElement(entry, rootStyle, activeBreakpoints, parentTag = null) {
   const el = document.createElement(entry.tag);
