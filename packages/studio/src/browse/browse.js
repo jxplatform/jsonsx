@@ -95,11 +95,14 @@ async function collectFiles(dir, platform) {
         results.push(...sub);
       } else {
         const ext = extOf(entry.name);
+        const category = categoryFor(entry.path, ext);
+        const type =
+          category === "Content" ? contentTypeFor(entry.path) || ext || "file" : ext || "file";
         results.push({
           name: entry.name,
           path: entry.path,
-          type: ext || "file",
-          category: categoryFor(entry.path, ext),
+          type,
+          category,
           ext,
         });
       }
@@ -108,6 +111,27 @@ async function collectFiles(dir, platform) {
     // Directory may not exist or be inaccessible
   }
   return results;
+}
+
+/**
+ * Match a file path against project contentTypes source globs to find its content type name.
+ * Returns the content type name (capitalized) or null if no match.
+ *
+ * @param {string} filePath
+ * @returns {string | null}
+ */
+function contentTypeFor(filePath) {
+  const config = projectState?.projectConfig;
+  if (!config?.contentTypes) return null;
+  for (const [name, def] of Object.entries(config.contentTypes)) {
+    const d = /** @type {any} */ (def);
+    if (!d.source) continue;
+    const prefix = d.source.replace(/^\.\//, "").split("/**")[0].split("/*")[0];
+    if (filePath.startsWith(prefix + "/") || filePath === prefix) {
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+  }
+  return null;
 }
 
 // ─── Data loading ────────────────────────────────────────────────────────────
@@ -376,7 +400,7 @@ export async function renderBrowse(container, ctx) {
                 >
                   <sp-table-cell class="browse-name-cell">${f.name}</sp-table-cell>
                   <sp-table-cell>${f.category}</sp-table-cell>
-                  <sp-table-cell>${f.ext || "—"}</sp-table-cell>
+                  <sp-table-cell>${f.type}</sp-table-cell>
                   <sp-table-cell class="browse-path-cell">${f.path}</sp-table-cell>
                 </sp-table-row>
               `,
