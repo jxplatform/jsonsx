@@ -2,7 +2,7 @@ import { BrowserView, BrowserWindow } from "electrobun/bun";
 import type { StudioRPC } from "./rpc-schema";
 import {
   setProjectRoot,
-  initElectrobunUtils,
+  setFileDialog,
   openProject,
   listDirectory,
   handleReadFile,
@@ -33,13 +33,15 @@ import {
   gitDiscard,
 } from "./git";
 import { addPackage, removePackage, listPackages } from "./packages";
+import { init as initUtils, openFileDialog } from "./utils";
 
 // ─── Determine project root ───────────────────────────────────────────────────
 
 const projectRoot = process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
 
 setProjectRoot(projectRoot);
-await initElectrobunUtils();
+await initUtils();
+setFileDialog(openFileDialog);
 
 // ─── Register RPC handlers ────────────────────────────────────────────────────
 

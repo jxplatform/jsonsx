@@ -1,20 +1,12 @@
-let Utils: any = null;
-
-export async function initElectrobunUtils() {
-  try {
-    Utils = (await import("electrobun/bun")).Utils;
-  } catch {}
-}
-
 import { readdir, readFile, writeFile, unlink, rename, stat, mkdir } from "node:fs/promises";
 import { resolve, relative, join, basename, dirname } from "node:path";
-import { homedir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let projectRoot: string | null = null;
+let fileDialogFn: (() => Promise<string | null>) | null = null;
 
 export function setProjectRoot(root: string | null) {
   projectRoot = root;
@@ -22,6 +14,10 @@ export function setProjectRoot(root: string | null) {
 
 export function getProjectRoot(): string | null {
   return projectRoot;
+}
+
+export function setFileDialog(fn: () => Promise<string | null>) {
+  fileDialogFn = fn;
 }
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
@@ -40,25 +36,9 @@ function assertUnderRoot(absPath: string, root: string) {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
-async function nativeFileDialog(): Promise<string | null> {
-  if (Utils) {
-    const paths = await Utils.openFileDialog({
-      startingFolder: projectRoot || homedir(),
-      allowedFileTypes: "json",
-      canChooseFiles: true,
-      canChooseDirectory: false,
-      allowsMultipleSelection: false,
-    });
-    if (!paths || paths.length === 0 || (paths.length === 1 && !paths[0])) return null;
-    return paths[0].trim() || null;
-  }
-
-  const { openFileDialog } = await import("./nixos-utils");
-  return openFileDialog();
-}
-
 export async function openProject(): Promise<OpenProjectResult | null> {
-  const dirPath = await nativeFileDialog();
+  if (!fileDialogFn) throw new Error("No file dialog configured");
+  const dirPath = await fileDialogFn();
   if (!dirPath) return null;
 
   const filePath = resolve(dirPath, "project.json");

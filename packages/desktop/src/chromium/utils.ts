@@ -1,8 +1,6 @@
 export async function openFileDialog(): Promise<string | null> {
-  // 1. Generate a unique token so we dictate the exact request object path
   const uniqueToken = `bun_portal_${Math.random().toString(36).substring(2, 11)}`;
 
-  // 2. Fetch our D-Bus sender ID to reconstruct the predictable request path
   const idCall = Bun.spawn(
     [
       "gdbus",
@@ -26,7 +24,6 @@ export async function openFileDialog(): Promise<string | null> {
   const formattedSender = `${senderNumber[1]}_${senderNumber[2]}`;
   const targetRequestPath = `/org/freedesktop/portal/desktop/request/${formattedSender}/${uniqueToken}`;
 
-  // 3. Start the monitor FIRST so it's listening before the dialog opens
   const monitor = Bun.spawn(
     [
       "gdbus",
@@ -40,7 +37,6 @@ export async function openFileDialog(): Promise<string | null> {
     { stdout: "pipe", stderr: "pipe" },
   );
 
-  // 4. Fire the OpenFile call with our handle_token
   const call = Bun.spawn(
     [
       "gdbus",
@@ -61,8 +57,7 @@ export async function openFileDialog(): Promise<string | null> {
 
   await call.exited;
 
-  // 5. Read the monitor output until we get a Response signal
-  const reader = monitor.stdout.getReader();
+  const reader = (monitor.stdout as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   const timeout = setTimeout(() => monitor.kill(), 60_000);

@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import {
   setProjectRoot,
+  setFileDialog,
   getProjectRoot,
   openProject,
   listDirectory,
@@ -33,11 +34,13 @@ import {
   gitDiscard,
 } from "../git";
 import { addPackage, removePackage, listPackages } from "../packages";
+import { openFileDialog } from "./utils";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
 const projectRoot = process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
 setProjectRoot(projectRoot);
+setFileDialog(openFileDialog);
 
 // ─── RPC handler dispatch map ────────────────────────────────────────────────
 
