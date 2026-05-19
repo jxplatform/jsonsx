@@ -436,6 +436,12 @@ function renderStylebookElementsIntoCanvas(
   customizedOnly,
   activeBreakpoints,
 ) {
+  for (const [k, v] of Object.entries(rootStyle)) {
+    if (k.startsWith("--") && (typeof v === "string" || typeof v === "number")) {
+      canvasEl.style.setProperty(k, String(v));
+    }
+  }
+
   /** @type {import("lit-html").TemplateResult[]} */
   const sectionTemplates = [];
 
@@ -473,7 +479,10 @@ function renderStylebookElementsIntoCanvas(
           <div
             class="element-card-preview"
             ${ref((c) => {
-              if (c && !c.firstChild) c.appendChild(el);
+              if (c) {
+                c.textContent = "";
+                c.appendChild(el);
+              }
             })}
           ></div>
           <div class="element-card-label">&lt;${entry.tag}&gt;</div>
