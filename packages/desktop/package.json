@@ -11,7 +11,7 @@
   "scripts": {
     "build": "bunx electrobun build",
     "build:release": "bunx electrobun build --env=canary",
-    "build:stable": "bunx electrobun build --env=stable",
+    "build:stable": "bunx electrobun build --env=stable && bun run scripts/build-msi.ts",
     "chromium": "bun run scripts/pre-build-rpc.ts && bun run src/chromium/index.ts",
     "dev": "bunx electrobun dev",
     "upgrade": "bunx npm-check-updates -u && bun install"
@@ -22,6 +22,7 @@
     "electrobun": "latest"
   },
   "devDependencies": {
-    "@jxsuite/server": "workspace:^"
+    "@jxsuite/server": "workspace:^",
+    "electrobun-builder-for-windows": "^0.3.7"
   }
 }
