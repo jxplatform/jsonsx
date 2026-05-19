@@ -45,15 +45,6 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   const S = _ctx.getState();
   const canvasMode = _ctx.getCanvasMode();
 
-  canvasEl.innerHTML = "";
-
-  // Apply content mode typography styling
-  if (S.mode === "content") {
-    canvasEl.setAttribute("data-content-mode", "");
-  } else {
-    canvasEl.removeAttribute("data-content-mode");
-  }
-
   const renderDoc =
     canvasMode === "preview" ? structuredClone(doc) : prepareForEditMode(stripEventHandlers(doc));
 
@@ -264,6 +255,14 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       for (const child of el.querySelectorAll("*")) {
         /** @type {any} */ (child).style.pointerEvents = "none";
       }
+    }
+    // Clear and append atomically — ensures the canvas is never left empty if a
+    // newer render starts and this one would have bailed after clearing.
+    canvasEl.innerHTML = "";
+    if (S.mode === "content") {
+      canvasEl.setAttribute("data-content-mode", "");
+    } else {
+      canvasEl.removeAttribute("data-content-mode");
     }
     canvasEl.appendChild(el);
     if (canvasMode === "design" || canvasMode === "edit") {

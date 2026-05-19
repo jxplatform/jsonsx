@@ -10,6 +10,7 @@ import {
   selectNode,
   insertNode,
   updateProperty,
+  getNodeAtPath,
   parentElementPath,
   childIndex,
   canvasPanels,
@@ -46,11 +47,14 @@ export function enterInlineEdit(el, path) {
       /** @type {any} */ textContent,
     ) {
       const S = getState();
+      const node = getNodeAtPath(S.document, commitPath);
       if (children) {
+        if (node && JSON.stringify(node.children) === JSON.stringify(children)) return;
         let s = updateProperty(S, commitPath, "textContent", undefined);
         s = updateProperty(s, commitPath, "children", children);
         update(s);
       } else if (textContent != null) {
+        if (node && node.textContent === textContent && !node.children) return;
         let s = updateProperty(S, commitPath, "children", undefined);
         s = updateProperty(s, commitPath, "textContent", textContent);
         update(s);
