@@ -261,19 +261,6 @@ export function selectStylebookTag(tag, media) {
     },
   });
   renderStylebookOverlays();
-  requestAnimationFrame(() => {
-    if (canvasPanels.length > 0) {
-      const el = findStylebookEl(canvasPanels[0].canvas, tag);
-      if (el) {
-        const wrap = /** @type {HTMLElement} */ (canvasWrap);
-        const rect = el.getBoundingClientRect();
-        const wrapRect = wrap.getBoundingClientRect();
-        const targetTop =
-          wrap.scrollTop + (rect.top - wrapRect.top) - wrapRect.height / 2 + rect.height / 2;
-        wrap.scrollTo({ top: targetTop, behavior: "smooth" });
-      }
-    }
-  });
 }
 
 /** Draw selection + hover overlays for stylebook elements */
