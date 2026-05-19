@@ -543,13 +543,19 @@ if (_openParam) {
         }
 
         // Read and open the file
-        const fileRelPath = siteCtx.fileRelPath || _openParam;
+        const _fileParam = new URLSearchParams(location.search).get("file");
+        const fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          const parsed = JSON.parse(content);
-          S = createState(parsed);
+          if (fileRelPath.endsWith(".md")) {
+            await loadMarkdown(content, null);
+            S.documentPath = fileRelPath;
+          } else {
+            const parsed = JSON.parse(content);
+            S = createState(parsed);
+            S.documentPath = fileRelPath;
+          }
           S.dirty = false;
-          S.documentPath = fileRelPath;
           S.ui = { ...S.ui, leftTab: "files" };
           ({ doc, session } = fromFlat(S));
           render();

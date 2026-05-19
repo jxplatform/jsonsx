@@ -127,7 +127,13 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
             console.warn("Studio: failed to import package", entry, e);
           }
         } else if (entry?.$ref) {
-          const href = new URL(entry.$ref, docBase).href;
+          let href;
+          try {
+            href = new URL(entry.$ref, docBase).href;
+          } catch (/** @type {any} */ urlErr) {
+            console.warn("Studio: invalid element URL", { ref: entry.$ref, docBase }, urlErr);
+            continue;
+          }
           try {
             await defineElement(href);
           } catch (/** @type {any} */ e) {

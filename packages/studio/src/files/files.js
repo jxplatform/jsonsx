@@ -564,6 +564,8 @@ export async function openFileFromTree(ctx, path) {
     if (path.endsWith(".md")) {
       await ctx.loadMarkdown(content, null);
       ctx.S.documentPath = path;
+      ctx.S.dirty = false;
+      ctx.commit(ctx.S);
     } else {
       const doc = JSON.parse(content);
       const newS = createState(doc);
