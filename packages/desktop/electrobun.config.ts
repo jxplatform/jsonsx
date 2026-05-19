@@ -69,4 +69,14 @@ export default {
   release: {
     baseUrl: "https://github.com/jxsuite/jx/releases/download/",
   },
-} satisfies ElectrobunConfig;
+
+  // electrobun-builder-for-windows configuration
+  name: "Jx Studio",
+  version: pkg.version,
+  author: "jxsuite",
+  windows: {
+    icon: "icon.png",
+    productId: "com.jxsuite.jx-studio",
+    installDir: "Jx Studio",
+  },
+} satisfies ElectrobunConfig as ElectrobunConfig & Record<string, unknown>;
