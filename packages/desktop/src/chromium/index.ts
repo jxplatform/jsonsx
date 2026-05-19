@@ -86,7 +86,7 @@ const server = Bun.serve({
     if (server.upgrade(req)) return;
 
     const url = new URL(req.url);
-    const path = url.pathname;
+    const path = url.pathname.replace(/^\/{2,}/, "/");
 
     if (path.startsWith("/studio/")) {
       const assetPath = resolve(studioDir, "." + path.replace("/studio/", "/"));

@@ -53,7 +53,7 @@ export async function openProject(): Promise<OpenProjectResult | null> {
   return {
     config,
     handle: {
-      root: projectRoot,
+      root: ".",
       name: config.name || basename(projectRoot),
       projectConfig: config,
     },
