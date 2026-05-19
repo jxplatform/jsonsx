@@ -1,6 +1,6 @@
 /**
  * Stylebook panel — renders the Settings mode canvas (element catalog, design variables,
- * definitions, collections). Extracted from studio.js Phase 4e.
+ * definitions, content types). Extracted from studio.js Phase 4e.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
@@ -26,7 +26,7 @@ import { parseMediaEntries, activeBreakpointsForWidth } from "../utils/canvas-me
 import { mediaDisplayName } from "./shared.js";
 import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils.js";
 import { renderDefsEditor } from "../settings/defs-editor.js";
-import { renderCollectionsEditor } from "../settings/collections-editor.js";
+import { renderContentTypesEditor } from "../settings/content-types-editor.js";
 import stylebookMeta from "../../data/stylebook-meta.json";
 
 export { stylebookMeta };
@@ -67,12 +67,12 @@ export function renderStylebookMode(ctx) {
       >
         <sp-tab label="Stylebook" value="stylebook"></sp-tab>
         <sp-tab label="Definitions" value="definitions"></sp-tab>
-        <sp-tab label="Collections" value="collections"></sp-tab>
+        <sp-tab label="Content Types" value="contentTypes"></sp-tab>
       </sp-tabs>
     </div>
   `;
 
-  if (settingsTab === "definitions" || settingsTab === "collections") {
+  if (settingsTab === "definitions" || settingsTab === "contentTypes") {
     /** @type {any} */ (canvasWrap).style.overflow = "hidden";
 
     litRender(
@@ -88,7 +88,7 @@ export function renderStylebookMode(ctx) {
       canvasWrap.querySelector(".settings-editor-container")
     );
     if (settingsTab === "definitions") renderDefsEditor(container);
-    else renderCollectionsEditor(container);
+    else renderContentTypesEditor(container);
     return;
   }
 
@@ -327,7 +327,7 @@ export function renderStylebookOverlays() {
  * @param {any} rootStyle
  * @param {any} activeBreakpoints
  */
-export function buildStylebookElement(entry, rootStyle, activeBreakpoints) {
+export function buildStylebookElement(entry, rootStyle, activeBreakpoints, parentTag = null) {
   const el = document.createElement(entry.tag);
   if (entry.text) el.textContent = entry.text;
   if (entry.attributes) {
@@ -338,7 +338,9 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints) {
     }
   }
   if (entry.style) el.style.cssText = entry.style;
-  const tagStyle = rootStyle[`& ${entry.tag}`];
+  const compoundSelector =
+    parentTag && parentTag !== entry.tag ? `& ${parentTag} ${entry.tag}` : null;
+  const tagStyle = (compoundSelector && rootStyle[compoundSelector]) || rootStyle[`& ${entry.tag}`];
   if (tagStyle) {
     for (const [prop, val] of Object.entries(tagStyle)) {
       if (typeof val === "string" || typeof val === "number") {
@@ -366,7 +368,7 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints) {
   }
   if (entry.children) {
     for (const child of entry.children) {
-      el.appendChild(buildStylebookElement(child, rootStyle, activeBreakpoints));
+      el.appendChild(buildStylebookElement(child, rootStyle, activeBreakpoints, entry.tag));
     }
   }
   return el;
@@ -462,10 +464,11 @@ export function renderStylebookElementsIntoCanvas(
             view.stylebookElToTag.set(card, entry.tag);
             elToPath.set(card, ["__sb", entry.tag]);
             for (const child of el.querySelectorAll("*")) {
-              const tag = child.tagName.toLowerCase();
+              const childTag = child.tagName.toLowerCase();
               if (!view.stylebookElToTag.has(child)) {
-                view.stylebookElToTag.set(child, tag);
-                elToPath.set(child, ["__sb", tag]);
+                const compound = childTag === entry.tag ? entry.tag : `${entry.tag} ${childTag}`;
+                view.stylebookElToTag.set(child, compound);
+                elToPath.set(child, ["__sb", compound]);
               }
             }
           })}

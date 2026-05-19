@@ -82,6 +82,75 @@ describe("buildStylebookElement", () => {
   });
 });
 
+// ─── buildStylebookElement — compound selectors ─────────────────────────────────
+
+describe("buildStylebookElement compound selectors", () => {
+  test("applies compound selector style when parentTag differs from entry.tag", () => {
+    const rootStyle = {
+      "& blockquote p": { fontStyle: "italic" },
+      "& p": { color: "black" },
+    };
+    const el = buildStylebookElement({ tag: "p", text: "Quote" }, rootStyle, null, "blockquote");
+    expect(el.style.fontStyle).toBe("italic");
+  });
+
+  test("falls back to leaf selector when compound not in rootStyle", () => {
+    const rootStyle = { "& p": { color: "green" } };
+    const el = buildStylebookElement({ tag: "p", text: "Test" }, rootStyle, null, "blockquote");
+    expect(el.style.color).toBe("green");
+  });
+
+  test("uses leaf selector when parentTag equals entry.tag", () => {
+    const rootStyle = { "& li": { margin: "4px" } };
+    const el = buildStylebookElement({ tag: "li", text: "Item" }, rootStyle, null, "li");
+    expect(el.style.margin).toBe("4px");
+  });
+
+  test("recursive children receive parent entry.tag as parentTag", () => {
+    const rootStyle = {
+      "& ul li": { listStyleType: "disc" },
+      "& li": { listStyleType: "none" },
+    };
+    const entry = {
+      tag: "ul",
+      children: [{ tag: "li", text: "Item" }],
+    };
+    const el = buildStylebookElement(entry, rootStyle, null);
+    expect(el.children[0].style.listStyleType).toBe("disc");
+  });
+
+  test("differentiates ul li from ol li", () => {
+    const rootStyle = {
+      "& ul li": { color: "blue" },
+      "& ol li": { color: "red" },
+    };
+    const ul = buildStylebookElement(
+      { tag: "ul", children: [{ tag: "li", text: "UL item" }] },
+      rootStyle,
+      null,
+    );
+    const ol = buildStylebookElement(
+      { tag: "ol", children: [{ tag: "li", text: "OL item" }] },
+      rootStyle,
+      null,
+    );
+    expect(ul.children[0].style.color).toBe("blue");
+    expect(ol.children[0].style.color).toBe("red");
+  });
+
+  test("compound selector with media breakpoint overrides", () => {
+    const rootStyle = {
+      "& blockquote p": {
+        fontSize: "1.2rem",
+        "@sm": { fontSize: "1rem" },
+      },
+    };
+    const active = new Set(["sm"]);
+    const el = buildStylebookElement({ tag: "p", text: "Q" }, rootStyle, active, "blockquote");
+    expect(el.style.fontSize).toBe("1rem");
+  });
+});
+
 // ─── renderStylebookElementsIntoCanvas — CSS variable propagation ─────────────
 
 describe("renderStylebookElementsIntoCanvas CSS variables", () => {
