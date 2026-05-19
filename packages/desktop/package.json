@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@jxsuite/studio": "workspace:^",
+    "dbus-ts": "^0.0.7",
     "electrobun": "latest"
   },
   "devDependencies": {

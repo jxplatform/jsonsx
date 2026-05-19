@@ -96,6 +96,17 @@ const server = Bun.serve({
 
     const root = getProjectRoot();
     if (root) {
+      // Serve absolute paths that fall under the project root
+      if (path.startsWith(root)) {
+        const file = Bun.file(path);
+        if (await file.exists()) return new Response(file);
+      }
+
+      // Serve relative paths from project root
+      const projectFile = Bun.file(resolve(root, "." + path));
+      if (await projectFile.exists()) return new Response(projectFile);
+
+      // Serve from public/ subdirectory
       const publicFile = Bun.file(resolve(root, "public", "." + path));
       if (await publicFile.exists()) return new Response(publicFile);
     }

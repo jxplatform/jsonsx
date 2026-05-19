@@ -1,85 +1,54 @@
+import { sessionBus } from "dbus-ts";
+
 export async function openFileDialog(): Promise<string | null> {
-  const uniqueToken = `bun_portal_${Math.random().toString(36).substring(2, 11)}`;
-
-  const idCall = Bun.spawn(
-    [
-      "gdbus",
-      "call",
-      "--session",
-      "--dest",
-      "org.freedesktop.DBus",
-      "--object-path",
-      "/org/freedesktop/DBus",
-      "--method",
-      "org.freedesktop.DBus.GetNameOwner",
-      "org.freedesktop.portal.Desktop",
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-  await idCall.exited;
-  const idStdout = (await new Response(idCall.stdout).text()).trim();
-  const senderNumber = idStdout.match(/:(\d+)\.(\d+)/);
-  if (!senderNumber) throw new Error("Could not resolve D-Bus sender ID");
-
-  const formattedSender = `${senderNumber[1]}_${senderNumber[2]}`;
-  const targetRequestPath = `/org/freedesktop/portal/desktop/request/${formattedSender}/${uniqueToken}`;
-
-  const monitor = Bun.spawn(
-    [
-      "gdbus",
-      "monitor",
-      "--session",
-      "--dest",
-      "org.freedesktop.portal.Desktop",
-      "--object-path",
-      targetRequestPath,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-
-  const call = Bun.spawn(
-    [
-      "gdbus",
-      "call",
-      "--session",
-      "--dest",
-      "org.freedesktop.portal.Desktop",
-      "--object-path",
-      "/org/freedesktop/portal/desktop",
-      "--method",
-      "org.freedesktop.portal.FileChooser.OpenFile",
-      "",
-      "Select Project",
-      `{'directory': <boolean true>, 'modal': <boolean true>, 'handle_token': <'${uniqueToken}'>}`,
-    ],
-    { stdout: "pipe", stderr: "pipe" },
-  );
-
-  await call.exited;
-
-  const reader = (monitor.stdout as ReadableStream<Uint8Array>).getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  const timeout = setTimeout(() => monitor.kill(), 60_000);
+  const bus = await sessionBus();
 
   try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    const portal = (await bus.getInterface(
+      "org.freedesktop.portal.Desktop",
+      "/org/freedesktop/portal/desktop",
+      "org.freedesktop.portal.FileChooser",
+    )) as any;
 
-      if (buffer.includes("Response")) {
-        const statusMatch = buffer.match(/uint32\s+([1-2])/);
-        if (statusMatch) return null;
+    const handleToken = `bun_${Math.random().toString(36).substring(2, 11)}`;
 
-        const uriMatch = buffer.match(/file:\/\/([^']+)/);
-        if (uriMatch) return decodeURIComponent(uriMatch[1]);
-      }
-    }
+    const options = [
+      ["directory", ["b", true]],
+      ["modal", ["b", true]],
+      ["handle_token", ["s", handleToken]],
+    ];
+
+    const [handle] = await portal.OpenFile("", "Select Project", options);
+
+    const result = await new Promise<string | null>((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 60_000);
+
+      bus
+        .getInterface("org.freedesktop.portal.Desktop", handle, "org.freedesktop.portal.Request")
+        .then((request: any) => {
+          request.on("Response", (response: number, results: any) => {
+            clearTimeout(timeout);
+            if (response !== 0) {
+              resolve(null);
+              return;
+            }
+            const uris: string[] = results[0]?.[1]?.[1] || results.uris || [];
+            if (uris.length === 0) {
+              resolve(null);
+              return;
+            }
+            try {
+              const filePath = new URL(uris[0]).pathname;
+              resolve(filePath);
+            } catch {
+              resolve(null);
+            }
+          });
+        });
+    });
+
+    return result;
   } finally {
-    clearTimeout(timeout);
-    monitor.kill();
+    bus.connection.end();
   }
-
-  return null;
 }

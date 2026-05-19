@@ -18,6 +18,7 @@ export default {
     bun: {
       entrypoint: "src/index.ts",
       external: [
+        "dbus-ts",
         "@prettier/plugin-oxc",
         "@prettier/plugin-hermes",
         "@prettier/plugin-pug",
