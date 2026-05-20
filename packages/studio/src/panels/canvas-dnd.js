@@ -21,18 +21,38 @@ import { applyDropInstruction } from "../panels/dnd.js";
 import { effectiveZoom } from "../canvas/canvas-helpers.js";
 
 /**
+ * @typedef {{
+ *   canvas: HTMLElement;
+ *   overlayClk: HTMLElement;
+ *   overlay: HTMLElement;
+ *   viewport: HTMLElement;
+ *   dropLine: HTMLElement;
+ * }} CanvasPanel
+ *
+ * @typedef {(string | number)[]} JxPath
+ *
+ * @typedef {{ type: "reorder-above" | "reorder-below" | "make-child" }} DropInstruction
+ *
+ * @typedef {{ instruction: DropInstruction; referenceEl: HTMLElement; targetPath: JxPath }} DropResult
+ */
+
+/** @type {HTMLElement | null} */
+let _activeDropEl = null;
+
+/**
  * Register all canvas elements in a panel as DnD drop targets.
  *
- * @param {any} panel
+ * @param {CanvasPanel} panel
  */
 export function registerPanelDnD(panel) {
   const { canvas, dropLine } = panel;
   const allEls = canvas.querySelectorAll("*");
 
   const monitorCleanup = monitorForElements({
-    onDragStart() {
+    onDragStart({ location }) {
+      view.lastDragInput = location.current.input;
       for (const el of canvas.querySelectorAll("*")) {
-        /** @type {any} */ (el).style.pointerEvents = "auto";
+        /** @type {HTMLElement} */ (el).style.pointerEvents = "auto";
       }
       for (const p of canvasPanels) p.overlayClk.style.pointerEvents = "none";
     },
@@ -40,10 +60,12 @@ export function registerPanelDnD(panel) {
       view.lastDragInput = location.current.input;
     },
     onDrop() {
+      _activeDropEl?.classList.remove("canvas-drop-target");
+      _activeDropEl = null;
       for (const p of canvasPanels) p.dropLine.style.display = "none";
       view.lastDragInput = null;
       for (const el of canvas.querySelectorAll("*")) {
-        /** @type {any} */ (el).style.pointerEvents = "none";
+        /** @type {HTMLElement} */ (el).style.pointerEvents = "none";
       }
       for (const p of canvasPanels) p.overlayClk.style.pointerEvents = "";
     },
@@ -56,34 +78,45 @@ export function registerPanelDnD(panel) {
     if (!elPath) continue;
 
     const node = getNodeAtPath(S.document, elPath);
-    const isVoid = VOID_ELEMENTS.has((node?.tagName || "div").toLowerCase());
+    const tag = (node?.tagName || "div").toLowerCase();
+    const hasElementChildren = node?.children?.some(
+      (/** @type {unknown} */ c) => c != null && typeof c === "object",
+    );
+    const isLeaf = VOID_ELEMENTS.has(tag) || !hasElementChildren;
 
     const cleanup = dropTargetForElements({
-      element: el,
+      element: /** @type {HTMLElement} */ (el),
       canDrop({ source }) {
-        const srcPath = source.data.path;
-        if (srcPath && isAncestor(/** @type {any} */ (srcPath), elPath)) return false;
+        const srcPath = /** @type {JxPath | undefined} */ (source.data.path);
+        if (srcPath && isAncestor(srcPath, elPath)) return false;
         return true;
       },
       getData() {
-        return { path: elPath, _isVoid: isVoid };
+        return { path: elPath, _isVoid: isLeaf };
       },
-      onDragEnter() {
-        showCanvasDropIndicator(el, elPath, isVoid, panel);
+      onDragEnter({ location }) {
+        view.lastDragInput = location.current.input;
+        if (_activeDropEl && _activeDropEl !== el) {
+          _activeDropEl.classList.remove("canvas-drop-target");
+        }
+        _activeDropEl = /** @type {HTMLElement} */ (el);
+        showCanvasDropIndicator(/** @type {HTMLElement} */ (el), elPath, isLeaf, panel);
       },
-      onDrag() {
-        showCanvasDropIndicator(el, elPath, isVoid, panel);
+      onDrag({ location }) {
+        view.lastDragInput = location.current.input;
+        showCanvasDropIndicator(/** @type {HTMLElement} */ (el), elPath, isLeaf, panel);
       },
-      onDragLeave() {
-        dropLine.style.display = "none";
-        el.classList.remove("canvas-drop-target");
-      },
+      onDragLeave() {},
       onDrop({ source }) {
         dropLine.style.display = "none";
-        el.classList.remove("canvas-drop-target");
-        const instruction = getCanvasDropInstruction(el, elPath, isVoid);
-        if (!instruction) return;
-        applyDropInstruction(instruction, source.data, elPath);
+        /** @type {HTMLElement} */ (el).classList.remove("canvas-drop-target");
+        _activeDropEl = null;
+        const { instruction, targetPath } = getCanvasDropResult(
+          /** @type {HTMLElement} */ (el),
+          elPath,
+          isLeaf,
+        );
+        applyDropInstruction(instruction, source.data, targetPath);
       },
     });
     view.canvasDndCleanups.push(cleanup);
@@ -91,49 +124,98 @@ export function registerPanelDnD(panel) {
 }
 
 /**
- * @param {any} el
- * @param {any} elPath
- * @param {any} isVoid
+ * @param {HTMLElement} el
+ * @param {JxPath} elPath
+ * @param {boolean} isLeaf
+ * @returns {DropResult}
  */
-function getCanvasDropInstruction(el, elPath, isVoid) {
-  const rect = el.getBoundingClientRect();
-  if (!view.lastDragInput) return null;
+function getCanvasDropResult(el, elPath, isLeaf) {
+  if (!view.lastDragInput)
+    return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
   const y = view.lastDragInput.clientY;
+
+  if (elPath.length === 0) {
+    const children = /** @type {HTMLElement[]} */ (Array.from(el.children));
+    if (children.length === 0)
+      return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
+    return nearestChildEdge(children, y, elPath);
+  }
+
+  const rect = el.getBoundingClientRect();
   const relY = (y - rect.top) / rect.height;
 
-  if (elPath.length === 0) return { type: "make-child" };
-  if (isVoid) return relY < 0.5 ? { type: "reorder-above" } : { type: "reorder-below" };
-  if (relY < 0.25) return { type: "reorder-above" };
-  if (relY > 0.75) return { type: "reorder-below" };
-  return { type: "make-child" };
+  if (isLeaf) {
+    const instruction =
+      relY < 0.5
+        ? { type: /** @type {const} */ ("reorder-above") }
+        : { type: /** @type {const} */ ("reorder-below") };
+    return { instruction, referenceEl: el, targetPath: elPath };
+  }
+
+  if (relY < 0.25)
+    return { instruction: { type: "reorder-above" }, referenceEl: el, targetPath: elPath };
+  if (relY > 0.75)
+    return { instruction: { type: "reorder-below" }, referenceEl: el, targetPath: elPath };
+  return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
 }
 
 /**
- * @param {any} el
- * @param {any} elPath
- * @param {any} isVoid
- * @param {any} panel
+ * Find the nearest child edge to the cursor and return the appropriate instruction along with the
+ * reference child element and its path.
+ *
+ * @param {HTMLElement[]} children
+ * @param {number} cursorY
+ * @param {JxPath} parentPath
+ * @returns {DropResult}
  */
-function showCanvasDropIndicator(el, elPath, isVoid, panel) {
-  const instruction = getCanvasDropInstruction(el, elPath, isVoid);
-  const { dropLine, viewport } = panel;
-  if (!instruction) {
-    dropLine.style.display = "none";
-    return;
+function nearestChildEdge(children, cursorY, parentPath) {
+  let closestDist = Infinity;
+  let instruction = /** @type {DropInstruction} */ ({ type: "reorder-below" });
+  let closestIdx = children.length - 1;
+
+  for (let i = 0; i < children.length; i++) {
+    const rect = children[i].getBoundingClientRect();
+    const topDist = Math.abs(cursorY - rect.top);
+    const bottomDist = Math.abs(cursorY - rect.bottom);
+
+    if (topDist < closestDist) {
+      closestDist = topDist;
+      instruction = { type: "reorder-above" };
+      closestIdx = i;
+    }
+    if (bottomDist < closestDist) {
+      closestDist = bottomDist;
+      instruction = { type: "reorder-below" };
+      closestIdx = i;
+    }
   }
+
+  const childPath = [...parentPath, "children", closestIdx];
+  return { instruction, referenceEl: children[closestIdx], targetPath: childPath };
+}
+
+/**
+ * @param {HTMLElement} el
+ * @param {JxPath} elPath
+ * @param {boolean} isLeaf
+ * @param {CanvasPanel} panel
+ */
+function showCanvasDropIndicator(el, elPath, isLeaf, panel) {
+  const { instruction, referenceEl } = getCanvasDropResult(el, elPath, isLeaf);
+  const { dropLine, viewport } = panel;
 
   const scale = effectiveZoom();
   const wrapRect = viewport.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
-  const left = (elRect.left - wrapRect.left + viewport.scrollLeft) / scale;
-  const width = elRect.width / scale;
+  const refRect = referenceEl.getBoundingClientRect();
+  const left = (refRect.left - wrapRect.left + viewport.scrollLeft) / scale;
+  const width = refRect.width / scale;
 
   if (instruction.type === "make-child") {
     dropLine.style.display = "block";
-    dropLine.style.top = `${(elRect.top - wrapRect.top + viewport.scrollTop) / scale}px`;
+    dropLine.style.top = `${(refRect.top - wrapRect.top + viewport.scrollTop) / scale}px`;
     dropLine.style.left = `${left}px`;
     dropLine.style.width = `${width}px`;
-    dropLine.style.height = `${elRect.height / scale}px`;
+    dropLine.style.height = `${refRect.height / scale}px`;
     dropLine.className = "canvas-drop-indicator inside";
     el.classList.add("canvas-drop-target");
     return;
@@ -142,13 +224,13 @@ function showCanvasDropIndicator(el, elPath, isVoid, panel) {
   el.classList.remove("canvas-drop-target");
   const top =
     instruction.type === "reorder-above"
-      ? (elRect.top - wrapRect.top + viewport.scrollTop) / scale
-      : (elRect.bottom - wrapRect.top + viewport.scrollTop) / scale;
+      ? (refRect.top - wrapRect.top + viewport.scrollTop) / scale
+      : (refRect.bottom - wrapRect.top + viewport.scrollTop) / scale;
 
   dropLine.style.display = "block";
   dropLine.style.top = `${top}px`;
   dropLine.style.left = `${left}px`;
   dropLine.style.width = `${width}px`;
-  dropLine.style.height = "2px";
+  dropLine.style.height = "";
   dropLine.className = "canvas-drop-indicator line";
 }
