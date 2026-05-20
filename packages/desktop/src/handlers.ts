@@ -177,19 +177,22 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
           $id: content.$id || null,
           path: match,
           props: Object.entries(content.state || {})
-            .filter(
-              ([, d]) =>
-                d &&
-                typeof d === "object" &&
-                !(d as any).$prototype &&
-                !(d as any).$handler &&
-                !(d as any).$compute,
-            )
-            .map(([name, d]) => ({
-              name,
-              type: (d as any).type,
-              default: (d as any).default,
-            })),
+            .filter(([, d]) => {
+              if (d == null) return false;
+              if (typeof d !== "object") return true;
+              return !(d as any).$prototype && !(d as any).$handler && !(d as any).$compute;
+            })
+            .map(([name, d]) => {
+              if (typeof d !== "object") {
+                return { name, type: typeof d, default: d };
+              }
+              return {
+                name,
+                type: (d as any).type,
+                default: (d as any).default,
+                format: (d as any).format,
+              };
+            }),
           hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
         });
       }
