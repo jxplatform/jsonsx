@@ -1,0 +1,1 @@
+export class WithSchema { static schema = { type: "object", properties: { x: { type: "number" } } }; }

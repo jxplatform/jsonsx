@@ -256,6 +256,257 @@ describe("handleResolve — errors", () => {
   });
 });
 
+// ─── handleResolve — $base URL resolution ───────────────────────────────────
+
+describe("handleResolve — $base URL resolution", () => {
+  test("resolves $src relative to document directory when $base is provided", async () => {
+    const subDir = join(FIXTURES, "sub");
+    mkdirSync(subDir, { recursive: true });
+    const subClass = {
+      title: "SubAdder",
+      $prototype: "Class",
+      $defs: {
+        fields: {
+          x: { role: "field", access: "public", scope: "instance", identifier: "x", default: 1 },
+        },
+        methods: {
+          resolve: { role: "method", identifier: "resolve", body: "return this.x * 2;" },
+        },
+      },
+    };
+    writeFileSync(join(subDir, "SubAdder.class.json"), JSON.stringify(subClass), "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./SubAdder.class.json",
+        $prototype: "SubAdder",
+        $base: "http://localhost/_fixtures/sub/page.json",
+        x: 7,
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe(14);
+    } finally {
+      rmSync(subDir, { recursive: true, force: true });
+    }
+  });
+
+  test("returns 400 when $base is a malformed URL", async () => {
+    const req = mockRequest({
+      $src: "./anything.class.json",
+      $prototype: "Foo",
+      $base: "not-a-url",
+    });
+    const res = await handleResolve(req, import.meta.dir);
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("Cannot resolve $src");
+  });
+
+  test("rebases relative config paths to CWD-relative when $base is provided", async () => {
+    const subDir = join(FIXTURES, "sub");
+    mkdirSync(subDir, { recursive: true });
+    const rebaserClass = {
+      title: "Rebaser",
+      $prototype: "Class",
+      $defs: {
+        fields: {
+          src: {
+            role: "field",
+            access: "public",
+            scope: "instance",
+            identifier: "src",
+            default: "",
+          },
+        },
+        methods: {
+          resolve: { role: "method", identifier: "resolve", body: "return this.src;" },
+        },
+      },
+    };
+    writeFileSync(join(subDir, "Rebaser.class.json"), JSON.stringify(rebaserClass), "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./Rebaser.class.json",
+        $prototype: "Rebaser",
+        $base: "http://localhost/_fixtures/sub/page.json",
+        src: "./data.json",
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(200);
+      const value = await res.json();
+      // The path should be rebased to CWD-relative (starts with ./) and include the sub dir
+      expect(typeof value).toBe("string");
+      expect(value.startsWith("./")).toBe(true);
+      expect(value).toContain("_fixtures/sub/data.json");
+    } finally {
+      rmSync(subDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── handleResolve — malformed .class.json ──────────────────────────────────
+
+describe("handleResolve — malformed .class.json", () => {
+  test("returns 500 with error object when .class.json contains invalid JSON", async () => {
+    const badFile = join(FIXTURES, "BadJson.class.json");
+    writeFileSync(badFile, "{ this is not valid json }", "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./_fixtures/BadJson.class.json",
+        $prototype: "BadJson",
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBeTruthy();
+    } finally {
+      rmSync(badFile, { force: true });
+    }
+  });
+});
+
+// ─── handleResolve — accessor with getter and setter ────────────────────────
+
+describe("handleResolve — accessor with getter and setter", () => {
+  test("accessor role generates get/set descriptor on prototype", async () => {
+    const counterClass = {
+      title: "Counter",
+      $prototype: "Class",
+      $defs: {
+        fields: {
+          _count: {
+            role: "field",
+            access: "public",
+            scope: "instance",
+            identifier: "_count",
+            default: 0,
+          },
+        },
+        methods: {
+          count: {
+            role: "accessor",
+            identifier: "count",
+            getter: { body: "return this._count;" },
+            setter: {
+              parameters: [{ $ref: "#/$defs/parameters/val" }],
+              body: "this._count = val;",
+            },
+          },
+          resolve: {
+            role: "method",
+            identifier: "resolve",
+            body: "this.count = 5; return this.count;",
+          },
+        },
+      },
+    };
+    const counterFile = join(FIXTURES, "Counter.class.json");
+    writeFileSync(counterFile, JSON.stringify(counterClass), "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./_fixtures/Counter.class.json",
+        $prototype: "Counter",
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe(5);
+    } finally {
+      rmSync(counterFile, { force: true });
+    }
+  });
+});
+
+// ─── handleResolve — static method ──────────────────────────────────────────
+
+describe("handleResolve — static method", () => {
+  test("static scope attaches method to class constructor", async () => {
+    const factoryClass = {
+      title: "Factory",
+      $prototype: "Class",
+      $defs: {
+        methods: {
+          create: {
+            role: "method",
+            scope: "static",
+            identifier: "create",
+            body: "return 42;",
+          },
+          resolve: {
+            role: "method",
+            identifier: "resolve",
+            body: "return this.constructor.create();",
+          },
+        },
+      },
+    };
+    const factoryFile = join(FIXTURES, "Factory.class.json");
+    writeFileSync(factoryFile, JSON.stringify(factoryClass), "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./_fixtures/Factory.class.json",
+        $prototype: "Factory",
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe(42);
+    } finally {
+      rmSync(factoryFile, { force: true });
+    }
+  });
+});
+
+// ─── handleResolve — hybrid .value instance (no resolve) ────────────────────
+
+describe("handleResolve — hybrid .value instance", () => {
+  test("returns value getter from $implementation when no resolve() method exists", async () => {
+    const implFile = join(FIXTURES, "value-holder.js");
+    const classFile = join(FIXTURES, "HybridValue.class.json");
+    writeFileSync(
+      implFile,
+      `export class HybridValue {
+  constructor(config) { this.data = config.data ?? "default"; }
+  get value() { return "got:" + this.data; }
+}`,
+      "utf8",
+    );
+    const hybridValueClass = {
+      title: "HybridValue",
+      $prototype: "Class",
+      $implementation: "./value-holder.js",
+    };
+    writeFileSync(classFile, JSON.stringify(hybridValueClass), "utf8");
+    try {
+      const req = mockRequest({
+        $src: "./_fixtures/HybridValue.class.json",
+        $prototype: "HybridValue",
+        data: "test",
+      });
+      const res = await handleResolve(req, import.meta.dir);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toBe("got:test");
+    } finally {
+      rmSync(implFile, { force: true });
+      rmSync(classFile, { force: true });
+    }
+  });
+});
+
+// ─── handleServerFunction — malformed $base ─────────────────────────────────
+
+describe("handleServerFunction — malformed $base", () => {
+  test("returns 400 when $base is not a valid URL", async () => {
+    const req = mockRequest({
+      $src: "./foo.js",
+      $export: "fn",
+      $base: "not-a-url",
+    });
+    const res = await handleServerFunction(req, import.meta.dir);
+    expect(res.status).toBe(400);
+    const text = await res.text();
+    expect(text).toContain("Cannot resolve $src");
+  });
+});
+
 // Cleanup
 process.on("exit", () => {
   try {

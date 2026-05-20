@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { injectSSE, SSE_SCRIPT, createWatcher } from "../src/watch.js";
-import { mkdirSync, rmSync } from "node:fs";
+import { injectSSE, SSE_SCRIPT, createWatcher, shouldIgnore } from "../src/watch.js";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_watch");
@@ -95,5 +95,54 @@ describe("createWatcher", () => {
     } finally {
       rmSync(FIXTURES, { recursive: true, force: true });
     }
+  });
+
+  test("broadcasts on file change with reloadOnAnyChange", async () => {
+    mkdirSync(FIXTURES, { recursive: true });
+    try {
+      const { handleSSE, watcher } = createWatcher(FIXTURES, [], {
+        debounce: 10,
+        reloadOnAnyChange: true,
+      });
+      const response = handleSSE();
+      const reader = /** @type {ReadableStream} */ (response.body).getReader();
+
+      // Wait for chokidar to be ready before writing
+      await new Promise((resolve) => watcher.on("ready", () => resolve(undefined)));
+
+      // Write a file to trigger the watcher
+      writeFileSync(join(FIXTURES, "trigger.txt"), "change-" + Date.now());
+
+      // Wait for debounce + watcher to fire
+      const { value } = await Promise.race([
+        reader.read(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+      ]);
+      const text = new TextDecoder().decode(value);
+      expect(text).toContain("data: reload");
+      reader.cancel();
+    } finally {
+      rmSync(FIXTURES, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── shouldIgnore ────────────────────────────────────────────────────────────
+
+describe("shouldIgnore", () => {
+  test("matches **/dir/** patterns", () => {
+    expect(shouldIgnore("src/node_modules/foo.js", ["**/node_modules/**"])).toBe(true);
+    expect(shouldIgnore("src/app.js", ["**/node_modules/**"])).toBe(false);
+  });
+
+  test("matches **/suffix patterns", () => {
+    expect(shouldIgnore("src/bun.lockb", ["**/bun.lockb"])).toBe(true);
+    expect(shouldIgnore("bun.lockb", ["**/bun.lockb"])).toBe(true);
+    expect(shouldIgnore("src/other.js", ["**/bun.lockb"])).toBe(false);
+  });
+
+  test("falls back to substring includes for plain patterns", () => {
+    expect(shouldIgnore("src/temp/file.js", ["temp"])).toBe(true);
+    expect(shouldIgnore("src/other/file.js", ["temp"])).toBe(false);
   });
 });

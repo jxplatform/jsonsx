@@ -122,4 +122,22 @@ describe("rebuild", () => {
       cleanup();
     }
   });
+
+  test("reports failure and empty rebuilt when Bun.build returns a failed result", async () => {
+    // Bun.build throws for parse errors in this runtime, so stub it to return
+    // a failed BuildResult, which exercises lines 61-62 of rebuild().
+    const originalBuild = Bun.build;
+    // @ts-ignore — intentional stub
+    Bun.build = async () => ({ success: false, logs: ["stub: build failed"] });
+    try {
+      const builds = [
+        { entrypoints: ["x.js"], outdir: "/tmp/stub-out", match: /\.js$/, label: "failing-build" },
+      ];
+      const result = await rebuild(builds, "x.js");
+      expect(result.success).toBe(false);
+      expect(result.rebuilt).toEqual([]);
+    } finally {
+      Bun.build = originalBuild;
+    }
+  });
 });

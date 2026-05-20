@@ -40,6 +40,8 @@ function shouldIgnore(pathname, ignore) {
   });
 }
 
+export { shouldIgnore };
+
 export const SSE_SCRIPT = `\n<script>new EventSource('/__reload').onmessage=()=>location.reload()</script>`;
 
 /** @param {string} html */
@@ -55,7 +57,11 @@ export function injectSSE(html) {
  * @param {string} root - Absolute path to watch
  * @param {any[]} builds - Build entries (for selective rebuild)
  * @param {{ ignore?: string[]; debounce?: number; reloadOnAnyChange?: boolean }} [opts]
- * @returns {{ broadcast: () => void; handleSSE: () => Response }}
+ * @returns {{
+ *   broadcast: () => void;
+ *   handleSSE: () => Response;
+ *   watcher: import("chokidar").FSWatcher;
+ * }}
  */
 export function createWatcher(root, builds, opts = {}) {
   const ignore = opts.ignore ?? DEFAULT_IGNORE;
@@ -132,5 +138,5 @@ export function createWatcher(root, builds, opts = {}) {
     }, debounceMs);
   });
 
-  return { broadcast, handleSSE };
+  return { broadcast, handleSSE, watcher };
 }
