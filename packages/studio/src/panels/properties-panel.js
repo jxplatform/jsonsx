@@ -36,6 +36,7 @@ import { isCustomElementDoc, collectCssParts } from "./signals-panel.js";
 import { mediaDisplayName } from "./shared.js";
 import { getCssInitialMap } from "./style-utils.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
+import { renderColorSelector } from "../ui/color-selector.js";
 import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context.js";
 import { getPlatform } from "../platform.js";
 import htmlMeta from "../../data/html-meta.json";
@@ -727,7 +728,21 @@ function renderComponentPropsFieldsTemplate(
       const staticVal = isBound ? "" : (rawValue ?? "");
       /** @type {any} */
       let widgetTpl;
-      if (parsed.kind === "boolean") {
+      if (prop.format === "image") {
+        widgetTpl = renderMediaPicker(prop.name, staticVal, onChange);
+      } else if (prop.format === "color") {
+        widgetTpl = renderColorSelector(prop.name, staticVal, onChange);
+      } else if (prop.format === "date") {
+        widgetTpl = html`<sp-textfield
+          size="s"
+          placeholder="YYYY-MM-DD"
+          value=${staticVal}
+          @input=${(/** @type {any} */ e) => {
+            clearTimeout(debounce);
+            debounce = setTimeout(() => onChange(e.target.value), 400);
+          }}
+        ></sp-textfield>`;
+      } else if (parsed.kind === "boolean") {
         widgetTpl = html`<sp-checkbox
           size="s"
           .checked=${live(!!staticVal)}

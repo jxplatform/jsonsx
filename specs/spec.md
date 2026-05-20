@@ -301,6 +301,26 @@ Every entry in `state` falls into exactly one of four shapes, determinable by in
 
 **Use the typed form when** the value needs type constraints, documentation, or references a shared type via `$ref`. **Use naked values (Shape 1) when none apply.**
 
+##### The `format` Keyword
+
+The `format` keyword provides rendering hints for visual editors. It does not affect runtime behavior — the value remains its declared `type` — but tells the studio which specialized input control to present.
+
+| `format` value | Underlying `type` | Studio control                          |
+| -------------- | ----------------- | --------------------------------------- |
+| `"image"`      | `string`          | Media picker (file browser + thumbnail) |
+| `"date"`       | `string`          | Date input (YYYY-MM-DD)                 |
+| `"color"`      | `string`          | Color picker                            |
+
+```json
+{
+  "state": {
+    "bg": { "type": "string", "format": "image", "default": "" },
+    "publishDate": { "type": "string", "format": "date", "default": "" },
+    "accentColor": { "type": "string", "format": "color", "default": "#000000" }
+  }
+}
+```
+
 > **Status: Implemented.** Runtime handles `default` extraction. Schema generator includes `TypedStateDef`.
 
 #### Shape 3 — Computed (Template String)

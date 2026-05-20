@@ -5,17 +5,9 @@
 
 import { html, nothing } from "lit-html";
 
-export const FIELD_TYPES = [
-  "string",
-  "number",
-  "boolean",
-  "array",
-  "object",
-  "date",
-  "image",
-  "gallery",
-  "reference",
-];
+export const FIELD_TYPES = ["string", "number", "boolean", "array", "object", "reference"];
+
+export const FORMAT_OPTIONS = ["", "image", "date", "color"];
 
 /**
  * @typedef {{
@@ -34,6 +26,7 @@ export const FIELD_TYPES = [
  *   onToggleRequired: (name: string) => void;
  *   onRename: (oldName: string, newName: string) => void;
  *   onChangeType: (name: string, newType: string) => void;
+ *   onChangeFormat?: (name: string, format: string) => void;
  *   onChangeRefTarget?: (name: string, target: string) => void;
  *   onAddNestedField?: (
  *     parentName: string,
@@ -43,6 +36,7 @@ export const FIELD_TYPES = [
  *   onToggleNestedRequired?: (parentName: string, childName: string) => void;
  *   onRenameNested?: (parentName: string, oldChild: string, newChild: string) => void;
  *   onChangeNestedType?: (parentName: string, childName: string, newType: string) => void;
+ *   onChangeNestedFormat?: (parentName: string, childName: string, format: string) => void;
  * }} FieldHandlers
  */
 
@@ -54,10 +48,18 @@ export const FIELD_TYPES = [
  */
 export function detectFieldType(schema) {
   if (schema.$ref) return "reference";
-  if (schema.format === "image") return "image";
-  if (schema.format === "date") return "date";
-  if (schema.type === "array" && schema.items?.format === "image") return "gallery";
   return schema.type || "string";
+}
+
+/**
+ * Detect the format from a JSON Schema property definition.
+ *
+ * @param {SchemaProperty} schema
+ * @returns {string}
+ */
+export function detectFieldFormat(schema) {
+  if (schema.type === "array" && schema.items?.format) return schema.items.format;
+  return schema.format || "";
 }
 
 /**
@@ -72,6 +74,7 @@ export function detectFieldType(schema) {
  */
 export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, contentTypeNames = []) {
   const type = detectFieldType(fieldSchema);
+  const format = detectFieldFormat(fieldSchema);
   const isNested = type === "object";
   const isRef = type === "reference";
   const nestedProps = fieldSchema.properties || {};
@@ -100,6 +103,11 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, conte
           }}
         ></sp-textfield>
         ${typePickerTpl(type, (newType) => handlers.onChangeType(fieldName, newType))}
+        ${type === "string" || type === "array"
+          ? formatPickerTpl(format, (f) => {
+              if (handlers.onChangeFormat) handlers.onChangeFormat(fieldName, f);
+            })
+          : nothing}
         <sp-switch
           size="s"
           ?checked=${isRequired}
@@ -166,6 +174,7 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, conte
  */
 function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, handlers) {
   const type = detectFieldType(childSchema);
+  const format = detectFieldFormat(childSchema);
 
   return html`
     <div class="schema-field-card schema-field-card--nested">
@@ -195,6 +204,12 @@ function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, hand
           if (handlers.onChangeNestedType)
             handlers.onChangeNestedType(parentName, childName, newType);
         })}
+        ${type === "string" || type === "array"
+          ? formatPickerTpl(format, (f) => {
+              if (handlers.onChangeNestedFormat)
+                handlers.onChangeNestedFormat(parentName, childName, f);
+            })
+          : nothing}
         <sp-switch
           size="s"
           ?checked=${isRequired}
@@ -291,9 +306,29 @@ export function typePickerTpl(value, onChange) {
 }
 
 /**
+ * Render the format picker as an sp-picker dropdown.
+ *
+ * @param {string} value
+ * @param {(format: string) => void} onChange
+ * @returns {any}
+ */
+export function formatPickerTpl(value, onChange) {
+  return html`
+    <sp-picker
+      size="s"
+      label="Format"
+      value=${value}
+      @change=${(/** @type {any} */ e) => onChange(e.target.value)}
+    >
+      ${FORMAT_OPTIONS.map((f) => html`<sp-menu-item value=${f}>${f || "(none)"}</sp-menu-item>`)}
+    </sp-picker>
+  `;
+}
+
+/**
  * Render the add-field form (inline, not a dialog).
  *
- * @param {{ name: string; type: string; required: boolean }} state
+ * @param {{ name: string; type: string; format: string; required: boolean }} state
  * @param {{
  *   onInput: (field: string, value: any) => void;
  *   onConfirm: () => void;
@@ -315,6 +350,9 @@ export function addFieldFormTpl(state, handlers) {
         }}
       ></sp-textfield>
       ${typePickerTpl(state.type, (t) => handlers.onInput("type", t))}
+      ${state.type === "string" || state.type === "array"
+        ? formatPickerTpl(state.format || "", (f) => handlers.onInput("format", f))
+        : nothing}
       <sp-switch
         size="s"
         ?checked=${state.required}
@@ -329,31 +367,28 @@ export function addFieldFormTpl(state, handlers) {
 }
 
 /**
- * Build a JSON Schema property definition from a type string.
+ * Build a JSON Schema property definition from a type and optional format.
  *
  * @param {string} type
+ * @param {string} [format]
  * @returns {object}
  */
-export function schemaForType(type) {
+export function schemaForType(type, format) {
   switch (type) {
     case "number":
       return { type: "number" };
     case "boolean":
       return { type: "boolean" };
     case "array":
-      return { type: "array", items: { type: "string" } };
+      return format
+        ? { type: "array", items: { type: "string", format } }
+        : { type: "array", items: { type: "string" } };
     case "object":
       return { type: "object", properties: {}, required: [] };
-    case "date":
-      return { type: "string", format: "date" };
-    case "image":
-      return { type: "string", format: "image" };
-    case "gallery":
-      return { type: "array", items: { type: "string", format: "image" } };
     case "reference":
       return { $ref: "#/contentTypes/" };
     default:
-      return { type: "string" };
+      return format ? { type: "string", format } : { type: "string" };
   }
 }
 

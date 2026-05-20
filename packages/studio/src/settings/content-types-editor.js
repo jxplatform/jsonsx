@@ -8,14 +8,19 @@
 import { html, render as litRender } from "lit-html";
 import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
-import { fieldCardTpl, addFieldFormTpl, schemaForType } from "./schema-field-ui.js";
+import {
+  fieldCardTpl,
+  addFieldFormTpl,
+  schemaForType,
+  detectFieldFormat,
+} from "./schema-field-ui.js";
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 /** @type {string | null} */
 let selectedContentType = null;
 let showAddField = false;
-let newFieldState = { name: "", type: "string", required: false };
+let newFieldState = { name: "", type: "string", format: "", required: false };
 let showNewContentType = false;
 let newContentTypeName = "";
 
@@ -76,7 +81,7 @@ function handleAddField(rerender) {
   if (!schema) return;
 
   if (!schema.properties) schema.properties = {};
-  schema.properties[name] = schemaForType(newFieldState.type);
+  schema.properties[name] = schemaForType(newFieldState.type, newFieldState.format || undefined);
 
   if (newFieldState.required) {
     if (!schema.required) schema.required = [];
@@ -84,7 +89,7 @@ function handleAddField(rerender) {
   }
 
   showAddField = false;
-  newFieldState = { name: "", type: "string", required: false };
+  newFieldState = { name: "", type: "string", format: "", required: false };
   rerender();
   saveProjectConfig();
 }
@@ -158,7 +163,27 @@ function handleChangeType(fieldName, newType, rerender) {
   const schema = getSelectedSchema();
   if (!schema?.properties?.[fieldName]) return;
 
-  schema.properties[fieldName] = schemaForType(newType);
+  const oldFormat =
+    newType === "string" || newType === "array"
+      ? detectFieldFormat(schema.properties[fieldName])
+      : undefined;
+  schema.properties[fieldName] = schemaForType(newType, oldFormat || undefined);
+  rerender();
+  saveProjectConfig();
+}
+
+/**
+ * @param {string} fieldName
+ * @param {string} format
+ * @param {() => void} rerender
+ */
+function handleChangeFormat(fieldName, format, rerender) {
+  const schema = getSelectedSchema();
+  if (!schema?.properties?.[fieldName]) return;
+
+  const prop = schema.properties[fieldName];
+  const type = prop.type || "string";
+  schema.properties[fieldName] = schemaForType(type, format || undefined);
   rerender();
   saveProjectConfig();
 }
@@ -278,7 +303,29 @@ function handleChangeNestedType(parentName, childName, newType, rerender) {
   const parent = schema?.properties?.[parentName];
   if (!parent?.properties?.[childName]) return;
 
-  parent.properties[childName] = schemaForType(newType);
+  const oldFormat =
+    newType === "string" || newType === "array"
+      ? detectFieldFormat(parent.properties[childName])
+      : undefined;
+  parent.properties[childName] = schemaForType(newType, oldFormat || undefined);
+  rerender();
+  saveProjectConfig();
+}
+
+/**
+ * @param {string} parentName
+ * @param {string} childName
+ * @param {string} format
+ * @param {() => void} rerender
+ */
+function handleChangeNestedFormat(parentName, childName, format, rerender) {
+  const schema = getSelectedSchema();
+  const parent = schema?.properties?.[parentName];
+  if (!parent?.properties?.[childName]) return;
+
+  const prop = parent.properties[childName];
+  const type = prop.type || "string";
+  parent.properties[childName] = schemaForType(type, format || undefined);
   rerender();
   saveProjectConfig();
 }
@@ -381,12 +428,14 @@ export function renderContentTypesEditor(container) {
       onToggleRequired: (n) => handleToggleRequired(n, rerender),
       onRename: (oldN, newN) => handleRenameField(oldN, newN, rerender),
       onChangeType: (n, t) => handleChangeType(n, t, rerender),
+      onChangeFormat: (n, f) => handleChangeFormat(n, f, rerender),
       onChangeRefTarget: (n, target) => handleChangeRefTarget(n, target, rerender),
       onAddNestedField: (p, s) => handleAddNestedField(p, s, rerender),
       onDeleteNested: (p, c) => handleDeleteNested(p, c, rerender),
       onToggleNestedRequired: (p, c) => handleToggleNestedRequired(p, c, rerender),
       onRenameNested: (p, o, n) => handleRenameNested(p, o, n, rerender),
       onChangeNestedType: (p, c, t) => handleChangeNestedType(p, c, t, rerender),
+      onChangeNestedFormat: (p, c, f) => handleChangeNestedFormat(p, c, f, rerender),
     };
 
     const fieldCards = Object.entries(properties).map(([name, def]) =>
@@ -423,7 +472,7 @@ export function renderContentTypesEditor(container) {
               onConfirm: () => handleAddField(rerender),
               onCancel: () => {
                 showAddField = false;
-                newFieldState = { name: "", type: "string", required: false };
+                newFieldState = { name: "", type: "string", format: "", required: false };
                 rerender();
               },
             })

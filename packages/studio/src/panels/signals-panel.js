@@ -444,6 +444,14 @@ function renderSignalEditorTemplate(
         def.type || "string",
         (/** @type {any} */ v) => update(updateDef(S, name, { type: v })),
       )}
+      ${def.type === "string" || !def.type
+        ? pickerRow(
+            "Format",
+            ["", "image", "date", "color"],
+            def.format || "",
+            (/** @type {any} */ v) => update(updateDef(S, name, { format: v || undefined })),
+          )
+        : nothing}
       ${signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
         let parsed = v;
         if (def.type === "integer") parsed = parseInt(v, 10) || 0;

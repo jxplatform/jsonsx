@@ -353,7 +353,7 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
                     // Shorthand: infer type from value
                     return { name, type: typeof d, default: d };
                   }
-                  return { name, type: d.type, default: d.default };
+                  return { name, type: d.type, default: d.default, format: d.format };
                 }),
               hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
             });

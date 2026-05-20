@@ -290,6 +290,24 @@ All git operations are exposed as PAL methods (`gitStatus()`, `gitCommit(message
 
 Displays and edits element properties (`tagName`, `className`, `textContent`, etc.) with auto-generated controls based on property type.
 
+#### Component Props Widget Selection
+
+When a Jx component is selected, the property panel renders its declared `state` entries as form controls. Widget selection priority:
+
+1. `format` → format-specific control (see table)
+2. `type === "boolean"` → checkbox
+3. `type === "number"` → number field
+4. `type` has enum/union → combobox (`jx-value-selector`)
+5. Fallback → text field
+
+| `format`  | Control                                                 |
+| --------- | ------------------------------------------------------- |
+| `"image"` | `renderMediaPicker()` — file browser + thumbnail        |
+| `"date"`  | Text field with `placeholder="YYYY-MM-DD"`              |
+| `"color"` | Color picker (reuses style panel `renderColorSelector`) |
+
+Each prop also supports signal binding via a toggle button — when bound, the widget is replaced by a signal picker dropdown listing available `state` entries.
+
 ### 6.2 Style Sidebar (Metadata-Driven)
 
 Organized, metadata-driven style sections. Metadata loaded from `css-meta.json` (JSON Schema definitions for each CSS property).
