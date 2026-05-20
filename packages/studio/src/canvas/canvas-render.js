@@ -249,10 +249,11 @@ export function renderCanvas() {
       resetZoomIndicator();
     }
 
+    const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     const editTpl = html`
       <div class="content-edit-canvas">
-        <div class="content-edit-column">${panelTpl}</div>
+        <div class="content-edit-column" style="max-width:${baseWidth}px">${panelTpl}</div>
       </div>
     `;
     litRender(editTpl, canvasWrap);
