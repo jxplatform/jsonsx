@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Jx Studio
+Comment=Visual JSON component editor
+Exec=jx-studio %F
+Icon=jx-studio
+Terminal=false
+Type=Application
+Categories=Development;WebDevelopment;
+MimeType=application/json;text/markdown;
+StartupWMClass=jx-studio

@@ -3,6 +3,7 @@
   stdenv,
   bun,
   makeWrapper,
+  copyDesktopItems,
   chromium,
   lib,
 }:
@@ -15,7 +16,10 @@ stdenv.mkDerivation {
   nativeBuildInputs = [
     bun
     makeWrapper
+    copyDesktopItems
   ];
+
+  desktopItems = [ ./jx-studio.desktop ];
 
   bunDeps = bun2nix.fetchBunDeps {
     bunNix = ../../bun.nix;
@@ -52,6 +56,9 @@ stdenv.mkDerivation {
       --add-flags "run $out/lib/jx-studio/src/chromium/index.ts" \
       --set CHROMIUM_BIN "${chromium}/bin/chromium" \
       --set JX_STUDIO_ASSETS "$out/lib/jx-studio/assets/studio"
+
+    install -Dm644 packages/desktop/icon.png $out/share/icons/hicolor/512x512/apps/jx-studio.png
+    install -Dm644 branding/jx_flattened.svg $out/share/icons/hicolor/scalable/apps/jx-studio.svg
 
     runHook postInstall
   '';
