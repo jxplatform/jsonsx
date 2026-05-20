@@ -1,5 +1,4 @@
 import { homedir } from "node:os";
-import { getProjectRoot } from "./handlers";
 
 let Utils: any = null;
 
@@ -12,7 +11,7 @@ export async function init() {
 export async function openFileDialog(): Promise<string | null> {
   if (!Utils) return null;
   const paths = await Utils.openFileDialog({
-    startingFolder: getProjectRoot() || homedir(),
+    startingFolder: homedir(),
     allowedFileTypes: "json",
     canChooseFiles: true,
     canChooseDirectory: false,
