@@ -23,6 +23,7 @@ import { showContextMenu } from "../editor/context-menu.js";
 import * as insertionHelper from "../editor/insertion-helper.js";
 import { defaultDef } from "../panels/shared.js";
 import { bubbleInlinePath, findCanvasElement, effectiveZoom } from "../canvas/canvas-helpers.js";
+import { layoutElements, activeLayoutPath } from "../canvas/canvas-live-render.js";
 
 /** @type {any} */
 let _ctx = null;
@@ -87,6 +88,15 @@ export function registerPanelEvents(panel) {
 
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
+          // Layout element clicked — show layout info instead of selecting in page doc
+          if (layoutElements.has(el)) {
+            view.layoutSelection = { el, layoutPath: activeLayoutPath };
+            update(selectNode(S, null));
+            renderOnly("rightPanel");
+            return;
+          }
+          view.layoutSelection = null;
+
           const originalPath = elToPath.get(el);
           if (originalPath) {
             let path = bubbleInlinePath(S.document, originalPath);

@@ -12,6 +12,9 @@ import {
   getEffectiveImports,
   getEffectiveMedia,
   getEffectiveHead,
+  getEffectiveLayoutPath,
+  resolveLayoutDoc,
+  distributePageIntoLayout,
 } from "../site-context.js";
 import { componentRegistry, computeRelativePath } from "../files/components.js";
 import { prepareForEditMode } from "../utils/edit-display.js";
@@ -19,6 +22,56 @@ import { getActiveElement } from "../editor/inline-edit.js";
 
 /** @type {any} */
 let _ctx = null;
+
+/** Set of DOM elements that originated from the layout (not page content). */
+export const layoutElements = new WeakSet();
+
+/**
+ * Walk the merged document tree to find the path prefix where page children were distributed into
+ * the layout slot. Returns the path to the container whose children are the page content (first
+ * non-$__layout children array).
+ *
+ * @param {any} node
+ * @param {any[]} [path]
+ * @returns {any[] | null}
+ */
+function findPageContentPrefix(node, path = []) {
+  if (!node || typeof node !== "object") return null;
+  if (Array.isArray(node.children)) {
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i];
+      if (child && typeof child === "object" && !child.$__layout) {
+        return [...path, "children"];
+      }
+    }
+    for (let i = 0; i < node.children.length; i++) {
+      const child = node.children[i];
+      if (child && typeof child === "object" && child.$__layout) {
+        const found = findPageContentPrefix(child, [...path, "children", i]);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
+}
+
+/** The path of the currently active layout file, or null. */
+export let activeLayoutPath = /** @type {string | null} */ (null);
+
+/**
+ * Recursively mark all nodes in a layout doc tree with $__layout: true so we can identify which
+ * rendered DOM elements came from the layout vs page content.
+ */
+function markLayoutNodes(/** @type {any} */ node) {
+  if (!node || typeof node !== "object") return;
+  node.$__layout = true;
+  if (Array.isArray(node.children)) {
+    for (const child of node.children) markLayoutNodes(child);
+  }
+  if (node.$elements) {
+    for (const el of node.$elements) markLayoutNodes(el);
+  }
+}
 
 /**
  * Initialize the canvas live render module.
@@ -45,8 +98,40 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   const S = _ctx.getState();
   const canvasMode = _ctx.getCanvasMode();
 
-  const renderDoc =
+  let renderDoc =
     canvasMode === "preview" ? structuredClone(doc) : prepareForEditMode(stripEventHandlers(doc));
+
+  // ─── Layout wrapping ────────────────────────────────────────────────────
+  // For page documents, resolve the layout and wrap content in the layout shell.
+  // Layout-originated nodes are marked with $__layout so we can distinguish them.
+  let layoutWrapped = false;
+  activeLayoutPath = null;
+
+  const isPage =
+    S.documentPath &&
+    projectState?.isSiteProject &&
+    (S.documentPath.startsWith("pages/") || S.documentPath.startsWith("./pages/"));
+
+  /** @type {any[] | null} Path prefix in merged doc where page children live */
+  let pageContentPrefix = null;
+
+  if (isPage) {
+    const layoutPath = getEffectiveLayoutPath(doc.$layout);
+    if (layoutPath) {
+      const layoutDoc = await resolveLayoutDoc(layoutPath);
+      if (layoutDoc) {
+        if (gen !== view.renderGeneration) return null;
+        activeLayoutPath = layoutPath.replace(/^\.\//, "");
+        markLayoutNodes(layoutDoc);
+        const pageForSlots = canvasMode === "preview" ? structuredClone(doc) : renderDoc;
+        const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
+        renderDoc =
+          canvasMode === "preview" ? merged : prepareForEditMode(stripEventHandlers(merged));
+        layoutWrapped = true;
+        pageContentPrefix = findPageContentPrefix(merged);
+      }
+    }
+  }
 
   // In edit mode, collect paths where $map templates were inlined as children[0]
   // so we can remap runtime paths (children,0,...) → (children,map,...)
@@ -224,26 +309,49 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     if (gen !== view.renderGeneration) return null;
     const el = /** @type {HTMLElement} */ (
       runtimeRenderNode(renderDoc, $defs, {
-        onNodeCreated(/** @type {any} */ el, /** @type {any} */ path) {
+        onNodeCreated(/** @type {any} */ el, /** @type {any} */ path, /** @type {any} */ def) {
+          // Track layout-originated elements — don't store in elToPath to avoid
+          // path collisions with remapped page content paths
+          if (layoutWrapped && def?.$__layout) {
+            layoutElements.add(el);
+            if (el.setAttribute) el.setAttribute("data-jx-layout", "");
+            return;
+          }
+
+          // Remap layout-wrapped paths: strip the layout prefix so paths are
+          // relative to the original page document (which is what S.document holds)
+          let mappedPath = path;
+          if (layoutWrapped && pageContentPrefix) {
+            const pfx = pageContentPrefix;
+            if (
+              path.length >= pfx.length &&
+              pfx.every((/** @type {any} */ seg, /** @type {number} */ i) => path[i] === seg)
+            ) {
+              mappedPath = ["children", ...path.slice(pfx.length)];
+            }
+          }
+
           // Remap $map paths: wrapper and template children → real document paths
           // prepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
           // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
-          let mappedPath = path;
           if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
-            for (let i = 0; i < path.length - 1; i++) {
-              if (path[i] === "children" && path[i + 1] === 0) {
-                const parentKey = path.slice(0, i).join("/");
+            for (let i = 0; i < mappedPath.length - 1; i++) {
+              if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
+                const parentKey = mappedPath.slice(0, i).join("/");
                 if (mapParentPaths.has(parentKey)) {
-                  if (path.length === i + 2) {
-                    // Wrapper div itself → $map container path
-                    mappedPath = path.slice(0, i + 1);
+                  if (mappedPath.length === i + 2) {
+                    mappedPath = mappedPath.slice(0, i + 1);
                   } else if (
-                    path.length >= i + 4 &&
-                    path[i + 2] === "children" &&
-                    path[i + 3] === 0
+                    mappedPath.length >= i + 4 &&
+                    mappedPath[i + 2] === "children" &&
+                    mappedPath[i + 3] === 0
                   ) {
-                    // Template or its descendants → children/map/...rest
-                    mappedPath = [...path.slice(0, i), "children", "map", ...path.slice(i + 4)];
+                    mappedPath = [
+                      ...mappedPath.slice(0, i),
+                      "children",
+                      "map",
+                      ...mappedPath.slice(i + 4),
+                    ];
                   }
                   break;
                 }

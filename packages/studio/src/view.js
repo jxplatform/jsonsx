@@ -61,6 +61,9 @@ export const view = {
   showAddBreakpointForm: false,
   addBreakpointPreview: "",
 
+  // Layout selection (when user clicks a layout element)
+  layoutSelection: null,
+
   // Autosave
   autosaveTimer: null,
 };

@@ -36,6 +36,7 @@ import { isCustomElementDoc, collectCssParts } from "./signals-panel.js";
 import { mediaDisplayName } from "./shared.js";
 import { getCssInitialMap } from "./style-utils.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
+import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context.js";
 import { getPlatform } from "../platform.js";
 import htmlMeta from "../../data/html-meta.json";
 
@@ -247,9 +248,12 @@ function renderFrontmatterOnlyPanel() {
     return html`<div class="empty-state">No frontmatter. Select an element to inspect.</div>`;
   }
 
+  const pageT = renderPageSection(S.document || {});
+
   return html`
     <div class="style-sidebar">
       <sp-accordion allow-multiple size="s">
+        ${pageT}
         <sp-accordion-item label=${col ? `Frontmatter (${col.name})` : "Frontmatter"} open>
           <div class="style-section-body">
             ${fields.map((f) => renderFmFieldRow(f.field, f.entry, f.value, requiredFields))}
@@ -980,6 +984,149 @@ function mediaBreakpointRowTemplate(/** @type {any} */ name, /** @type {any} */ 
   `;
 }
 
+// ─── Layout picker ──────────────────────────────────────────────────────────
+
+/** @type {{ name: string; path: string }[] | null} */
+let layoutEntries = null;
+
+async function loadLayoutEntries() {
+  try {
+    const platform = getPlatform();
+    const listing = await platform.listDirectory("layouts");
+    layoutEntries = listing
+      .filter((/** @type {any} */ f) => f.type === "file" && f.name.endsWith(".json"))
+      .map((/** @type {any} */ f) => ({
+        name: f.name.replace(/\.json$/, ""),
+        path: `./layouts/${f.name}`,
+      }));
+  } catch {
+    layoutEntries = [];
+  }
+  renderOnly("rightPanel");
+}
+
+export function invalidateLayoutPickerCache() {
+  layoutEntries = null;
+}
+
+function isPageDocument(/** @type {any} */ documentPath) {
+  if (!documentPath || !projectState?.isSiteProject) return false;
+  return documentPath.startsWith("pages/") || documentPath.startsWith("./pages/");
+}
+
+function renderPageSection(/** @type {any} */ node) {
+  const S = getState();
+  if (!isPageDocument(S.documentPath)) return nothing;
+
+  if (layoutEntries === null) {
+    loadLayoutEntries();
+    return nothing;
+  }
+
+  const currentLayout = node.$layout;
+  const defaultLayout = projectState?.projectConfig?.defaults?.layout;
+  const effectivePath = getEffectiveLayoutPath(currentLayout);
+  const displayValue =
+    currentLayout === false ? "__none__" : currentLayout ? currentLayout : "__default__";
+
+  return html`
+    <sp-accordion-item label="Page" open>
+      <div class="style-section-body">
+        <div class="style-row" data-prop="$layout">
+          <div class="style-row-label">
+            ${currentLayout !== undefined
+              ? html`<span
+                  class="set-dot"
+                  title="Reset to default"
+                  @click=${(/** @type {any} */ e) => {
+                    e.stopPropagation();
+                    update(updateProperty(getState(), [], "$layout", undefined));
+                  }}
+                ></span>`
+              : nothing}
+            <sp-field-label size="s">Layout</sp-field-label>
+          </div>
+          <sp-picker
+            size="s"
+            value=${displayValue}
+            @change=${(/** @type {any} */ e) => {
+              const val = e.target.value;
+              if (val === "__default__") {
+                update(updateProperty(getState(), [], "$layout", undefined));
+              } else if (val === "__none__") {
+                update(updateProperty(getState(), [], "$layout", false));
+              } else {
+                update(updateProperty(getState(), [], "$layout", val));
+              }
+              invalidateLayoutCache();
+            }}
+          >
+            <sp-menu-item value="__default__"
+              >Default${defaultLayout
+                ? ` (${defaultLayout.replace(/^\.\/layouts\//, "").replace(/\.json$/, "")})`
+                : ""}</sp-menu-item
+            >
+            <sp-menu-item value="__none__">None</sp-menu-item>
+            <sp-menu-divider></sp-menu-divider>
+            ${layoutEntries.map(
+              (/** @type {any} */ l) =>
+                html`<sp-menu-item value=${l.path}>${l.name}</sp-menu-item>`,
+            )}
+          </sp-picker>
+        </div>
+        ${effectivePath
+          ? html`<div style="font-size:10px;color:var(--fg-dim);padding:2px 0;font-style:italic">
+              Wraps page content via &lt;slot&gt; distribution
+            </div>`
+          : nothing}
+      </div>
+    </sp-accordion-item>
+  `;
+}
+
+// ─── Layout selection panel ─────────────────────────────────────────────────
+
+function renderLayoutSelectionPanel(/** @type {any} */ ctx) {
+  const { el, layoutPath } = view.layoutSelection;
+  const tagName = el?.tagName?.toLowerCase() || "element";
+  const className = el?.className || "";
+  const displayPath = layoutPath || "layout";
+
+  return html`
+    <div class="style-sidebar">
+      <sp-accordion allow-multiple size="s">
+        <sp-accordion-item label="Layout Element" open>
+          <div class="style-section-body">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+              <span
+                style="font-size:9px;padding:2px 6px;background:var(--spectrum-purple-600);color:white;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px"
+                >Layout</span
+              >
+              <code style="font-size:12px;font-family:monospace">&lt;${tagName}&gt;</code>
+            </div>
+            ${className
+              ? html`<div class="style-row">
+                  <div class="style-row-label">
+                    <sp-field-label size="s">Class</sp-field-label>
+                  </div>
+                  <span style="font-size:11px;color:var(--fg-dim);word-break:break-all"
+                    >${className}</span
+                  >
+                </div>`
+              : nothing}
+            <div style="font-size:10px;color:var(--fg-dim);padding:4px 0;font-style:italic">
+              This element is part of the page layout. Edit it by opening the layout file.
+            </div>
+            <span class="kv-add" @click=${() => ctx.navigateToComponent(displayPath)}
+              >Open Layout →</span
+            >
+          </div>
+        </sp-accordion-item>
+      </sp-accordion>
+    </div>
+  `;
+}
+
 // ─── Main entry point ───────────────────────────────────────────────────────
 
 /**
@@ -989,6 +1136,11 @@ function mediaBreakpointRowTemplate(/** @type {any} */ name, /** @type {any} */ 
  */
 export function renderPropertiesPanelTemplate(ctx) {
   const S = getState();
+
+  // Layout element selected — show read-only info with link to open layout
+  if (view.layoutSelection) {
+    return renderLayoutSelectionPanel(ctx);
+  }
 
   if (!S.selection) {
     if (S.mode === "content") {
@@ -1463,15 +1615,17 @@ export function renderPropertiesPanelTemplate(ctx) {
         })()
       : nothing;
 
+  const pageT = isRoot ? renderPageSection(node) : nothing;
+
   // ── Assemble ──
   const tpl = html`
     <div class="style-sidebar">
       <sp-accordion allow-multiple size="s">
-        ${frontmatterT} ${isMapNode ? repeaterT : elemT} ${isMapNode ? nothing : observedAttrsT}
-        ${isMapNode ? nothing : switchT} ${isMapNode ? nothing : compPropsT}
-        ${isMapNode ? nothing : attrSectionTemplates} ${isMapNode ? nothing : customSectionT}
-        ${isMapNode ? nothing : mediaT} ${isMapNode ? nothing : cssPropsT}
-        ${isMapNode ? nothing : cssPartsT}
+        ${pageT} ${frontmatterT} ${isMapNode ? repeaterT : elemT}
+        ${isMapNode ? nothing : observedAttrsT} ${isMapNode ? nothing : switchT}
+        ${isMapNode ? nothing : compPropsT} ${isMapNode ? nothing : attrSectionTemplates}
+        ${isMapNode ? nothing : customSectionT} ${isMapNode ? nothing : mediaT}
+        ${isMapNode ? nothing : cssPropsT} ${isMapNode ? nothing : cssPartsT}
       </sp-accordion>
     </div>
   `;

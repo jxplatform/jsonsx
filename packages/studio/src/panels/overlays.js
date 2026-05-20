@@ -11,6 +11,7 @@ import {
   getActivePanel,
   overlayBoxDescriptor,
 } from "../canvas/canvas-helpers.js";
+import { layoutElements } from "../canvas/canvas-live-render.js";
 
 /** @type {any} */
 let _ctx = null;
@@ -85,7 +86,11 @@ export function render() {
 
     if (S.hover && !pathsEqual(S.hover, S.selection)) {
       const el = findCanvasElement(S.hover, p.canvas);
-      if (el) boxes.push(overlayBoxDescriptor(el, "hover", p));
+      if (el) {
+        const desc = overlayBoxDescriptor(el, "hover", p);
+        if (layoutElements.has(el)) /** @type {any} */ (desc).isLayout = true;
+        boxes.push(desc);
+      }
     }
 
     if (S.selection && p === getActivePanel()) {
@@ -93,6 +98,7 @@ export function render() {
       if (el) {
         const desc = overlayBoxDescriptor(el, "selection", p);
         if (view.componentInlineEdit || _ctx.isEditing()) /** @type {any} */ (desc).border = "none";
+        if (layoutElements.has(el)) /** @type {any} */ (desc).isLayout = true;
         boxes.push(desc);
       }
     }
@@ -103,11 +109,17 @@ export function render() {
         ${boxes.map(
           (b) => html`
             <div
-              class=${b.cls}
+              class="${b.cls}${/** @type {any} */ (b).isLayout ? " overlay-layout" : ""}"
               style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}${b.border
                 ? `;border:${b.border}`
                 : ""}"
-            ></div>
+            >
+              ${
+                /** @type {any} */ (b).isLayout
+                  ? html`<span class="overlay-layout-badge">Layout</span>`
+                  : nothing
+              }
+            </div>
           `,
         )}
       `,

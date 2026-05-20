@@ -109,6 +109,111 @@ export function getEffectiveHead(docHead) {
   return merged;
 }
 
+// ─── Layout resolution ──────────────────────────────────────────────────────
+
+/** @type {Map<string, any>} */
+const layoutCache = new Map();
+
+export function invalidateLayoutCache() {
+  layoutCache.clear();
+}
+
+/**
+ * Determine the effective layout path for a document.
+ *
+ * @param {any} docLayout - The document's $layout value (string path, false, or undefined)
+ * @returns {string | null} The layout path, or null if no layout applies
+ */
+export function getEffectiveLayoutPath(docLayout) {
+  if (docLayout === false) return null;
+  const defaultLayout = projectState?.projectConfig?.defaults?.layout;
+  return docLayout || defaultLayout || null;
+}
+
+/**
+ * Resolve a layout document by path. Fetches and caches the parsed JSON.
+ *
+ * @param {string} layoutPath - Relative path to the layout file (e.g., "./layouts/base.json")
+ * @returns {Promise<any | null>} The parsed layout document, or null on failure
+ */
+export async function resolveLayoutDoc(layoutPath) {
+  const normalized = layoutPath.replace(/^\.\//, "");
+  if (layoutCache.has(normalized)) return structuredClone(layoutCache.get(normalized));
+
+  try {
+    const platform = getPlatform();
+    const content = await platform.readFile(normalized);
+    const doc = JSON.parse(content);
+    layoutCache.set(normalized, doc);
+    return structuredClone(doc);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Distribute page children into a layout document's <slot> elements. Returns the merged document
+ * with page content injected into slots.
+ *
+ * @param {any} layoutDoc - Deep-cloned layout document
+ * @param {any} pageDoc - The page document
+ * @returns {any} The merged document
+ */
+export function distributePageIntoLayout(layoutDoc, pageDoc) {
+  const pageChildren = pageDoc.children ?? [];
+  const children = typeof pageChildren === "string" ? [pageChildren] : pageChildren;
+
+  const named = new Map();
+  const defaults = [];
+
+  for (const child of children) {
+    if (child && typeof child === "object" && child.attributes?.slot) {
+      const slotName = child.attributes.slot;
+      if (!named.has(slotName)) named.set(slotName, []);
+      named.get(slotName).push(child);
+    } else {
+      defaults.push(child);
+    }
+  }
+
+  fillSlots(layoutDoc, named, defaults);
+
+  if (pageDoc.state) layoutDoc.state = { ...layoutDoc.state, ...pageDoc.state };
+  if (pageDoc.$media) layoutDoc.$media = { ...layoutDoc.$media, ...pageDoc.$media };
+  if (pageDoc.style) layoutDoc.style = { ...layoutDoc.style, ...pageDoc.style };
+  if (pageDoc.attributes) layoutDoc.attributes = { ...layoutDoc.attributes, ...pageDoc.attributes };
+
+  return layoutDoc;
+}
+
+function fillSlots(
+  /** @type {any} */ node,
+  /** @type {Map<string, any[]>} */ named,
+  /** @type {any[]} */ defaults,
+) {
+  if (!node || typeof node !== "object") return;
+  if (!Array.isArray(node.children)) return;
+
+  const newChildren = [];
+  for (const child of node.children) {
+    if (child && typeof child === "object" && child.tagName === "slot") {
+      const slotName = child.attributes?.name;
+      if (slotName && named.has(slotName)) {
+        newChildren.push(.../** @type {any[]} */ (named.get(slotName)));
+        named.delete(slotName);
+      } else if (!slotName && defaults.length > 0) {
+        newChildren.push(...defaults);
+      } else if (child.children) {
+        newChildren.push(...child.children);
+      }
+    } else {
+      fillSlots(child, named, defaults);
+      newChildren.push(child);
+    }
+  }
+  node.children = newChildren;
+}
+
 /**
  * Update the project's project.json with a partial patch and persist to disk.
  *
