@@ -126,12 +126,12 @@ A remark plugin that transforms markdown directive syntax into custom element ta
 
 Directives follow the [remark-directive](https://github.com/remarkjs/remark-directive) syntax. Nesting uses increasing colon counts:
 
-| Directive type | Syntax | Use case |
-| -------------- | ------ | -------- |
-| Text (inline)  | `:name[label]{attrs}` | Inline custom elements within a paragraph |
-| Leaf (block)   | `::name{attrs}` | Self-contained block elements (no body content) |
-| Container      | `:::name{attrs}` ... `:::` | Block elements wrapping child content |
-| Nested parent  | `::::name{attrs}` ... `::::` | Container wrapping other container directives |
+| Directive type | Syntax                       | Use case                                        |
+| -------------- | ---------------------------- | ----------------------------------------------- |
+| Text (inline)  | `:name[label]{attrs}`        | Inline custom elements within a paragraph       |
+| Leaf (block)   | `::name{attrs}`              | Self-contained block elements (no body content) |
+| Container      | `:::name{attrs}` ... `:::`   | Block elements wrapping child content           |
+| Nested parent  | `::::name{attrs}` ... `::::` | Container wrapping other container directives   |
 
 ```markdown
 ::::brm-services{heading="Our Services"}
@@ -170,11 +170,11 @@ Directives without parameters produce no `data-jx-props` attribute — body cont
 
 ### 5.5 Plugin Options
 
-| Option         | Type       | Default  | Description                                        |
-| -------------- | ---------- | -------- | -------------------------------------------------- |
-| `prefix`       | `string`   | `"jx-"` | Prefix for directive names without a hyphen         |
-| `passContent`  | `boolean`  | `true`   | Whether container directive content becomes slot children |
-| `allowedNames` | `string[]` | —        | Whitelist of allowed directive names (all if omitted) |
+| Option         | Type       | Default | Description                                               |
+| -------------- | ---------- | ------- | --------------------------------------------------------- |
+| `prefix`       | `string`   | `"jx-"` | Prefix for directive names without a hyphen               |
+| `passContent`  | `boolean`  | `true`  | Whether container directive content becomes slot children |
+| `allowedNames` | `string[]` | —       | Whitelist of allowed directive names (all if omitted)     |
 
 ### 5.6 Pipeline Position
 

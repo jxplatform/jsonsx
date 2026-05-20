@@ -32,16 +32,16 @@ Parses a single Markdown file into structured data.
 
 **Resolved value:**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `slug` | `string` | Filename without extension |
-| `path` | `string` | Full file path |
-| `frontmatter` | `object` | Parsed YAML frontmatter |
-| `$body` | `string` | Rendered HTML body |
-| `$excerpt` | `string` | First paragraph as HTML |
-| `$toc` | `array` | Table of contents (id, text, depth) |
-| `$readingTime` | `number` | Estimated reading time in minutes |
-| `$wordCount` | `number` | Word count |
+| Property       | Type     | Description                         |
+| -------------- | -------- | ----------------------------------- |
+| `slug`         | `string` | Filename without extension          |
+| `path`         | `string` | Full file path                      |
+| `frontmatter`  | `object` | Parsed YAML frontmatter             |
+| `$body`        | `string` | Rendered HTML body                  |
+| `$excerpt`     | `string` | First paragraph as HTML             |
+| `$toc`         | `array`  | Table of contents (id, text, depth) |
+| `$readingTime` | `number` | Estimated reading time in minutes   |
+| `$wordCount`   | `number` | Word count                          |
 
 ## `MarkdownCollection`
 
@@ -64,13 +64,13 @@ Globs Markdown files into a sorted, filterable collection.
 
 Returns an array of `MarkdownFile` resolved objects.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `src` | `string` | — | Glob pattern for Markdown files |
-| `sortBy` | `string` | `"date"` | Frontmatter field to sort by |
-| `sortOrder` | `string` | `"desc"` | `"asc"` or `"desc"` |
-| `limit` | `number` | — | Maximum number of results |
-| `filter` | `string` | — | Frontmatter field filter expression |
+| Option      | Type     | Default  | Description                         |
+| ----------- | -------- | -------- | ----------------------------------- |
+| `src`       | `string` | —        | Glob pattern for Markdown files     |
+| `sortBy`    | `string` | `"date"` | Frontmatter field to sort by        |
+| `sortOrder` | `string` | `"desc"` | `"asc"` or `"desc"`                 |
+| `limit`     | `number` | —        | Maximum number of results           |
+| `filter`    | `string` | —        | Frontmatter field filter expression |
 
 ## `MarkdownDirective` (remark plugin)
 

@@ -60,6 +60,9 @@
     ],
     "*.json": [
       "oxfmt --no-error-on-unmatched-pattern"
+    ],
+    "*.{md,html,css}": [
+      "oxfmt"
     ]
   },
   "release-it": {

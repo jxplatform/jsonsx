@@ -34,7 +34,6 @@ Jx is a schema and runtime for building reactive web applications using **plain 
 }
 ```
 
-
 ### Key ideas
 
 - **DOM-first** — Property names mirror the DOM API (`tagName`, `className`, `textContent`, `onclick`). Nothing new to learn.
@@ -45,15 +44,15 @@ Jx is a schema and runtime for building reactive web applications using **plain 
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| [`@jxsuite/runtime`](packages/runtime) | JSON-native reactive web component runtime |
-| [`@jxsuite/compiler`](packages/compiler) | Static HTML compiler, island detector, and site builder |
-| [`@jxsuite/server`](packages/server) | Dev server with live reload, server-side proxy, and studio integration |
-| [`@jxsuite/studio`](packages/studio) | Visual builder for Jx documents |
-| [`@jxsuite/desktop`](packages/desktop) | Standalone desktop app (Electrobun) |
-| [`@jxsuite/schema`](packages/schema) | JSON Schema 2020-12 meta-schema generator |
-| [`@jxsuite/parser`](packages/parser) | Markdown parser and external class integration |
+| Package                                  | Description                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| [`@jxsuite/runtime`](packages/runtime)   | JSON-native reactive web component runtime                             |
+| [`@jxsuite/compiler`](packages/compiler) | Static HTML compiler, island detector, and site builder                |
+| [`@jxsuite/server`](packages/server)     | Dev server with live reload, server-side proxy, and studio integration |
+| [`@jxsuite/studio`](packages/studio)     | Visual builder for Jx documents                                        |
+| [`@jxsuite/desktop`](packages/desktop)   | Standalone desktop app (Electrobun)                                    |
+| [`@jxsuite/schema`](packages/schema)     | JSON Schema 2020-12 meta-schema generator                              |
+| [`@jxsuite/parser`](packages/parser)     | Markdown parser and external class integration                         |
 
 ## Quick start
 
@@ -93,12 +92,12 @@ Every component declares its state in a `state` object. The shape of each entry 
 }
 ```
 
-| Shape | Detected by | Becomes |
-|-------|-------------|---------|
-| Naked value | Scalar, array, or plain object | `reactive()` property |
-| Computed | String containing `${}` | `computed()` |
-| Function | `$prototype: "Function"` | Event handler or computed |
-| Data source | `$prototype: "Request"`, etc. | Reactive async value |
+| Shape       | Detected by                    | Becomes                   |
+| ----------- | ------------------------------ | ------------------------- |
+| Naked value | Scalar, array, or plain object | `reactive()` property     |
+| Computed    | String containing `${}`        | `computed()`              |
+| Function    | `$prototype: "Function"`       | Event handler or computed |
+| Data source | `$prototype: "Request"`, etc.  | Reactive async value      |
 
 ### Reactive bindings
 
@@ -149,15 +148,15 @@ Components reference each other via `$ref` and pass data through `$props`:
 
 ### Built-in web API prototypes
 
-| `$prototype` | Web API | Description |
-|-------------|---------|-------------|
-| `Request` | Fetch | Reactive HTTP requests with debounce and abort |
-| `LocalStorage` | Storage | Persistent reactive key-value storage |
-| `SessionStorage` | Storage | Session-scoped reactive storage |
-| `Cookie` | Cookie | Cookie management with options |
-| `IndexedDB` | IDB | Store creation, indexes, CRUD |
-| `FormData` | FormData | Form field population |
-| `Set` / `Map` | — | Reactive collections |
+| `$prototype`     | Web API  | Description                                    |
+| ---------------- | -------- | ---------------------------------------------- |
+| `Request`        | Fetch    | Reactive HTTP requests with debounce and abort |
+| `LocalStorage`   | Storage  | Persistent reactive key-value storage          |
+| `SessionStorage` | Storage  | Session-scoped reactive storage                |
+| `Cookie`         | Cookie   | Cookie management with options                 |
+| `IndexedDB`      | IDB      | Store creation, indexes, CRUD                  |
+| `FormData`       | FormData | Form field population                          |
+| `Set` / `Map`    | —        | Reactive collections                           |
 
 ### Server functions
 

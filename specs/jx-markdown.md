@@ -34,7 +34,9 @@ state:
 ---
 
 :::div
+
 # Hello, ${state.name}!
+
 :::
 ```
 
@@ -44,20 +46,20 @@ All top-level Jx document properties are declared in YAML frontmatter. The `$` p
 
 Supported frontmatter keys:
 
-| Key | Description |
-|-----|-------------|
-| `tagName` | Custom element tag name (must contain a hyphen) |
-| `$schema` | JSON Schema reference |
-| `$id` | Document identifier |
-| `state` | Reactive state definitions |
-| `$media` | Media query responsive styles |
-| `$defs` | Reusable definitions |
-| `$elements` | Child element dependencies |
-| `$layout` | Layout template reference |
-| `$paths` | Dynamic route parameters (for pages) |
-| `$handlers` | Companion JS file reference |
-| `imports` | Module imports |
-| `observedAttributes` | Custom element observed attributes |
+| Key                  | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `tagName`            | Custom element tag name (must contain a hyphen) |
+| `$schema`            | JSON Schema reference                           |
+| `$id`                | Document identifier                             |
+| `state`              | Reactive state definitions                      |
+| `$media`             | Media query responsive styles                   |
+| `$defs`              | Reusable definitions                            |
+| `$elements`          | Child element dependencies                      |
+| `$layout`            | Layout template reference                       |
+| `$paths`             | Dynamic route parameters (for pages)            |
+| `$handlers`          | Companion JS file reference                     |
+| `imports`            | Module imports                                  |
+| `observedAttributes` | Custom element observed attributes              |
 
 Any additional frontmatter keys are passed through to the document.
 
@@ -136,14 +138,14 @@ Directive attributes use the standard HTML-like syntax:
 
 The `$` character cannot appear at the start of remark-directive attribute keys. The following Jx keywords are written **without** the `$` prefix in directive attributes, and the transpiler re-adds it:
 
-| Markdown attribute | Jx property |
-|-------------------|-------------|
-| `prototype` | `$prototype` |
-| `ref` | `$ref` |
-| `component` | `$component` |
-| `props` | `$props` |
-| `switch` | `$switch` |
-| `elements` | `$elements` |
+| Markdown attribute | Jx property  |
+| ------------------ | ------------ |
+| `prototype`        | `$prototype` |
+| `ref`              | `$ref`       |
+| `component`        | `$component` |
+| `props`            | `$props`     |
+| `switch`           | `$switch`    |
+| `elements`         | `$elements`  |
 
 DOM properties like `src`, `id`, and `export` are **not** mapped — they pass through as-is.
 
@@ -296,21 +298,21 @@ The `children.*` attributes expand to a `children` descriptor object (not an arr
 
 Standard markdown nodes map to Jx elements:
 
-| Markdown | Jx tagName |
-|----------|-----------|
-| `# Heading` | `h1`–`h6` |
-| Paragraph | `p` |
-| `*emphasis*` | `em` |
-| `**strong**` | `strong` |
-| `~~delete~~` | `del` |
-| `` `code` `` | `code` |
-| `[link](url)` | `a` |
-| `![alt](url)` | `img` |
-| `> blockquote` | `blockquote` |
-| `- list` | `ul` / `ol` + `li` |
-| Fenced code | `pre` > `code` |
-| `---` | `hr` |
-| Table | `table` > `thead`/`tbody` > `tr` > `th`/`td` |
+| Markdown       | Jx tagName                                   |
+| -------------- | -------------------------------------------- |
+| `# Heading`    | `h1`–`h6`                                    |
+| Paragraph      | `p`                                          |
+| `*emphasis*`   | `em`                                         |
+| `**strong**`   | `strong`                                     |
+| `~~delete~~`   | `del`                                        |
+| `` `code` ``   | `code`                                       |
+| `[link](url)`  | `a`                                          |
+| `![alt](url)`  | `img`                                        |
+| `> blockquote` | `blockquote`                                 |
+| `- list`       | `ul` / `ol` + `li`                           |
+| Fenced code    | `pre` > `code`                               |
+| `---`          | `hr`                                         |
+| Table          | `table` > `thead`/`tbody` > `tr` > `th`/`td` |
 
 ## Limitations
 
@@ -321,12 +323,12 @@ Standard markdown nodes map to Jx elements:
 
 ## When to Use JSON vs Markdown
 
-| Use Markdown | Use JSON |
-|-------------|----------|
-| Content-heavy pages (blog posts, docs) | Complex interactive components |
-| Components with significant prose | Components with many state functions |
-| Landing pages, marketing content | Deeply nested element hierarchies |
-| Quick prototyping | Components with complex `$prototype` usage |
+| Use Markdown                           | Use JSON                                   |
+| -------------------------------------- | ------------------------------------------ |
+| Content-heavy pages (blog posts, docs) | Complex interactive components             |
+| Components with significant prose      | Components with many state functions       |
+| Landing pages, marketing content       | Deeply nested element hierarchies          |
+| Quick prototyping                      | Components with complex `$prototype` usage |
 
 ## Transpiler API
 

@@ -348,21 +348,21 @@ When `build.adapter` is set in `project.json`, the site build collects all `timi
 The function signature for server entries is `(args, env)` — the second parameter receives the platform's environment bindings (e.g., Cloudflare `env` with KV, D1, email, etc.). Old functions that accept only `(args)` are unaffected since the extra parameter is ignored.
 
 ```js
-compileSiteServer(entries, { adapter, baseUrl })
+compileSiteServer(entries, { adapter, baseUrl });
 ```
 
-| Parameter | Type             | Default          | Description                                       |
-| --------- | ---------------- | ---------------- | ------------------------------------------------- |
-| `entries`  | `Array<{exportName, src}>` | —     | Pre-collected server entries from all components   |
-| `adapter` | `string \| null` | `null`          | Deployment adapter; adds platform-specific output |
-| `baseUrl`  | `string`        | `"/_jx/server"` | Base path prefix for all server endpoints          |
+| Parameter | Type                       | Default         | Description                                       |
+| --------- | -------------------------- | --------------- | ------------------------------------------------- |
+| `entries` | `Array<{exportName, src}>` | —               | Pre-collected server entries from all components  |
+| `adapter` | `string \| null`           | `null`          | Deployment adapter; adds platform-specific output |
+| `baseUrl` | `string`                   | `"/_jx/server"` | Base path prefix for all server endpoints         |
 
 Adapter-specific behavior:
 
-| Adapter       | Extra Output                                            |
-| -------------- | ------------------------------------------------------- |
-| `"cloudflare"` | `app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))` fallback for static assets |
-| `"node"`, `"bun"`, `null` | No extra output                          |
+| Adapter                   | Extra Output                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| `"cloudflare"`            | `app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))` fallback for static assets |
+| `"node"`, `"bun"`, `null` | No extra output                                                                 |
 
 Example generated `dist/worker.js` for `adapter: "cloudflare"`:
 
@@ -416,14 +416,14 @@ Image optimization is configured via `project.json` under the `images` key. All 
 }
 ```
 
-| Property   | Type       | Default                                      | Description                                                    |
-| ---------- | ---------- | -------------------------------------------- | -------------------------------------------------------------- |
-| `optimize` | `boolean`  | `true`                                       | Master switch for all image processing                         |
-| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`                | Pixel widths for responsive `srcset` variants                  |
-| `formats`  | `string[]` | `["webp", "avif"]`                           | Output formats (also supports `"jpeg"`, `"png"`)               |
-| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                         |
-| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`           | Default CSS `sizes` attribute for responsive layout hints      |
-| `lazyLoad` | `boolean`  | `true`                                       | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags  |
+| Property   | Type       | Default                                     | Description                                                  |
+| ---------- | ---------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `optimize` | `boolean`  | `true`                                      | Master switch for all image processing                       |
+| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                |
+| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)             |
+| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                       |
+| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive layout hints    |
+| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags |
 
 ### 7.2 Document Transformation (`transformImageNodes`)
 
@@ -441,11 +441,13 @@ Up to 4 variants are processed concurrently per image.
 ### 7.3 Eligibility
 
 **Processed:**
+
 - Static `src` paths (strings, not `${...}` template expressions)
 - Local paths (relative or `/`-prefixed) that exist on disk (resolved from `public/` or project root)
 - Raster formats: `.jpg`, `.jpeg`, `.png`, `.webp`, `.avif`, `.tiff`
 
 **Skipped:**
+
 - External URLs (`http://`, `https://`, `//`, `data:`)
 - SVGs (`.svg`) and animated GIFs (`.gif`)
 - Dynamic `src` containing `${...}` template expressions
@@ -521,20 +523,20 @@ For dynamic documents that are not custom elements, the compiler emits:
 
 ## 10. Pending Features
 
-| Feature                              | Description                                                    | Status                                                                        |
-| ------------------------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `timing: "compiler"`                 | Bake fetch responses into HTML at build time                   | **Not implemented**                                                           |
-| Island serialization                 | `<script type="application/Jx+json">` hydration islands        | **Not implemented**                                                           |
-| Bundle manifest                      | Exact dependency manifest from JSON analysis                   | **Partially implemented** (imports collected but no standalone manifest file) |
-| Multi-page build                     | Orchestrate compilation across all pages in a site project     | **Not implemented**                                                           |
-| Layout resolution                    | Resolve `$layout` and `<slot>` insertion during compilation    | **Implemented** via `site-build.js`                                           |
-| `$head` merge                        | Merge site + layout + page `<head>` entries with deduplication | **Implemented** via `head-merger.js`                                          |
-| `$paths` expansion                   | Generate one page per content entry for dynamic routes         | **Implemented** via `pages-discovery.js`                                      |
-| `ContentCollection` / `ContentEntry` | New `$prototype` values for querying content at build time     | **Implemented** via `content-loader.js`                                       |
-| Sitemap generation                   | Auto-generate `sitemap.xml` from route table                   | **Not implemented**                                                           |
-| Image optimization                   | Format conversion, responsive sizes, lazy loading, caching     | **Implemented** via `image-optimizer.js`, `image-transform.js`, `image-cache.js` |
-| Site-wide server bundling            | `build.adapter` collects all server entries into `dist/worker.js` | **Implemented** — Cloudflare adapter with asset fallback                     |
-| Platform-specific files              | Emit `_redirects` (Netlify), `vercel.json`, etc.               | **Not implemented** (redirects partially via `generateRedirects`)             |
+| Feature                              | Description                                                       | Status                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `timing: "compiler"`                 | Bake fetch responses into HTML at build time                      | **Not implemented**                                                              |
+| Island serialization                 | `<script type="application/Jx+json">` hydration islands           | **Not implemented**                                                              |
+| Bundle manifest                      | Exact dependency manifest from JSON analysis                      | **Partially implemented** (imports collected but no standalone manifest file)    |
+| Multi-page build                     | Orchestrate compilation across all pages in a site project        | **Not implemented**                                                              |
+| Layout resolution                    | Resolve `$layout` and `<slot>` insertion during compilation       | **Implemented** via `site-build.js`                                              |
+| `$head` merge                        | Merge site + layout + page `<head>` entries with deduplication    | **Implemented** via `head-merger.js`                                             |
+| `$paths` expansion                   | Generate one page per content entry for dynamic routes            | **Implemented** via `pages-discovery.js`                                         |
+| `ContentCollection` / `ContentEntry` | New `$prototype` values for querying content at build time        | **Implemented** via `content-loader.js`                                          |
+| Sitemap generation                   | Auto-generate `sitemap.xml` from route table                      | **Not implemented**                                                              |
+| Image optimization                   | Format conversion, responsive sizes, lazy loading, caching        | **Implemented** via `image-optimizer.js`, `image-transform.js`, `image-cache.js` |
+| Site-wide server bundling            | `build.adapter` collects all server entries into `dist/worker.js` | **Implemented** — Cloudflare adapter with asset fallback                         |
+| Platform-specific files              | Emit `_redirects` (Netlify), `vercel.json`, etc.                  | **Not implemented** (redirects partially via `generateRedirects`)                |
 
 See the [Site Architecture Specification](site-architecture.md) for the full multi-page compilation and routing design.
 

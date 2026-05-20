@@ -20,11 +20,11 @@ bun run dev   # starts dev server + Studio at http://localhost:3000
 
 Three-column layout:
 
-| Column | Content |
-|--------|---------|
-| Left | Activity bar + panel (layers, files, content, settings) |
-| Center | Canvas (live preview) + toolbar |
-| Right | Inspector (properties, style, state, code) |
+| Column | Content                                                 |
+| ------ | ------------------------------------------------------- |
+| Left   | Activity bar + panel (layers, files, content, settings) |
+| Center | Canvas (live preview) + toolbar                         |
+| Right  | Inspector (properties, style, state, code)              |
 
 ### Data flow
 
@@ -38,27 +38,27 @@ Three-column layout:
 
 Immutable state tree with 100-entry undo/redo history. All mutations produce a new state object. Key operations:
 
-| Operation | Description |
-|-----------|-------------|
-| `selectNode(path)` | Select element by path |
-| `insertNode(path, def)` | Add child element |
-| `removeNode(path)` | Delete element |
-| `moveNode(from, to)` | Reorder or reparent |
-| `updateProperty(path, key, value)` | Set element property |
-| `updateStyle(path, prop, value)` | Set style property |
-| `updateDef(key, value)` | Update state entry |
+| Operation                             | Description                         |
+| ------------------------------------- | ----------------------------------- |
+| `selectNode(path)`                    | Select element by path              |
+| `insertNode(path, def)`               | Add child element                   |
+| `removeNode(path)`                    | Delete element                      |
+| `moveNode(from, to)`                  | Reorder or reparent                 |
+| `updateProperty(path, key, value)`    | Set element property                |
+| `updateStyle(path, prop, value)`      | Set style property                  |
+| `updateDef(key, value)`               | Update state entry                  |
 | `pushDocument(doc)` / `popDocument()` | Navigate into/out of sub-components |
-| `undo()` / `redo()` | History navigation |
+| `undo()` / `redo()`                   | History navigation                  |
 
 ### Platform Abstraction Layer (PAL)
 
 Studio is backend-agnostic. Platform bindings (filesystem access, native dialogs, Git, package management) are injected at startup via `registerPlatform()`. Three targets share a single codebase:
 
-| Target | Backend |
-|--------|---------|
+| Target               | Backend                        |
+| -------------------- | ------------------------------ |
 | Desktop (Electrobun) | `@jxsuite/desktop` Bun process |
-| Dev mode (Chrome) | `@jxsuite/server` (localhost) |
-| SaaS | Cloud API (future) |
+| Dev mode (Chrome)    | `@jxsuite/server` (localhost)  |
+| SaaS                 | Cloud API (future)             |
 
 ## API
 

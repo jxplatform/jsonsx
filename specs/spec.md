@@ -917,17 +917,17 @@ When `build.adapter` is set in `project.json`, all `timing: "server"` entries ac
 
 Jx provides several `$prototype` types that resolve automatically without any `imports` or `$src` configuration:
 
-| Prototype             | Timing     | Description                                        |
-| --------------------- | ---------- | -------------------------------------------------- |
-| `Function`            | client     | Inline handlers with `body`/`arguments`            |
-| `Array`               | client     | Reactive array wrapper                             |
-| `LocalStorage`        | client     | Persistent key-value storage                       |
-| `SessionStorage`      | client     | Session-scoped key-value storage                   |
-| `Request`             | client     | HTTP fetch with reactive URL params                |
-| `MarkdownFile`        | compiler   | Parses a single `.md` file into frontmatter + tree |
-| `MarkdownCollection`  | compiler   | Globs and parses multiple `.md` files              |
-| `ContentCollection`   | compiler   | Schema-validated multi-format content source       |
-| `ContentEntry`        | compiler   | Single entry within a content collection           |
+| Prototype            | Timing   | Description                                        |
+| -------------------- | -------- | -------------------------------------------------- |
+| `Function`           | client   | Inline handlers with `body`/`arguments`            |
+| `Array`              | client   | Reactive array wrapper                             |
+| `LocalStorage`       | client   | Persistent key-value storage                       |
+| `SessionStorage`     | client   | Session-scoped key-value storage                   |
+| `Request`            | client   | HTTP fetch with reactive URL params                |
+| `MarkdownFile`       | compiler | Parses a single `.md` file into frontmatter + tree |
+| `MarkdownCollection` | compiler | Globs and parses multiple `.md` files              |
+| `ContentCollection`  | compiler | Schema-validated multi-format content source       |
+| `ContentEntry`       | compiler | Single entry within a content collection           |
 
 `MarkdownFile` and `MarkdownCollection` are first-class prototypes — they resolve at compile time with zero configuration:
 
@@ -967,11 +967,11 @@ For **third-party or project-local** classes, `$src` on any `state` entry with a
 }
 ```
 
-| Specifier form                      | Example                                           | Resolution                        |
-| ----------------------------------- | ------------------------------------------------- | --------------------------------- |
-| Relative `.class.json` path         | `"./lib/WeatherForecast.class.json"`              | Relative to the `.json` file      |
-| npm package specifier               | `"@acme/weather/WeatherForecast.class.json"`      | Resolved via `node_modules`       |
-| `$prototype: "Function"` with `.js` | `"./lib/helpers.js"`                              | Direct JS import (Functions only) |
+| Specifier form                      | Example                                      | Resolution                        |
+| ----------------------------------- | -------------------------------------------- | --------------------------------- |
+| Relative `.class.json` path         | `"./lib/WeatherForecast.class.json"`         | Relative to the `.json` file      |
+| npm package specifier               | `"@acme/weather/WeatherForecast.class.json"` | Resolved via `node_modules`       |
+| `$prototype: "Function"` with `.js` | `"./lib/helpers.js"`                         | Direct JS import (Functions only) |
 
 ### 12.3 External Class Contract
 
@@ -1042,7 +1042,7 @@ To avoid repeating `$src` paths across every state entry, a document may declare
 | Explicit `$src` wins              | If a state entry already has `$src`, the import map is not consulted               |
 | `$prototype: "Function"` excluded | Function prototypes are never resolved via import map                              |
 | Built-in prototypes unchanged     | `Request`, `Set`, `Map`, `LocalStorage`, etc. are unaffected                       |
-| Import overrides built-ins        | An explicit `imports` entry takes precedence over built-in prototype mappings       |
+| Import overrides built-ins        | An explicit `imports` entry takes precedence over built-in prototype mappings      |
 | Site-level cascading              | `imports` in `site.json` cascade to all pages; page-level entries win on collision |
 
 **Resolution order:** explicit `$src` → page `imports` → site `imports` → built-in prototype mappings → unknown prototype warning.

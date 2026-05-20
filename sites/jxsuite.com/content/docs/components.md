@@ -82,7 +82,7 @@ An object with `$prototype` for functions and data sources:
     "userData": {
       "$prototype": "Request",
       "url": "/api/users/",
-      "method": "GET",
+      "method": "GET"
     }
   }
 }

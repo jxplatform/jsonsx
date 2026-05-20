@@ -28,12 +28,12 @@
 
 Jx Studio is designed for three deployment targets that share a single core codebase:
 
-| Target              | Runtime                           | Backend                       | Storage                   | Status                      |
-| ------------------- | --------------------------------- | ----------------------------- | ------------------------- | --------------------------- |
-| **Desktop app**     | ElectroBun (Bun + native webview) | Bun process (local)           | Filesystem                | All platforms except NixOS  |
-| **NixOS desktop**   | Chromium `--app` + Bun            | `@jxsuite/server` (localhost) | Filesystem via dev server | NixOS only (via `nix build`) |
-| **Dev mode**        | Chrome                            | `@jxsuite/server` (localhost) | Filesystem via dev server | Active (Studio development) |
-| **SaaS/PaaS**       | Browser                           | Cloud API server              | Database / object storage | Future                      |
+| Target            | Runtime                           | Backend                       | Storage                   | Status                       |
+| ----------------- | --------------------------------- | ----------------------------- | ------------------------- | ---------------------------- |
+| **Desktop app**   | ElectroBun (Bun + native webview) | Bun process (local)           | Filesystem                | All platforms except NixOS   |
+| **NixOS desktop** | Chromium `--app` + Bun            | `@jxsuite/server` (localhost) | Filesystem via dev server | NixOS only (via `nix build`) |
+| **Dev mode**      | Chrome                            | `@jxsuite/server` (localhost) | Filesystem via dev server | Active (Studio development)  |
+| **SaaS/PaaS**     | Browser                           | Cloud API server              | Database / object storage | Future                       |
 
 ### 1.1a Platform Strategy
 

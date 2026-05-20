@@ -30,32 +30,32 @@ const state = await Jx({ tagName: "div", textContent: "Hello" });
 
 Each document goes through four steps:
 
-| Step | Function | Description |
-|------|----------|-------------|
-| 1 | `resolve(source)` | Fetch JSON or accept a raw object |
-| 2 | `buildScope(doc, parent, base)` | Detect state shapes, build reactive proxy |
-| 3 | `renderNode(doc, state, opts)` | Walk tree, create DOM nodes, wire effects |
-| 4 | append to target | Mount result into the container |
+| Step | Function                        | Description                               |
+| ---- | ------------------------------- | ----------------------------------------- |
+| 1    | `resolve(source)`               | Fetch JSON or accept a raw object         |
+| 2    | `buildScope(doc, parent, base)` | Detect state shapes, build reactive proxy |
+| 3    | `renderNode(doc, state, opts)`  | Walk tree, create DOM nodes, wire effects |
+| 4    | append to target                | Mount result into the container           |
 
 ## State shapes
 
-| Shape | Detected by | Reactive primitive |
-|-------|-------------|-------------------|
-| Naked value | Scalar, array, or plain object | `reactive()` |
-| Typed value | Object with `default` key | `ref()` |
-| Computed | String containing `${}` | `computed()` |
-| Function | `$prototype: "Function"` | Plain function |
-| Data source | `$prototype: <ClassName>` | `ref()` (async) |
+| Shape       | Detected by                    | Reactive primitive |
+| ----------- | ------------------------------ | ------------------ |
+| Naked value | Scalar, array, or plain object | `reactive()`       |
+| Typed value | Object with `default` key      | `ref()`            |
+| Computed    | String containing `${}`        | `computed()`       |
+| Function    | `$prototype: "Function"`       | Plain function     |
+| Data source | `$prototype: <ClassName>`      | `ref()` (async)    |
 
 ## `$ref` bindings
 
-| Pattern | Example | Meaning |
-|---------|---------|---------|
-| State | `{ "$ref": "#/state/count" }` | Reactive state binding |
-| Map item | `{ "$ref": "$map/item" }` | Current item in `Array` iteration |
-| Parent | `{ "$ref": "parent#/color" }` | Prop passed via `$props` |
-| Window | `{ "$ref": "window#/config" }` | Window global |
-| External | `{ "$ref": "./card.json" }` | Another Jx component |
+| Pattern  | Example                        | Meaning                           |
+| -------- | ------------------------------ | --------------------------------- |
+| State    | `{ "$ref": "#/state/count" }`  | Reactive state binding            |
+| Map item | `{ "$ref": "$map/item" }`      | Current item in `Array` iteration |
+| Parent   | `{ "$ref": "parent#/color" }`  | Prop passed via `$props`          |
+| Window   | `{ "$ref": "window#/config" }` | Window global                     |
+| External | `{ "$ref": "./card.json" }`    | Another Jx component              |
 
 ## Custom element support
 

@@ -567,12 +567,12 @@ Collections are defined in `the `collections` key in project.json`:
 
 ### 6.2 Collection Shapes
 
-| Source Pattern | File Type                 | Entry ID               | Notes                           |
-| -------------- | ------------------------- | ---------------------- | ------------------------------- |
+| Source Pattern | File Type                 | Entry ID               | Notes                                |
+| -------------- | ------------------------- | ---------------------- | ------------------------------------ |
 | `**/*.md`      | Markdown with frontmatter | Filename (slugified)   | Body parsed to Jx tree (`$children`) |
-| `**/*.json`    | JSON objects              | `id` field or filename | Direct data access              |
-| `*.csv`        | CSV rows                  | Row index or ID column | Parsed via built-in CSV parser  |
-| `**/*.yaml`    | YAML documents            | `id` field or filename | Parsed via built-in YAML parser |
+| `**/*.json`    | JSON objects              | `id` field or filename | Direct data access                   |
+| `*.csv`        | CSV rows                  | Row index or ID column | Parsed via built-in CSV parser       |
+| `**/*.yaml`    | YAML documents            | `id` field or filename | Parsed via built-in YAML parser      |
 
 ### 6.3 Schema Validation
 
@@ -652,7 +652,10 @@ A `ContentEntry` resolves to:
   "id": "hello-world",
   "data": { "title": "Hello World", "pubDate": "2024-01-15", "tags": ["intro"] },
   "body": "# Hello\n\nThis is my first post.",
-  "$children": [{ "tagName": "h1", "textContent": "Hello" }, { "tagName": "p", "textContent": "This is my first post." }]
+  "$children": [
+    { "tagName": "h1", "textContent": "Hello" },
+    { "tagName": "p", "textContent": "This is my first post." }
+  ]
 }
 ```
 
@@ -941,14 +944,14 @@ Image optimization is configured in `project.json` under the `images` key. All p
 }
 ```
 
-| Property   | Type       | Default                                    | Description                                                    |
-| ---------- | ---------- | ------------------------------------------ | -------------------------------------------------------------- |
-| `optimize` | `boolean`  | `true`                                     | Master switch — set to `false` to disable all image processing |
-| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`              | Pixel widths for responsive `srcset` variants                  |
-| `formats`  | `string[]` | `["webp", "avif"]`                         | Output formats (also supports `"jpeg"`, `"png"`)               |
-| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                        |
-| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`         | Default CSS `sizes` attribute for responsive hints             |
-| `lazyLoad` | `boolean`  | `true`                                     | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags  |
+| Property   | Type       | Default                                     | Description                                                    |
+| ---------- | ---------- | ------------------------------------------- | -------------------------------------------------------------- |
+| `optimize` | `boolean`  | `true`                                      | Master switch — set to `false` to disable all image processing |
+| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                  |
+| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)               |
+| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                         |
+| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints             |
+| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags   |
 
 #### 9.2.2 Build-Time Behavior
 
@@ -1348,13 +1351,13 @@ The collection config can specify locale awareness:
 
 The build output is standard static files deployable anywhere. When `build.adapter` is set, the compiler additionally generates platform-specific files:
 
-| Provider             | Extra Output                                                         |
-| -------------------- | -------------------------------------------------------------------- |
-| *(none)*             | Just `dist/` with HTML/CSS/JS/assets                                 |
-| `"cloudflare"`       | `dist/worker.js` (Hono server with asset fallback), `_redirects`     |
-| `"netlify"`          | `_redirects`, `_headers`                                             |
-| `"vercel"`           | `vercel.json` with redirects/headers                                 |
-| `"github-pages"`     | `.nojekyll`, 404.html                                                |
+| Provider         | Extra Output                                                     |
+| ---------------- | ---------------------------------------------------------------- |
+| _(none)_         | Just `dist/` with HTML/CSS/JS/assets                             |
+| `"cloudflare"`   | `dist/worker.js` (Hono server with asset fallback), `_redirects` |
+| `"netlify"`      | `_redirects`, `_headers`                                         |
+| `"vercel"`       | `vercel.json` with redirects/headers                             |
+| `"github-pages"` | `.nojekyll`, 404.html                                            |
 
 Configured in `project.json`:
 
@@ -1368,12 +1371,12 @@ Configured in `project.json`:
 
 #### 14.1.1 `build.adapter` Properties
 
-| Property        | Type             | Default          | Description                                             |
-| --------------- | ---------------- | ---------------- | ------------------------------------------------------- |
-| `outDir`        | `string`         | `"./dist"`       | Output directory for static assets                      |
-| `format`        | `string`         | `"directory"`    | URL format: `"directory"` (trailing slash) or `"file"`  |
-| `trailingSlash` | `string`         | `"always"`       | `"always"` or `"never"`                                 |
-| `adapter`      | `string \| null` | `null`           | Deployment adapter: `"cloudflare"`, `"netlify"`, `"vercel"`, `"github-pages"`, `"node"`, `"bun"` |
+| Property        | Type             | Default       | Description                                                                                      |
+| --------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------ |
+| `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                               |
+| `format`        | `string`         | `"directory"` | URL format: `"directory"` (trailing slash) or `"file"`                                           |
+| `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                                          |
+| `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare"`, `"netlify"`, `"vercel"`, `"github-pages"`, `"node"`, `"bun"` |
 
 When `adapter` is set and the site contains `timing: "server"` entries, the compiler:
 

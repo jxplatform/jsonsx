@@ -42,14 +42,14 @@ Executes `timing: "server"` function entries during development. The runtime sen
 
 REST API for the Studio visual builder:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/__studio/project` | Project metadata |
-| GET | `/__studio/files` | Directory listing |
-| GET/PUT/DELETE | `/__studio/file` | Read / write / delete file |
-| POST | `/__studio/file/rename` | Rename or move file |
-| GET | `/__studio/components` | Discover custom elements |
-| GET | `/__studio/search` | Search file contents |
+| Method         | Path                    | Description                |
+| -------------- | ----------------------- | -------------------------- |
+| GET            | `/__studio/project`     | Project metadata           |
+| GET            | `/__studio/files`       | Directory listing          |
+| GET/PUT/DELETE | `/__studio/file`        | Read / write / delete file |
+| POST           | `/__studio/file/rename` | Rename or move file        |
+| GET            | `/__studio/components`  | Discover custom elements   |
+| GET            | `/__studio/search`      | Search file contents       |
 
 All file operations are constrained to the project root (path traversal is rejected).
 
@@ -57,11 +57,11 @@ All file operations are constrained to the project root (path traversal is rejec
 
 OXC-powered tools for the Studio function body editor:
 
-| Endpoint | Tool | Description |
-|----------|------|-------------|
-| `POST /__studio/code/format` | oxfmt | Format a JS snippet |
+| Endpoint                     | Tool             | Description         |
+| ---------------------------- | ---------------- | ------------------- |
+| `POST /__studio/code/format` | oxfmt            | Format a JS snippet |
 | `POST /__studio/code/minify` | `Bun.Transpiler` | Minify a JS snippet |
-| `POST /__studio/code/lint` | oxlint | Lint a JS snippet |
+| `POST /__studio/code/lint`   | oxlint           | Lint a JS snippet   |
 
 ## Build pipeline
 
@@ -69,8 +69,8 @@ OXC-powered tools for the Studio function body editor:
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
+| Package    | Purpose                       |
+| ---------- | ----------------------------- |
 | `chokidar` | File watching for live reload |
 
 Bun built-ins used: `Bun.serve`, `Bun.build`, `Bun.Transpiler`.

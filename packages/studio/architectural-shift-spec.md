@@ -6,19 +6,20 @@
 
 ## Implementation Status
 
-| Phase | Status | Notes |
-|-------|--------|-------|
-| 1. Error Boundaries | ✅ Complete | All renderers wrapped in try/catch with retry |
-| 2. Doc/Session Split | ✅ Complete | updateSession/updateUi in use, no ad-hoc mutations |
-| 3. Lift Transient State | ✅ Complete | All mutable view state in view.js |
-| 4. Componentize Panels | ✅ Complete | studio.js: 714 lines (88.5% reduction) |
-| 5. Lit Host Hygiene | ✅ Complete | Single-writer hosts, no defensive catch/replace |
-| 6. Async as State | ✅ Complete | Canvas state machine, pendingInlineEdit in session |
-| 7. Selective Subscriptions | ⬜ Not Started | |
+| Phase                      | Status         | Notes                                              |
+| -------------------------- | -------------- | -------------------------------------------------- |
+| 1. Error Boundaries        | ✅ Complete    | All renderers wrapped in try/catch with retry      |
+| 2. Doc/Session Split       | ✅ Complete    | updateSession/updateUi in use, no ad-hoc mutations |
+| 3. Lift Transient State    | ✅ Complete    | All mutable view state in view.js                  |
+| 4. Componentize Panels     | ✅ Complete    | studio.js: 714 lines (88.5% reduction)             |
+| 5. Lit Host Hygiene        | ✅ Complete    | Single-writer hosts, no defensive catch/replace    |
+| 6. Async as State          | ✅ Complete    | Canvas state machine, pendingInlineEdit in session |
+| 7. Selective Subscriptions | ⬜ Not Started |                                                    |
 
 ### Phase 4 Detailed Status
 
 **Container panels** (mount/render/unmount orchestrators):
+
 - ✅ toolbar
 - ✅ overlays
 - ✅ right-panel
@@ -27,6 +28,7 @@
 - ✅ left-panel
 
 **Sub-panels** (pure render functions returning TemplateResult):
+
 - ✅ layers-panel
 - ✅ stylebook-layers-panel
 - ✅ elements-panel
@@ -64,9 +66,9 @@ The architecture works for most cases but exhibits several recurring failure mod
 
 1. **Cross-panel failure propagation.** An error in one renderer (most commonly the canvas) can destroy unrelated UI because renderers run in sequence without isolation.
 
-2. **Dual state-mutation paths.** The explicit `update()` dispatcher coexists with ad-hoc `S = { ...S, ui: { ... } }` mutations. The second path bypasses middleware, post-render hooks, and selective re-rendering. *(Fixed in Phase 2.)*
+2. **Dual state-mutation paths.** The explicit `update()` dispatcher coexists with ad-hoc `S = { ...S, ui: { ... } }` mutations. The second path bypasses middleware, post-render hooks, and selective re-rendering. _(Fixed in Phase 2.)_
 
-3. **Shared mutable substrate.** Renderers read and write module-scoped globals (`canvasPanels`, `elToPath`, `panzoomWrap`, `componentInlineEdit`, etc.) making them non-independent even though they're registered separately. *(Fixed in Phase 3.)*
+3. **Shared mutable substrate.** Renderers read and write module-scoped globals (`canvasPanels`, `elToPath`, `panzoomWrap`, `componentInlineEdit`, etc.) making them non-independent even though they're registered separately. _(Fixed in Phase 3.)_
 
 4. **Async inside renderers.** `renderCanvasLive` is async; the rest of the system dances around it with `pendingInlineEdit` flags and `requestAnimationFrame` coordination, creating race conditions.
 
@@ -125,9 +127,18 @@ Each major UI region becomes a self-contained module with `mount`/`render`/`unmo
 ### Pattern: Container Panel (orchestrator)
 
 ```js
-export function mount(ctx) { _ctx = ctx; _unsub = subscribe(onChange); }
-export function unmount() { _unsub?.(); _ctx = null; }
-export function render() { ensureLitState(root); litRender(template(), root); }
+export function mount(ctx) {
+  _ctx = ctx;
+  _unsub = subscribe(onChange);
+}
+export function unmount() {
+  _unsub?.();
+  _ctx = null;
+}
+export function render() {
+  ensureLitState(root);
+  litRender(template(), root);
+}
 ```
 
 ### Pattern: Sub-panel (pure render function)
@@ -141,22 +152,22 @@ export function renderFooTemplate(ctx) {
 
 ### Extraction History
 
-| Extraction | Lines Removed from studio.js | Date |
-|-----------|------------------------------|------|
-| Container panels (toolbar, overlays, etc.) | ~800 | Phase 4a–c |
-| properties-panel.js | ~1,300 | Phase 4d |
-| stylebook-panel.js | ~1,005 | Phase 4e |
-| dnd.js (+ shared.js defaultDef) | ~430 | Phase 4f |
-| editors.js (function editor + completions) | ~200 | Phase 4g |
-| block-action-bar.js (action bar + inline formatting) | ~395 | Phase 4h |
-| edit-display.js (edit-mode document transforms) | ~190 | Phase 4i |
-| component-inline-edit.js (design-mode text editing) | ~295 | Phase 4j |
-| content-inline-edit.js (rich-text editing bridge) | ~187 | Phase 4k |
-| canvas-utils.js (panzoom, zoom indicator, panel template) | ~273 | Phase 4l |
-| preview-render.js, pseudo-preview.js, canvas-dnd.js, panel-events.js | ~503 | Phase 4m |
-| canvas-helpers.js (shared canvas query/utility functions) | ~105 | Phase 4n |
-| canvas-render.js (multi-mode canvas rendering orchestrator) | ~350 | Phase 4o |
-| canvas-live-render.js (async runtime rendering pipeline) | ~269 | Phase 4p |
+| Extraction                                                           | Lines Removed from studio.js | Date       |
+| -------------------------------------------------------------------- | ---------------------------- | ---------- |
+| Container panels (toolbar, overlays, etc.)                           | ~800                         | Phase 4a–c |
+| properties-panel.js                                                  | ~1,300                       | Phase 4d   |
+| stylebook-panel.js                                                   | ~1,005                       | Phase 4e   |
+| dnd.js (+ shared.js defaultDef)                                      | ~430                         | Phase 4f   |
+| editors.js (function editor + completions)                           | ~200                         | Phase 4g   |
+| block-action-bar.js (action bar + inline formatting)                 | ~395                         | Phase 4h   |
+| edit-display.js (edit-mode document transforms)                      | ~190                         | Phase 4i   |
+| component-inline-edit.js (design-mode text editing)                  | ~295                         | Phase 4j   |
+| content-inline-edit.js (rich-text editing bridge)                    | ~187                         | Phase 4k   |
+| canvas-utils.js (panzoom, zoom indicator, panel template)            | ~273                         | Phase 4l   |
+| preview-render.js, pseudo-preview.js, canvas-dnd.js, panel-events.js | ~503                         | Phase 4m   |
+| canvas-helpers.js (shared canvas query/utility functions)            | ~105                         | Phase 4n   |
+| canvas-render.js (multi-mode canvas rendering orchestrator)          | ~350                         | Phase 4o   |
+| canvas-live-render.js (async runtime rendering pipeline)             | ~269                         | Phase 4p   |
 
 ### Remaining: Canvas Module
 
@@ -168,6 +179,7 @@ The canvas is the largest remaining block (~2,500+ lines) and the most complex �
 - DnD registration — `registerPanelDnD`, `registerLayersDnD`, `registerElementsDnD`, `registerComponentsDnD`
 
 Suggested sub-extraction order:
+
 1. Source mode (Monaco editor block)
 2. Manage mode (file browser)
 3. DnD registration functions
@@ -199,12 +211,15 @@ Canvas async state is now a first-class part of session state:
 
 ```js
 // session.canvas
-{ status: "idle" | "loading" | "ready" | "error", scope, error }
+{
+  status: ("idle" | "loading" | "ready" | "error", scope, error);
+}
 // session.ui.pendingInlineEdit
-null | { path, mediaName }
+null | { path, mediaName };
 ```
 
 **Changes made:**
+
 - `view.liveScope` → `session.canvas.scope` (updated via `updateCanvas()`)
 - `view.pendingInlineEdit` → `session.ui.pendingInlineEdit` (set via `updateUi()`, consumed in session update handler)
 - Duplicate processing consolidated: old post-render hook in studio.js + `.then()` in canvas-render.js → single processing point in session update handler when canvas becomes "ready"
@@ -223,15 +238,15 @@ Each panel declares which state slices it depends on. The dispatcher only notifi
 
 ## What Each Phase Delivers
 
-| Phase | Lands | User-visible? | Reversible? |
-|---|---|---|---|
-| 1. Error boundaries | Crash isolation between renderers | No | Trivially |
-| 2. Doc/session split | Routed state changes, no bypasses | No | With effort |
-| 3. View state in objects | No module-global view state | No | With effort |
-| 4. Componentize panels | True isolation between panels | No | Each panel independently |
-| 5. Lit host hygiene | No marker corruption workarounds | No | Trivially |
-| 6. Async as state | No race conditions on inline edit | No | With effort |
-| 7. Selective subscriptions | Fewer wasted re-renders | Maybe (perf) | Trivially |
+| Phase                      | Lands                             | User-visible? | Reversible?              |
+| -------------------------- | --------------------------------- | ------------- | ------------------------ |
+| 1. Error boundaries        | Crash isolation between renderers | No            | Trivially                |
+| 2. Doc/session split       | Routed state changes, no bypasses | No            | With effort              |
+| 3. View state in objects   | No module-global view state       | No            | With effort              |
+| 4. Componentize panels     | True isolation between panels     | No            | Each panel independently |
+| 5. Lit host hygiene        | No marker corruption workarounds  | No            | Trivially                |
+| 6. Async as state          | No race conditions on inline edit | No            | With effort              |
+| 7. Selective subscriptions | Fewer wasted re-renders           | Maybe (perf)  | Trivially                |
 
 ## Recommended Order
 

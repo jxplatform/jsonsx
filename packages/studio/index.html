@@ -149,8 +149,14 @@
         background: var(--accent, #0078d4);
         opacity: 0.5;
       }
-      #resize-left { grid-column: 3; justify-self: start; }
-      #resize-right { grid-column: 4; justify-self: start; }
+      #resize-left {
+        grid-column: 3;
+        justify-self: start;
+      }
+      #resize-right {
+        grid-column: 4;
+        justify-self: start;
+      }
 
       /* ─── Canvas (multi-panel) ────────────────────── */
       #canvas-wrap {
@@ -261,7 +267,13 @@
         border: 2px dashed var(--spectrum-global-color-gray-400);
         border-radius: 4px;
         position: relative;
-        background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(128,128,128,0.03) 10px, rgba(128,128,128,0.03) 20px);
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 10px,
+          rgba(128, 128, 128, 0.03) 10px,
+          rgba(128, 128, 128, 0.03) 20px
+        );
       }
       .canvas-panel-canvas slot:empty::before {
         content: "slot";
@@ -1991,12 +2003,24 @@
         font-weight: 700;
         font-family: "SF Mono", "Fira Code", monospace;
       }
-      .git-status-M { color: #e2b93d; }
-      .git-status-A { color: #73c991; }
-      .git-status-D { color: #e06c75; }
-      .git-status-R { color: #6796e6; }
-      .git-status-U { color: #73c991; }
-      .git-status-C { color: #6796e6; }
+      .git-status-M {
+        color: #e2b93d;
+      }
+      .git-status-A {
+        color: #73c991;
+      }
+      .git-status-D {
+        color: #e06c75;
+      }
+      .git-status-R {
+        color: #6796e6;
+      }
+      .git-status-U {
+        color: #73c991;
+      }
+      .git-status-C {
+        color: #6796e6;
+      }
       .git-loading {
         padding: 8px;
         text-align: center;

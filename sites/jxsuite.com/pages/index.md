@@ -130,6 +130,7 @@ Write a JSON document. The compiler produces static HTML with zero JavaScript â€
 
 ::::div{style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="1.5rem" style.--md.gridTemplateColumns="1fr"}
 :::code-panel{props.filename="counter.json" props.badge="INPUT"}
+
 ```
 {
   "tagName": "my-counter",
@@ -146,9 +147,11 @@ Write a JSON document. The compiler produces static HTML with zero JavaScript â€
   ]
 }
 ```
+
 :::
 
 :::code-panel{props.filename="index.html" props.badge="OUTPUT"}
+
 ```
 <!-- Static output: zero JS -->
 <my-counter>
@@ -162,6 +165,7 @@ Write a JSON document. The compiler produces static HTML with zero JavaScript â€
     './counter.js'
 </script>
 ```
+
 :::
 ::::
 :::::

@@ -8,11 +8,11 @@
 
 ## Platform targets
 
-| Target | Runtime | Status |
-|--------|---------|--------|
-| macOS, Windows, Linux (non-NixOS) | Electrobun (Bun + native webview) | Active |
-| NixOS | Chromium `--app` + `@jxsuite/server` | Via `nix build` |
-| Dev mode | Chrome + `@jxsuite/server` | Active (Studio development) |
+| Target                            | Runtime                              | Status                      |
+| --------------------------------- | ------------------------------------ | --------------------------- |
+| macOS, Windows, Linux (non-NixOS) | Electrobun (Bun + native webview)    | Active                      |
+| NixOS                             | Chromium `--app` + `@jxsuite/server` | Via `nix build`             |
+| Dev mode                          | Chrome + `@jxsuite/server`           | Active (Studio development) |
 
 ## Development
 
@@ -40,21 +40,21 @@ The Bun backend registers all RPC handlers at startup. Studio communicates with 
 
 ### RPC categories
 
-| Category | Handlers |
-|----------|----------|
+| Category   | Handlers                                                                             |
+| ---------- | ------------------------------------------------------------------------------------ |
 | Filesystem | `readFile`, `writeFile`, `deleteFile`, `renameFile`, `createDirectory`, `uploadFile` |
-| Project | `openProject`, `listDirectory`, `discoverComponents`, `resolveSiteContext` |
-| Git | `status`, `branches`, `log`, `stage`, `commit`, `push`, `pull`, `diff`, `discard` |
-| Packages | `addPackage`, `removePackage`, `listPackages` |
-| Code | `codeService`, `locateFile`, `fetchPluginSchema` |
+| Project    | `openProject`, `listDirectory`, `discoverComponents`, `resolveSiteContext`           |
+| Git        | `status`, `branches`, `log`, `stage`, `commit`, `push`, `pull`, `diff`, `discard`    |
+| Packages   | `addPackage`, `removePackage`, `listPackages`                                        |
+| Code       | `codeService`, `locateFile`, `fetchPluginSchema`                                     |
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `electrobun` | Native webview + Bun process host |
-| `@jxsuite/studio` | Studio UI |
-| `dbus-ts` | D-Bus integration (Linux) |
+| Package           | Purpose                           |
+| ----------------- | --------------------------------- |
+| `electrobun`      | Native webview + Bun process host |
+| `@jxsuite/studio` | Studio UI                         |
+| `dbus-ts`         | D-Bus integration (Linux)         |
 
 ## License
 

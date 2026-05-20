@@ -258,21 +258,21 @@ The branch picker lists all local branches and includes a "+ New branch..." opti
 
 #### Server Endpoints
 
-| Endpoint                    | Method | Purpose                          |
-| --------------------------- | ------ | -------------------------------- |
-| `/__studio/git/status`      | GET    | Branch info + changed files list |
-| `/__studio/git/branches`    | GET    | List local branches              |
-| `/__studio/git/log`         | GET    | Recent commit history            |
-| `/__studio/git/stage`       | POST   | Stage files                      |
-| `/__studio/git/unstage`     | POST   | Unstage files                    |
-| `/__studio/git/commit`      | POST   | Create commit with message       |
-| `/__studio/git/push`        | POST   | Push to remote                   |
-| `/__studio/git/pull`        | POST   | Pull from remote                 |
-| `/__studio/git/fetch`       | POST   | Fetch from remote                |
-| `/__studio/git/checkout`    | POST   | Switch branch                    |
-| `/__studio/git/create-branch` | POST | Create and checkout new branch   |
-| `/__studio/git/diff`        | GET    | File diff                        |
-| `/__studio/git/discard`     | POST   | Discard unstaged changes         |
+| Endpoint                      | Method | Purpose                          |
+| ----------------------------- | ------ | -------------------------------- |
+| `/__studio/git/status`        | GET    | Branch info + changed files list |
+| `/__studio/git/branches`      | GET    | List local branches              |
+| `/__studio/git/log`           | GET    | Recent commit history            |
+| `/__studio/git/stage`         | POST   | Stage files                      |
+| `/__studio/git/unstage`       | POST   | Unstage files                    |
+| `/__studio/git/commit`        | POST   | Create commit with message       |
+| `/__studio/git/push`          | POST   | Push to remote                   |
+| `/__studio/git/pull`          | POST   | Pull from remote                 |
+| `/__studio/git/fetch`         | POST   | Fetch from remote                |
+| `/__studio/git/checkout`      | POST   | Switch branch                    |
+| `/__studio/git/create-branch` | POST   | Create and checkout new branch   |
+| `/__studio/git/diff`          | GET    | File diff                        |
+| `/__studio/git/discard`       | POST   | Discard unstaged changes         |
 
 #### Auto-refresh
 

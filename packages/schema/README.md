@@ -14,11 +14,11 @@ bun add @jxsuite/schema
 
 ## Generated schemas
 
-| File | `$id` | Validates |
-|------|-------|-----------|
-| `schema.json` | `https://jxsuite.com/schema/v1` | Components, pages, and layouts |
-| `project-schema.json` | `https://jxsuite.com/schema/project/v1` | `project.json` config files |
-| `class-schema.json` | `https://jxsuite.com/schema/class/v1` | `.class.json` class definitions |
+| File                  | `$id`                                   | Validates                       |
+| --------------------- | --------------------------------------- | ------------------------------- |
+| `schema.json`         | `https://jxsuite.com/schema/v1`         | Components, pages, and layouts  |
+| `project-schema.json` | `https://jxsuite.com/schema/project/v1` | `project.json` config files     |
+| `class-schema.json`   | `https://jxsuite.com/schema/class/v1`   | `.class.json` class definitions |
 
 ## Regenerating schemas
 
@@ -38,8 +38,8 @@ import {
   validateDocument,
 } from "@jxsuite/schema";
 
-const schema = await generateSchema();        // component meta-schema object
-const valid = await validateDocument(doc);   // validate a Jx document
+const schema = await generateSchema(); // component meta-schema object
+const valid = await validateDocument(doc); // validate a Jx document
 ```
 
 ## Component schema coverage
@@ -61,11 +61,11 @@ Add the `$schema` field to any Jx file to get autocomplete and validation in any
 
 ## Dependencies
 
-| Package | Purpose |
-|---------|---------|
-| `@webref/css` | CSS property definitions |
-| `@webref/elements` | HTML element definitions |
-| `@webref/idl` | Web IDL interface definitions |
+| Package            | Purpose                       |
+| ------------------ | ----------------------------- |
+| `@webref/css`      | CSS property definitions      |
+| `@webref/elements` | HTML element definitions      |
+| `@webref/idl`      | Web IDL interface definitions |
 
 ## License
 
