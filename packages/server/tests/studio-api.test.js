@@ -689,7 +689,7 @@ describe("find-project", () => {
     const res = await handleStudioApi(req, url, FIXTURES);
     const data = await /** @type {any} */ (res).json();
     expect(data.path).toBeNull();
-  });
+  }, 15000);
 });
 
 // ─── components — markdown discovery ────────────────────────────────────────

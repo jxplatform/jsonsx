@@ -1,20 +1,5 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform.js";
-
-// Mock the dynamic parser import
-mock.module("@jxsuite/parser/transpile", () => ({
-  transpileJxMarkdown: (/** @type {string} */ source) => {
-    // Simplified mock: if source has frontmatter with tagName containing "-", treat as component
-    if (source.includes("tagName: my-component")) {
-      return { tagName: "my-component", children: [{ tagName: "div" }] };
-    }
-    // Otherwise treat as content markdown
-    return {
-      title: "Test Post",
-      children: [{ tagName: "p", textContent: "Hello" }],
-    };
-  },
-}));
 
 import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-ops.js";
 
@@ -22,7 +7,7 @@ import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-
 
 describe("loadMarkdown", () => {
   test("returns content state for plain markdown", async () => {
-    const state = await loadMarkdown("# Hello\n\nWorld", null);
+    const state = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Hello\n\nWorld", null);
     expect(state.sourceFormat).toBe("md");
     expect(state.mode).toBe("content");
     expect(state.dirty).toBe(false);
@@ -44,16 +29,15 @@ describe("loadMarkdown", () => {
   });
 
   test("returns component state for hyphenated tagName", async () => {
-    const state = await loadMarkdown("tagName: my-component", null);
+    const state = await loadMarkdown("---\ntagName: my-component\n---\n# Content\n", null);
     expect(state.sourceFormat).toBe("md");
     expect(state.dirty).toBe(false);
     expect(state.document.tagName).toBe("my-component");
-    // Component mode doesn't set mode = "content"
     expect(state.mode).not.toBe("content");
   });
 
   test("extracts frontmatter keys excluding children", async () => {
-    const state = await loadMarkdown("# Content doc", null);
+    const state = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Content doc", null);
     expect(state.content.frontmatter).toBeDefined();
     expect(state.content.frontmatter.children).toBeUndefined();
     expect(state.content.frontmatter.title).toBe("Test Post");

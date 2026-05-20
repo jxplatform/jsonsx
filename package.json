@@ -62,7 +62,7 @@
       "oxfmt --no-error-on-unmatched-pattern"
     ],
     "*.{md,html,css}": [
-      "oxfmt"
+      "oxfmt --no-error-on-unmatched-pattern"
     ]
   },
   "release-it": {
