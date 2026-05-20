@@ -126,7 +126,7 @@ Jx is a JSON Schema dialect. Documents may be validated against the Jx meta-sche
 
 Jx extends the base JSON Schema vocabulary with the following reserved keywords: `$prototype`, `$props`, `$switch`, `$map`, `$src`, `$export`, `timing`, `default`, `body`, `arguments`, `name`.
 
-Standard JSON Schema 2020-12 keywords (`type`, `properties`, `items`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `required`, `description`, `examples`, etc.) are inherited from the JSON Schema vocabulary and are valid on `$defs` type definitions and `state` typed value entries.
+Standard JSON Schema 2020-12 keywords (`type`, `format`, `properties`, `items`, `enum`, `minimum`, `maximum`, `minLength`, `maxLength`, `pattern`, `required`, `description`, `examples`, etc.) are inherited from the JSON Schema vocabulary and are valid on `$defs` type definitions and `state` typed value entries.
 
 ---
 

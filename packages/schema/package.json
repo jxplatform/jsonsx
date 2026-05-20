@@ -29,5 +29,5 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",
-  "version": "0.10.2"
+  "version": "0.11.0"
 }
