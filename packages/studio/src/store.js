@@ -164,7 +164,15 @@ export function stripEventHandlers(node) {
       const cases = {};
       for (const [ck, cv] of Object.entries(v)) cases[ck] = stripEventHandlers(cv);
       out.cases = cases;
-    } else if (k === "state" || k === "style" || k === "attributes" || k === "$media") {
+    } else if (k === "state" && typeof v === "object" && v !== null) {
+      /** @type {Record<string, any>} */
+      const state = {};
+      for (const [sk, sv] of Object.entries(v)) {
+        if (sv && typeof sv === "object" && sv.timing === "server") continue;
+        state[sk] = sv;
+      }
+      out.state = state;
+    } else if (k === "style" || k === "attributes" || k === "$media") {
       out[k] = v;
     } else {
       out[k] = v;

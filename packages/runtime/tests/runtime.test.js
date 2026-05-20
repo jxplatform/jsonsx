@@ -19,6 +19,7 @@ import {
   toCSSText,
   RESERVED_KEYS,
   Jx,
+  setSkipServerFunctions,
 } from "../src/runtime.js";
 
 /** @type {(...args: Parameters<typeof _renderNode>) => HTMLElement} */
@@ -394,6 +395,78 @@ describe("buildScope", () => {
     const doc = { $media: { "--md": "(min-width: 768px)" } };
     const state = await buildScope(doc, {}, BASE);
     expect(state["$media"]).toEqual({ "--md": "(min-width: 768px)" });
+  });
+});
+
+// ─── setSkipServerFunctions ──────────────────────────────────────────────────
+
+describe("setSkipServerFunctions", () => {
+  const BASE = "http://localhost/";
+
+  test("skips timing:'server' entries when flag is true", async () => {
+    setSkipServerFunctions(true);
+    try {
+      const state = await buildScope(
+        {
+          state: {
+            data: {
+              timing: "server",
+              $src: "./nonexistent.js",
+              $export: "getData",
+            },
+            count: 5,
+          },
+        },
+        {},
+        BASE,
+      );
+      expect(state.count).toBe(5);
+      expect(state.data).toBeUndefined();
+    } finally {
+      setSkipServerFunctions(false);
+    }
+  });
+
+  test("does not skip non-server state entries when flag is true", async () => {
+    setSkipServerFunctions(true);
+    try {
+      const state = await buildScope(
+        {
+          state: {
+            name: "hello",
+            count: { type: "integer", default: 42 },
+          },
+        },
+        {},
+        BASE,
+      );
+      expect(state.name).toBe("hello");
+      expect(state.count).toBe(42);
+    } finally {
+      setSkipServerFunctions(false);
+    }
+  });
+
+  test("flag defaults to false (server entries would be attempted)", async () => {
+    setSkipServerFunctions(false);
+    const state = await buildScope(
+      {
+        state: {
+          plain: "value",
+          serverEntry: {
+            timing: "server",
+            $src: "./nonexistent.js",
+            $export: "missing",
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(state.plain).toBe("value");
+    // Server entry attempted resolution (will fail/fallback but won't be undefined like skip mode)
+    // The key point: it's not skipped — resolution was attempted
+    expect("serverEntry" in state).toBe(true);
   });
 });
 

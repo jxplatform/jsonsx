@@ -6,7 +6,12 @@
 
 import { elToPath, stripEventHandlers, projectState } from "../store.js";
 import { view } from "../view.js";
-import { renderNode as runtimeRenderNode, buildScope, defineElement } from "@jxsuite/runtime";
+import {
+  renderNode as runtimeRenderNode,
+  buildScope,
+  defineElement,
+  setSkipServerFunctions,
+} from "@jxsuite/runtime";
 import {
   getEffectiveElements,
   getEffectiveImports,
@@ -97,6 +102,11 @@ export function initCanvasLiveRender(ctx) {
 export async function renderCanvasLive(gen, doc, canvasEl) {
   const S = _ctx.getState();
   const canvasMode = _ctx.getCanvasMode();
+
+  // Suppress server function resolution in non-preview modes to avoid
+  // failed proxy calls and infinite reactive retries (also covers
+  // async custom element connectedCallbacks that run after this function returns)
+  setSkipServerFunctions(canvasMode !== "preview");
 
   let renderDoc =
     canvasMode === "preview" ? structuredClone(doc) : prepareForEditMode(stripEventHandlers(doc));

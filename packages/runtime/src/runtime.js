@@ -81,6 +81,13 @@ const SCHEMA_KEYWORDS = new Set([
   "examples",
 ]);
 
+/** /** @type {{ skip: boolean }} */
+const _serverFnConfig = { skip: false };
+/** Set to true to suppress timing: "server" resolution (used by Studio edit mode). */
+export function setSkipServerFunctions(/** @type {boolean} */ v) {
+  _serverFnConfig.skip = v;
+}
+
 /**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
  *
@@ -182,16 +189,18 @@ export async function buildScope(doc, parentScope = {}, base = location.href) {
   }
 
   // Fifth pass: timing: "server" entries (dev mode — execute client-side, boundary unenforced)
-  for (const [key, def] of Object.entries(defs)) {
-    if (
-      def != null &&
-      typeof def === "object" &&
-      def.timing === "server" &&
-      def.$src &&
-      def.$export &&
-      !def.$prototype
-    ) {
-      state[key] = await resolveServerFunction(def, state, key, base);
+  if (!_serverFnConfig.skip) {
+    for (const [key, def] of Object.entries(defs)) {
+      if (
+        def != null &&
+        typeof def === "object" &&
+        def.timing === "server" &&
+        def.$src &&
+        def.$export &&
+        !def.$prototype
+      ) {
+        state[key] = await resolveServerFunction(def, state, key, base);
+      }
     }
   }
 

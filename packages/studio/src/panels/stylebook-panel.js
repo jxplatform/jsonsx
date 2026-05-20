@@ -19,7 +19,7 @@ import {
   projectState,
 } from "../store.js";
 import { view } from "../view.js";
-import { defineElement } from "@jxsuite/runtime";
+import { defineElement, setSkipServerFunctions } from "@jxsuite/runtime";
 import { componentRegistry } from "../files/components.js";
 import { getEffectiveStyle, getEffectiveMedia } from "../site-context.js";
 import { parseMediaEntries, activeBreakpointsForWidth } from "../utils/canvas-media.js";
@@ -351,12 +351,34 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
       }
     }
     if (activeBreakpoints) {
+      // Check media overrides nested inside the tag style (selector wraps media)
       for (const [key, val] of Object.entries(tagStyle)) {
         if (!key.startsWith("@") || typeof val !== "object") continue;
         const mediaName = key.slice(1);
         if (mediaName === "--") continue;
         if (activeBreakpoints.has(mediaName)) {
           for (const [prop, v] of Object.entries(/** @type {any} */ (val))) {
+            if (typeof v === "string" || typeof v === "number") {
+              try {
+                /** @type {any} */ (el.style)[prop] = v;
+              } catch {}
+            }
+          }
+        }
+      }
+    }
+  }
+  // Check top-level @media keys for tag-specific overrides (media wraps selector)
+  if (activeBreakpoints) {
+    const selector = compoundSelector || `& ${entry.tag}`;
+    for (const [key, val] of Object.entries(rootStyle)) {
+      if (!key.startsWith("@") || typeof val !== "object") continue;
+      const mediaName = key.slice(1);
+      if (mediaName === "--") continue;
+      if (activeBreakpoints.has(mediaName)) {
+        const mediaTagStyle = /** @type {any} */ (val)[selector];
+        if (mediaTagStyle && typeof mediaTagStyle === "object") {
+          for (const [prop, v] of Object.entries(mediaTagStyle)) {
             if (typeof v === "string" || typeof v === "number") {
               try {
                 /** @type {any} */ (el.style)[prop] = v;
@@ -382,6 +404,7 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
  * @returns {Promise<HTMLElement>}
  */
 export async function renderComponentPreview(comp) {
+  setSkipServerFunctions(true);
   try {
     if (comp.source === "npm") {
       if (!customElements.get(comp.tagName)) {
@@ -416,7 +439,13 @@ export async function renderComponentPreview(comp) {
  */
 function hasTagStyle(rootStyle, tag) {
   const s = rootStyle[`& ${tag}`];
-  return s && typeof s === "object" && Object.keys(s).length > 0;
+  if (s && typeof s === "object" && Object.keys(s).length > 0) return true;
+  const selector = `& ${tag}`;
+  for (const [key, val] of Object.entries(rootStyle)) {
+    if (!key.startsWith("@") || typeof val !== "object") continue;
+    if (/** @type {any} */ (val)[selector]) return true;
+  }
+  return false;
 }
 
 /**
