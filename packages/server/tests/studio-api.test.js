@@ -636,6 +636,412 @@ describe("unmatched endpoint", () => {
   });
 });
 
+// ─── resolve-site endpoint ───────────────────────────────────────────────────
+
+describe("resolve-site", () => {
+  test("finds ancestor project.json for a file path", async () => {
+    // SITE_PROJECT already has project.json at _studio_fixtures/my-site/project.json
+    const filePath = resolve(FIXTURES, "my-site/pages/index.json");
+    writeFileSync(filePath, JSON.stringify({ title: "test" }), "utf8");
+    const url = new URL(
+      `http://localhost/__studio/resolve-site?path=${encodeURIComponent(filePath)}`,
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.sitePath).not.toBeNull();
+    expect(data.projectConfig.name).toBe("Test Site");
+  });
+
+  test("returns null when no project.json found", async () => {
+    const filePath = "/tmp/no-project-here/somefile.json";
+    const url = new URL(
+      `http://localhost/__studio/resolve-site?path=${encodeURIComponent(filePath)}`,
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.sitePath).toBeNull();
+  });
+
+  test("returns 400 when path is missing", async () => {
+    const url = new URL("http://localhost/__studio/resolve-site");
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    expect(/** @type {any} */ (res).status).toBe(400);
+  });
+});
+
+// ─── find-project endpoint ───────────────────────────────────────────────────
+
+describe("find-project", () => {
+  test("returns 400 when name is missing", async () => {
+    const url = new URL("http://localhost/__studio/find-project");
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.error).toBe("Missing name");
+  });
+
+  test("returns null path when project not found", async () => {
+    const url = new URL("http://localhost/__studio/find-project?name=nonexistent-xyz-project-404");
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.path).toBeNull();
+  });
+});
+
+// ─── components — markdown discovery ────────────────────────────────────────
+
+describe("components — markdown discovery", () => {
+  // Set up md fixtures before tests run
+  const MD_DIR = join(FIXTURES, "md-components");
+  mkdirSync(MD_DIR, { recursive: true });
+
+  // Valid Jx component markdown
+  writeFileSync(join(MD_DIR, "my-widget.md"), `---\ntagName: my-widget\n---\n# Widget\n`, "utf8");
+
+  // Markdown with no frontmatter — should be skipped
+  writeFileSync(join(MD_DIR, "plain.md"), "# Just a doc\nNo frontmatter here.\n", "utf8");
+
+  // Markdown with frontmatter but no tagName — should be skipped
+  writeFileSync(join(MD_DIR, "no-tag.md"), `---\ntitle: Something\n---\n# Content\n`, "utf8");
+
+  // Markdown with tagName but no hyphen — should be skipped
+  writeFileSync(join(MD_DIR, "nohyphen.md"), `---\ntagName: widget\n---\n# Content\n`, "utf8");
+
+  test("discovers valid Jx component from .md file", async () => {
+    const url = new URL(`http://localhost/__studio/components?dir=${MD_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, MD_DIR);
+    const components = await /** @type {any} */ (res).json();
+    const widget = /** @type {any} */ (components).find(
+      (/** @type {any} */ c) => c.tagName === "my-widget",
+    );
+    expect(widget).toBeDefined();
+    expect(widget.source).toBe("jx");
+  });
+
+  test("skips .md without frontmatter", async () => {
+    const url = new URL(`http://localhost/__studio/components?dir=${MD_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, MD_DIR);
+    const components = await /** @type {any} */ (res).json();
+    expect(/** @type {any[]} */ (components).every((c) => c.path !== "plain.md")).toBe(true);
+  });
+});
+
+// ─── components — CEM npm discovery ─────────────────────────────────────────
+
+describe("components — CEM npm discovery", () => {
+  const CEM_DIR = join(FIXTURES, "cem-project");
+  mkdirSync(join(CEM_DIR, "node_modules/test-elements"), { recursive: true });
+
+  writeFileSync(
+    join(CEM_DIR, "package.json"),
+    JSON.stringify({
+      name: "cem-test",
+      dependencies: { "test-elements": "^1.0.0" },
+    }),
+    "utf8",
+  );
+
+  writeFileSync(
+    join(CEM_DIR, "node_modules/test-elements/package.json"),
+    JSON.stringify({
+      name: "test-elements",
+      version: "1.0.0",
+      customElements: "./custom-elements.json",
+    }),
+    "utf8",
+  );
+
+  writeFileSync(
+    join(CEM_DIR, "node_modules/test-elements/custom-elements.json"),
+    JSON.stringify({
+      schemaVersion: "1.0.0",
+      modules: [
+        {
+          path: "src/my-button.js",
+          declarations: [
+            {
+              kind: "class",
+              customElement: true,
+              tagName: "test-button",
+              description: "A test button",
+              attributes: [{ name: "variant", type: { text: "string" }, default: "primary" }],
+              members: [{ kind: "field", name: "disabled", privacy: "public" }],
+              slots: [{ name: "", description: "Default slot" }],
+              events: [{ name: "click" }],
+              cssProperties: [],
+            },
+          ],
+        },
+      ],
+    }),
+    "utf8",
+  );
+
+  test("discovers CEM components from node_modules", async () => {
+    const url = new URL(`http://localhost/__studio/components?dir=${CEM_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, CEM_DIR);
+    const components = await /** @type {any} */ (res).json();
+    const btn = /** @type {any} */ (components).find(
+      (/** @type {any} */ c) => c.tagName === "test-button",
+    );
+    expect(btn).toBeDefined();
+    expect(btn.source).toBe("npm");
+    expect(btn.package).toBe("test-elements");
+    expect(btn.props).toHaveLength(1);
+    expect(btn.props[0].name).toBe("variant");
+  });
+});
+
+// ─── packages endpoint ───────────────────────────────────────────────────────
+
+describe("packages endpoint", () => {
+  test("lists packages with CEM info", async () => {
+    const CEM_DIR = join(FIXTURES, "cem-project");
+    const url = new URL(`http://localhost/__studio/packages?dir=${CEM_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, CEM_DIR);
+    const packages = await /** @type {any} */ (res).json();
+    const testEl = /** @type {any[]} */ (packages).find((p) => p.name === "test-elements");
+    expect(testEl).toBeDefined();
+    expect(testEl.hasCem).toBe(true);
+  });
+
+  test("returns empty when no package.json", async () => {
+    const emptyDir = join(FIXTURES, "no-pkg");
+    mkdirSync(emptyDir, { recursive: true });
+    const url = new URL(`http://localhost/__studio/packages?dir=${emptyDir}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, emptyDir);
+    const packages = await /** @type {any} */ (res).json();
+    expect(packages).toEqual([]);
+  });
+});
+
+// ─── cem endpoint ────────────────────────────────────────────────────────────
+
+describe("cem endpoint", () => {
+  test("returns CEM for a valid package", async () => {
+    const CEM_DIR = join(FIXTURES, "cem-project");
+    const url = new URL(`http://localhost/__studio/cem?pkg=test-elements&dir=${CEM_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, CEM_DIR);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.cem).not.toBeNull();
+    expect(data.cem.modules).toHaveLength(1);
+  });
+
+  test("returns null for missing package", async () => {
+    const CEM_DIR = join(FIXTURES, "cem-project");
+    const url = new URL(`http://localhost/__studio/cem?pkg=nonexistent&dir=${CEM_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, CEM_DIR);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.cem).toBeNull();
+  });
+
+  test("returns 400 when pkg param missing", async () => {
+    const url = new URL("http://localhost/__studio/cem");
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    expect(/** @type {any} */ (res).status).toBe(400);
+  });
+});
+
+// ─── packages/add ────────────────────────────────────────────────────────────
+
+describe("packages/add", () => {
+  test("returns 400 when name is missing", async () => {
+    const url = new URL("http://localhost/__studio/packages/add");
+    const req = new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.error).toBe("Missing name");
+  });
+
+  test("returns 400 when name is not a string", async () => {
+    const url = new URL("http://localhost/__studio/packages/add");
+    const req = new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: 123 }),
+    });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.error).toBe("Missing name");
+  });
+
+  test("returns 500 when bun add fails", async () => {
+    const url = new URL("http://localhost/__studio/packages/add");
+    const req = new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "@nonexistent-scope-xyz/nonexistent-pkg-404" }),
+    });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    expect(/** @type {any} */ (res).status).toBe(500);
+  });
+});
+
+// ─── packages/remove ─────────────────────────────────────────────────────────
+
+describe("packages/remove", () => {
+  test("returns 400 when name is missing", async () => {
+    const url = new URL("http://localhost/__studio/packages/remove");
+    const req = new Request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.error).toBe("Missing name");
+  });
+});
+
+// ─── file — upload ────────────────────────────────────────────────────────────
+
+describe("file — upload", () => {
+  test("uploads binary file", async () => {
+    const url = new URL(`http://localhost/__studio/file/upload?path=uploaded.bin`);
+    const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+    const req = new Request(url, { method: "POST", body: data });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    const result = await /** @type {any} */ (res).json();
+    expect(result.ok).toBe(true);
+  });
+
+  test("returns 400 when path is missing", async () => {
+    const url = new URL("http://localhost/__studio/file/upload");
+    const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    expect(/** @type {any} */ (res).status).toBe(400);
+  });
+
+  test("returns 400 for path outside root", async () => {
+    const url = new URL(`http://localhost/__studio/file/upload?path=/etc/evil`);
+    const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
+    const res = await handleStudioApi(req, url, FIXTURES);
+    expect(/** @type {any} */ (res).status).toBe(400);
+  });
+});
+
+// ─── plugin-schema — JS module fallback ─────────────────────────────────────
+
+describe("plugin-schema — JS module fallback", () => {
+  // Create a JS module with static schema
+  writeFileSync(
+    join(FIXTURES, "WithSchema.js"),
+    `export class WithSchema { static schema = { type: "object", properties: { x: { type: "number" } } }; }`,
+    "utf8",
+  );
+
+  // Create a JS module without function export
+  writeFileSync(
+    join(FIXTURES, "NotAClass.js"),
+    `export const NotAClass = "not a function";`,
+    "utf8",
+  );
+
+  test("returns static schema from JS class", async () => {
+    const params = new URLSearchParams({
+      src: "./_studio_fixtures/WithSchema.js",
+      prototype: "WithSchema",
+    });
+    const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, import.meta.dir);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.schema).not.toBeNull();
+    expect(data.schema.properties.x).toBeDefined();
+  });
+
+  test("returns null schema when export is not a function", async () => {
+    const params = new URLSearchParams({
+      src: "./_studio_fixtures/NotAClass.js",
+      prototype: "NotAClass",
+    });
+    const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, import.meta.dir);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.schema).toBeNull();
+    expect(data.error).toContain("not found");
+  });
+
+  test("returns error for module import failure", async () => {
+    const params = new URLSearchParams({
+      src: "./_studio_fixtures/nonexistent-module.js",
+      prototype: "X",
+    });
+    const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, import.meta.dir);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.schema).toBeNull();
+    expect(data.error).toBeDefined();
+  });
+});
+
+// ─── plugin-schema — base resolution ─────────────────────────────────────────
+
+describe("plugin-schema — base resolution", () => {
+  test("resolves src relative to base URL", async () => {
+    const params = new URLSearchParams({
+      src: "./DataSource.class.json",
+      prototype: "DataSource",
+      base: "http://localhost/_studio_fixtures/page.json",
+    });
+    const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, import.meta.dir);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.schema).not.toBeNull();
+    expect(data.schema.properties.url).toBeDefined();
+  });
+
+  test("returns error for malformed base URL", async () => {
+    const params = new URLSearchParams({ src: "./Foo.class.json", base: "not-a-url" });
+    const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, import.meta.dir);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.schema).toBeNull();
+    expect(data.error).toBeDefined();
+  });
+});
+
+// ─── assertAccessible via activeProjectRoot ───────────────────────────────────
+
+describe("assertAccessible via activeProjectRoot", () => {
+  test("allows file inside activeProjectRoot even if outside server root", async () => {
+    const projectDir = join(FIXTURES, "active-project");
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(join(projectDir, "test.txt"), "content", "utf8");
+
+    // Use a server root that doesn't contain projectDir
+    const serverRoot = join(FIXTURES, "server-root");
+    mkdirSync(serverRoot, { recursive: true });
+
+    const url = new URL(`http://localhost/__studio/file?path=${join(projectDir, "test.txt")}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await handleStudioApi(req, url, serverRoot, projectDir);
+    expect(/** @type {any} */ (res).status).toBe(200);
+    const data = await /** @type {any} */ (res).json();
+    expect(data.content).toBe("content");
+  });
+});
+
 // Cleanup
 process.on("exit", () => {
   try {

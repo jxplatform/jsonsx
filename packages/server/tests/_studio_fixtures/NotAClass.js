@@ -1,0 +1,1 @@
+export const NotAClass = "not a function";

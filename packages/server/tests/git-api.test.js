@@ -290,4 +290,26 @@ describe("git endpoints", () => {
     const modified = data.files.find((f) => f.path === "hello.txt");
     expect(modified).toBeUndefined();
   });
+
+  test("POST push fails without remote (500)", async () => {
+    const res = await studioGitReq("/__studio/git/push", "POST");
+    expect(res.status).toBe(500);
+    const data = /** @type {any} */ (await res.json());
+    expect(data.error).toBeTruthy();
+  });
+
+  test("POST pull fails without remote (500)", async () => {
+    const res = await studioGitReq("/__studio/git/pull", "POST");
+    expect(res.status).toBe(500);
+    const data = /** @type {any} */ (await res.json());
+    expect(data.error).toBeTruthy();
+  });
+
+  test("POST fetch succeeds with no remotes (no-op)", async () => {
+    // git fetch exits 0 when there are no remotes configured — it is a silent no-op
+    const res = await studioGitReq("/__studio/git/fetch", "POST");
+    expect(res.status).toBe(200);
+    const data = /** @type {any} */ (await res.json());
+    expect(data.ok).toBe(true);
+  });
 });

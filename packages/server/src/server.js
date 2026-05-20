@@ -113,6 +113,8 @@ function resolveNpmPath(root, urlPath) {
   return null;
 }
 
+export { resolveNpmPath };
+
 /**
  * Create and start a Jx development server.
  *
