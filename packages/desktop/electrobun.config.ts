@@ -8,6 +8,13 @@ export default {
     name: "Jx Studio",
     identifier: "com.jxsuite.jx-studio",
     version: pkg.version,
+    fileAssociations: [
+      {
+        name: "Jx Project",
+        ext: ["json"],
+        role: "Editor",
+      },
+    ],
   },
 
   runtime: {
