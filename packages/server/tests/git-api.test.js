@@ -312,4 +312,56 @@ describe("git endpoints", () => {
     const data = /** @type {any} */ (await res.json());
     expect(data.ok).toBe(true);
   });
+
+  test("GET show returns file content at HEAD", async () => {
+    const res = await studioGitReq("/__studio/git/show?path=hello.txt&ref=HEAD");
+    expect(res.status).toBe(200);
+    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    expect(data.content).toBe("hello");
+    expect(data.format).toBe("json");
+  });
+
+  test("GET show returns json format for .json files", async () => {
+    writeFileSync(join(GIT_FIXTURE, "doc.json"), '{"tagName":"div"}');
+    git("add doc.json");
+    git('commit -m "add json"');
+    const res = await studioGitReq("/__studio/git/show?path=doc.json&ref=HEAD");
+    expect(res.status).toBe(200);
+    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    expect(data.content).toBe('{"tagName":"div"}');
+    expect(data.format).toBe("json");
+  });
+
+  test("GET show returns markdown format for .md files", async () => {
+    writeFileSync(join(GIT_FIXTURE, "page.md"), "# Hello");
+    git("add page.md");
+    git('commit -m "add md"');
+    const res = await studioGitReq("/__studio/git/show?path=page.md&ref=HEAD");
+    expect(res.status).toBe(200);
+    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    expect(data.content).toBe("# Hello");
+    expect(data.format).toBe("markdown");
+  });
+
+  test("GET show rejects missing path parameter", async () => {
+    const res = await studioGitReq("/__studio/git/show?ref=HEAD");
+    expect(res.status).toBe(400);
+  });
+
+  test("GET show rejects path traversal", async () => {
+    const res = await studioGitReq("/__studio/git/show?path=../etc/passwd&ref=HEAD");
+    expect(res.status).toBe(400);
+  });
+
+  test("GET show fails for non-existent file", async () => {
+    const res = await studioGitReq("/__studio/git/show?path=no-such-file.txt&ref=HEAD");
+    expect(res.status).toBe(500);
+  });
+
+  test("GET show defaults ref to HEAD when omitted", async () => {
+    const res = await studioGitReq("/__studio/git/show?path=hello.txt");
+    expect(res.status).toBe(200);
+    const data = /** @type {{ content: string }} */ (await res.json());
+    expect(data.content).toBe("hello");
+  });
 });

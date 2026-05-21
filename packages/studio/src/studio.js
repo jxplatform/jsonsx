@@ -132,6 +132,9 @@ function createFloatingContainer() {
 
 let canvasMode = "design";
 
+/** @type {any} */
+let gitDiffState = null;
+
 // ─── Component registry ───────────────────────────────────────────────────────
 
 /** @param {any} componentPath */
@@ -246,7 +249,11 @@ toolbarPanel.mount(toolbarEl, {
   saveFile: () => saveFile(),
   parseMediaEntries,
   getCanvasMode: () => canvasMode,
-  setCanvasMode: (/** @type {any} */ m) => {
+  setCanvasMode: (/** @type {string} */ m) => {
+    // Clear gitDiffState when exiting diff mode via toolbar
+    if (canvasMode === "git-diff" && m !== "git-diff") {
+      gitDiffState = null;
+    }
     canvasMode = m;
   },
   renderCanvas: () => renderCanvas(),
@@ -292,13 +299,21 @@ initCanvasLiveRender({
 });
 initCanvasRender({
   getCanvasMode: () => canvasMode,
-  setCanvasMode: (mode) => {
+  setCanvasMode: (/** @type {string} */ mode) => {
+    // Clear gitDiffState when exiting diff mode
+    if (canvasMode === "git-diff" && mode !== "git-diff") {
+      gitDiffState = null;
+    }
     canvasMode = mode;
   },
   getState: () => S,
   update,
   openFileFromTree,
   exportFile,
+  gitDiffState,
+  setGitDiffState: (/** @type {any} */ state) => {
+    gitDiffState = state;
+  },
 });
 
 rightPanelMod.mount({
@@ -310,6 +325,9 @@ rightPanelMod.mount({
 
 leftPanelMod.mount({
   getCanvasMode: () => canvasMode,
+  setCanvasMode: (/** @type {string} */ mode) => {
+    canvasMode = mode;
+  },
   renderImportsTemplate,
   renderFilesTemplate,
   renderSignalsTemplate,

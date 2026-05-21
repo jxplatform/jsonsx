@@ -859,6 +859,15 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         return Response.json({ diff });
       }
 
+      if (gitCmd === "show" && req.method === "GET") {
+        const fp = url.searchParams.get("path");
+        const ref = url.searchParams.get("ref") || "HEAD";
+        if (!fp) return Response.json({ error: "Missing path" }, { status: 400 });
+        if (fp.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
+        const content = await runGit(["show", `${ref}:${fp}`]);
+        return Response.json({ content, format: fp.endsWith(".md") ? "markdown" : "json" });
+      }
+
       if (gitCmd === "discard" && req.method === "POST") {
         const { files } = await req.json();
         if (!Array.isArray(files) || files.length === 0)

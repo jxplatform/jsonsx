@@ -29,6 +29,7 @@ import { renderCanvasLive } from "./canvas-live-render.js";
 import { renderCanvasNode } from "../panels/preview-render.js";
 import { registerPanelDnD } from "../panels/canvas-dnd.js";
 import { registerPanelEvents } from "../panels/panel-events.js";
+import { computeDocumentDiff } from "./canvas-diff.js";
 import { updateForcedPseudoPreview } from "../panels/pseudo-preview.js";
 import { renderStylebookMode } from "../panels/stylebook-panel.js";
 import { dismissLinkPopover, dismissBlockActionBar } from "../panels/block-action-bar.js";
@@ -53,6 +54,8 @@ let _ctx = null;
  *   update: (s: any) => void;
  *   openFileFromTree: (path: string) => void;
  *   exportFile: () => void;
+ *   gitDiffState: any;
+ *   setGitDiffState: (state: any) => void;
  * }} ctx
  */
 export function initCanvasRender(ctx) {
@@ -239,6 +242,75 @@ export function renderCanvas() {
     return;
   }
 
+  // Git diff mode — render original (left) and current (right) side-by-side
+  if (canvasMode === "git-diff") {
+    if (!_ctx.gitDiffState) {
+      // Fallback to design mode if diff state is missing
+      _ctx.setCanvasMode("design");
+      renderCanvas();
+      return;
+    }
+
+    canvasWrap.style.padding = "0";
+    canvasWrap.style.overflow = "hidden";
+
+    const gitDiffState = _ctx.gitDiffState;
+    const { tpl: origPanelTpl, panel: origPanel } = canvasPanelTemplate(
+      "git-diff-original",
+      "Original",
+      false,
+      "50%",
+    );
+    const { tpl: currPanelTpl, panel: currPanel } = canvasPanelTemplate(
+      "git-diff-current",
+      "Current",
+      false,
+      "50%",
+    );
+
+    const diffTpl = html`
+      <div style="display: flex; height: 100%; gap: 0;">
+        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+          ${origPanelTpl}
+        </div>
+        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+          ${currPanelTpl}
+        </div>
+      </div>
+    `;
+
+    litRender(diffTpl, canvasWrap);
+    canvasPanels.push(origPanel);
+    canvasPanels.push(currPanel);
+
+    // Parse original document from git content
+    let originalDoc = null;
+    try {
+      if (gitDiffState.isMarkdown) {
+        // For markdown, we need to convert it to Jx format
+        // For now, use a simple placeholder until we have markdown parsing
+        originalDoc = {
+          tagName: "div",
+          children: [{ tagName: "p", textContent: "Original (markdown)" }],
+        };
+      } else {
+        // Parse as JSON
+        originalDoc = JSON.parse(gitDiffState.originalContent);
+      }
+    } catch {
+      originalDoc = {
+        tagName: "div",
+        children: [{ tagName: "p", textContent: "Failed to parse original" }],
+      };
+    }
+
+    const currDoc = S.document;
+
+    renderCanvasIntoPanel(origPanel, new Set(), S.ui.featureToggles, originalDoc, gitDiffState);
+    renderCanvasIntoPanel(currPanel, new Set(), S.ui.featureToggles, currDoc, gitDiffState);
+    return;
+  }
+
   // Edit (content) mode — centered column, no panzoom, always 100%
   if (canvasMode === "edit") {
     if (modeChanged) {
@@ -376,35 +448,91 @@ export function renderCanvas() {
  * structural preview.
  *
  * @param {any} panel
- * @param {any} activeBreakpoints
+ * @param {Set<string>} activeBreakpoints
  * @param {any} featureToggles
+ * @param {any} [docOverride] - Optional document to render (for diff mode). Uses S.document if not
+ *   provided.
+ * @param {any} [gitDiffState] - Optional diff state. If provided, computes and applies diff
+ *   highlighting.
  */
-function renderCanvasIntoPanel(panel, activeBreakpoints, featureToggles) {
+function renderCanvasIntoPanel(
+  panel,
+  activeBreakpoints,
+  featureToggles,
+  docOverride = null,
+  gitDiffState = null,
+) {
   const gen = view.renderGeneration;
   const S = _ctx.getState();
-  renderCanvasLive(gen, S.document, panel.canvas).then((/** @type {any} */ scope) => {
+  const docToRender = docOverride || S.document;
+
+  renderCanvasLive(gen, docToRender, panel.canvas).then((/** @type {any} */ scope) => {
     // Skip post-render setup if a newer render has started
     if (gen !== view.renderGeneration) return;
     if (scope) {
       updateCanvas({ status: "ready", scope, error: null });
       applyCanvasMediaOverrides(panel.canvas, activeBreakpoints);
       statusMessage("Runtime render OK", 1500);
+
+      // Apply diff highlighting if in git-diff mode
+      if (gitDiffState && docOverride) {
+        // Determine which document is original and which is current
+        const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
+        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || S.document;
+        const currDoc = isOriginal ? gitDiffState.currentDoc || S.document : docOverride;
+
+        const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
+
+        // Can't iterate WeakMap, so apply styling by walking the canvas
+        const { elToPath } = scope;
+        if (elToPath instanceof WeakMap) {
+          applyDiffHighlightToCanvas(panel.canvas, diffMap);
+        }
+      }
     } else {
       // Fallback to structural preview
       updateCanvas({ status: "ready", scope: null, error: null });
-      renderCanvasNode(
-        _ctx.getState().document,
-        [],
-        panel.canvas,
-        activeBreakpoints,
-        featureToggles,
-      );
+      renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
     }
     registerPanelDnD(panel);
     registerPanelEvents(panel);
     renderOverlays();
     updateForcedPseudoPreview();
   });
+}
+
+/**
+ * Apply diff highlighting to canvas elements based on elToPath mapping. Walks the canvas DOM and
+ * applies classes based on diff status.
+ *
+ * @param {HTMLElement} canvas
+ * @param {Map<string, "added" | "removed" | "modified">} diffMap
+ */
+function applyDiffHighlightToCanvas(canvas, diffMap) {
+  if (!diffMap || diffMap.size === 0) return;
+
+  // Walk all elements in canvas and check their data attributes or other markers
+  const walkCanvas = (/** @type {HTMLElement} */ el, /** @type {string} */ path = "") => {
+    const pathKey = path || "/";
+
+    if (diffMap.has(pathKey)) {
+      const status = diffMap.get(pathKey);
+      if (status === "added") el.classList.add("element-diff-added");
+      else if (status === "removed") el.classList.add("element-diff-removed");
+      else if (status === "modified") el.classList.add("element-diff-modified");
+    }
+
+    // Check for child elements (heuristic: children array markers)
+    let childIdx = 0;
+    for (const child of el.children) {
+      const childPath =
+        pathKey === "/" ? `children/${childIdx}` : `${pathKey}/children/${childIdx}`;
+      walkCanvas(/** @type {HTMLElement} */ (child), childPath);
+      childIdx++;
+    }
+  };
+
+  walkCanvas(canvas, "");
 }
 
 /**

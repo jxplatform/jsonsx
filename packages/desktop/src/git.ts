@@ -102,6 +102,11 @@ export async function gitDiff(params: { path?: string }): Promise<string> {
   return git("diff");
 }
 
+export async function gitShow(params: { path: string; ref?: string }): Promise<string> {
+  const ref = params.ref || "HEAD";
+  return git("show", `${ref}:${params.path}`);
+}
+
 export async function gitDiscard(params: { files: string[] }): Promise<void> {
   await git("checkout", "--", ...params.files);
 }

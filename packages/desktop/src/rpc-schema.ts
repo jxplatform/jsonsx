@@ -196,6 +196,10 @@ export type StudioRPC = {
         params: { path?: string };
         response: string;
       };
+      gitShow: {
+        params: { path: string; ref?: string };
+        response: string;
+      };
       gitDiscard: {
         params: { files: string[] };
         response: void;

@@ -44,8 +44,11 @@ async function gitAction(action, body) {
 
 let _pollTimer = /** @type {any} */ (null);
 
-/** @param {any} S */
-export function renderGitPanel(S) {
+/**
+ * @param {any} S
+ * @param {any} ctx
+ */
+export function renderGitPanel(S, ctx) {
   const status = S.ui.gitStatus;
   const branches = S.ui.gitBranches;
   const loading = S.ui.gitLoading;
@@ -156,9 +159,48 @@ export function renderGitPanel(S) {
     const parts = file.path.split("/");
     const name = parts.pop();
     const dir = parts.join("/");
+
+    const onFileClick = async () => {
+      // Only support diff for modified/added files
+      if (file.status !== "M" && file.status !== "A") return;
+      if (!file.path.endsWith(".md") && !file.path.endsWith(".json")) return;
+
+      try {
+        const plat = getPlatform();
+        updateUi("gitLoading", true);
+        const originalContent = await plat.gitShow({ path: file.path, ref: "HEAD" });
+
+        // Determine if it's markdown or JSON
+        const isMarkdown = file.path.endsWith(".md");
+
+        // For now, we'll need to pass the original content to the canvas
+        // This requires state management which we'll add to studio.js
+        updateUi("gitDiffState", {
+          filePath: file.path,
+          originalContent,
+          isMarkdown,
+          fileStatus: file.status,
+        });
+
+        // Trigger diff mode via context
+        if (ctx?.setCanvasMode) {
+          ctx.setCanvasMode("git-diff");
+        }
+      } catch (/** @type {any} */ e) {
+        updateUi("gitError", `Failed to load diff: ${e.message}`);
+      } finally {
+        updateUi("gitLoading", false);
+      }
+    };
+
     return html`
       <div class="git-file-row">
-        <span class="git-file-info">
+        <span
+          class="git-file-info"
+          style="cursor: pointer; flex: 1;"
+          title="Click to view diff"
+          @click=${onFileClick}
+        >
           <span class="git-file-name" title=${file.path}>${name}</span>
           ${dir ? html`<span class="git-file-dir">${dir}</span>` : nothing}
         </span>

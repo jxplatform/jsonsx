@@ -122,7 +122,7 @@ function _render() {
           },
       renderLeftPanel: render,
     });
-  } else if (tab === "git") content = _ctx.renderGitPanel(S);
+  } else if (tab === "git") content = _ctx.renderGitPanel(S, _ctx);
   else content = nothing;
 
   litRender(html`<div class="panel-body">${content}</div>`, /** @type {any} */ (leftPanel));
