@@ -26,8 +26,12 @@ const HISTORY_LIMIT = 100;
 export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
   mutationFn(tab);
 
+  // Replace the document root reference so effects tracking tab.doc.document re-trigger.
+  // Nested objects are shared — the mutation already modified them in place.
+  const raw = toRaw(tab.doc.document);
+  tab.doc.document = { ...raw };
+
   if (!skipHistory) {
-    const raw = toRaw(tab.doc.document);
     const snapshot = {
       document: structuredClone(raw),
       selection: tab.session.selection ? [...tab.session.selection] : null,
@@ -40,7 +44,6 @@ export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
   }
 
   tab.doc.dirty = true;
-  tab.doc.version++;
 }
 
 /**

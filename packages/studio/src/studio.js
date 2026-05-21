@@ -313,7 +313,6 @@ effect(() => {
   if (!tab) return;
   void tab.doc.document;
   void tab.doc.mode;
-  void tab.doc.version;
   void tab.session.ui.canvasMode;
   void tab.session.ui.editingFunction;
   void tab.session.ui.featureToggles;

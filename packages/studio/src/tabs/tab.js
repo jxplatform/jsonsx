@@ -48,7 +48,6 @@ import { reactive, effectScope } from "../reactivity.js";
  *     sourceFormat: string | null;
  *     handlersSource: string | null;
  *     dirty: boolean;
- *     version: number;
  *   };
  *   session: {
  *     selection: (string | number)[] | null;
@@ -140,7 +139,6 @@ export function createTab({
               : "component",
         handlersSource: null,
         dirty: false,
-        version: 0,
       }),
       session: reactive({
         selection: null,

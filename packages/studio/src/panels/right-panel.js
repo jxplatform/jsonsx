@@ -48,7 +48,6 @@ export function mount(ctx) {
       if (!tab) return;
       // Track properties the right panel reads
       void tab.doc.document;
-      void tab.doc.version;
       void tab.session.selection;
       void tab.session.ui.rightTab;
       void tab.session.ui.activeMedia;
