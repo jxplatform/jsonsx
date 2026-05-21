@@ -139,6 +139,7 @@ export function renderLayersTemplate(ctx) {
         data-dnd-row=${isElement ? key : nothing}
         data-dnd-depth=${isElement ? depth : nothing}
         data-dnd-void=${isElement && isVoidEl ? "" : nothing}
+        data-dnd-expanded=${isElement && isExpandable && !collapsed.has(key) ? "" : nothing}
         @click=${() => (activeTab.value.session.selection = path)}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>

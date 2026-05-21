@@ -14,7 +14,14 @@ import {
   extractInstruction,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 
-import { leftPanel, getNodeAtPath, parentElementPath, childIndex, isAncestor } from "../store.js";
+import {
+  leftPanel,
+  getNodeAtPath,
+  parentElementPath,
+  childIndex,
+  isAncestor,
+  renderOnly,
+} from "../store.js";
 import { transact, transactDoc, mutateMoveNode, mutateInsertNode } from "../tabs/transact.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
@@ -35,6 +42,7 @@ export function registerLayersDnD() {
           .map((/** @type {any} */ s) => (/^\d+$/.test(s) ? parseInt(s) : s));
         const rowDepth = parseInt(/** @type {string} */ (row.dataset.dndDepth)) || 0;
         const isVoid = row.hasAttribute("data-dnd-void");
+        const isExpanded = row.hasAttribute("data-dnd-expanded");
 
         const cleanup = combine(
           draggable({
@@ -52,9 +60,15 @@ export function registerLayersDnD() {
             onDragStart() {
               row.classList.add("dragging");
               view.layerDragSourceHeight = row.offsetHeight;
+              if (isExpanded) {
+                hideDescendantRows(row, container);
+              }
             },
             onDrop() {
               row.classList.remove("dragging");
+              if (isExpanded) {
+                renderOnly("leftPanel");
+              }
             },
           }),
           dropTargetForElements({
@@ -72,6 +86,7 @@ export function registerLayersDnD() {
                   element,
                   currentLevel: rowDepth,
                   indentPerLevel: 16,
+                  mode: isExpanded ? "expanded" : "standard",
                   block: isVoid ? ["make-child"] : [],
                 }),
               );
@@ -104,7 +119,21 @@ export function registerLayersDnD() {
         if (!instruction || instruction.type === "instruction-blocked") return;
         const srcData = source.data;
         const targetPath = target.data.path;
+
+        // If the source had children, persist collapse at the new location
+        const srcRow = srcData.type === "tree-node" && source.element;
+        const wasExpanded = srcRow && srcRow.hasAttribute("data-dnd-expanded");
+
         applyDropInstruction(instruction, srcData, targetPath);
+
+        if (wasExpanded) {
+          const tab = activeTab.value;
+          const newPath = tab?.session.selection;
+          if (newPath) {
+            const collapsed = view._layersCollapsed || (view._layersCollapsed = new Set());
+            collapsed.add(newPath.join("/"));
+          }
+        }
       },
     });
     view.dndCleanups.push(monitorCleanup);
@@ -181,6 +210,22 @@ export function registerElementsDnD() {
       },
     );
   });
+}
+
+/**
+ * Hide descendant rows of the dragged item so it appears collapsed during drag.
+ *
+ * @param {any} parentRow
+ * @param {any} container
+ */
+function hideDescendantRows(parentRow, container) {
+  const prefix = parentRow.dataset.path + "/";
+  const rows = container.querySelectorAll(".layers-tree .layer-row");
+  for (const r of rows) {
+    if (/** @type {any} */ (r).dataset.path?.startsWith(prefix)) {
+      /** @type {any} */ (r).style.display = "none";
+    }
+  }
 }
 
 /**
