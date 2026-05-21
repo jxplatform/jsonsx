@@ -16,6 +16,10 @@ export const workspace = reactive({
   projectConfig: null,
   /** @type {ComponentEntry[]} */
   componentRegistry: [],
+  /** @type {import("../state.js").JxNode | null} */
+  clipboard: null,
+  /** @type {Record<string, any> | null} */
+  styleClipboard: null,
   fileTree: {
     /** @type {Map<string, FileEntry[]>} */
     dirs: new Map(),

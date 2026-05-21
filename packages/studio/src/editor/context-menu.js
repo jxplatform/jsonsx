@@ -1,13 +1,14 @@
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
 import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
-import { activeTab } from "../workspace/workspace.js";
+import { activeTab, workspace } from "../workspace/workspace.js";
 import {
   transactDoc,
   mutateInsertNode,
   mutateRemoveNode,
   mutateDuplicateNode,
   mutateWrapNode,
+  mutateReplaceStyle,
 } from "../tabs/transact.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
@@ -21,9 +22,6 @@ import { componentRegistry } from "../files/components.js";
  * @typedef {import("../state.js").JxNode} JxNode
  */
 
-/** @type {JxNode | null} */
-let clipboard = null;
-
 // ─── Clipboard ────────────────────────────────────────────────────────────────
 
 export function copyNode() {
@@ -31,7 +29,7 @@ export function copyNode() {
   if (!tab?.session.selection) return;
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) return;
-  clipboard = structuredClone(node);
+  workspace.clipboard = structuredClone(node);
   statusMessage("Copied");
 }
 
@@ -41,16 +39,16 @@ export function cutNode() {
   const sel = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, sel);
   if (!node) return;
-  clipboard = structuredClone(node);
+  workspace.clipboard = structuredClone(node);
   transactDoc(tab, (t) => mutateRemoveNode(t, sel));
   statusMessage("Cut");
 }
 
 export function pasteNode() {
-  if (!clipboard) return;
+  if (!workspace.clipboard) return;
   const tab = activeTab.value;
   if (!tab) return;
-  const clip = clipboard;
+  const clip = workspace.clipboard;
   const pPath = tab.session.selection || [];
   const parent = getNodeAtPath(tab.doc.document, pPath);
   if (!parent) return;
@@ -64,6 +62,25 @@ export function pasteNode() {
     transactDoc(tab, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
   }
   statusMessage("Pasted");
+}
+
+export function copyStyles() {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return;
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  if (!node?.style) return;
+  workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
+  statusMessage("Styles copied");
+}
+
+export function pasteStyles() {
+  if (!workspace.styleClipboard) return;
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return;
+  const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
+  const sel = /** @type {JxPath} */ (tab.session.selection);
+  transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
+  statusMessage("Styles pasted");
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
@@ -109,6 +126,26 @@ export function showContextMenu(e, path, opts = {}) {
       label: "Duplicate",
       action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
     });
+    if (node.style) {
+      items.push({
+        label: "Copy styles",
+        action: () => {
+          workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
+          statusMessage("Styles copied");
+        },
+      });
+    }
+    if (workspace.styleClipboard) {
+      items.push({
+        label: "Paste styles",
+        action: () => {
+          if (!workspace.styleClipboard) return;
+          const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
+          transactDoc(activeTab.value, (t) => mutateReplaceStyle(t, path, style));
+          statusMessage("Styles pasted");
+        },
+      });
+    }
     items.push({ label: "—" }); // separator
     items.push({
       label: "Insert before",
@@ -162,8 +199,8 @@ export function showContextMenu(e, path, opts = {}) {
       danger: true,
     });
   }
-  if (clipboard) {
-    const clip = clipboard;
+  if (workspace.clipboard) {
+    const clip = workspace.clipboard;
     items.push({ label: "—" });
     items.push({
       label: "Paste inside",

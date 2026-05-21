@@ -40,6 +40,7 @@ export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
   }
 
   tab.doc.dirty = true;
+  tab.doc.version++;
 }
 
 /**
@@ -268,6 +269,20 @@ export function mutateUpdateMediaNestedStyle(tab, path, mediaName, selector, pro
     node.style[key][selector][prop] = value;
   }
   if (Object.keys(node.style).length === 0) delete node.style;
+}
+
+/**
+ * @param {Tab} tab
+ * @param {JxPath} path
+ * @param {Record<string, any> | undefined} style
+ */
+export function mutateReplaceStyle(tab, path, style) {
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (style && Object.keys(style).length > 0) {
+    node.style = style;
+  } else {
+    delete node.style;
+  }
 }
 
 /**
