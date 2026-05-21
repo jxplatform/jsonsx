@@ -78,5 +78,11 @@ export default {
     icon: "icon.png",
     productId: "com.jxsuite.jx-studio",
     installDir: "Jx Studio",
+    msix: {
+      publisher: "CN=jxsuite",
+      publisherDisplayName: "jxsuite",
+      identityName: "com.jxsuite.jx-studio",
+      capabilities: ["internetClient"],
+    },
   },
 } satisfies ElectrobunConfig as ElectrobunConfig & Record<string, unknown>;
