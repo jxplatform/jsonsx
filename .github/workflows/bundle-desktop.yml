@@ -51,6 +51,15 @@ jobs:
         if: runner.os == 'Windows'
         run: dotnet tool install --global wix
 
+      - name: Free disk space (macOS x64)
+        if: matrix.platform == 'macos-x64'
+        run: |
+          echo "Disk space before cleanup:"
+          df -h /
+          sudo rm -rf /Applications/Xcode*.app
+          echo "Disk space after cleanup:"
+          df -h /
+
       - name: Build workspace packages
         run: bun run build
 
