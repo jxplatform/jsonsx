@@ -19,8 +19,9 @@
     "build:runtime": "bun run --cwd packages/runtime build",
     "build:studio": "bun run --cwd packages/studio build",
     "desktop": "bun run --cwd packages/desktop dev",
-    "desktop:chromium": "bun run --cwd packages/desktop chromium",
     "desktop:build": "bun run --cwd packages/desktop build",
+    "desktop:chromium": "bun run --cwd packages/desktop chromium",
+    "desktop:msix": "bun run --cwd packages/desktop build:msix",
     "desktop:release": "bun run --cwd packages/desktop build:release",
     "desktop:stable": "bun run --cwd packages/desktop build:stable",
     "dev": "bun run server.js",
@@ -58,18 +59,18 @@
       "oxfmt",
       "oxlint --fix"
     ],
-    "*.json": [
+    "*.{md,html,css}": [
       "oxfmt --no-error-on-unmatched-pattern"
     ],
-    "*.{md,html,css}": [
+    "*.json": [
       "oxfmt --no-error-on-unmatched-pattern"
     ]
   },
   "release-it": {
     "git": {
+      "commitMessage": "chore: release ${version}",
       "requireCleanWorkingDir": false,
-      "tagName": "v${version}",
-      "commitMessage": "chore: release ${version}"
+      "tagName": "v${version}"
     },
     "github": {
       "draft": true,
