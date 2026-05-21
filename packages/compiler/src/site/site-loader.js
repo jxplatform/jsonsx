@@ -87,6 +87,15 @@ export function loadProjectConfig(projectRoot) {
   if (raw.imports) config.imports = raw.imports;
   if (raw.contentTypes) config.contentTypes = raw.contentTypes;
 
+  // Validate adapter
+  const VALID_ADAPTERS = ["cloudflare-workers", "cloudflare-pages", "node", "bun"];
+  if (config.build.adapter && !VALID_ADAPTERS.includes(config.build.adapter)) {
+    throw new Error(
+      `Unknown build adapter "${config.build.adapter}" in project.json. ` +
+        `Valid adapters: ${VALID_ADAPTERS.join(", ")}`,
+    );
+  }
+
   return {
     config,
     configPath,

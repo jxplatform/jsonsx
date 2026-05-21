@@ -281,7 +281,7 @@ describe("buildSite — server worker", () => {
       name: "Server Test",
       url: "https://test.com",
       defaults: { lang: "en" },
-      build: { outDir: "./dist", adapter: "cloudflare" },
+      build: { outDir: "./dist", adapter: "cloudflare-workers" },
     });
 
     writeJ("pages/index.json", {
@@ -329,6 +329,95 @@ describe("buildSite — server worker", () => {
 
     const content = readFileSync(copied, "utf8");
     expect(content).toContain("export function sendForm");
+  });
+});
+
+// ── Cloudflare Pages adapter ────────────────────────────────────────────────
+
+describe("buildSite — cloudflare-pages adapter", () => {
+  const PAGES_TMP = resolve(import.meta.dir, "__test-site-pages__");
+
+  beforeAll(() => {
+    rmSync(PAGES_TMP, { recursive: true, force: true });
+
+    const writeJ = (/** @type {string} */ p, /** @type {any} */ obj) => {
+      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      writeFileSync(resolve(PAGES_TMP, p), JSON.stringify(obj, null, 2), "utf8");
+    };
+    const writeP = (/** @type {string} */ p, /** @type {string} */ c) => {
+      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      writeFileSync(resolve(PAGES_TMP, p), c, "utf8");
+    };
+
+    writeJ("project.json", {
+      name: "Pages Test",
+      url: "https://test.com",
+      defaults: { lang: "en" },
+      build: { outDir: "./dist", adapter: "cloudflare-pages" },
+    });
+
+    writeJ("pages/index.json", {
+      title: "Home",
+      children: [{ tagName: "test-mailer", $props: {} }],
+    });
+
+    writeJ("components/test-mailer.json", {
+      tagName: "test-mailer",
+      state: {
+        sendMail: {
+          timing: "server",
+          $src: "./mailer.server.js",
+          $export: "sendMail",
+        },
+      },
+      children: [{ tagName: "form", children: ["Mail"] }],
+    });
+
+    writeP(
+      "components/mailer.server.js",
+      "export function sendMail(args) { return { ok: true }; }\n",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(PAGES_TMP, { recursive: true, force: true });
+  });
+
+  it("generates Pages function files instead of worker.js", async () => {
+    await buildSite(PAGES_TMP, { verbose: false });
+
+    const workerPath = resolve(PAGES_TMP, "dist/worker.js");
+    expect(existsSync(workerPath)).toBe(false);
+
+    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
+    expect(existsSync(fnPath)).toBe(true);
+  });
+
+  it("generates valid Pages function with onRequestPost", async () => {
+    await buildSite(PAGES_TMP, { verbose: false });
+
+    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
+    const content = readFileSync(fnPath, "utf8");
+    expect(content).toContain("export async function onRequestPost(context)");
+    expect(content).toContain("sendMail(args, context.env)");
+    expect(content).toContain("Response.json");
+  });
+
+  it("does not use Hono in Pages functions", async () => {
+    await buildSite(PAGES_TMP, { verbose: false });
+
+    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
+    const content = readFileSync(fnPath, "utf8");
+    expect(content).not.toContain("Hono");
+    expect(content).not.toContain("ASSETS.fetch");
+  });
+
+  it("copies server source files into dist/components/", async () => {
+    await buildSite(PAGES_TMP, { verbose: false });
+
+    const copied = resolve(PAGES_TMP, "dist/components/mailer.server.js");
+    expect(existsSync(copied)).toBe(true);
+    expect(readFileSync(copied, "utf8")).toContain("export function sendMail");
   });
 });
 

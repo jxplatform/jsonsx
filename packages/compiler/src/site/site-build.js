@@ -25,7 +25,7 @@ import { discoverPages, expandDynamicRoutes } from "./pages-discovery.js";
 import { resolveLayout } from "./layout-resolver.js";
 import { mergeHead, renderHead } from "./head-merger.js";
 import { injectContext } from "./context-injection.js";
-import { compile, compileServer, compileSiteServer } from "../compiler.js";
+import { compile, compileServer, compileSiteServer, compilePagesFunctions } from "../compiler.js";
 import { compileElement } from "../targets/compile-element.js";
 import {
   buildInitialScope,
@@ -269,6 +269,7 @@ export async function buildSite(projectRoot, options = {}) {
 
   // ── 6c. Generate site-wide server worker ────────────────────────────────
   if (projectConfig.build.adapter) {
+    const adapter = projectConfig.build.adapter;
     log("Generating site-wide server worker...");
 
     const deduped = new Map();
@@ -276,23 +277,47 @@ export async function buildSite(projectRoot, options = {}) {
       if (!deduped.has(entry.exportName)) deduped.set(entry.exportName, entry);
     }
 
-    const workerSource = compileSiteServer([...deduped.values()], {
-      adapter: projectConfig.build.adapter,
-    });
+    if (adapter === "cloudflare-pages") {
+      const functions = compilePagesFunctions([...deduped.values()]);
 
-    if (workerSource) {
-      const workerPath = resolve(outDir, "worker.js");
-      writeFileSync(workerPath, workerSource, "utf8");
-      fileCount++;
-      log(`  Generated dist/worker.js (${deduped.size} server function(s))`);
+      for (const [filePath, source] of functions) {
+        const fullPath = resolve(outDir, filePath);
+        mkdirSync(resolve(fullPath, ".."), { recursive: true });
+        writeFileSync(fullPath, source, "utf8");
+        fileCount++;
+      }
 
-      // Copy server source files into dist/components/ so worker imports resolve
+      // Copy server source files so function imports resolve
       const distComponentsDir = resolve(outDir, "components");
+      mkdirSync(distComponentsDir, { recursive: true });
       for (const { src } of deduped.values()) {
         const srcFile = resolve(projectRoot, src.replace(/^\.\//, ""));
         const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
         if (existsSync(srcFile)) {
           copyFileSync(srcFile, destFile);
+        }
+      }
+
+      if (functions.size > 0) {
+        log(`  Generated ${functions.size} Pages function(s) in dist/functions/`);
+      }
+    } else {
+      const workerSource = compileSiteServer([...deduped.values()], { adapter });
+
+      if (workerSource) {
+        const workerPath = resolve(outDir, "worker.js");
+        writeFileSync(workerPath, workerSource, "utf8");
+        fileCount++;
+        log(`  Generated dist/worker.js (${deduped.size} server function(s))`);
+
+        // Copy server source files into dist/components/ so worker imports resolve
+        const distComponentsDir = resolve(outDir, "components");
+        for (const { src } of deduped.values()) {
+          const srcFile = resolve(projectRoot, src.replace(/^\.\//, ""));
+          const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
+          if (existsSync(srcFile)) {
+            copyFileSync(srcFile, destFile);
+          }
         }
       }
     }

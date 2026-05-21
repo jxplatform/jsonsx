@@ -1,5 +1,9 @@
 import { describe, test, expect } from "bun:test";
-import { compileServer, compileSiteServer } from "../src/targets/compile-server.js";
+import {
+  compileServer,
+  compileSiteServer,
+  compilePagesFunctions,
+} from "../src/targets/compile-server.js";
 
 // ─── compileServer ─────────────────────────────────────────────────────────
 
@@ -142,9 +146,9 @@ describe("compileSiteServer", () => {
     expect(result).toContain("ok: false");
   });
 
-  test("cloudflare adapter adds asset fallback", () => {
+  test("cloudflare-workers adapter adds asset fallback", () => {
     const entries = [{ exportName: "fn", src: "./fn.js" }];
-    const result = compileSiteServer(entries, { adapter: "cloudflare" });
+    const result = compileSiteServer(entries, { adapter: "cloudflare-workers" });
     expect(result).toContain("c.env.ASSETS.fetch(c.req.raw)");
   });
 
@@ -165,7 +169,7 @@ describe("compileSiteServer", () => {
       { exportName: "fnA", src: "./a.js" },
       { exportName: "fnB", src: "./b.js" },
     ];
-    const result = compileSiteServer(entries, { adapter: "cloudflare" });
+    const result = compileSiteServer(entries, { adapter: "cloudflare-workers" });
     expect(result).toContain("app.post('/_jx/server/fnA'");
     expect(result).toContain("app.post('/_jx/server/fnB'");
     expect(result).toContain("import { fnA } from './a.js'");
@@ -176,5 +180,75 @@ describe("compileSiteServer", () => {
     const entries = [{ exportName: "fn", src: "./fn.js" }];
     const result = compileSiteServer(entries, { baseUrl: "/api" });
     expect(result).toContain("app.post('/api/fn'");
+  });
+});
+
+// ─── compilePagesFunctions ────────────────────────────────────────────────────
+
+describe("compilePagesFunctions", () => {
+  test("returns a Map of file paths to source strings", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    expect(result).toBeInstanceOf(Map);
+    expect(result.size).toBe(1);
+  });
+
+  test("generates correct file path under functions/", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    expect(result.has("functions/_jx/server/sendEmail.js")).toBe(true);
+  });
+
+  test("uses onRequestPost with context parameter", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    const source = result.get("functions/_jx/server/sendEmail.js");
+    expect(source).toContain("export async function onRequestPost(context)");
+  });
+
+  test("uses native Response.json instead of Hono", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    const source = result.get("functions/_jx/server/sendEmail.js");
+    expect(source).toContain("Response.json(result)");
+    expect(source).toContain("Response.json({ ok: false");
+    expect(source).not.toContain("Hono");
+    expect(source).not.toContain("c.json");
+  });
+
+  test("passes context.env to the server function", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    const source = result.get("functions/_jx/server/sendEmail.js");
+    expect(source).toContain("sendEmail(args, context.env)");
+  });
+
+  test("generates correct relative import path", () => {
+    const entries = [{ exportName: "sendEmail", src: "./components/contact.server.js" }];
+    const result = compilePagesFunctions(entries);
+    const source = result.get("functions/_jx/server/sendEmail.js");
+    expect(source).toContain("from '../../../components/contact.server.js'");
+  });
+
+  test("generates multiple function files", () => {
+    const entries = [
+      { exportName: "sendEmail", src: "./components/contact.server.js" },
+      { exportName: "submitForm", src: "./components/form.server.js" },
+    ];
+    const result = compilePagesFunctions(entries);
+    expect(result.size).toBe(2);
+    expect(result.has("functions/_jx/server/sendEmail.js")).toBe(true);
+    expect(result.has("functions/_jx/server/submitForm.js")).toBe(true);
+  });
+
+  test("returns empty Map when no entries", () => {
+    const result = compilePagesFunctions([]);
+    expect(result.size).toBe(0);
+  });
+
+  test("supports custom baseUrl", () => {
+    const entries = [{ exportName: "fn", src: "./fn.js" }];
+    const result = compilePagesFunctions(entries, { baseUrl: "/api" });
+    expect(result.has("functions/api/fn.js")).toBe(true);
   });
 });
