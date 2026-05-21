@@ -64,6 +64,9 @@ export const view = {
   // Layout selection (when user clicks a layout element)
   layoutSelection: null,
 
+  // Global UI state (persists across tab switches)
+  leftTab: "layers",
+
   // Autosave
   autosaveTimer: null,
 };

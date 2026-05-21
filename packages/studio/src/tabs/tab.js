@@ -2,8 +2,8 @@ import { reactive, effectScope } from "../reactivity.js";
 
 /**
  * @typedef {{
- *   leftTab: string;
  *   rightTab: string;
+ *   canvasMode: string;
  *   zoom: number;
  *   activeMedia: string | null;
  *   activeSelector: string | null;
@@ -72,8 +72,8 @@ import { reactive, effectScope } from "../reactivity.js";
 /** @returns {TabUi} */
 function createDefaultUi() {
   return {
-    leftTab: "layers",
     rightTab: "properties",
+    canvasMode: "design",
     zoom: 1,
     activeMedia: null,
     activeSelector: null,

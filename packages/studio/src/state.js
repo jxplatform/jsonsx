@@ -211,7 +211,6 @@ export function createState(doc) {
     mode: "component", // 'component' | 'content'
     content: { frontmatter: {} }, // frontmatter metadata for .md files
     ui: {
-      leftTab: "layers", // 'files' | 'layers' | 'blocks' | 'state' | 'data'
       rightTab: "properties", // 'properties' | 'events' | 'style'
       zoom: 1,
       activeMedia: null, // '--md' | null (base) — focused canvas/breakpoint
@@ -377,7 +376,7 @@ export function pushDocument(state, doc, documentPath) {
   const newState = createState(doc);
   newState.documentStack = [...(state.documentStack || []), frame];
   newState.documentPath = documentPath;
-  newState.ui = { ...state.ui, leftTab: "layers", activeMedia: null, activeSelector: null };
+  newState.ui = { ...state.ui, activeMedia: null, activeSelector: null };
   return newState;
 }
 
@@ -395,6 +394,6 @@ export function popDocument(state) {
     ...state,
     ...frame,
     documentStack: stack,
-    ui: { ...state.ui, leftTab: "layers" },
+    ui: { ...state.ui },
   };
 }

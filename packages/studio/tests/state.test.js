@@ -310,7 +310,6 @@ describe("createState", () => {
 
   test("ui defaults", () => {
     const s = makeState();
-    expect(s.ui.leftTab).toBe("layers");
     expect(s.ui.rightTab).toBe("properties");
     expect(s.ui.zoom).toBe(1);
     expect(s.ui.activeMedia).toBeNull();
@@ -367,11 +366,10 @@ describe("pushDocument / popDocument", () => {
     expect(popDocument(s)).toBe(s);
   });
 
-  test("push resets ui tabs", () => {
+  test("push resets ui media", () => {
     let s = makeState();
-    s = { ...s, ui: { ...s.ui, leftTab: "files" } };
+    s = { ...s, ui: { ...s.ui, activeMedia: "--md" } };
     s = pushDocument(s, { tagName: "nav" }, "nav.json");
-    expect(s.ui.leftTab).toBe("layers");
     expect(s.ui.activeMedia).toBeNull();
   });
 });

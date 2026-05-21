@@ -15,8 +15,9 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
-import { workspace, openTab, activateTab, activeTab } from "../workspace/workspace.js";
+import { workspace, openTab, activateTab } from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
+import { view } from "../view.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     }
     projectState.projectDirs = foundDirs;
 
-    if (activeTab.value) activeTab.value.session.ui.leftTab = "files";
+    view.leftTab = "files";
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);

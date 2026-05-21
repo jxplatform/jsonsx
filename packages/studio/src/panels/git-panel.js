@@ -7,6 +7,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { getPlatform } from "../platform.js";
 import { updateUi, renderOnly } from "../store.js";
+import { view } from "../view.js";
 
 async function refreshGitStatus() {
   const plat = getPlatform();
@@ -60,7 +61,7 @@ export function renderGitPanel(S, ctx) {
 
   if (!_pollTimer) {
     _pollTimer = setInterval(() => {
-      if (S.ui.leftTab === "git" && !S.ui.gitLoading) refreshGitStatus();
+      if (view.leftTab === "git" && !S.ui.gitLoading) refreshGitStatus();
     }, 30000);
   }
 

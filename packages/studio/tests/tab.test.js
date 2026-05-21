@@ -16,7 +16,7 @@ describe("Tab primitive", () => {
     expect(tab.doc.mode).toBe("component");
     expect(tab.doc.dirty).toBe(false);
     expect(tab.session.selection).toBe(null);
-    expect(tab.session.ui.leftTab).toBe("layers");
+    expect(tab.session.ui.rightTab).toBe("properties");
     expect(tab.history.index).toBe(0);
     expect(tab.history.snapshots).toHaveLength(1);
 

@@ -93,7 +93,18 @@ function createFloatingContainer() {
   return el;
 }
 
-let canvasMode = "design";
+function getCanvasMode() {
+  return activeTab.value?.session.ui.canvasMode ?? "design";
+}
+
+/** @param {string} mode */
+function setCanvasMode(mode) {
+  if (getCanvasMode() === "git-diff" && mode !== "git-diff") {
+    gitDiffState = null;
+  }
+  const tab = activeTab.value;
+  if (tab) tab.session.ui.canvasMode = mode;
+}
 
 /** @type {any} */
 let gitDiffState = null;
@@ -127,7 +138,7 @@ async function navigateToComponent(componentPath) {
     tab.doc.mode = /** @type {any} */ (null);
     tab.documentPath = componentPath;
     tab.session.selection = null;
-    tab.session.ui.leftTab = "layers";
+    view.leftTab = "layers";
     tab.session.ui.activeMedia = null;
     tab.session.ui.activeSelector = null;
 
@@ -160,7 +171,7 @@ async function navigateBack() {
   tab.doc.mode = frame.mode;
   tab.documentPath = frame.documentPath;
   tab.session.selection = frame.selection;
-  tab.session.ui.leftTab = "layers";
+  view.leftTab = "layers";
 
   render();
   statusMessage("Returned to parent document");
@@ -243,14 +254,8 @@ toolbarPanel.mount(toolbarEl, {
   openFile: () => openFile(),
   saveFile: () => saveFile(),
   parseMediaEntries,
-  getCanvasMode: () => canvasMode,
-  setCanvasMode: (/** @type {string} */ m) => {
-    // Clear gitDiffState when exiting diff mode via toolbar
-    if (canvasMode === "git-diff" && m !== "git-diff") {
-      gitDiffState = null;
-    }
-    canvasMode = m;
-  },
+  getCanvasMode,
+  setCanvasMode,
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
 });
@@ -258,24 +263,24 @@ toolbarPanel.mount(toolbarEl, {
 tabStrip.mount(/** @type {HTMLElement} */ (document.querySelector("#tab-strip")));
 
 overlaysPanel.mount({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   isEditing,
   renderBlockActionBar,
 });
 
 initBlockActionBar({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   navigateToComponent,
   createFloatingContainer,
 });
 
 initComponentInlineEdit({ findCanvasElement });
 initCanvasHelpers({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
 });
 initCanvasUtils({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
   setZoomDirect: (zoom) => {
     if (activeTab.value) activeTab.value.session.ui.zoom = zoom;
@@ -283,22 +288,16 @@ initCanvasUtils({
   renderStylebookOverlays,
 });
 initPanelEvents({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   enterInlineEdit,
   navigateToComponent,
 });
 initCanvasLiveRender({
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
 });
 initCanvasRender({
-  getCanvasMode: () => canvasMode,
-  setCanvasMode: (/** @type {string} */ mode) => {
-    // Clear gitDiffState when exiting diff mode
-    if (canvasMode === "git-diff" && mode !== "git-diff") {
-      gitDiffState = null;
-    }
-    canvasMode = mode;
-  },
+  getCanvasMode,
+  setCanvasMode,
   openFileFromTree,
   exportFile,
   gitDiffState,
@@ -314,6 +313,7 @@ effect(() => {
   if (!tab) return;
   void tab.doc.document;
   void tab.doc.mode;
+  void tab.session.ui.canvasMode;
   void tab.session.ui.editingFunction;
   void tab.session.ui.featureToggles;
   void tab.session.ui.settingsTab;
@@ -335,16 +335,14 @@ effect(() => {
 
 rightPanelMod.mount({
   navigateToComponent,
-  getCanvasMode: () => canvasMode,
+  getCanvasMode,
   renderCanvas: () => renderCanvas(),
   updateForcedPseudoPreview,
 });
 
 leftPanelMod.mount({
-  getCanvasMode: () => canvasMode,
-  setCanvasMode: (/** @type {string} */ mode) => {
-    canvasMode = mode;
-  },
+  getCanvasMode,
+  setCanvasMode,
   renderImportsTemplate,
   renderFilesTemplate,
   renderSignalsTemplate,
@@ -479,7 +477,7 @@ if (_openParam) {
           });
 
           if (isMd && activeTab.value) activeTab.value.doc.mode = "content";
-          if (activeTab.value) activeTab.value.session.ui.leftTab = "files";
+          view.leftTab = "files";
 
           render();
           statusMessage(`Opened ${_openParam}`);
@@ -540,7 +538,7 @@ function openFileFromTree(/** @type {any} */ path) {
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
 initShortcuts(() => ({
-  canvasMode,
+  canvasMode: getCanvasMode(),
   panX: view.panX,
   panY: view.panY,
   setPan: (x, y) => {

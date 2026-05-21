@@ -1,9 +1,10 @@
 /** Activity bar — tab icons for switching left panel views. */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { activityBar } from "../store.js";
+import { activityBar, renderOnly } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
+import { view } from "../view.js";
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
 let _scope = null;
@@ -14,7 +15,6 @@ export function mount() {
     effect(() => {
       const tab = activeTab.value;
       if (!tab) return;
-      void tab.session.ui.leftTab;
       renderActivityBar();
     });
   });
@@ -83,7 +83,7 @@ export function tabIcon(tag, size) {
 export function renderActivityBar() {
   const tab = activeTab.value;
   if (!tab) return;
-  const leftTab = tab.session.ui.leftTab;
+  const leftTab = view.leftTab;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },
@@ -100,7 +100,9 @@ export function renderActivityBar() {
       direction="vertical"
       quiet
       @change=${(/** @type {any} */ e) => {
-        activeTab.value.session.ui.leftTab = e.target.selected;
+        view.leftTab = e.target.selected;
+        renderOnly("leftPanel");
+        renderActivityBar();
       }}
     >
       ${tabs.map(

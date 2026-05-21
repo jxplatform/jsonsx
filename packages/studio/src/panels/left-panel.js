@@ -10,6 +10,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { leftPanel, updateSession } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
+import { view } from "../view.js";
 import { transact, mutateUpdateFrontmatter } from "../tabs/transact.js";
 
 import { renderLayersTemplate } from "./layers-panel.js";
@@ -67,7 +68,6 @@ export function mount(ctx) {
       void tab.doc.document;
       void tab.doc.mode;
       void tab.session.selection;
-      void tab.session.ui.leftTab;
       void tab.session.ui.settingsTab;
       render();
     });
@@ -121,7 +121,7 @@ function _render() {
     mode: aTab.doc.mode,
     selection: aTab.session.selection,
   });
-  const tab = S.ui.leftTab;
+  const tab = view.leftTab;
 
   /** @type {TemplateResult | typeof nothing} */
   let content;

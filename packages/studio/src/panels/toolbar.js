@@ -72,9 +72,9 @@ export function mount(rootEl, ctx) {
       void tab.doc.dirty;
       void tab.doc.mode;
       void tab.session.selection;
+      void tab.session.ui.canvasMode;
       void tab.session.ui.editingFunction;
       void tab.session.ui.featureToggles;
-      void tab.session.ui.leftTab;
       void tab.session.ui.rightTab;
       render();
     });
@@ -213,7 +213,7 @@ function toolbarTemplate() {
               /** @type {Record<string, any>} */
               const uiPatch = { editingFunction: null };
               if (m.key === "settings") uiPatch.rightTab = "style";
-              if (m.key === "manage") uiPatch.leftTab = "files";
+              if (m.key === "manage") view.leftTab = "files";
               updateSession({ ui: uiPatch });
               _ctx.renderCanvas();
               _ctx.safeRenderRightPanel();
