@@ -71,6 +71,7 @@ export default {
   },
 
   // electrobun-builder-for-windows configuration
+  // @ts-expect-error
   name: "Jx Studio",
   version: pkg.version,
   author: "jxsuite",
