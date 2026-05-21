@@ -19,6 +19,31 @@ export function createDesktopPlatform() {
 
   new Electroview({ rpc });
 
+  const originalFetch = window.fetch.bind(window);
+  (window as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : (input as Request).url;
+    if (url.startsWith("views://")) {
+      const path = url.replace(/^views:\/\/[^/]+\//, "");
+      try {
+        const content = await rpc.request.readFile({ path });
+        const ext = path.split(".").pop() || "";
+        const mime = ext === "json" ? "application/json" : "text/plain";
+        return new Response(content as string, {
+          status: 200,
+          headers: { "content-type": mime },
+        });
+      } catch {
+        return new Response("Not Found", { status: 404 });
+      }
+    }
+    return originalFetch(input, init);
+  };
+
   return {
     id: "desktop" as const,
 
@@ -62,6 +87,14 @@ export function createDesktopPlatform() {
 
     async readFile(path: string) {
       return rpc.request.readFile({ path });
+    },
+
+    async resolveAssetUrl(path: string): Promise<string | null> {
+      try {
+        return await rpc.request.readFileAsDataUrl({ path });
+      } catch {
+        return null;
+      }
     },
 
     async writeFile(path: string, content: string) {

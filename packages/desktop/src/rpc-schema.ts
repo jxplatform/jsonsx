@@ -107,6 +107,10 @@ export type StudioRPC = {
         params: { path: string };
         response: string;
       };
+      readFileAsDataUrl: {
+        params: { path: string };
+        response: string;
+      };
       writeFile: {
         params: { path: string; content: string };
         response: void;

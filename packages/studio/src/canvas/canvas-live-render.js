@@ -389,6 +389,31 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     } else {
       canvasEl.removeAttribute("data-content-mode");
     }
+
+    // Resolve relative asset URLs through the PAL for environments that can't
+    // serve project files natively (e.g. ElectroBun's views:// scheme).
+    const platform = /** @type {any} */ (globalThis).__jxPlatform;
+    if (platform?.resolveAssetUrl && docBase) {
+      const mediaEls = el.querySelectorAll("img[src], video[src], source[src], video[poster]");
+      for (const node of mediaEls) {
+        for (const attr of ["src", "poster"]) {
+          const val = node.getAttribute(attr);
+          if (
+            val &&
+            !val.startsWith("data:") &&
+            !val.startsWith("blob:") &&
+            !val.startsWith("http")
+          ) {
+            try {
+              const resolved = new URL(val, docBase).pathname.replace(/^\//, "");
+              const dataUrl = await platform.resolveAssetUrl(resolved);
+              if (dataUrl) node.setAttribute(attr, dataUrl);
+            } catch {}
+          }
+        }
+      }
+    }
+
     canvasEl.appendChild(el);
     if (canvasMode === "design" || canvasMode === "edit") {
       // Custom element connectedCallbacks render children asynchronously —
