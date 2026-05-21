@@ -1,4 +1,5 @@
 import { BrowserView, BrowserWindow } from "electrobun/bun";
+import Electrobun from "electrobun/bun";
 import type { StudioRPC } from "./rpc-schema";
 import {
   setProjectRoot,
@@ -111,3 +112,16 @@ new BrowserWindow({
 
 startBackgroundChecks();
 setNotifyWebview((version) => rpc.send.updateReady({ version }));
+
+// ─── Handle file associations (open-url) ─────────────────────────────────────
+
+Electrobun.events.on("open-url", (e: any) => {
+  const url = new URL(e.data.url);
+  if (url.protocol === "file:") {
+    const filePath = decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
+    if (filePath.endsWith("project.json")) {
+      const dir = filePath.slice(0, filePath.lastIndexOf("/"));
+      setProjectRoot(dir);
+    }
+  }
+});
