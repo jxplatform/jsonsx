@@ -30,7 +30,7 @@
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
     "pack": "bun run --workspaces bun pm pack",
-    "postinstall": "bun2nix -o bun.nix 2>/dev/null || true",
+    "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
     "release": "release-it",
     "test": "bun test",
