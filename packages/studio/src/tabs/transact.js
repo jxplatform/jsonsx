@@ -40,6 +40,7 @@ export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
   }
 
   tab.doc.dirty = true;
+  tab.doc.version++;
 }
 
 /**
