@@ -1,7 +1,29 @@
 /** Activity bar — tab icons for switching left panel views. */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { activityBar, updateUi, renderOnly } from "../store.js";
+import { activityBar } from "../store.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
+
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
+
+export function mount() {
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      void tab.session.ui.leftTab;
+      renderActivityBar();
+    });
+  });
+}
+
+export function unmount() {
+  _scope?.stop();
+  _scope = null;
+}
 
 const gitBranchIcon = (/** @type {any} */ s) => html`
   <svg
@@ -58,8 +80,10 @@ export function tabIcon(tag, size) {
   return fn ? fn(size || "s") : nothing;
 }
 
-/** @param {any} S — current studio state */
-export function renderActivityBar(S) {
+export function renderActivityBar() {
+  const tab = activeTab.value;
+  if (!tab) return;
+  const leftTab = tab.session.ui.leftTab;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },
@@ -72,12 +96,11 @@ export function renderActivityBar(S) {
   ];
   const tpl = html`
     <sp-tabs
-      selected=${S.ui.leftTab}
+      selected=${leftTab}
       direction="vertical"
       quiet
       @change=${(/** @type {any} */ e) => {
-        updateUi("leftTab", e.target.selected);
-        renderOnly("activityBar", "leftPanel");
+        activeTab.value.session.ui.leftTab = e.target.selected;
       }}
     >
       ${tabs.map(

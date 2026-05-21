@@ -6,15 +6,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
-import {
-  getState,
-  updateSession,
-  renderOnly,
-  getNodeAtPath,
-  nodeLabel,
-  parentElementPath,
-  childIndex,
-} from "../store.js";
+import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateMoveNode } from "../tabs/transact.js";
 import { view } from "../view.js";
@@ -120,11 +112,11 @@ function onFormatClick(e, action) {
 }
 
 function renderParentSelector() {
-  const S = getState();
-  if (!S.selection) return nothing;
-  const pPath = parentElementPath(S.selection);
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return nothing;
+  const pPath = parentElementPath(tab.session.selection);
   if (!pPath) return nothing;
-  const parentNode = getNodeAtPath(S.document, pPath);
+  const parentNode = getNodeAtPath(tab.doc.document, pPath);
   return html`
     <sp-action-button
       size="xs"
@@ -141,11 +133,12 @@ function renderParentSelector() {
 }
 
 function renderMoveArrows() {
-  const S = getState();
-  if (!S.selection) return nothing;
-  const idx = /** @type {number} */ (childIndex(S.selection));
-  const pPath = parentElementPath(S.selection);
-  const parentNode = getNodeAtPath(S.document, /** @type {JxPath} */ (pPath));
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return nothing;
+  const sel = tab.session.selection;
+  const idx = /** @type {number} */ (childIndex(sel));
+  const pPath = parentElementPath(sel);
+  const parentNode = getNodeAtPath(tab.doc.document, /** @type {JxPath} */ (pPath));
   const siblings = parentNode?.children;
   return html`
     <sp-action-button
@@ -299,30 +292,28 @@ function showLinkPopover(anchorBtn) {
 
 /** Move the selected node up (swap with previous sibling). */
 function moveSelectionUp() {
-  const S = getState();
-  if (!S.selection || S.selection.length < 2) return;
-  const sel = S.selection;
+  const tab = activeTab.value;
+  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  const sel = tab.session.selection;
   const idx = /** @type {number} */ (childIndex(sel));
   if (idx <= 0) return;
   const pPath = /** @type {JxPath} */ (parentElementPath(sel));
-  transactDoc(activeTab.value, (t) => mutateMoveNode(t, sel, pPath, idx - 1));
-  updateSession({ selection: [...pPath, "children", idx - 1] });
-  renderOnly("overlays");
+  transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx - 1));
+  tab.session.selection = [...pPath, "children", idx - 1];
 }
 
 /** Move the selected node down (swap with next sibling). */
 function moveSelectionDown() {
-  const S = getState();
-  if (!S.selection || S.selection.length < 2) return;
-  const sel = S.selection;
+  const tab = activeTab.value;
+  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  const sel = tab.session.selection;
   const idx = /** @type {number} */ (childIndex(sel));
   const pPath = /** @type {JxPath} */ (parentElementPath(sel));
-  const parentNode = getNodeAtPath(S.document, pPath);
+  const parentNode = getNodeAtPath(tab.doc.document, pPath);
   const siblings = parentNode?.children;
   if (!siblings || idx >= siblings.length - 1) return;
-  transactDoc(activeTab.value, (t) => mutateMoveNode(t, sel, pPath, idx + 2));
-  updateSession({ selection: [...pPath, "children", idx + 1] });
-  renderOnly("overlays");
+  transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx + 2));
+  tab.session.selection = [...pPath, "children", idx + 1];
 }
 
 /** Render the unified block action bar above the selected element. */
@@ -337,21 +328,22 @@ export function renderBlockActionBar() {
     view.selDragCleanup = null;
   }
 
-  const S = getState();
+  const tab = activeTab.value;
   const canvasMode = _ctx.getCanvasMode();
 
-  if (!S.selection || (canvasMode !== "design" && canvasMode !== "edit")) {
+  if (!tab?.session.selection || (canvasMode !== "design" && canvasMode !== "edit")) {
     litRender(nothing, view.blockActionBarEl);
     return;
   }
 
+  const selection = tab.session.selection;
   const activePanel = getActivePanel();
   if (!activePanel) {
     litRender(nothing, view.blockActionBarEl);
     return;
   }
-  const el = findCanvasElement(S.selection, activePanel.canvas);
-  const node = el && getNodeAtPath(S.document, S.selection);
+  const el = findCanvasElement(selection, activePanel.canvas);
+  const node = el && getNodeAtPath(tab.doc.document, selection);
   if (!el || !node) {
     litRender(nothing, view.blockActionBarEl);
     return;
@@ -376,15 +368,15 @@ export function renderBlockActionBar() {
         style="left:${elRect.left}px; top:${topPos}px"
         @mousedown=${onBarMousedown}
       >
-        ${S.selection.length >= 2 ? renderParentSelector() : nothing}
+        ${selection.length >= 2 ? renderParentSelector() : nothing}
 
         <span class="bar-tag">${node.$id || (node.tagName ?? "div")}</span>
 
-        ${S.selection.length >= 2
+        ${selection.length >= 2
           ? html`<span class="bar-drag-handle" title="Drag to reorder">⡇</span>`
           : nothing}
-        ${S.selection.length >= 2 ? renderMoveArrows() : nothing}
-        ${S.selection.length >= 2 && node.tagName
+        ${selection.length >= 2 ? renderMoveArrows() : nothing}
+        ${selection.length >= 2 && node.tagName
           ? (() => {
               const isComp =
                 node.tagName.includes("-") &&
@@ -408,7 +400,7 @@ export function renderBlockActionBar() {
                 size="xs"
                 quiet
                 title="Convert to Component"
-                @click=${() => convertToComponent(S)}
+                @click=${() => convertToComponent()}
                 ><sp-icon-box slot="icon" size="xs"></sp-icon-box
               ></sp-action-button>`;
             })()
@@ -454,8 +446,8 @@ export function renderBlockActionBar() {
       bar.style.left = `${Math.max(0, window.innerWidth - barRect.width)}px`;
     }
     // Attach drag handle
-    const currentS = getState();
-    if (currentS.selection && currentS.selection.length >= 2) {
+    const currentTab = activeTab.value;
+    if (currentTab?.session.selection && currentTab.session.selection.length >= 2) {
       const handle = bar.querySelector(".bar-drag-handle");
       if (handle) {
         if (view.selDragCleanup) {
@@ -464,7 +456,7 @@ export function renderBlockActionBar() {
         }
         view.selDragCleanup = draggable({
           element: handle,
-          getInitialData: () => ({ type: "tree-node", path: getState().selection }),
+          getInitialData: () => ({ type: "tree-node", path: activeTab.value?.session.selection }),
         });
       }
     }

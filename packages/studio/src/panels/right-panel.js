@@ -162,9 +162,8 @@ function rightPanelTemplate() {
   if (tab === "properties") {
     bodyT = renderPropertiesPanelTemplate({ navigateToComponent: ctx.navigateToComponent });
   } else if (tab === "events") {
-    bodyT = eventsSidebarTemplate(S, {
+    bodyT = eventsSidebarTemplate({
       isCustomElementDoc: () => isCustomElementDoc(S),
-      renderCanvas: ctx.renderCanvas,
     });
   } else if (tab === "style") {
     try {

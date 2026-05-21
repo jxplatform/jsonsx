@@ -70,7 +70,6 @@ import {
   openFileInTab,
   setupTreeKeyboard,
 } from "./files/files.js";
-import { eventsSidebarTemplate as _eventsSidebarTemplate } from "./panels/events-panel.js";
 import { renderImportsTemplate } from "./panels/imports-panel.js";
 import { renderHeadTemplate } from "./panels/head-panel.js";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export.js";
@@ -94,7 +93,7 @@ import { renderGitPanel } from "./panels/git-panel.js";
 import { components as _swc } from "./ui/spectrum.js"; // eslint-disable-line no-unused-vars
 import "./ui/panel-resize.js";
 import { initShortcuts } from "./editor/shortcuts.js";
-import { renderActivityBar } from "./panels/activity-bar.js";
+import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar.js";
 import * as toolbarPanel from "./panels/toolbar.js";
 import * as overlaysPanel from "./panels/overlays.js";
 import * as rightPanelMod from "./panels/right-panel.js";
@@ -281,13 +280,14 @@ initBlockActionBar({
 });
 
 initComponentInlineEdit({ findCanvasElement });
-initCanvasHelpers({ getCanvasMode: () => canvasMode });
+initCanvasHelpers({ getCanvasMode: () => canvasMode, getZoom: () => S.ui.zoom });
 initCanvasUtils({
   getCanvasMode: () => canvasMode,
   getZoom: () => S.ui.zoom,
   setZoomDirect: (zoom) => {
     session = { ...session, ui: { ...session.ui, zoom } };
     S = toFlat(doc, session);
+    if (activeTab.value) activeTab.value.session.ui.zoom = zoom;
   },
   renderStylebookOverlays,
 });
@@ -378,15 +378,14 @@ leftPanelMod.mount({
 });
 
 // Register all renderers with the store so render()/renderOnly() work
-registerRenderer("toolbar", () => toolbarPanel.render());
-registerRenderer("activityBar", () => renderActivityBar(S));
+// Register remaining renderers for render()/renderOnly() compat during migration
 registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
-registerRenderer("statusbar", () => renderStatusbar(S));
 setStatusbarRenderer(() => renderStatusbar(S));
 mountStatusbar();
+mountActivityBar();
 
 // Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
 canvasWrap.addEventListener("click", (/** @type {any} */ e) => {
@@ -651,7 +650,7 @@ function openProject() {
       S = ns;
       ({ doc, session } = fromFlat(S));
     },
-    renderActivityBar: () => renderActivityBar(S),
+    renderActivityBar: () => renderActivityBar(),
     renderLeftPanel,
   });
 }

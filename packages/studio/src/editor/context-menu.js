@@ -150,7 +150,7 @@ export function showContextMenu(e, path, S, opts = {}) {
       } else if (!isComponent) {
         items.push({
           label: "Convert to Component",
-          action: () => convertToComponent(S),
+          action: () => convertToComponent(),
         });
       }
     }

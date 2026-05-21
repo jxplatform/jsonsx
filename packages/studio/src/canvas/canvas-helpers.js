@@ -13,15 +13,17 @@ let _ctx = null;
 /**
  * Initialize the canvas helpers module.
  *
- * @param {{ getCanvasMode: () => string }} ctx
+ * @param {{ getCanvasMode: () => string; getZoom: () => number }} ctx
  */
 export function initCanvasHelpers(ctx) {
   _ctx = ctx;
 }
 
-/** Effective zoom scale — always 1 in edit (content) mode, S.ui.zoom otherwise. */
+/** Effective zoom scale — always 1 in edit (content) mode, actual zoom otherwise. */
 export function effectiveZoom() {
-  return _ctx.getCanvasMode() === "edit" ? 1 : (activeTab.value?.session.ui.zoom ?? 1);
+  return _ctx.getCanvasMode() === "edit"
+    ? 1
+    : (_ctx.getZoom?.() ?? activeTab.value?.session.ui.zoom ?? 1);
 }
 
 /** Return the active canvas panel based on the current activeMedia setting. */

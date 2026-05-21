@@ -2,14 +2,7 @@
 
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import {
-  getState,
-  getNodeAtPath,
-  debouncedStyleCommit,
-  renderOnly,
-  updateUi,
-  projectState,
-} from "../store.js";
+import { getNodeAtPath, debouncedStyleCommit, renderOnly, projectState } from "../store.js";
 import {
   transactDoc,
   mutateUpdateProperty,
@@ -73,8 +66,8 @@ function bindableFieldRow(
   /** @type {any} */ filterFn = null,
   /** @type {any} */ extraSignals = null,
 ) {
-  const S = getState();
-  const defs = S.document.state || {};
+  const tab = activeTab.value;
+  const defs = tab.doc.document.state || {};
   const isBound = typeof rawValue === "object" && rawValue !== null && rawValue.$ref;
 
   const signalDefs = Object.entries(defs).filter(([, d]) =>
@@ -214,9 +207,9 @@ function kvRow(
 
 /** Frontmatter-only panel shown in content mode when no element is selected */
 function renderFrontmatterOnlyPanel() {
-  const S = getState();
-  const fm = S.content?.frontmatter || {};
-  const col = findContentTypeSchema(S.documentPath, projectState?.projectConfig);
+  const tab = activeTab.value;
+  const fm = tab.doc.content?.frontmatter || {};
+  const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
   const schemaProps = col?.schema?.properties;
   const requiredFields = new Set(col?.schema?.required || []);
 
@@ -251,7 +244,7 @@ function renderFrontmatterOnlyPanel() {
     return html`<div class="empty-state">No frontmatter. Select an element to inspect.</div>`;
   }
 
-  const pageT = renderPageSection(S.document || {});
+  const pageT = renderPageSection(tab.doc.document || {});
 
   return html`
     <div class="style-sidebar">
@@ -675,7 +668,7 @@ function renderComponentPropsFieldsTemplate(
   /** @type {any} */ mapSignals,
   /** @type {(path: string) => void} */ navigateToComponent,
 ) {
-  const S = getState();
+  const tab = activeTab.value;
   const comp = componentRegistry.find((c) => c.tagName === node.tagName);
   if (!comp || !comp.props) return html`<div class="empty-state">Component not found</div>`;
   const isNpm = comp.source === "npm";
@@ -688,7 +681,7 @@ function renderComponentPropsFieldsTemplate(
     : (/** @type {string} */ name, /** @type {any} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
 
-  const defs = S.document.state || {};
+  const defs = tab.doc.document.state || {};
   const signalDefs = Object.entries(defs).filter(
     ([, d]) => !d.$handler && d.$prototype !== "Function",
   );
@@ -1068,8 +1061,8 @@ function isPageDocument(/** @type {any} */ documentPath) {
 }
 
 function renderPageSection(/** @type {any} */ node) {
-  const S = getState();
-  if (!isPageDocument(S.documentPath)) return nothing;
+  const tab = activeTab.value;
+  if (!isPageDocument(tab.documentPath)) return nothing;
 
   if (layoutEntries === null) {
     loadLayoutEntries();
@@ -1192,23 +1185,24 @@ function renderLayoutSelectionPanel(/** @type {any} */ ctx) {
  * @param {{ navigateToComponent: (path: string) => void }} ctx
  */
 export function renderPropertiesPanelTemplate(ctx) {
-  const S = getState();
+  const tab = activeTab.value;
+  if (!tab) return html`<div class="empty-state">No document loaded</div>`;
 
   // Layout element selected — show read-only info with link to open layout
   if (view.layoutSelection) {
     return renderLayoutSelectionPanel(ctx);
   }
 
-  if (!S.selection) {
-    if (S.mode === "content") {
+  if (!tab.session.selection) {
+    if (tab.doc.mode === "content") {
       return renderFrontmatterOnlyPanel();
     }
     return html`<div class="empty-state">Select an element to inspect</div>`;
   }
-  const node = getNodeAtPath(S.document, S.selection);
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) return html`<div class="empty-state">Node not found</div>`;
 
-  const path = S.selection;
+  const path = tab.session.selection;
   const isMapNode = node.$prototype === "Array";
   const isMapParent =
     node.children && typeof node.children === "object" && node.children.$prototype === "Array";
@@ -1301,13 +1295,17 @@ export function renderPropertiesPanelTemplate(ctx) {
   if (customAttrs.length > 0) autoOpen.add("__custom");
 
   function isSectionOpen(/** @type {any} */ key) {
-    if (S.ui.inspectorSections[key] !== undefined) return S.ui.inspectorSections[key];
+    if (tab.session.ui.inspectorSections[key] !== undefined)
+      return tab.session.ui.inspectorSections[key];
     return autoOpen.has(key);
   }
 
   function toggleSection(/** @type {any} */ key) {
     const current = isSectionOpen(key);
-    updateUi("inspectorSections", { ...S.ui.inspectorSections, [key]: !current });
+    activeTab.value.session.ui.inspectorSections = {
+      ...activeTab.value.session.ui.inspectorSections,
+      [key]: !current,
+    };
   }
 
   // ── Build section templates ─────────────────────────────────────────
@@ -1480,9 +1478,9 @@ export function renderPropertiesPanelTemplate(ctx) {
     : nothing;
 
   const observedAttrsT =
-    isCustomElementDoc(S) && isRoot
+    isCustomElementDoc({ document: tab.doc.document }) && isRoot
       ? (() => {
-          const state = S.document.state || {};
+          const state = tab.doc.document.state || {};
           const entries = Object.entries(state).filter(([, d]) => d.attribute);
           return html`
             <sp-accordion-item label="Observed Attributes" ?open=${isSectionOpen("__observed")}>
@@ -1585,7 +1583,7 @@ export function renderPropertiesPanelTemplate(ctx) {
     : nothing;
 
   const cssPropsT =
-    isCustomElementDoc(S) && isRoot
+    isCustomElementDoc({ document: tab.doc.document }) && isRoot
       ? (() => {
           const style = node.style || {};
           const cssProps = Object.entries(style).filter(([k]) => k.startsWith("--"));
@@ -1614,9 +1612,9 @@ export function renderPropertiesPanelTemplate(ctx) {
       : nothing;
 
   const cssPartsT =
-    isCustomElementDoc(S) && isRoot
+    isCustomElementDoc({ document: tab.doc.document }) && isRoot
       ? (() => {
-          const parts = collectCssParts(S.document);
+          const parts = collectCssParts(tab.doc.document);
           if (parts.length === 0) return nothing;
           return html`
             <sp-accordion-item
@@ -1642,10 +1640,10 @@ export function renderPropertiesPanelTemplate(ctx) {
       : nothing;
 
   const frontmatterT =
-    S.mode === "content"
+    tab.doc.mode === "content"
       ? (() => {
-          const fm = S.content?.frontmatter || {};
-          const col = findContentTypeSchema(S.documentPath, projectState?.projectConfig);
+          const fm = tab.doc.content?.frontmatter || {};
+          const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
           const schemaProps = col?.schema?.properties;
           const requiredFields = new Set(col?.schema?.required || []);
 

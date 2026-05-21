@@ -32,8 +32,8 @@ export function renderLayersTemplate(ctx) {
   view.dndCleanups = [];
 
   const rows = flattenTree(S.document);
-  const collapsed = /** @type {any} */ (S)._collapsed ||
-  /** @type {any} */ ((S)._collapsed = new Set());
+  const _S = /** @type {any} */ (S);
+  const collapsed = _S._collapsed || (_S._collapsed = new Set());
 
   /** @type {any[]} */
   const layerRows = [];

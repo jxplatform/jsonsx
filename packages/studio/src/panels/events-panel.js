@@ -17,17 +17,17 @@ export const EVENT_NAMES = [
   "onmouseleave",
 ];
 
-/**
- * @param {any} S - Studio state
- * @param {{ isCustomElementDoc: () => boolean; renderCanvas: () => void }} helpers
- */
-export function eventsSidebarTemplate(S, helpers) {
-  const { isCustomElementDoc, renderCanvas } = helpers;
-  if (!S.selection) return html`<div class="empty-state">Select an element to edit events</div>`;
-  const node = getNodeAtPath(S.document, S.selection);
+/** @param {{ isCustomElementDoc: () => boolean }} helpers */
+export function eventsSidebarTemplate(helpers) {
+  const { isCustomElementDoc } = helpers;
+  const tab = activeTab.value;
+  const selection = tab?.session.selection;
+  const document = tab?.doc.document;
+  if (!selection) return html`<div class="empty-state">Select an element to edit events</div>`;
+  const node = getNodeAtPath(document, selection);
   if (!node) return html`<div class="empty-state">Node not found</div>`;
 
-  const defs = S.document.state || {};
+  const defs = document.state || {};
   const functionDefs = Object.entries(defs).filter(
     ([, d]) => d.$prototype === "Function" || d.$handler,
   );
@@ -90,8 +90,8 @@ export function eventsSidebarTemplate(S, helpers) {
                     const newKey = e.target.value;
                     if (newKey && newKey !== evKey) {
                       transactDoc(activeTab.value, (t) => {
-                        mutateUpdateProperty(t, S.selection, evKey, undefined);
-                        mutateUpdateProperty(t, S.selection, newKey, node[evKey]);
+                        mutateUpdateProperty(t, selection, evKey, undefined);
+                        mutateUpdateProperty(t, selection, newKey, node[evKey]);
                       });
                     }
                   }}
@@ -107,7 +107,7 @@ export function eventsSidebarTemplate(S, helpers) {
                   @change=${(/** @type {any} */ e) => {
                     if (e.target.value === "inline") {
                       transactDoc(activeTab.value, (t) =>
-                        mutateUpdateProperty(t, S.selection, evKey, {
+                        mutateUpdateProperty(t, selection, evKey, {
                           $prototype: "Function",
                           body: "",
                           parameters: [],
@@ -118,7 +118,7 @@ export function eventsSidebarTemplate(S, helpers) {
                       transactDoc(activeTab.value, (t) =>
                         mutateUpdateProperty(
                           t,
-                          S.selection,
+                          selection,
                           evKey,
                           firstFn ? { $ref: `#/state/${firstFn[0]}` } : { $ref: "" },
                         ),
@@ -134,7 +134,7 @@ export function eventsSidebarTemplate(S, helpers) {
                   quiet
                   @click=${() =>
                     transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, S.selection, evKey, undefined),
+                      mutateUpdateProperty(t, selection, evKey, undefined),
                     )}
                 >
                   <sp-icon-delete slot="icon"></sp-icon-delete>
@@ -151,7 +151,7 @@ export function eventsSidebarTemplate(S, helpers) {
                         .value=${live(evVal.body || "")}
                         @input=${(/** @type {any} */ e) => {
                           transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, S.selection, evKey, {
+                            mutateUpdateProperty(t, selection, evKey, {
                               $prototype: "Function",
                               body: e.target.value,
                               parameters: evVal.parameters || [],
@@ -165,18 +165,11 @@ export function eventsSidebarTemplate(S, helpers) {
                         quiet
                         title="Open in editor"
                         @click=${() => {
-                          S = {
-                            ...S,
-                            ui: {
-                              ...S.ui,
-                              editingFunction: {
-                                type: "event",
-                                path: S.selection,
-                                eventKey: evKey,
-                              },
-                            },
+                          tab.session.ui.editingFunction = {
+                            type: "event",
+                            path: selection,
+                            eventKey: evKey,
                           };
-                          renderCanvas();
                         }}
                       >
                         <sp-icon-code slot="icon"></sp-icon-code>
@@ -191,11 +184,11 @@ export function eventsSidebarTemplate(S, helpers) {
                       @change=${(/** @type {any} */ e) => {
                         if (e.target.value && e.target.value !== "__none__") {
                           transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, S.selection, evKey, { $ref: e.target.value }),
+                            mutateUpdateProperty(t, selection, evKey, { $ref: e.target.value }),
                           );
                         } else {
                           transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, S.selection, evKey, undefined),
+                            mutateUpdateProperty(t, selection, evKey, undefined),
                           );
                         }
                       }}
@@ -223,13 +216,13 @@ export function eventsSidebarTemplate(S, helpers) {
             }
             if (functionDefs.length > 0) {
               transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, S.selection, evName, {
+                mutateUpdateProperty(t, selection, evName, {
                   $ref: `#/state/${functionDefs[0][0]}`,
                 }),
               );
             } else {
               transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(t, S.selection, evName, {
+                mutateUpdateProperty(t, selection, evName, {
                   $prototype: "Function",
                   body: "",
                   parameters: [],

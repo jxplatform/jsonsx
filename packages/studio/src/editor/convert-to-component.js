@@ -13,15 +13,12 @@ import { statusMessage } from "../panels/statusbar.js";
 
 const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 
-/**
- * Convert the currently selected element into a reusable component.
- *
- * @param {any} S - Current studio state
- */
-export async function convertToComponent(S) {
-  if (!S.selection || S.selection.length < 2) return;
+/** Convert the currently selected element into a reusable component. */
+export async function convertToComponent() {
+  const tab = activeTab.value;
+  if (!tab?.session.selection || tab.session.selection.length < 2) return;
 
-  const node = getNodeAtPath(S.document, S.selection);
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node || !node.tagName) return;
 
   const defaultName = deriveDefaultName(node);
@@ -34,11 +31,11 @@ export async function convertToComponent(S) {
 
   // Compute paths
   const componentFile = "components/" + name + ".json";
-  const refPath = computeRelativePath(S.documentPath, componentFile);
+  const refPath = computeRelativePath(tab.documentPath, componentFile);
 
   // Single atomic mutation: replace node + add $elements ref
-  const selectionPath = S.selection;
-  transact(activeTab.value, (doc) => {
+  const selectionPath = tab.session.selection;
+  transact(tab, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];
     const idx = childIndex(selectionPath);

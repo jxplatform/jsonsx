@@ -10,7 +10,6 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 
 import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
-import { ensureLitState } from "../panels/shared.js";
 import { view } from "../view.js";
 
 /** @type {any} */
@@ -208,7 +207,6 @@ export function fitToScreen() {
 
 /** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
 export function resetZoomIndicator() {
-  ensureLitState(zoomIndicatorHost);
   litRender(nothing, zoomIndicatorHost);
 }
 
@@ -221,7 +219,6 @@ export function renderZoomIndicator() {
   if (!zoomIndicatorHost.isConnected) {
     document.body.appendChild(zoomIndicatorHost);
   }
-  ensureLitState(zoomIndicatorHost);
   litRender(
     html`
       <div class="zoom-indicator">

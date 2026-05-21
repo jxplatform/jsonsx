@@ -7,8 +7,6 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
-  getState,
-  updateUi,
   getNodeAtPath,
   COMMON_SELECTORS,
   isNestedSelector,
@@ -72,11 +70,11 @@ function renderStyleRow(
  * @param {any} _deleteFn @param {Record<string, any>} inherited
  */
 function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inherited = {}) {
-  const S = getState();
+  const tab = activeTab.value;
   const longhands = getLonghands(shortProp);
   const shortVal = style[shortProp];
   const hasLonghands = longhands.some((/** @type {any} */ l) => style[l.name] !== undefined);
-  const isExpanded = S.ui.styleShorthands[shortProp] ?? hasLonghands;
+  const isExpanded = tab.session.ui.styleShorthands[shortProp] ?? hasLonghands;
   const hasAnyVal =
     shortVal !== undefined || longhands.some((/** @type {any} */ l) => style[l.name] !== undefined);
 
@@ -125,10 +123,10 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
           quiet
           @click=${(/** @type {any} */ e) => {
             e.stopPropagation();
-            updateUi("styleShorthands", {
-              ...getState().ui.styleShorthands,
+            activeTab.value.session.ui.styleShorthands = {
+              ...activeTab.value.session.ui.styleShorthands,
               [shortProp]: !isExpanded,
-            });
+            };
           }}
         >
           ${isExpanded
@@ -215,10 +213,10 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
  * @param {any} activeSelector
  */
 function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
-  const S = getState();
-  const sel = /** @type {import("../state.js").JxPath} */ (S.selection);
+  const tab = activeTab.value;
+  const sel = /** @type {import("../state.js").JxPath} */ (tab.session.selection);
   const style = node.style || {};
-  const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(S.document.$media));
+  const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
   const mediaTab = activeMediaTab;
 
@@ -232,8 +230,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
             @change=${(/** @type {any} */ e) => {
               const val = e.target.selected;
               const newMedia = val === "base" ? null : val;
-              if (newMedia !== S.ui.activeMedia) {
-                updateUi("activeMedia", newMedia);
+              if (newMedia !== tab.session.ui.activeMedia) {
+                tab.session.ui.activeMedia = newMedia;
               }
             }}
           >
@@ -285,7 +283,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
             inp.remove();
             picker.style.display = "";
             if (accept && v && isNestedSelector(v)) {
-              updateUi("activeSelector", v);
+              activeTab.value.session.ui.activeSelector = v;
             }
           };
           inp.addEventListener("keydown", (ev) => {
@@ -296,7 +294,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
           return;
         }
         const newSelector = val === "__base__" ? null : val;
-        updateUi("activeSelector", newSelector);
+        activeTab.value.session.ui.activeSelector = newSelector;
       }}
     >
       <sp-menu-item value="__base__">(base)</sp-menu-item>
@@ -332,14 +330,19 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
         size="s"
         class="style-filter-input"
         placeholder="Filter properties…"
-        .value=${live(S.ui.styleFilter || "")}
-        @input=${(/** @type {any} */ e) => updateUi("styleFilter", e.target.value)}
+        .value=${live(tab.session.ui.styleFilter || "")}
+        @input=${(/** @type {any} */ e) => {
+          activeTab.value.session.ui.styleFilter = e.target.value;
+        }}
       ></sp-textfield>
       <sp-action-button
         size="xs"
         class="style-filter-toggle"
-        ?selected=${S.ui.styleFilterActive}
-        @click=${() => updateUi("styleFilterActive", !S.ui.styleFilterActive)}
+        ?selected=${tab.session.ui.styleFilterActive}
+        @click=${() => {
+          activeTab.value.session.ui.styleFilterActive =
+            !activeTab.value.session.ui.styleFilterActive;
+        }}
       >
         Active
       </sp-action-button>
@@ -390,9 +393,9 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
   const inheritedStyle = computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
 
   // Auto-open sections that have properties
-  const newSections = autoOpenSections({ style: activeStyle }, S.ui.styleSections);
-  if (JSON.stringify(newSections) !== JSON.stringify(S.ui.styleSections)) {
-    updateUi("styleSections", newSections);
+  const newSections = autoOpenSections({ style: activeStyle }, tab.session.ui.styleSections);
+  if (JSON.stringify(newSections) !== JSON.stringify(tab.session.ui.styleSections)) {
+    tab.session.ui.styleSections = newSections;
   }
 
   // Partition properties into sections
@@ -416,8 +419,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
   }
 
   // ── Filter state ─────────────────────────────────────────────────────────
-  const filterText = (S.ui.styleFilter || "").toLowerCase();
-  const filterActive = S.ui.styleFilterActive;
+  const filterText = (tab.session.ui.styleFilter || "").toLowerCase();
+  const filterActive = tab.session.ui.styleFilterActive;
   const isFiltering = filterText.length > 0 || filterActive;
 
   // ── Section templates ────────────────────────────────────────────────────
@@ -485,14 +488,17 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
       }
 
       if (isFiltering && rows.length === 0) return nothing;
-      const isOpen = isFiltering ? true : (S.ui.styleSections[sec.key] ?? false);
+      const isOpen = isFiltering ? true : (tab.session.ui.styleSections[sec.key] ?? false);
 
       return html`
         <sp-accordion-item
           label=${sec.label}
           .open=${isOpen}
           @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
-            updateUi("styleSections", { ...getState().ui.styleSections, [sec.key]: e.target.open });
+            activeTab.value.session.ui.styleSections = {
+              ...activeTab.value.session.ui.styleSections,
+              [sec.key]: e.target.open,
+            };
           }}
         >
           ${sectionActiveProps.length > 0
@@ -528,13 +534,16 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
 
   // ── Custom section ─────────────────────────────────────────────────────────
   const cssInitialMap = getCssInitialMap();
-  const customIsOpen = S.ui.styleSections.other ?? otherProps.length > 0;
+  const customIsOpen = tab.session.ui.styleSections.other ?? otherProps.length > 0;
   const customSectionT = html`
     <sp-accordion-item
       label="Custom"
       .open=${customIsOpen}
       @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
-        updateUi("styleSections", { ...getState().ui.styleSections, other: e.target.open });
+        activeTab.value.session.ui.styleSections = {
+          ...activeTab.value.session.ui.styleSections,
+          other: e.target.open,
+        };
       }}
     >
       <div>
@@ -609,19 +618,23 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderStylePanelTemplate(ctx) {
-  const S = getState();
-  if (ctx.getCanvasMode() === "settings" && S.ui.stylebookSelection) {
-    const node = S.document;
+  const tab = activeTab.value;
+  if (!tab) return html`<div class="empty-state">No document loaded</div>`;
+  if (ctx.getCanvasMode() === "settings" && tab.session.ui.stylebookSelection) {
+    const node = tab.doc.document;
     if (!node) return html`<div class="empty-state">No document loaded</div>`;
     return html`
-      <div class="stylebook-style-header">Styling: &lt;${S.ui.stylebookSelection}&gt;</div>
-      ${styleSidebarTemplate(node, S.ui.activeMedia, S.ui.activeSelector)}
+      <div class="stylebook-style-header">
+        Styling: &lt;${tab.session.ui.stylebookSelection}&gt;
+      </div>
+      ${styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector)}
     `;
   }
-  if (!S.selection) return html`<div class="empty-state">Select an element to style</div>`;
-  const node = getNodeAtPath(S.document, S.selection);
+  if (!tab.session.selection)
+    return html`<div class="empty-state">Select an element to style</div>`;
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) return html`<div class="empty-state">Select an element to style</div>`;
-  return styleSidebarTemplate(node, S.ui.activeMedia, S.ui.activeSelector);
+  return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector);
 }
 
 /** Single property input row (generic field row helper) */
