@@ -8,6 +8,7 @@ import {
   mutateRemoveNode,
   mutateDuplicateNode,
   mutateWrapNode,
+  mutateReplaceStyle,
 } from "../tabs/transact.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
@@ -23,6 +24,9 @@ import { componentRegistry } from "../files/components.js";
 
 /** @type {JxNode | null} */
 let clipboard = null;
+
+/** @type {Record<string, any> | null} */
+let styleClipboard = null;
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────
 
@@ -64,6 +68,25 @@ export function pasteNode() {
     transactDoc(tab, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
   }
   statusMessage("Pasted");
+}
+
+export function copyStyles() {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return;
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
+  if (!node?.style) return;
+  styleClipboard = structuredClone(node.style);
+  statusMessage("Styles copied");
+}
+
+export function pasteStyles() {
+  if (!styleClipboard) return;
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return;
+  const style = structuredClone(styleClipboard);
+  const sel = /** @type {JxPath} */ (tab.session.selection);
+  transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
+  statusMessage("Styles pasted");
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
@@ -109,6 +132,12 @@ export function showContextMenu(e, path, opts = {}) {
       label: "Duplicate",
       action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
     });
+    if (node.style) {
+      items.push({ label: "Copy styles", action: () => copyStyles() });
+    }
+    if (styleClipboard) {
+      items.push({ label: "Paste styles", action: () => pasteStyles() });
+    }
     items.push({ label: "—" }); // separator
     items.push({
       label: "Insert before",
