@@ -1,7 +1,7 @@
 /** Stylebook layers panel — shows element/variable tree when in stylebook (settings) mode. */
 
 import { html, nothing } from "lit-html";
-import { getState } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { componentRegistry } from "../files/components.js";
 
 /**
@@ -18,11 +18,11 @@ function hasTagStyle(rootStyle, tag) {
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderStylebookLayersTemplate(ctx) {
-  const S = getState();
-  const rootStyle = S.document?.style || {};
-  const selectedTag = S.ui.stylebookSelection;
+  const tab = activeTab.value;
+  const rootStyle = tab?.doc.document?.style || {};
+  const selectedTag = tab?.session.ui.stylebookSelection;
 
-  if (S.ui.stylebookTab === "elements") {
+  if (tab?.session.ui.stylebookTab === "elements") {
     /**
      * @param {any} entry
      * @param {number} depth

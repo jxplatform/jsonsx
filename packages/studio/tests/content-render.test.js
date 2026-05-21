@@ -296,20 +296,22 @@ describe("getEffectiveElements", () => {
 
 describe("loadMarkdown state", () => {
   test("sets mode to content", async () => {
-    const state = await loadMarkdown("# Hello\n\nSome text", null);
-    expect(state.mode).toBe("content");
+    const result = await loadMarkdown("# Hello\n\nSome text");
+    // Content mode is inferred: non-component markdown → document has children, no tagName
+    expect(result.document.children).toBeDefined();
+    expect(result.document.tagName).toBeUndefined();
   });
 
   test("parses frontmatter", async () => {
     const md = '---\ntitle: "My Page"\n---\n\n# Hello';
-    const state = await loadMarkdown(md, null);
-    expect(state.content.frontmatter.title).toBe("My Page");
+    const result = await loadMarkdown(md);
+    expect(result.frontmatter.title).toBe("My Page");
   });
 
   test("converts directives to custom element nodes", async () => {
     const md = "::hero\n\n::cta-banner\n";
-    const state = await loadMarkdown(md, null);
-    const doc = state.document;
+    const result = await loadMarkdown(md);
+    const doc = result.document;
     expect(doc.tagName).toBeUndefined();
     const tags = doc.children.map((/** @type {any} */ c) => c.tagName);
     expect(tags).toContain("hero");
@@ -318,13 +320,14 @@ describe("loadMarkdown state", () => {
 
   test("document has no $elements (components must be auto-discovered)", async () => {
     const md = "::hero\n\n::cta-banner\n";
-    const state = await loadMarkdown(md, null);
-    expect(state.document.$elements).toBeUndefined();
+    const result = await loadMarkdown(md);
+    expect(result.document.$elements).toBeUndefined();
   });
 
   test("documentPath is null (must be set by caller)", async () => {
-    const state = await loadMarkdown("# Hello", null);
-    expect(state.documentPath).toBeNull();
+    const result = await loadMarkdown("# Hello");
+    // loadMarkdown doesn't set documentPath — that's the caller's responsibility
+    expect(result.document).toBeDefined();
   });
 });
 

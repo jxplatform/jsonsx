@@ -6,7 +6,6 @@
 
 import {
   updateUi,
-  hoverNode,
   elToPath,
   pathsEqual,
   parentElementPath,
@@ -30,8 +29,6 @@ let _ctx = null;
  * Initialize the panel events module.
  *
  * @param {{
- *   getState: () => any;
- *   setState: (s: any) => void;
  *   getCanvasMode: () => string;
  *   enterInlineEdit: (el: any, path: any) => void;
  *   navigateToComponent: (path: any) => void;
@@ -77,7 +74,7 @@ export function registerPanelEvents(panel) {
         stopEditing();
       }
 
-      const S = _ctx.getState();
+      const tab = activeTab.value;
       const canvasMode = _ctx.getCanvasMode();
 
       const elements = withPanelPointerEvents(() =>
@@ -97,23 +94,22 @@ export function registerPanelEvents(panel) {
 
           const originalPath = elToPath.get(el);
           if (originalPath) {
-            let path = bubbleInlinePath(S.document, originalPath);
+            let path = bubbleInlinePath(tab?.doc.document, originalPath);
             const newMedia = mediaName === "base" ? null : (mediaName ?? null);
-            const withMedia = { ...S, ui: { ...S.ui, activeMedia: newMedia } };
 
             const resolvedEl = path === originalPath ? el : findCanvasElement(path, canvas) || el;
 
             if (
-              pathsEqual(path, S.selection) &&
+              pathsEqual(path, tab?.session.selection) &&
               isEditableBlock(resolvedEl) &&
-              (canvasMode === "edit" || S.mode === "content")
+              (canvasMode === "edit" || tab?.doc.mode === "content")
             ) {
-              _ctx.setState(withMedia);
+              activeTab.value.session.ui.activeMedia = newMedia;
               _ctx.enterInlineEdit(resolvedEl, path);
               return;
             }
 
-            if (canvasMode === "design" && S.mode !== "content") {
+            if (canvasMode === "design" && tab?.doc.mode !== "content") {
               updateUi("pendingInlineEdit", { path, mediaName });
               activeTab.value.session.ui.activeMedia = newMedia;
               activeTab.value.session.selection = path;
@@ -148,7 +144,7 @@ export function registerPanelEvents(panel) {
       const canvasMode = _ctx.getCanvasMode();
       if (canvasMode !== "edit" && canvasMode !== "design") return;
 
-      const S = _ctx.getState();
+      const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
         document.elementsFromPoint(e.clientX, e.clientY),
       );
@@ -157,7 +153,7 @@ export function registerPanelEvents(panel) {
         if (canvas.contains(el) && el !== canvas) {
           const originalPath = elToPath.get(el);
           if (originalPath) {
-            const path = bubbleInlinePath(S.document, originalPath);
+            const path = bubbleInlinePath(tab?.doc.document, originalPath);
             const resolvedEl = path === originalPath ? el : findCanvasElement(path, canvas) || el;
             if (isEditableBlock(resolvedEl)) {
               const newMedia = mediaName === "base" ? null : (mediaName ?? null);
@@ -187,7 +183,7 @@ export function registerPanelEvents(panel) {
         )
           return;
       }
-      const S = _ctx.getState();
+      const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
         document.elementsFromPoint(e.clientX, e.clientY),
       );
@@ -195,8 +191,8 @@ export function registerPanelEvents(panel) {
         if (canvas.contains(el) && el !== canvas) {
           let path = elToPath.get(el);
           if (path) {
-            path = bubbleInlinePath(S.document, path);
-            showContextMenu(e, path, S, { onEditComponent: _ctx.navigateToComponent });
+            path = bubbleInlinePath(tab?.doc.document, path);
+            showContextMenu(e, path, { onEditComponent: _ctx.navigateToComponent });
             return;
           }
         }
@@ -220,19 +216,19 @@ export function registerPanelEvents(panel) {
         )
           return;
       }
-      let S = _ctx.getState();
+      const tab = activeTab.value;
       const el = withPanelPointerEvents(() => document.elementFromPoint(e.clientX, e.clientY));
       if (el && canvas.contains(el) && el !== canvas) {
         let path = elToPath.get(el);
         if (path) {
-          path = bubbleInlinePath(S.document, path);
-          if (!pathsEqual(path, S.hover)) {
-            _ctx.setState(hoverNode(S, path));
+          path = bubbleInlinePath(tab?.doc.document, path);
+          if (!pathsEqual(path, tab?.session.hover)) {
+            activeTab.value.session.hover = path;
             renderOnly("overlays");
           }
         }
-      } else if (S.hover) {
-        _ctx.setState(hoverNode(S, null));
+      } else if (tab?.session.hover) {
+        activeTab.value.session.hover = null;
         renderOnly("overlays");
       }
     },
@@ -242,9 +238,8 @@ export function registerPanelEvents(panel) {
   overlayClk.addEventListener(
     "mouseleave",
     () => {
-      const S = _ctx.getState();
-      if (S.hover) {
-        _ctx.setState(hoverNode(S, null));
+      if (activeTab.value?.session.hover) {
+        activeTab.value.session.hover = null;
         renderOnly("overlays");
       }
     },
@@ -252,7 +247,6 @@ export function registerPanelEvents(panel) {
   );
 
   insertionHelper.mount({
-    getState: _ctx.getState,
     getCanvasMode: _ctx.getCanvasMode,
     withPanelPointerEvents,
     effectiveZoom: effectiveZoom,

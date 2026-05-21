@@ -33,7 +33,6 @@ import { transactDoc, mutateInsertNode } from "../tabs/transact.js";
 
 /**
  * @typedef {Object} InsertionHelperContext
- * @property {() => any} getState - Returns the current editor state.
  * @property {() => string} getCanvasMode - Returns the active canvas mode.
  * @property {(fn: Function) => any} withPanelPointerEvents - Executes fn with pointer-events
  *   temporarily enabled on the canvas.

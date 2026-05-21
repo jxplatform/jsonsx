@@ -3,7 +3,8 @@
  * DOM from Jx node trees as a fallback when runtime rendering fails.
  */
 
-import { getState, elToPath } from "../store.js";
+import { elToPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { applyCanvasStyle } from "../utils/canvas-media.js";
 import { resolveDefaultForCanvas } from "../panels/signals-panel.js";
 
@@ -32,7 +33,10 @@ export function renderCanvasNode(node, path, parent, activeBreakpoints, featureT
   if (typeof node.textContent === "string") {
     el.textContent = node.textContent;
   } else if (typeof node.textContent === "object" && node.textContent?.$ref) {
-    const resolved = resolveDefaultForCanvas(node.textContent, getState().document.state);
+    const resolved = resolveDefaultForCanvas(
+      node.textContent,
+      activeTab.value?.doc.document?.state,
+    );
     el.textContent = resolved;
     el.style.opacity = "0.7";
     el.style.fontStyle = "italic";
@@ -48,7 +52,7 @@ export function renderCanvasNode(node, path, parent, activeBreakpoints, featureT
     for (const [attr, val] of Object.entries(node.attributes)) {
       try {
         if (typeof val === "object" && val?.$ref) {
-          const resolved = resolveDefaultForCanvas(val, getState().document.state);
+          const resolved = resolveDefaultForCanvas(val, activeTab.value?.doc.document?.state);
           el.setAttribute(attr, resolved);
         } else {
           el.setAttribute(attr, val);

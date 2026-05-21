@@ -18,18 +18,12 @@ import {
 import { isEditing } from "./inline-edit.js";
 import { copyNode, cutNode, pasteNode } from "./context-menu.js";
 
-/**
- * @typedef {import("../state.js").StudioState} StudioState
- *
- * @typedef {import("../state.js").JxPath} JxPath
- */
+/** @typedef {import("../state.js").JxPath} JxPath */
 
 /**
  * Initialise all keyboard (and wheel/pointer) shortcuts.
  *
  * @param {() => {
- *   S: StudioState;
- *   setS: (s: StudioState) => void;
  *   canvasMode: string;
  *   panX: number;
  *   panY: number;
@@ -47,7 +41,7 @@ export function initShortcuts(getContext) {
   canvasWrap.addEventListener(
     "wheel",
     (/** @type {WheelEvent} */ e) => {
-      const { S, setS, canvasMode, panX, panY, setPan, applyTransform } = getContext();
+      const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
       // Edit (content) mode: let the scroll container handle scrolling natively
       if (canvasMode === "edit") return;
       e.preventDefault();
@@ -56,13 +50,13 @@ export function initShortcuts(getContext) {
         const rect = canvasWrap.getBoundingClientRect();
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
-        const oldZoom = S.ui.zoom;
+        const oldZoom = activeTab.value?.session.ui.zoom ?? 1;
         const delta = -e.deltaY * 0.005;
         const newZoom = Math.min(5.0, Math.max(0.05, oldZoom * (1 + delta)));
         const ratio = newZoom / oldZoom;
         // Adjust pan so the point under cursor stays stationary
         setPan(cursorX - (cursorX - panX) * ratio, cursorY - (cursorY - panY) * ratio);
-        setS({ ...S, ui: { ...S.ui, zoom: newZoom } });
+        activeTab.value.session.ui.zoom = newZoom;
       } else if (e.shiftKey) {
         // Shift+scroll = horizontal pan
         setPan(panX - e.deltaY, panY);
@@ -105,8 +99,6 @@ export function initShortcuts(getContext) {
 
   document.addEventListener("keydown", (e) => {
     const {
-      S,
-      setS,
       canvasMode,
       setPan,
       applyTransform,
@@ -115,6 +107,7 @@ export function initShortcuts(getContext) {
       openProject,
       enterEditOnPath,
     } = getContext();
+    const tab = activeTab.value;
     const mod = e.ctrlKey || e.metaKey;
 
     // Don't intercept when typing in inputs or contenteditable
@@ -182,27 +175,27 @@ export function initShortcuts(getContext) {
           break;
         case "d":
           e.preventDefault();
-          if (S.selection) {
-            const sel = S.selection;
-            transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, sel));
+          if (tab?.session.selection) {
+            const sel = tab.session.selection;
+            transactDoc(tab, (t) => mutateDuplicateNode(t, sel));
           }
           break;
         case "c":
           e.preventDefault();
-          copyNode(S);
+          copyNode();
           break;
         case "x":
           e.preventDefault();
-          cutNode(S);
+          cutNode();
           break;
         case "v":
           e.preventDefault();
-          pasteNode(S);
+          pasteNode();
           break;
         case "0":
           if (canvasMode === "edit") break;
           e.preventDefault();
-          setS({ ...S, ui: { ...S.ui, zoom: 1 } });
+          activeTab.value.session.ui.zoom = 1;
           setPan(16, 16);
           applyTransform();
           break;
@@ -210,13 +203,13 @@ export function initShortcuts(getContext) {
         case "+":
           if (canvasMode === "edit") break;
           e.preventDefault();
-          setS({ ...S, ui: { ...S.ui, zoom: Math.min(5.0, S.ui.zoom * 1.2) } });
+          activeTab.value.session.ui.zoom = Math.min(5.0, (tab?.session.ui.zoom ?? 1) * 1.2);
           applyTransform();
           break;
         case "-":
           if (canvasMode === "edit") break;
           e.preventDefault();
-          setS({ ...S, ui: { ...S.ui, zoom: Math.max(0.05, S.ui.zoom / 1.2) } });
+          activeTab.value.session.ui.zoom = Math.max(0.05, (tab?.session.ui.zoom ?? 1) / 1.2);
           applyTransform();
           break;
       }
@@ -226,22 +219,22 @@ export function initShortcuts(getContext) {
     switch (e.key) {
       case "Delete":
       case "Backspace":
-        if (S.selection && S.selection.length >= 2) {
+        if (tab?.session.selection && tab.session.selection.length >= 2) {
           e.preventDefault();
-          const sel = S.selection;
-          transactDoc(activeTab.value, (t) => mutateRemoveNode(t, sel));
+          const sel = tab.session.selection;
+          transactDoc(tab, (t) => mutateRemoveNode(t, sel));
         }
         break;
       case "Escape":
         activeTab.value.session.selection = null;
         break;
       case "Enter":
-        if (S.selection && S.selection.length >= 2) {
+        if (tab?.session.selection && tab.session.selection.length >= 2) {
           e.preventDefault();
-          const pp = /** @type {JxPath} */ (parentElementPath(S.selection));
-          const idx = /** @type {number} */ (childIndex(S.selection));
+          const pp = /** @type {JxPath} */ (parentElementPath(tab.session.selection));
+          const idx = /** @type {number} */ (childIndex(tab.session.selection));
           const newPath = [...pp, "children", idx + 1];
-          transactDoc(activeTab.value, (t) => {
+          transactDoc(tab, (t) => {
             mutateInsertNode(t, pp, idx + 1, { tagName: "p", textContent: "" });
             t.session.selection = newPath;
           });
@@ -250,24 +243,24 @@ export function initShortcuts(getContext) {
         break;
       case "ArrowUp":
         e.preventDefault();
-        navigateSelection(S);
+        navigateSelection(-1);
         break;
       case "ArrowDown":
         e.preventDefault();
-        navigateSelection(S, 1);
+        navigateSelection(1);
         break;
       case "ArrowLeft":
         e.preventDefault();
-        if (S.selection && S.selection.length >= 2) {
-          activeTab.value.session.selection = parentElementPath(S.selection);
+        if (tab?.session.selection && tab.session.selection.length >= 2) {
+          activeTab.value.session.selection = parentElementPath(tab.session.selection);
         }
         break;
       case "ArrowRight":
         e.preventDefault();
-        if (S.selection) {
-          const node = getNodeAtPath(S.document, S.selection);
+        if (tab?.session.selection) {
+          const node = getNodeAtPath(tab.doc.document, tab.session.selection);
           if (node?.children?.length > 0) {
-            activeTab.value.session.selection = [...S.selection, "children", 0];
+            activeTab.value.session.selection = [...tab.session.selection, "children", 0];
           }
         }
         break;
@@ -286,23 +279,24 @@ export function initShortcuts(getContext) {
   );
 }
 
-/**
- * @param {StudioState} S
- * @param {number} [direction]
- */
-function navigateSelection(S, direction = -1) {
-  if (!S.selection) {
+/** @param {number} [direction] */
+function navigateSelection(direction = -1) {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) {
     activeTab.value.session.selection = [];
     return;
   }
-  if (S.selection.length < 2) return;
+  if (tab.session.selection.length < 2) return;
 
-  const parent = getNodeAtPath(S.document, /** @type {JxPath} */ (parentElementPath(S.selection)));
-  const idx = /** @type {number} */ (childIndex(S.selection));
+  const parent = getNodeAtPath(
+    tab.doc.document,
+    /** @type {JxPath} */ (parentElementPath(tab.session.selection)),
+  );
+  const idx = /** @type {number} */ (childIndex(tab.session.selection));
   const newIdx = idx + direction;
   if (parent?.children && newIdx >= 0 && newIdx < parent.children.length) {
     activeTab.value.session.selection = [
-      .../** @type {JxPath} */ (parentElementPath(S.selection)),
+      .../** @type {JxPath} */ (parentElementPath(tab.session.selection)),
       "children",
       newIdx,
     ];

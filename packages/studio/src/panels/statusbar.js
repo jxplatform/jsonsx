@@ -34,11 +34,7 @@ export function mountStatusbar() {
       void tab.doc.document;
       void tab.doc.mode;
       void tab.session.selection;
-      renderStatusbar({
-        mode: tab.doc.mode,
-        document: tab.doc.document,
-        selection: tab.session.selection,
-      });
+      renderStatusbar();
     });
   });
 }
@@ -50,19 +46,15 @@ export function unmountStatusbar() {
 
 // ─── Statusbar ───────────────────────────────────────────────────────────────
 
-/**
- * Render the statusbar text. Receives current studio state so the module stays decoupled from the
- * mutable `S` local in studio.js.
- *
- * @param {any} S - Current studio state
- */
-export function renderStatusbar(S) {
+/** Render the statusbar text. */
+export function renderStatusbar() {
+  const tab = activeTab.value;
   const parts = [];
-  if (S.mode === "content") parts.push("Content Mode");
-  if (S.selection) {
-    const node = getNodeAtPath(S.document, S.selection);
+  if (tab?.doc.mode === "content") parts.push("Content Mode");
+  if (tab?.session.selection) {
+    const node = getNodeAtPath(tab.doc.document, tab.session.selection);
     parts.push(`Selected: ${nodeLabel(node)}`);
-    parts.push(`Path: ${S.selection.join(" > ") || "root"}`);
+    parts.push(`Path: ${tab.session.selection.join(" > ") || "root"}`);
   }
   if (statusMsg) parts.push(statusMsg);
   statusbarEl.textContent = parts.join("  |  ") || "Jx Studio";

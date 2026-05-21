@@ -13,7 +13,8 @@
 import { LitElement, html, nothing } from "lit";
 import { html as litHtml } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import { getState, debouncedStyleCommit } from "../store.js";
+import { debouncedStyleCommit } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { getEffectiveStyle } from "../site-context.js";
 import { kebabToLabel } from "../utils/studio-utils.js";
 
@@ -21,8 +22,7 @@ import { kebabToLabel } from "../utils/studio-utils.js";
 
 /** Extract --color-* CSS custom properties from the effective (site + document) style. */
 function getColorVars() {
-  const S = getState();
-  const style = getEffectiveStyle(S?.document?.style);
+  const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
   if (!style) return [];
   const vars = [];
   for (const [k, v] of Object.entries(style)) {
@@ -46,8 +46,7 @@ function resolveColorForDisplay(/** @type {any} */ val) {
   if (!val) return "transparent";
   const m = val.match(/^var\((--[^)]+)\)$/);
   if (m) {
-    const S = getState();
-    const style = getEffectiveStyle(S?.document?.style);
+    const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
     const resolved = style?.[m[1]];
     if (typeof resolved === "string") return resolved;
     return "transparent";

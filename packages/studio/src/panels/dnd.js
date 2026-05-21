@@ -14,14 +14,7 @@ import {
   extractInstruction,
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 
-import {
-  getState,
-  leftPanel,
-  getNodeAtPath,
-  parentElementPath,
-  childIndex,
-  isAncestor,
-} from "../store.js";
+import { leftPanel, getNodeAtPath, parentElementPath, childIndex, isAncestor } from "../store.js";
 import { transact, transactDoc, mutateMoveNode, mutateInsertNode } from "../tabs/transact.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
@@ -251,7 +244,7 @@ export function clearLayerDropGap(container) {
  * @param {any} targetPath
  */
 export function applyDropInstruction(instruction, srcData, targetPath) {
-  const S = getState();
+  const document = activeTab.value?.doc.document;
   if (srcData.type === "tree-node") {
     const fromPath = srcData.path;
     const targetParent = /** @type {any} */ (parentElementPath(targetPath));
@@ -267,7 +260,7 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
         );
         break;
       case "make-child": {
-        const target = getNodeAtPath(S.document, targetPath);
+        const target = getNodeAtPath(document, targetPath);
         const len = target?.children?.length || 0;
         transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetPath, len));
         break;
@@ -289,7 +282,7 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
         );
         break;
       case "make-child": {
-        const target = getNodeAtPath(S.document, targetPath);
+        const target = getNodeAtPath(document, targetPath);
         const len = target?.children?.length || 0;
         transactDoc(activeTab.value, (t) =>
           mutateInsertNode(t, targetPath, len, structuredClone(srcData.fragment)),
@@ -303,8 +296,8 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
     if (tag && tag.includes("-")) {
       const comp = componentRegistry.find((/** @type {any} */ c) => c.tagName === tag);
       if (comp) {
-        const currentS = getState();
-        const elements = currentS.document.$elements || [];
+        const tab = activeTab.value;
+        const elements = tab?.doc.document?.$elements || [];
         if (comp.source === "npm") {
           const specifier = comp.modulePath ? `${comp.package}/${comp.modulePath}` : comp.package;
           const alreadyImported = elements.some(
@@ -323,7 +316,7 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
               (e.$ref === `./${comp.path}` || e.$ref.endsWith(comp.path.split("/").pop())),
           );
           if (!alreadyImported) {
-            const relPath = computeRelativePath(currentS.documentPath, comp.path);
+            const relPath = computeRelativePath(tab?.documentPath, comp.path);
             transact(activeTab.value, (/** @type {any} */ doc) => {
               if (!doc.$elements) doc.$elements = [];
               doc.$elements.push({ $ref: relPath });

@@ -1,8 +1,7 @@
 /**
- * File Operations — open, load, save documents.
+ * File Operations — open, save, export documents.
  *
- * Each function that mutates state accepts a `commit(newState)` callback so the caller (studio.js)
- * can assign S and trigger render().
+ * All functions read/write directly from/to `activeTab.value` (the reactive tab).
  */
 
 import { unified } from "unified";
@@ -10,17 +9,13 @@ import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd, jxDocToMd } from "../markdown/md-convert.js";
-import { createState } from "../store.js";
 import { locateDocument } from "../services/code-services.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { getPlatform } from "../platform.js";
+import { activeTab, openTab } from "../workspace/workspace.js";
 
-/**
- * Open a file via the File System Access API (or fallback input).
- *
- * @param {{ S: any; commit: (s: any) => void; renderToolbar: () => void }} ctx
- */
-export async function openFile({ S: _S, commit, renderToolbar: _renderToolbar }) {
+/** Open a file via the File System Access API (or fallback input). */
+export async function openFile() {
   try {
     if ("showOpenFilePicker" in window) {
       const [handle] = await /** @type {any} */ (window).showOpenFilePicker({
@@ -31,18 +26,21 @@ export async function openFile({ S: _S, commit, renderToolbar: _renderToolbar })
       });
       const file = await handle.getFile();
       const text = await file.text();
+      const documentPath = await locateDocument(handle.name);
 
       if (handle.name.endsWith(".md")) {
-        const newState = await loadMarkdown(text, handle);
-        commit(newState);
+        const { document, frontmatter } = await loadMarkdown(text);
+        openTab({
+          id: handle.name,
+          documentPath,
+          fileHandle: handle,
+          document,
+          frontmatter,
+          sourceFormat: "md",
+        });
       } else {
-        const doc = JSON.parse(text);
-        const newState = createState(doc);
-        newState.fileHandle = handle;
-        newState.dirty = false;
-        newState.documentPath = await locateDocument(handle.name);
-        await loadCompanionJS(handle, newState);
-        commit(newState);
+        const document = JSON.parse(text);
+        openTab({ id: handle.name, documentPath, fileHandle: handle, document });
       }
 
       statusMessage(`Opened ${handle.name}`);
@@ -57,13 +55,11 @@ export async function openFile({ S: _S, commit, renderToolbar: _renderToolbar })
         const text = await file.text();
 
         if (file.name.endsWith(".md")) {
-          const newState = await loadMarkdown(text, null);
-          commit(newState);
+          const { document, frontmatter } = await loadMarkdown(text);
+          openTab({ id: file.name, document, frontmatter, sourceFormat: "md" });
         } else {
-          const doc = JSON.parse(text);
-          const newState = createState(doc);
-          newState.dirty = false;
-          commit(newState);
+          const document = JSON.parse(text);
+          openTab({ id: file.name, document });
         }
 
         statusMessage(`Opened ${file.name}`);
@@ -76,93 +72,50 @@ export async function openFile({ S: _S, commit, renderToolbar: _renderToolbar })
 }
 
 /**
- * Parse a markdown string into a Jx state object (pure — no side effects).
+ * Parse a markdown string into document + frontmatter (pure — no side effects).
  *
- * All markdown goes through `transpileJxMarkdown()`. Content documents (no hyphenated `tagName`)
- * are wrapped in a `{ tagName: "div", $id: "content" }` root to match the studio's content
- * contract.
- *
- * @param {any} source Markdown text
- * @param {any} fileHandle File handle (or null)
- * @returns {Promise<any>} A new state object ready for commit()
+ * @param {string} source Markdown text
+ * @returns {Promise<{ document: any; frontmatter: Record<string, any> }>}
  */
-export async function loadMarkdown(source, fileHandle) {
+export async function loadMarkdown(source) {
   const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
   const doc = /** @type {any} */ (transpileJxMarkdown(source));
 
   const isComponent = doc.tagName && String(doc.tagName).includes("-");
 
   if (isComponent) {
-    const newState = /** @type {any} */ (createState(doc));
-    newState.sourceFormat = "md";
-    newState.rawMarkdown = source;
-    newState.fileHandle = fileHandle;
-    newState.dirty = false;
-    return newState;
+    return { document: doc, frontmatter: {} };
   }
 
   // Content markdown — children form the root-level document body
-  const contentDoc = {
-    children: doc.children ?? [],
-  };
+  const contentDoc = { children: doc.children ?? [] };
 
-  // Extract frontmatter keys (everything except children) as content metadata
   /** @type {Record<string, any>} */
   const frontmatter = {};
   for (const [key, value] of Object.entries(doc)) {
     if (key !== "children") frontmatter[key] = value;
   }
 
-  const newState = /** @type {any} */ (createState(contentDoc));
-  newState.sourceFormat = "md";
-  newState.mode = "content";
-  newState.content = { frontmatter };
-  newState.rawMarkdown = source;
-  newState.fileHandle = fileHandle;
-  newState.dirty = false;
-  return newState;
+  return { document: contentDoc, frontmatter };
 }
 
-/**
- * Load companion JS file metadata into state.
- *
- * @param {any} handle
- * @param {any} state State object to mutate in-place
- */
-async function loadCompanionJS(handle, state) {
+/** Save the current document back to its source location. */
+export async function saveFile() {
+  const tab = activeTab.value;
+  if (!tab) return;
   try {
-    if (handle.getParent) {
-      // Not yet available in any browser; skip for now
-    }
-    if (state.document.$handlers) {
-      state.handlersSource = `// Companion file: ${state.document.$handlers}\n// (Read-only in builder — edit the JS file directly)`;
-    }
-  } catch {}
-}
+    const output = serializeDocument(tab);
 
-/**
- * Save the current document back to its source location.
- *
- * @param {{ S: any; commit: (s: any) => void; renderToolbar: () => void }} ctx
- */
-export async function saveFile({ S, commit, renderToolbar }) {
-  try {
-    const output = serializeDocument(S);
-
-    if (S.documentPath) {
-      // Project file — save via platform
+    if (tab.documentPath) {
       const platform = getPlatform();
-      await platform.writeFile(S.documentPath, output);
-      commit({ ...S, dirty: false });
-      renderToolbar();
+      await platform.writeFile(tab.documentPath, output);
+      tab.doc.dirty = false;
       statusMessage("Saved");
-    } else if (S.fileHandle && "createWritable" in S.fileHandle) {
-      // Standalone file opened via FS Access API
-      const writable = await S.fileHandle.createWritable();
+    } else if (tab.fileHandle && "createWritable" in tab.fileHandle) {
+      const writable = await /** @type {any} */ (tab.fileHandle).createWritable();
       await writable.write(output);
       await writable.close();
-      commit({ ...S, dirty: false });
-      renderToolbar();
+      tab.doc.dirty = false;
       statusMessage("Saved");
     } else {
       statusMessage("No save target — use Export");
@@ -172,22 +125,20 @@ export async function saveFile({ S, commit, renderToolbar }) {
   }
 }
 
-/**
- * Export the current document to a new location (Save As / download).
- *
- * @param {{ S: any; commit: (s: any) => void; renderToolbar: () => void }} ctx
- */
-export async function exportFile({ S, commit, renderToolbar }) {
+/** Export the current document to a new location (Save As / download). */
+export async function exportFile() {
+  const tab = activeTab.value;
+  if (!tab) return;
   try {
-    const isContent = S.mode === "content";
-    const output = serializeDocument(S);
+    const isContent = tab.doc.mode === "content";
+    const output = serializeDocument(tab);
     const mimeType = isContent ? "text/markdown" : "application/json";
     const ext = isContent ? ".md" : ".json";
     const description = isContent ? "Markdown Content" : "Jx Component";
 
     if ("showSaveFilePicker" in window) {
-      const suggestedName = S.documentPath
-        ? S.documentPath.split("/").pop()
+      const suggestedName = tab.documentPath
+        ? tab.documentPath.split("/").pop()
         : isContent
           ? "content.md"
           : "component.json";
@@ -198,8 +149,7 @@ export async function exportFile({ S, commit, renderToolbar }) {
       const writable = await handle.createWritable();
       await writable.write(output);
       await writable.close();
-      commit({ ...S, dirty: false });
-      renderToolbar();
+      tab.doc.dirty = false;
       statusMessage(`Exported as ${handle.name}`);
     } else {
       // Fallback: download
@@ -210,8 +160,7 @@ export async function exportFile({ S, commit, renderToolbar }) {
       a.download = isContent ? "content.md" : "component.json";
       a.click();
       URL.revokeObjectURL(url);
-      commit({ ...S, dirty: false });
-      renderToolbar();
+      tab.doc.dirty = false;
       statusMessage("Downloaded");
     }
   } catch (/** @type {any} */ e) {
@@ -222,22 +171,22 @@ export async function exportFile({ S, commit, renderToolbar }) {
 /**
  * Serialize the current document to its output format (JSON or Markdown).
  *
- * @param {any} S
+ * @param {import("../tabs/tab.js").Tab} tab
  * @returns {string}
  */
-function serializeDocument(S) {
-  if (S.sourceFormat === "md") {
-    return jxDocToMd(S.document);
+function serializeDocument(tab) {
+  if (tab.doc.sourceFormat === "md") {
+    return jxDocToMd(tab.doc.document);
   }
-  if (S.mode === "content") {
-    const mdast = jxToMd(S.document);
+  if (tab.doc.mode === "content") {
+    const mdast = jxToMd(tab.doc.document);
     const md = unified()
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
       .stringify(mdast);
-    const fm = S.content?.frontmatter;
+    const fm = tab.doc.content?.frontmatter;
     const hasFrontmatter = fm && Object.keys(fm).length > 0;
     return hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;
   }
-  return JSON.stringify(S.document, null, 2);
+  return JSON.stringify(tab.doc.document, null, 2);
 }

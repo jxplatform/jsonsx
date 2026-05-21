@@ -2,7 +2,7 @@
 
 import { html } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import { getState, debouncedStyleCommit } from "../store.js";
+import { debouncedStyleCommit } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateUpdateStyle } from "../tabs/transact.js";
 import { widgetForType as _widgetForType } from "../ui/widgets.js";
@@ -53,9 +53,8 @@ export function renderSelectInput(entry, prop, value, onChange) {
 
 /** @param {any} preset @param {any} onChange */
 function handleFontPresetSelection(preset, onChange) {
-  const S = getState();
   const varName = friendlyNameToVar(preset.title, "--font-");
-  if (!S.document?.style?.[varName]) {
+  if (!activeTab.value?.doc.document?.style?.[varName]) {
     transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, preset.value));
   }
   onChange(`var(${varName})`);

@@ -7,16 +7,8 @@ import {
   registerRenderer,
   render,
   renderOnly,
-  setUpdateFn,
-  setGetStateFn,
-  getState,
-  update,
   debouncedStyleCommit,
   cancelStyleDebounce,
-  addUpdateMiddleware,
-  runUpdateMiddleware,
-  addPostRenderHook,
-  runPostRenderHooks,
 } from "../src/store.js";
 
 // ─── isNestedSelector ───────────────────────────────────────────────────────
@@ -203,45 +195,6 @@ describe("render orchestration", () => {
 
   test("renderOnly skips unregistered names", () => {
     renderOnly("non-existent-renderer");
-  });
-});
-
-// ─── Update dispatch ────────────────────────────────────────────────────────
-
-describe("update dispatch", () => {
-  test("setUpdateFn + update routes correctly", () => {
-    /** @type {any[]} */
-    const calls = [];
-    setUpdateFn((/** @type {any} */ s) => calls.push(s));
-    update(/** @type {any} */ ({ doc: "test" }));
-    expect(calls).toEqual([{ doc: "test" }]);
-  });
-
-  test("setGetStateFn + getState returns current state", () => {
-    setGetStateFn(/** @type {any} */ (() => ({ count: 42 })));
-    expect(/** @type {any} */ (getState())).toEqual({ count: 42 });
-  });
-});
-
-// ─── Middleware & hooks ─────────────────────────────────────────────────────
-
-describe("middleware", () => {
-  test("addUpdateMiddleware + runUpdateMiddleware", () => {
-    /** @type {any[]} */
-    const calls = [];
-    addUpdateMiddleware((/** @type {any} */ s) => calls.push(s));
-    runUpdateMiddleware(/** @type {any} */ ({ test: true }));
-    expect(calls).toEqual([{ test: true }]);
-  });
-
-  test("addPostRenderHook + runPostRenderHooks", () => {
-    /** @type {any[]} */
-    const calls = [];
-    addPostRenderHook((/** @type {any} */ prevDoc, /** @type {any} */ prevSel) =>
-      calls.push({ prevDoc, prevSel }),
-    );
-    runPostRenderHooks(/** @type {any} */ ("doc1"), /** @type {any} */ ("sel1"));
-    expect(calls[calls.length - 1]).toEqual({ prevDoc: "doc1", prevSel: "sel1" });
   });
 });
 

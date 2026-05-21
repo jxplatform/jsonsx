@@ -8,7 +8,6 @@ import { ref } from "lit-html/directives/ref.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 
 import {
-  getState,
   updateSession,
   updateUi,
   canvasWrap,
@@ -49,9 +48,8 @@ let _ctx = null;
  */
 export function renderStylebookMode(ctx) {
   _ctx = ctx;
-  const S = getState();
 
-  const settingsTab = S.ui.settingsTab || "stylebook";
+  const settingsTab = activeTab.value?.session.ui.settingsTab || "stylebook";
 
   const settingsChromeBarTpl = html`
     <div
@@ -94,11 +92,14 @@ export function renderStylebookMode(ctx) {
 
   // Stylebook tab — element catalog / variables
   view.stylebookElToTag = new WeakMap();
-  const rootStyle = getEffectiveStyle(S.document.style);
-  const filter = (S.ui.stylebookFilter || "").toLowerCase();
-  const customizedOnly = S.ui.stylebookCustomizedOnly;
+  const tab = activeTab.value;
+  const rootStyle = getEffectiveStyle(tab?.doc.document?.style);
+  const filter = (tab?.session.ui.stylebookFilter || "").toLowerCase();
+  const customizedOnly = tab?.session.ui.stylebookCustomizedOnly;
 
-  const { sizeBreakpoints, baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
+  const { sizeBreakpoints, baseWidth } = parseMediaEntries(
+    getEffectiveMedia(tab?.doc.document?.$media),
+  );
   const hasMedia = sizeBreakpoints.length > 0;
 
   const onTabClick = (/** @type {string} */ t) => {
@@ -110,7 +111,7 @@ export function renderStylebookMode(ctx) {
   };
 
   const onCustomizedToggle = () => {
-    updateUi("stylebookCustomizedOnly", !S.ui.stylebookCustomizedOnly);
+    updateUi("stylebookCustomizedOnly", !tab?.session.ui.stylebookCustomizedOnly);
   };
 
   const chromeBarTpl = html`
@@ -121,7 +122,7 @@ export function renderStylebookMode(ctx) {
     >
       <sp-tabs
         size="s"
-        selected=${S.ui.stylebookTab || "elements"}
+        selected=${tab?.session.ui.stylebookTab || "elements"}
         @change=${(/** @type {any} */ e) => {
           onTabClick(e.target.selected);
         }}
@@ -132,17 +133,17 @@ export function renderStylebookMode(ctx) {
           `,
         )}
       </sp-tabs>
-      ${S.ui.stylebookTab === "elements"
+      ${tab?.session.ui.stylebookTab === "elements"
         ? html`
             <input
               class="field-input"
               style="flex:1;max-width:200px;margin-left:8px"
               placeholder="Filter…"
-              .value=${S.ui.stylebookFilter}
+              .value=${tab?.session.ui.stylebookFilter}
               @input=${onFilterInput}
             />
             <button
-              class="tb-toggle${S.ui.stylebookCustomizedOnly ? " active" : ""}"
+              class="tb-toggle${tab?.session.ui.stylebookCustomizedOnly ? " active" : ""}"
               style="margin-left:4px"
               @click=${onCustomizedToggle}
             >
@@ -176,7 +177,7 @@ export function renderStylebookMode(ctx) {
 
   const renderIntoPanel = (/** @type {any} */ panel, /** @type {any} */ activeBreakpoints) => {
     panel.canvas.classList.add("sb-canvas");
-    if (S.ui.stylebookTab === "elements") {
+    if (tab?.session.ui.stylebookTab === "elements") {
       renderStylebookElementsIntoCanvas(
         panel.canvas,
         rootStyle,
@@ -197,7 +198,7 @@ export function renderStylebookMode(ctx) {
   /** @type {{ tpl: any; panel: any; activeSet: any }[]} */
   let panelEntries;
   if (!hasMedia) {
-    const effectiveMedia = getEffectiveMedia(S.document.$media);
+    const effectiveMedia = getEffectiveMedia(tab?.doc.document?.$media);
     const hasBaseWidth = effectiveMedia && effectiveMedia["--"];
     const label = hasBaseWidth ? `${mediaDisplayName("--")} (${baseWidth}px)` : null;
     const entry = ctx.canvasPanelTemplate(
@@ -268,8 +269,7 @@ export function renderStylebookOverlays() {
   if (!_ctx) return;
   if (canvasPanels.length === 0) return;
 
-  const S = getState();
-  const selectedTag = S.ui.stylebookSelection;
+  const selectedTag = activeTab.value?.session.ui.stylebookSelection;
 
   for (const panel of canvasPanels) {
     const hoverTag = /** @type {any} */ (panel)._lastHoverTag;

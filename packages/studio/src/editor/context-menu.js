@@ -26,41 +26,42 @@ let clipboard = null;
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────
 
-/** @param {StudioState} S */
-export function copyNode(S) {
-  if (!S.selection) return;
-  const node = getNodeAtPath(S.document, S.selection);
+export function copyNode() {
+  const tab = activeTab.value;
+  if (!tab?.session.selection) return;
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) return;
   clipboard = structuredClone(node);
   statusMessage("Copied");
 }
 
-/** @param {StudioState} S */
-export function cutNode(S) {
-  if (!S.selection || S.selection.length < 2) return;
-  const sel = S.selection;
-  const node = getNodeAtPath(S.document, sel);
+export function cutNode() {
+  const tab = activeTab.value;
+  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  const sel = tab.session.selection;
+  const node = getNodeAtPath(tab.doc.document, sel);
   if (!node) return;
   clipboard = structuredClone(node);
-  transactDoc(activeTab.value, (t) => mutateRemoveNode(t, sel));
+  transactDoc(tab, (t) => mutateRemoveNode(t, sel));
   statusMessage("Cut");
 }
 
-/** @param {StudioState} S */
-export function pasteNode(S) {
+export function pasteNode() {
   if (!clipboard) return;
+  const tab = activeTab.value;
+  if (!tab) return;
   const clip = clipboard;
-  const pPath = S.selection || [];
-  const parent = getNodeAtPath(S.document, pPath);
+  const pPath = tab.session.selection || [];
+  const parent = getNodeAtPath(tab.doc.document, pPath);
   if (!parent) return;
 
-  if (S.selection && S.selection.length >= 2) {
-    const pp = /** @type {JxPath} */ (parentElementPath(S.selection));
-    const idx = /** @type {number} */ (childIndex(S.selection));
-    transactDoc(activeTab.value, (t) => mutateInsertNode(t, pp, idx + 1, structuredClone(clip)));
+  if (tab.session.selection && tab.session.selection.length >= 2) {
+    const pp = /** @type {JxPath} */ (parentElementPath(tab.session.selection));
+    const idx = /** @type {number} */ (childIndex(tab.session.selection));
+    transactDoc(tab, (t) => mutateInsertNode(t, pp, idx + 1, structuredClone(clip)));
   } else {
     const idx = parent.children ? parent.children.length : 0;
-    transactDoc(activeTab.value, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
+    transactDoc(tab, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
   }
   statusMessage("Pasted");
 }
@@ -85,25 +86,25 @@ export function dismissContextMenu() {
 /**
  * @param {MouseEvent} e
  * @param {JxPath} path
- * @param {StudioState} S
  * @param {{ onEditComponent?: (path: string) => void }} [opts]
  */
-export function showContextMenu(e, path, S, opts = {}) {
+export function showContextMenu(e, path, opts = {}) {
   e.preventDefault();
   ctxMenu.removeAttribute("open");
 
-  const node = getNodeAtPath(S.document, path);
+  const tab = activeTab.value;
+  const node = getNodeAtPath(tab?.doc.document, path);
   if (!node) return;
 
   // Select the node
-  activeTab.value.session.selection = path;
+  tab.session.selection = path;
 
   /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
   const items = [];
 
-  items.push({ label: "Copy", action: () => copyNode(S) });
+  items.push({ label: "Copy", action: () => copyNode() });
   if (path.length >= 2) {
-    items.push({ label: "Cut", action: () => cutNode(S) });
+    items.push({ label: "Cut", action: () => cutNode() });
     items.push({
       label: "Duplicate",
       action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),

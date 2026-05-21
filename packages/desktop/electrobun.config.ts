@@ -77,7 +77,7 @@ export default {
   windows: {
     icon: "icon.png",
     productId: "com.jxsuite.jx-studio",
-    installDir: "Jx Studio",
+    installDir: "com.jxsuite.jx-studio",
     msix: {
       publisher: "CN=jxsuite",
       publisherDisplayName: "jxsuite",

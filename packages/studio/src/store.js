@@ -12,10 +12,6 @@ import { activeTab } from "./workspace/workspace.js";
 
 export {
   createState,
-  selectNode,
-  hoverNode,
-  pushDocument,
-  popDocument,
   getNodeAtPath,
   flattenTree,
   nodeLabel,
@@ -27,8 +23,6 @@ export {
   projectState,
   setProjectState,
   updateFrontmatter,
-  toFlat,
-  fromFlat,
 } from "./state.js";
 
 // ─── DOM shortcuts & element refs ────────────────────────────────────────────
@@ -213,85 +207,7 @@ export function renderOnly(...names) {
   }
 }
 
-// ─── Update dispatch (late-bound) ────────────────────────────────────────────
-// studio.js registers the real update implementation via setUpdateFn() during bootstrap.
-// This allows extracted modules to import `update` from store.js without circular deps.
-
-/** @type {(state: import("./state.js").StudioState) => void} */
-let _updateFn = () => {
-  throw new Error("update() called before setUpdateFn() — bootstrap not complete");
-};
-
-/** @type {() => import("./state.js").StudioState | null} */
-let _getStateFn = () => null;
-
-/**
- * Register the update implementation. Called by studio.js at module load time.
- *
- * @param {(state: import("./state.js").StudioState) => void} fn
- */
-export function setUpdateFn(fn) {
-  _updateFn = fn;
-}
-
-/**
- * Register the state getter. Called by studio.js at module load time.
- *
- * @param {() => import("./state.js").StudioState} fn — returns current S
- */
-export function setGetStateFn(fn) {
-  _getStateFn = fn;
-}
-
-/**
- * Get the current state (live, not stale). Synthesized from the active tab's reactive state.
- *
- * @returns {import("./state.js").StudioState}
- */
-export function getState() {
-  const tab = activeTab.value;
-  if (tab) {
-    return /** @type {any} */ ({
-      document: tab.doc.document,
-      mode: tab.doc.mode,
-      dirty: tab.doc.dirty,
-      handlersSource: tab.doc.handlersSource,
-      content: tab.doc.content,
-      documentPath: tab.documentPath,
-      fileHandle: tab.fileHandle,
-      selection: tab.session.selection,
-      hover: tab.session.hover,
-      clipboard: tab.session.clipboard,
-      ui: tab.session.ui,
-      canvas: tab.session.canvas,
-      documentStack: tab.session.documentStack,
-    });
-  }
-  return /** @type {any} */ (_getStateFn());
-}
-
-/**
- * Dispatch a state update + selective re-render.
- *
- * @param {import("./state.js").StudioState} newState
- */
-export function update(newState) {
-  _updateFn(newState);
-}
-
-// ─── Session dispatch (late-bound) ──────────────────────────────────────────
-// Lightweight dispatcher for session-only changes (selection, hover, ui).
-// Does NOT trigger autosave middleware or push history.
-
-/** @type {(patch: object) => void} */
-let _updateSessionFn = () => {
-  throw new Error("updateSession() called before setUpdateSessionFn() — bootstrap not complete");
-};
-
-/** @param {(patch: object) => void} fn */
-export function setUpdateSessionFn(fn) {
-  _updateSessionFn = fn;
-}
+// ─── Session dispatch ──────────────────────────────────────────────────────
 
 /**
  * Dispatch a session-only state update (selection, hover, ui). Writes directly to reactive tab.
@@ -316,11 +232,10 @@ export function updateSession(patch) {
       }
     }
   }
-  _updateSessionFn(patch);
 }
 
 /**
- * Update a single UI field. Routes through session dispatch.
+ * Update a single UI field.
  *
  * @param {string} field
  * @param {unknown} value
@@ -330,7 +245,6 @@ export function updateUi(field, value) {
   if (tab) {
     /** @type {any} */ (tab.session.ui)[field] = value;
   }
-  _updateSessionFn({ ui: { [field]: value } });
 }
 
 /**
@@ -345,49 +259,4 @@ export function updateCanvas(patch) {
       /** @type {any} */ (tab.session.canvas)[k] = v;
     }
   }
-  _updateSessionFn({ canvas: patch });
-}
-
-/** @type {((state: import("./state.js").StudioState) => void)[]} */
-const _updateMiddleware = [];
-
-/**
- * Register middleware that runs after every update().
- *
- * @param {(state: import("./state.js").StudioState) => void} fn — receives (state) after core
- *   update
- */
-export function addUpdateMiddleware(fn) {
-  _updateMiddleware.push(fn);
-}
-
-/**
- * Run all registered update middleware.
- *
- * @param {import("./state.js").StudioState} state
- */
-export function runUpdateMiddleware(state) {
-  for (const mw of _updateMiddleware) mw(state);
-}
-
-/** @type {((prevDoc: object, prevSel: import("./state.js").JxPath | null) => void)[]} */
-const _postRenderHooks = [];
-
-/**
- * Register a hook that runs after renders in update().
- *
- * @param {(prevDoc: object, prevSel: import("./state.js").JxPath | null) => void} fn
- */
-export function addPostRenderHook(fn) {
-  _postRenderHooks.push(fn);
-}
-
-/**
- * Run all registered post-render hooks.
- *
- * @param {object} prevDoc
- * @param {import("./state.js").JxPath | null} prevSel
- */
-export function runPostRenderHooks(prevDoc, prevSel) {
-  for (const hook of _postRenderHooks) hook(prevDoc, prevSel);
 }

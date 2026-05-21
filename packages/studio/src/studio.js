@@ -6,27 +6,14 @@
  */
 
 import {
-  createState,
-  pushDocument,
-  popDocument,
   getNodeAtPath,
   canvasWrap,
   toolbarEl,
-  canvasPanels,
   registerRenderer,
   render,
-  setUpdateFn,
-  setGetStateFn,
-  addUpdateMiddleware,
-  runUpdateMiddleware,
-  addPostRenderHook,
-  runPostRenderHooks,
   projectState,
   setProjectState,
   updateUi,
-  setUpdateSessionFn,
-  toFlat,
-  fromFlat,
 } from "./store.js";
 
 import { activeTab, openTab } from "./workspace/workspace.js";
@@ -36,17 +23,9 @@ import { effect } from "./reactivity.js";
 import { view } from "./view.js";
 
 import { isEditing, isEditableBlock } from "./editor/inline-edit.js";
-import {
-  enterComponentInlineEdit,
-  initComponentInlineEdit,
-} from "./editor/component-inline-edit.js";
+import { initComponentInlineEdit } from "./editor/component-inline-edit.js";
 import { enterInlineEdit } from "./editor/content-inline-edit.js";
-import {
-  initCanvasUtils,
-  applyTransform,
-  positionZoomIndicator,
-  updateActivePanelHeaders,
-} from "./canvas/canvas-utils.js";
+import { initCanvasUtils, applyTransform, positionZoomIndicator } from "./canvas/canvas-utils.js";
 import { initCanvasHelpers, getActivePanel, findCanvasElement } from "./canvas/canvas-helpers.js";
 import { initCanvasRender, renderCanvas } from "./canvas/canvas-render.js";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render.js";
@@ -56,17 +35,11 @@ import {
   setStatusbarRenderer,
   mountStatusbar,
 } from "./panels/statusbar.js";
-import {
-  openFile as _openFile,
-  loadMarkdown as _loadMarkdown,
-  saveFile as _saveFile,
-  exportFile as _exportFile,
-} from "./files/file-ops.js";
+import { openFile, loadMarkdown, saveFile, exportFile } from "./files/file-ops.js";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
-  openFileFromTree as _openFileFromTree,
   openFileInTab,
   setupTreeKeyboard,
 } from "./files/files.js";
@@ -112,13 +85,6 @@ import { initPanelEvents } from "./panels/panel-events.js";
 // These mutable variables are local to studio.js for now. As sections are extracted
 // into their own modules, they will migrate to ctx in store.js.
 
-/** @type {any} */
-let S; // current state (flat compatibility view)
-/** @type {any} */
-let doc = null; // doc slice (persisted, history, autosave)
-/** @type {any} */
-let session = null; // session slice (selection, hover, ui)
-
 /** Creates a display:contents container appended to sp-theme or body, for floating popovers/menus. */
 function createFloatingContainer() {
   const el = document.createElement("div");
@@ -141,9 +107,30 @@ async function navigateToComponent(componentPath) {
     const content = await platform.readFile(componentPath);
     if (!content) return;
     const parsed = JSON.parse(content);
-    S = pushDocument(S, parsed, componentPath);
-    S.dirty = false;
-    ({ doc, session } = fromFlat(S));
+    const tab = activeTab.value;
+    if (!tab) return;
+
+    // Push current state onto the document stack
+    const frame = {
+      document: tab.doc.document,
+      selection: tab.session.selection,
+      documentPath: tab.documentPath,
+      dirty: tab.doc.dirty,
+      mode: tab.doc.mode,
+    };
+    if (!tab.session.documentStack) tab.session.documentStack = [];
+    tab.session.documentStack.push(frame);
+
+    // Load the component
+    tab.doc.document = parsed;
+    tab.doc.dirty = false;
+    tab.doc.mode = /** @type {any} */ (null);
+    tab.documentPath = componentPath;
+    tab.session.selection = null;
+    tab.session.ui.leftTab = "layers";
+    tab.session.ui.activeMedia = null;
+    tab.session.ui.activeSelector = null;
+
     render();
     statusMessage(`Editing component: ${parsed.tagName || componentPath}`);
   } catch (/** @type {any} */ e) {
@@ -153,37 +140,46 @@ async function navigateToComponent(componentPath) {
 }
 
 async function navigateBack() {
-  if (!S.documentStack || S.documentStack.length === 0) return;
-  if (S.dirty && S.documentPath) {
+  const tab = activeTab.value;
+  if (!tab?.session.documentStack || tab.session.documentStack.length === 0) return;
+  if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
-      await platform.writeFile(S.documentPath, JSON.stringify(S.document, null, 2));
+      await platform.writeFile(tab.documentPath, JSON.stringify(tab.doc.document, null, 2));
     } catch (/** @type {any} */ e) {
       const err = /** @type {any} */ (e);
       statusMessage(`Save error: ${err.message}`);
     }
   }
-  S = popDocument(S);
-  ({ doc, session } = fromFlat(S));
+
+  // Pop the stack
+  const frame = /** @type {any} */ (tab.session.documentStack.pop());
+  if (!frame) return;
+  tab.doc.document = frame.document;
+  tab.doc.dirty = frame.dirty;
+  tab.doc.mode = frame.mode;
+  tab.documentPath = frame.documentPath;
+  tab.session.selection = frame.selection;
+  tab.session.ui.leftTab = "layers";
+
   render();
   statusMessage("Returned to parent document");
 }
 
 async function closeFunctionEditor() {
-  const editing = S.ui.editingFunction;
+  const tab = activeTab.value;
+  const editing = /** @type {any} */ (tab?.session.ui.editingFunction);
   if (!editing) return;
   if (view.functionEditor) {
     const currentCode = view.functionEditor.getValue();
     const minResult = await codeService("minify", { code: currentCode });
     const bodyToStore = minResult?.code ?? currentCode;
     if (editing.type === "def") {
-      transactDoc(activeTab.value, (t) =>
-        mutateUpdateDef(t, editing.defName, { body: bodyToStore }),
-      );
+      transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName, { body: bodyToStore }));
     } else if (editing.type === "event") {
-      const node = getNodeAtPath(S.document, editing.path);
+      const node = getNodeAtPath(tab.doc.document, editing.path);
       const current = node?.[editing.eventKey] || {};
-      transactDoc(activeTab.value, (t) =>
+      transactDoc(tab, (t) =>
         mutateUpdateProperty(t, editing.path, editing.eventKey, {
           ...current,
           $prototype: "Function",
@@ -234,13 +230,7 @@ const EMPTY_DOC = {
   ],
 };
 
-S = createState(structuredClone(EMPTY_DOC));
-({ doc, session } = fromFlat(S));
-setGetStateFn(() => S);
-
-// Create the initial reactive tab — this is the canonical state container.
-// The flat `S` object and `_update`/`_updateSession` are kept as a compatibility layer
-// while call sites are progressively migrated to direct reactive mutations.
+// Create the initial reactive tab — the canonical state container.
 openTab({ id: "initial", document: structuredClone(EMPTY_DOC) });
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
@@ -280,23 +270,19 @@ initBlockActionBar({
 });
 
 initComponentInlineEdit({ findCanvasElement });
-initCanvasHelpers({ getCanvasMode: () => canvasMode, getZoom: () => S.ui.zoom });
+initCanvasHelpers({
+  getCanvasMode: () => canvasMode,
+  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
+});
 initCanvasUtils({
   getCanvasMode: () => canvasMode,
-  getZoom: () => S.ui.zoom,
+  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
   setZoomDirect: (zoom) => {
-    session = { ...session, ui: { ...session.ui, zoom } };
-    S = toFlat(doc, session);
     if (activeTab.value) activeTab.value.session.ui.zoom = zoom;
   },
   renderStylebookOverlays,
 });
 initPanelEvents({
-  getState: () => S,
-  setState: (s) => {
-    S = s;
-    ({ doc, session } = fromFlat(S));
-  },
   getCanvasMode: () => canvasMode,
   enterInlineEdit,
   navigateToComponent,
@@ -383,14 +369,14 @@ registerRenderer("leftPanel", () => leftPanelMod.render());
 registerRenderer("canvas", () => renderCanvas());
 registerRenderer("rightPanel", () => rightPanelMod.render());
 registerRenderer("overlays", () => overlaysPanel.render());
-setStatusbarRenderer(() => renderStatusbar(S));
+setStatusbarRenderer(() => renderStatusbar());
 mountStatusbar();
 mountActivityBar();
 
 // Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
 canvasWrap.addEventListener("click", (/** @type {any} */ e) => {
   if (e.target !== canvasWrap && e.target !== view.panzoomWrap) return;
-  if (!S.selection) return;
+  if (!activeTab.value?.session.selection) return;
   activeTab.value.session.selection = null;
 });
 
@@ -398,80 +384,7 @@ function safeRenderRightPanel() {
   rightPanelMod.render();
 }
 
-// Register the update implementation with the store
-setGetStateFn(() => S);
-setUpdateFn(function _update(/** @type {any} */ newState) {
-  const prevDoc = S.document;
-  const prevSel = S.selection;
-  const prevUi = S.ui;
-  S = newState;
-
-  // Keep doc/session slices in sync with flat S
-  ({ doc, session } = fromFlat(S));
-
-  // Sync into reactive tab so effects fire
-  const tab = activeTab.value;
-  if (tab) {
-    tab.doc.document = S.document;
-    tab.doc.dirty = S.dirty;
-    tab.doc.mode = S.mode;
-    tab.doc.handlersSource = S.handlersSource;
-    tab.doc.content.frontmatter = S.content?.frontmatter ?? {};
-    tab.session.selection = S.selection;
-    tab.session.hover = S.hover;
-    tab.session.clipboard = S.clipboard ?? null;
-    for (const [k, v] of Object.entries(S.ui || {})) {
-      /** @type {any} */ (tab.session.ui)[k] = v;
-    }
-    tab.session.canvas.status = S.canvas?.status ?? "idle";
-    tab.session.canvas.scope = S.canvas?.scope ?? null;
-    tab.session.canvas.error = S.canvas?.error ?? null;
-  }
-
-  if (prevUi?.activeMedia !== S.ui?.activeMedia) {
-    updateActivePanelHeaders();
-  }
-
-  runPostRenderHooks(prevDoc, prevSel);
-  runUpdateMiddleware(S);
-});
-
-// Register session dispatch — lightweight path for selection/hover/ui changes
-setUpdateSessionFn(function _updateSession(/** @type {any} */ patch) {
-  const prev = session;
-  session = { ...session, ...patch };
-  if (patch.ui) {
-    session.ui = { ...prev.ui, ...patch.ui };
-  }
-  if (patch.canvas) {
-    session.canvas = { ...prev.canvas, ...patch.canvas };
-  }
-  S = toFlat(doc, session);
-
-  if (prev.ui?.activeMedia !== session.ui?.activeMedia) {
-    updateActivePanelHeaders();
-  }
-
-  // Process pending inline edit when canvas becomes ready
-  const canvasChanged = prev.canvas !== session.canvas;
-  if (canvasChanged && session.canvas.status === "ready" && session.ui?.pendingInlineEdit) {
-    const { path, mediaName: mn } = session.ui.pendingInlineEdit;
-    updateUi("pendingInlineEdit", null);
-    const targetPanel =
-      canvasPanels.find((/** @type {any} */ p) => p.mediaName === mn) || canvasPanels[0];
-    if (targetPanel) {
-      const el = findCanvasElement(path, targetPanel.canvas);
-      if (el) enterComponentInlineEdit(el, path);
-    }
-  }
-
-  runPostRenderHooks(doc.document, prev.selection);
-});
-
-// Register post-render hook for pseudo-state preview
-addPostRenderHook(() => updateForcedPseudoPreview());
-
-// Now that renderers and update are registered, bootstrap
+// Now that renderers are registered, bootstrap
 registerFunctionCompletions();
 
 const _openParam = new URLSearchParams(location.search).get("open");
@@ -544,31 +457,29 @@ if (_openParam) {
         const fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          let parsedDoc;
-          if (fileRelPath.endsWith(".md")) {
-            const ns = await _loadMarkdown(content, null);
-            S = ns;
-            S.documentPath = fileRelPath;
-            parsedDoc = S.document;
+          let parsedDoc, frontmatter;
+          const isMd = fileRelPath.endsWith(".md");
+          if (isMd) {
+            const result = await loadMarkdown(content);
+            parsedDoc = result.document;
+            frontmatter = result.frontmatter;
           } else {
             parsedDoc = JSON.parse(content);
-            S = createState(parsedDoc);
-            S.documentPath = fileRelPath;
           }
-          S.dirty = false;
-          S.ui = { ...S.ui, leftTab: "files" };
-          ({ doc, session } = fromFlat(S));
 
-          // Sync into reactive tab
-          const tab = activeTab.value;
-          if (tab) {
-            tab.doc.document = S.document;
-            tab.doc.mode = S.mode;
-            tab.doc.dirty = false;
-            tab.doc.content = S.content || { frontmatter: {} };
-            /** @type {any} */ (tab).documentPath = fileRelPath;
-            tab.session.ui.leftTab = "files";
-          }
+          // Open in a tab (replaces initial tab)
+          const { closeTab } = await import("./workspace/workspace.js");
+          closeTab("initial");
+          openTab({
+            id: fileRelPath,
+            documentPath: fileRelPath,
+            document: parsedDoc,
+            frontmatter,
+            sourceFormat: isMd ? "md" : null,
+          });
+
+          if (isMd && activeTab.value) activeTab.value.doc.mode = "content";
+          if (activeTab.value) activeTab.value.session.ui.leftTab = "files";
 
           render();
           statusMessage(`Opened ${_openParam}`);
@@ -609,35 +520,6 @@ function renderLeftPanel() {
 
 // ─── Source/Function editors: delegated to panels/editors.js ─────────────────
 
-// ─── Toolbar (delegated to panels/toolbar.js) ────────────────────────────────
-
-function renderToolbar() {
-  toolbarPanel.render();
-}
-
-// ─── File Operations (delegated to file-ops.js) ─────────────────────────────
-
-function fileOpsCtx() {
-  return {
-    S,
-    commit: (/** @type {any} */ ns) => {
-      S = ns;
-      ({ doc, session } = fromFlat(S));
-      render();
-    },
-    renderToolbar,
-  };
-}
-function openFile() {
-  return _openFile(fileOpsCtx());
-}
-function saveFile() {
-  return _saveFile(fileOpsCtx());
-}
-function exportFile() {
-  return _exportFile(fileOpsCtx());
-}
-
 // ─── File tree (delegated to files.js) ───────────────────────────────────────
 
 function loadProject() {
@@ -645,11 +527,6 @@ function loadProject() {
 }
 function openProject() {
   return _openProject({
-    S,
-    commit: (/** @type {any} */ ns) => {
-      S = ns;
-      ({ doc, session } = fromFlat(S));
-    },
     renderActivityBar: () => renderActivityBar(),
     renderLeftPanel,
   });
@@ -663,11 +540,6 @@ function openFileFromTree(/** @type {any} */ path) {
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
 initShortcuts(() => ({
-  S,
-  setS: (ns) => {
-    S = ns;
-    ({ doc, session } = fromFlat(S));
-  },
   canvasMode,
   panX: view.panX,
   panY: view.panY,
@@ -700,21 +572,23 @@ initShortcuts(() => ({
 const AUTO_SAVE_DELAY = 2000;
 
 function scheduleAutosave() {
-  if (!S.fileHandle || !S.dirty) return;
+  const tab = activeTab.value;
+  if (!tab?.fileHandle || !tab.doc.dirty) return;
   clearTimeout(view.autosaveTimer);
   view.autosaveTimer = setTimeout(async () => {
-    if (S.fileHandle && S.dirty && "createWritable" in S.fileHandle) {
+    const t = activeTab.value;
+    if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
       try {
-        const writable = await S.fileHandle.createWritable();
-        await writable.write(JSON.stringify(S.document, null, 2));
+        const writable = await t.fileHandle.createWritable();
+        await writable.write(JSON.stringify(t.doc.document, null, 2));
         await writable.close();
-        activeTab.value.doc.dirty = false;
+        t.doc.dirty = false;
         statusMessage("Auto-saved");
       } catch {}
     }
   }, AUTO_SAVE_DELAY);
 }
 
-addUpdateMiddleware((/** @type {any} */ state) => {
-  if (state.dirty) scheduleAutosave();
+effect(() => {
+  if (activeTab.value?.doc.dirty) scheduleAutosave();
 });

@@ -7,26 +7,25 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 
-import { getState, renderOnly, canvasWrap, canvasPanels, getNodeAtPath } from "../store.js";
+import { renderOnly, canvasWrap, canvasPanels, getNodeAtPath } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { codeService, setLintMarkers, getFunctionArgs } from "../services/code-services.js";
 
 function getFunctionBody(/** @type {any} */ editing) {
-  const S = getState();
+  const document = activeTab.value?.doc.document;
   if (editing.type === "def") {
-    return S.document.state?.[editing.defName]?.body || "";
+    return document?.state?.[editing.defName]?.body || "";
   } else if (editing.type === "event") {
-    const node = getNodeAtPath(S.document, editing.path);
+    const node = getNodeAtPath(document, editing.path);
     return node?.[editing.eventKey]?.body || "";
   }
   return "";
 }
 
 export function renderFunctionEditor() {
-  const S = getState();
-  const editing = S.ui.editingFunction;
+  const editing = activeTab.value?.session.ui.editingFunction;
 
   // If editor already exists and matches current target, just sync value
   if (view.functionEditor && view.functionEditor._editingTarget === JSON.stringify(editing)) {
@@ -76,7 +75,7 @@ export function renderFunctionEditor() {
   );
 
   const body = getFunctionBody(editing);
-  const args = getFunctionArgs(editing, S);
+  const args = getFunctionArgs(editing, activeTab.value?.doc.document);
 
   view.functionEditor = monaco.editor.create(/** @type {any} */ (editorContainer), {
     value: body,
@@ -120,14 +119,14 @@ export function renderFunctionEditor() {
     clearTimeout(syncDebounce);
     syncDebounce = setTimeout(() => {
       const newBody = view.functionEditor.getValue();
-      if (editing.type === "def") {
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, editing.defName, { body: newBody }));
-      } else if (editing.type === "event") {
-        const S = getState();
-        const node = getNodeAtPath(S.document, editing.path);
-        const current = node?.[editing.eventKey] || {};
+      const ed = /** @type {any} */ (editing);
+      if (ed.type === "def") {
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, ed.defName, { body: newBody }));
+      } else if (ed.type === "event") {
+        const node = getNodeAtPath(activeTab.value?.doc.document, ed.path);
+        const current = node?.[ed.eventKey] || {};
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateProperty(t, editing.path, editing.eventKey, {
+          mutateUpdateProperty(t, ed.path, ed.eventKey, {
             ...current,
             $prototype: "Function",
             body: newBody,
@@ -157,8 +156,7 @@ export function registerFunctionCompletions() {
   monaco.languages.registerCompletionItemProvider("javascript", {
     triggerCharacters: ["."],
     provideCompletionItems(model, position) {
-      const S = getState();
-      const defs = S?.document?.state || {};
+      const defs = activeTab.value?.doc.document?.state || {};
       const word = model.getWordUntilPosition(position);
       const range = {
         startLineNumber: position.lineNumber,

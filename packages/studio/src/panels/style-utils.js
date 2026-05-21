@@ -1,6 +1,7 @@
 /** Style utilities — pure CSS helper functions used by the style panel. */
 
-import { getState, getNodeAtPath } from "../store.js";
+import { getNodeAtPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { camelToKebab } from "../utils/studio-utils.js";
 import cssMeta from "../../data/css-meta.json";
 
@@ -159,8 +160,7 @@ export function compressBorderSide(/** @type {string[]} */ vals) {
 
 /** Extract --font-* CSS custom properties from the document root style. */
 export function getFontVars() {
-  const S = getState();
-  const style = S.document?.style;
+  const style = activeTab.value?.doc.document?.style;
   if (!style) return [];
   const vars = [];
   for (const [k, v] of Object.entries(style)) {
@@ -181,12 +181,14 @@ export const TYPO_PREVIEW_PROPS = new Set([
 
 /** Resolve the current font family for typography preview (handles var() references) */
 export function currentFontFamily() {
-  const S = getState();
-  const node = S.selection ? getNodeAtPath(S.document, S.selection) : null;
+  const tab = activeTab.value;
+  const node = tab?.session.selection
+    ? getNodeAtPath(tab.doc.document, tab.session.selection)
+    : null;
   const raw = node?.style?.fontFamily;
   if (!raw) return "";
   const m = typeof raw === "string" && raw.match(/^var\((--[^)]+)\)$/);
-  if (m) return S.document?.style?.[m[1]] || "";
+  if (m) return tab?.doc.document?.style?.[m[1]] || "";
   return raw;
 }
 

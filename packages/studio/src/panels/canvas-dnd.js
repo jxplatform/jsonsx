@@ -8,14 +8,8 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
-import {
-  getState,
-  elToPath,
-  canvasPanels,
-  getNodeAtPath,
-  VOID_ELEMENTS,
-  isAncestor,
-} from "../store.js";
+import { elToPath, canvasPanels, getNodeAtPath, VOID_ELEMENTS, isAncestor } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { applyDropInstruction } from "../panels/dnd.js";
 import { effectiveZoom } from "../canvas/canvas-helpers.js";
@@ -72,12 +66,12 @@ export function registerPanelDnD(panel) {
   });
   view.canvasDndCleanups.push(monitorCleanup);
 
-  const S = getState();
+  const document = activeTab.value?.doc.document;
   for (const el of allEls) {
     const elPath = elToPath.get(el);
     if (!elPath) continue;
 
-    const node = getNodeAtPath(S.document, elPath);
+    const node = getNodeAtPath(document, elPath);
     const tag = (node?.tagName || "div").toLowerCase();
     const hasElementChildren = node?.children?.some(
       (/** @type {unknown} */ c) => c != null && typeof c === "object",

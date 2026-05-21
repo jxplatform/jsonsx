@@ -5,7 +5,6 @@
 
 import { html, nothing } from "lit-html";
 import {
-  getState,
   flattenTree,
   getNodeAtPath,
   pathKey,
@@ -26,14 +25,13 @@ import { showContextMenu } from "../editor/context-menu.js";
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderLayersTemplate(ctx) {
-  const S = getState();
+  const tab = activeTab.value;
 
   for (const fn of view.dndCleanups) fn();
   view.dndCleanups = [];
 
-  const rows = flattenTree(S.document);
-  const _S = /** @type {any} */ (S);
-  const collapsed = _S._collapsed || (_S._collapsed = new Set());
+  const rows = flattenTree(tab?.doc.document);
+  const collapsed = view._layersCollapsed || (view._layersCollapsed = new Set());
 
   /** @type {any[]} */
   const layerRows = [];
@@ -48,7 +46,7 @@ export function renderLayersTemplate(ctx) {
     }
     if (hidden) continue;
 
-    if (S.mode === "content" && path.length === 0) continue;
+    if (tab?.doc.mode === "content" && path.length === 0) continue;
 
     if (nodeType === "text") {
       const textPreview = String(node).length > 40 ? String(node).slice(0, 40) + "…" : String(node);
@@ -66,12 +64,12 @@ export function renderLayersTemplate(ctx) {
 
     if (path.length >= 2 && nodeType === "element") {
       const pPath = parentElementPath(path);
-      const parentNode = pPath ? getNodeAtPath(S.document, pPath) : null;
+      const parentNode = pPath ? getNodeAtPath(tab?.doc.document, pPath) : null;
       if (parentNode && isInlineElement(node, parentNode)) continue;
     }
 
     const key = pathKey(path);
-    const isSelected = pathsEqual(path, S.selection);
+    const isSelected = pathsEqual(path, tab?.session.selection);
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const hasMapChildren =
       node.children && typeof node.children === "object" && node.children.$prototype === "Array";
@@ -115,10 +113,10 @@ export function renderLayersTemplate(ctx) {
     }
 
     const isElement = nodeType === "element";
-    const isRoot = S.mode === "content" ? path.length === 0 : path.length < 2;
+    const isRoot = tab?.doc.mode === "content" ? path.length === 0 : path.length < 2;
     const idx = isElement ? /** @type {number} */ (childIndex(path)) : 0;
     const parentPath = isElement && !isRoot ? /** @type {any} */ (parentElementPath(path)) : null;
-    const parentNode = parentPath ? getNodeAtPath(S.document, parentPath) : null;
+    const parentNode = parentPath ? getNodeAtPath(tab?.doc.document, parentPath) : null;
     const siblingCount = parentNode?.children?.length || 0;
     const canMoveUp = isElement && !isRoot && idx > 0;
     const canMoveDown = isElement && !isRoot && idx < siblingCount - 1;
@@ -144,7 +142,7 @@ export function renderLayersTemplate(ctx) {
         @click=${() => (activeTab.value.session.selection = path)}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>
-              showContextMenu(e, path, getState(), {
+              showContextMenu(e, path, {
                 onEditComponent: ctx.navigateToComponent,
               })
           : nothing}
@@ -207,7 +205,7 @@ export function renderLayersTemplate(ctx) {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
                         const prevPath = [...parentPath, idx - 1];
-                        const prev = getNodeAtPath(getState().document, prevPath);
+                        const prev = getNodeAtPath(activeTab.value?.doc.document, prevPath);
                         const len = prev?.children?.length || 0;
                         transactDoc(activeTab.value, (t) => mutateMoveNode(t, path, prevPath, len));
                       }}

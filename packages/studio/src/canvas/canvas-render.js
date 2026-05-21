@@ -32,6 +32,8 @@ import { registerPanelDnD } from "../panels/canvas-dnd.js";
 import { registerPanelEvents } from "../panels/panel-events.js";
 import { computeDocumentDiff } from "./canvas-diff.js";
 import { updateForcedPseudoPreview } from "../panels/pseudo-preview.js";
+import { findCanvasElement } from "./canvas-helpers.js";
+import { enterComponentInlineEdit } from "../editor/component-inline-edit.js";
 import { renderStylebookMode } from "../panels/stylebook-panel.js";
 import { dismissLinkPopover, dismissBlockActionBar } from "../panels/block-action-bar.js";
 import { dismissContextMenu } from "../editor/context-menu.js";
@@ -481,8 +483,9 @@ function renderCanvasIntoPanel(
       if (gitDiffState && docOverride) {
         // Determine which document is original and which is current
         const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
-        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || tab?.doc.document;
-        const currDoc = isOriginal ? gitDiffState.currentDoc || tab?.doc.document : docOverride;
+        const _tab = activeTab.value;
+        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || _tab?.doc.document;
+        const currDoc = isOriginal ? gitDiffState.currentDoc || _tab?.doc.document : docOverride;
 
         const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
 
@@ -501,6 +504,21 @@ function renderCanvasIntoPanel(
     registerPanelEvents(panel);
     renderOverlays();
     updateForcedPseudoPreview();
+
+    // Process pending inline edit when canvas becomes ready
+    const currentTab = activeTab.value;
+    if (currentTab?.session.ui?.pendingInlineEdit) {
+      const { path, mediaName: mn } = /** @type {{ path: any; mediaName: string }} */ (
+        currentTab.session.ui.pendingInlineEdit
+      );
+      currentTab.session.ui.pendingInlineEdit = null;
+      const targetPanel =
+        canvasPanels.find((/** @type {any} */ p) => p.mediaName === mn) || canvasPanels[0];
+      if (targetPanel) {
+        const el = findCanvasElement(path, targetPanel.canvas);
+        if (el) enterComponentInlineEdit(el, path);
+      }
+    }
   });
 }
 

@@ -15,7 +15,7 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
-import { workspace, openTab, activateTab } from "../workspace/workspace.js";
+import { workspace, openTab, activateTab, activeTab } from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
@@ -79,13 +79,11 @@ export async function loadProject() {
  * Open a project via the platform adapter.
  *
  * @param {{
- *   S: any;
- *   commit: (s: any) => void;
  *   renderActivityBar: () => void;
  *   renderLeftPanel: () => void;
  * }} ctx
  */
-export async function openProject({ S, commit, renderActivityBar, renderLeftPanel }) {
+export async function openProject({ renderActivityBar, renderLeftPanel }) {
   try {
     const platform = getPlatform();
     const result = await platform.openProject();
@@ -129,7 +127,7 @@ export async function openProject({ S, commit, renderActivityBar, renderLeftPane
     }
     projectState.projectDirs = foundDirs;
 
-    commit({ ...S, ui: { ...S.ui, leftTab: "files" } });
+    if (activeTab.value) activeTab.value.session.ui.leftTab = "files";
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
@@ -616,15 +614,21 @@ export async function openFileInTab(path) {
 
     let document, frontmatter;
     if (path.endsWith(".md")) {
-      const state = await loadMarkdown(content, null);
-      document = state.document;
-      frontmatter = state.content?.frontmatter;
+      const result = await loadMarkdown(content);
+      document = result.document;
+      frontmatter = result.frontmatter;
     } else {
       document = JSON.parse(content);
     }
 
     const id = path;
-    openTab({ id, documentPath: path, document, frontmatter });
+    openTab({
+      id,
+      documentPath: path,
+      document,
+      frontmatter,
+      sourceFormat: path.endsWith(".md") ? "md" : null,
+    });
     projectState.selectedPath = path;
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {any} */ e) {

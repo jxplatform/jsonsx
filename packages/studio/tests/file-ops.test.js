@@ -1,46 +1,29 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform.js";
-
 import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-ops.js";
+import { activeTab, openTab, closeTab } from "../src/workspace/workspace.js";
 
 // ─── loadMarkdown ─────────────────────────────────────────────────────────────
 
 describe("loadMarkdown", () => {
   test("returns content state for plain markdown", async () => {
-    const state = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Hello\n\nWorld", null);
-    expect(state.sourceFormat).toBe("md");
-    expect(state.mode).toBe("content");
-    expect(state.dirty).toBe(false);
-    expect(state.document).toBeDefined();
-    expect(state.document.children).toBeDefined();
-    expect(state.content.frontmatter.title).toBe("Test Post");
-  });
-
-  test("stores rawMarkdown source", async () => {
-    const source = "# Hello\n\nWorld";
-    const state = await loadMarkdown(source, null);
-    expect(state.rawMarkdown).toBe(source);
-  });
-
-  test("stores fileHandle reference", async () => {
-    const handle = { name: "test.md" };
-    const state = await loadMarkdown("# Test", handle);
-    expect(state.fileHandle).toBe(handle);
+    const result = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Hello\n\nWorld");
+    expect(result.document).toBeDefined();
+    expect(result.document.children).toBeDefined();
+    expect(result.frontmatter.title).toBe("Test Post");
   });
 
   test("returns component state for hyphenated tagName", async () => {
-    const state = await loadMarkdown("---\ntagName: my-component\n---\n# Content\n", null);
-    expect(state.sourceFormat).toBe("md");
-    expect(state.dirty).toBe(false);
-    expect(state.document.tagName).toBe("my-component");
-    expect(state.mode).not.toBe("content");
+    const result = await loadMarkdown("---\ntagName: my-component\n---\n# Content\n");
+    expect(result.document.tagName).toBe("my-component");
+    expect(result.frontmatter).toEqual({});
   });
 
   test("extracts frontmatter keys excluding children", async () => {
-    const state = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Content doc", null);
-    expect(state.content.frontmatter).toBeDefined();
-    expect(state.content.frontmatter.children).toBeUndefined();
-    expect(state.content.frontmatter.title).toBe("Test Post");
+    const result = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Content doc");
+    expect(result.frontmatter).toBeDefined();
+    expect(result.frontmatter.children).toBeUndefined();
+    expect(result.frontmatter.title).toBe("Test Post");
   });
 });
 
@@ -49,35 +32,14 @@ describe("loadMarkdown", () => {
 describe("openFile", () => {
   beforeEach(() => {
     registerPlatform({});
-    // Clean up any showOpenFilePicker mock
     delete (/** @type {any} */ (window).showOpenFilePicker);
-  });
-
-  test("uses file input fallback when showOpenFilePicker unavailable", async () => {
-    let inputCreated = false;
-    const origCreate = document.createElement.bind(document);
-    document.createElement = (/** @type {any} */ tag, /** @type {any} */ ...args) => {
-      const el = origCreate(tag, ...args);
-      if (tag === "input") {
-        inputCreated = true;
-        el.click = () => {}; // prevent actual click
-      }
-      return el;
-    };
-
-    await openFile({
-      S: {},
-      commit: () => {},
-      renderToolbar: () => {},
-    });
-
-    expect(inputCreated).toBe(true);
-    document.createElement = origCreate;
+    // Close any existing tabs
+    for (const id of activeTab.value ? [activeTab.value.id] : []) {
+      closeTab(id);
+    }
   });
 
   test("opens JSON file via showOpenFilePicker", async () => {
-    /** @type {any} */
-    let committed = null;
     const mockHandle = {
       name: "component.json",
       getFile: async () => ({
@@ -86,25 +48,15 @@ describe("openFile", () => {
     };
     /** @type {any} */ (window).showOpenFilePicker = async () => [mockHandle];
 
-    registerPlatform({ locateFile: () => "pages/component.json" });
+    await openFile();
 
-    await openFile({
-      S: {},
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
-    });
-
-    expect(committed).not.toBeNull();
-    expect(committed.document.tagName).toBe("div");
-    expect(committed.fileHandle).toBe(mockHandle);
-    expect(committed.dirty).toBe(false);
+    const tab = activeTab.value;
+    expect(tab).not.toBeNull();
+    expect(tab.doc.document.tagName).toBe("div");
+    expect(tab.doc.dirty).toBe(false);
   });
 
   test("opens markdown file via showOpenFilePicker", async () => {
-    /** @type {any} */
-    let committed = null;
     const mockHandle = {
       name: "post.md",
       getFile: async () => ({
@@ -113,17 +65,12 @@ describe("openFile", () => {
     };
     /** @type {any} */ (window).showOpenFilePicker = async () => [mockHandle];
 
-    await openFile({
-      S: {},
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
-    });
+    await openFile();
 
-    expect(committed).not.toBeNull();
-    expect(committed.sourceFormat).toBe("md");
-    expect(committed.fileHandle).toBe(mockHandle);
+    const tab = activeTab.value;
+    expect(tab).not.toBeNull();
+    expect(tab.doc.sourceFormat).toBe("md");
+    expect(/** @type {any} */ (tab).fileHandle).toEqual(mockHandle);
   });
 
   test("handles AbortError silently", async () => {
@@ -134,17 +81,20 @@ describe("openFile", () => {
     };
 
     // Should not throw
-    await openFile({
-      S: {},
-      commit: () => {},
-      renderToolbar: () => {},
-    });
+    await openFile();
   });
 });
 
 // ─── saveFile ─────────────────────────────────────────────────────────────────
 
 describe("saveFile", () => {
+  beforeEach(() => {
+    // Close existing tabs and open a fresh one for each test
+    for (const id of activeTab.value ? [activeTab.value.id] : []) {
+      closeTab(id);
+    }
+  });
+
   test("saves via platform when documentPath exists", async () => {
     /** @type {any} */
     let written = null;
@@ -154,23 +104,18 @@ describe("saveFile", () => {
       },
     });
 
-    /** @type {any} */
-    let committed = null;
-    await saveFile({
-      S: {
-        documentPath: "pages/index.json",
-        document: { tagName: "div", children: [] },
-        mode: "component",
-      },
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
+    openTab({
+      id: "test-save",
+      documentPath: "pages/index.json",
+      document: { tagName: "div", children: [] },
     });
+    activeTab.value.doc.dirty = true;
+
+    await saveFile();
 
     expect(written).not.toBeNull();
     expect(written.path).toBe("pages/index.json");
-    expect(committed.dirty).toBe(false);
+    expect(activeTab.value.doc.dirty).toBe(false);
   });
 
   test("saves via File System Access API when fileHandle exists", async () => {
@@ -185,32 +130,28 @@ describe("saveFile", () => {
     };
 
     registerPlatform({});
-    /** @type {any} */
-    let committed = null;
-    await saveFile({
-      S: {
-        fileHandle: mockHandle,
-        document: { tagName: "div", children: [] },
-        mode: "component",
-      },
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
+    openTab({
+      id: "test-save-fs",
+      fileHandle: /** @type {any} */ (mockHandle),
+      document: { tagName: "div", children: [] },
     });
+    activeTab.value.doc.dirty = true;
+
+    await saveFile();
 
     expect(writtenContent).not.toBeNull();
-    expect(committed.dirty).toBe(false);
+    expect(activeTab.value.doc.dirty).toBe(false);
   });
 
   test("shows message when no save target", async () => {
     registerPlatform({});
-    // Should not throw
-    await saveFile({
-      S: { document: { tagName: "div" }, mode: "component" },
-      commit: () => {},
-      renderToolbar: () => {},
+    openTab({
+      id: "test-no-target",
+      document: { tagName: "div" },
     });
+
+    // Should not throw
+    await saveFile();
   });
 
   test("serializes markdown source format with jxDocToMd", async () => {
@@ -221,16 +162,15 @@ describe("saveFile", () => {
       },
     });
 
-    await saveFile({
-      S: {
-        documentPath: "pages/post.md",
-        sourceFormat: "md",
-        document: { tagName: "div", children: [{ tagName: "p", textContent: "Hello" }] },
-        mode: "component",
-      },
-      commit: () => {},
-      renderToolbar: () => {},
+    openTab({
+      id: "test-md-save",
+      documentPath: "pages/post.md",
+      document: { tagName: "div", children: [{ tagName: "p", textContent: "Hello" }] },
+      sourceFormat: "md",
     });
+    activeTab.value.doc.dirty = true;
+
+    await saveFile();
 
     expect(writtenContent).toBeDefined();
     expect(typeof writtenContent).toBe("string");
@@ -243,15 +183,14 @@ describe("saveFile", () => {
       },
     });
 
-    await saveFile({
-      S: {
-        documentPath: "pages/index.json",
-        document: { tagName: "div" },
-        mode: "component",
-      },
-      commit: () => {},
-      renderToolbar: () => {},
+    openTab({
+      id: "test-error",
+      documentPath: "pages/index.json",
+      document: { tagName: "div" },
     });
+
+    // Should not throw
+    await saveFile();
   });
 });
 
@@ -260,6 +199,9 @@ describe("saveFile", () => {
 describe("exportFile", () => {
   beforeEach(() => {
     delete (/** @type {any} */ (window).showSaveFilePicker);
+    for (const id of activeTab.value ? [activeTab.value.id] : []) {
+      closeTab(id);
+    }
   });
 
   test("exports via showSaveFilePicker when available", async () => {
@@ -275,21 +217,15 @@ describe("exportFile", () => {
     };
     /** @type {any} */ (window).showSaveFilePicker = async () => mockHandle;
 
-    /** @type {any} */
-    let committed = null;
-    await exportFile({
-      S: {
-        document: { tagName: "div", children: [] },
-        mode: "component",
-      },
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
+    openTab({
+      id: "test-export",
+      document: { tagName: "div", children: [] },
     });
 
+    await exportFile();
+
     expect(writtenContent).not.toBeNull();
-    expect(committed.dirty).toBe(false);
+    expect(activeTab.value.doc.dirty).toBe(false);
   });
 
   test("falls back to download when showSaveFilePicker unavailable", async () => {
@@ -305,21 +241,15 @@ describe("exportFile", () => {
       return el;
     };
 
-    /** @type {any} */
-    let committed = null;
-    await exportFile({
-      S: {
-        document: { tagName: "div", children: [] },
-        mode: "component",
-      },
-      commit: (/** @type {any} */ s) => {
-        committed = s;
-      },
-      renderToolbar: () => {},
+    openTab({
+      id: "test-download",
+      document: { tagName: "div", children: [] },
     });
 
+    await exportFile();
+
     expect(clickedLink).toBe(true);
-    expect(committed.dirty).toBe(false);
+    expect(activeTab.value.doc.dirty).toBe(false);
     document.createElement = origCreate;
   });
 
@@ -337,15 +267,16 @@ describe("exportFile", () => {
       return el;
     };
 
-    await exportFile({
-      S: {
-        document: { children: [{ tagName: "p", textContent: "Hello" }] },
-        mode: "content",
-        content: { frontmatter: {} },
-      },
-      commit: () => {},
-      renderToolbar: () => {},
+    openTab({
+      id: "test-md-export",
+      document: { children: [{ tagName: "p", textContent: "Hello" }] },
+      sourceFormat: "md",
     });
+    // Content mode is set by sourceFormat being "md" in createTab
+    // But for this test we need mode=content explicitly
+    activeTab.value.doc.mode = "content";
+
+    await exportFile();
 
     expect(downloadName).toBe("content.md");
     document.createElement = origCreate;
@@ -358,10 +289,11 @@ describe("exportFile", () => {
       throw error;
     };
 
-    await exportFile({
-      S: { document: { tagName: "div" }, mode: "component" },
-      commit: () => {},
-      renderToolbar: () => {},
+    openTab({
+      id: "test-abort",
+      document: { tagName: "div" },
     });
+
+    await exportFile();
   });
 });

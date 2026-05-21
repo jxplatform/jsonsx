@@ -45,6 +45,7 @@ import { reactive, effectScope } from "../reactivity.js";
  *     document: Record<string, any>;
  *     content: { frontmatter: Record<string, unknown> };
  *     mode: string;
+ *     sourceFormat: string | null;
  *     handlersSource: string | null;
  *     dirty: boolean;
  *   };
@@ -106,10 +107,18 @@ function createDefaultUi() {
  *   fileHandle?: FileSystemFileHandle | null;
  *   document: Record<string, any>;
  *   frontmatter?: Record<string, unknown>;
+ *   sourceFormat?: string | null;
  * }} opts
  * @returns {Tab}
  */
-export function createTab({ id, documentPath = null, fileHandle = null, document, frontmatter }) {
+export function createTab({
+  id,
+  documentPath = null,
+  fileHandle = null,
+  document,
+  frontmatter,
+  sourceFormat = null,
+}) {
   const scope = effectScope();
 
   const tab = /** @type {Tab} */ (
@@ -120,8 +129,14 @@ export function createTab({ id, documentPath = null, fileHandle = null, document
       scope,
       doc: reactive({
         document,
+        sourceFormat,
         content: { frontmatter: frontmatter || {} },
-        mode: documentPath?.endsWith(".md") ? "content" : "component",
+        mode:
+          sourceFormat === "md"
+            ? "content"
+            : documentPath?.endsWith(".md")
+              ? "content"
+              : "component",
         handlersSource: null,
         dirty: false,
       }),

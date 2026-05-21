@@ -4,7 +4,6 @@
  */
 
 import {
-  getState,
   renderOnly,
   getNodeAtPath,
   parentElementPath,
@@ -44,8 +43,7 @@ export function enterInlineEdit(el, path) {
       /** @type {any} */ children,
       /** @type {any} */ textContent,
     ) {
-      const S = getState();
-      const node = getNodeAtPath(S.document, commitPath);
+      const node = getNodeAtPath(activeTab.value?.doc.document, commitPath);
       if (children) {
         if (node && JSON.stringify(node.children) === JSON.stringify(children)) return;
         transactDoc(activeTab.value, (t) => {

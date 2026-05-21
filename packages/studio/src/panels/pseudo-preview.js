@@ -3,7 +3,8 @@
  * :focus, etc.) is active in the style sidebar, force those styles onto the selected element.
  */
 
-import { getState, getNodeAtPath } from "../store.js";
+import { getNodeAtPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { getActivePanel, findCanvasElement } from "../canvas/canvas-helpers.js";
 
@@ -21,20 +22,20 @@ export function updateForcedPseudoPreview() {
     view.forcedAttrEl = null;
   }
 
-  const S = getState();
-  const sel = S.ui?.activeSelector;
-  if (!sel || !sel.startsWith(":") || !S.selection) return;
+  const tab = activeTab.value;
+  const sel = tab?.session.ui?.activeSelector;
+  if (!sel || !sel.startsWith(":") || !tab?.session.selection) return;
 
   const panel = getActivePanel();
   if (!panel) return;
-  const el = findCanvasElement(S.selection, panel.canvas);
+  const el = findCanvasElement(tab.session.selection, panel.canvas);
   if (!el) return;
 
-  const node = getNodeAtPath(S.document, S.selection);
+  const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node?.style) return;
-  const activeTab = S.ui.activeMedia;
+  const activeMedia = tab.session.ui.activeMedia;
   /** @type {any} */
-  const ctx = activeTab ? node.style[`@${activeTab}`] || {} : node.style;
+  const ctx = activeMedia ? node.style[`@${activeMedia}`] || {} : node.style;
   const rules = ctx[sel];
   if (!rules || typeof rules !== "object") return;
 

@@ -1,7 +1,7 @@
 /** Elements panel — block/component palette with categorized accordion and search filter. */
 
 import { html, nothing } from "lit-html";
-import { getState, getNodeAtPath } from "../store.js";
+import { getNodeAtPath } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateInsertNode } from "../tabs/transact.js";
 import { view } from "../view.js";
@@ -13,7 +13,7 @@ import { componentRegistry } from "../files/components.js";
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderElementsTemplate(ctx) {
-  const S = getState();
+  const tab = activeTab.value;
 
   const categories = Object.entries(ctx.webdata.elements).map(
     (/** @type {any} */ [category, elements]) => {
@@ -38,12 +38,12 @@ export function renderElementsTemplate(ctx) {
                 class="element-card"
                 data-block-tag=${tag}
                 @click=${() => {
-                  const s = getState();
-                  const parentPath = s.selection || [];
-                  const parent = getNodeAtPath(s.document, parentPath);
+                  const t = activeTab.value;
+                  const parentPath = t?.session.selection || [];
+                  const parent = getNodeAtPath(t?.doc.document, parentPath);
                   const idx = parent?.children ? parent.children.length : 0;
-                  transactDoc(activeTab.value, (t) =>
-                    mutateInsertNode(t, parentPath, idx, structuredClone(def)),
+                  transactDoc(t, (tr) =>
+                    mutateInsertNode(tr, parentPath, idx, structuredClone(def)),
                   );
                 }}
               >
@@ -57,7 +57,7 @@ export function renderElementsTemplate(ctx) {
     },
   );
 
-  const effectiveEls = getEffectiveElements(S.document?.$elements);
+  const effectiveEls = getEffectiveElements(tab?.doc.document?.$elements);
   /** @type {Set<string>} */
   const enabledTags = new Set();
   for (const entry of effectiveEls) {
@@ -105,9 +105,9 @@ export function renderElementsTemplate(ctx) {
                       ? `${comp.package}: <${comp.tagName}>`
                       : comp.path}
                     @click=${() => {
-                      const s = getState();
-                      const parentPath = s.selection || [];
-                      const parent = getNodeAtPath(s.document, parentPath);
+                      const t = activeTab.value;
+                      const parentPath = t?.session.selection || [];
+                      const parent = getNodeAtPath(t?.doc.document, parentPath);
                       const idx = parent?.children ? parent.children.length : 0;
                       const instanceDef = {
                         tagName: comp.tagName,
@@ -118,8 +118,8 @@ export function renderElementsTemplate(ctx) {
                           ]),
                         ),
                       };
-                      transactDoc(activeTab.value, (t) =>
-                        mutateInsertNode(t, parentPath, idx, structuredClone(instanceDef)),
+                      transactDoc(t, (tr) =>
+                        mutateInsertNode(tr, parentPath, idx, structuredClone(instanceDef)),
                       );
                     }}
                   >

@@ -52,6 +52,7 @@ export const activeTab = /** @type {any} */ (
  *   fileHandle?: FileSystemFileHandle | null;
  *   document: Record<string, any>;
  *   frontmatter?: Record<string, unknown>;
+ *   sourceFormat?: string | null;
  * }} opts
  * @returns {Tab}
  */

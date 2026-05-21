@@ -4,7 +4,6 @@
  */
 
 import {
-  getState,
   updateUi,
   renderOnly,
   getNodeAtPath,
@@ -48,8 +47,7 @@ export function enterComponentInlineEdit(el, path) {
     return;
   }
 
-  const S = getState();
-  const node = getNodeAtPath(S.document, path);
+  const node = getNodeAtPath(activeTab.value?.doc.document, path);
   if (!node) return;
 
   const tc = node.textContent;
