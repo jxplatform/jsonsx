@@ -168,8 +168,7 @@ export function applyTransform() {
   if (!view.panzoomWrap) return;
   const zoom = _ctx.getZoom();
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
-  const label = document.querySelector(".zoom-indicator-label");
-  if (label) label.textContent = `${Math.round(zoom * 100)}%`;
+  renderZoomIndicator();
   renderOnly("overlays");
   if (_ctx.getCanvasMode() === "settings") _ctx.renderStylebookOverlays();
 }
