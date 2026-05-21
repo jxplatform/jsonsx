@@ -40,7 +40,7 @@ export async function handleResolve(req, root) {
     const docAbsDir = resolve(root, "." + docDir);
     for (const [k, v] of Object.entries(config)) {
       if (typeof v === "string" && (v.startsWith("./") || v.startsWith("../"))) {
-        config[k] = "./" + relative(process.cwd(), resolve(docAbsDir, v));
+        config[k] = "./" + relative(process.cwd(), resolve(docAbsDir, v)).split("\\").join("/");
       }
     }
   }

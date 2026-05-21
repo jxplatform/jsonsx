@@ -1,4 +1,4 @@
-import { readdir, readFile, writeFile, unlink, rename, stat, mkdir } from "node:fs/promises";
+import { readdir, readFile, writeFile, rename, stat, mkdir, rm } from "node:fs/promises";
 import { resolve, relative, join, basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
@@ -95,8 +95,18 @@ export async function handleReadFile(params: { path: string }): Promise<string> 
 
 export async function handleReadFileAsDataUrl(params: { path: string }): Promise<string> {
   const root = requireRoot();
-  const abs = resolve(root, params.path);
+  let abs = resolve(root, params.path);
   assertUnderRoot(abs, root);
+
+  if (!existsSync(abs)) {
+    const publicAbs = resolve(root, "public", params.path);
+    assertUnderRoot(publicAbs, root);
+    if (!existsSync(publicAbs)) {
+      throw new Error(`File not found: ${params.path}`);
+    }
+    abs = publicAbs;
+  }
+
   const buffer = await readFile(abs);
   const base64 = Buffer.from(buffer).toString("base64");
   const ext = params.path.split(".").pop()?.toLowerCase() || "";
@@ -126,7 +136,7 @@ export async function handleDeleteFile(params: { path: string }): Promise<void> 
   const root = requireRoot();
   const abs = resolve(root, params.path);
   assertUnderRoot(abs, root);
-  await unlink(abs);
+  await rm(abs, { force: true, maxRetries: 3, retryDelay: 100 });
 }
 
 export async function handleRenameFile(params: { from: string; to: string }): Promise<void> {

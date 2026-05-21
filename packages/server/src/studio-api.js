@@ -203,11 +203,13 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       const home = process.env.HOME || process.env.USERPROFILE || "";
       if (!home) return Response.json({ path: null });
       const glob = new Bun.Glob(`**/${name}/project.json`);
-      for await (const match of glob.scan({ cwd: home, dot: false })) {
-        if (match.includes("node_modules") || match.includes(".Trash")) continue;
-        const abs = resolve(home, dirname(match));
-        return Response.json({ path: abs });
-      }
+      try {
+        for await (const match of glob.scan({ cwd: home, dot: false })) {
+          if (match.includes("node_modules") || match.includes(".Trash")) continue;
+          const abs = resolve(home, dirname(match));
+          return Response.json({ path: abs });
+        }
+      } catch {}
       return Response.json({ path: null });
     } catch (/** @type {any} */ e) {
       return Response.json({ error: e.message }, { status: 500 });

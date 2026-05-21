@@ -1,4 +1,5 @@
 import { Electroview } from "electrobun/view";
+import { html, render as litRender } from "lit-html";
 import type { StudioRPC } from "./rpc-schema";
 
 export function createDesktopPlatform() {
@@ -38,7 +39,17 @@ export function createDesktopPlatform() {
           headers: { "content-type": mime },
         });
       } catch {
-        return new Response("Not Found", { status: 404 });
+        try {
+          const content = await rpc.request.readFile({ path: `public/${path}` });
+          const ext = path.split(".").pop() || "";
+          const mime = ext === "json" ? "application/json" : "text/plain";
+          return new Response(content as string, {
+            status: 200,
+            headers: { "content-type": mime },
+          });
+        } catch {
+          return new Response("Not Found", { status: 404 });
+        }
       }
     }
     return originalFetch(input, init);
@@ -200,21 +211,22 @@ export function createDesktopPlatform() {
 }
 
 function showUpdateToast(version: string, rpc: any) {
-  const toast = document.createElement("sp-toast") as any;
-  toast.open = true;
-  toast.variant = "info";
-  toast.textContent = `Version ${version} is ready`;
-
-  const btn = document.createElement("sp-button");
-  btn.setAttribute("slot", "action");
-  btn.setAttribute("variant", "overBackground");
-  btn.textContent = "Restart to update";
-  btn.addEventListener("click", () => {
-    rpc.request.updaterApplyUpdate();
-  });
-
-  toast.appendChild(btn);
-  toast.style.cssText =
-    "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999";
-  document.body.appendChild(toast);
+  const container = document.createElement("div");
+  container.className = "update-toast-container";
+  litRender(
+    html`
+      <sp-toast open variant="info">
+        Version ${version} is ready
+        <sp-button
+          slot="action"
+          variant="overBackground"
+          @click=${() => rpc.request.updaterApplyUpdate()}
+        >
+          Restart to update
+        </sp-button>
+      </sp-toast>
+    `,
+    container,
+  );
+  document.body.appendChild(container);
 }

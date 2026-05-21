@@ -177,7 +177,7 @@ export async function buildSite(projectRoot, options = {}) {
     for (const [, doc] of componentDefs) {
       const entries = collectServerEntries(doc);
       for (const entry of entries) {
-        const resolvedSrc = "./" + join("components", entry.src.replace(/^\.\//, ""));
+        const resolvedSrc = "./components/" + entry.src.replace(/^\.\//, "");
         siteServerEntries.push({ exportName: entry.exportName, src: resolvedSrc });
       }
     }
