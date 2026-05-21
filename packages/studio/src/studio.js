@@ -463,7 +463,7 @@ setUpdateSessionFn(function _updateSession(/** @type {any} */ patch) {
       console.error("renderCanvas error:", e);
     }
     safeRenderLeftPanel();
-  } else if (selChanged || leftUiChanged || canvasChanged) {
+  } else if (selChanged || leftUiChanged) {
     safeRenderLeftPanel();
   }
 

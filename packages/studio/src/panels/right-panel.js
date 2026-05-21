@@ -9,22 +9,33 @@ import { getState, updateUi, rightPanel, subscribe } from "../store.js";
 import { tabIcon } from "./activity-bar.js";
 import { eventsSidebarTemplate } from "./events-panel.js";
 import { isCustomElementDoc } from "./signals-panel.js";
-import { ensureLitState } from "./shared.js";
+
 import { isColorPopoverOpen } from "../ui/color-selector.js";
 import { renderStylePanelTemplate } from "./style-panel.js";
 import { renderPropertiesPanelTemplate } from "./properties-panel.js";
 
-/** @type {any} */
+/**
+ * @typedef {{
+ *   navigateToComponent: (path: string) => void;
+ *   getCanvasMode: () => string;
+ *   renderCanvas: () => void;
+ *   updateForcedPseudoPreview: () => void;
+ * }} RightPanelCtx
+ */
+
+/** @type {RightPanelCtx | null} */
 let _ctx = null;
 
 /** @type {(() => void) | null} */
 let _unsub = null;
 
+let _rendering = false;
+let _scheduled = false;
+
 /**
  * Mount the right panel.
  *
- * @param {any} ctx — { propertiesSidebarTemplate, getCanvasMode, renderCanvas,
- *   updateForcedPseudoPreview }
+ * @param {RightPanelCtx} ctx
  */
 export function mount(ctx) {
   _ctx = ctx;
@@ -58,8 +69,19 @@ export function unmount() {
 
 export function render() {
   if (!_ctx) return;
+  if (_rendering) return;
+  if (!_scheduled) {
+    _scheduled = true;
+    queueMicrotask(_flush);
+  }
+}
+
+function _flush() {
+  _scheduled = false;
+  if (!_ctx) return;
+  if (_rendering) return;
+  _rendering = true;
   try {
-    ensureLitState(rightPanel);
     litRender(rightPanelTemplate(), rightPanel);
   } catch (e) {
     console.error("right-panel render error:", e);
@@ -71,11 +93,14 @@ export function render() {
     } catch (e2) {
       console.error("right-panel retry failed:", e2);
     }
+  } finally {
+    _rendering = false;
   }
   _ctx.updateForcedPseudoPreview();
 }
 
 function rightPanelTemplate() {
+  const ctx = /** @type {RightPanelCtx} */ (_ctx);
   const S = getState();
   const tab = S.ui.rightTab;
 
@@ -90,7 +115,7 @@ function rightPanelTemplate() {
       <sp-tabs
         selected=${tab}
         quiet
-        @change=${(/** @type {any} */ e) => {
+        @change=${(/** @type {Event & { target: { selected: string } }} */ e) => {
           const sel = e.target.selected;
           if (sel && sel !== tab) {
             updateUi("rightTab", sel);
@@ -108,19 +133,19 @@ function rightPanelTemplate() {
     </div>
   `;
 
-  /** @type {any} */
+  /** @type {import("lit-html").TemplateResult | typeof nothing} */
   let bodyT = nothing;
   if (tab === "properties") {
-    bodyT = renderPropertiesPanelTemplate({ navigateToComponent: _ctx.navigateToComponent });
+    bodyT = renderPropertiesPanelTemplate({ navigateToComponent: ctx.navigateToComponent });
   } else if (tab === "events") {
     bodyT = eventsSidebarTemplate(S, {
       isCustomElementDoc: () => isCustomElementDoc(S),
-      renderCanvas: _ctx.renderCanvas,
+      renderCanvas: ctx.renderCanvas,
     });
   } else if (tab === "style") {
     try {
-      bodyT = renderStylePanelTemplate({ getCanvasMode: _ctx.getCanvasMode });
-    } catch (/** @type {any} */ e) {
+      bodyT = renderStylePanelTemplate({ getCanvasMode: ctx.getCanvasMode });
+    } catch (/** @type {unknown} */ e) {
       console.error("[renderStylePanelTemplate]", e);
     }
   }

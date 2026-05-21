@@ -15,19 +15,47 @@ import {
   applyMutation,
   updateFrontmatter,
 } from "../store.js";
-import { ensureLitState } from "./shared.js";
+
 import { renderLayersTemplate } from "./layers-panel.js";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel.js";
 import { renderElementsTemplate } from "./elements-panel.js";
 import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
 
-/** @type {any} */
+/** @typedef {import("lit-html").TemplateResult} TemplateResult */
+
+/**
+ * @typedef {{
+ *   getCanvasMode: () => string;
+ *   setCanvasMode: (mode: string) => void;
+ *   renderImportsTemplate: (...args: any[]) => TemplateResult;
+ *   renderFilesTemplate: () => TemplateResult;
+ *   renderSignalsTemplate: (...args: any[]) => TemplateResult;
+ *   renderDataExplorerTemplate: (...args: any[]) => TemplateResult;
+ *   renderHeadTemplate: (...args: any[]) => TemplateResult;
+ *   renderGitPanel: (...args: any[]) => TemplateResult;
+ *   renderCanvas: () => void;
+ *   defCategory: (tag: string) => string;
+ *   defBadgeLabel: (tag: string) => string;
+ *   navigateToComponent: (path: string) => void;
+ *   webdata: object;
+ *   defaultDef: (tag: string) => object;
+ *   registerLayersDnD: () => void;
+ *   registerElementsDnD: () => void;
+ *   registerComponentsDnD: () => void;
+ *   setupTreeKeyboard: (tree: HTMLElement) => void;
+ * }} LeftPanelCtx
+ */
+
+/** @type {LeftPanelCtx | null} */
 let _ctx = null;
+
+let _rendering = false;
+let _scheduled = false;
 
 /**
  * Mount the left panel orchestrator.
  *
- * @param {any} ctx — callbacks and references that avoid circular dependencies
+ * @param {LeftPanelCtx} ctx
  */
 export function mount(ctx) {
   _ctx = ctx;
@@ -39,8 +67,19 @@ export function unmount() {
 
 export function render() {
   if (!_ctx) return;
+  if (_rendering) return;
+  if (!_scheduled) {
+    _scheduled = true;
+    queueMicrotask(_flush);
+  }
+}
+
+function _flush() {
+  _scheduled = false;
+  if (!_ctx) return;
+  if (_rendering) return;
+  _rendering = true;
   try {
-    ensureLitState(leftPanel);
     _render();
   } catch (e) {
     console.error("left-panel render error:", e);
@@ -52,63 +91,66 @@ export function render() {
     } catch (e2) {
       console.error("left-panel retry failed:", e2);
     }
+  } finally {
+    _rendering = false;
   }
 }
 
 function _render() {
+  const ctx = /** @type {LeftPanelCtx} */ (_ctx);
   const S = getState();
   const tab = S.ui.leftTab;
 
-  /** @type {any} */
+  /** @type {TemplateResult | typeof nothing} */
   let content;
   if (tab === "layers")
     content =
-      _ctx.getCanvasMode() === "settings"
+      ctx.getCanvasMode() === "settings"
         ? renderStylebookLayersTemplate({
             selectStylebookTag,
             stylebookMeta,
           })
         : renderLayersTemplate({
-            navigateToComponent: _ctx.navigateToComponent,
+            navigateToComponent: ctx.navigateToComponent,
             rerender: render,
           });
   else if (tab === "imports")
-    content = _ctx.renderImportsTemplate({
+    content = ctx.renderImportsTemplate({
       renderLeftPanel: render,
       documentPath: S.documentPath,
       documentElements: S.document.$elements || [],
-      applyMutation: (/** @type {any} */ fn) => {
+      applyMutation: (/** @type {(doc: object) => void} */ fn) => {
         update(applyMutation(getState(), fn));
       },
     });
-  else if (tab === "files") content = _ctx.renderFilesTemplate();
+  else if (tab === "files") content = ctx.renderFilesTemplate();
   else if (tab === "blocks")
     content = renderElementsTemplate({
-      webdata: _ctx.webdata,
-      defaultDef: _ctx.defaultDef,
+      webdata: ctx.webdata,
+      defaultDef: ctx.defaultDef,
       rerender: render,
     });
   else if (tab === "state")
-    content = _ctx.renderSignalsTemplate(S, {
+    content = ctx.renderSignalsTemplate(S, {
       renderLeftPanel: render,
-      renderCanvas: _ctx.renderCanvas,
+      renderCanvas: ctx.renderCanvas,
       updateSession,
     });
   else if (tab === "data")
-    content = _ctx.renderDataExplorerTemplate(S.document.state, S.canvas?.scope ?? null, {
-      renderCanvas: _ctx.renderCanvas,
+    content = ctx.renderDataExplorerTemplate(S.document.state, S.canvas?.scope ?? null, {
+      renderCanvas: ctx.renderCanvas,
       renderLeftPanel: render,
-      defCategory: _ctx.defCategory,
-      defBadgeLabel: _ctx.defBadgeLabel,
+      defCategory: ctx.defCategory,
+      defBadgeLabel: ctx.defBadgeLabel,
     });
   else if (tab === "head") {
     const isContent = S.mode === "content";
     const fm = S.content?.frontmatter ?? {};
     const headDoc = isContent ? { ...S.document, title: fm.title, $head: fm.$head } : S.document;
-    content = _ctx.renderHeadTemplate({
+    content = ctx.renderHeadTemplate({
       document: headDoc,
       applyMutation: isContent
-        ? (/** @type {any} */ fn) => {
+        ? (/** @type {(doc: object) => void} */ fn) => {
             const tmp = { title: fm.title, $head: fm.$head ? [...fm.$head] : undefined };
             fn(tmp);
             let s = getState();
@@ -117,25 +159,25 @@ function _render() {
             s = updateFrontmatter(s, "$head", newHead);
             update(s);
           }
-        : (/** @type {any} */ fn) => {
+        : (/** @type {(doc: object) => void} */ fn) => {
             update(applyMutation(getState(), fn));
           },
       renderLeftPanel: render,
     });
-  } else if (tab === "git") content = _ctx.renderGitPanel(S, _ctx);
+  } else if (tab === "git") content = ctx.renderGitPanel(S, ctx);
   else content = nothing;
 
-  litRender(html`<div class="panel-body">${content}</div>`, /** @type {any} */ (leftPanel));
+  litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
 
   // Post-render side effects
-  if (tab === "layers" && _ctx.getCanvasMode() !== "settings") _ctx.registerLayersDnD();
+  if (tab === "layers" && ctx.getCanvasMode() !== "settings") ctx.registerLayersDnD();
   else if (tab === "imports") {
     /* no post-render DnD needed */
   } else if (tab === "blocks") {
-    _ctx.registerElementsDnD();
-    _ctx.registerComponentsDnD();
+    ctx.registerElementsDnD();
+    ctx.registerComponentsDnD();
   } else if (tab === "files") {
-    const tree = /** @type {any} */ (leftPanel)?.querySelector(".file-tree");
-    if (tree) _ctx.setupTreeKeyboard(tree);
+    const tree = /** @type {HTMLElement | null} */ (leftPanel.querySelector(".file-tree"));
+    if (tree) ctx.setupTreeKeyboard(tree);
   }
 }

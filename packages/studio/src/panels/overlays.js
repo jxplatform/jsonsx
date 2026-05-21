@@ -6,28 +6,46 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { getState, canvasPanels, pathsEqual, subscribe } from "../store.js";
 import { view } from "../view.js";
-import {
-  findCanvasElement,
-  getActivePanel,
-  overlayBoxDescriptor,
-} from "../canvas/canvas-helpers.js";
+import { findCanvasElement, getActivePanel, effectiveZoom } from "../canvas/canvas-helpers.js";
 import { layoutElements } from "../canvas/canvas-live-render.js";
 
-/** @type {any} */
+/**
+ * @typedef {{
+ *   cls: string;
+ *   top: string;
+ *   left: string;
+ *   width: string;
+ *   height: string;
+ *   border?: string;
+ *   isLayout?: boolean;
+ * }} OverlayBox
+ */
+
+/**
+ * @typedef {{
+ *   getCanvasMode: () => string;
+ *   isEditing: () => boolean;
+ *   renderBlockActionBar: () => void;
+ * }} OverlaysCtx
+ */
+
+/** @type {OverlaysCtx | null} */
 let _ctx = null;
 
 /** @type {(() => void) | null} */
 let _unsub = null;
 
+let _scheduled = false;
+
 /**
  * Mount the overlays panel.
  *
- * @param {any} ctx — { getCanvasMode, isEditing, renderBlockActionBar }
+ * @param {OverlaysCtx} ctx
  */
 export function mount(ctx) {
   _ctx = ctx;
   _unsub = subscribe((change) => {
-    if (change.selection || change.hover || change.mode || change.ui || change.doc) render();
+    if (change.selection || change.hover || change.mode) render();
   });
 }
 
@@ -38,6 +56,15 @@ export function unmount() {
 }
 
 export function render() {
+  if (!_ctx) return;
+  if (!_scheduled) {
+    _scheduled = true;
+    queueMicrotask(_flush);
+  }
+}
+
+function _flush() {
+  _scheduled = false;
   if (!_ctx) return;
   const S = getState();
   const canvasMode = _ctx.getCanvasMode();
@@ -72,23 +99,28 @@ export function render() {
   }
 
   for (const p of canvasPanels) {
-    /**
-     * @type {{
-     *   cls: string;
-     *   top: string;
-     *   left: string;
-     *   width: string;
-     *   height: string;
-     *   border?: string;
-     * }[]}
-     */
+    /** @type {OverlayBox[]} */
     const boxes = [];
+
+    // Batch layout reads: read viewport geometry once per panel
+    const vpRect = p.viewport.getBoundingClientRect();
+    const scrollTop = p.viewport.scrollTop;
+    const scrollLeft = p.viewport.scrollLeft;
+    const scale = effectiveZoom();
 
     if (S.hover && !pathsEqual(S.hover, S.selection)) {
       const el = findCanvasElement(S.hover, p.canvas);
       if (el) {
-        const desc = overlayBoxDescriptor(el, "hover", p);
-        if (layoutElements.has(el)) /** @type {any} */ (desc).isLayout = true;
+        const elRect = el.getBoundingClientRect();
+        /** @type {OverlayBox} */
+        const desc = {
+          cls: "overlay-box overlay-hover",
+          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
+          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
+          width: `${elRect.width / scale}px`,
+          height: `${elRect.height / scale}px`,
+        };
+        if (layoutElements.has(el)) desc.isLayout = true;
         boxes.push(desc);
       }
     }
@@ -96,9 +128,17 @@ export function render() {
     if (S.selection && p === getActivePanel()) {
       const el = findCanvasElement(S.selection, p.canvas);
       if (el) {
-        const desc = overlayBoxDescriptor(el, "selection", p);
-        if (view.componentInlineEdit || _ctx.isEditing()) /** @type {any} */ (desc).border = "none";
-        if (layoutElements.has(el)) /** @type {any} */ (desc).isLayout = true;
+        const elRect = el.getBoundingClientRect();
+        /** @type {OverlayBox} */
+        const desc = {
+          cls: "overlay-box overlay-selection",
+          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
+          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
+          width: `${elRect.width / scale}px`,
+          height: `${elRect.height / scale}px`,
+        };
+        if (view.componentInlineEdit || _ctx.isEditing()) desc.border = "none";
+        if (layoutElements.has(el)) desc.isLayout = true;
         boxes.push(desc);
       }
     }
@@ -109,16 +149,12 @@ export function render() {
         ${boxes.map(
           (b) => html`
             <div
-              class="${b.cls}${/** @type {any} */ (b).isLayout ? " overlay-layout" : ""}"
+              class="${b.cls}${b.isLayout ? " overlay-layout" : ""}"
               style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}${b.border
                 ? `;border:${b.border}`
                 : ""}"
             >
-              ${
-                /** @type {any} */ (b).isLayout
-                  ? html`<span class="overlay-layout-badge">Layout</span>`
-                  : nothing
-              }
+              ${b.isLayout ? html`<span class="overlay-layout-badge">Layout</span>` : nothing}
             </div>
           `,
         )}
