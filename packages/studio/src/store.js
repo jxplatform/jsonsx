@@ -8,35 +8,14 @@
 
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
+import { activeTab } from "./workspace/workspace.js";
+
 export {
   createState,
   selectNode,
   hoverNode,
-  undo,
-  redo,
-  insertNode,
-  removeNode,
-  duplicateNode,
-  wrapNode,
-  moveNode,
-  updateProperty,
-  updateStyle,
-  updateAttribute,
-  addDef,
-  removeDef,
-  updateDef,
-  renameDef,
-  updateMediaStyle,
-  updateMedia,
-  updateNestedStyle,
-  updateMediaNestedStyle,
   pushDocument,
   popDocument,
-  updateProp,
-  addSwitchCase,
-  removeSwitchCase,
-  renameSwitchCase,
-  applyMutation,
   getNodeAtPath,
   flattenTree,
   nodeLabel,
@@ -57,12 +36,12 @@ export {
 export const $ = (/** @type {string} */ sel) => document.querySelector(sel);
 export const _$$ = (/** @type {string} */ sel) => document.querySelectorAll(sel);
 
-export const canvasWrap = /** @type {any} */ (document.querySelector("#canvas-wrap"));
-export const activityBar = /** @type {any} */ (document.querySelector("#activity-bar"));
-export const leftPanel = /** @type {any} */ (document.querySelector("#left-panel"));
-export const rightPanel = /** @type {any} */ (document.querySelector("#right-panel"));
-export const toolbarEl = /** @type {any} */ (document.querySelector("#toolbar"));
-export const statusbarEl = /** @type {any} */ (document.querySelector("#statusbar"));
+export const canvasWrap = /** @type {HTMLElement} */ (document.querySelector("#canvas-wrap"));
+export const activityBar = /** @type {HTMLElement} */ (document.querySelector("#activity-bar"));
+export const leftPanel = /** @type {HTMLElement} */ (document.querySelector("#left-panel"));
+export const rightPanel = /** @type {HTMLElement} */ (document.querySelector("#right-panel"));
+export const toolbarEl = /** @type {HTMLElement} */ (document.querySelector("#toolbar"));
+export const statusbarEl = /** @type {HTMLElement} */ (document.querySelector("#statusbar"));
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────
 
@@ -70,9 +49,19 @@ export const statusbarEl = /** @type {any} */ (document.querySelector("#statusba
 export const elToPath = new WeakMap();
 
 /**
- * Canvas panels: Array<{ mediaName, canvas, overlay, overlayClk, viewport, dropLine }>
+ * Canvas panels: Array<{ mediaName, canvas, overlay, overlayClk, viewport, dropLine, element,
+ * _width }>
  *
- * @type {any[]}
+ * @type {{
+ *   mediaName: string;
+ *   canvas: HTMLElement;
+ *   overlay: HTMLElement;
+ *   overlayClk: HTMLElement;
+ *   viewport: HTMLElement;
+ *   dropLine: HTMLElement;
+ *   element?: HTMLElement | null;
+ *   _width?: number | null;
+ * }[]}
  */
 export const canvasPanels = [];
 
@@ -110,7 +99,7 @@ export const COMMON_SELECTORS = [
   "::placeholder",
 ];
 
-/** @param {any} k */
+/** @param {string} k */
 export function isNestedSelector(k) {
   return k.startsWith(":") || k.startsWith(".") || k.startsWith("&") || k.startsWith("[");
 }
@@ -120,12 +109,12 @@ export function isNestedSelector(k) {
 const _styleDebounceTimers = new Map();
 
 /**
- * @param {any} prop
- * @param {any} ms
- * @param {any} fn
+ * @param {string} prop
+ * @param {number} ms
+ * @param {Function} fn
  */
 export function debouncedStyleCommit(prop, ms, fn) {
-  return (/** @type {any[]} */ ...args) => {
+  return (/** @type {unknown[]} */ ...args) => {
     clearTimeout(_styleDebounceTimers.get(prop));
     _styleDebounceTimers.set(
       prop,
@@ -146,13 +135,13 @@ export function cancelStyleDebounce(/** @type {string} */ prop) {
 /**
  * Strip all on* event handler properties from a Jx document tree (deep clone).
  *
- * @param {any} node
- * @returns {any}
+ * @param {import("./state.js").JxNode | unknown} node
+ * @returns {import("./state.js").JxNode | unknown}
  */
 export function stripEventHandlers(node) {
   if (!node || typeof node !== "object") return node;
   if (Array.isArray(node)) return node.map(stripEventHandlers);
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const out = {};
   for (const [k, v] of Object.entries(node)) {
     if (k.startsWith("on") && typeof v === "object" && (v?.$ref || v?.$prototype === "Function"))
@@ -160,12 +149,12 @@ export function stripEventHandlers(node) {
     if (k === "children") {
       out.children = Array.isArray(v) ? v.map(stripEventHandlers) : stripEventHandlers(v);
     } else if (k === "cases" && typeof v === "object") {
-      /** @type {Record<string, any>} */
+      /** @type {Record<string, unknown>} */
       const cases = {};
       for (const [ck, cv] of Object.entries(v)) cases[ck] = stripEventHandlers(cv);
       out.cases = cases;
     } else if (k === "state" && typeof v === "object" && v !== null) {
-      /** @type {Record<string, any>} */
+      /** @type {Record<string, unknown>} */
       const state = {};
       for (const [sk, sv] of Object.entries(v)) {
         if (sv && typeof sv === "object" && sv.timing === "server") continue;
@@ -228,18 +217,18 @@ export function renderOnly(...names) {
 // studio.js registers the real update implementation via setUpdateFn() during bootstrap.
 // This allows extracted modules to import `update` from store.js without circular deps.
 
-/** @type {Function} */
+/** @type {(state: import("./state.js").StudioState) => void} */
 let _updateFn = () => {
   throw new Error("update() called before setUpdateFn() — bootstrap not complete");
 };
 
-/** @type {Function} */
+/** @type {() => import("./state.js").StudioState | null} */
 let _getStateFn = () => null;
 
 /**
  * Register the update implementation. Called by studio.js at module load time.
  *
- * @param {Function} fn
+ * @param {(state: import("./state.js").StudioState) => void} fn
  */
 export function setUpdateFn(fn) {
   _updateFn = fn;
@@ -248,25 +237,43 @@ export function setUpdateFn(fn) {
 /**
  * Register the state getter. Called by studio.js at module load time.
  *
- * @param {Function} fn — returns current S
+ * @param {() => import("./state.js").StudioState} fn — returns current S
  */
 export function setGetStateFn(fn) {
   _getStateFn = fn;
 }
 
 /**
- * Get the current state (live, not stale).
+ * Get the current state (live, not stale). Synthesized from the active tab's reactive state.
  *
- * @returns {any}
+ * @returns {import("./state.js").StudioState}
  */
 export function getState() {
-  return _getStateFn();
+  const tab = activeTab.value;
+  if (tab) {
+    return /** @type {any} */ ({
+      document: tab.doc.document,
+      mode: tab.doc.mode,
+      dirty: tab.doc.dirty,
+      handlersSource: tab.doc.handlersSource,
+      content: tab.doc.content,
+      documentPath: tab.documentPath,
+      fileHandle: tab.fileHandle,
+      selection: tab.session.selection,
+      hover: tab.session.hover,
+      clipboard: tab.session.clipboard,
+      ui: tab.session.ui,
+      canvas: tab.session.canvas,
+      documentStack: tab.session.documentStack,
+    });
+  }
+  return /** @type {any} */ (_getStateFn());
 }
 
 /**
  * Dispatch a state update + selective re-render.
  *
- * @param {any} newState
+ * @param {import("./state.js").StudioState} newState
  */
 export function update(newState) {
   _updateFn(newState);
@@ -276,113 +283,79 @@ export function update(newState) {
 // Lightweight dispatcher for session-only changes (selection, hover, ui).
 // Does NOT trigger autosave middleware or push history.
 
-/** @type {Function} */
+/** @type {(patch: object) => void} */
 let _updateSessionFn = () => {
   throw new Error("updateSession() called before setUpdateSessionFn() — bootstrap not complete");
 };
 
-/** @type {Function} */
-let _getDocFn = () => null;
-
-/** @type {Function} */
-let _getSessionFn = () => null;
-
-/** @param {Function} fn */
+/** @param {(patch: object) => void} fn */
 export function setUpdateSessionFn(fn) {
   _updateSessionFn = fn;
 }
 
-/** @param {Function} fn */
-export function setGetDocFn(fn) {
-  _getDocFn = fn;
-}
-
-/** @param {Function} fn */
-export function setGetSessionFn(fn) {
-  _getSessionFn = fn;
-}
-
-/** @returns {any} */
-export function getDoc() {
-  return _getDocFn();
-}
-
-/** @returns {any} */
-export function getSession() {
-  return _getSessionFn();
-}
-
 /**
- * Dispatch a session-only state update (selection, hover, ui). Does not trigger autosave.
+ * Dispatch a session-only state update (selection, hover, ui). Writes directly to reactive tab.
  *
- * @param {any} patch — partial session object, e.g. { ui: { zoom: 2 } }
+ * @param {object} patch — partial session object, e.g. { ui: { zoom: 2 } }
  */
 export function updateSession(patch) {
+  const tab = activeTab.value;
+  if (tab) {
+    const p = /** @type {any} */ (patch);
+    if (p.selection !== undefined) tab.session.selection = p.selection;
+    if (p.hover !== undefined) tab.session.hover = p.hover;
+    if (p.clipboard !== undefined) tab.session.clipboard = p.clipboard;
+    if (p.ui) {
+      for (const [k, v] of Object.entries(p.ui)) {
+        /** @type {any} */ (tab.session.ui)[k] = v;
+      }
+    }
+    if (p.canvas) {
+      for (const [k, v] of Object.entries(p.canvas)) {
+        /** @type {any} */ (tab.session.canvas)[k] = v;
+      }
+    }
+  }
   _updateSessionFn(patch);
 }
 
 /**
- * Update a single UI field and re-render. Routes through session dispatch (no autosave, no
- * history).
+ * Update a single UI field. Routes through session dispatch.
  *
  * @param {string} field
- * @param {any} value
+ * @param {unknown} value
  */
 export function updateUi(field, value) {
+  const tab = activeTab.value;
+  if (tab) {
+    /** @type {any} */ (tab.session.ui)[field] = value;
+  }
   _updateSessionFn({ ui: { [field]: value } });
 }
 
 /**
  * Update the canvas async state (status, scope, error).
  *
- * @param {any} patch
+ * @param {object} patch
  */
 export function updateCanvas(patch) {
+  const tab = activeTab.value;
+  if (tab) {
+    for (const [k, v] of Object.entries(patch)) {
+      /** @type {any} */ (tab.session.canvas)[k] = v;
+    }
+  }
   _updateSessionFn({ canvas: patch });
 }
 
-// ─── Subscription system ────────────────────────────────────────────────────
-// Panels subscribe to state changes and decide when to re-render, rather than
-// being called unconditionally from _update/_updateSession.
-
-/** @typedef {{ doc: boolean; selection: boolean; hover: boolean; ui: boolean; mode: boolean }} Change */
-
-/** @type {Set<(change: Change) => void>} */
-const _subscribers = new Set();
-
-/**
- * Subscribe to state changes. Returns an unsubscribe function.
- *
- * @param {(change: Change) => void} fn
- * @returns {() => void}
- */
-export function subscribe(fn) {
-  _subscribers.add(fn);
-  return () => _subscribers.delete(fn);
-}
-
-/**
- * Notify all subscribers of a state change.
- *
- * @param {Change} change
- */
-export function notify(change) {
-  for (const fn of _subscribers) {
-    try {
-      fn(change);
-    } catch (e) {
-      console.error("Subscriber failed:", e);
-    }
-  }
-}
-
-/** @type {Function[]} */
+/** @type {((state: import("./state.js").StudioState) => void)[]} */
 const _updateMiddleware = [];
 
 /**
  * Register middleware that runs after every update().
  *
- * @param {Function} fn — receives (state) after core update
+ * @param {(state: import("./state.js").StudioState) => void} fn — receives (state) after core
+ *   update
  */
 export function addUpdateMiddleware(fn) {
   _updateMiddleware.push(fn);
@@ -391,19 +364,19 @@ export function addUpdateMiddleware(fn) {
 /**
  * Run all registered update middleware.
  *
- * @param {any} state
+ * @param {import("./state.js").StudioState} state
  */
 export function runUpdateMiddleware(state) {
   for (const mw of _updateMiddleware) mw(state);
 }
 
-/** @type {Function[]} */
+/** @type {((prevDoc: object, prevSel: import("./state.js").JxPath | null) => void)[]} */
 const _postRenderHooks = [];
 
 /**
  * Register a hook that runs after renders in update().
  *
- * @param {Function} fn — receives (prevDoc, prevSel)
+ * @param {(prevDoc: object, prevSel: import("./state.js").JxPath | null) => void} fn
  */
 export function addPostRenderHook(fn) {
   _postRenderHooks.push(fn);
@@ -412,8 +385,8 @@ export function addPostRenderHook(fn) {
 /**
  * Run all registered post-render hooks.
  *
- * @param {any} prevDoc
- * @param {any} prevSel
+ * @param {object} prevDoc
+ * @param {import("./state.js").JxPath | null} prevSel
  */
 export function runPostRenderHooks(prevDoc, prevSel) {
   for (const hook of _postRenderHooks) hook(prevDoc, prevSel);

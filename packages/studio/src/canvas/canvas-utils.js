@@ -8,7 +8,8 @@ import { ref } from "lit-html/directives/ref.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
-import { getState, renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
+import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { ensureLitState } from "../panels/shared.js";
 import { view } from "../view.js";
 
@@ -44,14 +45,14 @@ export function initCanvasUtils(ctx) {
 export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   /**
    * @type {{
-   *   mediaName: any;
-   *   element: Element | null;
-   *   canvas: Element | null;
-   *   overlay: Element | null;
-   *   overlayClk: Element | null;
-   *   viewport: Element | null;
-   *   dropLine: Element | null;
-   *   _width: any;
+   *   mediaName: string;
+   *   element: HTMLElement | null;
+   *   canvas: HTMLElement | null;
+   *   overlay: HTMLElement | null;
+   *   overlayClk: HTMLElement | null;
+   *   viewport: HTMLElement | null;
+   *   dropLine: HTMLElement | null;
+   *   _width: number | null;
    * }}
    */
   const panel = {
@@ -69,7 +70,7 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
       class=${`canvas-panel${fullWidth ? " full-width" : ""}`}
       data-media=${ifDefined(mediaName !== null ? mediaName : undefined)}
       ${ref((el) => {
-        if (el) panel.element = el;
+        if (el) panel.element = /** @type {HTMLElement} */ (el);
       })}
     >
       ${label
@@ -88,34 +89,34 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
         class="canvas-panel-viewport"
         style=${styleMap({ width: width && !fullWidth ? `${width}px` : "" })}
         ${ref((el) => {
-          if (el) panel.viewport = el;
+          if (el) panel.viewport = /** @type {HTMLElement} */ (el);
         })}
       >
         <div
           class="canvas-panel-canvas"
           style=${styleMap({ width: width ? `${width}px` : "" })}
           ${ref((el) => {
-            if (el) panel.canvas = el;
+            if (el) panel.canvas = /** @type {HTMLElement} */ (el);
           })}
         ></div>
         <div
           class="canvas-panel-overlay"
           ${ref((el) => {
-            if (el) panel.overlay = el;
+            if (el) panel.overlay = /** @type {HTMLElement} */ (el);
           })}
         >
           <div
             class="canvas-drop-indicator"
             style="display:none"
             ${ref((el) => {
-              if (el) panel.dropLine = el;
+              if (el) panel.dropLine = /** @type {HTMLElement} */ (el);
             })}
           ></div>
         </div>
         <div
           class="canvas-panel-click"
           ${ref((el) => {
-            if (el) panel.overlayClk = el;
+            if (el) panel.overlayClk = /** @type {HTMLElement} */ (el);
           })}
         ></div>
       </div>
@@ -263,14 +264,14 @@ export function positionZoomIndicator() {
 
 /** Toggle "active" class on canvas panel headers based on activeMedia. */
 export function updateActivePanelHeaders() {
-  const S = getState();
+  const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
   for (const p of canvasPanels) {
-    const header = p.element.querySelector(".canvas-panel-header");
+    const header = p.element?.querySelector(".canvas-panel-header");
     if (header) {
       const isActive =
-        (S.ui.activeMedia === null && p.mediaName === "base") ||
-        (S.ui.activeMedia === null && p.mediaName === null) ||
-        S.ui.activeMedia === p.mediaName;
+        (activeMedia === null && p.mediaName === "base") ||
+        (activeMedia === null && p.mediaName === null) ||
+        activeMedia === p.mediaName;
       header.classList.toggle("active", isActive);
     }
   }

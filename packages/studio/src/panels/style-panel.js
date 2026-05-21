@@ -8,17 +8,20 @@ import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
   getState,
-  update,
   updateUi,
   getNodeAtPath,
-  updateStyle,
-  updateMediaStyle,
-  updateNestedStyle,
-  updateMediaNestedStyle,
   COMMON_SELECTORS,
   isNestedSelector,
   debouncedStyleCommit,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import {
+  transactDoc,
+  mutateUpdateStyle,
+  mutateUpdateMediaStyle,
+  mutateUpdateNestedStyle,
+  mutateUpdateMediaNestedStyle,
+} from "../tabs/transact.js";
 import { inferInputType, propLabel } from "../utils/studio-utils.js";
 import { renderFieldRow } from "../ui/field-row.js";
 import { parseMediaEntries } from "../utils/canvas-media.js";
@@ -65,10 +68,10 @@ function renderStyleRow(
 }
 
 /**
- * @param {any} shortProp @param {any} entry @param {any} style @param {any} commitFn
+ * @param {any} shortProp @param {any} entry @param {any} style @param {any} mutateFn
  * @param {any} _deleteFn @param {Record<string, any>} inherited
  */
-function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inherited = {}) {
+function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inherited = {}) {
   const S = getState();
   const longhands = getLonghands(shortProp);
   const shortVal = style[shortProp];
@@ -86,12 +89,12 @@ function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inheri
               title="Clear ${shortProp}"
               @click=${(/** @type {any} */ e) => {
                 e.stopPropagation();
-                let s = getState();
-                if (shortVal !== undefined) s = commitFn(s, shortProp, undefined);
-                for (const l of longhands) {
-                  if (style[l.name] !== undefined) s = commitFn(s, l.name, undefined);
-                }
-                update(s);
+                transactDoc(activeTab.value, (t) => {
+                  if (shortVal !== undefined) mutateFn(t, shortProp, undefined);
+                  for (const l of longhands) {
+                    if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                  }
+                });
               }}
             ></span>`
           : nothing}
@@ -109,12 +112,12 @@ function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inheri
                 ? longhands.map((/** @type {any} */ l) => inherited[l.name] || "0").join(" ")
                 : ""}
           @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (/** @type {any} */ e) => {
-            let s = getState();
-            for (const l of longhands) {
-              if (style[l.name] !== undefined) s = commitFn(s, l.name, undefined);
-            }
-            s = commitFn(s, shortProp, e.target.value || undefined);
-            update(s);
+            transactDoc(activeTab.value, (t) => {
+              for (const l of longhands) {
+                if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+              }
+              mutateFn(t, shortProp, e.target.value || undefined);
+            });
           })}
         ></sp-textfield>
         <sp-action-button
@@ -162,12 +165,12 @@ function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inheri
                                   ? emptyVal
                                   : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
                             );
-                            let s = getState();
-                            for (const l of longhands) {
-                              if (style[l.name] !== undefined) s = commitFn(s, l.name, undefined);
-                            }
-                            s = commitFn(s, shortProp, compress(vals));
-                            update(s);
+                            transactDoc(activeTab.value, (t) => {
+                              for (const l of longhands) {
+                                if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                              }
+                              mutateFn(t, shortProp, compress(vals));
+                            });
                           }}
                         ></span>`
                       : nothing}
@@ -186,12 +189,12 @@ function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inheri
                           ? newVal || emptyVal
                           : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
                       );
-                      let s = getState();
-                      for (const l of longhands) {
-                        if (style[l.name] !== undefined) s = commitFn(s, l.name, undefined);
-                      }
-                      s = commitFn(s, shortProp, compress(vals));
-                      update(s);
+                      transactDoc(activeTab.value, (t) => {
+                        for (const l of longhands) {
+                          if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                        }
+                        mutateFn(t, shortProp, compress(vals));
+                      });
                     },
                     { placeholder: !lVal && inherited[name] ? String(inherited[name]) : "" },
                   )}
@@ -213,10 +216,11 @@ function renderShorthandRow(shortProp, entry, style, commitFn, _deleteFn, inheri
  */
 function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
   const S = getState();
+  const sel = /** @type {import("../state.js").JxPath} */ (S.selection);
   const style = node.style || {};
   const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(S.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
-  const activeTab = activeMediaTab;
+  const mediaTab = activeMediaTab;
 
   // ── Media tabs template ──────────────────────────────────────────────────
   const mediaTabsT =
@@ -224,7 +228,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
       ? html`
           <sp-tabs
             size="s"
-            selected=${activeTab || "base"}
+            selected=${mediaTab || "base"}
             @change=${(/** @type {any} */ e) => {
               const val = e.target.selected;
               const newMedia = val === "base" ? null : val;
@@ -242,7 +246,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
       : nothing;
 
   // ── Selector dropdown ──────────────────────────────────────────────────────
-  const contextStyle = activeTab ? style[`@${activeTab}`] || {} : style;
+  const contextStyle = mediaTab ? style[`@${mediaTab}`] || {} : style;
   const existingSelectors = Object.keys(contextStyle).filter(isNestedSelector);
   const existingSet = new Set(existingSelectors);
   const commonSet = new Set(COMMON_SELECTORS);
@@ -345,35 +349,45 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
   // ── Determine the active style object ──────────────────────────────────────
   /** @type {Record<string, any>} */
   let activeStyle;
-  /** @type {any} */
+  /** @type {(prop: any, val: any) => void} */
   let commitStyle;
-  if (activeSelector && activeTab && mediaNames.length > 0) {
-    activeStyle = (style[`@${activeTab}`] || {})[activeSelector] || {};
-    commitStyle = (/** @type {any} */ s, /** @type {any} */ prop, /** @type {any} */ val) =>
-      updateMediaNestedStyle(s, S.selection, activeTab, activeSelector, prop, val);
+  /** @type {(t: any, prop: any, val: any) => void} */
+  let commitMutate;
+  if (activeSelector && mediaTab && mediaNames.length > 0) {
+    activeStyle = (style[`@${mediaTab}`] || {})[activeSelector] || {};
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateMediaNestedStyle(t, sel, mediaTab, activeSelector, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector) {
     activeStyle = style[activeSelector] || {};
-    commitStyle = (/** @type {any} */ s, /** @type {any} */ prop, /** @type {any} */ val) =>
-      updateNestedStyle(s, S.selection, activeSelector, prop, val);
-  } else if (activeTab !== null && mediaNames.length > 0) {
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateNestedStyle(t, sel, activeSelector, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+  } else if (mediaTab !== null && mediaNames.length > 0) {
     activeStyle = {};
-    for (const [p, v] of Object.entries(style[`@${activeTab}`] || {})) {
+    for (const [p, v] of Object.entries(style[`@${mediaTab}`] || {})) {
       if (typeof v !== "object") activeStyle[p] = v;
     }
-    commitStyle = (/** @type {any} */ s, /** @type {any} */ prop, /** @type {any} */ val) =>
-      updateMediaStyle(s, S.selection, activeTab, prop, val);
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateMediaStyle(t, sel, mediaTab, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else {
     activeStyle = {};
     for (const [p, v] of Object.entries(style)) {
       if (typeof v !== "object") activeStyle[p] = v;
     }
-    commitStyle = (/** @type {any} */ s, /** @type {any} */ prop, /** @type {any} */ val) =>
-      updateStyle(s, S.selection, prop, val);
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateStyle(t, sel, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   }
 
   // ── Compute inherited style from higher breakpoints ──────────────────────
   /** @type {Record<string, any>} */
-  const inheritedStyle = computeInheritedStyle(style, mediaNames, activeTab, activeSelector);
+  const inheritedStyle = computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
 
   // Auto-open sections that have properties
   const newSections = autoOpenSections({ style: activeStyle }, S.ui.styleSections);
@@ -449,7 +463,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
             hasVal || longhands.some((/** @type {any} */ l) => activeStyle[l.name] !== undefined);
           if (!hasAny && !condMet) continue;
           rows.push(
-            renderShorthandRow(prop, entry, activeStyle, commitStyle, () => {}, inheritedStyle),
+            renderShorthandRow(prop, entry, activeStyle, commitMutate, () => {}, inheritedStyle),
           );
         } else {
           const isWarning = hasVal && !condMet;
@@ -459,9 +473,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
                 entry,
                 prop,
                 val ?? "",
-                (/** @type {any} */ newVal) =>
-                  update(commitStyle(getState(), prop, newVal || undefined)),
-                () => update(commitStyle(getState(), prop, undefined)),
+                (/** @type {any} */ newVal) => commitStyle(prop, newVal || undefined),
+                () => commitStyle(prop, undefined),
                 isWarning,
                 sec.$layout === "grid",
                 inheritedStyle[prop],
@@ -492,17 +505,17 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
                     @click=${(/** @type {any} */ e) => {
                       e.stopPropagation();
                       e.preventDefault();
-                      let s = getState();
-                      for (const { prop, entry } of sectionActiveProps) {
-                        if (activeStyle[prop] !== undefined) s = commitStyle(s, prop, undefined);
-                        if (inferInputType(entry) === "shorthand") {
-                          for (const l of getLonghands(prop)) {
-                            if (activeStyle[l.name] !== undefined)
-                              s = commitStyle(s, l.name, undefined);
+                      transactDoc(activeTab.value, (t) => {
+                        for (const { prop, entry } of sectionActiveProps) {
+                          if (activeStyle[prop] !== undefined) commitMutate(t, prop, undefined);
+                          if (inferInputType(entry) === "shorthand") {
+                            for (const l of getLonghands(prop)) {
+                              if (activeStyle[l.name] !== undefined)
+                                commitMutate(t, l.name, undefined);
+                            }
                           }
                         }
-                      }
-                      update(s);
+                      });
                     }}
                   ></span>
                 </span>
@@ -535,9 +548,10 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
                 @change=${(/** @type {any} */ e) => {
                   const newProp = e.target.value.trim();
                   if (newProp && newProp !== prop) {
-                    let s = commitStyle(getState(), prop, undefined);
-                    s = commitStyle(s, newProp, String(activeStyle[prop]));
-                    update(s);
+                    transactDoc(activeTab.value, (t) => {
+                      commitMutate(t, prop, undefined);
+                      commitMutate(t, newProp, String(activeStyle[prop]));
+                    });
                   }
                 }}
               ></sp-textfield>
@@ -547,14 +561,10 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
                 .value=${live(String(activeStyle[prop]))}
                 placeholder=${ifDefined(cssInitialMap.get(prop))}
                 @input=${debouncedStyleCommit(`custom:${prop}`, 400, (/** @type {any} */ e) => {
-                  update(commitStyle(getState(), prop, e.target.value));
+                  commitStyle(prop, e.target.value);
                 })}
               ></sp-textfield>
-              <sp-action-button
-                size="xs"
-                quiet
-                @click=${() => update(commitStyle(getState(), prop, undefined))}
-              >
+              <sp-action-button size="xs" quiet @click=${() => commitStyle(prop, undefined)}>
                 <sp-icon-close slot="icon"></sp-icon-close>
               </sp-action-button>
             </div>
@@ -571,7 +581,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
                 const prop = e.target.value.trim();
                 if (prop) {
                   const initial = cssInitialMap.get(prop) || "";
-                  update(commitStyle(getState(), prop, initial || ""));
+                  commitStyle(prop, initial || "");
                   e.target.value = "";
                 }
               }

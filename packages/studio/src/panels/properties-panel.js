@@ -4,22 +4,24 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import {
   getState,
-  selectNode,
   getNodeAtPath,
-  update,
-  updateProperty,
-  updateAttribute,
-  updateProp,
-  updateMedia,
-  updateFrontmatter,
-  addSwitchCase,
-  removeSwitchCase,
-  renameSwitchCase,
   debouncedStyleCommit,
   renderOnly,
   updateUi,
   projectState,
 } from "../store.js";
+import {
+  transactDoc,
+  mutateUpdateProperty,
+  mutateUpdateAttribute,
+  mutateUpdateProp,
+  mutateUpdateFrontmatter,
+  mutateUpdateMedia,
+  mutateAddSwitchCase,
+  mutateRemoveSwitchCase,
+  mutateRenameSwitchCase,
+} from "../tabs/transact.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { componentRegistry } from "../files/components.js";
 import { widgetForType } from "./style-inputs.js";
@@ -272,12 +274,12 @@ function renderFmFieldRow(
   /** @type {any} */ value,
   /** @type {Set<string>} */ requiredFields,
 ) {
-  const S = getState();
   const isRequired = requiredFields.has(field);
   const label = field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
   const displayLabel = label + (isRequired ? " *" : "");
   const hasVal = value !== undefined && value !== "" && value !== false;
-  const onClear = () => update(updateFrontmatter(S, field, undefined));
+  const onClear = () =>
+    transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, undefined));
 
   if (entry.type === "boolean") {
     return renderFieldRow({
@@ -290,7 +292,9 @@ function renderFmFieldRow(
           size="s"
           .checked=${live(!!value)}
           @change=${(/** @type {any} */ e) =>
-            update(updateFrontmatter(getState(), field, e.target.checked || undefined))}
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, e.target.checked || undefined),
+            )}
         ></sp-checkbox>
       `,
     });
@@ -315,7 +319,7 @@ function renderFmFieldRow(
                   .map((/** @type {string} */ s) => s.trim())
                   .filter(Boolean)
               : undefined;
-            update(updateFrontmatter(getState(), field, arr));
+            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
           })}
         ></sp-textfield>
       `,
@@ -333,7 +337,9 @@ function renderFmFieldRow(
           size="s"
           .value=${live(value || "")}
           @change=${(/** @type {any} */ e) =>
-            update(updateFrontmatter(getState(), field, e.target.value || undefined))}
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, e.target.value || undefined),
+            )}
         >
           ${entry.enum.map(
             (/** @type {string} */ opt) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`,
@@ -350,7 +356,7 @@ function renderFmFieldRow(
       hasValue: hasVal,
       onClear,
       widget: renderMediaPicker(field, value, (v) =>
-        update(updateFrontmatter(getState(), field, v || undefined)),
+        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
       ),
     });
   }
@@ -375,7 +381,9 @@ function renderFmFieldRow(
                     title="Remove"
                     @click=${() => {
                       const next = images.filter((_, idx) => idx !== i);
-                      update(updateFrontmatter(getState(), field, next.length ? next : undefined));
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateFrontmatter(t, field, next.length ? next : undefined),
+                      );
                     }}
                   >
                     <sp-icon-close slot="icon"></sp-icon-close>
@@ -387,7 +395,7 @@ function renderFmFieldRow(
           ${renderMediaPicker(`${field}:add`, "", (v) => {
             if (!v) return;
             const next = [...images, v];
-            update(updateFrontmatter(getState(), field, next));
+            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, next));
           })}
         </div>
       `,
@@ -398,7 +406,7 @@ function renderFmFieldRow(
     const targetName = entry.$ref.replace("#/contentTypes/", "");
     const targetDef = projectState?.projectConfig?.contentTypes?.[targetName];
     const picker = renderReferencePicker(field, value, targetName, targetDef, (v) =>
-      update(updateFrontmatter(getState(), field, v || undefined)),
+      transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
     );
     return renderFieldRow({
       prop: field,
@@ -422,7 +430,9 @@ function renderFmFieldRow(
           .value=${live(value !== undefined ? Number(value) : undefined)}
           @change=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
             const v = e.target.value;
-            update(updateFrontmatter(getState(), field, isNaN(v) ? undefined : Number(v)));
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, isNaN(v) ? undefined : Number(v)),
+            );
           })}
         ></sp-number-field>
       `,
@@ -440,7 +450,9 @@ function renderFmFieldRow(
         placeholder=${entry.format === "date" ? "YYYY-MM-DD" : ""}
         .value=${live(value || "")}
         @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
-          update(updateFrontmatter(getState(), field, e.target.value || undefined));
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateFrontmatter(t, field, e.target.value || undefined),
+          );
         })}
       ></sp-textfield>
     `,
@@ -527,33 +539,42 @@ function renderRepeaterFieldsTemplate(
   /** @type {any} */ path,
   /** @type {any} */ _mapSignals,
 ) {
-  const S = getState();
   return html`
     ${bindableFieldRow("Items", "text", node.items, (/** @type {any} */ v) =>
-      update(updateProperty(getState(), path, "items", v)),
+      transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "items", v)),
     )}
     ${node.filter
       ? bindableFieldRow("Filter", "text", node.filter, (/** @type {any} */ v) =>
-          update(updateProperty(getState(), path, "filter", v || undefined)),
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateProperty(t, path, "filter", v || undefined),
+          ),
         )
       : nothing}
     ${node.sort
       ? bindableFieldRow("Sort", "text", node.sort, (/** @type {any} */ v) =>
-          update(updateProperty(getState(), path, "sort", v || undefined)),
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateProperty(t, path, "sort", v || undefined),
+          ),
         )
       : nothing}
     <div style="display:flex;gap:8px;margin-top:4px">
       ${!node.filter
         ? html`<span
             class="kv-add"
-            @click=${() => update(updateProperty(getState(), path, "filter", { $ref: "#/state/" }))}
+            @click=${() =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "filter", { $ref: "#/state/" }),
+              )}
             >+ Add filter</span
           >`
         : nothing}
       ${!node.sort
         ? html`<span
             class="kv-add"
-            @click=${() => update(updateProperty(getState(), path, "sort", { $ref: "#/state/" }))}
+            @click=${() =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "sort", { $ref: "#/state/" }),
+              )}
             >+ Add sort</span
           >`
         : nothing}
@@ -563,7 +584,9 @@ function renderRepeaterFieldsTemplate(
           <sp-action-button
             size="s"
             style="margin-top:8px;width:100%"
-            @click=${() => update(selectNode(S, [...path, "map"]))}
+            @click=${() => {
+              activeTab.value.session.selection = [...path, "map"];
+            }}
             >Edit template →</sp-action-button
           >
         `
@@ -583,7 +606,8 @@ function renderSwitchFieldsTemplate(
       "Expression",
       "text",
       node.$switch,
-      (/** @type {any} */ v) => update(updateProperty(getState(), path, "$switch", v)),
+      (/** @type {any} */ v) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$switch", v)),
       null,
       mapSignals,
     )}
@@ -605,7 +629,9 @@ function renderSwitchFieldsTemplate(
               clearTimeout(debounce);
               debounce = setTimeout(() => {
                 if (e.target.value && e.target.value !== caseName)
-                  update(renameSwitchCase(getState(), path, caseName, e.target.value));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateRenameSwitchCase(t, path, caseName, e.target.value),
+                  );
               }, 500);
             }}
           />
@@ -615,7 +641,7 @@ function renderSwitchFieldsTemplate(
             style="cursor:pointer"
             @click=${(/** @type {any} */ e) => {
               e.stopPropagation();
-              update(selectNode(getState(), [...path, "cases", caseName]));
+              activeTab.value.session.selection = [...path, "cases", caseName];
             }}
             >→</span
           >
@@ -623,7 +649,7 @@ function renderSwitchFieldsTemplate(
             style="cursor:pointer;color:var(--danger);font-size:11px"
             @click=${(/** @type {any} */ e) => {
               e.stopPropagation();
-              update(removeSwitchCase(getState(), path, caseName));
+              transactDoc(activeTab.value, (t) => mutateRemoveSwitchCase(t, path, caseName));
             }}
             >✕</span
           >
@@ -633,7 +659,9 @@ function renderSwitchFieldsTemplate(
     <span
       class="kv-add"
       @click=${() => {
-        update(addSwitchCase(getState(), path, `case${caseNames.length + 1}`));
+        transactDoc(activeTab.value, (t) =>
+          mutateAddSwitchCase(t, path, `case${caseNames.length + 1}`),
+        );
       }}
       >+ Add case</span
     >
@@ -649,14 +677,16 @@ function renderComponentPropsFieldsTemplate(
 ) {
   const S = getState();
   const comp = componentRegistry.find((c) => c.tagName === node.tagName);
-  if (!comp) return html`<div class="empty-state">Component not found</div>`;
+  if (!comp || !comp.props) return html`<div class="empty-state">Component not found</div>`;
   const isNpm = comp.source === "npm";
   const currentVals = isNpm ? node.attributes || {} : node.$props || {};
   const updateFn = isNpm
     ? (/** @type {string} */ name, /** @type {any} */ v) =>
-        update(updateAttribute(getState(), path, name, v === "" ? undefined : v))
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateAttribute(t, path, name, v === "" ? undefined : v),
+        )
     : (/** @type {string} */ name, /** @type {any} */ v) =>
-        update(updateProp(getState(), path, name, v));
+        transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
 
   const defs = S.document.state || {};
   const signalDefs = Object.entries(defs).filter(
@@ -821,19 +851,22 @@ function renderCustomAttrsFieldsTemplate(
         attr,
         String(val),
         (/** @type {any} */ newAttr, /** @type {any} */ newVal) => {
-          const S = getState();
           if (newAttr !== attr) {
-            let s = updateAttribute(S, path, attr, undefined);
-            s = updateAttribute(s, path, newAttr, newVal);
-            update(s);
+            transactDoc(activeTab.value, (t) => {
+              mutateUpdateAttribute(t, path, attr, undefined);
+              mutateUpdateAttribute(t, path, newAttr, newVal);
+            });
           } else {
-            update(updateAttribute(S, path, attr, newVal));
+            transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, newVal));
           }
         },
-        () => update(updateAttribute(getState(), path, attr, undefined)),
+        () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
       ),
     )}
-    <span class="kv-add" @click=${() => update(updateAttribute(getState(), path, "data-", ""))}
+    <span
+      class="kv-add"
+      @click=${() =>
+        transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "data-", ""))}
       >+ Add attribute</span
     >
   `;
@@ -860,12 +893,15 @@ function renderMediaFieldsTemplate(/** @type {any} */ node) {
           clearTimeout(baseDebounce);
           baseDebounce = setTimeout(() => {
             const val = e.target.value.trim();
-            update(updateMedia(getState(), "--", val || undefined));
+            transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--", val || undefined));
           }, 400);
         }}
       />
       ${media["--"]
-        ? html`<span class="kv-del" @click=${() => update(updateMedia(getState(), "--", undefined))}
+        ? html`<span
+            class="kv-del"
+            @click=${() =>
+              transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--", undefined))}
             >✕</span
           >`
         : nothing}
@@ -916,7 +952,7 @@ function renderMediaFieldsTemplate(/** @type {any} */ node) {
                     if (key && queryVal) {
                       view.showAddBreakpointForm = false;
                       view.addBreakpointPreview = "";
-                      update(updateMedia(getState(), key, queryVal));
+                      transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, key, queryVal));
                     }
                   }}
                 >
@@ -964,10 +1000,10 @@ function mediaBreakpointRowTemplate(/** @type {any} */ name, /** @type {any} */ 
                 const queryEl = e.target
                   .closest("div[style]")
                   ?.parentElement?.querySelector(".bp-query-input");
-                const S = getState();
-                let s = updateMedia(S, name, undefined);
-                s = updateMedia(s, newKey, queryEl?.value || query);
-                update(s);
+                transactDoc(activeTab.value, (t) => {
+                  mutateUpdateMedia(t, name, undefined);
+                  mutateUpdateMedia(t, newKey, queryEl?.value || query);
+                });
               }
             }, 600);
           }}
@@ -977,7 +1013,9 @@ function mediaBreakpointRowTemplate(/** @type {any} */ name, /** @type {any} */ 
           style="font-size:10px;color:var(--fg-dim);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap"
           >${name}</span
         >
-        <span class="kv-del" @click=${() => update(updateMedia(getState(), name, undefined))}
+        <span
+          class="kv-del"
+          @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name, undefined))}
           >✕</span
         >
       </div>
@@ -989,7 +1027,7 @@ function mediaBreakpointRowTemplate(/** @type {any} */ name, /** @type {any} */ 
           @input=${(/** @type {any} */ e) => {
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(
-              () => update(updateMedia(getState(), name, e.target.value)),
+              () => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name, e.target.value)),
               400,
             );
           }}
@@ -1055,7 +1093,9 @@ function renderPageSection(/** @type {any} */ node) {
                   title="Reset to default"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(updateProperty(getState(), [], "$layout", undefined));
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, [], "$layout", undefined),
+                    );
                   }}
                 ></span>`
               : nothing}
@@ -1067,11 +1107,13 @@ function renderPageSection(/** @type {any} */ node) {
             @change=${(/** @type {any} */ e) => {
               const val = e.target.value;
               if (val === "__default__") {
-                update(updateProperty(getState(), [], "$layout", undefined));
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateProperty(t, [], "$layout", undefined),
+                );
               } else if (val === "__none__") {
-                update(updateProperty(getState(), [], "$layout", false));
+                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout", false));
               } else {
-                update(updateProperty(getState(), [], "$layout", val));
+                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout", val));
               }
               invalidateLayoutCache();
             }}
@@ -1196,13 +1238,16 @@ export function renderPropertiesPanelTemplate(ctx) {
         prop: attr,
         label: attrLabel(entry, attr),
         hasValue: hasVal,
-        onClear: () => update(updateAttribute(getState(), path, attr, undefined)),
+        onClear: () =>
+          transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
         widget: html`
           <sp-checkbox
             size="s"
             .checked=${live(!!value)}
             @change=${(/** @type {any} */ e) =>
-              update(updateAttribute(getState(), path, attr, e.target.checked || undefined))}
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateAttribute(t, path, attr, e.target.checked || undefined),
+              )}
           >
           </sp-checkbox>
         `,
@@ -1213,9 +1258,10 @@ export function renderPropertiesPanelTemplate(ctx) {
       prop: attr,
       label: attrLabel(entry, attr),
       hasValue: hasVal,
-      onClear: () => update(updateAttribute(getState(), path, attr, undefined)),
+      onClear: () =>
+        transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
       widget: widgetForType(type, entry, attr, value || "", (/** @type {any} */ v) =>
-        update(updateAttribute(getState(), path, attr, v || undefined)),
+        transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, v || undefined)),
       ),
     });
   }
@@ -1243,7 +1289,7 @@ export function renderPropertiesPanelTemplate(ctx) {
   const knownAttrNames = new Set(Object.keys(applicableAttrs));
   if (isCustomInstance) {
     const comp = componentRegistry.find((c) => c.tagName === node.tagName);
-    if (comp) for (const p of comp.props) knownAttrNames.add(p.name);
+    if (comp?.props) for (const p of comp.props) knownAttrNames.add(p.name);
   }
   const customAttrs = Object.entries(attrs).filter(([k]) => !knownAttrNames.has(k));
 
@@ -1283,7 +1329,9 @@ export function renderPropertiesPanelTemplate(ctx) {
             autocomplete="off"
             list="tag-names"
             @input=${debouncedStyleCommit("prop:tagName", 400, (/** @type {any} */ e) => {
-              update(updateProperty(getState(), path, "tagName", e.target.value || undefined));
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "tagName", e.target.value || undefined),
+              );
             })}
           ></sp-textfield>
         </div>
@@ -1295,7 +1343,9 @@ export function renderPropertiesPanelTemplate(ctx) {
                   title="Clear $id"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(updateProperty(getState(), path, "$id", undefined));
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, path, "$id", undefined),
+                    );
                   }}
                 ></span>`
               : nothing}
@@ -1305,7 +1355,9 @@ export function renderPropertiesPanelTemplate(ctx) {
             size="s"
             .value=${live(node.$id || "")}
             @input=${debouncedStyleCommit("prop:$id", 400, (/** @type {any} */ e) => {
-              update(updateProperty(getState(), path, "$id", e.target.value || undefined));
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "$id", e.target.value || undefined),
+              );
             })}
           ></sp-textfield>
         </div>
@@ -1317,7 +1369,9 @@ export function renderPropertiesPanelTemplate(ctx) {
                   title="Clear class"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(updateProperty(getState(), path, "className", undefined));
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, path, "className", undefined),
+                    );
                   }}
                 ></span>`
               : nothing}
@@ -1327,7 +1381,9 @@ export function renderPropertiesPanelTemplate(ctx) {
             size="s"
             .value=${live(node.className || "")}
             @input=${debouncedStyleCommit("prop:className", 400, (/** @type {any} */ e) => {
-              update(updateProperty(getState(), path, "className", e.target.value || undefined));
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "className", e.target.value || undefined),
+              );
             })}
           ></sp-textfield>
         </div>
@@ -1341,7 +1397,9 @@ export function renderPropertiesPanelTemplate(ctx) {
                         title="Clear text"
                         @click=${(/** @type {any} */ e) => {
                           e.stopPropagation();
-                          update(updateProperty(getState(), path, "textContent", undefined));
+                          transactDoc(activeTab.value, (t) =>
+                            mutateUpdateProperty(t, path, "textContent", undefined),
+                          );
                         }}
                       ></span>`
                     : nothing}
@@ -1356,8 +1414,8 @@ export function renderPropertiesPanelTemplate(ctx) {
                       : (node.textContent ?? ""),
                   )}
                   @input=${debouncedStyleCommit("prop:textContent", 400, (/** @type {any} */ e) => {
-                    update(
-                      updateProperty(getState(), path, "textContent", e.target.value || undefined),
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, path, "textContent", e.target.value || undefined),
                     );
                   })}
                 ></sp-textfield>
@@ -1372,7 +1430,9 @@ export function renderPropertiesPanelTemplate(ctx) {
                   title="Clear hidden"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(updateProperty(getState(), path, "hidden", undefined));
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, path, "hidden", undefined),
+                    );
                   }}
                 ></span>`
               : nothing}
@@ -1382,7 +1442,9 @@ export function renderPropertiesPanelTemplate(ctx) {
             size="s"
             .checked=${live(!!node.hidden)}
             @change=${(/** @type {any} */ e) =>
-              update(updateProperty(getState(), path, "hidden", e.target.checked || undefined))}
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, path, "hidden", e.target.checked || undefined),
+              )}
           >
           </sp-checkbox>
         </div>

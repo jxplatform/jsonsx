@@ -7,35 +7,31 @@
 
 import {
   createState,
-  selectNode,
-  updateProperty,
-  updateDef,
   pushDocument,
   popDocument,
   getNodeAtPath,
-  pathsEqual,
   canvasWrap,
   toolbarEl,
   canvasPanels,
   registerRenderer,
   render,
-  update,
   setUpdateFn,
   setGetStateFn,
   addUpdateMiddleware,
   runUpdateMiddleware,
   addPostRenderHook,
   runPostRenderHooks,
-  notify,
   projectState,
   setProjectState,
   updateUi,
   setUpdateSessionFn,
-  setGetDocFn,
-  setGetSessionFn,
   toFlat,
   fromFlat,
 } from "./store.js";
+
+import { activeTab, openTab } from "./workspace/workspace.js";
+import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "./tabs/transact.js";
+import { effect } from "./reactivity.js";
 
 import { view } from "./view.js";
 
@@ -71,6 +67,7 @@ import {
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
   openFileFromTree as _openFileFromTree,
+  openFileInTab,
   setupTreeKeyboard,
 } from "./files/files.js";
 import { eventsSidebarTemplate as _eventsSidebarTemplate } from "./panels/events-panel.js";
@@ -102,6 +99,7 @@ import * as toolbarPanel from "./panels/toolbar.js";
 import * as overlaysPanel from "./panels/overlays.js";
 import * as rightPanelMod from "./panels/right-panel.js";
 import * as leftPanelMod from "./panels/left-panel.js";
+import * as tabStrip from "./panels/tab-strip.js";
 import { renderStylebookOverlays } from "./panels/stylebook-panel.js";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd.js";
 import { defaultDef } from "./panels/shared.js";
@@ -180,12 +178,14 @@ async function closeFunctionEditor() {
     const minResult = await codeService("minify", { code: currentCode });
     const bodyToStore = minResult?.code ?? currentCode;
     if (editing.type === "def") {
-      update(updateDef(S, editing.defName, { body: bodyToStore }));
+      transactDoc(activeTab.value, (t) =>
+        mutateUpdateDef(t, editing.defName, { body: bodyToStore }),
+      );
     } else if (editing.type === "event") {
       const node = getNodeAtPath(S.document, editing.path);
       const current = node?.[editing.eventKey] || {};
-      update(
-        updateProperty(S, editing.path, editing.eventKey, {
+      transactDoc(activeTab.value, (t) =>
+        mutateUpdateProperty(t, editing.path, editing.eventKey, {
           ...current,
           $prototype: "Function",
           body: bodyToStore,
@@ -237,6 +237,12 @@ const EMPTY_DOC = {
 
 S = createState(structuredClone(EMPTY_DOC));
 ({ doc, session } = fromFlat(S));
+setGetStateFn(() => S);
+
+// Create the initial reactive tab — this is the canonical state container.
+// The flat `S` object and `_update`/`_updateSession` are kept as a compatibility layer
+// while call sites are progressively migrated to direct reactive mutations.
+openTab({ id: "initial", document: structuredClone(EMPTY_DOC) });
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
@@ -259,6 +265,8 @@ toolbarPanel.mount(toolbarEl, {
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
 });
+
+tabStrip.mount(/** @type {HTMLElement} */ (document.querySelector("#tab-strip")));
 
 overlaysPanel.mount({
   getCanvasMode: () => canvasMode,
@@ -294,7 +302,6 @@ initPanelEvents({
   navigateToComponent,
 });
 initCanvasLiveRender({
-  getState: () => S,
   getCanvasMode: () => canvasMode,
 });
 initCanvasRender({
@@ -306,14 +313,38 @@ initCanvasRender({
     }
     canvasMode = mode;
   },
-  getState: () => S,
-  update,
   openFileFromTree,
   exportFile,
   gitDiffState,
   setGitDiffState: (/** @type {any} */ state) => {
     gitDiffState = state;
   },
+});
+
+// Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change
+let _canvasRenderScheduled = false;
+effect(() => {
+  const tab = activeTab.value;
+  if (!tab) return;
+  void tab.doc.document;
+  void tab.doc.mode;
+  void tab.session.ui.editingFunction;
+  void tab.session.ui.featureToggles;
+  void tab.session.ui.settingsTab;
+  void tab.session.ui.stylebookTab;
+  void tab.session.ui.stylebookFilter;
+  void tab.session.ui.stylebookCustomizedOnly;
+  if (!_canvasRenderScheduled) {
+    _canvasRenderScheduled = true;
+    queueMicrotask(() => {
+      _canvasRenderScheduled = false;
+      try {
+        renderCanvas();
+      } catch (e) {
+        console.error("renderCanvas error:", e);
+      }
+    });
+  }
 });
 
 rightPanelMod.mount({
@@ -361,12 +392,8 @@ mountStatusbar();
 canvasWrap.addEventListener("click", (/** @type {any} */ e) => {
   if (e.target !== canvasWrap && e.target !== view.panzoomWrap) return;
   if (!S.selection) return;
-  update(selectNode(S, null));
+  activeTab.value.session.selection = null;
 });
-
-function safeRenderLeftPanel() {
-  leftPanelMod.render();
-}
 
 function safeRenderRightPanel() {
   rightPanelMod.render();
@@ -375,60 +402,42 @@ function safeRenderRightPanel() {
 // Register the update implementation with the store
 setGetStateFn(() => S);
 setUpdateFn(function _update(/** @type {any} */ newState) {
-  const prev = S;
   const prevDoc = S.document;
   const prevSel = S.selection;
+  const prevUi = S.ui;
   S = newState;
 
   // Keep doc/session slices in sync with flat S
   ({ doc, session } = fromFlat(S));
 
-  const docChanged = prevDoc !== S.document;
-  const selChanged = !pathsEqual(prevSel, S.selection);
-  const modeChanged = prev.mode !== S.mode;
-  const uiChanged = prev.ui !== S.ui;
-
-  const canvasUiChanged =
-    uiChanged &&
-    (prev.ui?.editingFunction !== S.ui?.editingFunction ||
-      prev.ui?.settingsTab !== S.ui?.settingsTab ||
-      prev.ui?.stylebookTab !== S.ui?.stylebookTab ||
-      prev.ui?.stylebookFilter !== S.ui?.stylebookFilter ||
-      prev.ui?.stylebookCustomizedOnly !== S.ui?.stylebookCustomizedOnly ||
-      prev.ui?.featureToggles !== S.ui?.featureToggles);
-  const leftUiChanged =
-    uiChanged && (prev.ui?.leftTab !== S.ui?.leftTab || prev.ui?.settingsTab !== S.ui?.settingsTab);
-
-  if (docChanged || modeChanged || canvasUiChanged) {
-    try {
-      renderCanvas();
-    } catch (e) {
-      console.error("renderCanvas error:", e);
+  // Sync into reactive tab so effects fire
+  const tab = activeTab.value;
+  if (tab) {
+    tab.doc.document = S.document;
+    tab.doc.dirty = S.dirty;
+    tab.doc.mode = S.mode;
+    tab.doc.handlersSource = S.handlersSource;
+    tab.doc.content.frontmatter = S.content?.frontmatter ?? {};
+    tab.session.selection = S.selection;
+    tab.session.hover = S.hover;
+    tab.session.clipboard = S.clipboard ?? null;
+    for (const [k, v] of Object.entries(S.ui || {})) {
+      /** @type {any} */ (tab.session.ui)[k] = v;
     }
-    safeRenderLeftPanel();
-  } else if (selChanged || leftUiChanged) {
-    safeRenderLeftPanel();
+    tab.session.canvas.status = S.canvas?.status ?? "idle";
+    tab.session.canvas.scope = S.canvas?.scope ?? null;
+    tab.session.canvas.error = S.canvas?.error ?? null;
   }
 
-  if (uiChanged && prev.ui?.activeMedia !== S.ui?.activeMedia) {
+  if (prevUi?.activeMedia !== S.ui?.activeMedia) {
     updateActivePanelHeaders();
   }
 
   runPostRenderHooks(prevDoc, prevSel);
   runUpdateMiddleware(S);
-
-  notify({
-    doc: docChanged,
-    selection: selChanged,
-    hover: false,
-    ui: uiChanged,
-    mode: modeChanged,
-  });
 });
 
 // Register session dispatch — lightweight path for selection/hover/ui changes
-setGetDocFn(() => doc);
-setGetSessionFn(() => session);
 setUpdateSessionFn(function _updateSession(/** @type {any} */ patch) {
   const prev = session;
   session = { ...session, ...patch };
@@ -440,38 +449,12 @@ setUpdateSessionFn(function _updateSession(/** @type {any} */ patch) {
   }
   S = toFlat(doc, session);
 
-  const selChanged = !pathsEqual(prev.selection, session.selection);
-  const uiChanged = prev.ui !== session.ui;
-  const canvasChanged = prev.canvas !== session.canvas;
-
-  const canvasUiChanged =
-    uiChanged &&
-    (prev.ui?.editingFunction !== session.ui?.editingFunction ||
-      prev.ui?.settingsTab !== session.ui?.settingsTab ||
-      prev.ui?.stylebookTab !== session.ui?.stylebookTab ||
-      prev.ui?.stylebookFilter !== session.ui?.stylebookFilter ||
-      prev.ui?.stylebookCustomizedOnly !== session.ui?.stylebookCustomizedOnly ||
-      prev.ui?.featureToggles !== session.ui?.featureToggles);
-  const leftUiChanged =
-    uiChanged &&
-    (prev.ui?.leftTab !== session.ui?.leftTab || prev.ui?.settingsTab !== session.ui?.settingsTab);
-
-  if (canvasUiChanged) {
-    try {
-      renderCanvas();
-    } catch (e) {
-      console.error("renderCanvas error:", e);
-    }
-    safeRenderLeftPanel();
-  } else if (selChanged || leftUiChanged) {
-    safeRenderLeftPanel();
-  }
-
-  if (uiChanged && prev.ui?.activeMedia !== session.ui?.activeMedia) {
+  if (prev.ui?.activeMedia !== session.ui?.activeMedia) {
     updateActivePanelHeaders();
   }
 
   // Process pending inline edit when canvas becomes ready
+  const canvasChanged = prev.canvas !== session.canvas;
   if (canvasChanged && session.canvas.status === "ready" && session.ui?.pendingInlineEdit) {
     const { path, mediaName: mn } = session.ui.pendingInlineEdit;
     updateUi("pendingInlineEdit", null);
@@ -484,9 +467,6 @@ setUpdateSessionFn(function _updateSession(/** @type {any} */ patch) {
   }
 
   runPostRenderHooks(doc.document, prev.selection);
-
-  const hoverChanged = prev.hover !== session.hover;
-  notify({ doc: false, selection: selChanged, hover: hoverChanged, ui: uiChanged, mode: false });
 });
 
 // Register post-render hook for pseudo-state preview
@@ -565,17 +545,32 @@ if (_openParam) {
         const fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
         const content = await platform.readFile(fileRelPath);
         if (content) {
+          let parsedDoc;
           if (fileRelPath.endsWith(".md")) {
-            await loadMarkdown(content, null);
+            const ns = await _loadMarkdown(content, null);
+            S = ns;
             S.documentPath = fileRelPath;
+            parsedDoc = S.document;
           } else {
-            const parsed = JSON.parse(content);
-            S = createState(parsed);
+            parsedDoc = JSON.parse(content);
+            S = createState(parsedDoc);
             S.documentPath = fileRelPath;
           }
           S.dirty = false;
           S.ui = { ...S.ui, leftTab: "files" };
           ({ doc, session } = fromFlat(S));
+
+          // Sync into reactive tab
+          const tab = activeTab.value;
+          if (tab) {
+            tab.doc.document = S.document;
+            tab.doc.mode = S.mode;
+            tab.doc.dirty = false;
+            tab.doc.content = S.content || { frontmatter: {} };
+            /** @type {any} */ (tab).documentPath = fileRelPath;
+            tab.session.ui.leftTab = "files";
+          }
+
           render();
           statusMessage(`Opened ${_openParam}`);
         }
@@ -637,11 +632,6 @@ function fileOpsCtx() {
 function openFile() {
   return _openFile(fileOpsCtx());
 }
-async function loadMarkdown(/** @type {any} */ source, /** @type {any} */ fileHandle) {
-  const ns = await _loadMarkdown(source, fileHandle);
-  S = ns;
-  ({ doc, session } = fromFlat(S));
-}
 function saveFile() {
   return _saveFile(fileOpsCtx());
 }
@@ -669,23 +659,7 @@ function renderFilesTemplate() {
   return _renderFilesTemplate({ openProject, openFileFromTree, renderLeftPanel });
 }
 function openFileFromTree(/** @type {any} */ path) {
-  return _openFileFromTree(
-    {
-      get S() {
-        return S;
-      },
-      set S(v) {
-        S = v;
-      },
-      commit: (/** @type {any} */ ns) => {
-        S = ns;
-        ({ doc, session } = fromFlat(S));
-      },
-      render,
-      loadMarkdown,
-    },
-    path,
-  );
+  return openFileInTab(path);
 }
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
@@ -735,7 +709,7 @@ function scheduleAutosave() {
         const writable = await S.fileHandle.createWritable();
         await writable.write(JSON.stringify(S.document, null, 2));
         await writable.close();
-        update({ ...S, dirty: false });
+        activeTab.value.doc.dirty = false;
         statusMessage("Auto-saved");
       } catch {}
     }

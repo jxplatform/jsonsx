@@ -6,7 +6,6 @@
 import { html, nothing } from "lit-html";
 import {
   getState,
-  update,
   flattenTree,
   getNodeAtPath,
   pathKey,
@@ -14,11 +13,10 @@ import {
   parentElementPath,
   childIndex,
   nodeLabel,
-  selectNode,
-  moveNode,
-  removeNode,
   VOID_ELEMENTS,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateMoveNode, mutateRemoveNode } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { isInlineElement } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
@@ -34,7 +32,8 @@ export function renderLayersTemplate(ctx) {
   view.dndCleanups = [];
 
   const rows = flattenTree(S.document);
-  const collapsed = S._collapsed || (S._collapsed = new Set());
+  const collapsed = /** @type {any} */ (S)._collapsed ||
+  /** @type {any} */ ((S)._collapsed = new Set());
 
   /** @type {any[]} */
   const layerRows = [];
@@ -142,7 +141,7 @@ export function renderLayersTemplate(ctx) {
         data-dnd-row=${isElement ? key : nothing}
         data-dnd-depth=${isElement ? depth : nothing}
         data-dnd-void=${isElement && isVoidEl ? "" : nothing}
-        @click=${() => update(selectNode(getState(), path))}
+        @click=${() => (activeTab.value.session.selection = path)}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>
               showContextMenu(e, path, getState(), {
@@ -175,7 +174,9 @@ export function renderLayersTemplate(ctx) {
                       @click=${(/** @type {any} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        update(moveNode(getState(), path, parentPath, idx - 1));
+                        transactDoc(activeTab.value, (t) =>
+                          mutateMoveNode(t, path, parentPath, idx - 1),
+                        );
                       }}
                     >
                       <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
@@ -189,7 +190,9 @@ export function renderLayersTemplate(ctx) {
                       @click=${(/** @type {any} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        update(moveNode(getState(), path, parentPath, idx + 2));
+                        transactDoc(activeTab.value, (t) =>
+                          mutateMoveNode(t, path, parentPath, idx + 2),
+                        );
                       }}
                     >
                       <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
@@ -206,7 +209,7 @@ export function renderLayersTemplate(ctx) {
                         const prevPath = [...parentPath, idx - 1];
                         const prev = getNodeAtPath(getState().document, prevPath);
                         const len = prev?.children?.length || 0;
-                        update(moveNode(getState(), path, prevPath, len));
+                        transactDoc(activeTab.value, (t) => mutateMoveNode(t, path, prevPath, len));
                       }}
                     >
                       <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
@@ -221,7 +224,9 @@ export function renderLayersTemplate(ctx) {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
                         const parentIdx = /** @type {number} */ (childIndex(parentPath));
-                        update(moveNode(getState(), path, grandparentPath, parentIdx + 1));
+                        transactDoc(activeTab.value, (t) =>
+                          mutateMoveNode(t, path, grandparentPath, parentIdx + 1),
+                        );
                       }}
                     >
                       <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
@@ -234,7 +239,7 @@ export function renderLayersTemplate(ctx) {
                   title="Delete"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(removeNode(getState(), path));
+                    transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path));
                   }}
                 >
                   <sp-icon-close slot="icon"></sp-icon-close>

@@ -8,6 +8,7 @@ import { ref } from "lit-html/directives/ref.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
 import { canvasWrap, canvasPanels, updateCanvas } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import {
   canvasPanelTemplate,
@@ -50,8 +51,6 @@ let _ctx = null;
  * @param {{
  *   getCanvasMode: () => string;
  *   setCanvasMode: (mode: string) => void;
- *   getState: () => any;
- *   update: (s: any) => void;
  *   openFileFromTree: (path: string) => void;
  *   exportFile: () => void;
  *   gitDiffState: any;
@@ -63,7 +62,9 @@ export function initCanvasRender(ctx) {
 }
 
 export function renderCanvas() {
-  const S = _ctx.getState();
+  const tab = activeTab.value;
+  if (!tab) return;
+  const S = { document: tab.doc.document, ui: tab.session.ui, mode: tab.doc.mode };
   const canvasMode = _ctx.getCanvasMode();
 
   // Advance render generation so stale async renders from the previous cycle bail out
@@ -233,7 +234,9 @@ export function renderCanvas() {
       debounce = setTimeout(() => {
         try {
           const parsed = JSON.parse(view.monacoEditor.getValue());
-          _ctx.update({ ..._ctx.getState(), document: parsed, dirty: true });
+          const tab = activeTab.value;
+          tab.doc.document = parsed;
+          tab.doc.dirty = true;
         } catch {
           // Invalid JSON — don't update state
         }
@@ -280,8 +283,8 @@ export function renderCanvas() {
     `;
 
     litRender(diffTpl, canvasWrap);
-    canvasPanels.push(origPanel);
-    canvasPanels.push(currPanel);
+    canvasPanels.push(/** @type {any} */ (origPanel));
+    canvasPanels.push(/** @type {any} */ (currPanel));
 
     // Parse original document from git content
     let originalDoc = null;
@@ -329,7 +332,7 @@ export function renderCanvas() {
       </div>
     `;
     litRender(editTpl, canvasWrap);
-    canvasPanels.push(panel);
+    canvasPanels.push(/** @type {any} */ (panel));
     renderCanvasIntoPanel(panel, new Set(), S.ui.featureToggles);
     return;
   }
@@ -374,7 +377,7 @@ export function renderCanvas() {
       `,
       canvasWrap,
     );
-    canvasPanels.push(panel);
+    canvasPanels.push(/** @type {any} */ (panel));
     renderCanvasIntoPanel(panel, new Set(), featureToggles);
     applyTransform();
     if (modeChanged) {
@@ -426,7 +429,7 @@ export function renderCanvas() {
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(panel);
+    canvasPanels.push(/** @type {any} */ (panel));
     renderCanvasIntoPanel(panel, activeSet, featureToggles);
   }
 
@@ -450,8 +453,8 @@ export function renderCanvas() {
  * @param {any} panel
  * @param {Set<string>} activeBreakpoints
  * @param {any} featureToggles
- * @param {any} [docOverride] - Optional document to render (for diff mode). Uses S.document if not
- *   provided.
+ * @param {any} [docOverride] - Optional document to render (for diff mode). Uses active tab doc if
+ *   not provided.
  * @param {any} [gitDiffState] - Optional diff state. If provided, computes and applies diff
  *   highlighting.
  */
@@ -463,8 +466,8 @@ function renderCanvasIntoPanel(
   gitDiffState = null,
 ) {
   const gen = view.renderGeneration;
-  const S = _ctx.getState();
-  const docToRender = docOverride || S.document;
+  const tab = activeTab.value;
+  const docToRender = docOverride || tab?.doc.document;
 
   renderCanvasLive(gen, docToRender, panel.canvas).then((/** @type {any} */ scope) => {
     // Skip post-render setup if a newer render has started
@@ -478,8 +481,8 @@ function renderCanvasIntoPanel(
       if (gitDiffState && docOverride) {
         // Determine which document is original and which is current
         const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
-        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || S.document;
-        const currDoc = isOriginal ? gitDiffState.currentDoc || S.document : docOverride;
+        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || tab?.doc.document;
+        const currDoc = isOriginal ? gitDiffState.currentDoc || tab?.doc.document : docOverride;
 
         const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
 
@@ -545,8 +548,9 @@ function applyDiffHighlightToCanvas(canvas, diffMap) {
  */
 function applyCanvasMediaOverrides(canvasEl, activeBreakpoints) {
   if (!activeBreakpoints.size) return;
-  const S = _ctx.getState();
-  const docMedia = getEffectiveMedia(S.document.$media || {});
+  const tab = activeTab.value;
+  if (!tab) return;
+  const docMedia = getEffectiveMedia(tab.doc.document.$media || {});
   const validBreakpoints = new Set();
   for (const name of activeBreakpoints) {
     if (docMedia[name]) validBreakpoints.add(name);

@@ -5,18 +5,16 @@
  */
 
 import {
-  update,
   updateUi,
-  selectNode,
   hoverNode,
   elToPath,
   pathsEqual,
-  insertNode,
   parentElementPath,
   childIndex,
   getNodeAtPath,
   renderOnly,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { stopEditing, isEditing, isEditableBlock } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
@@ -91,7 +89,7 @@ export function registerPanelEvents(panel) {
           // Layout element clicked — show layout info instead of selecting in page doc
           if (layoutElements.has(el)) {
             view.layoutSelection = { el, layoutPath: activeLayoutPath };
-            update(selectNode(S, null));
+            activeTab.value.session.selection = null;
             renderOnly("rightPanel");
             return;
           }
@@ -117,16 +115,18 @@ export function registerPanelEvents(panel) {
 
             if (canvasMode === "design" && S.mode !== "content") {
               updateUi("pendingInlineEdit", { path, mediaName });
-              update(selectNode(withMedia, path));
+              activeTab.value.session.ui.activeMedia = newMedia;
+              activeTab.value.session.selection = path;
               return;
             }
 
-            update(selectNode(withMedia, path));
+            activeTab.value.session.ui.activeMedia = newMedia;
+            activeTab.value.session.selection = path;
             return;
           }
         }
       }
-      update(selectNode(S, null));
+      activeTab.value.session.selection = null;
     },
     opts,
   );
@@ -161,8 +161,8 @@ export function registerPanelEvents(panel) {
             const resolvedEl = path === originalPath ? el : findCanvasElement(path, canvas) || el;
             if (isEditableBlock(resolvedEl)) {
               const newMedia = mediaName === "base" ? null : (mediaName ?? null);
-              const withMedia = { ...S, ui: { ...S.ui, activeMedia: newMedia } };
-              update(selectNode(withMedia, path));
+              activeTab.value.session.ui.activeMedia = newMedia;
+              activeTab.value.session.selection = path;
               _ctx.enterInlineEdit(resolvedEl, path);
               return;
             }
@@ -253,13 +253,10 @@ export function registerPanelEvents(panel) {
 
   insertionHelper.mount({
     getState: _ctx.getState,
-    update,
     getCanvasMode: _ctx.getCanvasMode,
     withPanelPointerEvents,
     effectiveZoom: effectiveZoom,
     defaultDef,
-    insertNode,
-    selectNode,
     parentElementPath,
     childIndex,
     getNodeAtPath,

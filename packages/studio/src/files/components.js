@@ -3,8 +3,19 @@
 import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
 
-/** @type {any[]} */
-export let componentRegistry = []; // cached list from /__studio/components
+/**
+ * @typedef {{
+ *   tagName: string;
+ *   path: string;
+ *   props?: { name: string; type?: string; [k: string]: any }[];
+ *   source?: string;
+ *   package?: string;
+ *   modulePath?: string;
+ * }} ComponentEntry
+ */
+
+/** @type {ComponentEntry[]} */
+export let componentRegistry = [];
 export let _componentRegistryLoaded = false;
 
 export async function loadComponentRegistry() {
@@ -18,8 +29,8 @@ export async function loadComponentRegistry() {
 }
 
 /**
- * @param {any} fromDocPath
- * @param {any} toCompPath
+ * @param {string | null} fromDocPath
+ * @param {string} toCompPath
  */
 export function computeRelativePath(fromDocPath, toCompPath) {
   if (!fromDocPath) return `./${toCompPath}`;

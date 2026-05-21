@@ -1,7 +1,9 @@
 /** Elements panel — block/component palette with categorized accordion and search filter. */
 
 import { html, nothing } from "lit-html";
-import { getState, update, getNodeAtPath, insertNode } from "../store.js";
+import { getState, getNodeAtPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateInsertNode } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { getEffectiveElements } from "../site-context.js";
 import { componentRegistry } from "../files/components.js";
@@ -40,7 +42,9 @@ export function renderElementsTemplate(ctx) {
                   const parentPath = s.selection || [];
                   const parent = getNodeAtPath(s.document, parentPath);
                   const idx = parent?.children ? parent.children.length : 0;
-                  update(insertNode(s, parentPath, idx, structuredClone(def)));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateInsertNode(t, parentPath, idx, structuredClone(def)),
+                  );
                 }}
               >
                 <div class="element-card-preview"></div>
@@ -114,7 +118,9 @@ export function renderElementsTemplate(ctx) {
                           ]),
                         ),
                       };
-                      update(insertNode(s, parentPath, idx, structuredClone(instanceDef)));
+                      transactDoc(activeTab.value, (t) =>
+                        mutateInsertNode(t, parentPath, idx, structuredClone(instanceDef)),
+                      );
                     }}
                   >
                     <div class="element-card-preview">

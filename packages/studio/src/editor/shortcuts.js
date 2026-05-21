@@ -5,45 +5,48 @@
  * shortcuts on the canvas / document.
  */
 
+import { getNodeAtPath, parentElementPath, childIndex, canvasWrap } from "../store.js";
+import { activeTab, workspace, closeTab } from "../workspace/workspace.js";
 import {
-  selectNode,
-  undo,
-  redo,
-  removeNode,
-  insertNode,
-  duplicateNode,
-  getNodeAtPath,
-  parentElementPath,
-  childIndex,
-  canvasWrap,
-  update,
-} from "../store.js";
+  transactDoc,
+  mutateInsertNode,
+  mutateRemoveNode,
+  mutateDuplicateNode,
+  undo as tabUndo,
+  redo as tabRedo,
+} from "../tabs/transact.js";
 import { isEditing } from "./inline-edit.js";
 import { copyNode, cutNode, pasteNode } from "./context-menu.js";
+
+/**
+ * @typedef {import("../state.js").StudioState} StudioState
+ *
+ * @typedef {import("../state.js").JxPath} JxPath
+ */
 
 /**
  * Initialise all keyboard (and wheel/pointer) shortcuts.
  *
  * @param {() => {
- *   S: any;
- *   setS: (s: any) => void;
+ *   S: StudioState;
+ *   setS: (s: StudioState) => void;
  *   canvasMode: string;
  *   panX: number;
  *   panY: number;
  *   setPan: (x: number, y: number) => void;
  *   applyTransform: () => void;
  *   positionZoomIndicator: () => void;
- *   componentInlineEdit: any;
+ *   componentInlineEdit: object | null;
  *   saveFile: () => void;
  *   openProject: () => void;
- *   enterEditOnPath: (path: any) => void;
+ *   enterEditOnPath: (path: JxPath) => void;
  * }} getContext
  */
 export function initShortcuts(getContext) {
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
   canvasWrap.addEventListener(
     "wheel",
-    (/** @type {any} */ e) => {
+    (/** @type {WheelEvent} */ e) => {
       const { S, setS, canvasMode, panX, panY, setPan, applyTransform } = getContext();
       // Edit (content) mode: let the scroll container handle scrolling natively
       if (canvasMode === "edit") return;
@@ -73,7 +76,7 @@ export function initShortcuts(getContext) {
   );
 
   // Middle-mouse drag panning
-  canvasWrap.addEventListener("pointerdown", (/** @type {any} */ e) => {
+  canvasWrap.addEventListener("pointerdown", (/** @type {PointerEvent} */ e) => {
     const ctx = getContext();
     if (ctx.canvasMode === "edit") return; // no panning in edit mode
     if (e.button !== 1) return; // middle button only
@@ -81,7 +84,7 @@ export function initShortcuts(getContext) {
     canvasWrap.setPointerCapture(e.pointerId);
     let lastX = e.clientX,
       lastY = e.clientY;
-    const onMove = (/** @type {any} */ ev) => {
+    const onMove = (/** @type {PointerEvent} */ ev) => {
       const { panX, panY, setPan, applyTransform } = getContext();
       setPan(panX + (ev.clientX - lastX), panY + (ev.clientY - lastY));
       lastX = ev.clientX;
@@ -125,13 +128,18 @@ export function initShortcuts(getContext) {
         e.preventDefault();
         saveFile();
       }
+      if (mod && e.key === "w") {
+        e.preventDefault();
+      }
       return;
     }
     if (isEditing()) {
-      // Let inline editor handle its own keyboard events; only intercept Save
       if (mod && e.key === "s") {
         e.preventDefault();
         saveFile();
+      }
+      if (mod && e.key === "w") {
+        e.preventDefault();
       }
       return;
     }
@@ -140,11 +148,25 @@ export function initShortcuts(getContext) {
         e.preventDefault();
         saveFile();
       }
+      if (mod && e.key === "w") {
+        e.preventDefault();
+      }
       return;
     }
 
     if (mod) {
       switch (e.key) {
+        case "w":
+          e.preventDefault();
+          if (workspace.activeTabId && workspace.tabOrder.length > 1) {
+            const tab = workspace.tabs.get(workspace.activeTabId);
+            if (tab?.doc.dirty) {
+              const name = tab.documentPath?.split("/").pop() || "Untitled";
+              if (!window.confirm(`"${name}" has unsaved changes. Close without saving?`)) break;
+            }
+            closeTab(workspace.activeTabId);
+          }
+          break;
         case "o":
           e.preventDefault();
           openProject();
@@ -155,11 +177,15 @@ export function initShortcuts(getContext) {
           break;
         case "z":
           e.preventDefault();
-          update(e.shiftKey ? redo(S) : undo(S));
+          if (e.shiftKey) tabRedo(activeTab.value);
+          else tabUndo(activeTab.value);
           break;
         case "d":
           e.preventDefault();
-          if (S.selection) update(duplicateNode(S, S.selection));
+          if (S.selection) {
+            const sel = S.selection;
+            transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, sel));
+          }
           break;
         case "c":
           e.preventDefault();
@@ -202,21 +228,23 @@ export function initShortcuts(getContext) {
       case "Backspace":
         if (S.selection && S.selection.length >= 2) {
           e.preventDefault();
-          update(removeNode(S, S.selection));
+          const sel = S.selection;
+          transactDoc(activeTab.value, (t) => mutateRemoveNode(t, sel));
         }
         break;
       case "Escape":
-        update(selectNode(S, null));
+        activeTab.value.session.selection = null;
         break;
       case "Enter":
         if (S.selection && S.selection.length >= 2) {
           e.preventDefault();
-          const pp = /** @type {any} */ (parentElementPath(S.selection));
+          const pp = /** @type {JxPath} */ (parentElementPath(S.selection));
           const idx = /** @type {number} */ (childIndex(S.selection));
-          let s = insertNode(S, pp, idx + 1, { tagName: "p", textContent: "" });
           const newPath = [...pp, "children", idx + 1];
-          s = selectNode(s, newPath);
-          update(s);
+          transactDoc(activeTab.value, (t) => {
+            mutateInsertNode(t, pp, idx + 1, { tagName: "p", textContent: "" });
+            t.session.selection = newPath;
+          });
           enterEditOnPath(newPath);
         }
         break;
@@ -231,7 +259,7 @@ export function initShortcuts(getContext) {
       case "ArrowLeft":
         e.preventDefault();
         if (S.selection && S.selection.length >= 2) {
-          update(selectNode(S, parentElementPath(S.selection)));
+          activeTab.value.session.selection = parentElementPath(S.selection);
         }
         break;
       case "ArrowRight":
@@ -239,7 +267,7 @@ export function initShortcuts(getContext) {
         if (S.selection) {
           const node = getNodeAtPath(S.document, S.selection);
           if (node?.children?.length > 0) {
-            update(selectNode(S, [...S.selection, "children", 0]));
+            activeTab.value.session.selection = [...S.selection, "children", 0];
           }
         }
         break;
@@ -249,8 +277,8 @@ export function initShortcuts(getContext) {
   // Block ctrl+scroll (browser zoom) on all non-canvas areas
   document.addEventListener(
     "wheel",
-    (/** @type {any} */ e) => {
-      if ((e.ctrlKey || e.metaKey) && !canvasWrap.contains(e.target)) {
+    (/** @type {WheelEvent} */ e) => {
+      if ((e.ctrlKey || e.metaKey) && !canvasWrap.contains(/** @type {Node} */ (e.target))) {
         e.preventDefault();
       }
     },
@@ -259,22 +287,24 @@ export function initShortcuts(getContext) {
 }
 
 /**
- * @param {any} S
+ * @param {StudioState} S
  * @param {number} [direction]
  */
 function navigateSelection(S, direction = -1) {
   if (!S.selection) {
-    update(selectNode(S, []));
+    activeTab.value.session.selection = [];
     return;
   }
-  if (S.selection.length < 2) return; // can't navigate from root
+  if (S.selection.length < 2) return;
 
-  const parent = getNodeAtPath(S.document, /** @type {any} */ (parentElementPath(S.selection)));
+  const parent = getNodeAtPath(S.document, /** @type {JxPath} */ (parentElementPath(S.selection)));
   const idx = /** @type {number} */ (childIndex(S.selection));
   const newIdx = idx + direction;
   if (parent?.children && newIdx >= 0 && newIdx < parent.children.length) {
-    update(
-      selectNode(S, [.../** @type {any[]} */ (parentElementPath(S.selection)), "children", newIdx]),
-    );
+    activeTab.value.session.selection = [
+      .../** @type {JxPath} */ (parentElementPath(S.selection)),
+      "children",
+      newIdx,
+    ];
   }
 }

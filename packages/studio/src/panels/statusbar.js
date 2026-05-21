@@ -1,6 +1,8 @@
 /** Statusbar — status message display for Jx Studio */
 
-import { statusbarEl, getNodeAtPath, nodeLabel, getState, subscribe } from "../store.js";
+import { statusbarEl, getNodeAtPath, nodeLabel } from "../store.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
@@ -9,8 +11,8 @@ let statusMsg = "";
 let statusTimeout;
 /** @type {(() => void) | null} */
 let _rerender = null;
-/** @type {(() => void) | null} */
-let _unsub = null;
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
 
 /**
  * Register the callback used to re-render the statusbar. Called once from studio.js during init.
@@ -21,16 +23,29 @@ export function setStatusbarRenderer(fn) {
   _rerender = fn;
 }
 
-/** Subscribe the statusbar to state changes. */
+/** Subscribe the statusbar to state changes via reactive effect. */
 export function mountStatusbar() {
-  _unsub = subscribe((change) => {
-    if (change.selection || change.mode || change.doc) renderStatusbar(getState());
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      // Track relevant reactive properties
+      void tab.doc.document;
+      void tab.doc.mode;
+      void tab.session.selection;
+      renderStatusbar({
+        mode: tab.doc.mode,
+        document: tab.doc.document,
+        selection: tab.session.selection,
+      });
+    });
   });
 }
 
 export function unmountStatusbar() {
-  _unsub?.();
-  _unsub = null;
+  _scope?.stop();
+  _scope = null;
 }
 
 // ─── Statusbar ───────────────────────────────────────────────────────────────

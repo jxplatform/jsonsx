@@ -6,6 +6,8 @@
  */
 
 import { showSlashMenu } from "./slash-menu.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateInsertNode } from "../tabs/transact.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,15 +34,11 @@ import { showSlashMenu } from "./slash-menu.js";
 /**
  * @typedef {Object} InsertionHelperContext
  * @property {() => any} getState - Returns the current editor state.
- * @property {(state: any) => void} update - Commits a new state.
  * @property {() => string} getCanvasMode - Returns the active canvas mode.
  * @property {(fn: Function) => any} withPanelPointerEvents - Executes fn with pointer-events
  *   temporarily enabled on the canvas.
  * @property {() => number} effectiveZoom - Returns the current zoom scale factor.
  * @property {(tag: string) => Object} defaultDef - Creates a default element definition for a tag.
- * @property {(s: any, path: any[], idx: number, def: Object) => any} insertNode - Inserts a node
- *   into the document tree.
- * @property {(s: any, path: any[]) => any} selectNode - Sets the selection to the given path.
  * @property {(path: any[]) => any[] | null} parentElementPath - Returns the parent element path, or
  *   null for root.
  * @property {(path: any[]) => string | number} childIndex - Returns the child index within the
@@ -284,18 +282,18 @@ function onHelperClick(/** @type {MouseEvent} */ e) {
 function onSlashSelect(cmd, point) {
   if (!_ctx) return;
 
-  const { getState, update, defaultDef, insertNode, selectNode } = _ctx;
-  const S = getState();
+  const { defaultDef } = _ctx;
   const { parentPath, idx, edge } = point;
 
   const newDef = defaultDef(cmd.tag);
   const insertPath = edge === "center" ? point.path : parentPath;
   const insertIdx = edge === "center" ? 0 : idx;
-
-  let s = insertNode(S, insertPath, insertIdx, newDef);
   const newPath = [...insertPath, "children", insertIdx];
-  s = selectNode(s, newPath);
-  update(s);
+
+  transactDoc(activeTab.value, (t) => {
+    mutateInsertNode(t, insertPath, insertIdx, newDef);
+    t.session.selection = newPath;
+  });
 
   hide();
 }

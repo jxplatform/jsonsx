@@ -9,8 +9,6 @@ import { styleMap } from "lit-html/directives/style-map.js";
 
 import {
   getState,
-  update,
-  updateStyle,
   updateSession,
   updateUi,
   canvasWrap,
@@ -18,6 +16,8 @@ import {
   elToPath,
   projectState,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateUpdateStyle } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { defineElement, setSkipServerFunctions } from "@jxsuite/runtime";
 import { componentRegistry } from "../files/components.js";
@@ -272,7 +272,7 @@ export function renderStylebookOverlays() {
   const selectedTag = S.ui.stylebookSelection;
 
   for (const panel of canvasPanels) {
-    const hoverTag = panel._lastHoverTag;
+    const hoverTag = /** @type {any} */ (panel)._lastHoverTag;
     /**
      * @type {{
      *   cls: string;
@@ -691,8 +691,9 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
                 const swatch = /** @type {any} */ (row.querySelector(".sb-var-swatch"));
                 if (swatch) swatch.style.backgroundColor = colorPicker.value;
                 if (!isNew && varName) {
-                  const S = getState();
-                  update(updateStyle(S, [], varName, colorPicker.value));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateStyle(t, [], varName, colorPicker.value),
+                  );
                 }
               }}
             />
@@ -751,8 +752,7 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
             const swatch = /** @type {any} */ (row.querySelector(".sb-var-swatch"));
             if (swatch) swatch.style.backgroundColor = v;
             if (!isNew && varName) {
-              const S = getState();
-              update(updateStyle(S, [], varName, v));
+              transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, v));
             }
           }, 400);
         }}
@@ -765,8 +765,7 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
         const bar = /** @type {any} */ (row.querySelector(".sb-var-size-bar"));
         if (bar) bar.style.width = newVal;
         if (!isNew && varName) {
-          const S = getState();
-          update(updateStyle(S, [], varName, newVal));
+          transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, newVal));
         }
       },
     });
@@ -798,8 +797,7 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
             const v = textFieldEl.value;
             const fontPrev = /** @type {any} */ (row.querySelector(".sb-var-font-preview"));
             if (fontPrev) fontPrev.style.fontFamily = v;
-            const S = getState();
-            update(updateStyle(S, [], varName, v));
+            transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, v));
           }, 400);
         }}
       ></sp-textfield>
@@ -824,8 +822,7 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
               const val = getValueFn();
               const generatedVar = friendlyNameToVar(name, catMeta.prefix);
               if (!generatedVar || !val) return;
-              const S = getState();
-              update(updateStyle(S, [], generatedVar, val));
+              transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], generatedVar, val));
             }}
             >Add</sp-action-button
           >
@@ -858,8 +855,7 @@ function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
               class="sb-var-del"
               style="pointer-events:auto"
               @click=${() => {
-                const S = getState();
-                update(updateStyle(S, [], varName, undefined));
+                transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, undefined));
               }}
             >
               <sp-icon-delete slot="icon"></sp-icon-delete>

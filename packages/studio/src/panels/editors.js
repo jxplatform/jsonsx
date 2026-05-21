@@ -7,16 +7,9 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 
-import {
-  getState,
-  update,
-  renderOnly,
-  canvasWrap,
-  canvasPanels,
-  updateDef,
-  updateProperty,
-  getNodeAtPath,
-} from "../store.js";
+import { getState, renderOnly, canvasWrap, canvasPanels, getNodeAtPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { codeService, setLintMarkers, getFunctionArgs } from "../services/code-services.js";
 
@@ -126,15 +119,15 @@ export function renderFunctionEditor() {
 
     clearTimeout(syncDebounce);
     syncDebounce = setTimeout(() => {
-      const S = getState();
       const newBody = view.functionEditor.getValue();
       if (editing.type === "def") {
-        update(updateDef(S, editing.defName, { body: newBody }));
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, editing.defName, { body: newBody }));
       } else if (editing.type === "event") {
+        const S = getState();
         const node = getNodeAtPath(S.document, editing.path);
         const current = node?.[editing.eventKey] || {};
-        update(
-          updateProperty(S, editing.path, editing.eventKey, {
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateProperty(t, editing.path, editing.eventKey, {
             ...current,
             $prototype: "Function",
             body: newBody,

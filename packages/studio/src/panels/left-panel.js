@@ -7,14 +7,10 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import {
-  getState,
-  leftPanel,
-  updateSession,
-  update,
-  applyMutation,
-  updateFrontmatter,
-} from "../store.js";
+import { leftPanel, updateSession } from "../store.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transact, mutateUpdateFrontmatter } from "../tabs/transact.js";
 
 import { renderLayersTemplate } from "./layers-panel.js";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel.js";
@@ -49,6 +45,9 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
 /** @type {LeftPanelCtx | null} */
 let _ctx = null;
 
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
+
 let _rendering = false;
 let _scheduled = false;
 
@@ -59,9 +58,25 @@ let _scheduled = false;
  */
 export function mount(ctx) {
   _ctx = ctx;
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      // Track properties the left panel reads
+      void tab.doc.document;
+      void tab.doc.mode;
+      void tab.session.selection;
+      void tab.session.ui.leftTab;
+      void tab.session.ui.settingsTab;
+      render();
+    });
+  });
 }
 
 export function unmount() {
+  _scope?.stop();
+  _scope = null;
   _ctx = null;
 }
 
@@ -98,7 +113,14 @@ function _flush() {
 
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
-  const S = getState();
+  const aTab = activeTab.value;
+  if (!aTab) return;
+  const S = /** @type {any} */ ({
+    ui: aTab.session.ui,
+    document: aTab.doc.document,
+    mode: aTab.doc.mode,
+    selection: aTab.session.selection,
+  });
   const tab = S.ui.leftTab;
 
   /** @type {TemplateResult | typeof nothing} */
@@ -120,7 +142,7 @@ function _render() {
       documentPath: S.documentPath,
       documentElements: S.document.$elements || [],
       applyMutation: (/** @type {(doc: object) => void} */ fn) => {
-        update(applyMutation(getState(), fn));
+        transact(activeTab.value, fn);
       },
     });
   else if (tab === "files") content = ctx.renderFilesTemplate();
@@ -151,16 +173,17 @@ function _render() {
       document: headDoc,
       applyMutation: isContent
         ? (/** @type {(doc: object) => void} */ fn) => {
+            const tab = activeTab.value;
+            const fm = /** @type {Record<string, any>} */ (tab.doc.content?.frontmatter ?? {});
             const tmp = { title: fm.title, $head: fm.$head ? [...fm.$head] : undefined };
             fn(tmp);
-            let s = getState();
-            if (tmp.title !== fm.title) s = updateFrontmatter(s, "title", tmp.title);
+            if (tmp.title !== fm.title)
+              mutateUpdateFrontmatter(tab, "title", /** @type {any} */ (tmp.title));
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
-            s = updateFrontmatter(s, "$head", newHead);
-            update(s);
+            mutateUpdateFrontmatter(tab, "$head", newHead);
           }
         : (/** @type {(doc: object) => void} */ fn) => {
-            update(applyMutation(getState(), fn));
+            transact(activeTab.value, fn);
           },
       renderLeftPanel: render,
     });

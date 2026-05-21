@@ -1,7 +1,7 @@
 /** Activity bar — tab icons for switching left panel views. */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { activityBar, update, getState, renderOnly } from "../store.js";
+import { activityBar, updateUi, renderOnly } from "../store.js";
 
 const gitBranchIcon = (/** @type {any} */ s) => html`
   <svg
@@ -76,8 +76,7 @@ export function renderActivityBar(S) {
       direction="vertical"
       quiet
       @change=${(/** @type {any} */ e) => {
-        const current = getState();
-        update({ ...current, ui: { ...current.ui, leftTab: e.target.selected } });
+        updateUi("leftTab", e.target.selected);
         renderOnly("activityBar", "leftPanel");
       }}
     >

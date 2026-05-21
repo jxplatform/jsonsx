@@ -1,26 +1,32 @@
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
+import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import {
-  update,
-  selectNode,
-  insertNode,
-  removeNode,
-  duplicateNode,
-  wrapNode,
-  getNodeAtPath,
-  parentElementPath,
-  childIndex,
-} from "../store.js";
+  transactDoc,
+  mutateInsertNode,
+  mutateRemoveNode,
+  mutateDuplicateNode,
+  mutateWrapNode,
+} from "../tabs/transact.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
 import { componentRegistry } from "../files/components.js";
 
-/** @type {any} */
+/**
+ * @typedef {import("../state.js").StudioState} StudioState
+ *
+ * @typedef {import("../state.js").JxPath} JxPath
+ *
+ * @typedef {import("../state.js").JxNode} JxNode
+ */
+
+/** @type {JxNode | null} */
 let clipboard = null;
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────
 
-/** @param {any} S */
+/** @param {StudioState} S */
 export function copyNode(S) {
   if (!S.selection) return;
   const node = getNodeAtPath(S.document, S.selection);
@@ -29,32 +35,32 @@ export function copyNode(S) {
   statusMessage("Copied");
 }
 
-/** @param {any} S */
+/** @param {StudioState} S */
 export function cutNode(S) {
   if (!S.selection || S.selection.length < 2) return;
-  const node = getNodeAtPath(S.document, S.selection);
+  const sel = S.selection;
+  const node = getNodeAtPath(S.document, sel);
   if (!node) return;
   clipboard = structuredClone(node);
-  update(removeNode(S, S.selection));
+  transactDoc(activeTab.value, (t) => mutateRemoveNode(t, sel));
   statusMessage("Cut");
 }
 
-/** @param {any} S */
+/** @param {StudioState} S */
 export function pasteNode(S) {
   if (!clipboard) return;
+  const clip = clipboard;
   const pPath = S.selection || [];
   const parent = getNodeAtPath(S.document, pPath);
   if (!parent) return;
 
   if (S.selection && S.selection.length >= 2) {
-    // Paste as sibling after selection
-    const pp = /** @type {any} */ (parentElementPath(S.selection));
+    const pp = /** @type {JxPath} */ (parentElementPath(S.selection));
     const idx = /** @type {number} */ (childIndex(S.selection));
-    update(insertNode(S, pp, idx + 1, structuredClone(clipboard)));
+    transactDoc(activeTab.value, (t) => mutateInsertNode(t, pp, idx + 1, structuredClone(clip)));
   } else {
-    // Paste as last child of root/selected
     const idx = parent.children ? parent.children.length : 0;
-    update(insertNode(S, pPath, idx, structuredClone(clipboard)));
+    transactDoc(activeTab.value, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
   }
   statusMessage("Pasted");
 }
@@ -77,9 +83,9 @@ export function dismissContextMenu() {
 }
 
 /**
- * @param {any} e
- * @param {any} path
- * @param {any} S
+ * @param {MouseEvent} e
+ * @param {JxPath} path
+ * @param {StudioState} S
  * @param {{ onEditComponent?: (path: string) => void }} [opts]
  */
 export function showContextMenu(e, path, S, opts = {}) {
@@ -90,7 +96,7 @@ export function showContextMenu(e, path, S, opts = {}) {
   if (!node) return;
 
   // Select the node
-  update(selectNode(S, path));
+  activeTab.value.session.selection = path;
 
   /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
   const items = [];
@@ -98,37 +104,48 @@ export function showContextMenu(e, path, S, opts = {}) {
   items.push({ label: "Copy", action: () => copyNode(S) });
   if (path.length >= 2) {
     items.push({ label: "Cut", action: () => cutNode(S) });
-    items.push({ label: "Duplicate", action: () => update(duplicateNode(S, S.selection)) });
+    items.push({
+      label: "Duplicate",
+      action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
+    });
     items.push({ label: "—" }); // separator
     items.push({
       label: "Insert before",
       action: () => {
-        const pp = /** @type {any} */ (parentElementPath(path));
+        const pp = /** @type {JxPath} */ (parentElementPath(path));
         const idx = /** @type {number} */ (childIndex(path));
-        update(insertNode(S, pp, idx, { tagName: "p", children: [] }));
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, pp, idx, { tagName: "p", children: [] }),
+        );
       },
     });
     items.push({
       label: "Insert after",
       action: () => {
-        const pp = /** @type {any} */ (parentElementPath(path));
+        const pp = /** @type {JxPath} */ (parentElementPath(path));
         const idx = /** @type {number} */ (childIndex(path));
-        update(insertNode(S, pp, idx + 1, { tagName: "p", children: [] }));
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, pp, idx + 1, { tagName: "p", children: [] }),
+        );
       },
     });
     items.push({
       label: "Wrap in Div",
-      action: () => update(wrapNode(S, S.selection)),
+      action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
     });
     if (node.tagName) {
       const isComponent =
         node.tagName.includes("-") &&
-        componentRegistry.some((/** @type {any} */ c) => c.tagName === node.tagName);
+        componentRegistry.some(
+          (/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName,
+        );
       if (isComponent && opts.onEditComponent) {
-        const comp = componentRegistry.find((/** @type {any} */ c) => c.tagName === node.tagName);
+        const comp = componentRegistry.find(
+          (/** @type {{ tagName: string; path: string }} */ c) => c.tagName === node.tagName,
+        );
         items.push({
           label: "Edit Component",
-          action: () => opts.onEditComponent?.(comp.path),
+          action: () => opts.onEditComponent?.(/** @type {string} */ (comp?.path)),
         });
       } else if (!isComponent) {
         items.push({
@@ -138,24 +155,31 @@ export function showContextMenu(e, path, S, opts = {}) {
       }
     }
     items.push({ label: "—" }); // separator
-    items.push({ label: "Delete", action: () => update(removeNode(S, S.selection)), danger: true });
+    items.push({
+      label: "Delete",
+      action: () => transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path)),
+      danger: true,
+    });
   }
   if (clipboard) {
+    const clip = clipboard;
     items.push({ label: "—" });
     items.push({
       label: "Paste inside",
       action: () => {
         const idx = node.children ? node.children.length : 0;
-        update(insertNode(S, path, idx, structuredClone(clipboard)));
+        transactDoc(activeTab.value, (t) => mutateInsertNode(t, path, idx, structuredClone(clip)));
       },
     });
     if (path.length >= 2) {
       items.push({
         label: "Paste after",
         action: () => {
-          const pp = /** @type {any} */ (parentElementPath(path));
+          const pp = /** @type {JxPath} */ (parentElementPath(path));
           const idx = /** @type {number} */ (childIndex(path));
-          update(insertNode(S, pp, idx + 1, structuredClone(clipboard)));
+          transactDoc(activeTab.value, (t) =>
+            mutateInsertNode(t, pp, idx + 1, structuredClone(clip)),
+          );
         },
       });
     }

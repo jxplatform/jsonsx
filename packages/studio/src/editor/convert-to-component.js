@@ -1,6 +1,8 @@
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
-import { update, getNodeAtPath, applyMutation, parentElementPath, childIndex } from "../store.js";
+import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transact } from "../tabs/transact.js";
 import {
   computeRelativePath,
   loadComponentRegistry,
@@ -36,7 +38,7 @@ export async function convertToComponent(S) {
 
   // Single atomic mutation: replace node + add $elements ref
   const selectionPath = S.selection;
-  const newState = applyMutation(S, (doc) => {
+  transact(activeTab.value, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];
     const idx = childIndex(selectionPath);
@@ -53,8 +55,6 @@ export async function convertToComponent(S) {
       doc.$elements.push({ $ref: refPath });
     }
   });
-
-  update(newState);
 
   // Write component file and refresh registry
   try {

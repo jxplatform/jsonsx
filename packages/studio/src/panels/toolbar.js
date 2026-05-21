@@ -4,7 +4,10 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { getState, update, updateSession, updateUi, undo, redo, subscribe } from "../store.js";
+import { updateSession, updateUi } from "../store.js";
+import { undo as tabUndo, redo as tabRedo } from "../tabs/transact.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
 import { getEffectiveMedia } from "../site-context.js";
 import { mediaDisplayName } from "./shared.js";
 import { view } from "../view.js";
@@ -15,8 +18,8 @@ let _rootEl = null;
 /** @type {any} */
 let _ctx = null;
 
-/** @type {(() => void) | null} */
-let _unsub = null;
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
 
 const toolbarIconMap = /** @type {Record<string, any>} */ ({
   "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
@@ -59,12 +62,28 @@ function tbBtnTpl(label, onClick, iconTag) {
 export function mount(rootEl, ctx) {
   _rootEl = rootEl;
   _ctx = ctx;
-  _unsub = subscribe(() => render());
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      // Read reactive properties to establish tracking
+      void tab.doc.document;
+      void tab.doc.dirty;
+      void tab.doc.mode;
+      void tab.session.selection;
+      void tab.session.ui.editingFunction;
+      void tab.session.ui.featureToggles;
+      void tab.session.ui.leftTab;
+      void tab.session.ui.rightTab;
+      render();
+    });
+  });
 }
 
 export function unmount() {
-  _unsub?.();
-  _unsub = null;
+  _scope?.stop();
+  _scope = null;
   _rootEl = null;
   _ctx = null;
 }
@@ -79,7 +98,18 @@ export function render() {
 }
 
 function toolbarTemplate() {
-  const S = getState();
+  const tab = activeTab.value;
+  if (!tab) return html``;
+  const S = /** @type {any} */ ({
+    document: tab.doc.document,
+    ui: tab.session.ui,
+    mode: tab.doc.mode,
+    selection: tab.session.selection,
+    dirty: tab.doc.dirty,
+    documentPath: tab.documentPath,
+    fileHandle: tab.fileHandle,
+    documentStack: tab.session.documentStack,
+  });
   const canvasMode = _ctx.getCanvasMode();
   const hasStack = S.documentStack && S.documentStack.length > 0;
   const hasFunc = !!S.ui.editingFunction;
@@ -203,8 +233,8 @@ function toolbarTemplate() {
       ${tbBtnTpl("Save", _ctx.saveFile, "sp-icon-save-floppy")}
     </sp-action-group>
     <sp-action-group compact size="s">
-      ${tbBtnTpl("Undo", () => update(undo(getState())), "sp-icon-undo")}
-      ${tbBtnTpl("Redo", () => update(redo(getState())), "sp-icon-redo")}
+      ${tbBtnTpl("Undo", () => tabUndo(activeTab.value), "sp-icon-undo")}
+      ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}
     </sp-action-group>
     <div class="tb-spacer"></div>
     ${S.documentPath

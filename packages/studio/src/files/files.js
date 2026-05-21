@@ -15,10 +15,12 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
+import { workspace, openTab, activateTab } from "../workspace/workspace.js";
+import { loadMarkdown } from "./file-ops.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
-const fileIconMap = /** @type {Record<string, any>} */ ({
+const fileIconMap = /** @type {Record<string, import("lit-html").TemplateResult>} */ ({
   "sp-icon-folder-open": html`<sp-icon-folder-open></sp-icon-folder-open>`,
   "sp-icon-folder": html`<sp-icon-folder></sp-icon-folder>`,
   "sp-icon-file-code": html`<sp-icon-file-code></sp-icon-file-code>`,
@@ -29,7 +31,7 @@ const fileIconMap = /** @type {Record<string, any>} */ ({
 
 // ─── File management ──────────────────────────────────────────────────────────
 
-async function loadDirectory(/** @type {any} */ dirPath) {
+async function loadDirectory(/** @type {string} */ dirPath) {
   if (!projectState) return;
   try {
     const platform = getPlatform();
@@ -138,7 +140,7 @@ export async function openProject({ S, commit, renderActivityBar, renderLeftPane
 
 // ─── File tree templates ──────────────────────────────────────────────────────
 
-function fileTypeIconTpl(/** @type {any} */ name, /** @type {any} */ type) {
+function fileTypeIconTpl(/** @type {string} */ name, /** @type {string} */ type) {
   let tag;
   if (type === "directory") {
     tag = projectState?.expanded?.has(name) ? "sp-icon-folder-open" : "sp-icon-folder";
@@ -237,11 +239,11 @@ export function renderFilesTemplate({
         quiet
         placeholder="Filter files…"
         value=${projectState.searchQuery}
-        @input=${(/** @type {any} */ e) => {
-          projectState.searchQuery = e.target.value;
+        @input=${(/** @type {Event} */ e) => {
+          projectState.searchQuery = /** @type {HTMLInputElement} */ (e.target).value;
           renderLeftPanel();
         }}
-        @submit=${(/** @type {any} */ e) => e.preventDefault()}
+        @submit=${(/** @type {Event} */ e) => e.preventDefault()}
       ></sp-search>
     </div>
     <div class="file-tree" role="tree" aria-label="Project files">
@@ -250,10 +252,10 @@ export function renderFilesTemplate({
   `;
 }
 
-/** @returns {any} */
+/** @returns {import("lit-html").TemplateResult | import("lit-html").TemplateResult[]} */
 function renderTreeLevelTemplate(
-  /** @type {any} */ dirPath,
-  /** @type {any} */ depth,
+  /** @type {string} */ dirPath,
+  /** @type {number} */ depth,
   /** @type {{ openFileFn: (path: string) => void; renderLeftPanel: () => void }} */ ctx,
 ) {
   const entries = projectState.dirs.get(dirPath);
@@ -293,7 +295,7 @@ function renderTreeLevelTemplate(
         data-path=${entry.path}
         data-type=${entry.type}
         aria-expanded=${isDir ? String(isExpanded) : nothing}
-        @click=${async (/** @type {any} */ e) => {
+        @click=${async (/** @type {MouseEvent} */ e) => {
           e.stopPropagation();
           if (isDir) {
             if (isExpanded) projectState.expanded.delete(entry.path);
@@ -306,7 +308,7 @@ function renderTreeLevelTemplate(
             ctx.openFileFn(entry.path);
           }
         }}
-        @contextmenu=${(/** @type {any} */ e) => {
+        @contextmenu=${(/** @type {MouseEvent} */ e) => {
           e.preventDefault();
           e.stopPropagation();
           showFileContextMenu(e, entry, ctx);
@@ -325,10 +327,10 @@ function renderTreeLevelTemplate(
   });
 }
 
-export function setupTreeKeyboard(/** @type {any} */ tree) {
-  tree.addEventListener("keydown", (/** @type {any} */ e) => {
-    const items = [...tree.querySelectorAll(".file-tree-item")];
-    const focused = tree.querySelector(".file-tree-item:focus");
+export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
+  tree.addEventListener("keydown", (/** @type {KeyboardEvent} */ e) => {
+    const items = /** @type {HTMLElement[]} */ ([...tree.querySelectorAll(".file-tree-item")]);
+    const focused = /** @type {HTMLElement | null} */ (tree.querySelector(".file-tree-item:focus"));
     if (!focused || items.length === 0) return;
 
     const idx = items.indexOf(focused);
@@ -343,12 +345,15 @@ export function setupTreeKeyboard(/** @type {any} */ tree) {
         break;
       case "ArrowRight":
         if (focused.dataset.type === "directory") {
-          const path = focused.dataset.path;
+          const path = /** @type {string} */ (focused.dataset.path);
           if (!projectState.expanded.has(path)) {
             projectState.expanded.add(path);
             loadDirectory(path).then(() => {
               const panel = tree.closest(".panel-body");
-              if (panel) panel.querySelector(".file-tree-item:focus")?.click();
+              if (panel)
+                /** @type {HTMLElement | null} */ (
+                  panel.querySelector(".file-tree-item:focus")
+                )?.click();
             });
           }
         }
@@ -378,12 +383,12 @@ export function setupTreeKeyboard(/** @type {any} */ tree) {
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
-/** @type {any} */
+/** @type {HTMLElement | null} */
 let fileContextPopover = null;
 
 function showFileContextMenu(
-  /** @type {any} */ e,
-  /** @type {any} */ entry,
+  /** @type {MouseEvent} */ e,
+  /** @type {{ name: string; path: string; type: string }} */ entry,
   /** @type {{ openFileFn: (path: string) => void; renderLeftPanel: () => void }} */ ctx,
 ) {
   if (fileContextPopover) {
@@ -442,8 +447,8 @@ function showFileContextMenu(
   litRender(tpl, fileContextPopover);
   document.body.appendChild(fileContextPopover);
 
-  const closeHandler = (/** @type {any} */ ev) => {
-    if (!fileContextPopover?.contains(ev.target)) {
+  const closeHandler = (/** @type {MouseEvent} */ ev) => {
+    if (!fileContextPopover?.contains(/** @type {Node} */ (ev.target))) {
       closeFileContextMenu();
       document.removeEventListener("mousedown", closeHandler, true);
     }
@@ -478,7 +483,10 @@ async function createNewFile(dirPath = ".", /** @type {() => void} */ renderLeft
   }
 }
 
-async function renameFile(/** @type {any} */ entry, /** @type {() => void} */ renderLeftPanel) {
+async function renameFile(
+  /** @type {{ name: string; path: string; type: string }} */ entry,
+  /** @type {() => void} */ renderLeftPanel,
+) {
   const newName = prompt("New name:", entry.name);
   if (!newName || newName === entry.name) return;
   const entryPath = entry.path.replaceAll("\\", "/");
@@ -500,7 +508,10 @@ async function renameFile(/** @type {any} */ entry, /** @type {() => void} */ re
   }
 }
 
-async function deleteFile(/** @type {any} */ entry, /** @type {() => void} */ renderLeftPanel) {
+async function deleteFile(
+  /** @type {{ name: string; path: string; type: string }} */ entry,
+  /** @type {() => void} */ renderLeftPanel,
+) {
   if (!confirm(`Delete "${entry.name}"?`)) return;
   try {
     const platform = getPlatform();
@@ -579,6 +590,43 @@ export async function openFileFromTree(ctx, path) {
 
     ctx.render();
     statusMessage(`Opened ${path}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
+}
+
+/**
+ * Open a file from the tree into a tab. Activates existing tab if already open.
+ *
+ * @param {string} path
+ */
+export async function openFileInTab(path) {
+  for (const [id, tab] of workspace.tabs.entries()) {
+    if (tab.documentPath === path) {
+      activateTab(id);
+      projectState.selectedPath = path;
+      return;
+    }
+  }
+
+  const platform = getPlatform();
+  try {
+    const content = await platform.readFile(path);
+    if (!content) return;
+
+    let document, frontmatter;
+    if (path.endsWith(".md")) {
+      const state = await loadMarkdown(content, null);
+      document = state.document;
+      frontmatter = state.content?.frontmatter;
+    } else {
+      document = JSON.parse(content);
+    }
+
+    const id = path;
+    openTab({ id, documentPath: path, document, frontmatter });
+    projectState.selectedPath = path;
+    statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);
   }

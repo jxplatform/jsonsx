@@ -4,7 +4,9 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { getState, canvasPanels, pathsEqual, subscribe } from "../store.js";
+import { canvasPanels, pathsEqual } from "../store.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { findCanvasElement, getActivePanel, effectiveZoom } from "../canvas/canvas-helpers.js";
 import { layoutElements } from "../canvas/canvas-live-render.js";
@@ -32,8 +34,8 @@ import { layoutElements } from "../canvas/canvas-live-render.js";
 /** @type {OverlaysCtx | null} */
 let _ctx = null;
 
-/** @type {(() => void) | null} */
-let _unsub = null;
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
 
 let _scheduled = false;
 
@@ -44,14 +46,23 @@ let _scheduled = false;
  */
 export function mount(ctx) {
   _ctx = ctx;
-  _unsub = subscribe((change) => {
-    if (change.selection || change.hover || change.mode) render();
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      // Track selection, hover, and mode
+      void tab.session.selection;
+      void tab.session.hover;
+      void tab.doc.mode;
+      render();
+    });
   });
 }
 
 export function unmount() {
-  _unsub?.();
-  _unsub = null;
+  _scope?.stop();
+  _scope = null;
   _ctx = null;
 }
 
@@ -66,7 +77,10 @@ export function render() {
 function _flush() {
   _scheduled = false;
   if (!_ctx) return;
-  const S = getState();
+  const tab = activeTab.value;
+  if (!tab) return;
+  const { selection, hover } = tab.session;
+  const { stylebookTab } = tab.session.ui;
   const canvasMode = _ctx.getCanvasMode();
 
   if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "settings") {
@@ -82,7 +96,7 @@ function _flush() {
   }
 
   if (canvasMode === "settings") {
-    const enable = S.ui.stylebookTab === "elements";
+    const enable = stylebookTab === "elements";
     for (const p of canvasPanels) {
       p.overlayClk.style.pointerEvents = enable ? "" : "none";
     }
@@ -108,8 +122,8 @@ function _flush() {
     const scrollLeft = p.viewport.scrollLeft;
     const scale = effectiveZoom();
 
-    if (S.hover && !pathsEqual(S.hover, S.selection)) {
-      const el = findCanvasElement(S.hover, p.canvas);
+    if (hover && !pathsEqual(hover, selection)) {
+      const el = findCanvasElement(hover, p.canvas);
       if (el) {
         const elRect = el.getBoundingClientRect();
         /** @type {OverlayBox} */
@@ -125,8 +139,8 @@ function _flush() {
       }
     }
 
-    if (S.selection && p === getActivePanel()) {
-      const el = findCanvasElement(S.selection, p.canvas);
+    if (selection && p === getActivePanel()) {
+      const el = findCanvasElement(selection, p.canvas);
       if (el) {
         const elRect = el.getBoundingClientRect();
         /** @type {OverlayBox} */

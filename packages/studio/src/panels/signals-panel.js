@@ -5,7 +5,14 @@
  */
 
 import { html, nothing } from "lit-html";
-import { addDef, removeDef, updateDef, renameDef, update } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import {
+  transactDoc,
+  mutateUpdateDef,
+  mutateAddDef,
+  mutateRemoveDef,
+  mutateRenameDef,
+} from "../tabs/transact.js";
 import { renderFieldRow } from "../ui/field-row.js";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.js";
 
@@ -266,7 +273,7 @@ export function renderSignalsTemplate(S, ctx) {
                   class="signal-del"
                   @click=${(/** @type {any} */ e) => {
                     e.stopPropagation();
-                    update(removeDef(S, name));
+                    transactDoc(activeTab.value, (t) => mutateRemoveDef(t, name));
                   }}
                 >
                   <sp-icon-delete slot="icon"></sp-icon-delete>
@@ -304,7 +311,7 @@ export function renderSignalsTemplate(S, ctx) {
             while (S.document.state && S.document.state[n]) {
               n = nameBase + i++;
             }
-            update(addDef(S, n, structuredClone(template)));
+            transactDoc(activeTab.value, (t) => mutateAddDef(t, n, structuredClone(template)));
             expandedSignal = n;
             ctx.renderLeftPanel();
           }}
@@ -396,7 +403,7 @@ function renderSignalEditorTemplate(
   const nameField = signalFieldRow("Name", name, (/** @type {any} */ v) => {
     if (v && v !== name && !(S.document.state && S.document.state[v])) {
       expandedSignal = v;
-      update(renameDef(S, name, v));
+      transactDoc(activeTab.value, (t) => mutateRenameDef(t, name, v));
     }
   });
 
@@ -414,7 +421,9 @@ function renderSignalEditorTemplate(
     const cemFields = isCustomElementDoc(S)
       ? html`
           ${signalFieldRow("Attribute", def.attribute || "", (/** @type {any} */ v) =>
-            update(updateDef(S, name, { attribute: v || undefined })),
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateDef(t, name, { attribute: v || undefined }),
+            ),
           )}
           ${renderFieldRow({
             prop: "reflects",
@@ -425,14 +434,19 @@ function renderSignalEditorTemplate(
                 class="field-check"
                 ?checked=${!!def.reflects}
                 @change=${(/** @type {any} */ e) =>
-                  update(updateDef(S, name, { reflects: e.target.checked || undefined }))}
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { reflects: e.target.checked || undefined }),
+                  )}
               ></sp-checkbox>
             `,
           })}
           ${signalFieldRow(
             "Deprecated",
             typeof def.deprecated === "string" ? def.deprecated : "",
-            (/** @type {any} */ v) => update(updateDef(S, name, { deprecated: v || undefined })),
+            (/** @type {any} */ v) =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { deprecated: v || undefined }),
+              ),
           )}
         `
       : nothing;
@@ -442,14 +456,18 @@ function renderSignalEditorTemplate(
         "Type",
         ["string", "integer", "number", "boolean", "array", "object"],
         def.type || "string",
-        (/** @type {any} */ v) => update(updateDef(S, name, { type: v })),
+        (/** @type {any} */ v) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { type: v })),
       )}
       ${def.type === "string" || !def.type
         ? pickerRow(
             "Format",
             ["", "image", "date", "color"],
             def.format || "",
-            (/** @type {any} */ v) => update(updateDef(S, name, { format: v || undefined })),
+            (/** @type {any} */ v) =>
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { format: v || undefined }),
+              ),
           )
         : nothing}
       ${signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
@@ -464,10 +482,12 @@ function renderSignalEditorTemplate(
             parsed = v;
           }
         }
-        update(updateDef(S, name, { default: parsed }));
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
       })}
       ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { description: v || undefined })),
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateDef(t, name, { description: v || undefined }),
+        ),
       )}
       ${cemFields}
     `;
@@ -490,7 +510,9 @@ function renderSignalEditorTemplate(
                 const expr = e.target.value;
                 const depMatches = expr.match(/\$[a-zA-Z_]\w*/g) || [];
                 const deps = [...new Set(depMatches)].map((d) => `#/state/${d}`);
-                update(updateDef(S, name, { $compute: expr, $deps: deps }));
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { $compute: expr, $deps: deps }),
+                );
               }, 500);
             }}
           ></textarea>
@@ -534,16 +556,17 @@ function renderDataSourceFields(
   if (proto === "Request") {
     return html`
       ${signalFieldRow("URL", def.url || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { url: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { url: v })),
       )}
       ${pickerRow(
         "Method",
         ["GET", "POST", "PUT", "DELETE", "PATCH"],
         def.method || "GET",
-        (/** @type {any} */ v) => update(updateDef(S, name, { method: v })),
+        (/** @type {any} */ v) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { method: v })),
       )}
       ${pickerRow("Timing", ["client", "server"], def.timing || "client", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { timing: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { timing: v })),
       )}
     `;
   }
@@ -556,13 +579,13 @@ function renderDataSourceFields(
         : "";
     return html`
       ${signalFieldRow("Key", def.key || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { key: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { key: v })),
       )}
       ${textareaRow("Default", defaultStr, (/** @type {any} */ v) => {
         try {
-          update(updateDef(S, name, { default: JSON.parse(v) }));
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: JSON.parse(v) }));
         } catch {
-          update(updateDef(S, name, { default: v }));
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: v }));
         }
       })}
     `;
@@ -570,23 +593,25 @@ function renderDataSourceFields(
   if (proto === "IndexedDB") {
     return html`
       ${signalFieldRow("Database", def.database || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { database: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { database: v })),
       )}
       ${signalFieldRow("Store", def.store || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { store: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { store: v })),
       )}
       ${signalFieldRow("Version", String(def.version || 1), (/** @type {any} */ v) =>
-        update(updateDef(S, name, { version: parseInt(v, 10) || 1 })),
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateDef(t, name, { version: parseInt(v, 10) || 1 }),
+        ),
       )}
     `;
   }
   if (proto === "Cookie") {
     return html`
       ${signalFieldRow("Cookie", def.name || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { name: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { name: v })),
       )}
       ${signalFieldRow("Default", def.default || "", (/** @type {any} */ v) =>
-        update(updateDef(S, name, { default: v })),
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: v })),
       )}
     `;
   }
@@ -601,7 +626,9 @@ function renderDataSourceFields(
           : "";
     return textareaRow(fieldLabel, defaultStr, (/** @type {any} */ v) => {
       try {
-        update(updateDef(S, name, { [fieldName]: JSON.parse(v) }));
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateDef(t, name, { [fieldName]: JSON.parse(v) }),
+        );
       } catch {}
     });
   }
@@ -620,16 +647,19 @@ function renderFunctionFields(
   const srcFields = def.$src
     ? html`
         ${signalFieldRow("Source", def.$src || "", (/** @type {any} */ v) =>
-          update(updateDef(S, name, { $src: v || undefined })),
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined })),
         )}
         ${signalFieldRow("Export", def.$export || "", (/** @type {any} */ v) =>
-          update(updateDef(S, name, { $export: v || undefined })),
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateDef(t, name, { $export: v || undefined }),
+          ),
         )}
       `
     : textareaRow(
         "Body",
         def.body || "",
-        (/** @type {any} */ v) => update(updateDef(S, name, { body: v })),
+        (/** @type {any} */ v) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v })),
         { minHeight: "60px", mono: true },
       );
 
@@ -651,7 +681,9 @@ function renderFunctionFields(
         `
       : nothing}
     ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
-      update(updateDef(S, name, { description: v || undefined })),
+      transactDoc(activeTab.value, (t) =>
+        mutateUpdateDef(t, name, { description: v || undefined }),
+      ),
     )}
   `;
 }
@@ -685,8 +717,8 @@ function renderParameterEditorTemplate(
                 <span
                   style="cursor:pointer;opacity:0.5;margin-left:2px"
                   @click=${() => {
-                    update(
-                      updateDef(S, name, {
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateDef(t, name, {
                         parameters: params.filter(
                           (/** @type {any} */ _, /** @type {any} */ j) => j !== i,
                         ).length
@@ -706,8 +738,10 @@ function renderParameterEditorTemplate(
             placeholder="+"
             @keydown=${(/** @type {any} */ e) => {
               if (e.key === "Enter" && e.target.value.trim()) {
-                update(
-                  updateDef(S, name, { parameters: [...params, { name: e.target.value.trim() }] }),
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, {
+                    parameters: [...params, { name: e.target.value.trim() }],
+                  }),
                 );
               }
             }}
@@ -743,7 +777,9 @@ function renderParameterEditorTemplate(
                 @change=${(/** @type {any} */ e) => {
                   const next = [...params];
                   next[i] = { ...next[i], name: e.target.value };
-                  update(updateDef(S, name, { parameters: next }));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { parameters: next }),
+                  );
                 }}
               />
               <input
@@ -757,7 +793,9 @@ function renderParameterEditorTemplate(
                     ...next[i],
                     type: e.target.value ? { text: e.target.value } : undefined,
                   };
-                  update(updateDef(S, name, { parameters: next }));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { parameters: next }),
+                  );
                 }}
               />
               <input
@@ -768,7 +806,9 @@ function renderParameterEditorTemplate(
                 @change=${(/** @type {any} */ e) => {
                   const next = [...params];
                   next[i] = { ...next[i], description: e.target.value || undefined };
-                  update(updateDef(S, name, { parameters: next }));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { parameters: next }),
+                  );
                 }}
               />
               <input
@@ -778,7 +818,9 @@ function renderParameterEditorTemplate(
                 @change=${(/** @type {any} */ e) => {
                   const next = [...params];
                   next[i] = { ...next[i], optional: e.target.checked || undefined };
-                  update(updateDef(S, name, { parameters: next }));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { parameters: next }),
+                  );
                 }}
               />
               <span
@@ -787,7 +829,9 @@ function renderParameterEditorTemplate(
                   const next = params.filter(
                     (/** @type {any} */ _, /** @type {any} */ j) => j !== i,
                   );
-                  update(updateDef(S, name, { parameters: next.length ? next : undefined }));
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, { parameters: next.length ? next : undefined }),
+                  );
                 }}
                 >×</span
               >
@@ -796,7 +840,10 @@ function renderParameterEditorTemplate(
         )}
         <button
           class="kv-add"
-          @click=${() => update(updateDef(S, name, { parameters: [...params, { name: "" }] }))}
+          @click=${() =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateDef(t, name, { parameters: [...params, { name: "" }] }),
+            )}
         >
           + Add parameter
         </button>
@@ -839,7 +886,7 @@ function renderEmitsEditorTemplate(
             @change=${(/** @type {any} */ e) => {
               const next = [...emits];
               next[i] = { ...next[i], name: e.target.value };
-              update(updateDef(S, name, { emits: next }));
+              transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
           <input
@@ -850,7 +897,7 @@ function renderEmitsEditorTemplate(
             @change=${(/** @type {any} */ e) => {
               const next = [...emits];
               next[i] = { ...next[i], type: e.target.value ? { text: e.target.value } : undefined };
-              update(updateDef(S, name, { emits: next }));
+              transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
           <input
@@ -861,14 +908,14 @@ function renderEmitsEditorTemplate(
             @change=${(/** @type {any} */ e) => {
               const next = [...emits];
               next[i] = { ...next[i], description: e.target.value || undefined };
-              update(updateDef(S, name, { emits: next }));
+              transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
           <span
             style="cursor:pointer;opacity:0.5"
             @click=${() => {
-              update(
-                updateDef(S, name, {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, {
                   emits: emits.filter((/** @type {any} */ _, /** @type {any} */ j) => j !== i)
                     .length
                     ? emits.filter((/** @type {any} */ _, /** @type {any} */ j) => j !== i)
@@ -883,7 +930,10 @@ function renderEmitsEditorTemplate(
     )}
     <button
       class="kv-add"
-      @click=${() => update(updateDef(S, name, { emits: [...emits, { name: "" }] }))}
+      @click=${() =>
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateDef(t, name, { emits: [...emits, { name: "" }] }),
+        )}
     >
       + Add event
     </button>
@@ -900,7 +950,7 @@ export function renderSchemaFieldsTemplate(
   /** @type {any} */ schema,
   /** @type {any} */ def,
   /** @type {any} */ name,
-  /** @type {any} */ S,
+  /** @type {any} */ _S,
 ) {
   if (!schema?.properties) return nothing;
 
@@ -923,8 +973,8 @@ export function renderSchemaFieldsTemplate(
                 ? String(ps.default)
                 : "__none__"}
             @change=${(/** @type {any} */ e) =>
-              update(
-                updateDef(S, name, {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, {
                   [prop]: e.target.value === "__none__" ? undefined : e.target.value,
                 }),
               )}
@@ -939,7 +989,9 @@ export function renderSchemaFieldsTemplate(
         control = html`<sp-checkbox
           ?checked=${currentValue ?? ps.default ?? false}
           @change=${(/** @type {any} */ e) =>
-            update(updateDef(S, name, { [prop]: e.target.checked }))}
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateDef(t, name, { [prop]: e.target.checked }),
+            )}
         ></sp-checkbox>`;
       } else if (ps.type === "integer" || ps.type === "number") {
         /** @type {any} */
@@ -956,7 +1008,9 @@ export function renderSchemaFieldsTemplate(
             debounce = setTimeout(() => {
               const parsed =
                 ps.type === "integer" ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
-              update(updateDef(S, name, { [prop]: isNaN(parsed) ? undefined : parsed }));
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { [prop]: isNaN(parsed) ? undefined : parsed }),
+              );
             }, 400);
           }}
         ></sp-number-field>`;
@@ -992,7 +1046,9 @@ export function renderSchemaFieldsTemplate(
                 clearTimeout(debounce);
                 debounce = setTimeout(() => {
                   try {
-                    update(updateDef(S, name, { [prop]: JSON.parse(e.target.value) }));
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateDef(t, name, { [prop]: JSON.parse(e.target.value) }),
+                    );
                   } catch {}
                 }, 500);
               }}
@@ -1012,7 +1068,9 @@ export function renderSchemaFieldsTemplate(
             clearTimeout(debounce);
             debounce = setTimeout(() => {
               try {
-                update(updateDef(S, name, { [prop]: JSON.parse(e.target.value) }));
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { [prop]: JSON.parse(e.target.value) }),
+                );
               } catch {}
             }, 500);
           }}
@@ -1029,7 +1087,10 @@ export function renderSchemaFieldsTemplate(
           @input=${(/** @type {any} */ e) => {
             clearTimeout(debounce);
             debounce = setTimeout(
-              () => update(updateDef(S, name, { [prop]: e.target.value || undefined })),
+              () =>
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { [prop]: e.target.value || undefined }),
+                ),
               400,
             );
           }}
@@ -1085,16 +1146,18 @@ export function renderExternalPrototypeEditorTemplate(
 
   return html`
     ${signalFieldRow("Source", def.$src || "", (/** @type {any} */ v) => {
-      update(updateDef(S, name, { $src: v || undefined }));
+      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined }));
       pluginSchemaCache.delete(`${v}::${def.$prototype}`);
     })}
     ${signalFieldRow("Prototype", def.$prototype || "", (/** @type {any} */ v) => {
-      update(updateDef(S, name, { $prototype: v || undefined }));
+      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $prototype: v || undefined }));
       pluginSchemaCache.delete(`${def.$src}::${v}`);
     })}
     ${def.$export
       ? signalFieldRow("Export", def.$export || "", (/** @type {any} */ v) =>
-          update(updateDef(S, name, { $export: v || undefined })),
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateDef(t, name, { $export: v || undefined }),
+          ),
         )
       : nothing}
     ${schemaContent}

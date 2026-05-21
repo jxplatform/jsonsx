@@ -2,7 +2,9 @@
 
 import { html } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import { getState, update, updateStyle, debouncedStyleCommit } from "../store.js";
+import { getState, debouncedStyleCommit } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateUpdateStyle } from "../tabs/transact.js";
 import { widgetForType as _widgetForType } from "../ui/widgets.js";
 import { kebabToLabel, friendlyNameToVar, varDisplayName } from "../utils/studio-utils.js";
 import {
@@ -54,7 +56,7 @@ function handleFontPresetSelection(preset, onChange) {
   const S = getState();
   const varName = friendlyNameToVar(preset.title, "--font-");
   if (!S.document?.style?.[varName]) {
-    update(updateStyle(S, [], varName, preset.value));
+    transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, preset.value));
   }
   onChange(`var(${varName})`);
 }

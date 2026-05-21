@@ -16,16 +16,14 @@ import {
 
 import {
   getState,
-  update,
   leftPanel,
-  moveNode,
-  insertNode,
-  applyMutation,
   getNodeAtPath,
   parentElementPath,
   childIndex,
   isAncestor,
 } from "../store.js";
+import { transact, transactDoc, mutateMoveNode, mutateInsertNode } from "../tabs/transact.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { componentRegistry, computeRelativePath } from "../files/components.js";
 import { renderComponentPreview } from "./stylebook-panel.js";
@@ -144,12 +142,14 @@ export function registerComponentsDnD() {
 
         const instanceDef = {
           tagName: comp.tagName,
-          $props: Object.fromEntries(
-            comp.props.map((/** @type {any} */ p) => [
-              p.name,
-              p.default !== undefined ? p.default : "",
-            ]),
-          ),
+          $props: comp.props
+            ? Object.fromEntries(
+                comp.props.map((/** @type {any} */ p) => [
+                  p.name,
+                  p.default !== undefined ? p.default : "",
+                ]),
+              )
+            : {},
         };
         const cleanup = draggable({
           element: row,
@@ -259,15 +259,17 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
 
     switch (instruction.type) {
       case "reorder-above":
-        update(moveNode(S, fromPath, targetParent, targetIdx));
+        transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetParent, targetIdx));
         break;
       case "reorder-below":
-        update(moveNode(S, fromPath, targetParent, targetIdx + 1));
+        transactDoc(activeTab.value, (t) =>
+          mutateMoveNode(t, fromPath, targetParent, targetIdx + 1),
+        );
         break;
       case "make-child": {
         const target = getNodeAtPath(S.document, targetPath);
         const len = target?.children?.length || 0;
-        update(moveNode(S, fromPath, targetPath, len));
+        transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetPath, len));
         break;
       }
     }
@@ -277,15 +279,21 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
 
     switch (instruction.type) {
       case "reorder-above":
-        update(insertNode(S, targetParent, targetIdx, structuredClone(srcData.fragment)));
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, targetParent, targetIdx, structuredClone(srcData.fragment)),
+        );
         break;
       case "reorder-below":
-        update(insertNode(S, targetParent, targetIdx + 1, structuredClone(srcData.fragment)));
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, targetParent, targetIdx + 1, structuredClone(srcData.fragment)),
+        );
         break;
       case "make-child": {
         const target = getNodeAtPath(S.document, targetPath);
         const len = target?.children?.length || 0;
-        update(insertNode(S, targetPath, len, structuredClone(srcData.fragment)));
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, targetPath, len, structuredClone(srcData.fragment)),
+        );
         break;
       }
     }
@@ -303,12 +311,10 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
             (/** @type {any} */ e) => e === specifier || e === comp.package,
           );
           if (!alreadyImported) {
-            update(
-              applyMutation(currentS, (/** @type {any} */ doc) => {
-                if (!doc.$elements) doc.$elements = [];
-                doc.$elements.push(specifier);
-              }),
-            );
+            transact(activeTab.value, (/** @type {any} */ doc) => {
+              if (!doc.$elements) doc.$elements = [];
+              doc.$elements.push(specifier);
+            });
           }
         } else {
           const alreadyImported = elements.some(
@@ -318,12 +324,10 @@ export function applyDropInstruction(instruction, srcData, targetPath) {
           );
           if (!alreadyImported) {
             const relPath = computeRelativePath(currentS.documentPath, comp.path);
-            update(
-              applyMutation(currentS, (/** @type {any} */ doc) => {
-                if (!doc.$elements) doc.$elements = [];
-                doc.$elements.push({ $ref: relPath });
-              }),
-            );
+            transact(activeTab.value, (/** @type {any} */ doc) => {
+              if (!doc.$elements) doc.$elements = [];
+              doc.$elements.push({ $ref: relPath });
+            });
           }
         }
       }

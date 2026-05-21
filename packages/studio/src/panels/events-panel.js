@@ -1,6 +1,8 @@
-import { getNodeAtPath, updateProperty, update } from "../store.js";
+import { getNodeAtPath } from "../store.js";
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateUpdateProperty } from "../tabs/transact.js";
 
 export const EVENT_NAMES = [
   "onclick",
@@ -87,9 +89,10 @@ export function eventsSidebarTemplate(S, helpers) {
                   @change=${(/** @type {any} */ e) => {
                     const newKey = e.target.value;
                     if (newKey && newKey !== evKey) {
-                      let s = updateProperty(S, S.selection, evKey, undefined);
-                      s = updateProperty(s, S.selection, newKey, node[evKey]);
-                      update(s);
+                      transactDoc(activeTab.value, (t) => {
+                        mutateUpdateProperty(t, S.selection, evKey, undefined);
+                        mutateUpdateProperty(t, S.selection, newKey, node[evKey]);
+                      });
                     }
                   }}
                 >
@@ -103,8 +106,8 @@ export function eventsSidebarTemplate(S, helpers) {
                   .value=${live(isInline ? "inline" : "ref")}
                   @change=${(/** @type {any} */ e) => {
                     if (e.target.value === "inline") {
-                      update(
-                        updateProperty(S, S.selection, evKey, {
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(t, S.selection, evKey, {
                           $prototype: "Function",
                           body: "",
                           parameters: [],
@@ -112,9 +115,9 @@ export function eventsSidebarTemplate(S, helpers) {
                       );
                     } else {
                       const firstFn = functionDefs[0];
-                      update(
-                        updateProperty(
-                          S,
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(
+                          t,
                           S.selection,
                           evKey,
                           firstFn ? { $ref: `#/state/${firstFn[0]}` } : { $ref: "" },
@@ -129,7 +132,10 @@ export function eventsSidebarTemplate(S, helpers) {
                 <sp-action-button
                   size="xs"
                   quiet
-                  @click=${() => update(updateProperty(S, S.selection, evKey, undefined))}
+                  @click=${() =>
+                    transactDoc(activeTab.value, (t) =>
+                      mutateUpdateProperty(t, S.selection, evKey, undefined),
+                    )}
                 >
                   <sp-icon-delete slot="icon"></sp-icon-delete>
                 </sp-action-button>
@@ -144,8 +150,8 @@ export function eventsSidebarTemplate(S, helpers) {
                         placeholder="// handler body"
                         .value=${live(evVal.body || "")}
                         @input=${(/** @type {any} */ e) => {
-                          update(
-                            updateProperty(S, S.selection, evKey, {
+                          transactDoc(activeTab.value, (t) =>
+                            mutateUpdateProperty(t, S.selection, evKey, {
                               $prototype: "Function",
                               body: e.target.value,
                               parameters: evVal.parameters || [],
@@ -184,9 +190,13 @@ export function eventsSidebarTemplate(S, helpers) {
                       .value=${live(evVal.$ref || "__none__")}
                       @change=${(/** @type {any} */ e) => {
                         if (e.target.value && e.target.value !== "__none__") {
-                          update(updateProperty(S, S.selection, evKey, { $ref: e.target.value }));
+                          transactDoc(activeTab.value, (t) =>
+                            mutateUpdateProperty(t, S.selection, evKey, { $ref: e.target.value }),
+                          );
                         } else {
-                          update(updateProperty(S, S.selection, evKey, undefined));
+                          transactDoc(activeTab.value, (t) =>
+                            mutateUpdateProperty(t, S.selection, evKey, undefined),
+                          );
                         }
                       }}
                     >
@@ -212,12 +222,14 @@ export function eventsSidebarTemplate(S, helpers) {
               }
             }
             if (functionDefs.length > 0) {
-              update(
-                updateProperty(S, S.selection, evName, { $ref: `#/state/${functionDefs[0][0]}` }),
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, S.selection, evName, {
+                  $ref: `#/state/${functionDefs[0][0]}`,
+                }),
               );
             } else {
-              update(
-                updateProperty(S, S.selection, evName, {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateProperty(t, S.selection, evName, {
                   $prototype: "Function",
                   body: "",
                   parameters: [],

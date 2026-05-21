@@ -5,19 +5,21 @@
 
 import {
   getState,
-  update,
   updateUi,
   renderOnly,
   getNodeAtPath,
-  selectNode,
-  removeNode,
-  insertNode,
-  updateProperty,
   parentElementPath,
   childIndex,
   canvasPanels,
   elToPath,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import {
+  transactDoc,
+  mutateRemoveNode,
+  mutateInsertNode,
+  mutateUpdateProperty,
+} from "../tabs/transact.js";
 import { view } from "../view.js";
 import { isSlashMenuOpen, showSlashMenu, dismissSlashMenu } from "./slash-menu.js";
 import { renderBlockActionBar } from "../panels/block-action-bar.js";
@@ -59,7 +61,9 @@ export function enterComponentInlineEdit(el, path) {
   if (voids.has(node.tagName)) return;
 
   for (const p of canvasPanels) {
-    const boxes = p.overlay.querySelectorAll(".overlay-box");
+    const boxes = /** @type {NodeListOf<HTMLElement>} */ (
+      p.overlay.querySelectorAll(".overlay-box")
+    );
     for (const box of boxes) {
       box.style.border = "none";
     }
@@ -104,10 +108,11 @@ export function enterComponentInlineEdit(el, path) {
     if (view.blockActionBarEl && view.blockActionBarEl.contains(evt.target)) return;
     document.removeEventListener("mousedown", outsideHandler, true);
 
+    /** @type {(string | number)[] | null} */
     let hitPath = null,
       hitMedia = null;
     for (const p of canvasPanels) {
-      const els = p.canvas.querySelectorAll("*");
+      const els = /** @type {NodeListOf<HTMLElement>} */ (p.canvas.querySelectorAll("*"));
       for (const el of els) el.style.pointerEvents = "auto";
       p.overlayClk.style.display = "none";
       const found = document.elementsFromPoint(evt.clientX, evt.clientY);
@@ -132,37 +137,44 @@ export function enterComponentInlineEdit(el, path) {
 
     const isEmpty = !newText;
     const pPath = parentElementPath(editPath);
-    const S = getState();
 
     if (hitPath) {
+      let hp = hitPath;
       const media = hitMedia === "base" ? null : (hitMedia ?? null);
-      updateUi("pendingInlineEdit", { path: hitPath, mediaName: hitMedia });
-      const withMedia = { ...S, ui: { ...S.ui, activeMedia: media } };
+      updateUi("pendingInlineEdit", { path: hp, mediaName: hitMedia });
+      activeTab.value.session.ui.activeMedia = media;
       if (isEmpty && pPath) {
-        let s = removeNode(withMedia, editPath);
-        const removedIdx = /** @type {number} */ (childIndex(editPath));
-        const hitIdx = /** @type {number} */ (childIndex(hitPath));
-        const hitParent = parentElementPath(hitPath);
-        if (hitParent && pPath && hitParent.join("/") === pPath.join("/") && hitIdx > removedIdx) {
-          hitPath = [...pPath, "children", hitIdx - 1];
-          updateUi("pendingInlineEdit", { path: hitPath, mediaName: hitMedia });
-        }
-        update(selectNode(s, hitPath));
+        transactDoc(activeTab.value, (t) => {
+          mutateRemoveNode(t, editPath);
+          const removedIdx = /** @type {number} */ (childIndex(editPath));
+          const hitIdx = /** @type {number} */ (childIndex(hp));
+          const hitParent = parentElementPath(hp);
+          if (
+            hitParent &&
+            pPath &&
+            hitParent.join("/") === pPath.join("/") &&
+            hitIdx > removedIdx
+          ) {
+            hp = [...pPath, "children", hitIdx - 1];
+            updateUi("pendingInlineEdit", { path: hp, mediaName: hitMedia });
+          }
+          t.session.selection = hp;
+        });
       } else if (newText !== originalText) {
-        update(
-          selectNode(
-            updateProperty(withMedia, editPath, "textContent", newText || undefined),
-            hitPath,
-          ),
-        );
+        transactDoc(activeTab.value, (t) => {
+          mutateUpdateProperty(t, editPath, "textContent", newText || undefined);
+          t.session.selection = hp;
+        });
       } else {
-        update(selectNode(withMedia, hitPath));
+        activeTab.value.session.selection = hp;
       }
     } else {
       if (isEmpty && pPath) {
-        update(removeNode(S, editPath));
+        transactDoc(activeTab.value, (t) => mutateRemoveNode(t, editPath));
       } else if (newText !== originalText) {
-        update(updateProperty(S, editPath, "textContent", newText || undefined));
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateProperty(t, editPath, "textContent", newText || undefined),
+        );
       } else {
         renderOnly("canvas");
         renderOnly("overlays");
@@ -219,13 +231,13 @@ function splitParagraph() {
 
   cleanupComponentInlineEdit(el);
 
-  const S = getState();
-  let s = updateProperty(S, path, "textContent", textBefore || undefined);
-  s = insertNode(s, pPath, idx + 1, newDef);
-  s = selectNode(s, newPath);
+  transactDoc(activeTab.value, (t) => {
+    mutateUpdateProperty(t, path, "textContent", textBefore || undefined);
+    mutateInsertNode(t, pPath, idx + 1, newDef);
+    t.session.selection = newPath;
+  });
 
   updateUi("pendingInlineEdit", { path: newPath, mediaName });
-  update(s);
 }
 
 function _commitComponentInlineEdit() {
@@ -235,12 +247,13 @@ function _commitComponentInlineEdit() {
 
   cleanupComponentInlineEdit(el);
 
-  const S = getState();
   const pPath = parentElementPath(path);
   if (!newText && pPath) {
-    update(removeNode(S, path));
+    transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path));
   } else if (newText !== originalText) {
-    update(updateProperty(S, path, "textContent", newText || undefined));
+    transactDoc(activeTab.value, (t) =>
+      mutateUpdateProperty(t, path, "textContent", newText || undefined),
+    );
   } else {
     renderOnly("canvas");
     renderOnly("overlays");
@@ -303,15 +316,15 @@ function handleComponentSlashSelect(cmd) {
 
   cleanupComponentInlineEdit(el);
 
-  const S = getState();
   const newDef = defaultDef(cmd.tag);
   const newPath = [...pPath, "children", idx];
 
-  let s = removeNode(S, path);
-  s = insertNode(s, pPath, idx, newDef);
-  s = selectNode(s, newPath);
+  transactDoc(activeTab.value, (t) => {
+    mutateRemoveNode(t, path);
+    mutateInsertNode(t, pPath, idx, newDef);
+    t.session.selection = newPath;
+  });
 
   const hasText = newDef.textContent != null;
   if (hasText) updateUi("pendingInlineEdit", { path: newPath, mediaName });
-  update(s);
 }

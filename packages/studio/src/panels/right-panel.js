@@ -5,7 +5,9 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { getState, updateUi, rightPanel, subscribe } from "../store.js";
+import { updateUi, rightPanel } from "../store.js";
+import { effect, effectScope } from "../reactivity.js";
+import { activeTab } from "../workspace/workspace.js";
 import { tabIcon } from "./activity-bar.js";
 import { eventsSidebarTemplate } from "./events-panel.js";
 import { isCustomElementDoc } from "./signals-panel.js";
@@ -26,8 +28,8 @@ import { renderPropertiesPanelTemplate } from "./properties-panel.js";
 /** @type {RightPanelCtx | null} */
 let _ctx = null;
 
-/** @type {(() => void) | null} */
-let _unsub = null;
+/** @type {import("@vue/reactivity").EffectScope | null} */
+let _scope = null;
 
 let _rendering = false;
 let _scheduled = false;
@@ -39,31 +41,46 @@ let _scheduled = false;
  */
 export function mount(ctx) {
   _ctx = ctx;
-  _unsub = subscribe((change) => {
-    if (!change.selection && !change.ui && !change.doc) return;
+  _scope = effectScope();
+  _scope.run(() => {
+    effect(() => {
+      const tab = activeTab.value;
+      if (!tab) return;
+      // Track properties the right panel reads
+      void tab.doc.document;
+      void tab.session.selection;
+      void tab.session.ui.rightTab;
+      void tab.session.ui.activeMedia;
+      void tab.session.ui.activeSelector;
+      void tab.session.ui.styleSections;
+      void tab.session.ui.styleShorthands;
+      void tab.session.ui.styleFilter;
+      void tab.session.ui.styleFilterActive;
+      void tab.session.ui.inspectorSections;
 
-    const colorPopoverOpen = isColorPopoverOpen();
-    const activeTag = document.activeElement?.tagName;
-    const rightHasFocus =
-      !colorPopoverOpen &&
-      rightPanel.contains(document.activeElement) &&
-      (activeTag === "INPUT" ||
-        activeTag === "TEXTAREA" ||
-        activeTag === "SP-TEXTFIELD" ||
-        activeTag === "SP-NUMBER-FIELD" ||
-        activeTag === "SP-PICKER" ||
-        activeTag === "SP-COMBOBOX" ||
-        activeTag === "SP-SEARCH");
+      const colorPopoverOpen = isColorPopoverOpen();
+      const activeTag = document.activeElement?.tagName;
+      const rightHasFocus =
+        !colorPopoverOpen &&
+        rightPanel.contains(document.activeElement) &&
+        (activeTag === "INPUT" ||
+          activeTag === "TEXTAREA" ||
+          activeTag === "SP-TEXTFIELD" ||
+          activeTag === "SP-NUMBER-FIELD" ||
+          activeTag === "SP-PICKER" ||
+          activeTag === "SP-COMBOBOX" ||
+          activeTag === "SP-SEARCH");
 
-    if (!rightHasFocus || change.selection || change.ui) {
-      render();
-    }
+      if (!rightHasFocus) {
+        render();
+      }
+    });
   });
 }
 
 export function unmount() {
-  _unsub?.();
-  _unsub = null;
+  _scope?.stop();
+  _scope = null;
   _ctx = null;
 }
 
@@ -101,7 +118,14 @@ function _flush() {
 
 function rightPanelTemplate() {
   const ctx = /** @type {RightPanelCtx} */ (_ctx);
-  const S = getState();
+  const aTab = activeTab.value;
+  if (!aTab) return nothing;
+  const S = /** @type {any} */ ({
+    ui: aTab.session.ui,
+    document: aTab.doc.document,
+    mode: aTab.doc.mode,
+    selection: aTab.session.selection,
+  });
   const tab = S.ui.rightTab;
 
   const panelTabs = [

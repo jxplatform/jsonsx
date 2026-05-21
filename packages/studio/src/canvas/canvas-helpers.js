@@ -3,14 +3,8 @@
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.
  */
 
-import {
-  getState,
-  canvasPanels,
-  elToPath,
-  pathsEqual,
-  getNodeAtPath,
-  parentElementPath,
-} from "../store.js";
+import { canvasPanels, elToPath, pathsEqual, getNodeAtPath, parentElementPath } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { isInlineInContext } from "../editor/inline-edit.js";
 
 /** @type {any} */
@@ -27,17 +21,17 @@ export function initCanvasHelpers(ctx) {
 
 /** Effective zoom scale — always 1 in edit (content) mode, S.ui.zoom otherwise. */
 export function effectiveZoom() {
-  return _ctx.getCanvasMode() === "edit" ? 1 : getState().ui.zoom;
+  return _ctx.getCanvasMode() === "edit" ? 1 : (activeTab.value?.session.ui.zoom ?? 1);
 }
 
 /** Return the active canvas panel based on the current activeMedia setting. */
 export function getActivePanel() {
   if (canvasPanels.length === 0) return null;
   if (canvasPanels.length === 1) return canvasPanels[0];
-  const S = getState();
+  const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
   for (const p of canvasPanels) {
-    if (S.ui.activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) return p;
-    if (p.mediaName === S.ui.activeMedia) return p;
+    if (activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) return p;
+    if (p.mediaName === activeMedia) return p;
   }
   return canvasPanels[0];
 }

@@ -7,8 +7,6 @@ import {
   registerRenderer,
   render,
   renderOnly,
-  subscribe,
-  notify,
   setUpdateFn,
   setGetStateFn,
   getState,
@@ -62,7 +60,7 @@ describe("stripEventHandlers", () => {
       onclick: { $ref: "#/state/handleClick" },
       textContent: "Click me",
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.onclick).toBeUndefined();
     expect(result.textContent).toBe("Click me");
     expect(result.tagName).toBe("button");
@@ -74,7 +72,7 @@ describe("stripEventHandlers", () => {
       onchange: { $prototype: "Function", body: "state.value = event.target.value" },
       type: "text",
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.onchange).toBeUndefined();
     expect(result.type).toBe("text");
   });
@@ -85,7 +83,7 @@ describe("stripEventHandlers", () => {
       textContent: "hello",
       style: { color: "red" },
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.textContent).toBe("hello");
     expect(result.style).toEqual({ color: "red" });
   });
@@ -101,7 +99,7 @@ describe("stripEventHandlers", () => {
         },
       ],
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.children[0].onclick).toBeUndefined();
     expect(result.children[0].textContent).toBe("Click");
   });
@@ -114,7 +112,7 @@ describe("stripEventHandlers", () => {
         b: { tagName: "p", textContent: "hello" },
       },
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.cases.a.onclick).toBeUndefined();
     expect(result.cases.b.textContent).toBe("hello");
   });
@@ -124,7 +122,7 @@ describe("stripEventHandlers", () => {
       { tagName: "a", onclick: { $ref: "#/state/nav" } },
       { tagName: "span", textContent: "hi" },
     ];
-    const result = stripEventHandlers(nodes);
+    const result = /** @type {any} */ (stripEventHandlers(nodes));
     expect(result[0].onclick).toBeUndefined();
     expect(result[1].textContent).toBe("hi");
   });
@@ -143,7 +141,7 @@ describe("stripEventHandlers", () => {
       attributes: { "data-x": "1" },
       $media: { "--md": "(min-width: 768px)" },
     };
-    const result = stripEventHandlers(node);
+    const result = /** @type {any} */ (stripEventHandlers(node));
     expect(result.state).toEqual({ count: 0 });
     expect(result.style).toEqual({ color: "red" });
     expect(result.attributes).toEqual({ "data-x": "1" });
@@ -208,29 +206,6 @@ describe("render orchestration", () => {
   });
 });
 
-// ─── Subscription system ────────────────────────────────────────────────────
-
-describe("subscription system", () => {
-  test("subscribe + notify delivers changes", () => {
-    /** @type {any[]} */
-    const received = [];
-    const unsub = subscribe((change) => received.push(change));
-    notify({ doc: true, selection: false, hover: false, ui: false, mode: false });
-    expect(received).toHaveLength(1);
-    expect(received[0].doc).toBe(true);
-    unsub();
-  });
-
-  test("unsubscribe stops delivery", () => {
-    /** @type {any[]} */
-    const received = [];
-    const unsub = subscribe((change) => received.push(change));
-    unsub();
-    notify({ doc: true, selection: false, hover: false, ui: false, mode: false });
-    expect(received).toHaveLength(0);
-  });
-});
-
 // ─── Update dispatch ────────────────────────────────────────────────────────
 
 describe("update dispatch", () => {
@@ -238,13 +213,13 @@ describe("update dispatch", () => {
     /** @type {any[]} */
     const calls = [];
     setUpdateFn((/** @type {any} */ s) => calls.push(s));
-    update({ doc: "test" });
+    update(/** @type {any} */ ({ doc: "test" }));
     expect(calls).toEqual([{ doc: "test" }]);
   });
 
   test("setGetStateFn + getState returns current state", () => {
-    setGetStateFn(() => ({ count: 42 }));
-    expect(getState()).toEqual({ count: 42 });
+    setGetStateFn(/** @type {any} */ (() => ({ count: 42 })));
+    expect(/** @type {any} */ (getState())).toEqual({ count: 42 });
   });
 });
 
@@ -255,7 +230,7 @@ describe("middleware", () => {
     /** @type {any[]} */
     const calls = [];
     addUpdateMiddleware((/** @type {any} */ s) => calls.push(s));
-    runUpdateMiddleware({ test: true });
+    runUpdateMiddleware(/** @type {any} */ ({ test: true }));
     expect(calls).toEqual([{ test: true }]);
   });
 
@@ -265,7 +240,7 @@ describe("middleware", () => {
     addPostRenderHook((/** @type {any} */ prevDoc, /** @type {any} */ prevSel) =>
       calls.push({ prevDoc, prevSel }),
     );
-    runPostRenderHooks("doc1", "sel1");
+    runPostRenderHooks(/** @type {any} */ ("doc1"), /** @type {any} */ ("sel1"));
     expect(calls[calls.length - 1]).toEqual({ prevDoc: "doc1", prevSel: "sel1" });
   });
 });

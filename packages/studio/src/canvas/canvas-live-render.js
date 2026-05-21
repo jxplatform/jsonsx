@@ -5,6 +5,7 @@
  */
 
 import { elToPath, stripEventHandlers, projectState } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import {
   renderNode as runtimeRenderNode,
@@ -82,7 +83,6 @@ function markLayoutNodes(/** @type {any} */ node) {
  * Initialize the canvas live render module.
  *
  * @param {{
- *   getState: () => any;
  *   getCanvasMode: () => string;
  * }} ctx
  */
@@ -100,7 +100,8 @@ export function initCanvasLiveRender(ctx) {
  * @param {any} canvasEl
  */
 export async function renderCanvasLive(gen, doc, canvasEl) {
-  const S = _ctx.getState();
+  const tab = activeTab.value;
+  const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode, document: tab?.doc.document };
   const canvasMode = _ctx.getCanvasMode();
 
   // Suppress server function resolution in non-preview modes to avoid

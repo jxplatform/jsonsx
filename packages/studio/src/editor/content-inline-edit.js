@@ -5,16 +5,14 @@
 
 import {
   getState,
-  update,
   renderOnly,
-  selectNode,
-  insertNode,
-  updateProperty,
   getNodeAtPath,
   parentElementPath,
   childIndex,
   canvasPanels,
 } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateInsertNode, mutateUpdateProperty } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { startEditing, isEditableBlock } from "./inline-edit.js";
 import { restoreTemplateExpressions } from "../utils/edit-display.js";
@@ -50,28 +48,21 @@ export function enterInlineEdit(el, path) {
       const node = getNodeAtPath(S.document, commitPath);
       if (children) {
         if (node && JSON.stringify(node.children) === JSON.stringify(children)) return;
-        let s = updateProperty(S, commitPath, "textContent", undefined);
-        s = updateProperty(s, commitPath, "children", children);
-        update(s);
+        transactDoc(activeTab.value, (t) => {
+          mutateUpdateProperty(t, commitPath, "textContent", undefined);
+          mutateUpdateProperty(t, commitPath, "children", children);
+        });
       } else if (textContent != null) {
         if (node && node.textContent === textContent && !node.children) return;
-        let s = updateProperty(S, commitPath, "children", undefined);
-        s = updateProperty(s, commitPath, "textContent", textContent);
-        update(s);
+        transactDoc(activeTab.value, (t) => {
+          mutateUpdateProperty(t, commitPath, "children", undefined);
+          mutateUpdateProperty(t, commitPath, "textContent", textContent);
+        });
       }
     },
 
     onSplit(/** @type {any} */ splitPath, /** @type {any} */ before, /** @type {any} */ after) {
       const tag = "p";
-      let s = getState();
-
-      if (before.textContent != null) {
-        s = updateProperty(s, splitPath, "children", undefined);
-        s = updateProperty(s, splitPath, "textContent", before.textContent);
-      } else if (before.children) {
-        s = updateProperty(s, splitPath, "textContent", undefined);
-        s = updateProperty(s, splitPath, "children", before.children);
-      }
 
       // Insert new element after with "after" content
       const parentPath = /** @type {any} */ (parentElementPath(splitPath));
@@ -86,10 +77,19 @@ export function enterInlineEdit(el, path) {
         newNode.textContent = "";
       }
 
-      s = insertNode(s, parentPath, idx + 1, newNode);
       const newPath = [...parentPath, "children", idx + 1];
-      s = selectNode(s, newPath);
-      update(s);
+
+      transactDoc(activeTab.value, (t) => {
+        if (before.textContent != null) {
+          mutateUpdateProperty(t, splitPath, "children", undefined);
+          mutateUpdateProperty(t, splitPath, "textContent", before.textContent);
+        } else if (before.children) {
+          mutateUpdateProperty(t, splitPath, "textContent", undefined);
+          mutateUpdateProperty(t, splitPath, "children", before.children);
+        }
+        mutateInsertNode(t, parentPath, idx + 1, newNode);
+        t.session.selection = newPath;
+      });
 
       // Re-enter editing on the new element after render
       requestAnimationFrame(() => {
@@ -125,17 +125,17 @@ export function enterInlineEdit(el, path) {
 
       // If the element is empty, swap its tagName instead of inserting after
       if (isEmpty) {
-        let s = getState();
-        s = updateProperty(s, afterPath, "tagName", cmd.tag);
-        s = updateProperty(s, afterPath, "children", undefined);
-        const def = defaultDef(cmd.tag);
-        if (def.textContent && def.textContent !== "Paragraph text") {
-          s = updateProperty(s, afterPath, "textContent", def.textContent);
-        } else {
-          s = updateProperty(s, afterPath, "textContent", undefined);
-        }
-        s = selectNode(s, afterPath);
-        update(s);
+        transactDoc(activeTab.value, (t) => {
+          mutateUpdateProperty(t, afterPath, "tagName", cmd.tag);
+          mutateUpdateProperty(t, afterPath, "children", undefined);
+          const def = defaultDef(cmd.tag);
+          if (def.textContent && def.textContent !== "Paragraph text") {
+            mutateUpdateProperty(t, afterPath, "textContent", def.textContent);
+          } else {
+            mutateUpdateProperty(t, afterPath, "textContent", undefined);
+          }
+          t.session.selection = afterPath;
+        });
 
         requestAnimationFrame(() => {
           const activePanel = getActivePanel();
@@ -152,23 +152,22 @@ export function enterInlineEdit(el, path) {
       const elementDef = defaultDef(cmd.tag);
       const parentPath = /** @type {any} */ (parentElementPath(afterPath));
       const idx = /** @type {number} */ (childIndex(afterPath));
+      const newPath = [...parentPath, "children", idx + 1];
 
       // Apply pending commit from inline edit first (batched to avoid double render)
-      let s = getState();
-      if (commitData) {
-        if (commitData.children) {
-          s = updateProperty(s, afterPath, "textContent", undefined);
-          s = updateProperty(s, afterPath, "children", commitData.children);
-        } else if (commitData.textContent != null) {
-          s = updateProperty(s, afterPath, "children", undefined);
-          s = updateProperty(s, afterPath, "textContent", commitData.textContent);
+      transactDoc(activeTab.value, (t) => {
+        if (commitData) {
+          if (commitData.children) {
+            mutateUpdateProperty(t, afterPath, "textContent", undefined);
+            mutateUpdateProperty(t, afterPath, "children", commitData.children);
+          } else if (commitData.textContent != null) {
+            mutateUpdateProperty(t, afterPath, "children", undefined);
+            mutateUpdateProperty(t, afterPath, "textContent", commitData.textContent);
+          }
         }
-      }
-
-      s = insertNode(s, parentPath, idx + 1, structuredClone(elementDef));
-      const newPath = [...parentPath, "children", idx + 1];
-      s = selectNode(s, newPath);
-      update(s);
+        mutateInsertNode(t, parentPath, idx + 1, structuredClone(elementDef));
+        t.session.selection = newPath;
+      });
 
       // If the inserted element is editable, enter editing
       requestAnimationFrame(() => {
