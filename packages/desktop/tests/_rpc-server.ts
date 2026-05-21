@@ -84,6 +84,7 @@ const server = Bun.serve({
 
       const handler = handlers[msg.method];
       if (!handler) {
+        await Bun.sleep(0);
         ws.send(JSON.stringify({ id: msg.id, error: `Unknown method: ${msg.method}` }));
         return;
       }
@@ -92,6 +93,7 @@ const server = Bun.serve({
         const result = await handler(msg.params);
         ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
       } catch (err: any) {
+        await Bun.sleep(0);
         ws.send(JSON.stringify({ id: msg.id, error: err.message || String(err) }));
       }
     },

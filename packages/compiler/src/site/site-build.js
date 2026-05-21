@@ -177,7 +177,7 @@ export async function buildSite(projectRoot, options = {}) {
     for (const [, doc] of componentDefs) {
       const entries = collectServerEntries(doc);
       for (const entry of entries) {
-        const resolvedSrc = "./" + join("components", entry.src.replace(/^\.\//, ""));
+        const resolvedSrc = "./components/" + entry.src.replace(/^\.\//, "");
         siteServerEntries.push({ exportName: entry.exportName, src: resolvedSrc });
       }
     }
@@ -288,6 +288,7 @@ export async function buildSite(projectRoot, options = {}) {
 
       // Copy server source files into dist/components/ so worker imports resolve
       const distComponentsDir = resolve(outDir, "components");
+      mkdirSync(distComponentsDir, { recursive: true });
       for (const { src } of deduped.values()) {
         const srcFile = resolve(projectRoot, src.replace(/^\.\//, ""));
         const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
