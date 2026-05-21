@@ -93,6 +93,27 @@ export async function handleReadFile(params: { path: string }): Promise<string> 
   return readFile(abs, "utf8");
 }
 
+export async function handleReadFileAsDataUrl(params: { path: string }): Promise<string> {
+  const root = requireRoot();
+  const abs = resolve(root, params.path);
+  assertUnderRoot(abs, root);
+  const buffer = await readFile(abs);
+  const base64 = Buffer.from(buffer).toString("base64");
+  const ext = params.path.split(".").pop()?.toLowerCase() || "";
+  const mimeMap: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    svg: "image/svg+xml",
+    webp: "image/webp",
+    ico: "image/x-icon",
+    avif: "image/avif",
+  };
+  const mime = mimeMap[ext] || "application/octet-stream";
+  return `data:${mime};base64,${base64}`;
+}
+
 export async function handleWriteFile(params: { path: string; content: string }): Promise<void> {
   const root = requireRoot();
   const abs = resolve(root, params.path);
