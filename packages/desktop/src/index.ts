@@ -95,6 +95,16 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       updaterDownloadUpdate: () => downloadUpdate(),
       updaterApplyUpdate: () => applyUpdate(),
       updaterGetStatus: () => getStatus(),
+      windowMinimize: () => {
+        win.minimize();
+      },
+      windowMaximize: () => {
+        if (win.isMaximized()) win.unmaximize();
+        else win.maximize();
+      },
+      windowClose: () => {
+        win.close();
+      },
     },
     messages: {},
   },
@@ -102,10 +112,11 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
 
 // ─── Open the main window ─────────────────────────────────────────────────────
 
-new BrowserWindow({
+const win = new BrowserWindow({
   title: "Jx Studio",
   url: "views://studio/index.html",
   frame: { x: 0, y: 0, width: 1400, height: 900 },
+  titleBarStyle: "hidden",
   navigationRules: "views://*,^*",
   rpc,
 });

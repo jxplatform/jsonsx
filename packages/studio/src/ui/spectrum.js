@@ -114,6 +114,7 @@ import { IconDistributeHorizontalCenter } from "@spectrum-web-components/icons-w
 import { IconTextBaselineShift } from "@spectrum-web-components/icons-workflow/src/elements/IconTextBaselineShift.js";
 import { IconFlipVertical } from "@spectrum-web-components/icons-workflow/src/elements/IconFlipVertical.js";
 import { IconRemove } from "@spectrum-web-components/icons-workflow/src/elements/IconRemove.js";
+import { IconFullScreen } from "@spectrum-web-components/icons-workflow/src/elements/IconFullScreen.js";
 import { IconViewColumn } from "@spectrum-web-components/icons-workflow/src/elements/IconViewColumn.js";
 import { IconBox } from "@spectrum-web-components/icons-workflow/src/elements/IconBox.js";
 import { IconVisibility } from "@spectrum-web-components/icons-workflow/src/elements/IconVisibility.js";
@@ -244,6 +245,7 @@ const components = [
   ["sp-icon-text-baseline-shift", IconTextBaselineShift],
   ["sp-icon-flip-vertical", IconFlipVertical],
   ["sp-icon-remove", IconRemove],
+  ["sp-icon-full-screen", IconFullScreen],
   ["sp-icon-download", IconDownload],
   ["sp-icon-checkmark", IconCheckmark],
   ["sp-icon-view-column", IconViewColumn],
