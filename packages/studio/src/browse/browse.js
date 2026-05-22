@@ -6,7 +6,7 @@
  * button with type-aware entity creation (including content types from project.json).
  */
 
-import { html, render as litRender } from "lit-html";
+import { html, render as litRender, nothing } from "lit-html";
 import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
 import { yamlDefault } from "../settings/schema-field-ui.js";
@@ -60,6 +60,22 @@ let lastProjectDirsKey = "";
 function extOf(name) {
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot).toLowerCase() : "";
+}
+
+const IMAGE_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".svg",
+  ".webp",
+  ".avif",
+  ".ico",
+]);
+
+/** @param {string} ext */
+function isImage(ext) {
+  return IMAGE_EXTENSIONS.has(ext);
 }
 
 /** Map a file path to a display category. Media files override by extension. */
@@ -396,9 +412,14 @@ export async function renderBrowse(container, ctx) {
                 <sp-table-row
                   value=${f.path}
                   class="browse-row"
-                  @click=${() => ctx.openFile(f.path)}
+                  style=${isImage(f.ext) ? "cursor:default" : ""}
+                  @click=${isImage(f.ext) ? nothing : () => ctx.openFile(f.path)}
                 >
-                  <sp-table-cell class="browse-name-cell">${f.name}</sp-table-cell>
+                  <sp-table-cell class="browse-name-cell"
+                    >${isImage(f.ext)
+                      ? html`<img class="browse-thumb" src="/${f.path}" />`
+                      : nothing}${f.name}</sp-table-cell
+                  >
                   <sp-table-cell>${f.category}</sp-table-cell>
                   <sp-table-cell>${f.type}</sp-table-cell>
                   <sp-table-cell class="browse-path-cell">${f.path}</sp-table-cell>

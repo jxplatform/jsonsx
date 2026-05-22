@@ -45,6 +45,8 @@ export function initShortcuts(getContext) {
       const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
       // Edit (content) mode: let the scroll container handle scrolling natively
       if (canvasMode === "edit") return;
+      // Manage mode: browse table handles its own scrolling
+      if (canvasMode === "manage") return;
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom towards cursor
