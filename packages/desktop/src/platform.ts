@@ -55,6 +55,65 @@ export function createDesktopPlatform() {
     return originalFetch(input, init);
   };
 
+  // ─── Global MutationObserver: resolve relative asset URLs everywhere ────────
+  // Catches <img src>, <video src>, <source src>, <video poster> in any part of
+  // the DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
+  const resolving = new WeakSet<Element>();
+
+  function resolveElementAssets(el: Element) {
+    if (resolving.has(el)) return;
+    const tag = el.tagName;
+    if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") return;
+
+    for (const attr of ["src", "poster"]) {
+      const val = el.getAttribute(attr);
+      if (
+        val &&
+        !val.startsWith("data:") &&
+        !val.startsWith("blob:") &&
+        !val.startsWith("http") &&
+        !val.startsWith("views://")
+      ) {
+        resolving.add(el);
+        el.removeAttribute(attr);
+        const path = val.replace(/^\.?\//, "");
+        rpc.request
+          .readFileAsDataUrl({ path })
+          .then((dataUrl: string) => {
+            if (dataUrl) el.setAttribute(attr, dataUrl);
+          })
+          .catch(() => {})
+          .finally(() => resolving.delete(el));
+      }
+    }
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== 1) continue;
+          const el = node as Element;
+          resolveElementAssets(el);
+          for (const child of el.querySelectorAll(
+            "img[src], video[src], source[src], video[poster]",
+          )) {
+            resolveElementAssets(child);
+          }
+        }
+      } else if (mutation.type === "attributes") {
+        resolveElementAssets(mutation.target as Element);
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "poster"],
+  });
+
   return {
     id: "desktop" as const,
 
@@ -65,7 +124,10 @@ export function createDesktopPlatform() {
     },
 
     async openProject() {
-      return rpc.request.openProject();
+      console.log("[platform] openProject RPC call");
+      const res = await rpc.request.openProject();
+      console.log("[platform] openProject RPC result:", res);
+      return res;
     },
 
     async probeRootProject() {
