@@ -176,7 +176,9 @@ export async function exportFile() {
  */
 export function serializeDocument(tab) {
   if (tab.doc.sourceFormat === "md") {
-    return jxDocToMd(tab.doc.document);
+    const fm = tab.doc.content?.frontmatter || {};
+    const fullDoc = { ...fm, children: tab.doc.document.children ?? [] };
+    return jxDocToMd(fullDoc);
   }
   if (tab.doc.mode === "content") {
     const mdast = jxToMd(tab.doc.document);
