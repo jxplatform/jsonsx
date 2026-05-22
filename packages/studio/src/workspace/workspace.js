@@ -84,14 +84,48 @@ export function closeTab(tabId) {
   }
 }
 
-/** Close all open tabs, disposing each. */
+/** Close all open tabs, disposing each. Defers reactivity until fully cleared. */
 export function closeAllTabs() {
-  for (const tab of workspace.tabs.values()) {
-    disposeTab(tab);
-  }
+  const tabs = [...workspace.tabs.values()];
   workspace.tabs.clear();
   workspace.tabOrder = [];
   workspace.activeTabId = null;
+  for (const tab of tabs) {
+    disposeTab(tab);
+  }
+}
+
+/**
+ * Replace all existing tabs with a new one atomically. Ensures activeTab is never null during the
+ * transition.
+ *
+ * @param {{
+ *   id: string;
+ *   documentPath?: string | null;
+ *   document: Record<string, any>;
+ *   frontmatter?: Record<string, unknown>;
+ *   sourceFormat?: string | null;
+ * }} newTabOpts
+ * @returns {import("../tabs/tab.js").Tab}
+ */
+export function replaceAllTabs(newTabOpts) {
+  const oldIds = [...workspace.tabs.keys()];
+  const oldTabs = [...workspace.tabs.values()];
+
+  const newTab = createTab(newTabOpts);
+  workspace.tabs.set(newTab.id, newTab);
+  workspace.activeTabId = newTab.id;
+  workspace.tabOrder = [newTab.id];
+
+  for (const id of oldIds) {
+    if (id === newTab.id) continue;
+    workspace.tabs.delete(id);
+  }
+  for (const tab of oldTabs) {
+    disposeTab(tab);
+  }
+
+  return newTab;
 }
 
 /**

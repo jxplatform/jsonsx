@@ -15,7 +15,7 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
-import { workspace, openTab, activateTab, closeAllTabs } from "../workspace/workspace.js";
+import { workspace, openTab, activateTab, replaceAllTabs } from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
 import { view } from "../view.js";
 
@@ -92,7 +92,7 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
 
     const { config, handle } = result;
 
-    closeAllTabs();
+    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
 
     setProjectState({
       ...projectState,
