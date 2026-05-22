@@ -296,6 +296,14 @@ export function createDesktopPlatform() {
       return rpc.request.listPackages();
     },
 
+    updater: {
+      getLocalInfo: () => rpc.request.updaterGetLocalInfo(),
+      checkForUpdate: () => rpc.request.updaterCheckForUpdate(),
+      downloadUpdate: () => rpc.request.updaterDownloadUpdate(),
+      applyUpdate: () => rpc.request.updaterApplyUpdate(),
+      getStatus: () => rpc.request.updaterGetStatus(),
+    },
+
     windowControls: {
       minimize: () => rpc.request.windowMinimize(),
       maximize: () => rpc.request.windowMaximize(),
