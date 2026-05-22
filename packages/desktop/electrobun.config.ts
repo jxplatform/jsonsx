@@ -74,7 +74,7 @@ export default {
   },
 
   release: {
-    baseUrl: "https://github.com/jxsuite/jx/releases/download/",
+    baseUrl: "https://github.com/jxsuite/jx/releases/latest/download/",
   },
 
   // electrobun-builder-for-windows configuration
