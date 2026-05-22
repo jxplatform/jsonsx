@@ -1767,11 +1767,23 @@
       }
       .tb-search-trigger {
         flex: 0 1 280px;
-        cursor: pointer;
-        pointer-events: auto;
+        border: 1px solid var(--spectrum-gray-300, #393939);
+        border-radius: 4px;
+        --mod-actionbutton-edge-to-text: 10px;
       }
-      .tb-search-trigger::part(textfield) {
-        cursor: pointer;
+      .tb-search-trigger:hover {
+        border-color: var(--spectrum-gray-400, #4a4a4a);
+      }
+      .tb-search-label {
+        flex: 1;
+        text-align: left;
+        color: var(--spectrum-gray-600, #666);
+        font-weight: normal;
+        font-size: 12px;
+      }
+      .tb-search-label kbd {
+        font-family: inherit;
+        opacity: 0.6;
       }
       .quick-search-overlay {
         position: fixed;

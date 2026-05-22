@@ -292,15 +292,10 @@ function toolbarTemplate() {
       ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}
     </sp-action-group>
     <div class="tb-spacer"></div>
-    <sp-search
-      class="tb-search-trigger"
-      size="s"
-      quiet
-      readonly
-      placeholder="Search files… ⌘P"
-      @click=${openQuickSearch}
-      @focus=${openQuickSearch}
-    ></sp-search>
+    <sp-action-button class="tb-search-trigger" size="s" quiet @click=${openQuickSearch}>
+      <sp-icon-search slot="icon"></sp-icon-search>
+      <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
+    </sp-action-button>
     <div class="tb-spacer"></div>
     ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
   `;
