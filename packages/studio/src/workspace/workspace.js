@@ -84,6 +84,16 @@ export function closeTab(tabId) {
   }
 }
 
+/** Close all open tabs, disposing each. */
+export function closeAllTabs() {
+  for (const tab of workspace.tabs.values()) {
+    disposeTab(tab);
+  }
+  workspace.tabs.clear();
+  workspace.tabOrder = [];
+  workspace.activeTabId = null;
+}
+
 /**
  * Switch to an existing tab.
  *
