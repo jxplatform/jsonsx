@@ -35,7 +35,13 @@ import {
   setStatusbarRenderer,
   mountStatusbar,
 } from "./panels/statusbar.js";
-import { openFile, loadMarkdown, saveFile, exportFile } from "./files/file-ops.js";
+import {
+  openFile,
+  loadMarkdown,
+  saveFile,
+  exportFile,
+  serializeDocument,
+} from "./files/file-ops.js";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
@@ -128,6 +134,7 @@ async function navigateToComponent(componentPath) {
       documentPath: tab.documentPath,
       dirty: tab.doc.dirty,
       mode: tab.doc.mode,
+      sourceFormat: tab.doc.sourceFormat,
     };
     if (!tab.session.documentStack) tab.session.documentStack = [];
     tab.session.documentStack.push(frame);
@@ -136,6 +143,7 @@ async function navigateToComponent(componentPath) {
     tab.doc.document = parsed;
     tab.doc.dirty = false;
     tab.doc.mode = /** @type {any} */ (null);
+    tab.doc.sourceFormat = null;
     tab.documentPath = componentPath;
     tab.session.selection = null;
     view.leftTab = "layers";
@@ -156,7 +164,7 @@ async function navigateBack() {
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, JSON.stringify(tab.doc.document, null, 2));
+      await platform.writeFile(tab.documentPath, serializeDocument(tab));
     } catch (/** @type {any} */ e) {
       const err = /** @type {any} */ (e);
       statusMessage(`Save error: ${err.message}`);
@@ -169,6 +177,7 @@ async function navigateBack() {
   tab.doc.document = frame.document;
   tab.doc.dirty = frame.dirty;
   tab.doc.mode = frame.mode;
+  tab.doc.sourceFormat = frame.sourceFormat;
   tab.documentPath = frame.documentPath;
   tab.session.selection = frame.selection;
   view.leftTab = "layers";
@@ -583,7 +592,7 @@ function scheduleAutosave() {
     if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
       try {
         const writable = await t.fileHandle.createWritable();
-        await writable.write(JSON.stringify(t.doc.document, null, 2));
+        await writable.write(serializeDocument(t));
         await writable.close();
         t.doc.dirty = false;
         statusMessage("Auto-saved");
