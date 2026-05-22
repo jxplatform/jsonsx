@@ -319,7 +319,11 @@ export function mutateRemoveDef(tab, name) {
 export function mutateUpdateDef(tab, name, updates) {
   const doc = tab.doc.document;
   if (!doc.state) doc.state = {};
-  if (!doc.state[name]) doc.state[name] = {};
+  if (doc.state[name] == null) {
+    doc.state[name] = {};
+  } else if (typeof doc.state[name] !== "object") {
+    doc.state[name] = { default: doc.state[name] };
+  }
   Object.assign(doc.state[name], updates);
   for (const k of Object.keys(doc.state[name])) {
     if (doc.state[name][k] === undefined || doc.state[name][k] === null) {

@@ -14,6 +14,7 @@ import {
   mutateRenameDef,
 } from "../tabs/transact.js";
 import { renderFieldRow } from "../ui/field-row.js";
+import { renderMediaPicker } from "../ui/media-picker.js";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.js";
 
 // ─── Module-local state ─────────────────────────────────────────────────────
@@ -343,6 +344,9 @@ function renderSignalEditorTemplate(
   /** @type {any} */ def,
   /** @type {any} */ ctx,
 ) {
+  if (typeof def !== "object" || def === null) {
+    def = { default: def };
+  }
   const cat = defCategory(def);
 
   // Helper for picker rows
@@ -470,20 +474,31 @@ function renderSignalEditorTemplate(
               ),
           )
         : nothing}
-      ${signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
-        let parsed = v;
-        if (def.type === "integer") parsed = parseInt(v, 10) || 0;
-        else if (def.type === "number") parsed = parseFloat(v) || 0;
-        else if (def.type === "boolean") parsed = v === "true";
-        else if (def.type === "array" || def.type === "object") {
-          try {
-            parsed = JSON.parse(v);
-          } catch {
-            parsed = v;
-          }
-        }
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
-      })}
+      ${def.format === "image"
+        ? renderFieldRow({
+            prop: "Default",
+            label: "Default",
+            hasValue: false,
+            widget: renderMediaPicker("default", defaultVal, (/** @type {any} */ v) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { default: v || undefined }),
+              );
+            }),
+          })
+        : signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
+            let parsed = v;
+            if (def.type === "integer") parsed = parseInt(v, 10) || 0;
+            else if (def.type === "number") parsed = parseFloat(v) || 0;
+            else if (def.type === "boolean") parsed = v === "true";
+            else if (def.type === "array" || def.type === "object") {
+              try {
+                parsed = JSON.parse(v);
+              } catch {
+                parsed = v;
+              }
+            }
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
+          })}
       ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { description: v || undefined }),
