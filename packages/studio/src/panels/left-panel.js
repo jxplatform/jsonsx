@@ -40,6 +40,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerElementsDnD: () => void;
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
+ *   setGitDiffState: (state: any) => void;
  * }} LeftPanelCtx
  */
 

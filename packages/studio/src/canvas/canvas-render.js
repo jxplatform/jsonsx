@@ -10,6 +10,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { canvasWrap, canvasPanels, updateCanvas } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { loadMarkdown } from "../files/file-ops.js";
 import {
   canvasPanelTemplate,
   applyTransform,
@@ -262,25 +263,7 @@ export function renderCanvas() {
     }
 
     const gitDiffState = _ctx.gitDiffState;
-    const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
-    const panelWidth = baseWidth || 800;
-
-    let originalDoc = null;
-    try {
-      if (gitDiffState.isMarkdown) {
-        originalDoc = {
-          tagName: "div",
-          children: [{ tagName: "p", textContent: "(Markdown preview not supported)" }],
-        };
-      } else {
-        originalDoc = JSON.parse(gitDiffState.originalContent);
-      }
-    } catch {
-      originalDoc = {
-        tagName: "div",
-        children: [{ tagName: "p", textContent: "Failed to parse original" }],
-      };
-    }
+    const panelWidth = 800;
 
     const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
       "git-diff-original",
@@ -313,8 +296,28 @@ export function renderCanvas() {
     canvasPanels.push(/** @type {any} */ (origPanel));
     canvasPanels.push(/** @type {any} */ (currPanel));
 
-    renderCanvasIntoPanel(origPanel, new Set(), S.ui.featureToggles, originalDoc, gitDiffState);
-    renderCanvasIntoPanel(currPanel, new Set(), S.ui.featureToggles, S.document, gitDiffState);
+    /** @param {string} content */
+    const parseContent = (content) => {
+      if (gitDiffState.isMarkdown) {
+        return loadMarkdown(content).then((r) => r.document);
+      }
+      return Promise.resolve().then(() => {
+        try {
+          return JSON.parse(content);
+        } catch {
+          return { tagName: "div", children: [{ tagName: "p", textContent: "Failed to parse" }] };
+        }
+      });
+    };
+
+    const featureToggles = S.ui.featureToggles;
+    Promise.all([
+      parseContent(gitDiffState.originalContent || ""),
+      parseContent(gitDiffState.currentContent || ""),
+    ]).then(([originalDoc, currentDoc]) => {
+      renderCanvasIntoPanel(origPanel, new Set(), featureToggles, originalDoc, gitDiffState);
+      renderCanvasIntoPanel(currPanel, new Set(), featureToggles, currentDoc, gitDiffState);
+    });
 
     applyTransform();
     if (modeChanged) observeCenterUntilStable();

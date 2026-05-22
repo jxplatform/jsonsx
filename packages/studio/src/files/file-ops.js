@@ -174,7 +174,7 @@ export async function exportFile() {
  * @param {import("../tabs/tab.js").Tab} tab
  * @returns {string}
  */
-function serializeDocument(tab) {
+export function serializeDocument(tab) {
   if (tab.doc.sourceFormat === "md") {
     return jxDocToMd(tab.doc.document);
   }

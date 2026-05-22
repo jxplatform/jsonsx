@@ -160,36 +160,33 @@ export function renderGitPanel(S, ctx) {
     const dir = parts.join("/");
 
     const onFileClick = async () => {
-      // Only support diff for modified/added files
       if (file.status !== "M" && file.status !== "A") return;
       if (!file.path.endsWith(".md") && !file.path.endsWith(".json")) return;
 
       try {
         const plat = getPlatform();
         updateUi("gitLoading", true);
-        const originalContent = await plat.gitShow({ path: file.path, ref: "HEAD" });
 
-        // Determine if it's markdown or JSON
+        const [originalContent, currentContent] = await Promise.all([
+          file.status === "A"
+            ? Promise.resolve("")
+            : plat.gitShow({ path: file.path, ref: "HEAD" }),
+          plat.readFile(file.path),
+        ]);
+
         const isMarkdown = file.path.endsWith(".md");
-
-        // For now, we'll need to pass the original content to the canvas
-        // This requires state management which we'll add to studio.js
-        updateUi("gitDiffState", {
+        const diffState = {
           filePath: file.path,
           originalContent,
+          currentContent,
           isMarkdown,
           fileStatus: file.status,
-        });
+        };
+
+        updateUi("gitDiffState", diffState);
 
         if (ctx?.setCanvasMode) {
-          if (ctx.setGitDiffState) {
-            ctx.setGitDiffState({
-              filePath: file.path,
-              originalContent,
-              isMarkdown,
-              fileStatus: file.status,
-            });
-          }
+          if (ctx.setGitDiffState) ctx.setGitDiffState(diffState);
           ctx.setCanvasMode("git-diff");
         }
       } catch (/** @type {any} */ e) {
