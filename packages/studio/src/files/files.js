@@ -15,9 +15,10 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
-import { workspace, openTab, activateTab } from "../workspace/workspace.js";
+import { workspace, openTab, activateTab, replaceAllTabs } from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
 import { view } from "../view.js";
+import { addRecentProject, trackRecentFile } from "../recent-projects.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ const fileIconMap = /** @type {Record<string, import("lit-html").TemplateResult>
 
 // ─── File management ──────────────────────────────────────────────────────────
 
-async function loadDirectory(/** @type {string} */ dirPath) {
+export async function loadDirectory(/** @type {string} */ dirPath) {
   if (!projectState) return;
   try {
     const platform = getPlatform();
@@ -92,6 +93,8 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
 
     const { config, handle } = result;
 
+    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
+
     setProjectState({
       ...projectState,
       projectRoot: handle.root,
@@ -129,6 +132,7 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     projectState.projectDirs = foundDirs;
 
     view.leftTab = "files";
+    addRecentProject(projectState.name, projectState.projectRoot);
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
@@ -383,83 +387,83 @@ export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
 /** @type {HTMLElement | null} */
-let fileContextPopover = null;
+let _fileCtxHost = null;
+
+function getFileCtxHost() {
+  if (!_fileCtxHost) {
+    _fileCtxHost = document.createElement("div");
+    _fileCtxHost.style.display = "contents";
+    (document.querySelector("sp-theme") || document.body).appendChild(_fileCtxHost);
+    document.addEventListener("click", dismissFileContextMenu);
+  }
+  return _fileCtxHost;
+}
+
+function dismissFileContextMenu() {
+  const host = _fileCtxHost;
+  if (!host) return;
+  const popover = host.querySelector("sp-popover");
+  if (popover) popover.removeAttribute("open");
+}
 
 function showFileContextMenu(
   /** @type {MouseEvent} */ e,
   /** @type {{ name: string; path: string; type: string }} */ entry,
   /** @type {{ openFileFn: (path: string) => void; renderLeftPanel: () => void }} */ ctx,
 ) {
-  if (fileContextPopover) {
-    fileContextPopover.remove();
-    fileContextPopover = null;
-  }
-
+  e.preventDefault();
+  const host = getFileCtxHost();
   const isDir = entry.type === "directory";
-  fileContextPopover = document.createElement("div");
 
-  const tpl = html`
-    <sp-popover
-      placement="right-start"
-      open
-      style="position:fixed;left:${e.clientX}px;top:${e.clientY}px;z-index:9999"
-    >
-      <sp-menu style="min-width:160px">
-        ${!isDir
-          ? html`<sp-menu-item
-              @click=${() => {
-                closeFileContextMenu();
-                ctx.openFileFn(entry.path);
-              }}
-              >Open</sp-menu-item
-            >`
-          : nothing}
-        ${isDir
-          ? html`<sp-menu-item
-              @click=${() => {
-                closeFileContextMenu();
-                createNewFile(entry.path, ctx.renderLeftPanel);
-              }}
-              >New File…</sp-menu-item
-            >`
-          : nothing}
-        <sp-menu-divider></sp-menu-divider>
-        <sp-menu-item
-          @click=${() => {
-            closeFileContextMenu();
-            renameFile(entry, ctx.renderLeftPanel);
-          }}
-          >Rename…</sp-menu-item
-        >
-        <sp-menu-item
-          style="color:var(--danger)"
-          @click=${() => {
-            closeFileContextMenu();
-            deleteFile(entry, ctx.renderLeftPanel);
-          }}
-          >Delete</sp-menu-item
-        >
-      </sp-menu>
-    </sp-popover>
-  `;
+  /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
+  const items = [];
 
-  litRender(tpl, fileContextPopover);
-  document.body.appendChild(fileContextPopover);
-
-  const closeHandler = (/** @type {MouseEvent} */ ev) => {
-    if (!fileContextPopover?.contains(/** @type {Node} */ (ev.target))) {
-      closeFileContextMenu();
-      document.removeEventListener("mousedown", closeHandler, true);
-    }
-  };
-  setTimeout(() => document.addEventListener("mousedown", closeHandler, true), 0);
-}
-
-function closeFileContextMenu() {
-  if (fileContextPopover) {
-    fileContextPopover.remove();
-    fileContextPopover = null;
+  if (!isDir) {
+    items.push({ label: "Open", action: () => ctx.openFileFn(entry.path) });
   }
+  if (isDir) {
+    items.push({
+      label: "New File\u2026",
+      action: () => createNewFile(entry.path, ctx.renderLeftPanel),
+    });
+  }
+  items.push({ label: "\u2014" });
+  items.push({ label: "Rename\u2026", action: () => renameFile(entry, ctx.renderLeftPanel) });
+  items.push({
+    label: "Delete",
+    action: () => deleteFile(entry, ctx.renderLeftPanel),
+    danger: true,
+  });
+
+  litRender(
+    html`<sp-popover style="position:fixed;z-index:10000">
+      <sp-menu>
+        ${items.map((item) =>
+          item.label === "\u2014"
+            ? html`<sp-menu-divider></sp-menu-divider>`
+            : html`<sp-menu-item
+                style=${item.danger ? "color: var(--danger)" : ""}
+                @click=${() => {
+                  dismissFileContextMenu();
+                  item.action?.();
+                }}
+                >${item.label}</sp-menu-item
+              >`,
+        )}
+      </sp-menu>
+    </sp-popover>`,
+    host,
+  );
+
+  const popover = /** @type {HTMLElement} */ (host.querySelector("sp-popover"));
+  popover.setAttribute("open", "");
+  const menuRect = popover.getBoundingClientRect();
+  let x = e.clientX,
+    y = e.clientY;
+  if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+  if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
+  popover.style.left = `${x}px`;
+  popover.style.top = `${y}px`;
 }
 
 // ─── File CRUD ────────────────────────────────────────────────────────────────
@@ -631,6 +635,7 @@ export async function openFileInTab(path) {
       sourceFormat: path.endsWith(".md") ? "md" : null,
     });
     projectState.selectedPath = path;
+    trackRecentFile({ path, name: path.split("/").pop() || path });
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);

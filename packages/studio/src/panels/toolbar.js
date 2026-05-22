@@ -11,6 +11,8 @@ import { activeTab } from "../workspace/workspace.js";
 import { getEffectiveMedia } from "../site-context.js";
 import { mediaDisplayName } from "./shared.js";
 import { view } from "../view.js";
+import { getRecentProjects } from "../recent-projects.js";
+import { openQuickSearch } from "./quick-search.js";
 
 /** @type {HTMLElement | null} */
 let _rootEl = null;
@@ -259,13 +261,27 @@ function toolbarTemplate() {
             <sp-icon-close slot="icon"></sp-icon-close>
           </sp-action-button>
         </sp-action-group>
+  const recentProjects = getRecentProjects();
+  const recentProjectsTpl = recentProjects.length
+    ? html`
+        <overlay-trigger placement="bottom-start">
+          <sp-action-button size="s" slot="trigger" title="Recent projects">
+            <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
+          </sp-action-button>
+          <sp-popover slot="click-content" tip>
+            <sp-menu @change=${(/** @type {any} */ e) => _ctx.openRecentProject(e.target.value)}>
+              ${recentProjects.map(
+                (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
+              )}
+            </sp-menu>
+          </sp-popover>
+        </overlay-trigger>
       `
     : nothing;
 
   return html`
     <sp-action-group compact size="s">
-      ${tbBtnTpl("Open Project", _ctx.openProject, "sp-icon-folder-open")}
-      ${tbBtnTpl("Open File", _ctx.openFile, "sp-icon-document")}
+      ${tbBtnTpl("Open Project", _ctx.openProject, "sp-icon-folder-open")} ${recentProjectsTpl}
       ${tbBtnTpl("Save", _ctx.saveFile, "sp-icon-save-floppy")}
     </sp-action-group>
     <sp-action-group compact size="s">
@@ -273,17 +289,16 @@ function toolbarTemplate() {
       ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}
     </sp-action-group>
     <div class="tb-spacer"></div>
-    ${S.documentPath
-      ? html`<span class="tb-file-title" title=${S.documentPath}
-          >${S.documentPath}${S.dirty ? html`<span class="tb-dirty">●</span>` : nothing}</span
-        >`
-      : S.fileHandle
-        ? html`<span class="tb-file-title"
-            >${S.fileHandle.name}${S.dirty ? html`<span class="tb-dirty">●</span>` : nothing}</span
-          >`
-        : nothing}
-    ${breadcrumbTpl}
+    <sp-search
+      class="tb-search-trigger"
+      size="s"
+      quiet
+      readonly
+      placeholder="Search files… ⌘P"
+      @click=${openQuickSearch}
+      @focus=${openQuickSearch}
+    ></sp-search>
     <div class="tb-spacer"></div>
-    ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
+    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
   `;
 }

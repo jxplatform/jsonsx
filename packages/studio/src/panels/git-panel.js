@@ -7,6 +7,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { getPlatform } from "../platform.js";
 import { updateUi, renderOnly } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 
 async function refreshGitStatus() {
@@ -70,7 +71,8 @@ export function renderGitPanel(S, ctx) {
   const totalChanges = status?.files?.length || 0;
 
   const doCommit = async () => {
-    const msg = S.ui.gitCommitMessage?.trim();
+    const tab = activeTab.value;
+    const msg = tab?.session.ui.gitCommitMessage?.trim();
     if (!msg) return;
     updateUi("gitCommitMessage", "");
     await gitAction("gitCommit", msg);
@@ -145,11 +147,7 @@ export function renderGitPanel(S, ctx) {
           }
         }}
       ></sp-textfield>
-      <sp-action-button
-        class="git-commit-btn"
-        @click=${doCommit}
-        ?disabled=${!S.ui.gitCommitMessage?.trim() || loading}
-      >
+      <sp-action-button class="git-commit-btn" @click=${doCommit} ?disabled=${loading}>
         <sp-icon-checkmark slot="icon" size="xs"></sp-icon-checkmark>
         Commit
       </sp-action-button>
@@ -162,29 +160,33 @@ export function renderGitPanel(S, ctx) {
     const dir = parts.join("/");
 
     const onFileClick = async () => {
-      // Only support diff for modified/added files
       if (file.status !== "M" && file.status !== "A") return;
       if (!file.path.endsWith(".md") && !file.path.endsWith(".json")) return;
 
       try {
         const plat = getPlatform();
         updateUi("gitLoading", true);
-        const originalContent = await plat.gitShow({ path: file.path, ref: "HEAD" });
 
-        // Determine if it's markdown or JSON
+        const [originalContent, currentContent] = await Promise.all([
+          file.status === "A"
+            ? Promise.resolve("")
+            : plat.gitShow({ path: file.path, ref: "HEAD" }),
+          plat.readFile(file.path),
+        ]);
+
         const isMarkdown = file.path.endsWith(".md");
-
-        // For now, we'll need to pass the original content to the canvas
-        // This requires state management which we'll add to studio.js
-        updateUi("gitDiffState", {
+        const diffState = {
           filePath: file.path,
           originalContent,
+          currentContent,
           isMarkdown,
           fileStatus: file.status,
-        });
+        };
 
-        // Trigger diff mode via context
+        updateUi("gitDiffState", diffState);
+
         if (ctx?.setCanvasMode) {
+          if (ctx.setGitDiffState) ctx.setGitDiffState(diffState);
           ctx.setCanvasMode("git-diff");
         }
       } catch (/** @type {any} */ e) {

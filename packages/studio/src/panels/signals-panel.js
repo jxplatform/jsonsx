@@ -14,6 +14,7 @@ import {
   mutateRenameDef,
 } from "../tabs/transact.js";
 import { renderFieldRow } from "../ui/field-row.js";
+import { renderMediaPicker } from "../ui/media-picker.js";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.js";
 
 // ─── Module-local state ─────────────────────────────────────────────────────
@@ -343,6 +344,9 @@ function renderSignalEditorTemplate(
   /** @type {any} */ def,
   /** @type {any} */ ctx,
 ) {
+  if (typeof def !== "object" || def === null) {
+    def = { default: def };
+  }
   const cat = defCategory(def);
 
   // Helper for picker rows
@@ -470,20 +474,31 @@ function renderSignalEditorTemplate(
               ),
           )
         : nothing}
-      ${signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
-        let parsed = v;
-        if (def.type === "integer") parsed = parseInt(v, 10) || 0;
-        else if (def.type === "number") parsed = parseFloat(v) || 0;
-        else if (def.type === "boolean") parsed = v === "true";
-        else if (def.type === "array" || def.type === "object") {
-          try {
-            parsed = JSON.parse(v);
-          } catch {
-            parsed = v;
-          }
-        }
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
-      })}
+      ${def.format === "image"
+        ? renderFieldRow({
+            prop: "Default",
+            label: "Default",
+            hasValue: false,
+            widget: renderMediaPicker("default", defaultVal, (/** @type {any} */ v) => {
+              transactDoc(activeTab.value, (t) =>
+                mutateUpdateDef(t, name, { default: v || undefined }),
+              );
+            }),
+          })
+        : signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
+            let parsed = v;
+            if (def.type === "integer") parsed = parseInt(v, 10) || 0;
+            else if (def.type === "number") parsed = parseFloat(v) || 0;
+            else if (def.type === "boolean") parsed = v === "true";
+            else if (def.type === "array" || def.type === "object") {
+              try {
+                parsed = JSON.parse(v);
+              } catch {
+                parsed = v;
+              }
+            }
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
+          })}
       ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { description: v || undefined }),
@@ -644,7 +659,16 @@ function renderFunctionFields(
   /** @type {any} */ textareaRow,
   /** @type {any} */ ctx,
 ) {
-  const srcFields = def.$src
+  const descriptionField = signalFieldRow(
+    "Description",
+    def.description || "",
+    (/** @type {any} */ v) =>
+      transactDoc(activeTab.value, (t) =>
+        mutateUpdateDef(t, name, { description: v || undefined }),
+      ),
+  );
+
+  const bodyField = def.$src
     ? html`
         ${signalFieldRow("Source", def.$src || "", (/** @type {any} */ v) =>
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined })),
@@ -655,36 +679,35 @@ function renderFunctionFields(
           ),
         )}
       `
-    : textareaRow(
-        "Body",
-        def.body || "",
-        (/** @type {any} */ v) =>
-          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v })),
-        { minHeight: "60px", mono: true },
-      );
-
-  return html`
-    ${srcFields} ${renderParameterEditorTemplate(S, name, def, ctx)}
-    ${isCustomElementDoc(S) ? renderEmitsEditorTemplate(S, name, def) : nothing}
-    ${!def.$src
-      ? html`
-          <button
-            class="kv-add"
-            style="margin-top:4px"
+    : html`
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="field-label" style="flex:1">Body</span>
+          <sp-action-button
+            size="xs"
+            quiet
+            title="Open in code editor"
             @click=${() => {
               ctx.updateSession({ ui: { editingFunction: { type: "def", defName: name } } });
               ctx.renderCanvas();
             }}
           >
-            Open in editor
-          </button>
-        `
-      : nothing}
-    ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
-      transactDoc(activeTab.value, (t) =>
-        mutateUpdateDef(t, name, { description: v || undefined }),
-      ),
-    )}
+            <sp-icon-code slot="icon"></sp-icon-code>
+          </sp-action-button>
+        </div>
+        <textarea
+          class="field-input"
+          style="min-height:60px;font-family:monospace;font-size:11px"
+          .value=${def.body || ""}
+          @input=${(/** @type {any} */ e) => {
+            const v = e.target.value;
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
+          }}
+        ></textarea>
+      `;
+
+  return html`
+    ${descriptionField} ${renderParameterEditorTemplate(S, name, def, ctx)}
+    ${isCustomElementDoc(S) ? renderEmitsEditorTemplate(S, name, def) : nothing} ${bodyField}
   `;
 }
 

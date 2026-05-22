@@ -16,7 +16,7 @@ import {
   updateUi,
 } from "./store.js";
 
-import { activeTab, openTab } from "./workspace/workspace.js";
+import { activeTab, openTab, replaceAllTabs } from "./workspace/workspace.js";
 import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "./tabs/transact.js";
 import { effect } from "./reactivity.js";
 
@@ -35,13 +35,14 @@ import {
   setStatusbarRenderer,
   mountStatusbar,
 } from "./panels/statusbar.js";
-import { openFile, loadMarkdown, saveFile, exportFile } from "./files/file-ops.js";
+import { loadMarkdown, saveFile, exportFile, serializeDocument } from "./files/file-ops.js";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
   openFileInTab,
   setupTreeKeyboard,
+  loadDirectory,
 } from "./files/files.js";
 import { renderImportsTemplate } from "./panels/imports-panel.js";
 import { renderHeadTemplate } from "./panels/head-panel.js";
@@ -80,6 +81,8 @@ import { renderBlockActionBar, initBlockActionBar } from "./panels/block-action-
 import { initCssData } from "./panels/style-utils.js";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview.js";
 import { initPanelEvents } from "./panels/panel-events.js";
+import { initQuickSearch } from "./panels/quick-search.js";
+import { addRecentProject } from "./recent-projects.js";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -128,6 +131,7 @@ async function navigateToComponent(componentPath) {
       documentPath: tab.documentPath,
       dirty: tab.doc.dirty,
       mode: tab.doc.mode,
+      sourceFormat: tab.doc.sourceFormat,
     };
     if (!tab.session.documentStack) tab.session.documentStack = [];
     tab.session.documentStack.push(frame);
@@ -136,6 +140,7 @@ async function navigateToComponent(componentPath) {
     tab.doc.document = parsed;
     tab.doc.dirty = false;
     tab.doc.mode = /** @type {any} */ (null);
+    tab.doc.sourceFormat = null;
     tab.documentPath = componentPath;
     tab.session.selection = null;
     view.leftTab = "layers";
@@ -156,7 +161,7 @@ async function navigateBack() {
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, JSON.stringify(tab.doc.document, null, 2));
+      await platform.writeFile(tab.documentPath, serializeDocument(tab));
     } catch (/** @type {any} */ e) {
       const err = /** @type {any} */ (e);
       statusMessage(`Save error: ${err.message}`);
@@ -169,6 +174,7 @@ async function navigateBack() {
   tab.doc.document = frame.document;
   tab.doc.dirty = frame.dirty;
   tab.doc.mode = frame.mode;
+  tab.doc.sourceFormat = frame.sourceFormat;
   tab.documentPath = frame.documentPath;
   tab.session.selection = frame.selection;
   view.leftTab = "layers";
@@ -251,7 +257,7 @@ toolbarPanel.mount(toolbarEl, {
   navigateBack: () => navigateBack(),
   closeFunctionEditor: () => closeFunctionEditor(),
   openProject: () => openProject(),
-  openFile: () => openFile(),
+  openRecentProject: (/** @type {string} */ root) => openRecentProject(root),
   saveFile: () => saveFile(),
   parseMediaEntries,
   getCanvasMode,
@@ -259,6 +265,8 @@ toolbarPanel.mount(toolbarEl, {
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
 });
+
+initQuickSearch();
 
 tabStrip.mount(/** @type {HTMLElement} */ (document.querySelector("#tab-strip")));
 
@@ -300,7 +308,9 @@ initCanvasRender({
   setCanvasMode,
   openFileFromTree,
   exportFile,
-  gitDiffState,
+  get gitDiffState() {
+    return gitDiffState;
+  },
   setGitDiffState: (/** @type {any} */ state) => {
     gitDiffState = state;
   },
@@ -359,6 +369,9 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
+  setGitDiffState: (/** @type {any} */ state) => {
+    gitDiffState = state;
+  },
 });
 
 // Register all renderers with the store so render()/renderOnly() work
@@ -529,6 +542,56 @@ function openProject() {
     renderLeftPanel,
   });
 }
+async function openRecentProject(/** @type {string} */ root) {
+  try {
+    const platform = getPlatform();
+    platform.projectRoot = root;
+    const content = await platform.readFile("project.json");
+    const config = JSON.parse(content);
+
+    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
+
+    setProjectState({
+      ...projectState,
+      projectRoot: root,
+      isSiteProject: true,
+      projectConfig: config,
+      name: config.name || root.split("/").pop(),
+      dirs: new Map(),
+      expanded: new Set(),
+      selectedPath: null,
+      searchQuery: "",
+    });
+
+    await loadDirectory(".");
+    await loadComponentRegistry();
+
+    const conventionalDirs = [
+      "pages",
+      "layouts",
+      "components",
+      "content",
+      "data",
+      "public",
+      "styles",
+    ];
+    const entries = projectState.dirs.get(".") || [];
+    for (const e of entries) {
+      if (e.type === "directory" && conventionalDirs.includes(e.name)) {
+        projectState.expanded.add(e.path || e.name);
+        await loadDirectory(e.path || e.name);
+      }
+    }
+
+    addRecentProject(projectState.name, root);
+    view.leftTab = "files";
+    renderActivityBar();
+    renderLeftPanel();
+    statusMessage(`Opened project: ${projectState.name}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
+}
 function renderFilesTemplate() {
   return _renderFilesTemplate({ openProject, openFileFromTree, renderLeftPanel });
 }
@@ -578,7 +641,7 @@ function scheduleAutosave() {
     if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
       try {
         const writable = await t.fileHandle.createWritable();
-        await writable.write(JSON.stringify(t.doc.document, null, 2));
+        await writable.write(serializeDocument(t));
         await writable.close();
         t.doc.dirty = false;
         statusMessage("Auto-saved");

@@ -55,6 +55,93 @@ export function createDesktopPlatform() {
     return originalFetch(input, init);
   };
 
+  // ─── Global MutationObserver: resolve relative asset URLs everywhere ────────
+  // Catches <img src>, <video src>, <source src>, <video poster> in any part of
+  // the DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
+  const resolving = new WeakSet<Element>();
+
+  function resolveElementAssets(el: Element) {
+    if (resolving.has(el)) return;
+    const tag = el.tagName;
+    if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") return;
+
+    for (const attr of ["src", "poster"]) {
+      const val = el.getAttribute(attr);
+      if (
+        val &&
+        !val.startsWith("data:") &&
+        !val.startsWith("blob:") &&
+        !val.startsWith("http") &&
+        !val.startsWith("views://")
+      ) {
+        resolving.add(el);
+        el.removeAttribute(attr);
+        const path = val.replace(/^\.?\//, "");
+        rpc.request
+          .readFileAsDataUrl({ path })
+          .then((dataUrl: string) => {
+            if (dataUrl) el.setAttribute(attr, dataUrl);
+          })
+          .catch(() => {})
+          .finally(() => resolving.delete(el));
+      }
+    }
+  }
+
+  function resolveBackgroundImage(el: Element) {
+    const htmlEl = el as HTMLElement;
+    if (!htmlEl.style) return;
+    const bg = htmlEl.style.backgroundImage;
+    if (!bg) return;
+    const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
+    if (!match) return;
+    const val = match[1];
+    if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) return;
+    const path = val.replace(/^\.?\//, "");
+    rpc.request
+      .readFileAsDataUrl({ path })
+      .then((dataUrl: string) => {
+        if (dataUrl) htmlEl.style.backgroundImage = `url(${dataUrl})`;
+      })
+      .catch(() => {});
+  }
+
+  function resolveAllAssets(el: Element) {
+    resolveElementAssets(el);
+    resolveBackgroundImage(el);
+    for (const child of el.querySelectorAll("img[src], video[src], source[src], video[poster]")) {
+      resolveElementAssets(child);
+    }
+    for (const child of el.querySelectorAll("[style]")) {
+      resolveBackgroundImage(child);
+    }
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "childList") {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType !== 1) continue;
+          resolveAllAssets(node as Element);
+        }
+      } else if (mutation.type === "attributes") {
+        const el = mutation.target as Element;
+        if (mutation.attributeName === "style") {
+          resolveBackgroundImage(el);
+        } else {
+          resolveElementAssets(el);
+        }
+      }
+    }
+  });
+
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["src", "poster", "style"],
+  });
+
   return {
     id: "desktop" as const,
 
@@ -65,7 +152,8 @@ export function createDesktopPlatform() {
     },
 
     async openProject() {
-      return rpc.request.openProject();
+      const res = await rpc.request.openProject();
+      return res;
     },
 
     async probeRootProject() {

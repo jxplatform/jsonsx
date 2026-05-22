@@ -40,6 +40,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerElementsDnD: () => void;
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
+ *   setGitDiffState: (state: any) => void;
  * }} LeftPanelCtx
  */
 
@@ -69,6 +70,9 @@ export function mount(ctx) {
       void tab.doc.mode;
       void tab.session.selection;
       void tab.session.ui.settingsTab;
+      void tab.session.ui.gitStatus;
+      void tab.session.ui.gitLoading;
+      void tab.session.ui.gitError;
       render();
     });
   });

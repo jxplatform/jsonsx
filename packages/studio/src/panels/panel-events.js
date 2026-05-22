@@ -81,12 +81,14 @@ export function registerPanelEvents(panel) {
         document.elementsFromPoint(e.clientX, e.clientY),
       );
 
+      if (!tab) return;
+
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
           // Layout element clicked — show layout info instead of selecting in page doc
           if (layoutElements.has(el)) {
             view.layoutSelection = { el, layoutPath: activeLayoutPath };
-            activeTab.value.session.selection = null;
+            tab.session.selection = null;
             renderOnly("rightPanel");
             return;
           }
@@ -94,35 +96,35 @@ export function registerPanelEvents(panel) {
 
           const originalPath = elToPath.get(el);
           if (originalPath) {
-            let path = bubbleInlinePath(tab?.doc.document, originalPath);
+            let path = bubbleInlinePath(tab.doc.document, originalPath);
             const newMedia = mediaName === "base" ? null : (mediaName ?? null);
 
             const resolvedEl = path === originalPath ? el : findCanvasElement(path, canvas) || el;
 
             if (
-              pathsEqual(path, tab?.session.selection) &&
+              pathsEqual(path, tab.session.selection) &&
               isEditableBlock(resolvedEl) &&
-              (canvasMode === "edit" || tab?.doc.mode === "content")
+              (canvasMode === "edit" || tab.doc.mode === "content")
             ) {
-              activeTab.value.session.ui.activeMedia = newMedia;
+              tab.session.ui.activeMedia = newMedia;
               _ctx.enterInlineEdit(resolvedEl, path);
               return;
             }
 
-            if (canvasMode === "design" && tab?.doc.mode !== "content") {
+            if (canvasMode === "design" && tab.doc.mode !== "content") {
               updateUi("pendingInlineEdit", { path, mediaName });
-              activeTab.value.session.ui.activeMedia = newMedia;
-              activeTab.value.session.selection = path;
+              tab.session.ui.activeMedia = newMedia;
+              tab.session.selection = path;
               return;
             }
 
-            activeTab.value.session.ui.activeMedia = newMedia;
-            activeTab.value.session.selection = path;
+            tab.session.ui.activeMedia = newMedia;
+            tab.session.selection = path;
             return;
           }
         }
       }
-      activeTab.value.session.selection = null;
+      tab.session.selection = null;
     },
     opts,
   );
@@ -149,16 +151,18 @@ export function registerPanelEvents(panel) {
         document.elementsFromPoint(e.clientX, e.clientY),
       );
 
+      if (!tab) return;
+
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
           const originalPath = elToPath.get(el);
           if (originalPath) {
-            const path = bubbleInlinePath(tab?.doc.document, originalPath);
+            const path = bubbleInlinePath(tab.doc.document, originalPath);
             const resolvedEl = path === originalPath ? el : findCanvasElement(path, canvas) || el;
             if (isEditableBlock(resolvedEl)) {
               const newMedia = mediaName === "base" ? null : (mediaName ?? null);
-              activeTab.value.session.ui.activeMedia = newMedia;
-              activeTab.value.session.selection = path;
+              tab.session.ui.activeMedia = newMedia;
+              tab.session.selection = path;
               _ctx.enterInlineEdit(resolvedEl, path);
               return;
             }
@@ -217,18 +221,19 @@ export function registerPanelEvents(panel) {
           return;
       }
       const tab = activeTab.value;
+      if (!tab) return;
       const el = withPanelPointerEvents(() => document.elementFromPoint(e.clientX, e.clientY));
       if (el && canvas.contains(el) && el !== canvas) {
         let path = elToPath.get(el);
         if (path) {
-          path = bubbleInlinePath(tab?.doc.document, path);
-          if (!pathsEqual(path, tab?.session.hover)) {
-            activeTab.value.session.hover = path;
+          path = bubbleInlinePath(tab.doc.document, path);
+          if (!pathsEqual(path, tab.session.hover)) {
+            tab.session.hover = path;
             renderOnly("overlays");
           }
         }
-      } else if (tab?.session.hover) {
-        activeTab.value.session.hover = null;
+      } else if (tab.session.hover) {
+        tab.session.hover = null;
         renderOnly("overlays");
       }
     },

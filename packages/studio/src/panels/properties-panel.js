@@ -222,16 +222,16 @@ function renderFrontmatterOnlyPanel() {
       fields.push({ field, entry: fieldSchema, value: fm[field] });
     }
     for (const [field, value] of Object.entries(fm)) {
-      if (!schemaProps[field]) {
-        fields.push({
-          field,
-          entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-          value,
-        });
-      }
+      if (schemaProps[field] || field.startsWith("$")) continue;
+      fields.push({
+        field,
+        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+        value,
+      });
     }
   } else {
     for (const [field, value] of Object.entries(fm)) {
+      if (field.startsWith("$")) continue;
       fields.push({
         field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
@@ -1656,16 +1656,16 @@ export function renderPropertiesPanelTemplate(ctx) {
               fields.push({ field, entry: fieldSchema, value: fm[field] });
             }
             for (const [field, value] of Object.entries(fm)) {
-              if (!schemaProps[field]) {
-                fields.push({
-                  field,
-                  entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-                  value,
-                });
-              }
+              if (schemaProps[field] || field.startsWith("$")) continue;
+              fields.push({
+                field,
+                entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+                value,
+              });
             }
           } else {
             for (const [field, value] of Object.entries(fm)) {
+              if (field.startsWith("$")) continue;
               fields.push({
                 field,
                 entry: { type: typeof value === "boolean" ? "boolean" : "string" },

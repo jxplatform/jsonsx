@@ -315,6 +315,18 @@ export function createDevServerPlatform() {
       return null;
     },
 
+    /** @param {string} query */
+    async searchFiles(query) {
+      const glob = `**/*${query}*.{json,md}`;
+      const res = await fetch(
+        `/__studio/files?dir=${encodeURIComponent(serverPath("."))}&glob=${encodeURIComponent(glob)}`,
+      );
+      if (!res.ok) return [];
+      const entries = await res.json();
+      for (const e of entries) e.path = stripRoot(e.path);
+      return entries;
+    },
+
     // ─── Plugin schema ────────────────────────────────────────────────────
 
     /**
@@ -432,6 +444,16 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/git/diff?path=${encodeURIComponent(path)}`);
       if (!res.ok) throw new Error(await res.text());
       return await res.json();
+    },
+
+    /** @param {{ path: string; ref?: string }} opts */
+    async gitShow(opts) {
+      const params = new URLSearchParams({ path: opts.path });
+      if (opts.ref) params.set("ref", opts.ref);
+      const res = await fetch(`/__studio/git/show?${params}`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      return data.content;
     },
 
     /** @param {string[]} files */

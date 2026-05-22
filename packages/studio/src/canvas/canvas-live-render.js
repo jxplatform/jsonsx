@@ -390,38 +390,12 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       canvasEl.removeAttribute("data-content-mode");
     }
 
-    // Resolve relative asset URLs through the PAL for environments that can't
-    // serve project files natively (e.g. ElectroBun's views:// scheme).
-    const platform = /** @type {any} */ (globalThis).__jxPlatform;
-    if (platform?.resolveAssetUrl && docBase) {
-      const mediaEls = el.querySelectorAll("img[src], video[src], source[src], video[poster]");
-      for (const node of mediaEls) {
-        for (const attr of ["src", "poster"]) {
-          const val = node.getAttribute(attr);
-          if (
-            val &&
-            !val.startsWith("data:") &&
-            !val.startsWith("blob:") &&
-            !val.startsWith("http")
-          ) {
-            try {
-              const resolved = new URL(val, docBase).pathname.replace(/^\//, "");
-              const dataUrl = await platform.resolveAssetUrl(resolved);
-              if (dataUrl) node.setAttribute(attr, dataUrl);
-            } catch {}
-          }
-        }
-      }
-    }
-
     canvasEl.appendChild(el);
+
     if (canvasMode === "design" || canvasMode === "edit") {
-      // Custom element connectedCallbacks render children asynchronously —
-      // sweep again after they've had a chance to run
       requestAnimationFrame(() => {
         const editingEl = getActiveElement();
         for (const child of canvasEl.querySelectorAll("*")) {
-          // Preserve pointer-events on the actively-edited element
           if (view.componentInlineEdit && child === view.componentInlineEdit.el) continue;
           if (editingEl && child === editingEl) continue;
           /** @type {any} */ (child).style.pointerEvents = "none";

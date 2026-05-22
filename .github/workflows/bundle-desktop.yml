@@ -92,9 +92,29 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
+      - name: Generate release body
+        id: body
+        run: |
+          TAG="${{ github.ref_name }}"
+          BASE="https://github.com/jxsuite/jx/releases/download/${TAG}"
+          cat <<'EOF' > body.md
+          ## Downloads
+
+          | Platform | Architecture | Installer | Archive |
+          |----------|-------------|-----------|---------|
+          | macOS | Apple Silicon (arm64) | [DMG](BASE/stable-macos-arm64-JxStudio.dmg) | [tar.zst](BASE/stable-macos-arm64-JxStudio.app.tar.zst) |
+          | macOS | Intel (x64) | [DMG](BASE/stable-macos-x64-JxStudio.dmg) | [tar.zst](BASE/stable-macos-x64-JxStudio.app.tar.zst) |
+          | Linux | x64 | [tar.gz](BASE/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](BASE/stable-linux-x64-JxStudio.tar.zst) |
+          | Windows | x64 | [MSI](BASE/Jx.Studio.msi) | [ZIP](BASE/stable-win-x64-JxStudio-Setup.zip) |
+          EOF
+          sed -i "s|BASE|${BASE}|g" body.md
+          # Strip leading whitespace from heredoc
+          sed -i 's/^          //' body.md
+
       - name: Attach artifacts and publish release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           draft: false
+          body_path: body.md
           files: artifacts/*

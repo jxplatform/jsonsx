@@ -10,6 +10,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { canvasWrap, canvasPanels, updateCanvas } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { loadMarkdown } from "../files/file-ops.js";
 import {
   canvasPanelTemplate,
   applyTransform,
@@ -144,6 +145,7 @@ export function renderCanvas() {
     // Reset inline style overrides from other modes
     canvasWrap.style.padding = "";
     canvasWrap.style.alignItems = "";
+    canvasWrap.style.flexDirection = "";
     canvasWrap.style.display = "";
     canvasWrap.style.overflow = "";
     canvasWrap.style.overflow = "";
@@ -247,72 +249,79 @@ export function renderCanvas() {
     return;
   }
 
-  // Git diff mode — render original (left) and current (right) side-by-side
+  // Git diff mode — render original (left) and current (right) side-by-side on panzoom surface
   if (canvasMode === "git-diff") {
     if (!_ctx.gitDiffState) {
-      // Fallback to design mode if diff state is missing
       _ctx.setCanvasMode("design");
       renderCanvas();
       return;
     }
 
-    canvasWrap.style.padding = "0";
-    canvasWrap.style.overflow = "hidden";
+    if (modeChanged) {
+      canvasWrap.style.padding = "0";
+      canvasWrap.style.overflow = "hidden";
+    }
 
     const gitDiffState = _ctx.gitDiffState;
-    const { tpl: origPanelTpl, panel: origPanel } = canvasPanelTemplate(
+    const panelWidth = 800;
+
+    const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
       "git-diff-original",
       "Original",
       false,
-      "50%",
+      panelWidth,
     );
-    const { tpl: currPanelTpl, panel: currPanel } = canvasPanelTemplate(
+    const { tpl: currTpl, panel: currPanel } = canvasPanelTemplate(
       "git-diff-current",
       "Current",
       false,
-      "50%",
+      panelWidth,
     );
 
-    const diffTpl = html`
-      <div style="display: flex; height: 100%; gap: 0;">
-        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-          ${origPanelTpl}
+    litRender(
+      html`
+        <div
+          class="panzoom-wrap"
+          style="transform-origin:0 0"
+          ${ref((el) => {
+            if (el) view.panzoomWrap = /** @type {HTMLDivElement} */ (el);
+          })}
+        >
+          ${origTpl} ${currTpl}
         </div>
-        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-          ${currPanelTpl}
-        </div>
-      </div>
-    `;
+      `,
+      canvasWrap,
+    );
 
-    litRender(diffTpl, canvasWrap);
     canvasPanels.push(/** @type {any} */ (origPanel));
     canvasPanels.push(/** @type {any} */ (currPanel));
 
-    // Parse original document from git content
-    let originalDoc = null;
-    try {
+    /** @param {string} content */
+    const parseContent = (content) => {
       if (gitDiffState.isMarkdown) {
-        // For markdown, we need to convert it to Jx format
-        // For now, use a simple placeholder until we have markdown parsing
-        originalDoc = {
-          tagName: "div",
-          children: [{ tagName: "p", textContent: "Original (markdown)" }],
-        };
-      } else {
-        // Parse as JSON
-        originalDoc = JSON.parse(gitDiffState.originalContent);
+        return loadMarkdown(content).then((r) => r.document);
       }
-    } catch {
-      originalDoc = {
-        tagName: "div",
-        children: [{ tagName: "p", textContent: "Failed to parse original" }],
-      };
-    }
+      return Promise.resolve().then(() => {
+        try {
+          return JSON.parse(content);
+        } catch {
+          return { tagName: "div", children: [{ tagName: "p", textContent: "Failed to parse" }] };
+        }
+      });
+    };
 
-    const currDoc = S.document;
+    const featureToggles = S.ui.featureToggles;
+    Promise.all([
+      parseContent(gitDiffState.originalContent || ""),
+      parseContent(gitDiffState.currentContent || ""),
+    ]).then(([originalDoc, currentDoc]) => {
+      renderCanvasIntoPanel(origPanel, new Set(), featureToggles, originalDoc, gitDiffState);
+      renderCanvasIntoPanel(currPanel, new Set(), featureToggles, currentDoc, gitDiffState);
+    });
 
-    renderCanvasIntoPanel(origPanel, new Set(), S.ui.featureToggles, originalDoc, gitDiffState);
-    renderCanvasIntoPanel(currPanel, new Set(), S.ui.featureToggles, currDoc, gitDiffState);
+    applyTransform();
+    if (modeChanged) observeCenterUntilStable();
+    renderZoomIndicator();
     return;
   }
 
@@ -498,6 +507,7 @@ function renderCanvasIntoPanel(
     } else {
       // Fallback to structural preview
       updateCanvas({ status: "ready", scope: null, error: null });
+      panel.canvas.innerHTML = "";
       renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
     }
     registerPanelDnD(panel);
