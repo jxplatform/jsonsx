@@ -57,6 +57,8 @@ export function renderFunctionEditor() {
 
   litRender(nothing, canvasWrap);
   canvasWrap.style.padding = "0";
+  canvasWrap.style.flexDirection = "column";
+  canvasWrap.style.alignItems = "stretch";
 
   // Toolbar breadcrumb handles context display — re-render it
   renderOnly("toolbar");
@@ -65,12 +67,14 @@ export function renderFunctionEditor() {
   /** @type {HTMLDivElement | null} */
   let editorContainer = null;
   litRender(
-    html`<div
-      class="source-editor"
-      ${ref((el) => {
-        if (el) editorContainer = /** @type {HTMLDivElement} */ (el);
-      })}
-    ></div>`,
+    html`<div class="source-wrap">
+      <div
+        class="source-editor"
+        ${ref((el) => {
+          if (el) editorContainer = /** @type {HTMLDivElement} */ (el);
+        })}
+      ></div>
+    </div>`,
     canvasWrap,
   );
 

@@ -33,7 +33,7 @@ export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
 
   if (!skipHistory) {
     const snapshot = {
-      document: structuredClone(raw),
+      document: JSON.parse(JSON.stringify(raw)),
       selection: tab.session.selection ? [...tab.session.selection] : null,
     };
     const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);

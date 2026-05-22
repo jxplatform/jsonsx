@@ -144,6 +144,7 @@ export function renderCanvas() {
     // Reset inline style overrides from other modes
     canvasWrap.style.padding = "";
     canvasWrap.style.alignItems = "";
+    canvasWrap.style.flexDirection = "";
     canvasWrap.style.display = "";
     canvasWrap.style.overflow = "";
     canvasWrap.style.overflow = "";
@@ -498,6 +499,7 @@ function renderCanvasIntoPanel(
     } else {
       // Fallback to structural preview
       updateCanvas({ status: "ready", scope: null, error: null });
+      panel.canvas.innerHTML = "";
       renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
     }
     registerPanelDnD(panel);

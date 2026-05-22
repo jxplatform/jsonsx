@@ -363,18 +363,18 @@ describe("buildScope", () => {
     ).rejects.toThrow("mutually exclusive");
   });
 
-  test("Shape 4: Function with neither body nor $src → throws", async () => {
-    await expect(
-      buildScope(
-        {
-          state: {
-            bad: { $prototype: "Function" },
-          },
+  test("Shape 4: Function with neither body nor $src → returns no-op", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          empty: { $prototype: "Function" },
         },
-        {},
-        BASE,
-      ),
-    ).rejects.toThrow("no body or $src");
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.empty).toBe("function");
+    expect(state.empty()).toBeUndefined();
   });
 
   // Shape 5: External class $prototype

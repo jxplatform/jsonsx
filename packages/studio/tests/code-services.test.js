@@ -193,35 +193,31 @@ describe("setLintMarkers", () => {
 describe("getFunctionArgs", () => {
   test("returns parameters from state def", () => {
     const editing = { type: "def", defName: "onClick" };
-    const state = {
-      document: { state: { onClick: { parameters: ["state", "event", "el"] } } },
-    };
-    expect(getFunctionArgs(editing, state)).toEqual(["state", "event", "el"]);
+    const document = { state: { onClick: { parameters: ["state", "event", "el"] } } };
+    expect(getFunctionArgs(editing, document)).toEqual(["state", "event", "el"]);
   });
 
   test("returns default when state def has no parameters", () => {
     const editing = { type: "def", defName: "handler" };
-    const state = { document: { state: { handler: {} } } };
-    expect(getFunctionArgs(editing, state)).toEqual(["state", "event"]);
+    const document = { state: { handler: {} } };
+    expect(getFunctionArgs(editing, document)).toEqual(["state", "event"]);
   });
 
   test("returns default when state def not found", () => {
     const editing = { type: "def", defName: "missing" };
-    const state = { document: { state: {} } };
-    expect(getFunctionArgs(editing, state)).toEqual(["state", "event"]);
+    const document = { state: {} };
+    expect(getFunctionArgs(editing, document)).toEqual(["state", "event"]);
   });
 
   test("returns parameters from event node", () => {
     const editing = { type: "event", path: ["children", 0], eventKey: "onclick" };
-    const state = {
-      document: { children: [{ onclick: { parameters: ["state"] } }] },
-    };
-    expect(getFunctionArgs(editing, state)).toEqual(["state"]);
+    const document = { children: [{ onclick: { parameters: ["state"] } }] };
+    expect(getFunctionArgs(editing, document)).toEqual(["state"]);
   });
 
   test("returns default for unknown editing type", () => {
     const editing = { type: "unknown" };
-    const state = { document: {} };
-    expect(getFunctionArgs(editing, state)).toEqual(["state", "event"]);
+    const document = {};
+    expect(getFunctionArgs(editing, document)).toEqual(["state", "event"]);
   });
 });

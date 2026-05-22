@@ -261,7 +261,10 @@ async function resolveFunction(def, state, key, base) {
     throw new Error(`Jx: '${key}' declares both body and $src — these are mutually exclusive`);
   }
   if (!def.body && !def.$src) {
-    throw new Error(`Jx: '${key}' is a Function prototype with no body or $src`);
+    const params = resolveParamNames(def);
+    const noop = new Function(...params, "");
+    Object.defineProperty(noop, "name", { value: def.name ?? key, configurable: true });
+    return noop;
   }
 
   let fn;

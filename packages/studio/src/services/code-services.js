@@ -85,13 +85,13 @@ export function setLintMarkers(editor, diagnostics) {
 
 /**
  * @param {any} editing
- * @param {any} state
+ * @param {any} document
  */
-export function getFunctionArgs(editing, state) {
+export function getFunctionArgs(editing, document) {
   if (editing.type === "def") {
-    return state.document.state?.[editing.defName]?.parameters || ["state", "event"];
+    return document?.state?.[editing.defName]?.parameters || ["state", "event"];
   } else if (editing.type === "event") {
-    const node = getNodeAtPath(state.document, editing.path);
+    const node = getNodeAtPath(document, editing.path);
     return node?.[editing.eventKey]?.parameters || ["state", "event"];
   }
   return ["state", "event"];
