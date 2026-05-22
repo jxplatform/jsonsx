@@ -248,59 +248,31 @@ export function renderCanvas() {
     return;
   }
 
-  // Git diff mode — render original (left) and current (right) side-by-side
+  // Git diff mode — render original (left) and current (right) side-by-side on panzoom surface
   if (canvasMode === "git-diff") {
     if (!_ctx.gitDiffState) {
-      // Fallback to design mode if diff state is missing
       _ctx.setCanvasMode("design");
       renderCanvas();
       return;
     }
 
-    canvasWrap.style.padding = "0";
-    canvasWrap.style.overflow = "hidden";
+    if (modeChanged) {
+      canvasWrap.style.padding = "0";
+      canvasWrap.style.overflow = "hidden";
+    }
 
     const gitDiffState = _ctx.gitDiffState;
-    const { tpl: origPanelTpl, panel: origPanel } = canvasPanelTemplate(
-      "git-diff-original",
-      "Original",
-      false,
-      "50%",
-    );
-    const { tpl: currPanelTpl, panel: currPanel } = canvasPanelTemplate(
-      "git-diff-current",
-      "Current",
-      false,
-      "50%",
-    );
+    const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
+    const panelWidth = baseWidth || 800;
 
-    const diffTpl = html`
-      <div style="display: flex; height: 100%; gap: 0;">
-        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-          ${origPanelTpl}
-        </div>
-        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
-          ${currPanelTpl}
-        </div>
-      </div>
-    `;
-
-    litRender(diffTpl, canvasWrap);
-    canvasPanels.push(/** @type {any} */ (origPanel));
-    canvasPanels.push(/** @type {any} */ (currPanel));
-
-    // Parse original document from git content
     let originalDoc = null;
     try {
       if (gitDiffState.isMarkdown) {
-        // For markdown, we need to convert it to Jx format
-        // For now, use a simple placeholder until we have markdown parsing
         originalDoc = {
           tagName: "div",
-          children: [{ tagName: "p", textContent: "Original (markdown)" }],
+          children: [{ tagName: "p", textContent: "(Markdown preview not supported)" }],
         };
       } else {
-        // Parse as JSON
         originalDoc = JSON.parse(gitDiffState.originalContent);
       }
     } catch {
@@ -310,10 +282,43 @@ export function renderCanvas() {
       };
     }
 
-    const currDoc = S.document;
+    const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
+      "git-diff-original",
+      "Original",
+      false,
+      panelWidth,
+    );
+    const { tpl: currTpl, panel: currPanel } = canvasPanelTemplate(
+      "git-diff-current",
+      "Current",
+      false,
+      panelWidth,
+    );
+
+    litRender(
+      html`
+        <div
+          class="panzoom-wrap"
+          style="transform-origin:0 0"
+          ${ref((el) => {
+            if (el) view.panzoomWrap = /** @type {HTMLDivElement} */ (el);
+          })}
+        >
+          ${origTpl} ${currTpl}
+        </div>
+      `,
+      canvasWrap,
+    );
+
+    canvasPanels.push(/** @type {any} */ (origPanel));
+    canvasPanels.push(/** @type {any} */ (currPanel));
 
     renderCanvasIntoPanel(origPanel, new Set(), S.ui.featureToggles, originalDoc, gitDiffState);
-    renderCanvasIntoPanel(currPanel, new Set(), S.ui.featureToggles, currDoc, gitDiffState);
+    renderCanvasIntoPanel(currPanel, new Set(), S.ui.featureToggles, S.document, gitDiffState);
+
+    applyTransform();
+    if (modeChanged) observeCenterUntilStable();
+    renderZoomIndicator();
     return;
   }
 
