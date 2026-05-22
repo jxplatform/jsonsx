@@ -29,47 +29,6 @@ import { getActiveElement } from "../editor/inline-edit.js";
 /** @type {any} */
 let _ctx = null;
 
-/**
- * Resolve relative asset URLs (img src, video src/poster, background-image) through the PAL for
- * environments that can't serve project files natively (e.g. ElectroBun's views:// scheme).
- *
- * @param {Element} root
- * @param {{ resolveAssetUrl: (path: string) => Promise<string | null> }} platform
- * @param {string} docBase
- */
-async function resolveAssetUrls(root, platform, docBase) {
-  const mediaEls = root.querySelectorAll("img[src], video[src], source[src], video[poster]");
-  for (const node of mediaEls) {
-    for (const attr of ["src", "poster"]) {
-      const val = node.getAttribute(attr);
-      if (val && !val.startsWith("data:") && !val.startsWith("blob:") && !val.startsWith("http")) {
-        node.removeAttribute(attr);
-        try {
-          const resolved = new URL(val, docBase).pathname.replace(/^\//, "");
-          const dataUrl = await platform.resolveAssetUrl(resolved);
-          if (dataUrl) node.setAttribute(attr, dataUrl);
-        } catch {}
-      }
-    }
-  }
-
-  // Resolve background-image: url(...) in inline styles
-  const allEls = root.querySelectorAll("[style]");
-  for (const node of allEls) {
-    const bg = /** @type {HTMLElement} */ (node).style.backgroundImage;
-    if (!bg) continue;
-    const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
-    if (!match) continue;
-    const val = match[1];
-    if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) continue;
-    try {
-      const resolved = new URL(val, docBase).pathname.replace(/^\//, "");
-      const dataUrl = await platform.resolveAssetUrl(resolved);
-      if (dataUrl) /** @type {HTMLElement} */ (node).style.backgroundImage = `url(${dataUrl})`;
-    } catch {}
-  }
-}
-
 /** Set of DOM elements that originated from the layout (not page content). */
 export const layoutElements = new WeakSet();
 
@@ -431,21 +390,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       canvasEl.removeAttribute("data-content-mode");
     }
 
-    // Resolve relative asset URLs through the PAL for environments that can't
-    // serve project files natively (e.g. ElectroBun's views:// scheme).
-    const platform = /** @type {any} */ (globalThis).__jxPlatform;
-    if (platform?.resolveAssetUrl && docBase) {
-      await resolveAssetUrls(el, platform, docBase);
-    }
-
     canvasEl.appendChild(el);
-
-    // Custom element connectedCallbacks are async — their children (including
-    // images) don't exist until after connection. Re-resolve assets once they've
-    // had a chance to render.
-    if (platform?.resolveAssetUrl && docBase) {
-      requestAnimationFrame(() => resolveAssetUrls(canvasEl, platform, docBase));
-    }
 
     if (canvasMode === "design" || canvasMode === "edit") {
       requestAnimationFrame(() => {

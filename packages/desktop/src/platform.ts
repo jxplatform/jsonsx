@@ -88,21 +88,49 @@ export function createDesktopPlatform() {
     }
   }
 
+  function resolveBackgroundImage(el: Element) {
+    const htmlEl = el as HTMLElement;
+    if (!htmlEl.style) return;
+    const bg = htmlEl.style.backgroundImage;
+    if (!bg) return;
+    const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
+    if (!match) return;
+    const val = match[1];
+    if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) return;
+    const path = val.replace(/^\.?\//, "");
+    rpc.request
+      .readFileAsDataUrl({ path })
+      .then((dataUrl: string) => {
+        if (dataUrl) htmlEl.style.backgroundImage = `url(${dataUrl})`;
+      })
+      .catch(() => {});
+  }
+
+  function resolveAllAssets(el: Element) {
+    resolveElementAssets(el);
+    resolveBackgroundImage(el);
+    for (const child of el.querySelectorAll("img[src], video[src], source[src], video[poster]")) {
+      resolveElementAssets(child);
+    }
+    for (const child of el.querySelectorAll("[style]")) {
+      resolveBackgroundImage(child);
+    }
+  }
+
   const observer = new MutationObserver((mutations) => {
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
         for (const node of mutation.addedNodes) {
           if (node.nodeType !== 1) continue;
-          const el = node as Element;
-          resolveElementAssets(el);
-          for (const child of el.querySelectorAll(
-            "img[src], video[src], source[src], video[poster]",
-          )) {
-            resolveElementAssets(child);
-          }
+          resolveAllAssets(node as Element);
         }
       } else if (mutation.type === "attributes") {
-        resolveElementAssets(mutation.target as Element);
+        const el = mutation.target as Element;
+        if (mutation.attributeName === "style") {
+          resolveBackgroundImage(el);
+        } else {
+          resolveElementAssets(el);
+        }
       }
     }
   });
@@ -111,7 +139,7 @@ export function createDesktopPlatform() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["src", "poster"],
+    attributeFilter: ["src", "poster", "style"],
   });
 
   return {
@@ -124,9 +152,7 @@ export function createDesktopPlatform() {
     },
 
     async openProject() {
-      console.log("[platform] openProject RPC call");
       const res = await rpc.request.openProject();
-      console.log("[platform] openProject RPC result:", res);
       return res;
     },
 
