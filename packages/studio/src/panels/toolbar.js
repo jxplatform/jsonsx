@@ -261,6 +261,9 @@ function toolbarTemplate() {
             <sp-icon-close slot="icon"></sp-icon-close>
           </sp-action-button>
         </sp-action-group>
+      `
+    : nothing;
+
   const recentProjects = getRecentProjects();
   const recentProjectsTpl = recentProjects.length
     ? html`
