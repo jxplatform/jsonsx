@@ -315,6 +315,18 @@ export function createDevServerPlatform() {
       return null;
     },
 
+    /** @param {string} query */
+    async searchFiles(query) {
+      const glob = `**/*${query}*.{json,md}`;
+      const res = await fetch(
+        `/__studio/files?dir=${encodeURIComponent(serverPath("."))}&glob=${encodeURIComponent(glob)}`,
+      );
+      if (!res.ok) return [];
+      const entries = await res.json();
+      for (const e of entries) e.path = stripRoot(e.path);
+      return entries;
+    },
+
     // ─── Plugin schema ────────────────────────────────────────────────────
 
     /**

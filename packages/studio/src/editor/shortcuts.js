@@ -17,6 +17,7 @@ import {
 } from "../tabs/transact.js";
 import { isEditing } from "./inline-edit.js";
 import { copyNode, cutNode, pasteNode } from "./context-menu.js";
+import { openQuickSearch } from "../panels/quick-search.js";
 
 /** @typedef {import("../state.js").JxPath} JxPath */
 
@@ -163,6 +164,10 @@ export function initShortcuts(getContext) {
         case "o":
           e.preventDefault();
           openProject();
+          break;
+        case "p":
+          e.preventDefault();
+          openQuickSearch();
           break;
         case "s":
           e.preventDefault();

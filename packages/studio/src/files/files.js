@@ -18,6 +18,7 @@ import { loadComponentRegistry } from "./components.js";
 import { workspace, openTab, activateTab, replaceAllTabs } from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
 import { view } from "../view.js";
+import { addRecentProject, trackRecentFile } from "../recent-projects.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ const fileIconMap = /** @type {Record<string, import("lit-html").TemplateResult>
 
 // ─── File management ──────────────────────────────────────────────────────────
 
-async function loadDirectory(/** @type {string} */ dirPath) {
+export async function loadDirectory(/** @type {string} */ dirPath) {
   if (!projectState) return;
   try {
     const platform = getPlatform();
@@ -131,6 +132,7 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     projectState.projectDirs = foundDirs;
 
     view.leftTab = "files";
+    addRecentProject(projectState.name, projectState.projectRoot);
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
@@ -633,6 +635,7 @@ export async function openFileInTab(path) {
       sourceFormat: path.endsWith(".md") ? "md" : null,
     });
     projectState.selectedPath = path;
+    trackRecentFile({ path, name: path.split("/").pop() || path });
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);

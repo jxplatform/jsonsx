@@ -16,7 +16,7 @@ import {
   updateUi,
 } from "./store.js";
 
-import { activeTab, openTab } from "./workspace/workspace.js";
+import { activeTab, openTab, replaceAllTabs } from "./workspace/workspace.js";
 import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "./tabs/transact.js";
 import { effect } from "./reactivity.js";
 
@@ -35,19 +35,14 @@ import {
   setStatusbarRenderer,
   mountStatusbar,
 } from "./panels/statusbar.js";
-import {
-  openFile,
-  loadMarkdown,
-  saveFile,
-  exportFile,
-  serializeDocument,
-} from "./files/file-ops.js";
+import { loadMarkdown, saveFile, exportFile, serializeDocument } from "./files/file-ops.js";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
   openFileInTab,
   setupTreeKeyboard,
+  loadDirectory,
 } from "./files/files.js";
 import { renderImportsTemplate } from "./panels/imports-panel.js";
 import { renderHeadTemplate } from "./panels/head-panel.js";
@@ -86,6 +81,8 @@ import { renderBlockActionBar, initBlockActionBar } from "./panels/block-action-
 import { initCssData } from "./panels/style-utils.js";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview.js";
 import { initPanelEvents } from "./panels/panel-events.js";
+import { initQuickSearch } from "./panels/quick-search.js";
+import { addRecentProject } from "./recent-projects.js";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -260,7 +257,7 @@ toolbarPanel.mount(toolbarEl, {
   navigateBack: () => navigateBack(),
   closeFunctionEditor: () => closeFunctionEditor(),
   openProject: () => openProject(),
-  openFile: () => openFile(),
+  openRecentProject: (/** @type {string} */ root) => openRecentProject(root),
   saveFile: () => saveFile(),
   parseMediaEntries,
   getCanvasMode,
@@ -268,6 +265,8 @@ toolbarPanel.mount(toolbarEl, {
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
 });
+
+initQuickSearch();
 
 tabStrip.mount(/** @type {HTMLElement} */ (document.querySelector("#tab-strip")));
 
@@ -542,6 +541,56 @@ function openProject() {
     renderActivityBar: () => renderActivityBar(),
     renderLeftPanel,
   });
+}
+async function openRecentProject(/** @type {string} */ root) {
+  try {
+    const platform = getPlatform();
+    platform.projectRoot = root;
+    const content = await platform.readFile("project.json");
+    const config = JSON.parse(content);
+
+    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
+
+    setProjectState({
+      ...projectState,
+      projectRoot: root,
+      isSiteProject: true,
+      projectConfig: config,
+      name: config.name || root.split("/").pop(),
+      dirs: new Map(),
+      expanded: new Set(),
+      selectedPath: null,
+      searchQuery: "",
+    });
+
+    await loadDirectory(".");
+    await loadComponentRegistry();
+
+    const conventionalDirs = [
+      "pages",
+      "layouts",
+      "components",
+      "content",
+      "data",
+      "public",
+      "styles",
+    ];
+    const entries = projectState.dirs.get(".") || [];
+    for (const e of entries) {
+      if (e.type === "directory" && conventionalDirs.includes(e.name)) {
+        projectState.expanded.add(e.path || e.name);
+        await loadDirectory(e.path || e.name);
+      }
+    }
+
+    addRecentProject(projectState.name, root);
+    view.leftTab = "files";
+    renderActivityBar();
+    renderLeftPanel();
+    statusMessage(`Opened project: ${projectState.name}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
 }
 function renderFilesTemplate() {
   return _renderFilesTemplate({ openProject, openFileFromTree, renderLeftPanel });
