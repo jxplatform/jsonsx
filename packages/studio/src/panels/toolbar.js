@@ -64,6 +64,9 @@ function tbBtnTpl(label, onClick, iconTag) {
 export function mount(rootEl, ctx) {
   _rootEl = rootEl;
   _ctx = ctx;
+  if (/** @type {any} */ (globalThis).__jxPlatform?.windowControls) {
+    rootEl.classList.add("electrobun-webkit-app-region-drag");
+  }
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -228,6 +231,36 @@ function toolbarTemplate() {
     </sp-action-group>
   `;
 
+  const windowControls = /** @type {any} */ (globalThis).__jxPlatform?.windowControls;
+  const csdTpl = windowControls
+    ? html`
+        <sp-action-group class="window-controls" size="s">
+          <sp-action-button
+            quiet
+            size="s"
+            title="Minimize"
+            @click=${() => windowControls.minimize()}
+          >
+            <sp-icon-remove slot="icon"></sp-icon-remove>
+          </sp-action-button>
+          <sp-action-button
+            quiet
+            size="s"
+            title="Maximize"
+            @click=${() => windowControls.maximize()}
+          >
+            <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+          </sp-action-button>
+          <sp-action-button
+            quiet
+            size="s"
+            title="Close"
+            class="csd-close"
+            @click=${() => windowControls.close()}
+          >
+            <sp-icon-close slot="icon"></sp-icon-close>
+          </sp-action-button>
+        </sp-action-group>
   const recentProjects = getRecentProjects();
   const recentProjectsTpl = recentProjects.length
     ? html`
@@ -266,6 +299,6 @@ function toolbarTemplate() {
       @focus=${openQuickSearch}
     ></sp-search>
     <div class="tb-spacer"></div>
-    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
+    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
   `;
 }

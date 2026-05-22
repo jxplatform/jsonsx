@@ -295,6 +295,12 @@ export function createDesktopPlatform() {
     async listPackages() {
       return rpc.request.listPackages();
     },
+
+    windowControls: {
+      minimize: () => rpc.request.windowMinimize(),
+      maximize: () => rpc.request.windowMaximize(),
+      close: () => rpc.request.windowClose(),
+    },
   };
 }
 

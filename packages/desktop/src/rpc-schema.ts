@@ -242,6 +242,19 @@ export type StudioRPC = {
         params: void;
         response: UpdateStatus;
       };
+      // Window controls
+      windowMinimize: {
+        params: void;
+        response: void;
+      };
+      windowMaximize: {
+        params: void;
+        response: void;
+      };
+      windowClose: {
+        params: void;
+        response: void;
+      };
     };
     messages: {};
   }>;

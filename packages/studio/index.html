@@ -94,6 +94,21 @@
         background: var(--bg-panel);
         border-bottom: 1px solid var(--border);
       }
+      #toolbar.electrobun-webkit-app-region-drag {
+        -webkit-app-region: drag;
+      }
+      #toolbar sp-action-group,
+      #toolbar sp-action-button,
+      #toolbar .breadcrumb {
+        -webkit-app-region: no-drag;
+      }
+      .window-controls {
+        margin-left: auto;
+      }
+      .window-controls .csd-close:hover {
+        background: var(--spectrum-negative-background-color-default, #e34850);
+        color: white;
+      }
       #tab-strip {
         grid-row: 2;
         grid-column: 3;
