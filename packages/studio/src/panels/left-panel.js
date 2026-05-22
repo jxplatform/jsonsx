@@ -69,6 +69,9 @@ export function mount(ctx) {
       void tab.doc.mode;
       void tab.session.selection;
       void tab.session.ui.settingsTab;
+      void tab.session.ui.gitStatus;
+      void tab.session.ui.gitLoading;
+      void tab.session.ui.gitError;
       render();
     });
   });

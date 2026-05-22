@@ -300,7 +300,9 @@ initCanvasRender({
   setCanvasMode,
   openFileFromTree,
   exportFile,
-  gitDiffState,
+  get gitDiffState() {
+    return gitDiffState;
+  },
   setGitDiffState: (/** @type {any} */ state) => {
     gitDiffState = state;
   },
@@ -359,6 +361,9 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
+  setGitDiffState: (/** @type {any} */ state) => {
+    gitDiffState = state;
+  },
 });
 
 // Register all renderers with the store so render()/renderOnly() work

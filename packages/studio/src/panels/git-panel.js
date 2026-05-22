@@ -7,6 +7,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { getPlatform } from "../platform.js";
 import { updateUi, renderOnly } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 
 async function refreshGitStatus() {
@@ -70,7 +71,8 @@ export function renderGitPanel(S, ctx) {
   const totalChanges = status?.files?.length || 0;
 
   const doCommit = async () => {
-    const msg = S.ui.gitCommitMessage?.trim();
+    const tab = activeTab.value;
+    const msg = tab?.session.ui.gitCommitMessage?.trim();
     if (!msg) return;
     updateUi("gitCommitMessage", "");
     await gitAction("gitCommit", msg);
@@ -145,11 +147,7 @@ export function renderGitPanel(S, ctx) {
           }
         }}
       ></sp-textfield>
-      <sp-action-button
-        class="git-commit-btn"
-        @click=${doCommit}
-        ?disabled=${!S.ui.gitCommitMessage?.trim() || loading}
-      >
+      <sp-action-button class="git-commit-btn" @click=${doCommit} ?disabled=${loading}>
         <sp-icon-checkmark slot="icon" size="xs"></sp-icon-checkmark>
         Commit
       </sp-action-button>
@@ -183,8 +181,15 @@ export function renderGitPanel(S, ctx) {
           fileStatus: file.status,
         });
 
-        // Trigger diff mode via context
         if (ctx?.setCanvasMode) {
+          if (ctx.setGitDiffState) {
+            ctx.setGitDiffState({
+              filePath: file.path,
+              originalContent,
+              isMarkdown,
+              fileStatus: file.status,
+            });
+          }
           ctx.setCanvasMode("git-diff");
         }
       } catch (/** @type {any} */ e) {

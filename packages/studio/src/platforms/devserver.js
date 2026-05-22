@@ -434,6 +434,16 @@ export function createDevServerPlatform() {
       return await res.json();
     },
 
+    /** @param {{ path: string; ref?: string }} opts */
+    async gitShow(opts) {
+      const params = new URLSearchParams({ path: opts.path });
+      if (opts.ref) params.set("ref", opts.ref);
+      const res = await fetch(`/__studio/git/show?${params}`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      return data.content;
+    },
+
     /** @param {string[]} files */
     async gitDiscard(files) {
       const res = await fetch("/__studio/git/discard", {
