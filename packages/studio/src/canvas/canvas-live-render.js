@@ -43,6 +43,7 @@ async function resolveAssetUrls(root, platform, docBase) {
     for (const attr of ["src", "poster"]) {
       const val = node.getAttribute(attr);
       if (val && !val.startsWith("data:") && !val.startsWith("blob:") && !val.startsWith("http")) {
+        node.removeAttribute(attr);
         try {
           const resolved = new URL(val, docBase).pathname.replace(/^\//, "");
           const dataUrl = await platform.resolveAssetUrl(resolved);
