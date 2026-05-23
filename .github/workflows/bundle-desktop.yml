@@ -92,33 +92,9 @@ jobs:
           path: artifacts/
           merge-multiple: true
 
-      - name: Append download table to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="${{ github.ref_name }}"
-          BASE="https://github.com/jxsuite/jx/releases/download/${TAG}"
-
-          # Fetch existing release body (changelog from release-it)
-          EXISTING="$(gh release view "$TAG" --json body --jq .body 2>/dev/null || echo "")"
-
-          # Build download table
-          TABLE="## Downloads
-
-          | Platform | Architecture | Installer | Archive |
-          |----------|-------------|-----------|---------|
-          | macOS | Apple Silicon (arm64) | [DMG](${BASE}/stable-macos-arm64-JxStudio.dmg) | [tar.zst](${BASE}/stable-macos-arm64-JxStudio.app.tar.zst) |
-          | macOS | Intel (x64) | [DMG](${BASE}/stable-macos-x64-JxStudio.dmg) | [tar.zst](${BASE}/stable-macos-x64-JxStudio.app.tar.zst) |
-          | Linux | x64 | [tar.gz](${BASE}/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](${BASE}/stable-linux-x64-JxStudio.tar.zst) |
-          | Windows | x64 | [MSI](${BASE}/Jx.Studio.msi) | [ZIP](${BASE}/stable-win-x64-JxStudio-Setup.zip) |"
-
-          # Combine: existing changelog + download table
-          printf '%s\n\n%s\n' "$EXISTING" "$TABLE" > body.md
-
-      - name: Attach artifacts and update release
+      - name: Attach artifacts to release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           draft: false
-          body_path: body.md
           files: artifacts/*

@@ -95,7 +95,10 @@
         ]
       },
       "@release-it/conventional-changelog": {
-        "preset": "angular"
+        "preset": "angular",
+        "writerOpts": {
+          "footerPartial": "\n## Downloads\n\n| Platform | Architecture | Installer | Archive |\n|----------|-------------|-----------|--------|\n| macOS | Apple Silicon | [DMG](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-macos-arm64-JxStudio.dmg) | [tar.zst](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-macos-arm64-JxStudio.app.tar.zst) |\n| macOS | Intel | [DMG](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-macos-x64-JxStudio.dmg) | [tar.zst](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-macos-x64-JxStudio.app.tar.zst) |\n| Linux | x64 | [tar.gz](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-linux-x64-JxStudio.tar.zst) |\n| Windows | x64 | [MSI](https://github.com/jxsuite/jx/releases/download/v{{version}}/Jx.Studio.msi) | [ZIP](https://github.com/jxsuite/jx/releases/download/v{{version}}/stable-win-x64-JxStudio-Setup.zip) |\n"
+        }
       }
     }
   }
