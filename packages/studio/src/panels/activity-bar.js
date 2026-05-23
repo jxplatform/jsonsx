@@ -122,7 +122,7 @@ export function renderActivityBar() {
         aria-label="Settings"
         @click=${() => openSettingsModal()}
       >
-        <sp-icon-gears slot="icon"></sp-icon-gears>
+        <sp-icon-settings slot="icon"></sp-icon-settings>
       </sp-action-button>
     </div>
   `;
