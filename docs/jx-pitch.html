@@ -15,27 +15,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=JetBrains+Mono:wght@300;400;500;700&family=Inter+Tight:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
 
     <style>
       :root {
-        --ink: #0a0a0b;
-        --paper: #f4f1ea;
-        --paper-warm: #ebe6da;
-        --rule: #1a1a1c;
-        --accent: #ff4d1f;
-        --accent-soft: #ffd4c4;
-        --muted: #6b6862;
-        --code-bg: #111113;
-        --code-fg: #e8e4d8;
-        --code-comment: #6b6862;
-        --code-key: #ff8a5b;
-        --code-string: #b8d4a8;
-        --display: "Fraunces", "Times New Roman", serif;
-        --sans: "Inter Tight", system-ui, sans-serif;
-        --mono: "JetBrains Mono", "SF Mono", Menlo, monospace;
+        --ink: #fafafa;
+        --paper: #0a0a0a;
+        --paper-warm: #111111;
+        --rule: #222222;
+        --accent: #3b82f6;
+        --accent-soft: #93c5fd;
+        --muted: #71717a;
+        --code-bg: #111111;
+        --code-fg: #e4e4e7;
+        --code-comment: #71717a;
+        --code-key: #60a5fa;
+        --code-string: #86efac;
+        --surface: #1a1a1a;
+        --border: #222222;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: "JetBrains Mono", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
       }
 
       .reveal {
@@ -105,12 +106,8 @@
       .reveal h1,
       .reveal h2,
       .reveal h3 {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-weight: 400;
-        font-variation-settings:
-          "opsz" 144,
-          "SOFT" 30,
-          "WONK" 0;
         letter-spacing: -0.02em;
         line-height: 0.95;
         text-transform: none;
@@ -142,7 +139,7 @@
       }
 
       .reveal .lede {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(1.4rem, 2.2vw, 2rem);
         line-height: 1.3;
         font-weight: 300;
@@ -151,7 +148,6 @@
       }
 
       .reveal em {
-        font-family: var(--display);
         font-style: italic;
         font-weight: 400;
         color: var(--accent);
@@ -194,23 +190,12 @@
         color: var(--accent);
       }
       .title-slide .mark {
-        font-family: var(--display);
-        font-size: clamp(8rem, 22vw, 22rem);
-        font-weight: 300;
-        line-height: 0.85;
-        color: var(--paper);
-        letter-spacing: -0.05em;
-      }
-      .title-slide .mark .x {
-        color: var(--accent);
-        font-style: italic;
-        font-variation-settings:
-          "opsz" 144,
-          "SOFT" 100,
-          "WONK" 1;
+        display: block;
+        width: clamp(120px, 18vw, 220px);
+        height: auto;
       }
       .title-slide .subtitle {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(1.5rem, 2.5vw, 2.4rem);
         font-weight: 300;
         line-height: 1.2;
@@ -288,7 +273,7 @@
 
       /* Pull quote */
       .pull {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(2.5rem, 5.5vw, 4.5rem);
         line-height: 1.05;
         font-weight: 300;
@@ -350,7 +335,7 @@
         margin-bottom: 0.5rem;
       }
       .timeline .step .name {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(1rem, 1.5vw, 1.3rem);
         line-height: 1.1;
         margin-bottom: 0.75rem;
@@ -393,7 +378,7 @@
         color: var(--paper);
       }
       .compare tbody tr.jx td:first-child {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-style: italic;
         color: var(--accent);
         font-size: 1.2em;
@@ -437,7 +422,7 @@
         font-style: italic;
       }
       .code-card .punc {
-        color: #6b6862;
+        color: #52525b;
       }
 
       /* Diagram */
@@ -466,7 +451,7 @@
         box-shadow: 6px 6px 0 var(--accent);
       }
       .node.center .label {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-style: italic;
         font-size: 1.4rem;
         color: var(--accent);
@@ -502,7 +487,7 @@
         gap: 0.5rem;
       }
       .stat .num {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(4rem, 9vw, 8rem);
         font-weight: 300;
         line-height: 0.9;
@@ -568,7 +553,7 @@
       }
       .ba dd {
         margin: 0;
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: 1.2rem;
         align-self: center;
       }
@@ -624,6 +609,7 @@
           16px 16px 0 var(--accent);
         display: grid;
         grid-template-columns: 56px 200px 1fr 240px;
+        grid-template-rows: auto 1fr;
         height: 100%;
         max-height: 55vh;
         font-family: var(--mono);
@@ -701,7 +687,7 @@
         padding-left: 2rem;
       }
       .studio-mock .panel .tree-item.selected {
-        background: rgba(255, 77, 31, 0.15);
+        background: rgba(59, 130, 246, 0.15);
         color: var(--accent);
         border-radius: 3px;
         padding-left: 0.5rem;
@@ -736,7 +722,7 @@
         box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.15);
       }
       .studio-mock .canvas-preview h3 {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: 1.1rem;
         margin: 0 0 0.5rem 0;
         color: #0a0a0b;
@@ -817,7 +803,7 @@
         grid-row: span 2;
         background: var(--ink);
         color: var(--paper);
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(1.4rem, 2vw, 1.8rem);
         letter-spacing: -0.02em;
         line-height: 1.1;
@@ -837,7 +823,7 @@
         max-width: 60ch;
       }
       .manifesto p {
-        font-family: var(--display);
+        font-family: var(--sans);
         font-size: clamp(1.4rem, 2.2vw, 2rem);
         line-height: 1.3;
         font-weight: 300;
@@ -898,7 +884,7 @@
         <!-- ============================================ -->
         <!-- SLIDE 01 - TITLE                              -->
         <!-- ============================================ -->
-        <section data-background-color="#0a0a0b">
+        <section data-background-color="#fafafa">
           <div class="slide title-slide">
             <div class="top">
               <span>A Pitch for Marketing Agencies</span>
@@ -906,7 +892,13 @@
             </div>
 
             <div>
-              <div class="mark">J<span class="x">x</span></div>
+              <svg class="mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="4" fill="#1a1a2e" />
+                <path
+                  d="m 10.498047,22.433985 c 2.786133,0 4.438476,-1.617188 4.438476,-4.429688 V 9.7777348 H 9.7597656 v 2.1357422 h 2.8564454 v 6.09082 c 0,1.423828 -0.74707,2.223633 -2.074219,2.223633 -1.3095701,0 -2.0654295,-0.817383 -2.0654295,-2.223633 H 6.0595703 c 0,2.803711 1.5996094,4.429688 4.4384767,4.429688 z m 6.213867,-0.175781 h 2.838867 l 1.6875,-2.917969 1.757813,2.917969 h 2.838867 l -3.462891,-4.675782 3.462891,-4.640625 h -2.838867 l -1.722657,2.917969 -1.722656,-2.917969 h -2.838867 l 3.418945,4.710938 z"
+                  fill="#ffffff"
+                />
+              </svg>
               <div class="subtitle" style="margin-top: 2rem">
                 Build any website your clients can imagine.<br />
                 <em>Visually. Without the WordPress tax.</em>
@@ -1193,7 +1185,7 @@
                     <div>
                       <strong
                         style="
-                          font-family: var(--display);
+                          font-family: var(--sans);
                           font-size: 1.5rem;
                           font-weight: 400;
                           display: block;
@@ -1226,7 +1218,7 @@
                     <div>
                       <strong
                         style="
-                          font-family: var(--display);
+                          font-family: var(--sans);
                           font-size: 1.5rem;
                           font-weight: 400;
                           display: block;
@@ -1259,7 +1251,7 @@
                     <div>
                       <strong
                         style="
-                          font-family: var(--display);
+                          font-family: var(--sans);
                           font-size: 1.5rem;
                           font-weight: 400;
                           display: block;
@@ -1295,9 +1287,9 @@
         <!-- ============================================ -->
         <!-- SLIDE 07 - THE INSIGHT                        -->
         <!-- ============================================ -->
-        <section data-background-color="#0a0a0b">
+        <section data-background-color="#fafafa">
           <div class="slide headline" style="background: var(--ink); color: var(--paper)">
-            <div class="tag" style="color: rgba(244, 241, 234, 0.4)">
+            <div class="tag" style="color: rgba(10, 10, 10, 0.4)">
               <span class="num" style="color: var(--accent)">07</span>The Realization
             </div>
 
@@ -1317,7 +1309,7 @@
               >
                 Serialize it, and you have a single source of truth for the whole site.
               </p>
-              <div class="pull-attr" style="color: rgba(244, 241, 234, 0.4)">
+              <div class="pull-attr" style="color: rgba(10, 10, 10, 0.4)">
                 — Why Jx exists, in one breath
               </div>
             </div>
@@ -1571,7 +1563,7 @@
         <!-- ============================================ -->
         <!-- SLIDE 12 - MEET STUDIO                        -->
         <!-- ============================================ -->
-        <section data-background-color="#0a0a0b">
+        <section data-background-color="#fafafa">
           <div
             class="slide"
             style="
@@ -1582,7 +1574,7 @@
               text-align: center;
             "
           >
-            <div class="tag" style="color: rgba(244, 241, 234, 0.4)">
+            <div class="tag" style="color: rgba(10, 10, 10, 0.4)">
               <span class="num" style="color: var(--accent)">12</span>The Product
             </div>
 
@@ -1603,7 +1595,7 @@
               </h2>
               <p
                 style="
-                  font-family: var(--display);
+                  font-family: var(--sans);
                   font-size: clamp(1.5rem, 2.5vw, 2.2rem);
                   font-weight: 300;
                   max-width: 36ch;
@@ -1621,7 +1613,7 @@
                   font-size: 0.85rem;
                   letter-spacing: 0.2em;
                   text-transform: uppercase;
-                  color: rgba(244, 241, 234, 0.5);
+                  color: rgba(10, 10, 10, 0.5);
                   margin-top: 3rem;
                   max-width: 50ch;
                   margin-left: auto;
@@ -1821,7 +1813,7 @@
                 <h3 style="font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--paper)">
                   Logic without leaving
                 </h3>
-                <p style="font-size: 0.95rem; color: rgba(244, 241, 234, 0.6)">
+                <p style="font-size: 0.95rem; color: rgba(10, 10, 10, 0.6)">
                   When a client says "just one little interactive thing," you stop saying no.
                 </p>
               </div>
@@ -1872,7 +1864,7 @@
                 >
                   01
                 </div>
-                <div style="font-family: var(--display); font-size: 1.4rem; margin-bottom: 0.5rem">
+                <div style="font-family: var(--sans); font-size: 1.4rem; margin-bottom: 0.5rem">
                   Edit in Studio
                 </div>
                 <div style="font-family: var(--mono); font-size: 0.75rem; color: var(--muted)">
@@ -1892,7 +1884,7 @@
                 >
                   02
                 </div>
-                <div style="font-family: var(--display); font-size: 1.4rem; margin-bottom: 0.5rem">
+                <div style="font-family: var(--sans); font-size: 1.4rem; margin-bottom: 0.5rem">
                   git commit
                 </div>
                 <div style="font-family: var(--mono); font-size: 0.75rem; color: var(--muted)">
@@ -1912,7 +1904,7 @@
                 >
                   03
                 </div>
-                <div style="font-family: var(--display); font-size: 1.4rem; margin-bottom: 0.5rem">
+                <div style="font-family: var(--sans); font-size: 1.4rem; margin-bottom: 0.5rem">
                   Live on CDN
                 </div>
                 <div style="font-family: var(--mono); font-size: 0.75rem; color: var(--muted)">
@@ -1931,7 +1923,7 @@
         <!-- ============================================ -->
         <!-- SLIDE 16 - SECTION DIVIDER                    -->
         <!-- ============================================ -->
-        <section data-background-color="#ff4d1f">
+        <section data-background-color="#3b82f6">
           <div
             class="slide"
             style="
@@ -1941,7 +1933,7 @@
               align-items: flex-start;
             "
           >
-            <div class="tag" style="color: rgba(10, 10, 11, 0.5)">
+            <div class="tag" style="color: rgba(255, 255, 255, 0.5)">
               <span class="num" style="color: var(--ink)">III</span>What It Means for Agencies
             </div>
 
@@ -2045,7 +2037,7 @@
               <div style="padding: 2rem; border-top: 3px solid var(--accent)">
                 <div
                   style="
-                    font-family: var(--display);
+                    font-family: var(--sans);
                     font-size: 3rem;
                     font-weight: 300;
                     line-height: 1;
@@ -2064,7 +2056,7 @@
               <div style="padding: 2rem; border-top: 3px solid var(--accent)">
                 <div
                   style="
-                    font-family: var(--display);
+                    font-family: var(--sans);
                     font-size: 3rem;
                     font-weight: 300;
                     line-height: 1;
@@ -2083,7 +2075,7 @@
               <div style="padding: 2rem; border-top: 3px solid var(--accent)">
                 <div
                   style="
-                    font-family: var(--display);
+                    font-family: var(--sans);
                     font-size: 3rem;
                     font-weight: 300;
                     line-height: 1;
@@ -2238,7 +2230,7 @@
                 >
                   01 / LICENSE
                 </div>
-                <div style="font-family: var(--display); font-size: 1.3rem; line-height: 1.2">
+                <div style="font-family: var(--sans); font-size: 1.3rem; line-height: 1.2">
                   MIT open source, forever.
                 </div>
               </div>
@@ -2254,7 +2246,7 @@
                 >
                   02 / OUTPUT
                 </div>
-                <div style="font-family: var(--display); font-size: 1.3rem; line-height: 1.2">
+                <div style="font-family: var(--sans); font-size: 1.3rem; line-height: 1.2">
                   Plain HTML / CSS / JS — deployable anywhere.
                 </div>
               </div>
@@ -2270,7 +2262,7 @@
                 >
                   03 / SOURCE
                 </div>
-                <div style="font-family: var(--display); font-size: 1.3rem; line-height: 1.2">
+                <div style="font-family: var(--sans); font-size: 1.3rem; line-height: 1.2">
                   .json + .md in git — human-readable forever.
                 </div>
               </div>
@@ -2295,7 +2287,7 @@
                 </div>
                 <div
                   style="
-                    font-family: var(--display);
+                    font-family: var(--sans);
                     font-size: 1.3rem;
                     line-height: 1.2;
                     color: var(--paper);
@@ -2499,9 +2491,9 @@
         <!-- ============================================ -->
         <!-- SLIDE 24 - CLOSING                            -->
         <!-- ============================================ -->
-        <section data-background-color="#0a0a0b">
+        <section data-background-color="#fafafa">
           <div class="slide close-slide">
-            <div class="tag" style="color: rgba(244, 241, 234, 0.4)">
+            <div class="tag" style="color: rgba(10, 10, 10, 0.4)">
               <span class="num" style="color: var(--accent)">24</span>End
             </div>
 
@@ -2511,12 +2503,25 @@
                 font-size: 0.85rem;
                 letter-spacing: 0.3em;
                 text-transform: uppercase;
-                color: rgba(244, 241, 234, 0.5);
+                color: rgba(10, 10, 10, 0.5);
                 margin-bottom: 3rem;
               "
             >
               — Let's build the next one —
             </p>
+
+            <svg
+              style="width: 64px; height: 64px; margin-bottom: 2rem"
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <rect width="32" height="32" rx="4" fill="#1a1a2e" />
+              <path
+                d="m 10.498047,22.433985 c 2.786133,0 4.438476,-1.617188 4.438476,-4.429688 V 9.7777348 H 9.7597656 v 2.1357422 h 2.8564454 v 6.09082 c 0,1.423828 -0.74707,2.223633 -2.074219,2.223633 -1.3095701,0 -2.0654295,-0.817383 -2.0654295,-2.223633 H 6.0595703 c 0,2.803711 1.5996094,4.429688 4.4384767,4.429688 z m 6.213867,-0.175781 h 2.838867 l 1.6875,-2.917969 1.757813,2.917969 h 2.838867 l -3.462891,-4.675782 3.462891,-4.640625 h -2.838867 l -1.722657,2.917969 -1.722656,-2.917969 h -2.838867 l 3.418945,4.710938 z"
+                fill="#ffffff"
+              />
+            </svg>
 
             <h2>
               The websites of <em>2030</em><br />
