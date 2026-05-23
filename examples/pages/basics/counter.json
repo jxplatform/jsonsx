@@ -1,0 +1,5 @@
+{
+  "title": "Counter — Jx Examples",
+  "$layout": "../../layouts/example.json",
+  "children": [{ "$ref": "../../components/counter.json" }]
+}

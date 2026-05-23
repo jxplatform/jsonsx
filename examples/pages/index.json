@@ -1,0 +1,356 @@
+{
+  "title": "Jx Examples",
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "960px",
+        "margin": "0 auto",
+        "padding": "3rem 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "h1",
+          "style": { "fontSize": "2rem", "marginBottom": "0.5rem" },
+          "children": ["Jx Examples"]
+        },
+        {
+          "tagName": "p",
+          "style": { "color": "#666", "marginBottom": "2.5rem", "fontSize": "1.125rem" },
+          "children": ["Interactive examples demonstrating Jx features and patterns."]
+        },
+        {
+          "tagName": "h2",
+          "style": { "fontSize": "1.25rem", "marginBottom": "1rem", "color": "#333" },
+          "children": ["Basics"]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(220px, 1fr))",
+            "gap": "1rem",
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/counter" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Counter"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["State management basics"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/computed" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Computed"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Derived reactive state"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/list" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["List"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Dynamic array rendering"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/fetch" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Fetch"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Async data fetching"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/switch" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Switch"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Conditional rendering"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/form" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Form"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Form handling and validation"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/responsive" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Responsive"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Media query-driven layouts"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/todo" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Todo"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Full application example"]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": { "fontSize": "1.25rem", "marginBottom": "1rem", "color": "#333" },
+          "children": ["Advanced"]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(220px, 1fr))",
+            "gap": "1rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/custom-elements" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Custom Elements"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Component composition with props"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/markdown-blog" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Markdown Blog"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Content collections and Markdown"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/markdown-todo" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Markdown Todo"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Jx components in Markdown syntax"]
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/shoelace" },
+              "style": {
+                "display": "block",
+                "padding": "1.25rem",
+                "border": "1px solid #e0e0e0",
+                "borderRadius": "8px",
+                "textDecoration": "none",
+                "color": "inherit",
+                ":hover": { "borderColor": "#007bff", "boxShadow": "0 2px 8px rgba(0,123,255,0.1)" }
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "style": { "display": "block", "marginBottom": "0.25rem" },
+                  "children": ["Shoelace"]
+                },
+                {
+                  "tagName": "span",
+                  "style": { "fontSize": "0.8125rem", "color": "#666" },
+                  "children": ["Third-party web components"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

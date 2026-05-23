@@ -4,15 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run server.js",
-    "compile": "bun run compile.js",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "build": "jx build",
+    "dev": "jx dev"
   },
   "dependencies": {
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/server": "workspace:^",
-    "@jxsuite/studio": "workspace:^"
+    "@jxsuite/studio": "workspace:^",
+    "@shoelace-style/shoelace": "^2.20.1"
   }
 }

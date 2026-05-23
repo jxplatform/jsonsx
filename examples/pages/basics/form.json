@@ -1,0 +1,5 @@
+{
+  "title": "Form — Jx Examples",
+  "$layout": "../../layouts/example.json",
+  "children": [{ "$ref": "../../components/contact-form.json" }]
+}

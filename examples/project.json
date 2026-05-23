@@ -1,0 +1,30 @@
+{
+  "name": "Jx Examples",
+  "url": "https://examples.jxsuite.dev",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [{ "tagName": "meta", "attributes": { "name": "generator", "content": "Jx" } }],
+  "style": {
+    "fontFamily": "system-ui, sans-serif",
+    "margin": "0"
+  },
+  "contentTypes": {
+    "posts": {
+      "source": "./content/posts/**/*.md",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "date": { "type": "string", "format": "date" }
+        },
+        "required": ["title", "date"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory"
+  }
+}
