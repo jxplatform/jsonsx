@@ -18,9 +18,13 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.149",
+    "@anthropic-ai/sdk": "^0.98.0",
     "@jxsuite/studio": "workspace:^",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dbus-ts": "^0.0.7",
-    "electrobun": "latest"
+    "electrobun": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@jxsuite/server": "workspace:^",
