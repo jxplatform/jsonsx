@@ -1,9 +1,9 @@
 /**
- * Manage view — project-level file browser rendered as a Spectrum table.
+ * Manage view — project-level file browser with grid and table views.
  *
- * Displays pages, layouts, components, content, and media in a filterable table grid. Fills the
- * center canvas area as a parallel state to Edit/Design/Preview/Code/Settings. Includes a "New +"
- * button with type-aware entity creation (including content types from project.json).
+ * Displays pages, layouts, components, content, and media in a filterable grid or table. Grid view
+ * shows live component/page/layout previews and image thumbnails. Includes a "New +" button with
+ * type-aware entity creation (including content types from project.json).
  */
 
 import { html, render as litRender, nothing } from "lit-html";
@@ -11,6 +11,10 @@ import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
 import { yamlDefault } from "../settings/schema-field-ui.js";
 import { invalidateMediaCache } from "../ui/media-picker.js";
+import { componentRegistry } from "../files/components.js";
+import { renderComponentPreview } from "../panels/stylebook-panel.js";
+import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime";
+import { loadMarkdown } from "../files/file-ops.js";
 
 // ─── Category definitions ────────────────────────────────────────────────────
 
@@ -48,6 +52,8 @@ const MEDIA_EXTENSIONS = new Set([
 
 let activeCategory = "all";
 let searchQuery = "";
+/** @type {"grid" | "table"} */
+let viewMode = "grid";
 /** @type {{ name: string; path: string; type: string; category: string; ext: string }[]} */
 let fileCache = [];
 let loading = false;
@@ -303,6 +309,109 @@ async function handleUpload(files, container, ctx) {
   renderBrowse(container, ctx);
 }
 
+// ─── Grid view helpers ──────────────────────────────────────────────────────
+
+/**
+ * Render a live preview for a page or layout file (JSON or Markdown).
+ *
+ * @param {string} filePath
+ * @returns {Promise<HTMLElement | null>}
+ */
+async function renderDocPreview(filePath) {
+  try {
+    const platform = getPlatform();
+    const content = await platform.readFile(filePath);
+    setSkipServerFunctions(true);
+    let doc;
+    if (filePath.endsWith(".md")) {
+      const result = await loadMarkdown(content);
+      doc = result.document;
+    } else {
+      doc = JSON.parse(content);
+    }
+    const scope = buildScope(doc.state || {});
+    const el = renderNode(doc, scope);
+    return /** @type {HTMLElement | null} */ (el);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * After lit-html renders the grid, populate preview cards with live content.
+ *
+ * @param {HTMLElement} container
+ * @param {{ name: string; path: string; type: string; category: string; ext: string }[]} files
+ */
+async function populateCardPreviews(container, files) {
+  const cards = container.querySelectorAll(".element-card-preview[data-preview]");
+  for (const card of cards) {
+    const path = /** @type {HTMLElement} */ (card).dataset.preview;
+    if (!path) continue;
+    const file = files.find((f) => f.path === path);
+    if (!file) continue;
+    try {
+      let el = null;
+      const comp = componentRegistry.find((/** @type {any} */ c) => c.path === path);
+      if (comp) {
+        el = await renderComponentPreview(comp);
+      } else if (
+        file.category === "Pages" ||
+        file.category === "Layouts" ||
+        file.category === "Content"
+      ) {
+        el = await renderDocPreview(path);
+      }
+      if (el) {
+        /** @type {HTMLElement} */ (card).innerHTML = "";
+        /** @type {HTMLElement} */ (card).appendChild(el);
+      }
+    } catch {
+      // Preview failed — leave placeholder
+    }
+  }
+}
+
+/**
+ * Grid view — renders file cards with live previews.
+ *
+ * @param {{ name: string; path: string; type: string; category: string; ext: string }[]} files
+ * @param {{ openFile: (path: string) => void }} ctx
+ */
+function gridView(files, ctx) {
+  if (files.length === 0) {
+    return html`<div class="browse-grid-empty">${loading ? "Loading..." : "No files found"}</div>`;
+  }
+  return html`
+    <div class="browse-grid">
+      ${files.map((f) => {
+        const needsPreview =
+          f.category === "Components" ||
+          f.category === "Pages" ||
+          f.category === "Layouts" ||
+          f.category === "Content";
+        const isImg = isImage(f.ext);
+
+        return html`
+          <div class="element-card" @click=${() => ctx.openFile(f.path)}>
+            <div class="element-card-preview" data-preview=${needsPreview ? f.path : nothing}>
+              ${isImg
+                ? html`<img
+                    src="/${f.path}"
+                    style="max-width:100%;max-height:100%;object-fit:contain"
+                  />`
+                : needsPreview
+                  ? nothing
+                  : html`<sp-icon-document size="xl"></sp-icon-document>`}
+            </div>
+            <div class="element-card-label">${f.name}</div>
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
 // ─── Render ──────────────────────────────────────────────────────────────────
 
 /**
@@ -323,72 +432,94 @@ export async function renderBrowse(container, ctx) {
   const contentTypeTypes = getContentTypeTypes();
 
   const filterBar = html`
-    <div class="browse-filter-bar">
-      <sp-action-group selects="single" size="s" compact>
-        ${CATEGORIES.map(
-          (cat) => html`
-            <sp-action-button
-              size="s"
-              ?selected=${activeCategory === cat.key}
-              @click=${() => {
-                activeCategory = cat.key;
-                renderBrowse(container, ctx);
-              }}
-            >
-              ${cat.label}
-            </sp-action-button>
-          `,
-        )}
-      </sp-action-group>
-      <sp-search
-        size="s"
-        placeholder="Filter files..."
-        .value=${searchQuery}
-        @input=${(/** @type {any} */ e) => {
-          searchQuery = e.target.value;
-          renderBrowse(container, ctx);
-        }}
-        @submit=${(/** @type {Event} */ e) => e.preventDefault()}
-      ></sp-search>
-      <overlay-trigger placement="bottom-start">
-        <sp-action-button size="s" slot="trigger">
-          <sp-icon-add slot="icon"></sp-icon-add> New
-        </sp-action-button>
-        <sp-popover slot="click-content" tip>
-          <sp-menu
-            @change=${(/** @type {any} */ e) => handleNewEntity(e.target.value, container, ctx)}
+    <sp-action-group selects="single" size="s" compact>
+      ${CATEGORIES.map(
+        (cat) => html`
+          <sp-action-button
+            size="s"
+            ?selected=${activeCategory === cat.key}
+            @click=${() => {
+              activeCategory = cat.key;
+              renderBrowse(container, ctx);
+            }}
           >
-            ${ENTITY_TYPES.map((t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`)}
-            ${contentTypeTypes.length
-              ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
-                    (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
-                  )}`
-              : ""}
-          </sp-menu>
-        </sp-popover>
-      </overlay-trigger>
+            ${cat.label}
+          </sp-action-button>
+        `,
+      )}
+    </sp-action-group>
+    <sp-search
+      size="s"
+      placeholder="Filter files..."
+      .value=${searchQuery}
+      @input=${(/** @type {any} */ e) => {
+        searchQuery = e.target.value;
+        renderBrowse(container, ctx);
+      }}
+      @submit=${(/** @type {Event} */ e) => e.preventDefault()}
+    ></sp-search>
+    <overlay-trigger placement="bottom-start" triggered-by="click">
+      <sp-action-button size="s" slot="trigger">
+        <sp-icon-add slot="icon"></sp-icon-add> New
+      </sp-action-button>
+      <sp-popover slot="click-content" tip>
+        <sp-menu
+          @change=${(/** @type {any} */ e) => handleNewEntity(e.target.value, container, ctx)}
+        >
+          ${ENTITY_TYPES.map((t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`)}
+          ${contentTypeTypes.length
+            ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
+                  (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
+                )}`
+            : ""}
+        </sp-menu>
+      </sp-popover>
+    </overlay-trigger>
+    <sp-action-button
+      size="s"
+      @click=${() => {
+        const input = /** @type {HTMLInputElement} */ (
+          container.querySelector(".browse-upload-input")
+        );
+        if (input) input.click();
+      }}
+    >
+      <sp-icon-upload slot="icon"></sp-icon-upload> Upload
+    </sp-action-button>
+    <input
+      type="file"
+      multiple
+      accept=${UPLOAD_ACCEPT}
+      class="browse-upload-input"
+      style="display:none"
+      @change=${(/** @type {any} */ e) => {
+        if (e.target.files?.length) handleUpload(e.target.files, container, ctx);
+        e.target.value = "";
+      }}
+    />
+    <div class="browse-view-switcher">
       <sp-action-button
         size="s"
+        ?selected=${viewMode === "grid"}
         @click=${() => {
-          const input = /** @type {HTMLInputElement} */ (
-            container.querySelector(".browse-upload-input")
-          );
-          if (input) input.click();
+          viewMode = "grid";
+          renderBrowse(container, ctx);
         }}
+        title="Grid view"
       >
-        <sp-icon-upload slot="icon"></sp-icon-upload> Upload
+        <sp-icon-view-grid slot="icon"></sp-icon-view-grid>
       </sp-action-button>
-      <input
-        type="file"
-        multiple
-        accept=${UPLOAD_ACCEPT}
-        class="browse-upload-input"
-        style="display:none"
-        @change=${(/** @type {any} */ e) => {
-          if (e.target.files?.length) handleUpload(e.target.files, container, ctx);
-          e.target.value = "";
+      <sp-action-button
+        size="s"
+        ?selected=${viewMode === "table"}
+        @click=${() => {
+          viewMode = "table";
+          renderBrowse(container, ctx);
         }}
-      />
+        title="Table view"
+      >
+        <sp-icon-view-list slot="icon"></sp-icon-view-list>
+      </sp-action-button>
     </div>
   `;
 
@@ -430,29 +561,71 @@ export async function renderBrowse(container, ctx) {
     </sp-table>
   `;
 
-  const tpl = html`
-    <div
-      class="browse-view"
-      @dragover=${(/** @type {DragEvent} */ e) => {
-        e.preventDefault();
-        /** @type {HTMLElement} */ (e.currentTarget).classList.add("browse-drop-active");
-      }}
-      @dragleave=${(/** @type {DragEvent} */ e) => {
-        /** @type {HTMLElement} */ (e.currentTarget).classList.remove("browse-drop-active");
-      }}
-      @drop=${(/** @type {DragEvent} */ e) => {
-        e.preventDefault();
-        /** @type {HTMLElement} */ (e.currentTarget).classList.remove("browse-drop-active");
-        const files = e.dataTransfer?.files;
-        if (files?.length) handleUpload(files, container, ctx);
-      }}
-    >
-      ${filterBar}
-      <div class="browse-table">${table}</div>
-    </div>
-  `;
+  const body =
+    viewMode === "grid" ? gridView(files, ctx) : html`<div class="browse-table">${table}</div>`;
 
-  litRender(tpl, container);
+  // Replace browse-body with a fresh element each render to avoid lit-html's
+  // ChildPart conflict (populateCardPreviews mutates the DOM post-render).
+  const oldBody = container.querySelector(".browse-body");
+  const browseView = container.querySelector(".browse-view");
+  if (oldBody) oldBody.remove();
+  let browseBody;
+
+  if (!browseView) {
+    const shell = document.createElement("div");
+    shell.className = "browse-view";
+    shell.addEventListener("dragover", (/** @type {DragEvent} */ e) => {
+      e.preventDefault();
+      shell.classList.add("browse-drop-active");
+    });
+    shell.addEventListener("dragleave", () => {
+      shell.classList.remove("browse-drop-active");
+    });
+    shell.addEventListener("drop", (/** @type {DragEvent} */ e) => {
+      e.preventDefault();
+      shell.classList.remove("browse-drop-active");
+      const droppedFiles = e.dataTransfer?.files;
+      if (droppedFiles?.length) handleUpload(droppedFiles, container, ctx);
+    });
+
+    const filterBarEl = document.createElement("div");
+    filterBarEl.className = "browse-filter-bar";
+    shell.appendChild(filterBarEl);
+    litRender(filterBar, filterBarEl);
+
+    browseBody = document.createElement("div");
+    browseBody.className = "browse-body";
+    shell.appendChild(browseBody);
+
+    container.replaceChildren(shell);
+  } else {
+    // Update filter bar button states without re-rendering overlay-trigger
+    const group = container.querySelector(".browse-filter-bar sp-action-group");
+    if (group) {
+      const buttons = group.querySelectorAll("sp-action-button");
+      buttons.forEach((btn, i) => {
+        const cat = CATEGORIES[i];
+        if (cat) btn.toggleAttribute("selected", activeCategory === cat.key);
+      });
+    }
+    // Update view switcher states
+    const switcher = container.querySelector(".browse-view-switcher");
+    if (switcher) {
+      const btns = switcher.querySelectorAll("sp-action-button");
+      btns[0]?.toggleAttribute("selected", viewMode === "grid");
+      btns[1]?.toggleAttribute("selected", viewMode === "table");
+    }
+
+    browseBody = document.createElement("div");
+    browseBody.className = "browse-body";
+    browseView.appendChild(browseBody);
+  }
+
+  litRender(body, browseBody);
+
+  if (viewMode === "grid") {
+    populateCardPreviews(container, files);
+  }
 }
 
 /** Force a data reload on next render (e.g., after file creation/deletion). */

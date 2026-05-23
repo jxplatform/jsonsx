@@ -1982,6 +1982,40 @@
         font-family: "SF Mono", "Fira Code", monospace;
         font-size: 11px;
       }
+      .browse-view-switcher {
+        display: flex;
+        gap: 2px;
+        margin-left: auto;
+      }
+      .browse-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 12px;
+        padding: 12px;
+        overflow-y: auto;
+        flex: 1;
+        align-items: start;
+      }
+      .browse-grid .element-card {
+        cursor: pointer;
+        margin-bottom: 0;
+      }
+      .browse-grid .element-card-preview {
+        aspect-ratio: 4/3;
+        max-height: none;
+        min-height: unset;
+      }
+      .browse-grid-empty {
+        padding: 24px;
+        text-align: center;
+        color: var(--fg-dim);
+      }
+      .browse-body {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        overflow: hidden;
+      }
 
       /* ─── Settings Modal ─── */
       .settings-modal {
