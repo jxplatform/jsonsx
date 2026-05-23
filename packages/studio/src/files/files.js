@@ -15,7 +15,13 @@ import { createState, projectState, setProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
-import { workspace, openTab, activateTab, replaceAllTabs } from "../workspace/workspace.js";
+import {
+  workspace,
+  openTab,
+  activateTab,
+  replaceAllTabs,
+  activeTab,
+} from "../workspace/workspace.js";
 import { loadMarkdown } from "./file-ops.js";
 import { view } from "../view.js";
 import { addRecentProject, trackRecentFile } from "../recent-projects.js";
@@ -636,6 +642,12 @@ export async function openFileInTab(path) {
     });
     projectState.selectedPath = path;
     trackRecentFile({ path, name: path.split("/").pop() || path });
+
+    if (path === "project.json") {
+      const tab = activeTab.value;
+      if (tab) tab.session.ui.canvasMode = "stylebook";
+    }
+
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);

@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const FIXTURE_DIR = join(__dirname, "..", "..", "..", "examples", "markdown", "content", "posts");
+const FIXTURE_DIR = join(__dirname, "..", "..", "..", "examples", "content", "posts");
 
 /**
  * Mock fetch to serve .class.json files from disk (Happy DOM can't fetch file:// URLs). Uses spyOn

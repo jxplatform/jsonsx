@@ -345,16 +345,7 @@ describe("resolveClassJson — hybrid $implementation", () => {
     const schemaSrc = "file://" + join(parserDir, "MdFile.class.json");
     const restore = setupFetchMock({ "MdFile.class.json": hybridDef });
     try {
-      const fixtureDir = resolvePath(
-        __dirname,
-        "..",
-        "..",
-        "..",
-        "examples",
-        "markdown",
-        "content",
-        "posts",
-      );
+      const fixtureDir = resolvePath(__dirname, "..", "..", "..", "examples", "content", "posts");
       const sig = await resolvePrototype(
         {
           $prototype: "MarkdownFile",

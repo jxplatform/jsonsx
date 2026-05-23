@@ -4,7 +4,7 @@ import { emitElementModule } from "../src/targets/compile-element.js";
 import { resolve } from "node:path";
 
 const fixturesDir = import.meta.dir;
-const examplesDir = resolve(fixturesDir, "../../../examples/custom-elements");
+const examplesDir = resolve(fixturesDir, "../../../examples/components");
 
 // ─── compileElement — basic output ──────────────────────────────────────────
 
@@ -310,7 +310,7 @@ describe("compileElement — templates", () => {
 
 describe("compileElement — $elements", () => {
   test("compiles task-item.json from file", async () => {
-    const result = await compileElement(resolve(examplesDir, "components/task-item.json"));
+    const result = await compileElement(resolve(examplesDir, "task-item.json"));
 
     expect(result.files).toHaveLength(1);
     const file = result.files[0];
@@ -321,7 +321,7 @@ describe("compileElement — $elements", () => {
   });
 
   test("compiles task-stats.json with computed signals", async () => {
-    const result = await compileElement(resolve(examplesDir, "components/task-stats.json"));
+    const result = await compileElement(resolve(examplesDir, "task-stats.json"));
 
     const content = result.files[0].content;
     expect(content).toContain("class TaskStats extends HTMLElement");
@@ -339,8 +339,8 @@ describe("compileElement — $elements", () => {
 
     // Root element (task-manager) should import the deps
     const root = result.files[2];
-    expect(root.content).toContain("import './components/task-item.js'");
-    expect(root.content).toContain("import './components/task-stats.js'");
+    expect(root.content).toContain("import './task-item.js'");
+    expect(root.content).toContain("import './task-stats.js'");
   });
 
   test("does not duplicate visited elements from file", async () => {

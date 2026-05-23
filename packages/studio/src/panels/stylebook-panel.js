@@ -1,11 +1,10 @@
 /**
- * Stylebook panel — renders the Settings mode canvas (element catalog, design variables,
- * definitions, content types). Extracted from studio.js Phase 4e.
+ * Stylebook panel — renders the Stylebook mode canvas (element catalog with per-file style
+ * defaults). Extracted from studio.js Phase 4e.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
-import { styleMap } from "lit-html/directives/style-map.js";
 
 import {
   updateSession,
@@ -16,16 +15,12 @@ import {
   projectState,
 } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
-import { transactDoc, mutateUpdateStyle } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { defineElement, setSkipServerFunctions } from "@jxsuite/runtime";
 import { componentRegistry } from "../files/components.js";
 import { getEffectiveStyle, getEffectiveMedia } from "../site-context.js";
 import { parseMediaEntries, activeBreakpointsForWidth } from "../utils/canvas-media.js";
 import { mediaDisplayName } from "./shared.js";
-import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils.js";
-import { renderDefsEditor } from "../settings/defs-editor.js";
-import { renderContentTypesEditor } from "../settings/content-types-editor.js";
 import stylebookMeta from "../../data/stylebook-meta.json";
 
 export { stylebookMeta };
@@ -49,48 +44,7 @@ let _ctx = null;
 export function renderStylebookMode(ctx) {
   _ctx = ctx;
 
-  const settingsTab = activeTab.value?.session.ui.settingsTab || "stylebook";
-
-  const settingsChromeBarTpl = html`
-    <div
-      class="sb-chrome settings-top-chrome"
-      style="position:absolute;top:0;left:0;right:0;z-index:16;background:var(--bg-panel);border-bottom:1px solid var(--border)"
-    >
-      <sp-tabs
-        size="s"
-        selected=${settingsTab}
-        @change=${(/** @type {any} */ e) => {
-          updateUi("settingsTab", e.target.selected);
-        }}
-      >
-        <sp-tab label="Stylebook" value="stylebook"></sp-tab>
-        <sp-tab label="Definitions" value="definitions"></sp-tab>
-        <sp-tab label="Content Types" value="contentTypes"></sp-tab>
-      </sp-tabs>
-    </div>
-  `;
-
-  if (settingsTab === "definitions" || settingsTab === "contentTypes") {
-    /** @type {any} */ (canvasWrap).style.overflow = "hidden";
-
-    litRender(
-      html`${settingsChromeBarTpl}
-        <div
-          class="settings-editor-container"
-          style="position:absolute;inset:40px 0 0 0;overflow:auto"
-        ></div>`,
-      /** @type {any} */ (canvasWrap),
-    );
-
-    const container = /** @type {HTMLElement} */ (
-      canvasWrap.querySelector(".settings-editor-container")
-    );
-    if (settingsTab === "definitions") renderDefsEditor(container);
-    else renderContentTypesEditor(container);
-    return;
-  }
-
-  // Stylebook tab — element catalog / variables
+  // Stylebook mode — element catalog only
   view.stylebookElToTag = new WeakMap();
   const tab = activeTab.value;
   const rootStyle = getEffectiveStyle(tab?.doc.document?.style);
@@ -102,10 +56,6 @@ export function renderStylebookMode(ctx) {
   );
   const hasMedia = sizeBreakpoints.length > 0;
 
-  const onTabClick = (/** @type {string} */ t) => {
-    updateUi("stylebookTab", t);
-  };
-
   const onFilterInput = (/** @type {any} */ e) => {
     updateUi("stylebookFilter", e.target.value);
   };
@@ -115,42 +65,25 @@ export function renderStylebookMode(ctx) {
   };
 
   const chromeBarTpl = html`
-    ${settingsChromeBarTpl}
     <div
       class="sb-chrome"
-      style="position:absolute;top:36px;left:0;right:0;z-index:15;background:var(--bg-panel);border-bottom:1px solid var(--border)"
+      style="position:absolute;top:0;left:0;right:0;z-index:15;background:var(--bg-panel);border-bottom:1px solid var(--border)"
     >
-      <sp-tabs
-        size="s"
-        selected=${tab?.session.ui.stylebookTab || "elements"}
-        @change=${(/** @type {any} */ e) => {
-          onTabClick(e.target.selected);
-        }}
-      >
-        ${["elements", "variables"].map(
-          (t) => html`
-            <sp-tab label=${t.charAt(0).toUpperCase() + t.slice(1)} value=${t}></sp-tab>
-          `,
-        )}
-      </sp-tabs>
-      ${tab?.session.ui.stylebookTab === "elements"
-        ? html`
-            <input
-              class="field-input"
-              style="flex:1;max-width:200px;margin-left:8px"
-              placeholder="Filter…"
-              .value=${tab?.session.ui.stylebookFilter}
-              @input=${onFilterInput}
-            />
-            <button
-              class="tb-toggle${tab?.session.ui.stylebookCustomizedOnly ? " active" : ""}"
-              style="margin-left:4px"
-              @click=${onCustomizedToggle}
-            >
-              Customized
-            </button>
-          `
-        : nothing}
+      <div style="display:flex;align-items:center;padding:4px 8px;gap:4px">
+        <input
+          class="field-input"
+          style="flex:1;max-width:200px"
+          placeholder="Filter…"
+          .value=${tab?.session.ui.stylebookFilter}
+          @input=${onFilterInput}
+        />
+        <button
+          class="tb-toggle${tab?.session.ui.stylebookCustomizedOnly ? " active" : ""}"
+          @click=${onCustomizedToggle}
+        >
+          Customized
+        </button>
+      </div>
     </div>
   `;
 
@@ -177,22 +110,17 @@ export function renderStylebookMode(ctx) {
 
   const renderIntoPanel = (/** @type {any} */ panel, /** @type {any} */ activeBreakpoints) => {
     panel.canvas.classList.add("sb-canvas");
-    if (tab?.session.ui.stylebookTab === "elements") {
-      renderStylebookElementsIntoCanvas(
-        panel.canvas,
-        rootStyle,
-        filter,
-        customizedOnly,
-        activeBreakpoints,
-      );
-      for (const child of panel.canvas.querySelectorAll("*")) {
-        child.style.pointerEvents = "none";
-      }
-      registerStylebookPanelEvents(panel);
-    } else {
-      renderStylebookVarsIntoCanvas(panel.canvas, rootStyle);
-      panel.overlayClk.style.pointerEvents = "none";
+    renderStylebookElementsIntoCanvas(
+      panel.canvas,
+      rootStyle,
+      filter,
+      customizedOnly,
+      activeBreakpoints,
+    );
+    for (const child of panel.canvas.querySelectorAll("*")) {
+      child.style.pointerEvents = "none";
     }
+    registerStylebookPanelEvents(panel);
   };
 
   /** @type {{ tpl: any; panel: any; activeSet: any }[]} */
@@ -221,7 +149,7 @@ export function renderStylebookMode(ctx) {
       ${chromeBarTpl}
       <div
         class="panzoom-wrap"
-        style="transform-origin:0 0;padding-top:72px"
+        style="transform-origin:0 0;padding-top:40px"
         ${ref((el) => {
           if (el) view.panzoomWrap = /** @type {HTMLDivElement} */ (el);
         })}
@@ -582,433 +510,6 @@ export function renderStylebookElementsIntoCanvas(
   } else {
     litRender(html`${sectionTemplates}`, canvasEl);
   }
-}
-
-/**
- * Render variables into the canvas (card-based layout matching Elements tab)
- *
- * @param {any} canvasEl
- * @param {any} rootStyle
- */
-function renderStylebookVarsIntoCanvas(canvasEl, rootStyle) {
-  const varCats = stylebookMeta.$variables;
-
-  /** @type {Record<string, any>} */
-  const groups = {};
-  for (const key of Object.keys(varCats)) groups[key] = [];
-  for (const [k, v] of Object.entries(rootStyle)) {
-    if (!k.startsWith("--")) continue;
-    if (typeof v !== "string" && typeof v !== "number") continue;
-    if (k.startsWith("--color")) groups.color.push([k, v]);
-    else if (k.startsWith("--font")) groups.font.push([k, v]);
-    else if (k.startsWith("--size") || k.startsWith("--spacing") || k.startsWith("--radius"))
-      groups.size.push([k, v]);
-    else groups.other.push([k, v]);
-  }
-
-  /** @type {Map<string, HTMLElement | null>} */
-  const bodyRefs = new Map();
-
-  const sectionTemplates = Object.entries(varCats).map(([catKey, catMeta]) => {
-    const vars = groups[catKey];
-
-    const onAdd = () => {
-      const bodyEl = bodyRefs.get(catKey);
-      if (!bodyEl) return;
-      const addBtn = bodyEl.querySelector(".sb-var-add-btn");
-      const row = renderVarRow(catKey, /** @type {any} */ (catMeta), null, "", true);
-      bodyEl.insertBefore(row, addBtn);
-      if (addBtn) /** @type {any} */ (addBtn).style.display = "none";
-      const nameField = /** @type {any} */ (row.querySelector("sp-textfield"));
-      if (nameField) requestAnimationFrame(() => nameField.focus());
-    };
-
-    return html`
-      <div class="sb-section">
-        <div class="sb-label">${/** @type {any} */ (catMeta).label}</div>
-        <div
-          class="sb-body"
-          ${ref((el) => {
-            if (el) bodyRefs.set(catKey, /** @type {HTMLElement} */ (el));
-          })}
-        >
-          ${vars.length > 0
-            ? vars.map((/** @type {[string, any]} */ [varName, varVal]) =>
-                renderVarRow(catKey, /** @type {any} */ (catMeta), varName, String(varVal), false),
-              )
-            : html`<div class="sb-var-empty">
-                No ${/** @type {any} */ (catMeta).label.toLowerCase()} variables yet.
-              </div>`}
-          <button class="sb-var-add-btn" @click=${onAdd}>
-            <span class="sb-var-add-icon">+</span> Add ${/** @type {any} */ (catMeta).label}
-          </button>
-        </div>
-      </div>
-    `;
-  });
-
-  litRender(html`${sectionTemplates}`, canvasEl);
-}
-
-/**
- * Render a single variable row — used for both existing and add-new.
- *
- * @param {string} catKey
- * @param {any} catMeta
- * @param {string | null} varName
- * @param {string} varVal
- * @param {boolean} isNew
- */
-function renderVarRow(catKey, catMeta, varName, varVal, isNew) {
-  const row = document.createElement("div");
-  row.className = isNew ? "sb-var-row is-new" : "sb-var-row";
-
-  /** @type {any} */
-  let colorPicker = null;
-  /** @type {any} */
-  let nameField = null;
-  /** @type {any} */
-  let getValueFn;
-  /** @type {any} */
-  let hexField = null;
-
-  const swatchTpl =
-    catKey === "color"
-      ? html`
-          <div
-            class="sb-var-swatch"
-            style=${styleMap({ backgroundColor: varVal || "var(--accent)" })}
-          >
-            <input
-              type="color"
-              .value=${varVal && varVal.startsWith("#") ? varVal : "#007acc"}
-              ${ref((el) => {
-                if (el) colorPicker = el;
-              })}
-              @input=${() => {
-                if (!colorPicker || !hexField) return;
-                hexField.value = colorPicker.value;
-                const swatch = /** @type {any} */ (row.querySelector(".sb-var-swatch"));
-                if (swatch) swatch.style.backgroundColor = colorPicker.value;
-                if (!isNew && varName) {
-                  transactDoc(activeTab.value, (t) =>
-                    mutateUpdateStyle(t, [], varName, colorPicker.value),
-                  );
-                }
-              }}
-            />
-          </div>
-        `
-      : nothing;
-
-  const namePlaceholder =
-    catKey === "color"
-      ? "Primary Blue"
-      : catKey === "font"
-        ? "Body Serif"
-        : catKey === "size"
-          ? "Spacing Large"
-          : "Border Radius";
-
-  const nameColTpl = isNew
-    ? html`
-        <div class="sb-var-col-name">
-          <div class="sb-var-col-label">Name</div>
-          <sp-textfield
-            size="s"
-            placeholder=${namePlaceholder}
-            style="pointer-events:auto"
-            ${ref((el) => {
-              if (el) nameField = el;
-            })}
-          ></sp-textfield>
-        </div>
-      `
-    : nothing;
-
-  /** @type {any} */
-  let valueContent;
-
-  if (catKey === "color") {
-    /** @type {any} */
-    let debounce;
-    valueContent = html`
-      <sp-textfield
-        size="s"
-        .value=${varVal || "#007acc"}
-        placeholder="#007acc"
-        style="pointer-events:auto"
-        ${ref((el) => {
-          if (el) hexField = el;
-        })}
-        @input=${() => {
-          clearTimeout(debounce);
-          debounce = setTimeout(() => {
-            if (!hexField) return;
-            const v = hexField.value;
-            try {
-              if (colorPicker) colorPicker.value = v.startsWith("#") ? v : colorPicker.value;
-            } catch {}
-            const swatch = /** @type {any} */ (row.querySelector(".sb-var-swatch"));
-            if (swatch) swatch.style.backgroundColor = v;
-            if (!isNew && varName) {
-              transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, v));
-            }
-          }, 400);
-        }}
-      ></sp-textfield>
-    `;
-    getValueFn = () => hexField?.value?.trim() || "";
-  } else if (catKey === "size") {
-    const ui = createUnitInput(varVal || "16px", {
-      onChange: (/** @type {any} */ newVal) => {
-        const bar = /** @type {any} */ (row.querySelector(".sb-var-size-bar"));
-        if (bar) bar.style.width = newVal;
-        if (!isNew && varName) {
-          transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, newVal));
-        }
-      },
-    });
-    if (isNew) ui.textfield.value = "";
-    valueContent = html`<div
-      ${ref((el) => {
-        if (el && !el.firstChild) el.appendChild(ui.wrap);
-      })}
-    ></div>`;
-    getValueFn = () => ui.getValue();
-  } else {
-    /** @type {any} */
-    let textFieldEl = null;
-    /** @type {any} */
-    let debounce;
-    valueContent = html`
-      <sp-textfield
-        size="s"
-        .value=${varVal}
-        placeholder=${catMeta.placeholder}
-        style="pointer-events:auto"
-        ${ref((el) => {
-          if (el) textFieldEl = el;
-        })}
-        @input=${() => {
-          if (!textFieldEl || isNew || !varName) return;
-          clearTimeout(debounce);
-          debounce = setTimeout(() => {
-            const v = textFieldEl.value;
-            const fontPrev = /** @type {any} */ (row.querySelector(".sb-var-font-preview"));
-            if (fontPrev) fontPrev.style.fontFamily = v;
-            transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, v));
-          }, 400);
-        }}
-      ></sp-textfield>
-    `;
-    getValueFn = () => textFieldEl?.value?.trim() || "";
-  }
-
-  const valColTpl = html`
-    <div class="sb-var-col-value">
-      ${isNew ? html`<div class="sb-var-col-label">Value</div>` : nothing} ${valueContent}
-    </div>
-  `;
-
-  const actionsTpl = isNew
-    ? html`
-        <div class="sb-var-add-actions">
-          <sp-action-button
-            size="s"
-            style="pointer-events:auto"
-            @click=${() => {
-              const name = (nameField?.value || "").trim();
-              const val = getValueFn();
-              const generatedVar = friendlyNameToVar(name, catMeta.prefix);
-              if (!generatedVar || !val) return;
-              transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], generatedVar, val));
-            }}
-            >Add</sp-action-button
-          >
-          <sp-action-button
-            size="s"
-            quiet
-            style="pointer-events:auto"
-            @click=${() => {
-              const body = row.parentElement;
-              row.remove();
-              const addBtn = /** @type {any} */ (body?.querySelector(".sb-var-add-btn"));
-              if (addBtn) addBtn.style.display = "";
-            }}
-          >
-            <sp-icon-close slot="icon"></sp-icon-close>
-          </sp-action-button>
-        </div>
-      `
-    : nothing;
-
-  const headerTpl =
-    !isNew && varName
-      ? html`
-          <div class="sb-var-row-header">
-            <span class="sb-var-row-title">${varDisplayName(varName, catMeta.prefix)}</span>
-            <span class="sb-var-row-ref">${varName}</span>
-            <sp-action-button
-              size="s"
-              quiet
-              class="sb-var-del"
-              style="pointer-events:auto"
-              @click=${() => {
-                transactDoc(activeTab.value, (t) => mutateUpdateStyle(t, [], varName, undefined));
-              }}
-            >
-              <sp-icon-delete slot="icon"></sp-icon-delete>
-            </sp-action-button>
-          </div>
-        `
-      : nothing;
-
-  const addPreviewTpl = isNew
-    ? html`
-        <div
-          class="sb-var-add-preview"
-          ${ref((el) => {
-            if (!el || !nameField) return;
-            nameField.addEventListener("input", () => {
-              el.textContent = friendlyNameToVar(nameField.value || "", catMeta.prefix);
-            });
-          })}
-        ></div>
-      `
-    : nothing;
-
-  const typePrevTpl =
-    catKey === "font" && varVal
-      ? html`
-          <div class="sb-var-preview">
-            <div class="sb-var-font-preview" style=${styleMap({ fontFamily: varVal })}>
-              The quick brown fox jumps over the lazy dog
-            </div>
-          </div>
-        `
-      : catKey === "size" && varVal
-        ? html`
-            <div class="sb-var-preview">
-              <div class="sb-var-size-track">
-                <div class="sb-var-size-bar" style=${styleMap({ width: varVal })}></div>
-              </div>
-            </div>
-          `
-        : nothing;
-
-  litRender(
-    html`
-      ${headerTpl}
-      <div class="sb-var-input-row">${swatchTpl} ${nameColTpl} ${valColTpl} ${actionsTpl}</div>
-      ${addPreviewTpl} ${typePrevTpl}
-    `,
-    row,
-  );
-
-  return row;
-}
-
-/**
- * Creates a combined textfield + quiet sp-picker for CSS values with units.
- *
- * @param {any} initialValue
- * @param {any} [options]
- */
-function createUnitInput(initialValue, { onChange, size = "s" } = {}) {
-  const match = String(initialValue).match(
-    /^(-?[\d.]+)\s*(px|em|rem|vw|vh|%|ch|ex|vmin|vmax|pt|cm|mm|in)?$/,
-  );
-  let numVal = match ? match[1] : initialValue;
-  let unitVal = match ? match[2] || "px" : "";
-  const isNumeric = !!match;
-
-  const wrap = document.createElement("div");
-  wrap.className = "sb-unit-input";
-  wrap.style.pointerEvents = "auto";
-
-  /** @type {any} */
-  let textfield = null;
-  /** @type {any} */
-  let picker = null;
-
-  const units = [
-    { value: "px", label: "px" },
-    { value: "rem", label: "rem" },
-    { value: "em", label: "em" },
-    { value: "%", label: "%" },
-    { value: "vw", label: "vw" },
-    { value: "vh", label: "vh" },
-    { value: "ch", label: "ch" },
-    { value: "pt", label: "pt" },
-    { divider: true },
-    { value: "auto", label: "auto" },
-    { value: "fit-content", label: "fit-content" },
-  ];
-
-  /** @type {any} */
-  let debounce;
-
-  function getValue() {
-    const num = textfield?.value;
-    const unit = picker?.value;
-    if (unit === "auto" || unit === "fit-content") return unit;
-    return num ? `${num}${unit}` : "";
-  }
-
-  litRender(
-    html`
-      <sp-textfield
-        .value=${numVal}
-        size=${size}
-        ${ref((el) => {
-          if (el) textfield = el;
-        })}
-        @input=${() => {
-          clearTimeout(debounce);
-          const raw = textfield?.value?.trim();
-          const looksNumeric = /^-?[\d.]+$/.test(raw || "");
-          if (picker) picker.style.display = looksNumeric ? "" : "none";
-          debounce = setTimeout(() => {
-            if (onChange) onChange(looksNumeric ? `${raw}${picker?.value}` : raw);
-          }, 400);
-        }}
-      ></sp-textfield>
-      <sp-picker
-        quiet
-        size=${size}
-        style=${styleMap({ display: isNumeric ? "" : "none" })}
-        ${ref((el) => {
-          if (el) {
-            picker = el;
-            requestAnimationFrame(() => {
-              /** @type {any} */ (el).value = unitVal || "px";
-            });
-          }
-        })}
-        @change=${() => {
-          const unit = picker?.value;
-          if (unit === "auto" || unit === "fit-content") {
-            if (textfield) textfield.value = unit;
-            if (picker) picker.style.display = "none";
-            if (onChange) onChange(unit);
-          } else {
-            unitVal = unit;
-            if (onChange) onChange(getValue());
-          }
-        }}
-      >
-        ${units.map((u) =>
-          u.divider
-            ? html`<sp-menu-divider></sp-menu-divider>`
-            : html`<sp-menu-item value=${u.value}>${u.label}</sp-menu-item>`,
-        )}
-      </sp-picker>
-    `,
-    wrap,
-  );
-
-  return { wrap, textfield, picker, getValue };
 }
 
 /**

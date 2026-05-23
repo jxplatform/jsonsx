@@ -131,7 +131,7 @@ function _render() {
   let content;
   if (tab === "layers")
     content =
-      ctx.getCanvasMode() === "settings"
+      ctx.getCanvasMode() === "stylebook"
         ? renderStylebookLayersTemplate({
             selectStylebookTag,
             stylebookMeta,
@@ -197,7 +197,7 @@ function _render() {
   litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
 
   // Post-render side effects
-  if (tab === "layers" && ctx.getCanvasMode() !== "settings") ctx.registerLayersDnD();
+  if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") ctx.registerLayersDnD();
   else if (tab === "imports") {
     /* no post-render DnD needed */
   } else if (tab === "blocks") {

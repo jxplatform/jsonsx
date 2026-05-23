@@ -83,7 +83,7 @@ function _flush() {
   const { stylebookTab } = tab.session.ui;
   const canvasMode = _ctx.getCanvasMode();
 
-  if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "settings") {
+  if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "stylebook") {
     for (const p of canvasPanels) {
       litRender(nothing, p.overlay);
       p.overlayClk.style.pointerEvents = "none";
@@ -95,7 +95,7 @@ function _flush() {
     return;
   }
 
-  if (canvasMode === "settings") {
+  if (canvasMode === "stylebook") {
     const enable = stylebookTab === "elements";
     for (const p of canvasPanels) {
       p.overlayClk.style.pointerEvents = enable ? "" : "none";

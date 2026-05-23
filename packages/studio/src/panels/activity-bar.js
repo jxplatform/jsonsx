@@ -5,6 +5,7 @@ import { activityBar, renderOnly } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { openSettingsModal } from "../settings/settings-modal.js";
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
 let _scope = null;
@@ -113,6 +114,17 @@ export function renderActivityBar() {
         `,
       )}
     </sp-tabs>
+    <div style="margin-top:auto;padding:8px 0;display:flex;justify-content:center">
+      <sp-action-button
+        quiet
+        size="m"
+        title="Settings"
+        aria-label="Settings"
+        @click=${() => openSettingsModal()}
+      >
+        <sp-icon-gears slot="icon"></sp-icon-gears>
+      </sp-action-button>
+    </div>
   `;
   litRender(tpl, /** @type {any} */ (activityBar));
 }

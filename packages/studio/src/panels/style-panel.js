@@ -620,7 +620,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
 export function renderStylePanelTemplate(ctx) {
   const tab = activeTab.value;
   if (!tab) return html`<div class="empty-state">No document loaded</div>`;
-  if (ctx.getCanvasMode() === "settings" && tab.session.ui.stylebookSelection) {
+  if (ctx.getCanvasMode() === "stylebook" && tab.session.ui.stylebookSelection) {
     const node = tab.doc.document;
     if (!node) return html`<div class="empty-state">No document loaded</div>`;
     return html`

@@ -170,7 +170,7 @@ export function applyTransform() {
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
   renderZoomIndicator();
   renderOnly("overlays");
-  if (_ctx.getCanvasMode() === "settings") _ctx.renderStylebookOverlays();
+  if (_ctx.getCanvasMode() === "stylebook") _ctx.renderStylebookOverlays();
 }
 
 /** Calculate zoom + pan to fit all panels within the viewport. */

@@ -194,8 +194,11 @@ function toolbarTemplate() {
     { key: "design", label: "Design", iconTag: "sp-icon-artboard" },
     { key: "preview", label: "Preview", iconTag: "sp-icon-preview" },
     { key: "source", label: "Code", iconTag: "sp-icon-code" },
-    { key: "settings", label: "Settings", iconTag: "sp-icon-gears" },
+    { key: "stylebook", label: "Stylebook", iconTag: "sp-icon-brush" },
   ];
+
+  const isProjectFile = S.documentPath === "project.json";
+  const allowedModes = isProjectFile ? new Set(["stylebook", "source"]) : null;
 
   const modeSwitcherTpl = html`
     <sp-action-group selects="single" size="s" compact>
@@ -204,8 +207,10 @@ function toolbarTemplate() {
           <sp-action-button
             size="s"
             ?selected=${canvasMode === m.key}
+            ?disabled=${allowedModes && !allowedModes.has(m.key)}
             @click=${() => {
               if (canvasMode === m.key) return;
+              if (allowedModes && !allowedModes.has(m.key)) return;
               if (S.ui.editingFunction) {
                 if (view.functionEditor) {
                   view.functionEditor.dispose();
@@ -217,7 +222,7 @@ function toolbarTemplate() {
               view.panY = 0;
               /** @type {Record<string, any>} */
               const uiPatch = { editingFunction: null };
-              if (m.key === "settings") uiPatch.rightTab = "style";
+              if (m.key === "stylebook") uiPatch.rightTab = "style";
               if (m.key === "manage") view.leftTab = "files";
               updateSession({ ui: uiPatch });
               _ctx.renderCanvas();

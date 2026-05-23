@@ -173,8 +173,8 @@ export function renderCanvas() {
     return;
   }
 
-  // Settings mode: render element catalog with panzoom surface
-  if (canvasMode === "settings") {
+  // Stylebook mode: render element catalog with panzoom surface
+  if (canvasMode === "stylebook") {
     renderStylebookMode({
       canvasPanelTemplate,
       applyTransform,
