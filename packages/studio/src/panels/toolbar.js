@@ -13,6 +13,7 @@ import { mediaDisplayName } from "./shared.js";
 import { view } from "../view.js";
 import { getRecentProjects } from "../recent-projects.js";
 import { openQuickSearch } from "./quick-search.js";
+import { openBrowseModal } from "../browse/browse-modal.js";
 
 /** @type {HTMLElement | null} */
 let _rootEl = null;
@@ -189,7 +190,6 @@ function toolbarTemplate() {
       : nothing;
 
   const modes = [
-    { key: "manage", label: "Manage", iconTag: "sp-icon-view-list" },
     { key: "edit", label: "Edit", iconTag: "sp-icon-edit" },
     { key: "design", label: "Design", iconTag: "sp-icon-artboard" },
     { key: "preview", label: "Preview", iconTag: "sp-icon-preview" },
@@ -223,7 +223,6 @@ function toolbarTemplate() {
               /** @type {Record<string, any>} */
               const uiPatch = { editingFunction: null };
               if (m.key === "stylebook") uiPatch.rightTab = "style";
-              if (m.key === "manage") view.leftTab = "files";
               updateSession({ ui: uiPatch });
               _ctx.renderCanvas();
               _ctx.safeRenderRightPanel();
@@ -288,10 +287,9 @@ function toolbarTemplate() {
     : nothing;
 
   return html`
-    <sp-action-group compact size="s">
-      ${tbBtnTpl("Open Project", _ctx.openProject, "sp-icon-folder-open")} ${recentProjectsTpl}
-      ${tbBtnTpl("Save", _ctx.saveFile, "sp-icon-save-floppy")}
-    </sp-action-group>
+    ${tbBtnTpl("Open Project", _ctx.openProject, "sp-icon-folder-open")} ${recentProjectsTpl}
+    ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
+    ${tbBtnTpl("Save", _ctx.saveFile, "sp-icon-save-floppy")}
     <sp-action-group compact size="s">
       ${tbBtnTpl("Undo", () => tabUndo(activeTab.value), "sp-icon-undo")}
       ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}

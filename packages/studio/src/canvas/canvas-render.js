@@ -39,7 +39,6 @@ import { renderStylebookMode } from "../panels/stylebook-panel.js";
 import { dismissLinkPopover, dismissBlockActionBar } from "../panels/block-action-bar.js";
 import { dismissContextMenu } from "../editor/context-menu.js";
 import { dismissSlashMenu } from "../editor/slash-menu.js";
-import { renderBrowse } from "../browse/browse.js";
 import { renderFunctionEditor } from "../panels/editors.js";
 import { mediaDisplayName } from "../panels/shared.js";
 import { statusMessage } from "../panels/statusbar.js";
@@ -158,19 +157,6 @@ export function renderCanvas() {
     dismissLinkPopover();
     dismissContextMenu();
     dismissSlashMenu();
-  }
-
-  // Manage mode: project-level file browser table
-  if (canvasMode === "manage") {
-    canvasWrap.style.padding = "0";
-    canvasWrap.style.overflow = "auto";
-    renderBrowse(canvasWrap, {
-      openFile: (/** @type {string} */ path) => {
-        _ctx.setCanvasMode("edit");
-        _ctx.openFileFromTree(path);
-      },
-    });
-    return;
   }
 
   // Stylebook mode: render element catalog with panzoom surface
