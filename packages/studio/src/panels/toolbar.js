@@ -271,7 +271,7 @@ function toolbarTemplate() {
   const recentProjects = getRecentProjects();
   const recentProjectsTpl = recentProjects.length
     ? html`
-        <overlay-trigger placement="bottom-start">
+        <overlay-trigger placement="bottom-start" triggered-by="click">
           <sp-action-button size="s" slot="trigger" title="Recent projects">
             <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
           </sp-action-button>

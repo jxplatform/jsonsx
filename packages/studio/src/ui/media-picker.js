@@ -134,7 +134,7 @@ export function renderMediaPicker(prop, value, onCommit) {
       ></sp-textfield>
       ${mediaCache.length > 0
         ? html`
-            <overlay-trigger placement="bottom-end">
+            <overlay-trigger placement="bottom-end" triggered-by="click">
               <sp-action-button size="xs" quiet slot="trigger" title="Browse media">
                 <sp-icon-image slot="icon"></sp-icon-image>
               </sp-action-button>
