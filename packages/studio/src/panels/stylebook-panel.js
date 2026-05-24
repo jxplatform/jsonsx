@@ -5,6 +5,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { styleMap } from "lit-html/directives/style-map.js";
 
 import {
   updateSession,
@@ -331,7 +332,7 @@ export function renderStylebookOverlays() {
           (b) => html`
             <div
               class=${b.cls}
-              style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}"
+              style=${styleMap({ top: b.top, left: b.left, width: b.width, height: b.height })}
             >
               ${b.label ? html`<div class="overlay-label">${b.label}</div>` : nothing}
             </div>

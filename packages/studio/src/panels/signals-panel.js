@@ -5,6 +5,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
   transactDoc,
@@ -390,9 +391,13 @@ function renderSignalEditorTemplate(
       widget: html`
         <textarea
           class="field-input"
-          style="min-height:${opts.minHeight || "40px"};${opts.mono
-            ? "font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px;"
-            : ""}"
+          style=${styleMap({
+            minHeight: opts.minHeight || "40px",
+            ...(opts.mono && {
+              fontFamily: "'SF Mono','Fira Code','Consolas',monospace",
+              fontSize: "11px",
+            }),
+          })}
           .value=${value}
           @input=${(/** @type {any} */ e) => {
             clearTimeout(debounce);
@@ -1062,7 +1067,11 @@ export function renderSchemaFieldsTemplate(
             <sp-textfield
               multiline
               size="s"
-              style="min-height:${hasValue ? "80px" : "40px"};font-family:monospace;font-size:11px"
+              style=${styleMap({
+                minHeight: hasValue ? "80px" : "40px",
+                fontFamily: "monospace",
+                fontSize: "11px",
+              })}
               .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
               placeholder=${ps.description ?? "JSON Schema defining the data shape\u2026"}
               @input=${(/** @type {any} */ e) => {
