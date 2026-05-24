@@ -35,7 +35,7 @@ import { computeDocumentDiff } from "./canvas-diff.js";
 import { updateForcedPseudoPreview } from "../panels/pseudo-preview.js";
 import { findCanvasElement } from "./canvas-helpers.js";
 import { enterComponentInlineEdit } from "../editor/component-inline-edit.js";
-import { renderStylebookMode } from "../panels/stylebook-panel.js";
+import { renderStylebookMode, refreshStylebookStyles } from "../panels/stylebook-panel.js";
 import { dismissLinkPopover, dismissBlockActionBar } from "../panels/block-action-bar.js";
 import { dismissContextMenu } from "../editor/context-menu.js";
 import { dismissSlashMenu } from "../editor/slash-menu.js";
@@ -46,6 +46,9 @@ import * as overlaysPanel from "../panels/overlays.js";
 
 /** @type {any} */
 let _ctx = null;
+
+let _prevStylebookFilter = "";
+let _prevStylebookCustomizedOnly = false;
 
 /**
  * Initialize the canvas render module.
@@ -109,6 +112,18 @@ export function renderCanvas() {
     return;
   }
 
+  // Stylebook fast-path: re-apply styles without rebuilding DOM
+  if (canvasMode === "stylebook" && !modeChanged) {
+    const curFilter = tab.session.ui.stylebookFilter || "";
+    const curCustomized = !!tab.session.ui.stylebookCustomizedOnly;
+    const filterChanged =
+      curFilter !== _prevStylebookFilter || curCustomized !== _prevStylebookCustomizedOnly;
+    if (!filterChanged) {
+      refreshStylebookStyles();
+      return;
+    }
+  }
+
   // Detect whether this is a mode transition or a content-only re-render
   view.prevCanvasMode = canvasMode;
 
@@ -161,6 +176,8 @@ export function renderCanvas() {
 
   // Stylebook mode: render element catalog with panzoom surface
   if (canvasMode === "stylebook") {
+    _prevStylebookFilter = tab.session.ui.stylebookFilter || "";
+    _prevStylebookCustomizedOnly = !!tab.session.ui.stylebookCustomizedOnly;
     renderStylebookMode({
       canvasPanelTemplate,
       applyTransform,
