@@ -5,6 +5,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
@@ -260,7 +261,7 @@ export function renderSignalsTemplate(S, ctx) {
             const isExpanded = expandedSignal === name;
             return html`
               <div
-                class="signal-row${isExpanded ? " expanded" : ""}"
+                class=${classMap({ "signal-row": true, expanded: isExpanded })}
                 @click=${() => {
                   expandedSignal = isExpanded ? null : name;
                   ctx.renderLeftPanel();

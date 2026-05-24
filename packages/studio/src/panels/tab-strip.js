@@ -6,6 +6,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { effect, effectScope } from "../reactivity.js";
 import { workspace, activateTab, closeTab } from "../workspace/workspace.js";
 
@@ -63,7 +64,7 @@ function render() {
           const label = tabLabel(tab);
           return html`
             <div
-              class="tab-strip-tab ${isActive ? "active" : ""}"
+              class=${classMap({ "tab-strip-tab": true, active: isActive })}
               @click=${() => activateTab(id)}
               @auxclick=${(/** @type {MouseEvent} */ e) => {
                 if (e.button === 1) {

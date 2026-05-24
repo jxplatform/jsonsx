@@ -1,4 +1,5 @@
 import { html, render as litRender, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { getPlatform } from "../platform.js";
 import { openFileInTab } from "../files/files.js";
 import { getRecentFiles, trackRecentFile } from "../recent-projects.js";
@@ -146,7 +147,7 @@ function renderOverlay() {
           ${items.map(
             (item, i) => html`
               <div
-                class="quick-search-item ${i === _selectedIndex ? "selected" : ""}"
+                class=${classMap({ "quick-search-item": true, selected: i === _selectedIndex })}
                 @click=${() => selectItem(item)}
                 @mouseenter=${() => {
                   _selectedIndex = i;

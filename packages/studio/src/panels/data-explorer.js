@@ -1,6 +1,7 @@
 // ─── Data Explorer ──────────────────────────────────────────────────────────
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 
 /** Expanded data entries set — persists across renders. */
 const expandedDataKeys = new Set();
@@ -68,7 +69,7 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
           return html`
             <div class="data-row">
               <div
-                class="data-row-header${isExpanded ? " expanded" : ""}"
+                class=${classMap({ "data-row-header": true, expanded: isExpanded })}
                 @click=${() => {
                   if (expandedDataKeys.has(name)) expandedDataKeys.delete(name);
                   else expandedDataKeys.add(name);
@@ -77,7 +78,7 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
               >
                 <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
                 <span class="data-name">${name}</span>
-                <span class="data-type${unwrapped === null ? " data-pending" : ""}"
+                <span class=${classMap({ "data-type": true, "data-pending": unwrapped === null })}
                   >${dataTypeLabel(value)}</span
                 >
               </div>

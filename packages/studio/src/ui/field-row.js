@@ -6,6 +6,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 
 /**
  * Render a universal field row with indicator dot, label, and widget.
@@ -24,7 +25,7 @@ import { html, nothing } from "lit-html";
 export function renderFieldRow({ prop, label, hasValue, onClear, widget, span, warning }) {
   return html`
     <div
-      class=${"style-row" + (warning ? " style-row--warning" : "")}
+      class=${classMap({ "style-row": true, "style-row--warning": warning })}
       data-prop=${prop}
       style=${span === 2 ? "grid-column: 1 / -1" : ""}
     >

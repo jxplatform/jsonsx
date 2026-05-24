@@ -6,6 +6,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import { renderPopover } from "../ui/layers.js";
@@ -297,7 +298,7 @@ function renderTreeLevelTemplate(
 
     return html`
       <div
-        class="file-tree-item${isSelected ? " selected" : ""}"
+        class=${classMap({ "file-tree-item": true, selected: isSelected })}
         style="padding-left:${8 + depth * 16}px"
         role="treeitem"
         aria-level=${depth + 1}

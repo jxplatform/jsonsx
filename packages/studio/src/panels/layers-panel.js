@@ -4,6 +4,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import {
   flattenTree,
   getNodeAtPath,
@@ -134,7 +135,7 @@ export function renderLayersTemplate(ctx) {
 
     layerRows.push(html`
       <div
-        class="layer-row${isSelected ? " selected" : ""}"
+        class=${classMap({ "layer-row": true, selected: isSelected })}
         data-path=${key}
         data-dnd-row=${isElement ? key : nothing}
         data-dnd-depth=${isElement ? depth : nothing}

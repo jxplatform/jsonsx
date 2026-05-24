@@ -5,6 +5,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
@@ -63,7 +64,7 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   };
   const tpl = html`
     <div
-      class=${`canvas-panel${fullWidth ? " full-width" : ""}`}
+      class=${classMap({ "canvas-panel": true, "full-width": fullWidth })}
       data-media=${ifDefined(mediaName !== null ? mediaName : undefined)}
       ${ref((el) => {
         if (el) panel.element = /** @type {HTMLElement} */ (el);

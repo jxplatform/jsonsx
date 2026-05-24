@@ -5,6 +5,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 
 import {
@@ -87,7 +88,7 @@ export function renderStylebookMode(ctx) {
           @input=${onFilterInput}
         />
         <button
-          class="tb-toggle${tab?.session.ui.stylebookCustomizedOnly ? " active" : ""}"
+          class=${classMap({ "tb-toggle": true, active: tab?.session.ui.stylebookCustomizedOnly })}
           @click=${onCustomizedToggle}
         >
           Customized
