@@ -28,6 +28,14 @@ export { stylebookMeta };
 /** @type {any} */
 let _ctx = null;
 
+/** Lookup: tag → entry from stylebookMeta (built once) */
+const _entryByTag = new Map();
+for (const section of stylebookMeta.$sections) {
+  for (const entry of /** @type {any} */ (section.elements)) {
+    _entryByTag.set(entry.tag, entry);
+  }
+}
+
 /**
  * Render the stylebook/settings mode into the canvas.
  *
@@ -171,6 +179,95 @@ export function renderStylebookMode(ctx) {
   ctx.applyTransform();
   ctx.observeCenterUntilStable();
   ctx.renderZoomIndicator();
+}
+
+/** Fast-path: re-apply styles to existing stylebook elements without rebuilding the DOM. */
+export function refreshStylebookStyles() {
+  const tab = activeTab.value;
+  if (!tab) return;
+  const rootStyle = getEffectiveStyle(tab.doc.document?.style);
+
+  for (const panel of canvasPanels) {
+    const { canvas } = panel;
+    // Re-apply CSS custom properties
+    for (const [k, v] of Object.entries(rootStyle)) {
+      if (k.startsWith("--") && (typeof v === "string" || typeof v === "number")) {
+        canvas.style.setProperty(k, String(v));
+      }
+    }
+
+    const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document?.$media));
+    const activeBreakpoints = panel.mediaName
+      ? activeBreakpointsForWidth(sizeBreakpoints, /** @type {number} */ (panel._width))
+      : new Set();
+
+    // Re-apply styles to each element in the canvas
+    const allEls = canvas.querySelectorAll("*");
+    for (const el of allEls) {
+      const tag = view.stylebookElToTag.get(el);
+      if (!tag) continue;
+      const htmlEl = /** @type {HTMLElement} */ (el);
+      // Determine if it's a compound selector (e.g. "ul li") or simple tag
+      const parts = tag.split(" ");
+      const leafTag = parts[parts.length - 1];
+      const entry = _entryByTag.get(leafTag);
+
+      // Reset to base style
+      htmlEl.style.cssText = entry?.style || "";
+
+      // Apply root style for this tag
+      const selector = `& ${tag}`;
+      const tagStyle = rootStyle[selector];
+      if (tagStyle) {
+        for (const [prop, val] of Object.entries(tagStyle)) {
+          if (typeof val === "string" || typeof val === "number") {
+            try {
+              /** @type {any} */ (htmlEl.style)[prop] = val;
+            } catch {}
+          }
+        }
+        // Media overrides nested in tag style
+        if (activeBreakpoints.size > 0) {
+          for (const [key, val] of Object.entries(tagStyle)) {
+            if (!key.startsWith("@") || typeof val !== "object") continue;
+            const mediaName = key.slice(1);
+            if (mediaName === "--") continue;
+            if (activeBreakpoints.has(mediaName)) {
+              for (const [prop, v] of Object.entries(/** @type {any} */ (val))) {
+                if (typeof v === "string" || typeof v === "number") {
+                  try {
+                    /** @type {any} */ (htmlEl.style)[prop] = v;
+                  } catch {}
+                }
+              }
+            }
+          }
+        }
+      }
+      // Top-level @media keys
+      if (activeBreakpoints.size > 0) {
+        for (const [key, val] of Object.entries(rootStyle)) {
+          if (!key.startsWith("@") || typeof val !== "object") continue;
+          const mediaName = key.slice(1);
+          if (mediaName === "--") continue;
+          if (activeBreakpoints.has(mediaName)) {
+            const mediaTagStyle = /** @type {any} */ (val)[selector];
+            if (mediaTagStyle && typeof mediaTagStyle === "object") {
+              for (const [prop, v] of Object.entries(mediaTagStyle)) {
+                if (typeof v === "string" || typeof v === "number") {
+                  try {
+                    /** @type {any} */ (htmlEl.style)[prop] = v;
+                  } catch {}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  renderStylebookOverlays();
 }
 
 /**
