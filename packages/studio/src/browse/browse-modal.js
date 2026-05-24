@@ -3,44 +3,24 @@
  * button; selecting a file closes the modal and opens it in the editor.
  */
 
-import { html, render as litRender } from "lit-html";
+import { html } from "lit-html";
 import { renderBrowse } from "./browse.js";
 import { openFileInTab } from "../files/files.js";
+import { openModal } from "../ui/layers.js";
 
-/** @type {HTMLElement | null} */
-let _host = null;
+/** @type {ReturnType<typeof openModal> | null} */
+let _handle = null;
 
 /** @type {((e: KeyboardEvent) => void) | null} */
 let _escHandler = null;
 
 export function openBrowseModal() {
-  if (_host) return;
-
-  _host = document.createElement("div");
-  _host.style.display = "contents";
-  const themeRoot = document.querySelector("sp-theme") || document.body;
-  themeRoot.appendChild(_host);
+  if (_handle) return;
 
   _escHandler = (/** @type {KeyboardEvent} */ e) => {
     if (e.key === "Escape") closeBrowseModal();
   };
   document.addEventListener("keydown", _escHandler, true);
-
-  renderModal();
-}
-
-export function closeBrowseModal() {
-  if (!_host) return;
-  if (_escHandler) {
-    document.removeEventListener("keydown", _escHandler, true);
-    _escHandler = null;
-  }
-  _host.remove();
-  _host = null;
-}
-
-function renderModal() {
-  if (!_host) return;
 
   const tpl = html`
     <sp-underlay open @close=${closeBrowseModal}></sp-underlay>
@@ -55,10 +35,10 @@ function renderModal() {
     </div>
   `;
 
-  litRender(tpl, _host);
+  _handle = openModal(tpl);
 
   requestAnimationFrame(() => {
-    const container = _host?.querySelector(".browse-modal-content");
+    const container = _handle?.host.querySelector(".browse-modal-content");
     if (container) {
       renderBrowse(/** @type {HTMLElement} */ (container), {
         openFile: (/** @type {string} */ path) => {
@@ -68,4 +48,14 @@ function renderModal() {
       });
     }
   });
+}
+
+export function closeBrowseModal() {
+  if (!_handle) return;
+  if (_escHandler) {
+    document.removeEventListener("keydown", _escHandler, true);
+    _escHandler = null;
+  }
+  _handle.close();
+  _handle = null;
 }

@@ -15,6 +15,7 @@ import { toggleInlineFormat, isTagActiveInSelection } from "../editor/inline-for
 import { componentRegistry } from "../files/components.js";
 import { convertToComponent } from "../editor/convert-to-component.js";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers.js";
+import { getLayerSlot } from "../ui/layers.js";
 
 /**
  * @typedef {import("../state.js").StudioState} StudioState
@@ -28,7 +29,6 @@ import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers.js";
  * @type {{
  *   getCanvasMode: () => string;
  *   navigateToComponent: (path: string) => void;
- *   createFloatingContainer: () => HTMLElement;
  * } | null}
  */
 let _ctx = null;
@@ -39,14 +39,10 @@ let _ctx = null;
  * @param {{
  *   getCanvasMode: () => string;
  *   navigateToComponent: (path: string) => void;
- *   createFloatingContainer: () => HTMLElement;
  * }} ctx
  */
 export function initBlockActionBar(ctx) {
   _ctx = ctx;
-  view.linkPopoverHost = document.createElement("div");
-  view.linkPopoverHost.style.display = "contents";
-  (document.querySelector("sp-theme") || document.body).appendChild(view.linkPopoverHost);
 }
 
 /** Pre-built icon templates for inline format buttons (avoids unsafeStatic) */
@@ -195,7 +191,8 @@ function applyInlineFormat(action) {
 
 /** Dismiss the link popover if open. */
 export function dismissLinkPopover() {
-  if (view.linkPopoverHost) litRender(nothing, view.linkPopoverHost);
+  const host = getLayerSlot("popover", "link-popover");
+  litRender(nothing, host);
 }
 
 /** Dismiss the block action bar. */
@@ -205,7 +202,8 @@ export function dismissBlockActionBar() {
 
 /** @param {HTMLElement} anchorBtn */
 function showLinkPopover(anchorBtn) {
-  litRender(nothing, view.linkPopoverHost);
+  const host = getLayerSlot("popover", "link-popover");
+  litRender(nothing, host);
 
   const sel = window.getSelection();
   /** @type {HTMLAnchorElement | null} */
@@ -228,16 +226,14 @@ function showLinkPopover(anchorBtn) {
   const rect = anchorBtn.getBoundingClientRect();
 
   const onApply = () => {
-    const field = /** @type {HTMLInputElement | null} */ (
-      view.linkPopoverHost.querySelector("sp-textfield")
-    );
+    const field = /** @type {HTMLInputElement | null} */ (host.querySelector("sp-textfield"));
     const url = field?.value || "";
     if (existingLink) {
       existingLink.setAttribute("href", url);
     } else if (url) {
       document.execCommand("createLink", false, url);
     }
-    litRender(nothing, view.linkPopoverHost);
+    litRender(nothing, host);
     renderBlockActionBar();
   };
 
@@ -246,14 +242,14 @@ function showLinkPopover(anchorBtn) {
     const frag = document.createDocumentFragment();
     while (existingLink.firstChild) frag.appendChild(existingLink.firstChild);
     existingLink.parentNode.replaceChild(frag, existingLink);
-    litRender(nothing, view.linkPopoverHost);
+    litRender(nothing, host);
     renderBlockActionBar();
   };
 
   const onKeydown = (/** @type {KeyboardEvent} */ e) => {
     if (e.key === "Enter") onApply();
     else if (e.key === "Escape") {
-      litRender(nothing, view.linkPopoverHost);
+      litRender(nothing, host);
     }
   };
 
@@ -279,14 +275,11 @@ function showLinkPopover(anchorBtn) {
           : nothing}
       </sp-popover>
     `,
-    view.linkPopoverHost,
+    host,
   );
 
   requestAnimationFrame(
-    () =>
-      /** @type {HTMLElement | null} */ (
-        view.linkPopoverHost?.querySelector("sp-textfield")
-      )?.focus(),
+    () => /** @type {HTMLElement | null} */ (host.querySelector("sp-textfield"))?.focus(),
   );
 }
 
@@ -320,7 +313,7 @@ function moveSelectionDown() {
 export function renderBlockActionBar() {
   if (!_ctx) return;
   if (!view.blockActionBarEl) {
-    view.blockActionBarEl = _ctx.createFloatingContainer();
+    view.blockActionBarEl = getLayerSlot("popover", "block-action-bar");
   }
 
   if (view.selDragCleanup) {

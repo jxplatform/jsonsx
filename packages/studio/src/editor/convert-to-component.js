@@ -10,6 +10,7 @@ import {
 } from "../files/components.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
+import { showDialog } from "../ui/layers.js";
 
 const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 
@@ -118,88 +119,74 @@ function validateName(val) {
  * @returns {Promise<string | null>}
  */
 function promptComponentName(defaultName) {
-  return new Promise((resolve) => {
-    let value = defaultName;
-    let error = "";
-    let resolved = false;
+  let value = defaultName;
+  let error = "";
 
-    const host = document.createElement("div");
-    const themeRoot = document.querySelector("sp-theme") || document.body;
-    themeRoot.appendChild(host);
-
-    function cleanup() {
-      if (resolved) return;
-      resolved = true;
-      host.remove();
-    }
-
+  return showDialog((done) => {
     function confirm() {
       const result = validateName(value);
       if (!result.valid) {
         error = result.error;
-        renderDialog();
+        rerender();
         return;
       }
-      cleanup();
-      resolve(value.trim().toLowerCase());
-    }
-
-    function cancel() {
-      cleanup();
-      resolve(null);
+      done(value.trim().toLowerCase());
     }
 
     function onInput(/** @type {Event} */ e) {
       value = /** @type {any} */ (e.target).value || "";
       const result = validateName(value);
       error = result.valid ? "" : result.error;
-      renderDialog();
+      rerender();
     }
 
     function onKeydown(/** @type {KeyboardEvent} */ e) {
       if (e.key === "Enter") confirm();
     }
 
-    function renderDialog() {
-      litRender(
-        html`
-          <sp-dialog-wrapper
-            open
-            underlay
-            headline="Convert to Component"
-            confirm-label="Convert"
-            cancel-label="Cancel"
-            size="s"
-            @confirm=${confirm}
-            @cancel=${cancel}
-            @close=${cancel}
-          >
-            <p>Enter a hyphenated tag name for the new component.</p>
-            <sp-textfield
-              placeholder="my-component"
-              value=${value}
-              ?negative=${!!error}
-              @input=${onInput}
-              @keydown=${onKeydown}
-            >
-              <sp-help-text slot="negative-help-text">${error}</sp-help-text>
-            </sp-textfield>
-          </sp-dialog-wrapper>
-        `,
-        host,
-      );
+    function rerender() {
+      const layer = document.getElementById("layer-dialog");
+      const slot = layer?.lastElementChild;
+      if (slot) litRender(buildTpl(), /** @type {HTMLElement} */ (slot));
     }
 
-    renderDialog();
+    function buildTpl() {
+      return html`
+        <sp-dialog-wrapper
+          open
+          underlay
+          headline="Convert to Component"
+          confirm-label="Convert"
+          cancel-label="Cancel"
+          size="s"
+          @confirm=${confirm}
+          @cancel=${() => done(null)}
+          @close=${() => done(null)}
+        >
+          <p>Enter a hyphenated tag name for the new component.</p>
+          <sp-textfield
+            placeholder="my-component"
+            value=${value}
+            ?negative=${!!error}
+            @input=${onInput}
+            @keydown=${onKeydown}
+          >
+            <sp-help-text slot="negative-help-text">${error}</sp-help-text>
+          </sp-textfield>
+        </sp-dialog-wrapper>
+      `;
+    }
 
-    // Focus the textfield after Spectrum renders
     requestAnimationFrame(() => {
-      const tf = /** @type {any} */ (host.querySelector("sp-textfield"));
+      const layer = document.getElementById("layer-dialog");
+      const tf = /** @type {any} */ (layer?.querySelector("sp-textfield"));
       if (tf) {
         tf.focus();
         const input = tf.shadowRoot?.querySelector("input");
         if (input) input.select();
       }
     });
+
+    return buildTpl();
   });
 }

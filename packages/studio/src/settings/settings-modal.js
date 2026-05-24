@@ -4,16 +4,17 @@
  * area.
  */
 
-import { html, render as litRender } from "lit-html";
+import { html } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { renderDefsEditor } from "./defs-editor.js";
 import { renderContentTypesEditor } from "./content-types-editor.js";
 import { renderCssVarsEditor } from "./css-vars-editor.js";
 import { renderHeadEditor } from "./head-editor.js";
 import { renderGeneralSettings } from "./general-settings.js";
+import { openModal } from "../ui/layers.js";
 
-/** @type {HTMLElement | null} */
-let _host = null;
+/** @type {ReturnType<typeof openModal> | null} */
+let _handle = null;
 
 /** @type {string} */
 let _activeSection = "general";
@@ -27,25 +28,18 @@ const sections = [
 ];
 
 export function openSettingsModal() {
-  if (_host) return;
-
-  _host = document.createElement("div");
-  _host.style.display = "contents";
-  const themeRoot = document.querySelector("sp-theme") || document.body;
-  themeRoot.appendChild(_host);
+  if (_handle) return;
   _activeSection = "general";
   renderModal();
 }
 
 export function closeSettingsModal() {
-  if (!_host) return;
-  _host.remove();
-  _host = null;
+  if (!_handle) return;
+  _handle.close();
+  _handle = null;
 }
 
 function renderModal() {
-  if (!_host) return;
-
   const onNavClick = (/** @type {string} */ key) => {
     _activeSection = key;
     renderModal();
@@ -89,12 +83,16 @@ function renderModal() {
     </div>
   `;
 
-  litRender(tpl, _host);
+  if (!_handle) {
+    _handle = openModal(tpl);
+  } else {
+    _handle.update(tpl);
+  }
 }
 
 function renderActiveSection() {
-  if (!_host) return;
-  const container = _host.querySelector(".settings-modal-content");
+  if (!_handle) return;
+  const container = _handle.host.querySelector(".settings-modal-content");
   if (!container) return;
 
   switch (_activeSection) {

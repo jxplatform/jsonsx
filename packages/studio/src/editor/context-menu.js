@@ -1,5 +1,5 @@
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
-import { html, render as litRender } from "lit-html";
+import { html } from "lit-html";
 import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
 import { activeTab, workspace } from "../workspace/workspace.js";
 import {
@@ -13,6 +13,7 @@ import {
 import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
 import { componentRegistry } from "../files/components.js";
+import { renderPopover } from "../ui/layers.js";
 
 /**
  * @typedef {import("../state.js").StudioState} StudioState
@@ -85,19 +86,15 @@ export function pasteStyles() {
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
-const ctxMenu = document.createElement("sp-popover");
-ctxMenu.style.position = "fixed";
-ctxMenu.style.zIndex = "10000";
-/** Append inside sp-theme so the popover inherits Spectrum styles */
-(document.querySelector("sp-theme") || document.body).appendChild(ctxMenu);
-
-document.addEventListener("click", () => {
-  ctxMenu.removeAttribute("open");
-});
+/** @type {ReturnType<typeof renderPopover> | null} */
+let _ctxHandle = null;
 
 /** Dismiss the context menu if open. */
 export function dismissContextMenu() {
-  ctxMenu.removeAttribute("open");
+  if (_ctxHandle) {
+    _ctxHandle.dismiss();
+    _ctxHandle = null;
+  }
 }
 
 /**
@@ -107,7 +104,7 @@ export function dismissContextMenu() {
  */
 export function showContextMenu(e, path, opts = {}) {
   e.preventDefault();
-  ctxMenu.removeAttribute("open");
+  dismissContextMenu();
 
   const tab = activeTab.value;
   const node = getNodeAtPath(tab?.doc.document, path);
@@ -223,31 +220,43 @@ export function showContextMenu(e, path, opts = {}) {
     }
   }
 
-  litRender(
-    html`<sp-menu>
-      ${items.map((item) =>
-        item.label === "—"
-          ? html`<sp-menu-divider></sp-menu-divider>`
-          : html`<sp-menu-item
-              style=${item.danger ? "color: var(--danger)" : ""}
-              @click=${() => {
-                ctxMenu.removeAttribute("open");
-                item.action?.();
-              }}
-              >${item.label}</sp-menu-item
-            >`,
-      )}
-    </sp-menu>`,
-    ctxMenu,
-  );
-
-  // Position the menu
-  ctxMenu.setAttribute("open", "");
-  const menuRect = ctxMenu.getBoundingClientRect();
   let x = e.clientX,
     y = e.clientY;
-  if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-  if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
-  ctxMenu.style.left = `${x}px`;
-  ctxMenu.style.top = `${y}px`;
+
+  _ctxHandle = renderPopover(
+    html`<sp-popover open style="position:fixed;z-index:10000;left:${x}px;top:${y}px">
+      <sp-menu>
+        ${items.map((item) =>
+          item.label === "—"
+            ? html`<sp-menu-divider></sp-menu-divider>`
+            : html`<sp-menu-item
+                style=${item.danger ? "color: var(--danger)" : ""}
+                @click=${() => {
+                  dismissContextMenu();
+                  item.action?.();
+                }}
+                >${item.label}</sp-menu-item
+              >`,
+        )}
+      </sp-menu>
+    </sp-popover>`,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _ctxHandle = null;
+      },
+    },
+  );
+
+  requestAnimationFrame(() => {
+    const popover = /** @type {HTMLElement | null} */ (
+      _ctxHandle?.host.querySelector("sp-popover")
+    );
+    if (!popover) return;
+    const menuRect = popover.getBoundingClientRect();
+    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
+    popover.style.left = `${x}px`;
+    popover.style.top = `${y}px`;
+  });
 }

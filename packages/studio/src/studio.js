@@ -66,6 +66,7 @@ import { renderGitPanel } from "./panels/git-panel.js";
 // by Bun's bundler despite sideEffects declarations in Spectrum's package.json.
 import { components as _swc } from "./ui/spectrum.js"; // eslint-disable-line no-unused-vars
 import "./ui/panel-resize.js";
+import { initLayers } from "./ui/layers.js";
 import { initShortcuts } from "./editor/shortcuts.js";
 import { renderActivityBar, mount as mountActivityBar } from "./panels/activity-bar.js";
 import * as toolbarPanel from "./panels/toolbar.js";
@@ -87,14 +88,6 @@ import { addRecentProject } from "./recent-projects.js";
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
 // into their own modules, they will migrate to ctx in store.js.
-
-/** Creates a display:contents container appended to sp-theme or body, for floating popovers/menus. */
-function createFloatingContainer() {
-  const el = document.createElement("div");
-  el.style.display = "contents";
-  (document.querySelector("sp-theme") || document.body).appendChild(el);
-  return el;
-}
 
 function getCanvasMode() {
   return activeTab.value?.session.ui.canvasMode ?? "design";
@@ -266,6 +259,7 @@ toolbarPanel.mount(toolbarEl, {
   safeRenderRightPanel: () => safeRenderRightPanel(),
 });
 
+initLayers();
 initQuickSearch();
 
 tabStrip.mount(/** @type {HTMLElement} */ (document.querySelector("#tab-strip")));
@@ -279,7 +273,6 @@ overlaysPanel.mount({
 initBlockActionBar({
   getCanvasMode,
   navigateToComponent,
-  createFloatingContainer,
 });
 
 initComponentInlineEdit({ findCanvasElement });
@@ -490,6 +483,9 @@ if (_openParam) {
           });
 
           if (isMd && activeTab.value) activeTab.value.doc.mode = "content";
+          if (fileRelPath === "project.json" && activeTab.value) {
+            activeTab.value.session.ui.canvasMode = "stylebook";
+          }
           view.leftTab = "files";
 
           render();

@@ -11,13 +11,10 @@ import { ifDefined } from "lit-html/directives/if-defined.js";
 import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { getLayerSlot } from "../ui/layers.js";
 
 /** @type {any} */
 let _ctx = null;
-
-let zoomIndicatorHost = document.createElement("div");
-zoomIndicatorHost.style.display = "contents";
-document.body.appendChild(zoomIndicatorHost);
 
 /**
  * Initialize the canvas utils module.
@@ -206,7 +203,7 @@ export function fitToScreen() {
 
 /** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
 export function resetZoomIndicator() {
-  litRender(nothing, zoomIndicatorHost);
+  litRender(nothing, getLayerSlot("popover", "zoom-indicator"));
 }
 
 /**
@@ -215,9 +212,7 @@ export function resetZoomIndicator() {
  */
 export function renderZoomIndicator() {
   const zoom = _ctx.getZoom();
-  if (!zoomIndicatorHost.isConnected) {
-    document.body.appendChild(zoomIndicatorHost);
-  }
+  const host = getLayerSlot("popover", "zoom-indicator");
   litRender(
     html`
       <div class="zoom-indicator">
@@ -243,7 +238,7 @@ export function renderZoomIndicator() {
         </sp-action-button>
       </div>
     `,
-    zoomIndicatorHost,
+    host,
   );
   positionZoomIndicator();
 }

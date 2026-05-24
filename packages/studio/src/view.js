@@ -27,7 +27,6 @@ export const view = {
 
   // Floating UI containers
   blockActionBarEl: null,
-  linkPopoverHost: null,
 
   // Selection & drag
   selDragCleanup: null,

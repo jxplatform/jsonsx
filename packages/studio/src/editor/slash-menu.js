@@ -8,6 +8,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { getLayerSlot } from "../ui/layers.js";
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
@@ -31,9 +32,6 @@ const SLASH_COMMANDS = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const host = document.createElement("div");
-host.style.display = "contents";
-
 /** @type {{ onSelect: (cmd: any) => void; showFilter?: boolean } | null} */
 let callbacks = null;
 let activeIdx = 0;
@@ -44,6 +42,11 @@ let open = false;
 let _anchorEl = null;
 /** @type {DOMRect | null} */
 let _anchorRect = null;
+
+/** @returns {HTMLElement} */
+function getHost() {
+  return getLayerSlot("popover", "slash-menu");
+}
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -60,11 +63,6 @@ export function isSlashMenuOpen() {
  * @param {{ onSelect: (cmd: any) => void; showFilter?: boolean }} cbs
  */
 export function showSlashMenu(anchorEl, filter, cbs) {
-  // Lazily attach host to sp-theme
-  if (!host.parentElement) {
-    (document.querySelector("sp-theme") || document.body).appendChild(host);
-  }
-
   callbacks = cbs;
   _anchorEl = anchorEl;
   _anchorRect = anchorEl.getBoundingClientRect();
@@ -94,7 +92,9 @@ export function showSlashMenu(anchorEl, filter, cbs) {
 
   if (cbs.showFilter) {
     requestAnimationFrame(() => {
-      const input = /** @type {HTMLInputElement | null} */ (host.querySelector(".slash-filter"));
+      const input = /** @type {HTMLInputElement | null} */ (
+        getHost().querySelector(".slash-filter")
+      );
       if (input) input.focus();
     });
   }
@@ -109,7 +109,7 @@ export function dismissSlashMenu() {
   filteredItems = [];
   document.removeEventListener("keydown", onKeydown, true);
   document.removeEventListener("mousedown", onOutsideClick, true);
-  litRender(nothing, host);
+  litRender(nothing, getHost());
 }
 
 // ─── Internal ─────────────────────────────────────────────────────────────────
@@ -161,12 +161,13 @@ function render(anchorEl, showFilter) {
         </sp-menu>
       </sp-popover>
     `,
-    host,
+    getHost(),
   );
 }
 
 /** @param {MouseEvent} e */
 function onOutsideClick(e) {
+  const host = getHost();
   const popover = host.querySelector("sp-popover");
   if (popover && !popover.contains(/** @type {Node} */ (e.target))) {
     dismissSlashMenu();
@@ -196,7 +197,7 @@ function onFilterInput(e) {
 
   // Re-focus input after re-render
   requestAnimationFrame(() => {
-    const el = /** @type {HTMLInputElement | null} */ (host.querySelector(".slash-filter"));
+    const el = /** @type {HTMLInputElement | null} */ (getHost().querySelector(".slash-filter"));
     if (el && el !== document.activeElement) {
       el.focus();
       el.selectionStart = el.selectionEnd = el.value.length;
@@ -209,7 +210,7 @@ function onKeydown(e) {
   if (!open) return;
 
   const items = /** @type {NodeListOf<Element>} */ (
-    host.querySelectorAll("sp-menu-item:not([disabled])")
+    getHost().querySelectorAll("sp-menu-item:not([disabled])")
   );
 
   if (e.key === "ArrowDown") {

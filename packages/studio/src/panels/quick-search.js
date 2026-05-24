@@ -2,6 +2,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { getPlatform } from "../platform.js";
 import { openFileInTab } from "../files/files.js";
 import { getRecentFiles, trackRecentFile } from "../recent-projects.js";
+import { getLayerSlot } from "../ui/layers.js";
 
 let _open = false;
 let _query = "";
@@ -10,13 +11,13 @@ let _results = [];
 let _selectedIndex = 0;
 let _debounceTimer = 0;
 
-/** @type {HTMLElement | null} */
-let _container = null;
+/** @returns {HTMLElement} */
+function getContainer() {
+  return getLayerSlot("popover", "quick-search");
+}
 
 export function initQuickSearch() {
-  _container = document.createElement("div");
-  _container.style.display = "contents";
-  (document.querySelector("sp-theme") || document.body).appendChild(_container);
+  // No-op — container is now provided by the layer system
 }
 
 export function openQuickSearch() {
@@ -26,7 +27,7 @@ export function openQuickSearch() {
   _selectedIndex = 0;
   renderOverlay();
   requestAnimationFrame(() => {
-    const input = _container?.querySelector(".quick-search-input");
+    const input = getContainer().querySelector(".quick-search-input");
     if (input) /** @type {HTMLInputElement} */ (input).focus();
   });
 }
@@ -111,9 +112,9 @@ function dirPart(/** @type {string} */ path) {
 }
 
 function renderOverlay() {
-  if (!_container) return;
+  const container = getContainer();
   if (!_open) {
-    litRender(nothing, _container);
+    litRender(nothing, container);
     return;
   }
 
@@ -166,5 +167,5 @@ function renderOverlay() {
     </div>
   `;
 
-  litRender(tpl, _container);
+  litRender(tpl, container);
 }

@@ -1903,7 +1903,7 @@
       .browse-modal-content {
         flex: 1;
         min-height: 0;
-        overflow: auto;
+        overflow: hidden;
       }
 
       /* ─── Browse view ────────────────────────────── */
@@ -1992,18 +1992,19 @@
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
         gap: 12px;
         padding: 12px;
-        overflow-y: auto;
-        flex: 1;
         align-items: start;
       }
       .browse-grid .element-card {
         cursor: pointer;
         margin-bottom: 0;
+        overflow: hidden;
       }
       .browse-grid .element-card-preview {
         aspect-ratio: 4/3;
         max-height: none;
         min-height: unset;
+        display: block;
+        overflow: hidden;
       }
       .browse-grid-empty {
         padding: 24px;
@@ -2011,10 +2012,9 @@
         color: var(--fg-dim);
       }
       .browse-body {
-        display: flex;
-        flex-direction: column;
         flex: 1;
-        overflow: hidden;
+        overflow-y: auto;
+        min-height: 0;
       }
 
       /* ─── Settings Modal ─── */
@@ -2842,6 +2842,18 @@
         <div id="right-panel"></div>
         <div id="statusbar"></div>
       </div>
+      <div
+        id="layer-popover"
+        style="position: fixed; inset: 0; pointer-events: none; z-index: 1000"
+      ></div>
+      <div
+        id="layer-modal"
+        style="position: fixed; inset: 0; pointer-events: none; z-index: 2000"
+      ></div>
+      <div
+        id="layer-dialog"
+        style="position: fixed; inset: 0; pointer-events: none; z-index: 3000"
+      ></div>
     </sp-theme>
     <script type="module" src="./dist/studio.js"></script>
   </body>
