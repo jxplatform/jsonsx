@@ -7,11 +7,14 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
 import { yamlDefault } from "../settings/schema-field-ui.js";
 import { invalidateMediaCache } from "../ui/media-picker.js";
+import { statusMessage } from "../panels/statusbar.js";
 import { componentRegistry } from "../files/components.js";
+import { showDialog, renderPopover } from "../ui/layers.js";
 import { renderComponentPreview } from "../panels/stylebook-panel.js";
 import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime";
 import { loadMarkdown } from "../files/file-ops.js";
@@ -309,7 +312,239 @@ async function handleUpload(files, container, ctx) {
   renderBrowse(container, ctx);
 }
 
+// ─── Context menu ───────────────────────────────────────────────────────────
+
+/** @type {ReturnType<typeof renderPopover> | null} */
+let _browseCtxHandle = null;
+
+function dismissBrowseContextMenu() {
+  if (_browseCtxHandle) {
+    _browseCtxHandle.dismiss();
+    _browseCtxHandle = null;
+  }
+}
+
+/**
+ * @param {MouseEvent} e
+ * @param {{ name: string; path: string; ext: string }} file
+ * @param {HTMLElement} container
+ * @param {{ openFile: (path: string) => void }} ctx
+ */
+function showBrowseContextMenu(e, file, container, ctx) {
+  e.preventDefault();
+  e.stopPropagation();
+  dismissBrowseContextMenu();
+
+  /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
+  const items = [
+    { label: "Open", action: () => ctx.openFile(file.path) },
+    { label: "\u2014" },
+    {
+      label: "Rename\u2026",
+      action: () => browseRenameFile(file, container, ctx),
+    },
+    {
+      label: "Duplicate",
+      action: () => browseDuplicateFile(file, container, ctx),
+    },
+    { label: "\u2014" },
+    {
+      label: "Delete",
+      action: () => browseDeleteFile(file, container, ctx),
+      danger: true,
+    },
+  ];
+
+  let x = e.clientX,
+    y = e.clientY;
+
+  _browseCtxHandle = renderPopover(
+    html`<sp-popover open style="position:fixed;left:${x}px;top:${y}px">
+      <sp-menu>
+        ${items.map((item) =>
+          item.label === "\u2014"
+            ? html`<sp-menu-divider></sp-menu-divider>`
+            : html`<sp-menu-item
+                style=${item.danger ? "color: var(--danger)" : ""}
+                @click=${() => {
+                  dismissBrowseContextMenu();
+                  item.action?.();
+                }}
+                >${item.label}</sp-menu-item
+              >`,
+        )}
+      </sp-menu>
+    </sp-popover>`,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _browseCtxHandle = null;
+      },
+      layer: "dialog",
+    },
+  );
+
+  requestAnimationFrame(() => {
+    const popover = /** @type {HTMLElement | null} */ (
+      _browseCtxHandle?.host.querySelector("sp-popover")
+    );
+    if (!popover) return;
+    const menuRect = popover.getBoundingClientRect();
+    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
+    popover.style.left = `${x}px`;
+    popover.style.top = `${y}px`;
+  });
+}
+
+/**
+ * @param {{ name: string; path: string; ext: string }} file
+ * @param {HTMLElement} container
+ * @param {{ openFile: (path: string) => void }} ctx
+ */
+async function browseRenameFile(file, container, ctx) {
+  const newName = await showRenameDialog(file.name);
+  if (!newName || newName === file.name) return;
+  const filePath = file.path.replaceAll("\\", "/");
+  const parentDir = filePath.includes("/") ? filePath.substring(0, filePath.lastIndexOf("/")) : ".";
+  const newPath = parentDir === "." ? newName : `${parentDir}/${newName}`;
+  try {
+    const platform = getPlatform();
+    await platform.renameFile(file.path, newPath);
+    invalidateBrowseCache();
+    renderBrowse(container, ctx);
+    statusMessage(`Renamed to ${newName}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
+}
+
+/**
+ * @param {{ name: string; path: string; ext: string }} file
+ * @param {HTMLElement} container
+ * @param {{ openFile: (path: string) => void }} ctx
+ */
+async function browseDuplicateFile(file, container, ctx) {
+  const filePath = file.path.replaceAll("\\", "/");
+  const parentDir = filePath.includes("/") ? filePath.substring(0, filePath.lastIndexOf("/")) : ".";
+  const baseName = file.name.replace(/(\.[^.]+)$/, "");
+  const ext = file.ext || "";
+  const copyName = `${baseName}-copy${ext}`;
+  const copyPath = parentDir === "." ? copyName : `${parentDir}/${copyName}`;
+  try {
+    const platform = getPlatform();
+    const content = await platform.readFile(file.path);
+    await platform.writeFile(copyPath, content);
+    invalidateBrowseCache();
+    renderBrowse(container, ctx);
+    statusMessage(`Duplicated as ${copyName}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
+}
+
+/**
+ * @param {{ name: string; path: string; ext: string }} file
+ * @param {HTMLElement} container
+ * @param {{ openFile: (path: string) => void }} ctx
+ */
+async function browseDeleteFile(file, container, ctx) {
+  const confirmed = await showDeleteDialog(file.name);
+  if (!confirmed) return;
+  try {
+    const platform = getPlatform();
+    await platform.deleteFile(file.path);
+    invalidateBrowseCache();
+    renderBrowse(container, ctx);
+    statusMessage(`Deleted ${file.name}`);
+  } catch (/** @type {any} */ e) {
+    statusMessage(`Error: ${e.message}`);
+  }
+}
+
+// ─── Spectrum dialogs ───────────────────────────────────────────────────────
+
+/**
+ * @param {string} currentName
+ * @returns {Promise<string | null>}
+ */
+function showRenameDialog(currentName) {
+  let value = currentName;
+
+  return showDialog((done) => {
+    function confirm() {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      done(trimmed);
+    }
+
+    const tpl = html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline="Rename"
+        confirm-label="Rename"
+        cancel-label="Cancel"
+        size="s"
+        @confirm=${confirm}
+        @cancel=${() => done(null)}
+        @close=${() => done(null)}
+      >
+        <sp-textfield
+          style="width:100%"
+          value=${value}
+          @input=${(/** @type {Event} */ e) => {
+            value = /** @type {any} */ (e.target).value || "";
+          }}
+          @keydown=${(/** @type {KeyboardEvent} */ e) => {
+            if (e.key === "Enter") confirm();
+          }}
+        ></sp-textfield>
+      </sp-dialog-wrapper>
+    `;
+
+    requestAnimationFrame(() => {
+      const layer = document.getElementById("layer-dialog");
+      const tf = /** @type {any} */ (layer?.querySelector("sp-textfield"));
+      if (tf) {
+        tf.focus();
+        const input = tf.shadowRoot?.querySelector("input");
+        if (input) input.select();
+      }
+    });
+
+    return tpl;
+  });
+}
+
+/**
+ * @param {string} fileName
+ * @returns {Promise<boolean>}
+ */
+function showDeleteDialog(fileName) {
+  return showDialog(
+    (done) => html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline="Delete File"
+        confirm-label="Delete"
+        cancel-label="Cancel"
+        size="s"
+        @confirm=${() => done(true)}
+        @cancel=${() => done(false)}
+        @close=${() => done(false)}
+      >
+        <p>Are you sure you want to delete <strong>${fileName}</strong>? This cannot be undone.</p>
+      </sp-dialog-wrapper>
+    `,
+  );
+}
+
 // ─── Grid view helpers ──────────────────────────────────────────────────────
+
+/** @type {Map<string, HTMLElement>} */
+const _previewCache = new Map();
 
 /**
  * Render a live preview for a page or layout file (JSON or Markdown).
@@ -338,76 +573,74 @@ async function renderDocPreview(filePath) {
 }
 
 /**
- * After lit-html renders the grid, populate preview cards with live content.
+ * Load (or retrieve from cache) the preview for a card element.
  *
- * @param {HTMLElement} container
- * @param {{ name: string; path: string; type: string; category: string; ext: string }[]} files
+ * @param {Element} el — the .element-card-preview div
+ * @param {{ path: string; category: string }} file
  */
-async function populateCardPreviews(container, files) {
-  const cards = container.querySelectorAll(".element-card-preview[data-preview]");
-  for (const card of cards) {
-    const path = /** @type {HTMLElement} */ (card).dataset.preview;
-    if (!path) continue;
-    const file = files.find((f) => f.path === path);
-    if (!file) continue;
+async function loadPreview(el, file) {
+  // Already populated
+  if (el.firstElementChild) return;
+
+  /** @type {HTMLElement | undefined} */
+  let preview = _previewCache.get(file.path);
+  if (!preview) {
     try {
-      let el = null;
-      const comp = componentRegistry.find((/** @type {any} */ c) => c.path === path);
+      const comp = componentRegistry.find((/** @type {any} */ c) => c.path === file.path);
       if (comp) {
-        el = await renderComponentPreview(comp);
-      } else if (
-        file.category === "Pages" ||
-        file.category === "Layouts" ||
-        file.category === "Content"
-      ) {
-        el = await renderDocPreview(path);
+        preview = /** @type {HTMLElement | undefined} */ (await renderComponentPreview(comp));
+      } else {
+        preview = /** @type {HTMLElement | undefined} */ (await renderDocPreview(file.path)) ||
+        undefined;
       }
-      if (el) {
-        /** @type {HTMLElement} */ (card).innerHTML = "";
-        /** @type {HTMLElement} */ (card).appendChild(el);
-      }
+      if (preview) _previewCache.set(file.path, /** @type {HTMLElement} */ (preview));
     } catch {
-      // Preview failed — leave placeholder
+      return;
     }
   }
+  if (preview) el.appendChild(preview);
 }
 
 /**
- * Grid view — renders file cards with live previews.
+ * Render a single grid card.
  *
- * @param {{ name: string; path: string; type: string; category: string; ext: string }[]} files
+ * @param {{ name: string; path: string; type: string; category: string; ext: string }} file
+ * @param {HTMLElement} container
  * @param {{ openFile: (path: string) => void }} ctx
  */
-function gridView(files, ctx) {
-  if (files.length === 0) {
-    return html`<div class="browse-grid-empty">${loading ? "Loading..." : "No files found"}</div>`;
-  }
-  return html`
-    <div class="browse-grid">
-      ${files.map((f) => {
-        const needsPreview =
-          f.category === "Components" ||
-          f.category === "Pages" ||
-          f.category === "Layouts" ||
-          f.category === "Content";
-        const isImg = isImage(f.ext);
+function renderCard(file, container, ctx) {
+  const isImg = isImage(file.ext);
+  const needsPreview =
+    file.category === "Components" ||
+    file.category === "Pages" ||
+    file.category === "Layouts" ||
+    file.category === "Content";
 
-        return html`
-          <div class="element-card" @click=${() => ctx.openFile(f.path)}>
-            <div class="element-card-preview" data-preview=${needsPreview ? f.path : nothing}>
-              ${isImg
-                ? html`<img
-                    src="/${f.path}"
-                    style="max-width:100%;max-height:100%;object-fit:contain"
-                  />`
-                : needsPreview
-                  ? nothing
-                  : html`<sp-icon-document size="xl"></sp-icon-document>`}
-            </div>
-            <div class="element-card-label">${f.name}</div>
-          </div>
-        `;
-      })}
+  return html`
+    <div
+      class="element-card"
+      @click=${() => ctx.openFile(file.path)}
+      @contextmenu=${(/** @type {MouseEvent} */ e) =>
+        showBrowseContextMenu(e, file, container, ctx)}
+    >
+      <div
+        class="element-card-preview"
+        ${needsPreview
+          ? ref((/** @type {Element | undefined} */ el) => {
+              if (el) loadPreview(el, file);
+            })
+          : nothing}
+      >
+        ${isImg
+          ? html`<img
+              src="/${file.path}"
+              style="max-width:100%;max-height:100%;object-fit:contain"
+            />`
+          : needsPreview
+            ? nothing
+            : html`<sp-icon-document size="xl"></sp-icon-document>`}
+      </div>
+      <div class="element-card-label">${file.name}</div>
     </div>
   `;
 }
@@ -545,6 +778,8 @@ export async function renderBrowse(container, ctx) {
                   class="browse-row"
                   style=${isImage(f.ext) ? "cursor:default" : ""}
                   @click=${isImage(f.ext) ? nothing : () => ctx.openFile(f.path)}
+                  @contextmenu=${(/** @type {MouseEvent} */ e) =>
+                    showBrowseContextMenu(e, f, container, ctx)}
                 >
                   <sp-table-cell class="browse-name-cell"
                     >${isImage(f.ext)
@@ -561,74 +796,40 @@ export async function renderBrowse(container, ctx) {
     </sp-table>
   `;
 
-  const body =
-    viewMode === "grid" ? gridView(files, ctx) : html`<div class="browse-table">${table}</div>`;
+  const grid =
+    files.length === 0
+      ? html`<div class="browse-grid-empty">${loading ? "Loading..." : "No files found"}</div>`
+      : html`<div class="browse-grid">${files.map((f) => renderCard(f, container, ctx))}</div>`;
 
-  // Replace browse-body with a fresh element each render to avoid lit-html's
-  // ChildPart conflict (populateCardPreviews mutates the DOM post-render).
-  const oldBody = container.querySelector(".browse-body");
-  const browseView = container.querySelector(".browse-view");
-  if (oldBody) oldBody.remove();
-  let browseBody;
+  const body = viewMode === "grid" ? grid : html`<div class="browse-table">${table}</div>`;
 
-  if (!browseView) {
-    const shell = document.createElement("div");
-    shell.className = "browse-view";
-    shell.addEventListener("dragover", (/** @type {DragEvent} */ e) => {
-      e.preventDefault();
-      shell.classList.add("browse-drop-active");
-    });
-    shell.addEventListener("dragleave", () => {
-      shell.classList.remove("browse-drop-active");
-    });
-    shell.addEventListener("drop", (/** @type {DragEvent} */ e) => {
-      e.preventDefault();
-      shell.classList.remove("browse-drop-active");
-      const droppedFiles = e.dataTransfer?.files;
-      if (droppedFiles?.length) handleUpload(droppedFiles, container, ctx);
-    });
+  const tpl = html`
+    <div
+      class="browse-view"
+      @dragover=${(/** @type {DragEvent} */ e) => {
+        e.preventDefault();
+        /** @type {HTMLElement} */ (e.currentTarget).classList.add("browse-drop-active");
+      }}
+      @dragleave=${(/** @type {DragEvent} */ e) => {
+        /** @type {HTMLElement} */ (e.currentTarget).classList.remove("browse-drop-active");
+      }}
+      @drop=${(/** @type {DragEvent} */ e) => {
+        e.preventDefault();
+        /** @type {HTMLElement} */ (e.currentTarget).classList.remove("browse-drop-active");
+        const droppedFiles = e.dataTransfer?.files;
+        if (droppedFiles?.length) handleUpload(droppedFiles, container, ctx);
+      }}
+    >
+      <div class="browse-filter-bar">${filterBar}</div>
+      <div class="browse-body">${body}</div>
+    </div>
+  `;
 
-    const filterBarEl = document.createElement("div");
-    filterBarEl.className = "browse-filter-bar";
-    shell.appendChild(filterBarEl);
-    litRender(filterBar, filterBarEl);
-
-    browseBody = document.createElement("div");
-    browseBody.className = "browse-body";
-    shell.appendChild(browseBody);
-
-    container.replaceChildren(shell);
-  } else {
-    // Update filter bar button states without re-rendering overlay-trigger
-    const group = container.querySelector(".browse-filter-bar sp-action-group");
-    if (group) {
-      const buttons = group.querySelectorAll("sp-action-button");
-      buttons.forEach((btn, i) => {
-        const cat = CATEGORIES[i];
-        if (cat) btn.toggleAttribute("selected", activeCategory === cat.key);
-      });
-    }
-    // Update view switcher states
-    const switcher = container.querySelector(".browse-view-switcher");
-    if (switcher) {
-      const btns = switcher.querySelectorAll("sp-action-button");
-      btns[0]?.toggleAttribute("selected", viewMode === "grid");
-      btns[1]?.toggleAttribute("selected", viewMode === "table");
-    }
-
-    browseBody = document.createElement("div");
-    browseBody.className = "browse-body";
-    browseView.appendChild(browseBody);
-  }
-
-  litRender(body, browseBody);
-
-  if (viewMode === "grid") {
-    populateCardPreviews(container, files);
-  }
+  litRender(tpl, container);
 }
 
 /** Force a data reload on next render (e.g., after file creation/deletion). */
 export function invalidateBrowseCache() {
   fileCache = [];
+  _previewCache.clear();
 }
