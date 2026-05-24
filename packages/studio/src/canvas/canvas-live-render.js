@@ -32,6 +32,12 @@ let _ctx = null;
 /** Set of DOM elements that originated from the layout (not page content). */
 export const layoutElements = new WeakSet();
 
+/** Cache of element HREFs that failed to load — prevents infinite retry loops. */
+const _failedElements = new Set();
+
+/** @type {string | null} */
+let _failedElementsDocPath = null;
+
 /**
  * Walk the merged document tree to find the path prefix where page children were distributed into
  * the layout slot. Returns the path to the container whose children are the page content (first
@@ -103,6 +109,11 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   const tab = activeTab.value;
   const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode, document: tab?.doc.document };
   const canvasMode = _ctx.getCanvasMode();
+
+  if (S.documentPath !== _failedElementsDocPath) {
+    _failedElements.clear();
+    _failedElementsDocPath = S.documentPath ?? null;
+  }
 
   // Suppress server function resolution in non-preview modes to avoid
   // failed proxy calls and infinite reactive retries (also covers
@@ -230,9 +241,11 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
             console.warn("Studio: invalid element URL", { ref: entry.$ref, docBase }, urlErr);
             continue;
           }
+          if (_failedElements.has(href)) continue;
           try {
             await defineElement(href);
           } catch (/** @type {any} */ e) {
+            _failedElements.add(href);
             console.warn("Studio: failed to register element", entry.$ref, e);
           }
         }
