@@ -1,0 +1,40 @@
+{
+  "tagName": "stat-card",
+  "state": {
+    "value": "0",
+    "label": "Description"
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "gap": "0.5rem",
+    "padding": "2rem",
+    "borderRadius": "var(--radius-lg)",
+    "border": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-surface)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontSize": "clamp(2.5rem, 5vw, 4rem)",
+        "fontWeight": "700",
+        "letterSpacing": "-0.03em",
+        "lineHeight": "1",
+        "color": "var(--color-accent)"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-mono)",
+        "fontSize": "0.75rem",
+        "letterSpacing": "0.08em",
+        "textTransform": "uppercase",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

@@ -58,6 +58,42 @@
           "children": [
             {
               "tagName": "a",
+              "attributes": { "href": "/features" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "transition": "color 0.15s"
+              },
+              "children": ["Features"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/studio" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "transition": "color 0.15s"
+              },
+              "children": ["Studio"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/compare" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "transition": "color 0.15s"
+              },
+              "children": ["Compare"]
+            },
+            {
+              "tagName": "a",
               "attributes": { "href": "/docs/getting-started" },
               "style": {
                 "color": "var(--color-text-secondary)",
@@ -70,20 +106,8 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/docs/spec" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s"
-              },
-              "children": ["Spec"]
-            },
-            {
-              "tagName": "a",
               "attributes": {
-                "href": "https://github.com/jxsuite/jx",
+                "href": "https://github.com/nickshanks347/jx",
                 "target": "_blank",
                 "rel": "noopener noreferrer"
               },
