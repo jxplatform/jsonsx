@@ -6,6 +6,7 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
@@ -1027,8 +1028,8 @@ export function renderSchemaFieldsTemplate(
         let debounce;
         control = html`<sp-number-field
           size="s"
-          min=${ps.minimum !== undefined ? ps.minimum : nothing}
-          max=${ps.maximum !== undefined ? ps.maximum : nothing}
+          min=${ifDefined(ps.minimum)}
+          max=${ifDefined(ps.maximum)}
           step=${ps.type === "integer" ? "1" : nothing}
           .value=${currentValue !== undefined ? currentValue : nothing}
           placeholder=${ps.default !== undefined ? String(ps.default) : nothing}

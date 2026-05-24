@@ -5,6 +5,7 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
   flattenTree,
   getNodeAtPath,
@@ -159,7 +160,7 @@ export function renderLayersTemplate(ctx) {
               `
             : nothing}</span
         >
-        <span class=${badgeClass} title=${badgeTitle ?? nothing}>${badgeText}</span>
+        <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
         <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
           >${labelText}</span
         >
