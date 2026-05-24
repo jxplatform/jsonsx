@@ -5,9 +5,10 @@
  * file-ops.js.
  */
 
-import { html, render as litRender, nothing } from "lit-html";
+import { html, nothing } from "lit-html";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
+import { renderPopover } from "../ui/layers.js";
 import remarkDirective from "remark-directive";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd } from "../markdown/md-convert.js";
@@ -392,24 +393,14 @@ export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
-/** @type {HTMLElement | null} */
-let _fileCtxHost = null;
-
-function getFileCtxHost() {
-  if (!_fileCtxHost) {
-    _fileCtxHost = document.createElement("div");
-    _fileCtxHost.style.display = "contents";
-    (document.querySelector("sp-theme") || document.body).appendChild(_fileCtxHost);
-    document.addEventListener("click", dismissFileContextMenu);
-  }
-  return _fileCtxHost;
-}
+/** @type {ReturnType<typeof renderPopover> | null} */
+let _fileCtxHandle = null;
 
 function dismissFileContextMenu() {
-  const host = _fileCtxHost;
-  if (!host) return;
-  const popover = host.querySelector("sp-popover");
-  if (popover) popover.removeAttribute("open");
+  if (_fileCtxHandle) {
+    _fileCtxHandle.dismiss();
+    _fileCtxHandle = null;
+  }
 }
 
 function showFileContextMenu(
@@ -418,7 +409,7 @@ function showFileContextMenu(
   /** @type {{ openFileFn: (path: string) => void; renderLeftPanel: () => void }} */ ctx,
 ) {
   e.preventDefault();
-  const host = getFileCtxHost();
+  dismissFileContextMenu();
   const isDir = entry.type === "directory";
 
   /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
@@ -441,8 +432,11 @@ function showFileContextMenu(
     danger: true,
   });
 
-  litRender(
-    html`<sp-popover style="position:fixed;z-index:10000">
+  let x = e.clientX,
+    y = e.clientY;
+
+  _fileCtxHandle = renderPopover(
+    html`<sp-popover open style="position:fixed;z-index:10000;left:${x}px;top:${y}px">
       <sp-menu>
         ${items.map((item) =>
           item.label === "\u2014"
@@ -458,18 +452,25 @@ function showFileContextMenu(
         )}
       </sp-menu>
     </sp-popover>`,
-    host,
+    {
+      dismissOnOutsideClick: true,
+      onDismiss: () => {
+        _fileCtxHandle = null;
+      },
+    },
   );
 
-  const popover = /** @type {HTMLElement} */ (host.querySelector("sp-popover"));
-  popover.setAttribute("open", "");
-  const menuRect = popover.getBoundingClientRect();
-  let x = e.clientX,
-    y = e.clientY;
-  if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-  if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
-  popover.style.left = `${x}px`;
-  popover.style.top = `${y}px`;
+  requestAnimationFrame(() => {
+    const popover = /** @type {HTMLElement | null} */ (
+      _fileCtxHandle?.host.querySelector("sp-popover")
+    );
+    if (!popover) return;
+    const menuRect = popover.getBoundingClientRect();
+    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
+    popover.style.left = `${x}px`;
+    popover.style.top = `${y}px`;
+  });
 }
 
 // ─── File CRUD ────────────────────────────────────────────────────────────────
