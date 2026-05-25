@@ -1,5 +1,6 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import { live } from "lit-html/directives/live.js";
 import { getPlatform } from "../platform.js";
 import { openFileInTab } from "../files/files.js";
 import { getRecentFiles, trackRecentFile } from "../recent-projects.js";
@@ -130,7 +131,7 @@ function renderOverlay() {
           class="quick-search-input"
           type="text"
           placeholder="Search project files…"
-          .value=${_query}
+          .value=${live(_query)}
           @input=${onInput}
           @keydown=${onKeydown}
         />

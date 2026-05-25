@@ -7,6 +7,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
+import { live } from "lit-html/directives/live.js";
 
 import {
   updateSession,
@@ -84,7 +85,7 @@ export function renderStylebookMode(ctx) {
           class="field-input"
           style="flex:1;max-width:200px"
           placeholder="Filter…"
-          .value=${tab?.session.ui.stylebookFilter}
+          .value=${live(tab?.session.ui.stylebookFilter)}
           @input=${onFilterInput}
         />
         <button
