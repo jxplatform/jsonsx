@@ -341,7 +341,12 @@ export function renderCanvas() {
     const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     const editTpl = html`
-      <div class="content-edit-canvas">
+      <div
+        class="content-edit-canvas"
+        ${ref((el) => {
+          panel.scrollContainer = /** @type {HTMLElement | null} */ (el);
+        })}
+      >
         <div class="content-edit-column" style="max-width:${baseWidth}px">${panelTpl}</div>
       </div>
     `;

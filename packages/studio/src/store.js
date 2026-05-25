@@ -52,6 +52,7 @@ export const elToPath = new WeakMap();
  *   overlay: HTMLElement;
  *   overlayClk: HTMLElement;
  *   viewport: HTMLElement;
+ *   scrollContainer?: HTMLElement | null;
  *   dropLine: HTMLElement;
  *   element?: HTMLElement | null;
  *   _width?: number | null;

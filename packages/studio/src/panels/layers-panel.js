@@ -21,6 +21,7 @@ import { transactDoc, mutateMoveNode, mutateRemoveNode } from "../tabs/transact.
 import { view } from "../view.js";
 import { isInlineElement } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
+import { panToElement } from "../canvas/canvas-utils.js";
 
 /**
  * @param {{ navigateToComponent: any; rerender: () => void }} ctx
@@ -142,7 +143,10 @@ export function renderLayersTemplate(ctx) {
         data-dnd-depth=${isElement ? depth : nothing}
         data-dnd-void=${isElement && isVoidEl ? "" : nothing}
         data-dnd-expanded=${isElement && isExpandable && !collapsed.has(key) ? "" : nothing}
-        @click=${() => (activeTab.value.session.selection = path)}
+        @click=${() => {
+          activeTab.value.session.selection = path;
+          panToElement(path);
+        }}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>
               showContextMenu(e, path, {
