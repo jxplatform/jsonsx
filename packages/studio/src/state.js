@@ -180,6 +180,7 @@ export function nodeLabel(node) {
     const ref = node.items?.$ref || "items";
     return `Repeater → ${ref}`;
   }
+  if (node.$title) return node.$title;
   if (node.$id) return node.$id;
   const tag = node.tagName ?? "div";
   const suffix = node.$switch ? " ⇆" : "";

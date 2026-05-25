@@ -624,6 +624,8 @@ const JX_DOLLAR_KEYS = new Set([
   "$elements",
 ]);
 
+const JX_ANNOTATION_KEYS = new Set(["$title", "$description"]);
+
 /**
  * Convert a Jx JSON document back to Jx Markdown source string.
  *
@@ -766,6 +768,10 @@ function collapsePropsToAttrMap(propsObj) {
       // Strip $ prefix for Jx keywords
       if (JX_DOLLAR_KEYS.has(key)) {
         mdAttrKey = key.slice(1);
+      }
+      // Convert $title/$description to --title/--description
+      if (JX_ANNOTATION_KEYS.has(key)) {
+        mdAttrKey = `--${key.slice(1)}`;
       }
       // Strip : prefix for CSS pseudo-classes (inside style.* paths)
       if (key.startsWith(":") && CSS_PSEUDO_NAMES.has(key.slice(1))) {

@@ -1,28 +1,32 @@
 ---
-title: "Jx Suite — Design visually. Ship as static HTML."
+title: Jx Suite — Design visually. Ship as static HTML.
 $head:
   - tagName: meta
     attributes:
       name: description
-      content: "An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default."
+      content: An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default.
   - tagName: meta
     attributes:
       property: "og:title"
-      content: "Jx Suite — Design visually. Ship as static HTML."
+      content: Jx Suite — Design visually. Ship as static HTML.
   - tagName: meta
     attributes:
       property: "og:description"
-      content: "An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default."
+      content: An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default.
   - tagName: meta
     attributes:
       property: "og:type"
       content: website
 $elements:
-  - "$ref": "../components/cta-button.json"
-  - "$ref": "../components/feature-card.json"
-  - "$ref": "../components/step-card.json"
-  - "$ref": "../components/check-item.json"
-  - "$ref": "../components/code-panel.json"
+  - $ref: ../components/cta-button.json
+
+  - $ref: ../components/feature-card.json
+
+  - $ref: ../components/step-card.json
+
+  - $ref: ../components/check-item.json
+
+  - $ref: ../components/code-panel.json
 ---
 
 ::::::hero-section{style.padding="clamp(4rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent)"}
@@ -58,7 +62,7 @@ bun create jx-suite my-site
 :::::
 ::::::
 
-:::::::product-showcase{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::::product-showcase{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" --title="showcase"}
 ::::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 :::::div{style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="clamp(2rem, 4vw, 4rem)" style.alignItems="center" style.--md.gridTemplateColumns="1fr"}
 ::::div

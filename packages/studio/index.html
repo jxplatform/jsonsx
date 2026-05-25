@@ -535,6 +535,10 @@
         padding: 0 4px;
         opacity: 0.7;
         user-select: none;
+        display: inline-flex;
+        align-items: center;
+        line-height: 1;
+        transform: translateY(1px);
       }
       .block-action-bar .bar-drag-handle:hover {
         opacity: 1;
@@ -736,7 +740,7 @@
       .layer-row:hover .layer-actions {
         display: flex;
       }
-      .layer-row:hover .layer-label {
+      .layer-row:has(.layer-title-input) .layer-actions {
         display: none;
       }
       .layer-drag-handle {
@@ -765,7 +769,20 @@
       .layer-label {
         overflow: hidden;
         text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 24px;
         flex: 1;
+      }
+      .layer-title-input {
+        width: 100%;
+        background: var(--bg-alt, #1e1e1e);
+        color: inherit;
+        border: 1px solid var(--accent, #0078d4);
+        border-radius: 2px;
+        font: inherit;
+        font-size: inherit;
+        padding: 0 2px;
+        outline: none;
       }
       .layer-dot {
         font-size: 9px;

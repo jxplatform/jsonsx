@@ -353,6 +353,8 @@ export const RESERVED_KEYS = new Set([
   "$ref",
   "$props",
   "$elements",
+  "$title",
+  "$description",
   "$switch",
   "$prototype",
   "$src",

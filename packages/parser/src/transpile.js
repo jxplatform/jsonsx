@@ -29,13 +29,21 @@ export { htmlToJx };
 const JX_DOLLAR_KEYS = new Set(["prototype", "ref", "component", "props", "switch", "elements"]);
 
 /**
- * Re-add `$` prefix to known Jx reserved keywords.
+ * Annotation keys written as `--key` in markdown directives, mapped to `$key` in JX JSON. These use
+ * `--` prefix to avoid collision with HTML attributes like `title`.
+ */
+const JX_ANNOTATION_KEYS = new Set(["title", "description"]);
+
+/**
+ * Re-add `$` prefix to known Jx reserved keywords and annotation keys.
  *
  * @param {string} key
  * @returns {string}
  */
 export function jxKey(key) {
-  return JX_DOLLAR_KEYS.has(key) ? `$${key}` : key;
+  if (JX_DOLLAR_KEYS.has(key)) return `$${key}`;
+  if (key.startsWith("--") && JX_ANNOTATION_KEYS.has(key.slice(2))) return `$${key.slice(2)}`;
+  return key;
 }
 
 /**
@@ -47,6 +55,9 @@ export function jxKey(key) {
 export function mdKey(key) {
   if (key.startsWith("$") && JX_DOLLAR_KEYS.has(key.slice(1))) {
     return key.slice(1);
+  }
+  if (key.startsWith("$") && JX_ANNOTATION_KEYS.has(key.slice(1))) {
+    return `--${key.slice(1)}`;
   }
   return key;
 }

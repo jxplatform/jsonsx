@@ -17,11 +17,74 @@ import {
   VOID_ELEMENTS,
 } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
-import { transactDoc, mutateMoveNode, mutateRemoveNode } from "../tabs/transact.js";
+import {
+  transactDoc,
+  mutateMoveNode,
+  mutateRemoveNode,
+  mutateUpdateProperty,
+} from "../tabs/transact.js";
 import { view } from "../view.js";
 import { isInlineElement } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
 import { panToElement } from "../canvas/canvas-utils.js";
+
+/**
+ * Start inline title editing on a layer row.
+ *
+ * @param {any[]} path
+ * @param {() => void} rerender
+ */
+export function startLayerTitleEdit(path, rerender) {
+  const key = pathKey(path);
+  const row = document.querySelector(`.layer-row[data-path="${key}"]`);
+  if (!row) return;
+  const label = /** @type {HTMLElement | null} */ (row.querySelector(".layer-label"));
+  if (!label) return;
+
+  const tab = activeTab.value;
+  const node = getNodeAtPath(tab?.doc.document, path);
+  if (!node) return;
+
+  label.style.display = "none";
+  const input = document.createElement("input");
+  input.className = "layer-title-input";
+  input.value = node.$title || "";
+  input.placeholder = nodeLabel({ ...node, $title: undefined });
+  label.after(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const cleanup = () => {
+    input.remove();
+    label.style.display = "";
+  };
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    cleanup();
+    const val = input.value.trim();
+    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$title", val || undefined));
+    rerender();
+  };
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    cleanup();
+    rerender();
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (/** @type {KeyboardEvent} */ e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancel();
+    }
+  });
+}
 
 /**
  * @param {{ navigateToComponent: any; rerender: () => void }} ctx
@@ -155,10 +218,17 @@ export function renderLayersTemplate(ctx) {
           activeTab.value.session.selection = path;
           panToElement(path);
         }}
+        @dblclick=${isElement
+          ? (/** @type {any} */ e) => {
+              e.stopPropagation();
+              startLayerTitleEdit(path, ctx.rerender);
+            }
+          : nothing}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>
               showContextMenu(e, path, {
                 onEditComponent: ctx.navigateToComponent,
+                rerender: ctx.rerender,
               })
           : nothing}
       >
