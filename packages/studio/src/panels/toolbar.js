@@ -4,7 +4,6 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { classMap } from "lit-html/directives/class-map.js";
 import { updateSession, updateUi } from "../store.js";
 import { undo as tabUndo, redo as tabRedo } from "../tabs/transact.js";
 import { effect, effectScope } from "../reactivity.js";
@@ -119,48 +118,27 @@ function toolbarTemplate() {
   });
   const canvasMode = _ctx.getCanvasMode();
   const hasStack = S.documentStack && S.documentStack.length > 0;
-  const hasFunc = !!S.ui.editingFunction;
 
-  const breadcrumbTpl =
-    hasStack || hasFunc
-      ? html`
-          <div class="breadcrumb">
-            <sp-action-button
-              size="s"
-              title=${hasFunc ? "Close function editor" : "Return to parent document"}
-              @click=${hasFunc ? _ctx.closeFunctionEditor : _ctx.navigateBack}
-            >
-              ${toolbarIconMap["sp-icon-back"]}Back
-            </sp-action-button>
-            ${hasStack
-              ? S.documentStack.map(
-                  (/** @type {any} */ frame) => html`
-                    <span class="breadcrumb-item"
-                      >${frame.documentPath?.split("/").pop() || "untitled"}</span
-                    >
-                    <span class="breadcrumb-sep"> › </span>
-                  `,
-                )
-              : nothing}
-            <span
-              class=${classMap({ "breadcrumb-item": true, clickable: hasFunc, current: !hasFunc })}
-              @click=${hasFunc ? _ctx.closeFunctionEditor : nothing}
-            >
-              ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}
-            </span>
-            ${hasFunc
-              ? html`
-                  <span class="breadcrumb-sep"> › </span>
-                  <span class="breadcrumb-item current"
-                    >${S.ui.editingFunction.type === "def"
-                      ? `ƒ ${S.ui.editingFunction.defName}`
-                      : `ƒ ${S.ui.editingFunction.eventKey}`}</span
-                  >
-                `
-              : nothing}
-          </div>
-        `
-      : nothing;
+  const breadcrumbTpl = hasStack
+    ? html`
+        <div class="breadcrumb">
+          <sp-action-button size="s" title="Return to parent document" @click=${_ctx.navigateBack}>
+            ${toolbarIconMap["sp-icon-back"]}Back
+          </sp-action-button>
+          ${S.documentStack.map(
+            (/** @type {any} */ frame) => html`
+              <span class="breadcrumb-item"
+                >${frame.documentPath?.split("/").pop() || "untitled"}</span
+              >
+              <span class="breadcrumb-sep"> › </span>
+            `,
+          )}
+          <span class="breadcrumb-item current">
+            ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}
+          </span>
+        </div>
+      `
+    : nothing;
 
   const { featureQueries } = _ctx.parseMediaEntries(getEffectiveMedia(S.document.$media));
   const togglesTpl =

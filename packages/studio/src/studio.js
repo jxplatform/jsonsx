@@ -304,6 +304,7 @@ initCanvasRender({
   setCanvasMode,
   openFileFromTree,
   exportFile,
+  closeFunctionEditor: () => closeFunctionEditor(),
   get gitDiffState() {
     return gitDiffState;
   },

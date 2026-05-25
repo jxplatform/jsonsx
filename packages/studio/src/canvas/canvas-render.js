@@ -58,6 +58,7 @@ let _prevStylebookCustomizedOnly = false;
  *   setCanvasMode: (mode: string) => void;
  *   openFileFromTree: (path: string) => void;
  *   exportFile: () => void;
+ *   closeFunctionEditor: () => void;
  *   gitDiffState: any;
  *   setGitDiffState: (state: any) => void;
  * }} ctx
@@ -91,7 +92,7 @@ export function renderCanvas() {
 
   // Function editor mode: editing a function body in Monaco (JS)
   if (S.ui.editingFunction) {
-    renderFunctionEditor();
+    renderFunctionEditor(_ctx.closeFunctionEditor);
     return;
   }
 
