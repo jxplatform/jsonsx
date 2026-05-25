@@ -372,7 +372,7 @@ export function renderBlockActionBar() {
         <span class="bar-tag">${node.$id || (node.tagName ?? "div")}</span>
 
         ${selection.length >= 2
-          ? html`<span class="bar-drag-handle" title="Drag to reorder">⡇</span>`
+          ? html`<span class="bar-drag-handle" title="Drag to reorder">⠿</span>`
           : nothing}
         ${selection.length >= 2 ? renderMoveArrows() : nothing}
         ${selection.length >= 2 && node.tagName
