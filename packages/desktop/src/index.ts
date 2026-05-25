@@ -1,4 +1,4 @@
-import { BrowserView, BrowserWindow } from "electrobun/bun";
+import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import type { StudioRPC } from "./rpc-schema";
 import {
@@ -54,6 +54,11 @@ setProjectRoot(projectRoot);
 await initUtils();
 setFileDialog(openFileDialog);
 
+// ─── Window maximize state (workaround for frameless window fullscreen bug) ──
+
+let _maximized = false;
+let _restoreFrame = { x: 0, y: 0, width: 1400, height: 900 };
+
 // ─── Register RPC handlers ────────────────────────────────────────────────────
 
 const rpc = BrowserView.defineRPC<StudioRPC>({
@@ -99,8 +104,16 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
         win.minimize();
       },
       windowMaximize: () => {
-        if (win.isMaximized()) win.unmaximize();
-        else win.maximize();
+        if (_maximized) {
+          win.setFrame(_restoreFrame.x, _restoreFrame.y, _restoreFrame.width, _restoreFrame.height);
+          _maximized = false;
+        } else {
+          _restoreFrame = win.getFrame();
+          const display = Screen.getPrimaryDisplay();
+          const { x, y, width, height } = display.workArea;
+          win.setFrame(x, y, width, height);
+          _maximized = true;
+        }
       },
       windowClose: () => {
         win.close();
