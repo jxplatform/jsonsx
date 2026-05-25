@@ -232,7 +232,7 @@ function toolbarTemplate() {
             title="Maximize"
             @click=${() => windowControls.maximize()}
           >
-            <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+            <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
           </sp-action-button>
           <sp-action-button
             quiet
