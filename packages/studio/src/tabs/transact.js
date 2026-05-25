@@ -275,6 +275,80 @@ export function mutateUpdateMediaNestedStyle(tab, path, mediaName, selector, pro
 }
 
 /**
+ * Update a style property at a nested style path (e.g., ["table", "th"]). Creates intermediate
+ * objects as needed.
+ *
+ * @param {Tab} tab
+ * @param {JxPath} path
+ * @param {string[]} stylePath
+ * @param {string} prop
+ * @param {string | undefined} value
+ */
+export function mutateUpdateNestedStylePath(tab, path, stylePath, prop, value) {
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node.style) node.style = {};
+  let obj = node.style;
+  for (const seg of stylePath) {
+    if (!obj[seg] || typeof obj[seg] !== "object") obj[seg] = {};
+    obj = obj[seg];
+  }
+  if (value === undefined || value === "") {
+    delete obj[prop];
+    // Clean up empty parent objects
+    let cur = node.style;
+    for (let i = 0; i < stylePath.length; i++) {
+      const child = cur[stylePath[i]];
+      if (child && typeof child === "object" && Object.keys(child).length === 0) {
+        delete cur[stylePath[i]];
+        break;
+      }
+      cur = child;
+    }
+  } else {
+    obj[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) delete node.style;
+}
+
+/**
+ * Update a style property at a nested style path within a media query.
+ *
+ * @param {Tab} tab
+ * @param {JxPath} path
+ * @param {string} mediaName
+ * @param {string[]} stylePath
+ * @param {string} prop
+ * @param {string | undefined} value
+ */
+export function mutateUpdateMediaNestedStylePath(tab, path, mediaName, stylePath, prop, value) {
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node.style) node.style = {};
+  const key = `@${mediaName}`;
+  if (!node.style[key]) node.style[key] = {};
+  let obj = node.style[key];
+  for (const seg of stylePath) {
+    if (!obj[seg] || typeof obj[seg] !== "object") obj[seg] = {};
+    obj = obj[seg];
+  }
+  if (value === undefined || value === "") {
+    delete obj[prop];
+    let cur = node.style[key];
+    for (let i = 0; i < stylePath.length; i++) {
+      const child = cur[stylePath[i]];
+      if (child && typeof child === "object" && Object.keys(child).length === 0) {
+        delete cur[stylePath[i]];
+        break;
+      }
+      cur = child;
+    }
+    if (Object.keys(node.style[key]).length === 0) delete node.style[key];
+  } else {
+    obj[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) delete node.style;
+}
+
+/**
  * @param {Tab} tab
  * @param {JxPath} path
  * @param {Record<string, any> | undefined} style

@@ -116,7 +116,7 @@ When a site project is loaded (via `?open=`, `openProject()`, or `probeRootProje
 | Inherited from `project.json` | Effect in Studio                                                                                                   |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `$media` breakpoints          | Media tabs, responsive presets, and canvas panel widths reflect the site's breakpoints — not the individual file's |
-| `style` (`:root` variables)   | Global CSS custom properties and stylesheet rules are applied to the canvas, stylebook, and component previews     |
+| `style` (custom properties)   | Global CSS custom properties and stylesheet rules are applied to the canvas, stylebook, and component previews     |
 | Component definitions         | The Components panel shows only components defined in the current project's `components/` and `$elements`          |
 | `$head`                       | Global fonts, viewport, and other head entries are applied to canvas rendering                                     |
 | `state`                       | Site-wide state entries are available (read-only) in the state explorer                                            |

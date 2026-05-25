@@ -13,17 +13,20 @@ import {
   debouncedStyleCommit,
 } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
+import { selectStylebookTag } from "./stylebook-panel.js";
 import {
   transactDoc,
   mutateUpdateStyle,
   mutateUpdateMediaStyle,
   mutateUpdateNestedStyle,
   mutateUpdateMediaNestedStyle,
+  mutateUpdateNestedStylePath,
+  mutateUpdateMediaNestedStylePath,
 } from "../tabs/transact.js";
 import { inferInputType, propLabel } from "../utils/studio-utils.js";
 import { renderFieldRow } from "../ui/field-row.js";
 import { parseMediaEntries } from "../utils/canvas-media.js";
-import { getEffectiveMedia } from "../site-context.js";
+import { getEffectiveMedia, getEffectiveStyle } from "../site-context.js";
 import { computeInheritedStyle } from "../utils/inherited-style.js";
 import { mediaDisplayName } from "./shared.js";
 import {
@@ -38,6 +41,34 @@ import {
   compressBorderSide,
 } from "./style-utils.js";
 import { widgetForType } from "./style-inputs.js";
+
+/**
+ * Check if a selector is a stylebook tag path (e.g., "table" or "table th"). Tag paths don't start
+ * with selector prefixes (`:`, `.`, `&`, `[`, `@`).
+ *
+ * @param {string} selector
+ * @returns {boolean}
+ */
+function isTagPath(selector) {
+  return /^[a-z]/.test(selector);
+}
+
+/**
+ * Resolve a style object by traversing a nested tag path. e.g., "table th" → style["table"]["th"]
+ *
+ * @param {Record<string, any>} style
+ * @param {string} tagPath
+ * @returns {Record<string, any>}
+ */
+function resolveNestedTagStyle(style, tagPath) {
+  const parts = tagPath.split(" ");
+  let obj = style;
+  for (const part of parts) {
+    if (!obj || typeof obj !== "object") return {};
+    obj = obj[part];
+  }
+  return obj && typeof obj === "object" ? obj : {};
+}
 
 // ─── Row renderers ──────────────────────────────────────────────────────────
 
@@ -211,11 +242,12 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
  * @param {any} node
  * @param {any} activeMediaTab
  * @param {any} activeSelector
+ * @param {Record<string, any>} [effectiveStyle]
  */
-function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
+function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveStyle) {
   const tab = activeTab.value;
   const sel = /** @type {import("../state.js").JxPath} */ (tab.session.selection);
-  const style = node.style || {};
+  const style = effectiveStyle || node.style || {};
   const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
   const mediaTab = activeMediaTab;
@@ -356,7 +388,22 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
   let commitStyle;
   /** @type {(t: any, prop: any, val: any) => void} */
   let commitMutate;
-  if (activeSelector && mediaTab && mediaNames.length > 0) {
+  if (activeSelector && isTagPath(activeSelector) && mediaTab && mediaNames.length > 0) {
+    const mediaObj = style[`@${mediaTab}`] || {};
+    activeStyle = resolveNestedTagStyle(mediaObj, activeSelector);
+    const stylePath = activeSelector.split(" ");
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateMediaNestedStylePath(t, sel, mediaTab, stylePath, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+  } else if (activeSelector && isTagPath(activeSelector)) {
+    activeStyle = resolveNestedTagStyle(style, activeSelector);
+    const stylePath = activeSelector.split(" ");
+    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
+      mutateUpdateNestedStylePath(t, sel, stylePath, prop, val);
+    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
+      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+  } else if (activeSelector && mediaTab && mediaNames.length > 0) {
     activeStyle = (style[`@${mediaTab}`] || {})[activeSelector] || {};
     commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
       mutateUpdateMediaNestedStyle(t, sel, mediaTab, activeSelector, prop, val);
@@ -415,7 +462,19 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
 
   const otherProps = [];
   for (const prop of Object.keys(activeStyle)) {
-    if (!(/** @type {Record<string, any>} */ (cssMeta.$defs)[prop])) otherProps.push(prop);
+    if (!(/** @type {Record<string, any>} */ (cssMeta.$defs)[prop])) {
+      const val = activeStyle[prop];
+      if (val !== null && typeof val === "object") continue;
+      otherProps.push(prop);
+    }
+  }
+
+  /** @type {string[]} */
+  const nestedRules = [];
+  for (const [prop, val] of Object.entries(activeStyle)) {
+    if (val !== null && typeof val === "object" && !Array.isArray(val) && !prop.startsWith("@")) {
+      nestedRules.push(prop);
+    }
   }
 
   // ── Filter state ─────────────────────────────────────────────────────────
@@ -601,10 +660,62 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector) {
     </sp-accordion-item>
   `;
 
+  // ── Relative Styling section (nested rules) ───────────────────────────────
+  const nestedIsOpen = tab.session.ui.styleSections.nested ?? nestedRules.length > 0;
+  const nestedSectionT =
+    nestedRules.length > 0
+      ? html`
+          <sp-accordion-item
+            label="Relative Styling"
+            .open=${nestedIsOpen}
+            @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
+              activeTab.value.session.ui.styleSections = {
+                ...activeTab.value.session.ui.styleSections,
+                nested: e.target.open,
+              };
+            }}
+          >
+            <div style="display:flex;flex-direction:column;gap:4px;padding:4px 0">
+              ${nestedRules.map(
+                (rule) => html`
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <button
+                      style="flex:1;text-align:left;padding:6px 10px;background:var(--spectrum-gray-200, #1a1a1a);border:none;border-radius:4px;color:var(--spectrum-gray-900, #fafafa);font-size:12px;cursor:pointer"
+                      @click=${() => {
+                        const newSelector = activeSelector ? `${activeSelector} ${rule}` : rule;
+                        selectStylebookTag(newSelector, undefined, { panCanvas: true });
+                      }}
+                    >
+                      ${rule}
+                    </button>
+                    <sp-action-button size="xs" quiet @click=${() => commitStyle(rule, undefined)}>
+                      <sp-icon-delete slot="icon"></sp-icon-delete>
+                    </sp-action-button>
+                  </div>
+                `,
+              )}
+              <button
+                style="padding:6px 10px;background:none;border:1px dashed var(--spectrum-gray-400, #333);border-radius:4px;color:var(--spectrum-gray-700, #a1a1aa);font-size:12px;cursor:pointer"
+                @click=${() => {
+                  const name = prompt("Selector name (e.g. th, :hover, .active):");
+                  if (name && name.trim()) {
+                    commitStyle(name.trim(), {});
+                  }
+                }}
+              >
+                + Add
+              </button>
+            </div>
+          </sp-accordion-item>
+        `
+      : nothing;
+
   return html`
     <div class="style-sidebar">
       ${toolbarT} ${filterBarT}
-      <sp-accordion allow-multiple size="s"> ${sectionTemplates} ${customSectionT} </sp-accordion>
+      <sp-accordion allow-multiple size="s">
+        ${sectionTemplates} ${nestedSectionT} ${customSectionT}
+      </sp-accordion>
     </div>
   `;
 }
@@ -627,7 +738,12 @@ export function renderStylePanelTemplate(ctx) {
       <div class="stylebook-style-header">
         Styling: &lt;${tab.session.ui.stylebookSelection}&gt;
       </div>
-      ${styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector)}
+      ${styleSidebarTemplate(
+        node,
+        tab.session.ui.activeMedia,
+        tab.session.ui.activeSelector,
+        getEffectiveStyle(node.style),
+      )}
     `;
   }
   if (!tab.session.selection)

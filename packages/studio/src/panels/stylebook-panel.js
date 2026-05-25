@@ -24,9 +24,27 @@ import { componentRegistry } from "../files/components.js";
 import { getEffectiveStyle, getEffectiveMedia } from "../site-context.js";
 import { parseMediaEntries, activeBreakpointsForWidth } from "../utils/canvas-media.js";
 import { mediaDisplayName } from "./shared.js";
+import { panToCanvasEl } from "../canvas/canvas-utils.js";
 import stylebookMeta from "../../data/stylebook-meta.json";
 
 export { stylebookMeta };
+
+/**
+ * Resolve a nested tag path in a style object. e.g., "table th" → style["table"]["th"]
+ *
+ * @param {Record<string, any>} style
+ * @param {string} tagPath
+ * @returns {Record<string, any> | null}
+ */
+function _resolveNestedStyle(style, tagPath) {
+  const parts = tagPath.split(" ");
+  let obj = style;
+  for (const part of parts) {
+    if (!obj || typeof obj !== "object") return null;
+    obj = obj[part];
+  }
+  return obj && typeof obj === "object" ? /** @type {Record<string, any>} */ (obj) : null;
+}
 
 /** @type {any} */
 let _ctx = null;
@@ -218,9 +236,8 @@ export function refreshStylebookStyles() {
       // Reset to base style
       htmlEl.style.cssText = entry?.style || "";
 
-      // Apply root style for this tag
-      const selector = `& ${tag}`;
-      const tagStyle = rootStyle[selector];
+      // Apply root style for this tag (nested path)
+      const tagStyle = _resolveNestedStyle(rootStyle, tag);
       if (tagStyle) {
         for (const [prop, val] of Object.entries(tagStyle)) {
           if (typeof val === "string" || typeof val === "number") {
@@ -254,7 +271,7 @@ export function refreshStylebookStyles() {
           const mediaName = key.slice(1);
           if (mediaName === "--") continue;
           if (activeBreakpoints.has(mediaName)) {
-            const mediaTagStyle = /** @type {any} */ (val)[selector];
+            const mediaTagStyle = _resolveNestedStyle(/** @type {any} */ (val), tag);
             if (mediaTagStyle && typeof mediaTagStyle === "object") {
               for (const [prop, v] of Object.entries(mediaTagStyle)) {
                 if (typeof v === "string" || typeof v === "number") {
@@ -279,17 +296,22 @@ export function refreshStylebookStyles() {
  * @param {string} tag
  * @param {string | null} [media]
  */
-export function selectStylebookTag(tag, media) {
+export function selectStylebookTag(tag, media, { panCanvas = false } = {}) {
   updateSession({
     selection: [],
     ui: {
       stylebookSelection: tag,
       rightTab: "style",
-      activeSelector: `& ${tag}`,
+      activeSelector: tag,
       ...(media !== undefined ? { activeMedia: media } : {}),
     },
   });
   renderStylebookOverlays();
+
+  if (tag && panCanvas && canvasPanels.length > 0) {
+    const el = findStylebookEl(canvasPanels[0].canvas, tag);
+    if (el) panToCanvasEl(el);
+  }
 }
 
 /** Draw selection + hover overlays for stylebook elements */
@@ -367,9 +389,10 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
     }
   }
   if (entry.style) el.style.cssText = entry.style;
-  const compoundSelector =
-    parentTag && parentTag !== entry.tag ? `& ${parentTag} ${entry.tag}` : null;
-  const tagStyle = (compoundSelector && rootStyle[compoundSelector]) || rootStyle[`& ${entry.tag}`];
+  const compoundTag = parentTag && parentTag !== entry.tag ? `${parentTag} ${entry.tag}` : null;
+  const tagStyle =
+    (compoundTag && _resolveNestedStyle(rootStyle, compoundTag)) ||
+    _resolveNestedStyle(rootStyle, entry.tag);
   if (tagStyle) {
     for (const [prop, val] of Object.entries(tagStyle)) {
       if (typeof val === "string" || typeof val === "number") {
@@ -398,13 +421,13 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
   }
   // Check top-level @media keys for tag-specific overrides (media wraps selector)
   if (activeBreakpoints) {
-    const selector = compoundSelector || `& ${entry.tag}`;
+    const tagPath = compoundTag || entry.tag;
     for (const [key, val] of Object.entries(rootStyle)) {
       if (!key.startsWith("@") || typeof val !== "object") continue;
       const mediaName = key.slice(1);
       if (mediaName === "--") continue;
       if (activeBreakpoints.has(mediaName)) {
-        const mediaTagStyle = /** @type {any} */ (val)[selector];
+        const mediaTagStyle = _resolveNestedStyle(/** @type {any} */ (val), tagPath);
         if (mediaTagStyle && typeof mediaTagStyle === "object") {
           for (const [prop, v] of Object.entries(mediaTagStyle)) {
             if (typeof v === "string" || typeof v === "number") {
@@ -474,12 +497,12 @@ function _componentFallback(tagName) {
  * @param {any} tag
  */
 function hasTagStyle(rootStyle, tag) {
-  const s = rootStyle[`& ${tag}`];
+  const s = _resolveNestedStyle(rootStyle, tag);
   if (s && typeof s === "object" && Object.keys(s).length > 0) return true;
-  const selector = `& ${tag}`;
   for (const [key, val] of Object.entries(rootStyle)) {
     if (!key.startsWith("@") || typeof val !== "object") continue;
-    if (/** @type {any} */ (val)[selector]) return true;
+    const ms = _resolveNestedStyle(/** @type {any} */ (val), tag);
+    if (ms && typeof ms === "object" && Object.keys(ms).length > 0) return true;
   }
   return false;
 }

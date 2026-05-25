@@ -563,7 +563,7 @@ describe("applyStyle", () => {
     const uid = el.dataset.jx;
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
     expect(style).not.toBeNull();
-    expect(style.textContent).toContain(`[data-jx="${uid}"] :hover`);
+    expect(style.textContent).toContain(`[data-jx="${uid}"]:hover`);
     expect(style.textContent).toContain("color: blue");
   });
 
@@ -571,7 +571,7 @@ describe("applyStyle", () => {
     applyStyle(el, { ".child": { marginTop: "4px" } });
     const uid = el.dataset.jx;
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
-    expect(style.textContent).toContain(`[data-jx="${uid}"] .child`);
+    expect(style.textContent).toContain(`[data-jx="${uid}"].child`);
   });
 
   test("emits scoped <style> for &.compound selector", () => {
@@ -617,7 +617,7 @@ describe("applyStyle", () => {
     );
     expect(el.style.color).toBe("green");
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
-    expect(style.textContent).toContain("] :focus");
+    expect(style.textContent).toContain("]:focus");
     expect(style.textContent).toContain("@media (min-width: 640px)");
   });
 
@@ -634,7 +634,7 @@ describe("applyStyle", () => {
     expect(css).toContain("font-size: 2rem");
     // Nested selector within media
     expect(css).toMatch(
-      /@media \(min-width: 768px\) \{ \[data-jx="[^"]+"\] :hover \{ color: blue \} \}/,
+      /@media \(min-width: 768px\) \{ \[data-jx="[^"]+"\]:hover \{ color: blue \} \}/,
     );
   });
 

@@ -211,23 +211,19 @@ export function resetZoomIndicator() {
 }
 
 /**
- * Pan the canvas vertically so the element at `path` is centered in the viewport.
+ * Smoothly pan/scroll the canvas vertically to center the given DOM element.
  *
- * @param {(string | number)[]} path
+ * @param {HTMLElement} el
+ * @param {{ scrollContainer?: HTMLElement | null }} [panel]
  */
-export function panToElement(path) {
-  const panel = getActivePanel();
-  if (!panel?.canvas) return;
-  const el = findCanvasElement(path, panel.canvas);
-  if (!el) return;
-
+function _panToEl(el, panel) {
   const wrapRect = canvasWrap.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
   const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
   const vpCenterY = wrapRect.height / 2;
   const offsetY = vpCenterY - elCenterY;
 
-  if (panel.scrollContainer) {
+  if (panel?.scrollContainer) {
     panel.scrollContainer.scrollTo({
       top: panel.scrollContainer.scrollTop - offsetY,
       behavior: "smooth",
@@ -246,6 +242,29 @@ export function panToElement(path) {
     }
     requestAnimationFrame(step);
   }
+}
+
+/**
+ * Pan the canvas vertically so the element at `path` is centered in the viewport.
+ *
+ * @param {(string | number)[]} path
+ */
+export function panToElement(path) {
+  const panel = getActivePanel();
+  if (!panel?.canvas) return;
+  const el = findCanvasElement(path, panel.canvas);
+  if (!el) return;
+  _panToEl(el, panel);
+}
+
+/**
+ * Pan the canvas vertically to center a specific DOM element (e.g. stylebook elements).
+ *
+ * @param {HTMLElement} el
+ */
+export function panToCanvasEl(el) {
+  const panel = getActivePanel();
+  _panToEl(el, panel ?? undefined);
 }
 
 /**

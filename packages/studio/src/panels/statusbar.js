@@ -34,6 +34,7 @@ export function mountStatusbar() {
       void tab.doc.document;
       void tab.doc.mode;
       void tab.session.selection;
+      void tab.session.ui.stylebookSelection;
       renderStatusbar();
     });
   });
@@ -51,10 +52,13 @@ export function renderStatusbar() {
   const tab = activeTab.value;
   const parts = [];
   if (tab?.doc.mode === "content") parts.push("Content Mode");
-  if (tab?.session.selection) {
+  if (tab?.session.selection?.length) {
     const node = getNodeAtPath(tab.doc.document, tab.session.selection);
     parts.push(`Selected: ${nodeLabel(node)}`);
     parts.push(`Path: ${tab.session.selection.join(" > ") || "root"}`);
+  } else if (tab?.session.ui.stylebookSelection) {
+    const sel = tab.session.ui.stylebookSelection;
+    parts.push(`Style: ${sel.replace(/ /g, " > ")}`);
   }
   if (statusMsg) parts.push(statusMsg);
   statusbarEl.textContent = parts.join("  |  ") || "Jx Studio";

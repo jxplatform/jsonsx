@@ -15,32 +15,42 @@ function hasTagStyle(rootStyle, tag) {
 }
 
 /**
- * @param {{ selectStylebookTag: (tag: string) => void; stylebookMeta: any }} ctx
+ * @param {{
+ *   selectStylebookTag: (
+ *     tag: string,
+ *     media?: string | null,
+ *     opts?: { panCanvas?: boolean },
+ *   ) => void;
+ *   stylebookMeta: any;
+ * }} ctx
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderStylebookLayersTemplate(ctx) {
   const tab = activeTab.value;
   const rootStyle = tab?.doc.document?.style || {};
   const selectedTag = tab?.session.ui.stylebookSelection;
+  const selectedLeaf = selectedTag?.includes(" ") ? selectedTag.split(" ").pop() : selectedTag;
 
   if (tab?.session.ui.stylebookTab === "elements") {
     /**
      * @param {any} entry
      * @param {number} depth
+     * @param {string} parentPath
      * @returns {any}
      */
-    const renderEntryRow = (entry, depth = 0) => {
+    const renderEntryRow = (entry, depth = 0, parentPath = "") => {
       const tag = entry.tag;
+      const fullPath = parentPath ? `${parentPath} ${tag}` : tag;
       const uniqueChildren = entry.children
         ? [...new Map(entry.children.map((/** @type {any} */ c) => [c.tag, c])).values()]
         : [];
       return html`
         <div
-          class=${classMap({ "layer-row": true, selected: tag === selectedTag })}
+          class=${classMap({ "layer-row": true, selected: tag === selectedLeaf })}
           style="padding-left:${8 + depth * 16}px"
           @click=${(/** @type {any} */ e) => {
             e.stopPropagation();
-            ctx.selectStylebookTag(tag);
+            ctx.selectStylebookTag(fullPath, undefined, { panCanvas: true });
           }}
         >
           <span class="layer-tag">${tag}</span>
@@ -55,7 +65,9 @@ export function renderStylebookLayersTemplate(ctx) {
               ></span>`
             : nothing}
         </div>
-        ${uniqueChildren.map((/** @type {any} */ child) => renderEntryRow(child, depth + 1))}
+        ${uniqueChildren.map((/** @type {any} */ child) =>
+          renderEntryRow(child, depth + 1, fullPath),
+        )}
       `;
     };
 
@@ -70,7 +82,7 @@ export function renderStylebookLayersTemplate(ctx) {
       /** @param {any} comp */ (comp) => html`
         <div
           class=${classMap({ "layer-row": true, selected: comp.tagName === selectedTag })}
-          @click=${() => ctx.selectStylebookTag(comp.tagName)}
+          @click=${() => ctx.selectStylebookTag(comp.tagName, undefined, { panCanvas: true })}
         >
           <span class="layer-tag component-tag" style="background:var(--accent)">⬡</span>
           <span class="layer-label">${comp.tagName}</span>
