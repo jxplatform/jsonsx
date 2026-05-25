@@ -6,6 +6,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { abbreviateValue, kebabToLabel } from "../utils/studio-utils.js";
 import icons from "./icons.js";
 
@@ -37,7 +38,7 @@ export function renderButtonGroup(
   const extraSelected = hasExtra && extra.includes(value);
 
   return html`
-    <div class="button-group-combo ${hasExtra ? "has-overflow" : ""}">
+    <div class=${classMap({ "button-group-combo": true, "has-overflow": hasExtra })}>
       <sp-action-group size="s" compact>
         ${values.map(
           (/** @type {any} */ v) => html`
@@ -63,7 +64,7 @@ export function renderButtonGroup(
             <sp-picker-button
               size="s"
               id=${menuId}
-              class=${extraSelected ? "has-selection" : ""}
+              class=${classMap({ "has-selection": extraSelected })}
             ></sp-picker-button>
             <sp-overlay trigger="${menuId}@click" placement="bottom-end" type="auto">
               <sp-popover>

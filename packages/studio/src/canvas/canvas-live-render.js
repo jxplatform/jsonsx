@@ -7,6 +7,7 @@
 import { elToPath, stripEventHandlers, projectState } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { toRaw } from "../reactivity.js";
 import {
   renderNode as runtimeRenderNode,
   buildScope,
@@ -121,7 +122,9 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   setSkipServerFunctions(canvasMode !== "preview");
 
   let renderDoc =
-    canvasMode === "preview" ? structuredClone(doc) : prepareForEditMode(stripEventHandlers(doc));
+    canvasMode === "preview"
+      ? structuredClone(toRaw(doc))
+      : prepareForEditMode(stripEventHandlers(doc));
 
   // ─── Layout wrapping ────────────────────────────────────────────────────
   // For page documents, resolve the layout and wrap content in the layout shell.
@@ -145,7 +148,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
         if (gen !== view.renderGeneration) return null;
         activeLayoutPath = layoutPath.replace(/^\.\//, "");
         markLayoutNodes(layoutDoc);
-        const pageForSlots = canvasMode === "preview" ? structuredClone(doc) : renderDoc;
+        const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
         const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
         renderDoc =
           canvasMode === "preview" ? merged : prepareForEditMode(stripEventHandlers(merged));
@@ -226,9 +229,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
         if (typeof entry === "string") {
           try {
             const specifier =
-              entry.startsWith("/") || entry.startsWith(".")
-                ? entry
-                : `/${projectState?.projectRoot || ""}/node_modules/${entry}`.replace(/\/+/g, "/");
+              entry.startsWith("/") || entry.startsWith(".") ? entry : `/node_modules/${entry}`;
             await import(specifier);
           } catch (/** @type {any} */ e) {
             console.warn("Studio: failed to import package", entry, e);
@@ -308,7 +309,6 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
         if (!entry?.tagName) continue;
         const tag = entry.tagName.toLowerCase();
         const attrs = { ...entry.attributes };
-        const headRoot = projectState?.projectRoot || "";
         for (const key of ["href", "src"]) {
           if (
             attrs[key] &&
@@ -316,7 +316,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
             !attrs[key].startsWith(".") &&
             !attrs[key].startsWith("http")
           ) {
-            attrs[key] = `/${headRoot}/node_modules/${attrs[key]}`.replace(/\/+/g, "/");
+            attrs[key] = `/node_modules/${attrs[key]}`;
           }
         }
         const selector = `${tag}${attrs.href ? `[href="${attrs.href}"]` : ""}${attrs.src ? `[src="${attrs.src}"]` : ""}`;

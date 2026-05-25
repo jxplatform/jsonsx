@@ -5,6 +5,7 @@
 
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
+import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform.js";
 import { updateUi, renderOnly } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
@@ -268,7 +269,7 @@ export function renderGitPanel(S, ctx) {
                 <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
               </sp-action-button>
             </div>
-            ${stagedFiles.map(fileRowT)}
+            ${repeat(stagedFiles, (/** @type {any} */ f) => f.path, fileRowT)}
           </div>
         `
       : nothing}
@@ -291,7 +292,7 @@ export function renderGitPanel(S, ctx) {
                 <sp-icon-add slot="icon" size="xs"></sp-icon-add>
               </sp-action-button>
             </div>
-            ${unstagedFiles.map(fileRowT)}
+            ${repeat(unstagedFiles, (/** @type {any} */ f) => f.path, fileRowT)}
           </div>
         `
       : nothing}

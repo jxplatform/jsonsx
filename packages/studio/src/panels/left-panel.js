@@ -113,6 +113,11 @@ function _flush() {
   } finally {
     _rendering = false;
   }
+
+  if (view.leftTab === "layers") {
+    const sel = leftPanel.querySelector(".layer-row.selected");
+    if (sel) sel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
 }
 
 function _render() {
@@ -124,6 +129,7 @@ function _render() {
     document: aTab.doc.document,
     mode: aTab.doc.mode,
     selection: aTab.session.selection,
+    canvas: aTab.session.canvas,
   });
   const tab = view.leftTab;
 

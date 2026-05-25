@@ -4,6 +4,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { updateSession, updateUi } from "../store.js";
 import { undo as tabUndo, redo as tabRedo } from "../tabs/transact.js";
 import { effect, effectScope } from "../reactivity.js";
@@ -142,7 +143,7 @@ function toolbarTemplate() {
                 )
               : nothing}
             <span
-              class="breadcrumb-item${hasFunc ? " clickable" : " current"}"
+              class=${classMap({ "breadcrumb-item": true, clickable: hasFunc, current: !hasFunc })}
               @click=${hasFunc ? _ctx.closeFunctionEditor : nothing}
             >
               ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}

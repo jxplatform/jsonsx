@@ -5,6 +5,9 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
   transactDoc,
@@ -103,7 +106,8 @@ export function defHint(name, def) {
   if (def.$handler) return "handler (legacy)";
   if (def.$compute)
     return "=" + (def.$compute.length > 20 ? def.$compute.slice(0, 20) + "..." : def.$compute);
-  if (def.$prototype === "Request") return def.method + " " + (def.url || "").slice(0, 20);
+  if (def.$prototype === "Request")
+    return (def.method || "GET") + " " + (def.url || "").slice(0, 20);
   if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
     return def.key || "";
   if (def.$prototype === "IndexedDB") return def.database || "";
@@ -259,7 +263,7 @@ export function renderSignalsTemplate(S, ctx) {
             const isExpanded = expandedSignal === name;
             return html`
               <div
-                class="signal-row${isExpanded ? " expanded" : ""}"
+                class=${classMap({ "signal-row": true, expanded: isExpanded })}
                 @click=${() => {
                   expandedSignal = isExpanded ? null : name;
                   ctx.renderLeftPanel();
@@ -390,9 +394,13 @@ function renderSignalEditorTemplate(
       widget: html`
         <textarea
           class="field-input"
-          style="min-height:${opts.minHeight || "40px"};${opts.mono
-            ? "font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px;"
-            : ""}"
+          style=${styleMap({
+            minHeight: opts.minHeight || "40px",
+            ...(opts.mono && {
+              fontFamily: "'SF Mono','Fira Code','Consolas',monospace",
+              fontSize: "11px",
+            }),
+          })}
           .value=${value}
           @input=${(/** @type {any} */ e) => {
             clearTimeout(debounce);
@@ -1021,8 +1029,8 @@ export function renderSchemaFieldsTemplate(
         let debounce;
         control = html`<sp-number-field
           size="s"
-          min=${ps.minimum !== undefined ? ps.minimum : nothing}
-          max=${ps.maximum !== undefined ? ps.maximum : nothing}
+          min=${ifDefined(ps.minimum)}
+          max=${ifDefined(ps.maximum)}
           step=${ps.type === "integer" ? "1" : nothing}
           .value=${currentValue !== undefined ? currentValue : nothing}
           placeholder=${ps.default !== undefined ? String(ps.default) : nothing}
@@ -1062,7 +1070,11 @@ export function renderSchemaFieldsTemplate(
             <sp-textfield
               multiline
               size="s"
-              style="min-height:${hasValue ? "80px" : "40px"};font-family:monospace;font-size:11px"
+              style=${styleMap({
+                minHeight: hasValue ? "80px" : "40px",
+                fontFamily: "monospace",
+                fontSize: "11px",
+              })}
               .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
               placeholder=${ps.description ?? "JSON Schema defining the data shape\u2026"}
               @input=${(/** @type {any} */ e) => {

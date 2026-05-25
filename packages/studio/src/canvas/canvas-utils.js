@@ -5,6 +5,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
@@ -12,6 +13,7 @@ import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { getLayerSlot } from "../ui/layers.js";
+import { getActivePanel, findCanvasElement } from "./canvas-helpers.js";
 
 /** @type {any} */
 let _ctx = null;
@@ -47,6 +49,7 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
    *   overlay: HTMLElement | null;
    *   overlayClk: HTMLElement | null;
    *   viewport: HTMLElement | null;
+   *   scrollContainer: HTMLElement | null;
    *   dropLine: HTMLElement | null;
    *   _width: number | null;
    * }}
@@ -58,12 +61,13 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
     overlay: null,
     overlayClk: null,
     viewport: null,
+    scrollContainer: null,
     dropLine: null,
     _width: width || null,
   };
   const tpl = html`
     <div
-      class=${`canvas-panel${fullWidth ? " full-width" : ""}`}
+      class=${classMap({ "canvas-panel": true, "full-width": fullWidth })}
       data-media=${ifDefined(mediaName !== null ? mediaName : undefined)}
       ${ref((el) => {
         if (el) panel.element = /** @type {HTMLElement} */ (el);
@@ -204,6 +208,44 @@ export function fitToScreen() {
 /** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
 export function resetZoomIndicator() {
   litRender(nothing, getLayerSlot("popover", "zoom-indicator"));
+}
+
+/**
+ * Pan the canvas vertically so the element at `path` is centered in the viewport.
+ *
+ * @param {(string | number)[]} path
+ */
+export function panToElement(path) {
+  const panel = getActivePanel();
+  if (!panel?.canvas) return;
+  const el = findCanvasElement(path, panel.canvas);
+  if (!el) return;
+
+  const wrapRect = canvasWrap.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
+  const vpCenterY = wrapRect.height / 2;
+  const offsetY = vpCenterY - elCenterY;
+
+  if (panel.scrollContainer) {
+    panel.scrollContainer.scrollTo({
+      top: panel.scrollContainer.scrollTop - offsetY,
+      behavior: "smooth",
+    });
+  } else {
+    const startY = view.panY;
+    const targetY = startY + offsetY;
+    const start = performance.now();
+    const duration = 250;
+    function step(/** @type {number} */ now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = t * (2 - t);
+      view.panY = startY + (targetY - startY) * ease;
+      applyTransform();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
 }
 
 /**

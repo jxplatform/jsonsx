@@ -6,6 +6,8 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { repeat } from "lit-html/directives/repeat.js";
 import { effect, effectScope } from "../reactivity.js";
 import { workspace, activateTab, closeTab } from "../workspace/workspace.js";
 
@@ -55,38 +57,42 @@ function render() {
   litRender(
     html`
       <div class="tab-strip">
-        ${workspace.tabOrder.map((id) => {
-          const tab = workspace.tabs.get(id);
-          if (!tab) return nothing;
-          const isActive = id === workspace.activeTabId;
-          const isDirty = tab.doc.dirty;
-          const label = tabLabel(tab);
-          return html`
-            <div
-              class="tab-strip-tab ${isActive ? "active" : ""}"
-              @click=${() => activateTab(id)}
-              @auxclick=${(/** @type {MouseEvent} */ e) => {
-                if (e.button === 1) {
-                  e.preventDefault();
-                  requestClose(id);
-                }
-              }}
-              title=${tab.documentPath || "Untitled"}
-            >
-              <span class="tab-strip-label">${label}</span>
-              ${isDirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
-              <button
-                class="tab-strip-close"
-                @click=${(/** @type {Event} */ e) => {
-                  e.stopPropagation();
-                  requestClose(id);
+        ${repeat(
+          workspace.tabOrder,
+          (id) => id,
+          (id) => {
+            const tab = workspace.tabs.get(id);
+            if (!tab) return nothing;
+            const isActive = id === workspace.activeTabId;
+            const isDirty = tab.doc.dirty;
+            const label = tabLabel(tab);
+            return html`
+              <div
+                class=${classMap({ "tab-strip-tab": true, active: isActive })}
+                @click=${() => activateTab(id)}
+                @auxclick=${(/** @type {MouseEvent} */ e) => {
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    requestClose(id);
+                  }
                 }}
+                title=${tab.documentPath || "Untitled"}
               >
-                ×
-              </button>
-            </div>
-          `;
-        })}
+                <span class="tab-strip-label">${label}</span>
+                ${isDirty ? html`<span class="tab-strip-dirty">●</span>` : nothing}
+                <button
+                  class="tab-strip-close"
+                  @click=${(/** @type {Event} */ e) => {
+                    e.stopPropagation();
+                    requestClose(id);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            `;
+          },
+        )}
       </div>
     `,
     _host,

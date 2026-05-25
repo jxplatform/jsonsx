@@ -4,6 +4,8 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
   flattenTree,
   getNodeAtPath,
@@ -19,6 +21,7 @@ import { transactDoc, mutateMoveNode, mutateRemoveNode } from "../tabs/transact.
 import { view } from "../view.js";
 import { isInlineElement } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
+import { panToElement } from "../canvas/canvas-utils.js";
 
 /**
  * @param {{ navigateToComponent: any; rerender: () => void }} ctx
@@ -134,13 +137,16 @@ export function renderLayersTemplate(ctx) {
 
     layerRows.push(html`
       <div
-        class="layer-row${isSelected ? " selected" : ""}"
+        class=${classMap({ "layer-row": true, selected: isSelected })}
         data-path=${key}
         data-dnd-row=${isElement ? key : nothing}
         data-dnd-depth=${isElement ? depth : nothing}
         data-dnd-void=${isElement && isVoidEl ? "" : nothing}
         data-dnd-expanded=${isElement && isExpandable && !collapsed.has(key) ? "" : nothing}
-        @click=${() => (activeTab.value.session.selection = path)}
+        @click=${() => {
+          activeTab.value.session.selection = path;
+          panToElement(path);
+        }}
         @contextmenu=${isElement
           ? (/** @type {any} */ e) =>
               showContextMenu(e, path, {
@@ -158,7 +164,7 @@ export function renderLayersTemplate(ctx) {
               `
             : nothing}</span
         >
-        <span class=${badgeClass} title=${badgeTitle ?? nothing}>${badgeText}</span>
+        <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
         <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
           >${labelText}</span
         >

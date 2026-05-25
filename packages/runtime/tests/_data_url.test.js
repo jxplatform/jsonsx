@@ -21,7 +21,7 @@ describe("buildScope", () => {
       {},
       BASE,
     );
-    expect(typeof state.myFn).toBe("function");
+    expect(state.myFn).toBe(42);
   });
 });
 

@@ -1,6 +1,7 @@
 // ─── Data Explorer ──────────────────────────────────────────────────────────
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 
 /** Expanded data entries set — persists across renders. */
 const expandedDataKeys = new Set();
@@ -37,12 +38,9 @@ function dataTypeLabel(/** @type {any} */ value) {
 export function renderDataExplorerTemplate(state, liveScope, callbacks) {
   const { renderCanvas, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
 
-  if (!liveScope) {
-    return html`<div class="empty-state">No live data — render the document in preview mode</div>`;
-  }
-
   const defs = state || {};
   const entries = Object.entries(defs);
+  const scope = liveScope || {};
 
   return html`
     <div class="data-explorer-toolbar">
@@ -62,13 +60,13 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
     ${entries.length === 0
       ? html`<div class="empty-state">No state defined</div>`
       : entries.map(([name, def]) => {
-          const value = liveScope[name];
+          const value = scope[name];
           const unwrapped = unwrapSignal(value);
           const isExpanded = expandedDataKeys.has(name);
           return html`
             <div class="data-row">
               <div
-                class="data-row-header${isExpanded ? " expanded" : ""}"
+                class=${classMap({ "data-row-header": true, expanded: isExpanded })}
                 @click=${() => {
                   if (expandedDataKeys.has(name)) expandedDataKeys.delete(name);
                   else expandedDataKeys.add(name);
@@ -77,7 +75,7 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
               >
                 <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
                 <span class="data-name">${name}</span>
-                <span class="data-type${unwrapped === null ? " data-pending" : ""}"
+                <span class=${classMap({ "data-type": true, "data-pending": unwrapped === null })}
                   >${dataTypeLabel(value)}</span
                 >
               </div>

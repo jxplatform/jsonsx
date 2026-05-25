@@ -4,6 +4,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
 import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store.js";
@@ -258,7 +259,12 @@ function showLinkPopover(anchorBtn) {
       <sp-popover
         class="link-popover"
         open
-        style="position:fixed; left:${rect.left}px; top:${rect.bottom + 4}px; z-index:30"
+        style=${styleMap({
+          position: "fixed",
+          left: `${rect.left}px`,
+          top: `${rect.bottom + 4}px`,
+          zIndex: "30",
+        })}
       >
         <sp-textfield
           placeholder="https://..."
@@ -358,7 +364,7 @@ export function renderBlockActionBar() {
     html`
       <div
         class="block-action-bar"
-        style="left:${elRect.left}px; top:${topPos}px"
+        style=${styleMap({ left: `${elRect.left}px`, top: `${topPos}px` })}
         @mousedown=${onBarMousedown}
       >
         ${selection.length >= 2 ? renderParentSelector() : nothing}

@@ -341,7 +341,12 @@ export function renderCanvas() {
     const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
     const editTpl = html`
-      <div class="content-edit-canvas">
+      <div
+        class="content-edit-canvas"
+        ${ref((el) => {
+          panel.scrollContainer = /** @type {HTMLElement | null} */ (el);
+        })}
+      >
         <div class="content-edit-column" style="max-width:${baseWidth}px">${panelTpl}</div>
       </div>
     `;
@@ -483,56 +488,76 @@ function renderCanvasIntoPanel(
   const tab = activeTab.value;
   const docToRender = docOverride || tab?.doc.document;
 
-  renderCanvasLive(gen, docToRender, panel.canvas).then((/** @type {any} */ scope) => {
-    // Skip post-render setup if a newer render has started
-    if (gen !== view.renderGeneration) return;
-    if (scope) {
-      updateCanvas({ status: "ready", scope, error: null });
-      applyCanvasMediaOverrides(panel.canvas, activeBreakpoints);
-      statusMessage("Runtime render OK", 1500);
+  renderCanvasLive(gen, docToRender, panel.canvas)
+    .then((/** @type {any} */ scope) => {
+      // Skip post-render setup if a newer render has started
+      if (gen !== view.renderGeneration) return;
+      if (scope) {
+        updateCanvas({ status: "ready", scope, error: null });
+        applyCanvasMediaOverrides(panel.canvas, activeBreakpoints);
+        statusMessage("Runtime render OK", 1500);
 
-      // Apply diff highlighting if in git-diff mode
-      if (gitDiffState && docOverride) {
-        // Determine which document is original and which is current
-        const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
-        const _tab = activeTab.value;
-        const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || _tab?.doc.document;
-        const currDoc = isOriginal ? gitDiffState.currentDoc || _tab?.doc.document : docOverride;
+        // Apply diff highlighting if in git-diff mode
+        if (gitDiffState && docOverride) {
+          // Determine which document is original and which is current
+          const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
+          const _tab = activeTab.value;
+          const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || _tab?.doc.document;
+          const currDoc = isOriginal ? gitDiffState.currentDoc || _tab?.doc.document : docOverride;
 
-        const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
+          const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
 
-        // Can't iterate WeakMap, so apply styling by walking the canvas
-        const { elToPath } = scope;
-        if (elToPath instanceof WeakMap) {
-          applyDiffHighlightToCanvas(panel.canvas, diffMap);
+          // Can't iterate WeakMap, so apply styling by walking the canvas
+          const { elToPath } = scope;
+          if (elToPath instanceof WeakMap) {
+            applyDiffHighlightToCanvas(panel.canvas, diffMap);
+          }
+        }
+      } else {
+        // Fallback to structural preview
+        updateCanvas({ status: "ready", scope: null, error: null });
+        panel.canvas.innerHTML = "";
+        renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
+      }
+      try {
+        registerPanelDnD(panel);
+      } catch (/** @type {any} */ e) {
+        console.warn("registerPanelDnD failed:", e.message);
+      }
+      registerPanelEvents(panel);
+      renderOverlays();
+      updateForcedPseudoPreview();
+
+      // Process pending inline edit when canvas becomes ready
+      const currentTab = activeTab.value;
+      if (currentTab?.session.ui?.pendingInlineEdit) {
+        const { path, mediaName: mn } = /** @type {{ path: any; mediaName: string }} */ (
+          currentTab.session.ui.pendingInlineEdit
+        );
+        currentTab.session.ui.pendingInlineEdit = null;
+        const targetPanel =
+          canvasPanels.find((/** @type {any} */ p) => p.mediaName === mn) || canvasPanels[0];
+        if (targetPanel) {
+          const el = findCanvasElement(path, targetPanel.canvas);
+          if (el) enterComponentInlineEdit(el, path);
         }
       }
-    } else {
-      // Fallback to structural preview
+    })
+    .catch((/** @type {any} */ err) => {
+      if (gen !== view.renderGeneration) return;
+      console.warn("renderCanvasLive rejected:", err?.message || err);
       updateCanvas({ status: "ready", scope: null, error: null });
       panel.canvas.innerHTML = "";
       renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
-    }
-    registerPanelDnD(panel);
-    registerPanelEvents(panel);
-    renderOverlays();
-    updateForcedPseudoPreview();
-
-    // Process pending inline edit when canvas becomes ready
-    const currentTab = activeTab.value;
-    if (currentTab?.session.ui?.pendingInlineEdit) {
-      const { path, mediaName: mn } = /** @type {{ path: any; mediaName: string }} */ (
-        currentTab.session.ui.pendingInlineEdit
-      );
-      currentTab.session.ui.pendingInlineEdit = null;
-      const targetPanel =
-        canvasPanels.find((/** @type {any} */ p) => p.mediaName === mn) || canvasPanels[0];
-      if (targetPanel) {
-        const el = findCanvasElement(path, targetPanel.canvas);
-        if (el) enterComponentInlineEdit(el, path);
+      try {
+        registerPanelDnD(panel);
+      } catch (/** @type {any} */ e) {
+        console.warn("registerPanelDnD failed:", e.message);
       }
-    }
-  });
+      registerPanelEvents(panel);
+      renderOverlays();
+      updateForcedPseudoPreview();
+    });
 }
 
 /**

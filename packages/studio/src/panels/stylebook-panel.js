@@ -5,6 +5,9 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
+import { styleMap } from "lit-html/directives/style-map.js";
+import { live } from "lit-html/directives/live.js";
 
 import {
   updateSession,
@@ -82,11 +85,11 @@ export function renderStylebookMode(ctx) {
           class="field-input"
           style="flex:1;max-width:200px"
           placeholder="Filter…"
-          .value=${tab?.session.ui.stylebookFilter}
+          .value=${live(tab?.session.ui.stylebookFilter)}
           @input=${onFilterInput}
         />
         <button
-          class="tb-toggle${tab?.session.ui.stylebookCustomizedOnly ? " active" : ""}"
+          class=${classMap({ "tb-toggle": true, active: tab?.session.ui.stylebookCustomizedOnly })}
           @click=${onCustomizedToggle}
         >
           Customized
@@ -331,7 +334,7 @@ export function renderStylebookOverlays() {
           (b) => html`
             <div
               class=${b.cls}
-              style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}"
+              style=${styleMap({ top: b.top, left: b.left, width: b.width, height: b.height })}
             >
               ${b.label ? html`<div class="overlay-label">${b.label}</div>` : nothing}
             </div>
@@ -433,9 +436,12 @@ export async function renderComponentPreview(comp) {
   try {
     if (comp.source === "npm") {
       if (!customElements.get(comp.tagName)) {
-        throw new Error("not registered");
+        return _componentFallback(comp.tagName);
       }
     } else {
+      if (comp.path && /\.md$/i.test(comp.path)) {
+        return _componentFallback(comp.tagName);
+      }
       const root = projectState?.projectRoot;
       const url = `${location.origin}/${root ? root + "/" : ""}${comp.path}`;
       await defineElement(url);
@@ -450,12 +456,17 @@ export async function renderComponentPreview(comp) {
     return el;
   } catch (/** @type {any} */ e) {
     console.warn("Component preview failed:", comp.tagName, e);
-    const fallback = document.createElement("div");
-    fallback.style.cssText =
-      "padding:12px;border:1px dashed var(--border);border-radius:4px;color:var(--fg-dim)";
-    fallback.textContent = `<${comp.tagName}>`;
-    return fallback;
+    return _componentFallback(comp.tagName);
   }
+}
+
+/** @param {string} tagName */
+function _componentFallback(tagName) {
+  const fallback = document.createElement("div");
+  fallback.style.cssText =
+    "padding:12px;border:1px dashed var(--border);border-radius:4px;color:var(--fg-dim)";
+  fallback.textContent = `<${tagName}>`;
+  return fallback;
 }
 
 /**
@@ -580,9 +591,11 @@ export function renderStylebookElementsIntoCanvas(
             <div class="element-card-label">&lt;${comp.tagName}&gt;</div>
           </div>
         `;
-        renderComponentPreview(comp).then((el) => {
-          if (previewEl) previewEl.appendChild(el);
-        });
+        renderComponentPreview(comp)
+          .then((el) => {
+            if (previewEl) previewEl.appendChild(el);
+          })
+          .catch(() => {});
         return cardTpl;
       });
 

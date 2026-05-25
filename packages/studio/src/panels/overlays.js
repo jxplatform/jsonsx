@@ -4,6 +4,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { canvasPanels, pathsEqual } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
@@ -164,9 +165,13 @@ function _flush() {
           (b) => html`
             <div
               class="${b.cls}${b.isLayout ? " overlay-layout" : ""}"
-              style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}${b.border
-                ? `;border:${b.border}`
-                : ""}"
+              style=${styleMap({
+                top: b.top,
+                left: b.left,
+                width: b.width,
+                height: b.height,
+                border: b.border,
+              })}
             >
               ${b.isLayout ? html`<span class="overlay-layout-badge">Layout</span>` : nothing}
             </div>

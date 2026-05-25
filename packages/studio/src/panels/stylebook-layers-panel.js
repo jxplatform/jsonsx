@@ -1,6 +1,7 @@
 /** Stylebook layers panel — shows element/variable tree when in stylebook (settings) mode. */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import { componentRegistry } from "../files/components.js";
 
@@ -35,7 +36,7 @@ export function renderStylebookLayersTemplate(ctx) {
         : [];
       return html`
         <div
-          class="layer-row${tag === selectedTag ? " selected" : ""}"
+          class=${classMap({ "layer-row": true, selected: tag === selectedTag })}
           style="padding-left:${8 + depth * 16}px"
           @click=${(/** @type {any} */ e) => {
             e.stopPropagation();
@@ -68,7 +69,7 @@ export function renderStylebookLayersTemplate(ctx) {
     const compRows = componentRegistry.map(
       /** @param {any} comp */ (comp) => html`
         <div
-          class="layer-row${comp.tagName === selectedTag ? " selected" : ""}"
+          class=${classMap({ "layer-row": true, selected: comp.tagName === selectedTag })}
           @click=${() => ctx.selectStylebookTag(comp.tagName)}
         >
           <span class="layer-tag component-tag" style="background:var(--accent)">⬡</span>

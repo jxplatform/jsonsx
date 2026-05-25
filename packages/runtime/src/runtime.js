@@ -281,15 +281,15 @@ async function resolveFunction(def, state, key, base) {
     if (_moduleCache.has(src)) {
       mod = _moduleCache.get(src);
     } else {
-      try {
-        mod = await import(src);
-      } catch {
-        if (base) {
-          const resolvedSrc = new URL(src, base).href;
+      if (base) {
+        const resolvedSrc = new URL(src, base).href;
+        try {
           mod = await import(resolvedSrc);
-        } else {
-          throw new Error(`Jx: failed to import '$src' "${src}" for "${key}"`);
+        } catch {
+          mod = await import(src);
         }
+      } else {
+        mod = await import(src);
       }
       _moduleCache.set(src, mod);
     }
@@ -299,8 +299,18 @@ async function resolveFunction(def, state, key, base) {
     }
   }
 
-  // Detect computed: body contains a return statement
-  if (def.body && /\breturn\b/.test(def.body)) {
+  // Detect computed: body contains a return statement, or $src function introspection.
+  // Functions with parameters (event handlers, callbacks) are never computed.
+  const hasParams = (def.parameters ?? def.arguments ?? []).length > 0;
+  let isComputed = false;
+  if (!hasParams) {
+    if (def.body) {
+      isComputed = /\breturn\b/.test(def.body);
+    } else if (fn) {
+      isComputed = fn.length <= 1 && /\breturn\b/.test(fn.toString());
+    }
+  }
+  if (isComputed) {
     return computed(() => fn(state));
   }
 

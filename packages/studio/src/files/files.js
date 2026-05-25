@@ -6,6 +6,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import { renderPopover } from "../ui/layers.js";
@@ -75,6 +76,7 @@ export async function loadProject() {
     if (info.isSiteProject) {
       await loadDirectory(".");
       await loadComponentRegistry();
+      await openHomePage();
     }
     // If not a site project (monorepo) — show welcome prompt, don't load tree
   } catch {
@@ -143,8 +145,22 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
+
+    await openHomePage();
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);
+  }
+}
+
+export async function openHomePage() {
+  const platform = getPlatform();
+  const candidates = ["pages/index.md", "pages/index.json"];
+  for (const path of candidates) {
+    try {
+      await platform.readFile(path);
+      await openFileInTab(path);
+      return;
+    } catch {}
   }
 }
 
@@ -297,7 +313,7 @@ function renderTreeLevelTemplate(
 
     return html`
       <div
-        class="file-tree-item${isSelected ? " selected" : ""}"
+        class=${classMap({ "file-tree-item": true, selected: isSelected })}
         style="padding-left:${8 + depth * 16}px"
         role="treeitem"
         aria-level=${depth + 1}
@@ -643,6 +659,7 @@ export async function openFileInTab(path) {
     });
     projectState.selectedPath = path;
     trackRecentFile({ path, name: path.split("/").pop() || path });
+    view.leftTab = "layers";
 
     if (path === "project.json") {
       const tab = activeTab.value;

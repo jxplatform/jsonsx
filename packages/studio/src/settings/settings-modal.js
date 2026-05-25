@@ -5,6 +5,7 @@
  */
 
 import { html } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { renderDefsEditor } from "./defs-editor.js";
 import { renderContentTypesEditor } from "./content-types-editor.js";
@@ -65,7 +66,7 @@ function renderModal() {
           ${sections.map(
             (s) => html`
               <button
-                class="settings-nav-item${_activeSection === s.key ? " active" : ""}"
+                class=${classMap({ "settings-nav-item": true, active: _activeSection === s.key })}
                 @click=${() => onNavClick(s.key)}
               >
                 ${s.label}
