@@ -27,7 +27,7 @@ export function renderGeneralSettings(container) {
   };
 
   const onAdapterChange = (/** @type {any} */ e) => {
-    updateSiteConfig({ adapter: e.target.value });
+    updateSiteConfig({ build: { ...config.build, adapter: e.target.value } });
   };
 
   const onEditGlobalStyles = () => {
@@ -69,7 +69,7 @@ export function renderGeneralSettings(container) {
         <sp-picker
           size="s"
           label="Platform Adapter"
-          .value=${config.adapter || "static"}
+          .value=${config.build?.adapter || "static"}
           @change=${onAdapterChange}
         >
           <sp-menu-item value="static">Static</sp-menu-item>
