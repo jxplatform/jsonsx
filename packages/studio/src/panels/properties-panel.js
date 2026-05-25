@@ -8,7 +8,6 @@ import {
   mutateUpdateProperty,
   mutateUpdateAttribute,
   mutateUpdateProp,
-  mutateUpdateFrontmatter,
   mutateUpdateMedia,
   mutateAddSwitchCase,
   mutateRemoveSwitchCase,
@@ -22,7 +21,6 @@ import { renderFieldRow } from "../ui/field-row.js";
 import {
   attrLabel,
   inferInputType,
-  findContentTypeSchema,
   friendlyNameToVar,
   camelToLabel,
   parseCemType,
@@ -201,327 +199,6 @@ function kvRow(
       </sp-action-button>
     </div>
   `;
-}
-
-// ─── Frontmatter ────────────────────────────────────────────────────────────
-
-/** Frontmatter-only panel shown in content mode when no element is selected */
-function renderFrontmatterOnlyPanel() {
-  const tab = activeTab.value;
-  const fm = tab.doc.content?.frontmatter || {};
-  const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
-  const schemaProps = col?.schema?.properties;
-  const requiredFields = new Set(col?.schema?.required || []);
-
-  /** @type {{ field: string; entry: any; value: any }[]} */
-  const fields = [];
-  if (schemaProps) {
-    for (const [field, fieldSchema] of Object.entries(
-      /** @type {Record<string, any>} */ (schemaProps),
-    )) {
-      fields.push({ field, entry: fieldSchema, value: fm[field] });
-    }
-    for (const [field, value] of Object.entries(fm)) {
-      if (schemaProps[field] || field.startsWith("$")) continue;
-      fields.push({
-        field,
-        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        value,
-      });
-    }
-  } else {
-    for (const [field, value] of Object.entries(fm)) {
-      if (field.startsWith("$")) continue;
-      fields.push({
-        field,
-        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        value,
-      });
-    }
-  }
-
-  if (fields.length === 0 && !schemaProps) {
-    return html`<div class="empty-state">No frontmatter. Select an element to inspect.</div>`;
-  }
-
-  const pageT = renderPageSection(tab.doc.document || {});
-
-  return html`
-    <div class="style-sidebar">
-      <sp-accordion allow-multiple size="s">
-        ${pageT}
-        <sp-accordion-item label=${col ? `Frontmatter (${col.name})` : "Frontmatter"} open>
-          <div class="style-section-body">
-            ${fields.map((f) => renderFmFieldRow(f.field, f.entry, f.value, requiredFields))}
-          </div>
-        </sp-accordion-item>
-      </sp-accordion>
-    </div>
-  `;
-}
-
-/** Render a single frontmatter field row (shared between both panels) */
-function renderFmFieldRow(
-  /** @type {string} */ field,
-  /** @type {any} */ entry,
-  /** @type {any} */ value,
-  /** @type {Set<string>} */ requiredFields,
-) {
-  const isRequired = requiredFields.has(field);
-  const label = field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
-  const displayLabel = label + (isRequired ? " *" : "");
-  const hasVal = value !== undefined && value !== "" && value !== false;
-  const onClear = () =>
-    transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, undefined));
-
-  if (entry.type === "boolean") {
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: html`
-        <sp-checkbox
-          size="s"
-          .checked=${live(!!value)}
-          @change=${(/** @type {any} */ e) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(t, field, e.target.checked || undefined),
-            )}
-        ></sp-checkbox>
-      `,
-    });
-  }
-
-  if (entry.type === "array") {
-    const display = Array.isArray(value) ? value.join(", ") : value || "";
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: html`
-        <sp-textfield
-          size="s"
-          placeholder="comma, separated"
-          .value=${live(display)}
-          @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
-            const arr = e.target.value
-              ? e.target.value
-                  .split(",")
-                  .map((/** @type {string} */ s) => s.trim())
-                  .filter(Boolean)
-              : undefined;
-            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
-          })}
-        ></sp-textfield>
-      `,
-    });
-  }
-
-  if (Array.isArray(entry.enum)) {
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: html`
-        <sp-picker
-          size="s"
-          .value=${live(value || "")}
-          @change=${(/** @type {any} */ e) =>
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(t, field, e.target.value || undefined),
-            )}
-        >
-          ${entry.enum.map(
-            (/** @type {string} */ opt) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`,
-          )}
-        </sp-picker>
-      `,
-    });
-  }
-
-  if (entry.format === "image") {
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: renderMediaPicker(field, value, (v) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
-      ),
-    });
-  }
-
-  if (entry.type === "array" && entry.items?.format === "image") {
-    const images = Array.isArray(value) ? value : [];
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: html`
-        <div class="gallery-picker">
-          <div class="gallery-picker-strip">
-            ${images.map(
-              (img, i) => html`
-                <div class="gallery-picker-item">
-                  <img src=${img} alt="" class="gallery-picker-thumb" />
-                  <sp-action-button
-                    size="xs"
-                    quiet
-                    title="Remove"
-                    @click=${() => {
-                      const next = images.filter((_, idx) => idx !== i);
-                      transactDoc(activeTab.value, (t) =>
-                        mutateUpdateFrontmatter(t, field, next.length ? next : undefined),
-                      );
-                    }}
-                  >
-                    <sp-icon-close slot="icon"></sp-icon-close>
-                  </sp-action-button>
-                </div>
-              `,
-            )}
-          </div>
-          ${renderMediaPicker(`${field}:add`, "", (v) => {
-            if (!v) return;
-            const next = [...images, v];
-            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, next));
-          })}
-        </div>
-      `,
-    });
-  }
-
-  if (entry.$ref) {
-    const targetName = entry.$ref.replace("#/contentTypes/", "");
-    const targetDef = projectState?.projectConfig?.contentTypes?.[targetName];
-    const picker = renderReferencePicker(field, value, targetName, targetDef, (v) =>
-      transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
-    );
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: picker,
-    });
-  }
-
-  if (entry.type === "number") {
-    return renderFieldRow({
-      prop: field,
-      label: displayLabel,
-      hasValue: hasVal,
-      onClear,
-      widget: html`
-        <sp-number-field
-          size="s"
-          hide-stepper
-          .value=${live(value !== undefined ? Number(value) : undefined)}
-          @change=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
-            const v = e.target.value;
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(t, field, isNaN(v) ? undefined : Number(v)),
-            );
-          })}
-        ></sp-number-field>
-      `,
-    });
-  }
-
-  return renderFieldRow({
-    prop: field,
-    label: displayLabel,
-    hasValue: hasVal,
-    onClear,
-    widget: html`
-      <sp-textfield
-        size="s"
-        placeholder=${entry.format === "date" ? "YYYY-MM-DD" : ""}
-        .value=${live(value || "")}
-        @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateFrontmatter(t, field, e.target.value || undefined),
-          );
-        })}
-      ></sp-textfield>
-    `,
-  });
-}
-
-// ─── Reference picker ────────────────────────────────────────────────────────
-
-/** @type {Map<string, { slug: string; title: string }[]>} */
-const refEntriesCache = new Map();
-
-/**
- * Render a reference field as a picker of entries from the target content type.
- *
- * @param {string} field
- * @param {any} value
- * @param {string} targetName
- * @param {any} targetDef
- * @param {(val: any) => void} onCommit
- */
-function renderReferencePicker(field, value, targetName, targetDef, onCommit) {
-  if (!targetDef?.source) {
-    return html`<sp-textfield
-      size="s"
-      placeholder="slug"
-      .value=${live(value || "")}
-      @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) =>
-        onCommit(e.target.value),
-      )}
-    ></sp-textfield>`;
-  }
-
-  const cacheKey = targetName;
-  if (!refEntriesCache.has(cacheKey)) {
-    loadRefEntries(targetName, targetDef);
-  }
-  const entries = refEntriesCache.get(cacheKey) || [];
-
-  return html`
-    <sp-picker
-      size="s"
-      label=${targetName}
-      .value=${live(value || "")}
-      @change=${(/** @type {any} */ e) => onCommit(e.target.value || undefined)}
-    >
-      <sp-menu-item value="">— none —</sp-menu-item>
-      ${entries.map(
-        (ent) => html`<sp-menu-item value=${ent.slug}>${ent.title || ent.slug}</sp-menu-item>`,
-      )}
-    </sp-picker>
-  `;
-}
-
-async function loadRefEntries(/** @type {string} */ targetName, /** @type {any} */ targetDef) {
-  const platform = getPlatform();
-  const sourceDir = targetDef.source.replace(/^\.\//, "").split("/**")[0].split("/*")[0];
-  try {
-    const listing = await platform.listDirectory(sourceDir);
-    const entries = [];
-    for (const item of listing) {
-      if (item.type === "directory") continue;
-      const slug = item.name.replace(/\.[^.]+$/, "");
-      let title = slug;
-      try {
-        const content = await platform.readFile(item.path);
-        const match = content.match(/^---[\s\S]*?title:\s*(.+?)[\r\n]/m);
-        if (match) title = match[1].trim().replace(/^["']|["']$/g, "");
-      } catch {}
-      entries.push({ slug, title });
-    }
-    refEntriesCache.set(targetName, entries);
-  } catch {}
-}
-
-export function invalidateRefCache() {
-  refEntriesCache.clear();
 }
 
 // ─── Sub-templates ──────────────────────────────────────────────────────────
@@ -1194,9 +871,6 @@ export function renderPropertiesPanelTemplate(ctx) {
   }
 
   if (!tab.session.selection) {
-    if (tab.doc.mode === "content") {
-      return renderFrontmatterOnlyPanel();
-    }
     return html`<div class="empty-state">Select an element to inspect</div>`;
   }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
@@ -1639,68 +1313,17 @@ export function renderPropertiesPanelTemplate(ctx) {
         })()
       : nothing;
 
-  const frontmatterT =
-    tab.doc.mode === "content"
-      ? (() => {
-          const fm = tab.doc.content?.frontmatter || {};
-          const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
-          const schemaProps = col?.schema?.properties;
-          const requiredFields = new Set(col?.schema?.required || []);
-
-          /** @type {{ field: string; entry: any; value: any }[]} */
-          const fields = [];
-          if (schemaProps) {
-            for (const [field, fieldSchema] of Object.entries(
-              /** @type {Record<string, any>} */ (schemaProps),
-            )) {
-              fields.push({ field, entry: fieldSchema, value: fm[field] });
-            }
-            for (const [field, value] of Object.entries(fm)) {
-              if (schemaProps[field] || field.startsWith("$")) continue;
-              fields.push({
-                field,
-                entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-                value,
-              });
-            }
-          } else {
-            for (const [field, value] of Object.entries(fm)) {
-              if (field.startsWith("$")) continue;
-              fields.push({
-                field,
-                entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-                value,
-              });
-            }
-          }
-
-          if (fields.length === 0 && !schemaProps) return nothing;
-
-          return html`
-            <sp-accordion-item
-              label=${col ? `Frontmatter (${col.name})` : "Frontmatter"}
-              ?open=${isSectionOpen("__frontmatter") !== false}
-              @sp-accordion-item-toggle=${() => toggleSection("__frontmatter")}
-            >
-              <div class="style-section-body">
-                ${fields.map((f) => renderFmFieldRow(f.field, f.entry, f.value, requiredFields))}
-              </div>
-            </sp-accordion-item>
-          `;
-        })()
-      : nothing;
-
   const pageT = isRoot ? renderPageSection(node) : nothing;
 
   // ── Assemble ──
   const tpl = html`
     <div class="style-sidebar">
       <sp-accordion allow-multiple size="s">
-        ${pageT} ${frontmatterT} ${isMapNode ? repeaterT : elemT}
-        ${isMapNode ? nothing : observedAttrsT} ${isMapNode ? nothing : switchT}
-        ${isMapNode ? nothing : compPropsT} ${isMapNode ? nothing : attrSectionTemplates}
-        ${isMapNode ? nothing : customSectionT} ${isMapNode ? nothing : mediaT}
-        ${isMapNode ? nothing : cssPropsT} ${isMapNode ? nothing : cssPartsT}
+        ${pageT} ${isMapNode ? repeaterT : elemT} ${isMapNode ? nothing : observedAttrsT}
+        ${isMapNode ? nothing : switchT} ${isMapNode ? nothing : compPropsT}
+        ${isMapNode ? nothing : attrSectionTemplates} ${isMapNode ? nothing : customSectionT}
+        ${isMapNode ? nothing : mediaT} ${isMapNode ? nothing : cssPropsT}
+        ${isMapNode ? nothing : cssPartsT}
       </sp-accordion>
     </div>
   `;

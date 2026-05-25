@@ -1,15 +1,19 @@
 /**
- * Head panel — Page meta, OpenGraph, Google Fonts, and custom `$head` entries.
+ * Head panel — Page meta, OpenGraph, Frontmatter, and custom `$head` entries.
  *
  * Uses `renderFieldRow()` for consistent indicator-dot fields and `renderMediaPicker()` for image
  * selection (icon, og:image).
  */
 
-import { html } from "lit-html";
+import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
-import { debouncedStyleCommit } from "../store.js";
+import { debouncedStyleCommit, projectState } from "../store.js";
+import { activeTab } from "../workspace/workspace.js";
+import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact.js";
+import { findContentTypeSchema } from "../utils/studio-utils.js";
+import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts.js";
 
 // ─── Field definitions ───────────────────────────────────────────────────
 
@@ -165,98 +169,6 @@ function entryValue(entry) {
   return a.content ?? a.href ?? a.src ?? entry?.textContent ?? "";
 }
 
-// ─── Google Fonts helpers ────────────────────────────────────────────────
-
-const GFONTS_CSS_PREFIX = "https://fonts.googleapis.com/css2?";
-const GFONTS_PRECONNECT_ORIGINS = ["https://fonts.googleapis.com", "https://fonts.gstatic.com"];
-
-/**
- * Check if a `$head` entry is a Google Fonts stylesheet link.
- *
- * @param {any} entry
- * @returns {boolean}
- */
-function isGoogleFontEntry(entry) {
-  return (
-    entry?.tagName === "link" &&
-    entry?.attributes?.rel === "stylesheet" &&
-    typeof entry?.attributes?.href === "string" &&
-    entry.attributes.href.startsWith(GFONTS_CSS_PREFIX)
-  );
-}
-
-/**
- * Check if a `$head` entry is a Google Fonts preconnect link.
- *
- * @param {any} entry
- * @returns {boolean}
- */
-function isGoogleFontPreconnect(entry) {
-  return (
-    entry?.tagName === "link" &&
-    entry?.attributes?.rel === "preconnect" &&
-    GFONTS_PRECONNECT_ORIGINS.includes(entry?.attributes?.href)
-  );
-}
-
-/**
- * Extract the font family name from a Google Fonts CSS URL.
- *
- * @param {string} href
- * @returns {string}
- */
-function extractFontFamily(href) {
-  const match = href.match(/family=([^&:]+)/);
-  if (!match) return "";
-  return decodeURIComponent(match[1].replace(/\+/g, " "));
-}
-
-/**
- * Build a Google Fonts CSS2 URL for a family name.
- *
- * @param {string} family
- * @returns {string}
- */
-function buildGoogleFontUrl(family) {
-  return `${GFONTS_CSS_PREFIX}family=${encodeURIComponent(family).replace(/%20/g, "+")}&display=swap`;
-}
-
-/**
- * Ensure preconnect links exist in `$head` for Google Fonts.
- *
- * @param {any} doc
- */
-function ensureGoogleFontPreconnects(doc) {
-  if (!doc.$head) doc.$head = [];
-  for (const origin of GFONTS_PRECONNECT_ORIGINS) {
-    const exists = doc.$head.some(
-      (/** @type {any} */ e) =>
-        e?.tagName === "link" &&
-        e?.attributes?.rel === "preconnect" &&
-        e?.attributes?.href === origin,
-    );
-    if (!exists) {
-      /** @type {Record<string, any>} */
-      const attrs = { rel: "preconnect", href: origin };
-      if (origin === "https://fonts.gstatic.com") attrs.crossorigin = "";
-      doc.$head.push({ tagName: "link", attributes: attrs });
-    }
-  }
-}
-
-/**
- * Remove preconnect links if no Google Font stylesheets remain.
- *
- * @param {any} doc
- */
-function cleanupGoogleFontPreconnects(doc) {
-  if (!doc.$head) return;
-  const hasFont = doc.$head.some((/** @type {any} */ e) => isGoogleFontEntry(e));
-  if (!hasFont) {
-    doc.$head = doc.$head.filter((/** @type {any} */ e) => !isGoogleFontPreconnect(e));
-  }
-}
-
 // ─── Field renderers ─────────────────────────────────────────────────────
 
 /**
@@ -345,11 +257,15 @@ export function renderHeadTemplate({ document: doc, applyMutation, renderLeftPan
       !isManagedEntry(e) && !isGoogleFontEntry(e) && !isGoogleFontPreconnect(e),
   );
 
-  // Google Font entries
-  const fontEntries = head.filter((/** @type {any} */ e) => isGoogleFontEntry(e));
+  // Frontmatter section (content mode only)
+  const tab = activeTab.value;
+  const isContent = tab?.doc.mode === "content";
+  const frontmatterSection = isContent ? renderFrontmatterSection() : nothing;
 
   return html`
     <div class="imports-panel">
+      ${frontmatterSection}
+
       <!-- Page section -->
       <div class="imports-section">
         <div class="imports-section-header">
@@ -399,87 +315,6 @@ export function renderHeadTemplate({ document: doc, applyMutation, renderLeftPan
         </div>
         <div class="head-section-body">
           ${OG_FIELDS.map((field) => renderMetaFieldRow(field, head, applyMutation))}
-        </div>
-      </div>
-
-      <!-- Google Fonts -->
-      <div class="imports-section">
-        <div class="imports-section-header">
-          <span class="imports-section-title">Google Fonts</span>
-          <span class="imports-count">${fontEntries.length}</span>
-        </div>
-        ${fontEntries.length > 0
-          ? html`
-              <div class="imports-list">
-                ${fontEntries.map((/** @type {any} */ entry) => {
-                  const family = extractFontFamily(entry.attributes.href);
-                  return html`
-                    <div class="import-row">
-                      <span class="import-name">${family}</span>
-                      <sp-action-button
-                        quiet
-                        size="xs"
-                        title="Remove"
-                        @click=${() => {
-                          applyMutation((/** @type {any} */ d) => {
-                            if (!d.$head) return;
-                            d.$head = d.$head.filter((/** @type {any} */ e) => e !== entry);
-                            cleanupGoogleFontPreconnects(d);
-                          });
-                          renderLeftPanel();
-                        }}
-                      >
-                        <sp-icon-close slot="icon" size="xs"></sp-icon-close>
-                      </sp-action-button>
-                    </div>
-                  `;
-                })}
-              </div>
-            `
-          : html`<div class="imports-empty">No fonts imported</div>`}
-        <div class="head-add-form">
-          <sp-textfield
-            placeholder="Font family name…"
-            size="s"
-            style="flex:1"
-            @keydown=${(/** @type {any} */ e) => {
-              if (e.key !== "Enter") return;
-              const family = e.target.value?.trim();
-              if (!family) return;
-              e.target.value = "";
-              applyMutation((/** @type {any} */ d) => {
-                if (!d.$head) d.$head = [];
-                ensureGoogleFontPreconnects(d);
-                d.$head.push({
-                  tagName: "link",
-                  attributes: { rel: "stylesheet", href: buildGoogleFontUrl(family) },
-                });
-              });
-              renderLeftPanel();
-            }}
-          ></sp-textfield>
-          <sp-action-button
-            quiet
-            size="xs"
-            title="Add font"
-            @click=${(/** @type {any} */ e) => {
-              const input = e.target.closest(".head-add-form")?.querySelector("sp-textfield");
-              const family = input?.value?.trim();
-              if (!family) return;
-              input.value = "";
-              applyMutation((/** @type {any} */ d) => {
-                if (!d.$head) d.$head = [];
-                ensureGoogleFontPreconnects(d);
-                d.$head.push({
-                  tagName: "link",
-                  attributes: { rel: "stylesheet", href: buildGoogleFontUrl(family) },
-                });
-              });
-              renderLeftPanel();
-            }}
-          >
-            <sp-icon-add slot="icon" size="xs"></sp-icon-add>
-          </sp-action-button>
         </div>
       </div>
 
@@ -573,4 +408,193 @@ export function renderHeadTemplate({ document: doc, applyMutation, renderLeftPan
       </div>
     </div>
   `;
+}
+
+// ─── Frontmatter section ────────────────────────────────────────────────
+
+function renderFrontmatterSection() {
+  const tab = activeTab.value;
+  if (!tab) return nothing;
+
+  const fm = tab.doc.content?.frontmatter || {};
+  const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
+  const schemaProps = col?.schema?.properties;
+  const requiredFields = new Set(col?.schema?.required || []);
+
+  /** @type {{ field: string; entry: any; value: any }[]} */
+  const fields = [];
+  if (schemaProps) {
+    for (const [field, fieldSchema] of Object.entries(
+      /** @type {Record<string, any>} */ (schemaProps),
+    )) {
+      fields.push({ field, entry: fieldSchema, value: fm[field] });
+    }
+    for (const [field, value] of Object.entries(fm)) {
+      if (schemaProps[field] || field.startsWith("$")) continue;
+      fields.push({
+        field,
+        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+        value,
+      });
+    }
+  } else {
+    for (const [field, value] of Object.entries(fm)) {
+      if (field.startsWith("$")) continue;
+      fields.push({
+        field,
+        entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+        value,
+      });
+    }
+  }
+
+  if (fields.length === 0 && !schemaProps) return nothing;
+
+  return html`
+    <div class="imports-section">
+      <div class="imports-section-header">
+        <span class="imports-section-title"
+          >${col ? `Frontmatter (${col.name})` : "Frontmatter"}</span
+        >
+      </div>
+      <div class="head-section-body">
+        ${fields.map((f) => renderFmField(f.field, f.entry, f.value, requiredFields))}
+      </div>
+    </div>
+  `;
+}
+
+function renderFmField(
+  /** @type {string} */ field,
+  /** @type {any} */ entry,
+  /** @type {any} */ value,
+  /** @type {Set<string>} */ requiredFields,
+) {
+  const isRequired = requiredFields.has(field);
+  const label = field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+  const displayLabel = label + (isRequired ? " *" : "");
+  const hasVal = value !== undefined && value !== "" && value !== false;
+  const onClear = () =>
+    transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, undefined));
+
+  if (entry.type === "boolean") {
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: html`
+        <sp-checkbox
+          size="s"
+          .checked=${live(!!value)}
+          @change=${(/** @type {any} */ e) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, e.target.checked || undefined),
+            )}
+        ></sp-checkbox>
+      `,
+    });
+  }
+
+  if (entry.type === "array") {
+    const display = Array.isArray(value) ? value.join(", ") : value || "";
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: html`
+        <sp-textfield
+          size="s"
+          placeholder="comma, separated"
+          .value=${live(display)}
+          @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
+            const arr = e.target.value
+              ? e.target.value
+                  .split(",")
+                  .map((/** @type {string} */ s) => s.trim())
+                  .filter(Boolean)
+              : undefined;
+            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
+          })}
+        ></sp-textfield>
+      `,
+    });
+  }
+
+  if (Array.isArray(entry.enum)) {
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: html`
+        <sp-picker
+          size="s"
+          .value=${live(value || "")}
+          @change=${(/** @type {any} */ e) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, e.target.value || undefined),
+            )}
+        >
+          ${entry.enum.map(
+            (/** @type {string} */ opt) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`,
+          )}
+        </sp-picker>
+      `,
+    });
+  }
+
+  if (entry.format === "image") {
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: renderMediaPicker(field, value, (v) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
+      ),
+    });
+  }
+
+  if (entry.type === "number") {
+    return renderFieldRow({
+      prop: field,
+      label: displayLabel,
+      hasValue: hasVal,
+      onClear,
+      widget: html`
+        <sp-number-field
+          size="s"
+          hide-stepper
+          .value=${live(value !== undefined ? Number(value) : undefined)}
+          @change=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
+            const v = e.target.value;
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateFrontmatter(t, field, isNaN(v) ? undefined : Number(v)),
+            );
+          })}
+        ></sp-number-field>
+      `,
+    });
+  }
+
+  return renderFieldRow({
+    prop: field,
+    label: displayLabel,
+    hasValue: hasVal,
+    onClear,
+    widget: html`
+      <sp-textfield
+        size="s"
+        placeholder=${entry.format === "date" ? "YYYY-MM-DD" : ""}
+        .value=${live(value || "")}
+        @input=${debouncedStyleCommit(`fm:${field}`, 400, (/** @type {any} */ e) => {
+          transactDoc(activeTab.value, (t) =>
+            mutateUpdateFrontmatter(t, field, e.target.value || undefined),
+          );
+        })}
+      ></sp-textfield>
+    `,
+  });
 }

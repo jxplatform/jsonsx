@@ -76,6 +76,8 @@ export function tabIcon(tag, size) {
       html`<sp-icon-brush slot="icon" size=${s}></sp-icon-brush>`,
     "sp-icon-file-single-web-page": (/** @type {any} */ s) =>
       html`<sp-icon-file-single-web-page slot="icon" size=${s}></sp-icon-file-single-web-page>`,
+    "sp-icon-view-all-tags": (/** @type {any} */ s) =>
+      html`<sp-icon-view-all-tags slot="icon" size=${s}></sp-icon-view-all-tags>`,
     "sp-icon-artboard": (/** @type {any} */ s) =>
       html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
     "sp-icon-box": (/** @type {any} */ s) =>
@@ -98,7 +100,7 @@ export function renderActivityBar() {
     { value: "blocks", icon: "sp-icon-view-grid", label: "Elements" },
     { value: "state", icon: "sp-icon-brackets", label: "State" },
     { value: "data", icon: "sp-icon-data", label: "Data" },
-    { value: "head", icon: "sp-icon-file-single-web-page", label: "Head" },
+    { value: "head", icon: "sp-icon-view-all-tags", label: "Document" },
     { value: "git", icon: "sp-icon-git-branch", label: "Source Control" },
   ];
   const tpl = html`
