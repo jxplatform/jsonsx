@@ -179,6 +179,35 @@ async function navigateBack() {
   statusMessage("Returned to parent document");
 }
 
+/** @param {number} targetIndex */
+async function navigateToLevel(targetIndex) {
+  const tab = activeTab.value;
+  const stack = tab?.session.documentStack;
+  if (!stack || targetIndex < 0 || targetIndex >= stack.length) return;
+  if (tab.doc.dirty && tab.documentPath) {
+    try {
+      const platform = getPlatform();
+      await platform.writeFile(tab.documentPath, serializeDocument(tab));
+    } catch (/** @type {any} */ e) {
+      const err = /** @type {any} */ (e);
+      statusMessage(`Save error: ${err.message}`);
+    }
+  }
+
+  const frame = /** @type {any} */ (stack[targetIndex]);
+  tab.session.documentStack = stack.slice(0, targetIndex);
+  tab.doc.document = frame.document;
+  tab.doc.dirty = frame.dirty;
+  tab.doc.mode = frame.mode;
+  tab.doc.sourceFormat = frame.sourceFormat;
+  tab.documentPath = frame.documentPath;
+  tab.session.selection = frame.selection;
+  view.leftTab = "layers";
+
+  render();
+  statusMessage("Returned to parent document");
+}
+
 async function closeFunctionEditor() {
   const tab = activeTab.value;
   const editing = /** @type {any} */ (tab?.session.ui.editingFunction);
@@ -251,6 +280,7 @@ openTab({ id: "initial", document: structuredClone(EMPTY_DOC) });
 // Mount extracted panel modules
 toolbarPanel.mount(toolbarEl, {
   navigateBack: () => navigateBack(),
+  navigateToLevel: (/** @type {number} */ i) => navigateToLevel(i),
   closeFunctionEditor: () => closeFunctionEditor(),
   openProject: () => openProject(),
   openRecentProject: (/** @type {string} */ root) => openRecentProject(root),
