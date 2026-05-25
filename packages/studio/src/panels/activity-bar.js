@@ -6,6 +6,7 @@ import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view, applyPanelCollapse } from "../view.js";
 import { openSettingsModal } from "../settings/settings-modal.js";
+import { refreshGitStatus } from "./git-panel.js";
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
 let _scope = null;
@@ -16,6 +17,10 @@ export function mount() {
     effect(() => {
       const tab = activeTab.value;
       if (!tab) return;
+      const gs = tab.session.ui.gitStatus;
+      if (!gs && !tab.session.ui.gitLoading) {
+        refreshGitStatus();
+      }
       renderActivityBar();
     });
   });
@@ -85,6 +90,7 @@ export function renderActivityBar() {
   const tab = activeTab.value;
   if (!tab) return;
   const leftTab = view.leftTab;
+  const gitFileCount = /** @type {any} */ (tab?.session.ui.gitStatus)?.files?.length || 0;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },
@@ -119,6 +125,9 @@ export function renderActivityBar() {
         (t) => html`
           <sp-tab value=${t.value} title=${t.label} aria-label=${t.label}>
             ${tabIcon(t.icon, "m")}
+            ${t.value === "git" && gitFileCount > 0
+              ? html`<span class="activity-badge">${gitFileCount}</span>`
+              : nothing}
           </sp-tab>
         `,
       )}

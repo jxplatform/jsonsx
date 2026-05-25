@@ -13,6 +13,8 @@ import { mediaDisplayName } from "./shared.js";
 import { view, applyPanelCollapse } from "../view.js";
 import { getRecentProjects } from "../recent-projects.js";
 import { openQuickSearch } from "./quick-search.js";
+import { getPlatform } from "../platform.js";
+import { refreshGitStatus } from "./git-panel.js";
 import { openBrowseModal } from "../browse/browse-modal.js";
 
 /** @type {HTMLElement | null} */
@@ -82,6 +84,7 @@ export function mount(rootEl, ctx) {
       void tab.session.ui.editingFunction;
       void tab.session.ui.featureToggles;
       void tab.session.ui.rightTab;
+      void tab.session.ui.gitStatus;
       render();
     });
   });
@@ -278,6 +281,20 @@ function toolbarTemplate() {
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
+    ${
+      /** @type {any} */ (activeTab.value?.session.ui.gitStatus)?.behind > 0
+        ? html`<sp-action-button
+            size="s"
+            @click=${async () => {
+              await getPlatform().gitPull();
+              await refreshGitStatus();
+            }}
+          >
+            <sp-icon-download slot="icon"></sp-icon-download>
+            Sync Project
+          </sp-action-button>`
+        : nothing
+    }
     <div class="tb-spacer"></div>
     ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
     <sp-action-button

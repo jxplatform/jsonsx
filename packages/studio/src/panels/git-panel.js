@@ -11,7 +11,7 @@ import { updateUi, renderOnly } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 
-async function refreshGitStatus() {
+export async function refreshGitStatus() {
   const plat = getPlatform();
   updateUi("gitLoading", true);
   updateUi("gitError", null);

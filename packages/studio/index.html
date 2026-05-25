@@ -570,6 +570,7 @@
         --mod-tabs-color-selected: var(--fg);
       }
       #activity-bar sp-tab {
+        position: relative;
         width: 48px;
         height: 48px;
         display: flex;
@@ -578,6 +579,23 @@
         color: var(--fg-dim);
         opacity: 0.6;
         margin: 0;
+      }
+      .activity-badge {
+        position: absolute;
+        top: 6px;
+        right: 4px;
+        min-width: 16px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--spectrum-white);
+        font-size: 9px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
       }
       #activity-bar sp-tab:hover {
         opacity: 1;
