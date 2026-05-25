@@ -125,19 +125,15 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   return { tpl, panel };
 }
 
-/** Center canvas in viewport. */
+/** Center canvas horizontally in viewport, top-aligned vertically. */
 export function centerCanvas() {
   if (!view.panzoomWrap) return;
   const wrapWidth = canvasWrap.clientWidth;
-  const wrapHeight = canvasWrap.clientHeight;
   const contentWidth = view.panzoomWrap.scrollWidth;
-  const contentHeight = view.panzoomWrap.scrollHeight;
   const zoom = _ctx.getZoom();
   const scaledWidth = contentWidth * zoom;
-  const scaledHeight = contentHeight * zoom;
   view.panX = Math.max(16, (wrapWidth - scaledWidth) / 2);
-  const verticalCenter = (wrapHeight - scaledHeight) / 2;
-  view.panY = verticalCenter > 16 ? verticalCenter : 16;
+  view.panY = 0;
 }
 
 /**
