@@ -229,9 +229,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
         if (typeof entry === "string") {
           try {
             const specifier =
-              entry.startsWith("/") || entry.startsWith(".")
-                ? entry
-                : `/${projectState?.projectRoot || ""}/node_modules/${entry}`.replace(/\/+/g, "/");
+              entry.startsWith("/") || entry.startsWith(".") ? entry : `/node_modules/${entry}`;
             await import(specifier);
           } catch (/** @type {any} */ e) {
             console.warn("Studio: failed to import package", entry, e);
@@ -311,7 +309,6 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
         if (!entry?.tagName) continue;
         const tag = entry.tagName.toLowerCase();
         const attrs = { ...entry.attributes };
-        const headRoot = projectState?.projectRoot || "";
         for (const key of ["href", "src"]) {
           if (
             attrs[key] &&
@@ -319,7 +316,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
             !attrs[key].startsWith(".") &&
             !attrs[key].startsWith("http")
           ) {
-            attrs[key] = `/${headRoot}/node_modules/${attrs[key]}`.replace(/\/+/g, "/");
+            attrs[key] = `/node_modules/${attrs[key]}`;
           }
         }
         const selector = `${tag}${attrs.href ? `[href="${attrs.href}"]` : ""}${attrs.src ? `[src="${attrs.src}"]` : ""}`;
