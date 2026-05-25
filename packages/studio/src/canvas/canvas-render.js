@@ -103,11 +103,13 @@ export function renderCanvas() {
 
   // Source mode: update existing Monaco editor without recreating
   if (canvasMode === "source" && view.monacoEditor) {
-    const jsonStr = JSON.stringify(S.document, null, 2);
+    const filePath = tab.documentPath || "document.json";
+    const isJs = filePath.endsWith(".js");
+    const newVal = isJs ? S.document?.toString?.() || "" : JSON.stringify(S.document, null, 2);
     const currentVal = view.monacoEditor.getValue();
-    if (currentVal !== jsonStr) {
+    if (currentVal !== newVal) {
       view.monacoEditor._ignoreNextChange = true;
-      view.monacoEditor.setValue(jsonStr);
+      view.monacoEditor.setValue(newVal);
     }
     return;
   }
@@ -150,6 +152,7 @@ export function renderCanvas() {
 
     // Dispose Monaco editor if switching away from source mode
     if (view.monacoEditor) {
+      view.monacoEditor.getModel()?.dispose();
       view.monacoEditor.dispose();
       view.monacoEditor = null;
     }
@@ -214,10 +217,14 @@ export function renderCanvas() {
       canvasWrap,
     );
 
-    const jsonStr = JSON.stringify(S.document, null, 2);
+    const filePath = tab.documentPath || "document.json";
+    const lang = filePath.endsWith(".js") ? "javascript" : "json";
+    const content =
+      lang === "json" ? JSON.stringify(S.document, null, 2) : S.document?.toString?.() || "";
+    const modelUri = monaco.Uri.parse("file:///" + filePath);
+    const model = monaco.editor.createModel(content, lang, modelUri);
     view.monacoEditor = monaco.editor.create(/** @type {any} */ (editorContainer), {
-      value: jsonStr,
-      language: "json",
+      model,
       theme: "vs-dark",
       automaticLayout: true,
       minimap: { enabled: false },
@@ -239,13 +246,16 @@ export function renderCanvas() {
       }
       clearTimeout(debounce);
       debounce = setTimeout(() => {
-        try {
-          const parsed = JSON.parse(view.monacoEditor.getValue());
-          const tab = activeTab.value;
-          tab.doc.document = parsed;
+        const tab = activeTab.value;
+        if (lang === "json") {
+          try {
+            tab.doc.document = JSON.parse(view.monacoEditor.getValue());
+            tab.doc.dirty = true;
+          } catch {
+            // Invalid JSON — don't update state
+          }
+        } else {
           tab.doc.dirty = true;
-        } catch {
-          // Invalid JSON — don't update state
         }
       }, 600);
     });

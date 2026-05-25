@@ -5,6 +5,8 @@
  * and save. Phase 2: Tree editing with drag-and-drop reordering.
  */
 
+import "./services/monaco-setup.js";
+
 import {
   getNodeAtPath,
   canvasWrap,
