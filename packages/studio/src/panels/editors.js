@@ -24,7 +24,8 @@ function getFunctionBody(/** @type {any} */ editing) {
   return "";
 }
 
-export function renderFunctionEditor() {
+/** @param {() => void} closeFunctionEditor */
+export function renderFunctionEditor(closeFunctionEditor) {
   const editing = activeTab.value?.session.ui.editingFunction;
 
   // If editor already exists and matches current target, just sync value
@@ -63,11 +64,25 @@ export function renderFunctionEditor() {
   // Toolbar breadcrumb handles context display — re-render it
   renderOnly("toolbar");
 
+  const tab = activeTab.value;
+  const docName = tab?.documentPath?.split("/").pop() || tab?.doc.document?.tagName || "document";
+  const ed = /** @type {any} */ (editing);
+  const funcLabel = ed.type === "def" ? `ƒ ${ed.defName}` : `ƒ ${ed.eventKey}`;
+
   // Editor container
   /** @type {HTMLDivElement | null} */
   let editorContainer = null;
   litRender(
     html`<div class="source-wrap">
+      <div class="source-toolbar">
+        <sp-action-button size="s" @click=${closeFunctionEditor}>
+          <sp-icon-back slot="icon"></sp-icon-back>
+          Back
+        </sp-action-button>
+        <span class="breadcrumb-item">${docName}</span>
+        <span class="breadcrumb-sep"> › </span>
+        <span class="breadcrumb-item current">${funcLabel}</span>
+      </div>
       <div
         class="source-editor"
         ${ref((el) => {

@@ -267,7 +267,7 @@ Layouts wrap page content. Use `{ "tagName": "slot" }` for the page content inse
       "schema": { "type": "object", "properties": { "title": { "type": "string" } }, "required": ["title"] }
     }
   },
-  "build": { "outDir": "./dist", "format": "directory", "trailingSlash": "always" }
+  "build": { "outDir": "./dist", "trailingSlash": "always" }
 }
 ```
 

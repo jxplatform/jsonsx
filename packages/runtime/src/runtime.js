@@ -537,6 +537,7 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
   for (const [prop, val] of Object.entries(styleDef)) {
     if (prop.startsWith("@")) media[prop] = val;
     else if (isNestedSelector(prop)) nested[prop] = val;
+    else if (val !== null && typeof val === "object" && !Array.isArray(val)) nested[prop] = val;
     else if (prop.startsWith("--")) {
       if (isTemplateString(val))
         effect(() => {
@@ -559,13 +560,32 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
 
   let css = "";
 
+  function emitNested(/** @type {string} */ scope, /** @type {Record<string, any>} */ rules) {
+    const props = toCSSText(rules);
+    if (props) css += `${scope} { ${props} }\n`;
+    for (const [sel, sub] of Object.entries(rules)) {
+      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
+      if (sel.startsWith("@")) continue;
+      const resolved = sel.startsWith("&")
+        ? sel.replace("&", scope)
+        : sel.startsWith("[")
+          ? `${scope}${sel}`
+          : sel.startsWith(":") || sel.startsWith(".")
+            ? `${scope}${sel}`
+            : `${scope} ${sel}`;
+      emitNested(resolved, sub);
+    }
+  }
+
   for (const [sel, rules] of Object.entries(nested)) {
     const resolved = sel.startsWith("&")
       ? sel.replace("&", `[data-jx="${uid}"]`)
       : sel.startsWith("[")
         ? `[data-jx="${uid}"]${sel}`
-        : `[data-jx="${uid}"] ${sel}`;
-    css += `${resolved} { ${toCSSText(rules)} }\n`;
+        : sel.startsWith(":") || sel.startsWith(".")
+          ? `[data-jx="${uid}"]${sel}`
+          : `[data-jx="${uid}"] ${sel}`;
+    emitNested(resolved, rules);
   }
 
   for (const [key, rules] of Object.entries(media)) {
@@ -575,15 +595,27 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
       : key.slice(1);
     const scope = `[data-jx="${uid}"]`;
     css += `@media ${query} { ${scope} { ${toCSSText(rules)} } }\n`;
-    for (const [sel, nestedRules] of Object.entries(rules)) {
-      if (!isNestedSelector(sel)) continue;
-      const resolved = sel.startsWith("&")
-        ? sel.replace("&", scope)
-        : sel.startsWith("[")
-          ? `${scope}${sel}`
-          : `${scope} ${sel}`;
-      css += `@media ${query} { ${resolved} { ${toCSSText(nestedRules)} } }\n`;
+
+    function emitMediaNested(
+      /** @type {string} */ parentSel,
+      /** @type {Record<string, any>} */ obj,
+    ) {
+      for (const [sel, sub] of Object.entries(obj)) {
+        if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
+        if (sel.startsWith("@")) continue;
+        const resolved = sel.startsWith("&")
+          ? sel.replace("&", parentSel)
+          : sel.startsWith("[")
+            ? `${parentSel}${sel}`
+            : sel.startsWith(":") || sel.startsWith(".")
+              ? `${parentSel}${sel}`
+              : `${parentSel} ${sel}`;
+        const props = toCSSText(sub);
+        if (props) css += `@media ${query} { ${resolved} { ${props} } }\n`;
+        emitMediaNested(resolved, sub);
+      }
     }
+    emitMediaNested(scope, rules);
   }
 
   const tag = document.createElement("style");
@@ -1455,7 +1487,7 @@ export function camelToKebab(s) {
  */
 export function toCSSText(rules) {
   return Object.entries(rules)
-    .filter(([k]) => !isNestedSelector(k))
+    .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
     .map(([p, v]) => `${camelToKebab(p)}: ${v}`)
     .join("; ");
 }

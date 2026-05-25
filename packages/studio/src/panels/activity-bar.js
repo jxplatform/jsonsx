@@ -4,7 +4,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { activityBar, renderOnly } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
-import { view } from "../view.js";
+import { view, applyPanelCollapse } from "../view.js";
 import { openSettingsModal } from "../settings/settings-modal.js";
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
@@ -97,13 +97,22 @@ export function renderActivityBar() {
   ];
   const tpl = html`
     <sp-tabs
-      selected=${leftTab}
+      selected=${view.leftPanelCollapsed ? "" : leftTab}
       direction="vertical"
       quiet
       @change=${(/** @type {any} */ e) => {
-        view.leftTab = e.target.selected;
-        renderOnly("leftPanel");
-        renderActivityBar();
+        const clicked = e.target.selected;
+        if (clicked === view.leftTab && !view.leftPanelCollapsed) {
+          view.leftPanelCollapsed = true;
+          applyPanelCollapse();
+          renderActivityBar();
+        } else {
+          view.leftTab = clicked;
+          view.leftPanelCollapsed = false;
+          applyPanelCollapse();
+          renderOnly("leftPanel");
+          renderActivityBar();
+        }
       }}
     >
       ${tabs.map(

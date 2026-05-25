@@ -124,11 +124,19 @@ export function renderLayersTemplate(ctx) {
     const canMoveUp = isElement && !isRoot && idx > 0;
     const canMoveDown = isElement && !isRoot && idx < siblingCount - 1;
     const prevSibling = canMoveUp && parentNode ? parentNode.children[idx - 1] : null;
-    const canMoveIn =
-      isElement &&
-      !isRoot &&
-      prevSibling &&
-      !VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase());
+    const prevIsContainer = (() => {
+      if (!prevSibling || typeof prevSibling !== "object") return false;
+      if (VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase())) return false;
+      const ch = prevSibling.children;
+      if (!ch) return false;
+      if (typeof ch === "object" && ch.$prototype === "Array") return true;
+      if (!Array.isArray(ch)) return false;
+      if (ch.length === 0) return true;
+      return ch.some(
+        (c) => typeof c === "object" && c !== null && !isInlineElement(c, prevSibling),
+      );
+    })();
+    const canMoveIn = isElement && !isRoot && prevIsContainer;
     const grandparentPath =
       isElement && parentPath && parentPath.length >= 2
         ? /** @type {any} */ (parentElementPath(parentPath))
@@ -171,6 +179,7 @@ export function renderLayersTemplate(ctx) {
         ${isElement && !isRoot
           ? html`
               <span class="layer-actions">
+                <span class="layer-drag-handle" title="Drag to reorder">⠿</span>
                 ${canMoveUp
                   ? html`<sp-action-button
                       quiet

@@ -24,7 +24,6 @@
     }
   },
   "build": {
-    "outDir": "./dist",
-    "format": "directory"
+    "outDir": "./dist"
   }
 }

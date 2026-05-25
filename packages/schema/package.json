@@ -6,7 +6,9 @@
   },
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
-    ".": "./src/schema.js"
+    ".": "./src/schema.js",
+    "./schema.json": "./schema.json",
+    "./project-schema.json": "./project-schema.json"
   },
   "files": [
     "src/",

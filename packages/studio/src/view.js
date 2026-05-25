@@ -65,7 +65,26 @@ export const view = {
 
   // Global UI state (persists across tab switches)
   leftTab: "layers",
+  leftPanelCollapsed: false,
+  rightPanelCollapsed: false,
 
   // Autosave
   autosaveTimer: null,
 };
+
+const COLLAPSE_STORAGE_KEY = "jx-studio-panel-widths";
+
+export function applyPanelCollapse() {
+  const app = document.getElementById("app");
+  if (!app) return;
+  app.classList.toggle("left-collapsed", view.leftPanelCollapsed);
+  app.classList.toggle("right-collapsed", view.rightPanelCollapsed);
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || "{}");
+    saved.leftCollapsed = view.leftPanelCollapsed;
+    saved.rightCollapsed = view.rightPanelCollapsed;
+    localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(saved));
+  } catch {
+    // storage unavailable
+  }
+}

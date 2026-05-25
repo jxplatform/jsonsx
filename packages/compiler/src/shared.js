@@ -488,10 +488,45 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
   // everything else on body.  Project-level style is implicitly :root, so a
   // flat object like { "--bg": "#000", "margin": "0" } is the expected format.
   if (projectStyle && typeof projectStyle === "object") {
+    function emitProjectRules(
+      /** @type {string} */ selector,
+      /** @type {Record<string, any>} */ obj,
+    ) {
+      const props = toCSSText(/** @type {any} */ (obj));
+      if (props) rules.push(`${selector} { ${props} }`);
+      for (const [key, val] of Object.entries(obj)) {
+        if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
+        if (key.startsWith("@")) {
+          const query = key.startsWith("@--")
+            ? (mediaQueries[key.slice(1)] ?? key.slice(1))
+            : key.slice(1);
+          const mProps = toCSSText(/** @type {any} */ (val));
+          if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
+          for (const [sel, sub] of Object.entries(/** @type {Record<string, any>} */ (val))) {
+            if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
+            if (sel.startsWith("@")) continue;
+            const resolved = sel.startsWith("&")
+              ? sel.replace("&", selector)
+              : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
+                ? `${selector}${sel}`
+                : `${selector} ${sel}`;
+            const subProps = toCSSText(/** @type {any} */ (sub));
+            if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
+          }
+          continue;
+        }
+        const resolved = key.startsWith("&")
+          ? key.replace("&", selector)
+          : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
+            ? `${selector}${key}`
+            : `${selector} ${key}`;
+        emitProjectRules(resolved, val);
+      }
+    }
+
     for (const [key, val] of Object.entries(projectStyle)) {
       if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
-        // Standalone selector (e.g. `.dark`, `:focus-visible`)
-        rules.push(`${key} { ${toCSSText(/** @type {any} */ (val))} }`);
+        emitProjectRules(key, /** @type {any} */ (val));
       } else if (
         val !== null &&
         typeof val === "object" &&
@@ -499,10 +534,9 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
         !key.startsWith("@") &&
         !key.startsWith("--")
       ) {
-        // Element selector with object value (e.g. `html`, `*`)
-        rules.push(`${key} { ${toCSSText(/** @type {any} */ (val))} }`);
+        emitProjectRules(key, val);
       } else if (key.startsWith("@")) {
-        // @media block
+        // @media block at top level
         const query = key.startsWith("@--")
           ? (mediaQueries[key.slice(1)] ?? key.slice(1))
           : key.slice(1);
@@ -539,6 +573,47 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
   collectStyles(doc, rules, mediaQueries, "", counter);
   if (rules.length === 0) return "";
   return `<style>\n${rules.join("\n")}\n</style>`;
+}
+
+/**
+ * Recursively emit CSS rules for a nested element selector.
+ *
+ * @param {string} selector
+ * @param {Record<string, any>} obj
+ * @param {string[]} rules
+ * @param {Record<string, any>} mediaQueries
+ */
+function emitNestedElement(selector, obj, rules, mediaQueries) {
+  const props = toCSSText(/** @type {any} */ (obj));
+  if (props) rules.push(`${selector} { ${props} }`);
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
+    if (key.startsWith("@")) {
+      const query = key.startsWith("@--")
+        ? (mediaQueries[key.slice(1)] ?? key.slice(1))
+        : key.slice(1);
+      const mProps = toCSSText(/** @type {any} */ (val));
+      if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
+      for (const [sel, sub] of Object.entries(/** @type {Record<string, any>} */ (val))) {
+        if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
+        if (sel.startsWith("@")) continue;
+        const resolved = sel.startsWith("&")
+          ? sel.replace("&", selector)
+          : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
+            ? `${selector}${sel}`
+            : `${selector} ${sel}`;
+        const subProps = toCSSText(/** @type {any} */ (sub));
+        if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
+      }
+      continue;
+    }
+    const resolved = key.startsWith("&")
+      ? key.replace("&", selector)
+      : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
+        ? `${selector}${key}`
+        : `${selector} ${key}`;
+    emitNestedElement(resolved, val, rules, mediaQueries);
+  }
 }
 
 /**
@@ -590,34 +665,32 @@ export function collectStyles(
     }
 
     for (const [prop, val] of Object.entries(def.style)) {
+      if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
       if (prop.startsWith("@")) {
         const query = prop.startsWith("@--")
           ? (mediaQueries[prop.slice(1)] ?? prop.slice(1))
           : prop.slice(1);
         rules.push(`@media ${query} { ${selector} { ${toCSSText(/** @type {any} */ (val))} } }`);
         for (const [sel, nestedRules] of Object.entries(/** @type {Record<string, any>} */ (val))) {
-          if (
-            !(
-              sel.startsWith(":") ||
-              sel.startsWith(".") ||
-              sel.startsWith("&") ||
-              sel.startsWith("[")
-            )
-          )
+          if (nestedRules === null || typeof nestedRules !== "object" || Array.isArray(nestedRules))
             continue;
-          const resolved = sel.startsWith("&") ? sel.replace("&", selector) : `${selector}${sel}`;
+          if (sel.startsWith("@")) continue;
+          const resolved = sel.startsWith("&")
+            ? sel.replace("&", selector)
+            : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
+              ? `${selector}${sel}`
+              : `${selector} ${sel}`;
           rules.push(
             `@media ${query} { ${resolved} { ${toCSSText(/** @type {any} */ (nestedRules))} } }`,
           );
         }
-      } else if (
-        prop.startsWith(":") ||
-        prop.startsWith(".") ||
-        prop.startsWith("&") ||
-        prop.startsWith("[")
-      ) {
-        const resolved = prop.startsWith("&") ? prop.replace("&", selector) : `${selector}${prop}`;
-        rules.push(`${resolved} { ${toCSSText(/** @type {any} */ (val))} }`);
+      } else {
+        const resolved = prop.startsWith("&")
+          ? prop.replace("&", selector)
+          : prop.startsWith(":") || prop.startsWith(".") || prop.startsWith("[")
+            ? `${selector}${prop}`
+            : `${selector} ${prop}`;
+        emitNestedElement(resolved, val, rules, mediaQueries);
       }
     }
   }

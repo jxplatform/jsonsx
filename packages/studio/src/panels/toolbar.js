@@ -4,14 +4,13 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { classMap } from "lit-html/directives/class-map.js";
 import { updateSession, updateUi } from "../store.js";
 import { undo as tabUndo, redo as tabRedo } from "../tabs/transact.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
 import { getEffectiveMedia } from "../site-context.js";
 import { mediaDisplayName } from "./shared.js";
-import { view } from "../view.js";
+import { view, applyPanelCollapse } from "../view.js";
 import { getRecentProjects } from "../recent-projects.js";
 import { openQuickSearch } from "./quick-search.js";
 import { openBrowseModal } from "../browse/browse-modal.js";
@@ -119,48 +118,27 @@ function toolbarTemplate() {
   });
   const canvasMode = _ctx.getCanvasMode();
   const hasStack = S.documentStack && S.documentStack.length > 0;
-  const hasFunc = !!S.ui.editingFunction;
 
-  const breadcrumbTpl =
-    hasStack || hasFunc
-      ? html`
-          <div class="breadcrumb">
-            <sp-action-button
-              size="s"
-              title=${hasFunc ? "Close function editor" : "Return to parent document"}
-              @click=${hasFunc ? _ctx.closeFunctionEditor : _ctx.navigateBack}
-            >
-              ${toolbarIconMap["sp-icon-back"]}Back
-            </sp-action-button>
-            ${hasStack
-              ? S.documentStack.map(
-                  (/** @type {any} */ frame) => html`
-                    <span class="breadcrumb-item"
-                      >${frame.documentPath?.split("/").pop() || "untitled"}</span
-                    >
-                    <span class="breadcrumb-sep"> › </span>
-                  `,
-                )
-              : nothing}
-            <span
-              class=${classMap({ "breadcrumb-item": true, clickable: hasFunc, current: !hasFunc })}
-              @click=${hasFunc ? _ctx.closeFunctionEditor : nothing}
-            >
-              ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}
-            </span>
-            ${hasFunc
-              ? html`
-                  <span class="breadcrumb-sep"> › </span>
-                  <span class="breadcrumb-item current"
-                    >${S.ui.editingFunction.type === "def"
-                      ? `ƒ ${S.ui.editingFunction.defName}`
-                      : `ƒ ${S.ui.editingFunction.eventKey}`}</span
-                  >
-                `
-              : nothing}
-          </div>
-        `
-      : nothing;
+  const breadcrumbTpl = hasStack
+    ? html`
+        <div class="breadcrumb">
+          <sp-action-button size="s" title="Return to parent document" @click=${_ctx.navigateBack}>
+            ${toolbarIconMap["sp-icon-back"]}Back
+          </sp-action-button>
+          ${S.documentStack.map(
+            (/** @type {any} */ frame, /** @type {number} */ i) => html`
+              <span class="breadcrumb-item clickable" @click=${() => _ctx.navigateToLevel(i)}
+                >${frame.documentPath?.split("/").pop() || "untitled"}</span
+              >
+              <span class="breadcrumb-sep"> › </span>
+            `,
+          )}
+          <span class="breadcrumb-item current">
+            ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}
+          </span>
+        </div>
+      `
+    : nothing;
 
   const { featureQueries } = _ctx.parseMediaEntries(getEffectiveMedia(S.document.$media));
   const togglesTpl =
@@ -254,7 +232,7 @@ function toolbarTemplate() {
             title="Maximize"
             @click=${() => windowControls.maximize()}
           >
-            <sp-icon-full-screen slot="icon"></sp-icon-full-screen>
+            <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
           </sp-action-button>
           <sp-action-button
             quiet
@@ -301,6 +279,21 @@ function toolbarTemplate() {
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
     <div class="tb-spacer"></div>
-    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
+    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
+    <sp-action-button
+      quiet
+      size="s"
+      title="Toggle Right Panel"
+      @click=${() => {
+        view.rightPanelCollapsed = !view.rightPanelCollapsed;
+        applyPanelCollapse();
+        render();
+      }}
+    >
+      ${view.rightPanelCollapsed
+        ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
+        : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
+    </sp-action-button>
+    ${csdTpl}
   `;
 }

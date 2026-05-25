@@ -18,18 +18,17 @@ export function renderHeadEditor(container) {
 
   const addEntry = (/** @type {string} */ tag) => {
     /** @type {any} */
-    const entry = { tag };
+    const entry = { tagName: tag, attributes: {} };
     if (tag === "link") {
-      entry.rel = "stylesheet";
-      entry.href = "";
+      entry.attributes.rel = "stylesheet";
+      entry.attributes.href = "";
     } else if (tag === "meta") {
-      entry.name = "";
-      entry.content = "";
+      entry.attributes.name = "";
+      entry.attributes.content = "";
     } else if (tag === "script") {
-      entry.src = "";
-      entry.body = "";
+      entry.attributes.src = "";
     } else if (tag === "style") {
-      entry.body = "";
+      entry.content = "";
     }
     headEntries.push(entry);
     save();
@@ -47,7 +46,13 @@ export function renderHeadEditor(container) {
     /** @type {string} */ key,
     /** @type {string} */ val,
   ) => {
-    headEntries[idx][key] = val;
+    const entry = headEntries[idx];
+    if (key === "content" && (entry.tagName === "script" || entry.tagName === "style")) {
+      entry.content = val;
+    } else {
+      if (!entry.attributes) entry.attributes = {};
+      entry.attributes[key] = val;
+    }
     save();
   };
 
@@ -63,7 +68,7 @@ export function renderHeadEditor(container) {
           (/** @type {any} */ entry, /** @type {number} */ idx) => html`
             <div class="head-entry">
               <div class="head-entry-header">
-                <span class="head-entry-tag">&lt;${entry.tag}&gt;</span>
+                <span class="head-entry-tag">&lt;${entry.tagName}&gt;</span>
                 <sp-action-button quiet size="s" @click=${() => removeEntry(idx)}>
                   <sp-icon-delete slot="icon"></sp-icon-delete>
                 </sp-action-button>
@@ -101,20 +106,22 @@ function renderEntryFields(entry, idx, updateEntry) {
     }, 300);
   };
 
-  switch (entry.tag) {
+  const attrs = entry.attributes || {};
+
+  switch (entry.tagName) {
     case "link":
       return html`
         <div class="settings-field-row">
           <sp-textfield
             size="s"
             label="rel"
-            .value=${entry.rel || ""}
+            .value=${attrs.rel || ""}
             @change=${onFieldChange("rel")}
           ></sp-textfield>
           <sp-textfield
             size="s"
             label="href"
-            .value=${entry.href || ""}
+            .value=${attrs.href || ""}
             @change=${onFieldChange("href")}
             style="flex:1"
           ></sp-textfield>
@@ -126,13 +133,13 @@ function renderEntryFields(entry, idx, updateEntry) {
           <sp-textfield
             size="s"
             label="name"
-            .value=${entry.name || ""}
+            .value=${attrs.name || ""}
             @change=${onFieldChange("name")}
           ></sp-textfield>
           <sp-textfield
             size="s"
             label="content"
-            .value=${entry.content || ""}
+            .value=${attrs.content || ""}
             @change=${onFieldChange("content")}
             style="flex:1"
           ></sp-textfield>
@@ -144,20 +151,20 @@ function renderEntryFields(entry, idx, updateEntry) {
           <sp-textfield
             size="s"
             label="src"
-            .value=${entry.src || ""}
+            .value=${attrs.src || ""}
             @change=${onFieldChange("src")}
             placeholder="URL or leave empty for inline"
             style="flex:1"
           ></sp-textfield>
         </div>
-        ${!entry.src
+        ${!attrs.src
           ? html`
               <div class="head-entry-body">
                 <label class="settings-field-label">Script body</label>
                 <textarea
                   class="head-code-editor"
-                  .value=${entry.body || ""}
-                  @input=${onFieldChange("body")}
+                  .value=${entry.content || ""}
+                  @input=${onFieldChange("content")}
                   rows="6"
                   spellcheck="false"
                 ></textarea>
@@ -171,8 +178,8 @@ function renderEntryFields(entry, idx, updateEntry) {
           <label class="settings-field-label">Style body</label>
           <textarea
             class="head-code-editor"
-            .value=${entry.body || ""}
-            @input=${onFieldChange("body")}
+            .value=${entry.content || ""}
+            @input=${onFieldChange("content")}
             rows="8"
             spellcheck="false"
           ></textarea>

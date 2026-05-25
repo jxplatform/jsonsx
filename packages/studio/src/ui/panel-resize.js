@@ -5,6 +5,8 @@
  * localStorage so they survive page reloads.
  */
 
+import { view, applyPanelCollapse } from "../view.js";
+
 const STORAGE_KEY = "jx-studio-panel-widths";
 const MIN_WIDTH = 160;
 const MAX_RATIO = 0.5; // max 50% of viewport
@@ -13,12 +15,15 @@ const DEFAULT_RIGHT = 280;
 
 const root = document.documentElement;
 
-// ─── Restore saved widths ────────────────────────────────────────────────────
+// ─── Restore saved widths & collapse state ──────────────────────────────────
 
 try {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
   if (saved.left) root.style.setProperty("--panel-w-left", `${saved.left}px`);
   if (saved.right) root.style.setProperty("--panel-w-right", `${saved.right}px`);
+  if (saved.leftCollapsed) view.leftPanelCollapsed = true;
+  if (saved.rightCollapsed) view.rightPanelCollapsed = true;
+  applyPanelCollapse();
 } catch {
   // ignore
 }

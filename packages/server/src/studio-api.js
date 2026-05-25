@@ -817,7 +817,12 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         const { message } = await req.json();
         if (!message || typeof message !== "string")
           return Response.json({ error: "Missing message" }, { status: 400 });
-        const out = await runGit(["commit", "-m", message]);
+        const statusOut = await runGit(["status", "--porcelain"]);
+        const hasStaged = statusOut
+          .split("\n")
+          .some((l) => l.length > 0 && l[0] !== " " && l[0] !== "?");
+        const args = hasStaged ? ["commit", "-m", message] : ["commit", "-a", "-m", message];
+        const out = await runGit(args);
         const hashMatch = out.match(/\[[\w/]+ ([a-f0-9]+)\]/);
         return Response.json({ ok: true, hash: hashMatch?.[1] || "" });
       }

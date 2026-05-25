@@ -147,6 +147,23 @@
         background: var(--bg-panel);
         border-left: 1px solid var(--border);
       }
+
+      /* ─── Collapsed sidebars ──────────────────────── */
+      #app.left-collapsed {
+        --panel-w-left: 0px;
+      }
+      #app.left-collapsed #left-panel,
+      #app.left-collapsed #resize-left {
+        display: none;
+      }
+      #app.right-collapsed {
+        --panel-w-right: 0px;
+      }
+      #app.right-collapsed #right-panel,
+      #app.right-collapsed #resize-right {
+        display: none;
+      }
+
       #statusbar {
         grid-row: 4;
         grid-column: 1 / -1;
@@ -157,6 +174,19 @@
         color: var(--fg-dim);
         background: var(--bg-panel);
         border-top: 1px solid var(--border);
+      }
+      #statusbar .sb-path-seg {
+        cursor: pointer;
+        border-radius: 2px;
+        padding: 0 2px;
+      }
+      #statusbar .sb-path-seg:hover {
+        color: var(--fg);
+        background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+        text-decoration: underline;
+      }
+      #statusbar .sb-path-sep {
+        color: var(--fg-dim);
       }
 
       /* ─── Tab strip ───────────────────────────────── */
@@ -492,8 +522,9 @@
       .block-action-bar .bar-tag {
         font-size: 10px;
         padding: 0 4px;
-        color: var(--fg-dim);
-        font-family: var(--mono);
+        border-radius: 2px;
+        color: var(--accent-fg);
+        background: var(--tag);
         max-width: 140px;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -701,14 +732,19 @@
         display: none;
         align-items: center;
         gap: 0;
-        flex-shrink: 0;
-        margin-left: auto;
-      }
-      .layer-actions sp-action-button {
-        cursor: pointer;
       }
       .layer-row:hover .layer-actions {
         display: flex;
+      }
+      .layer-row:hover .layer-label {
+        display: none;
+      }
+      .layer-drag-handle {
+        color: var(--fg-dim);
+        opacity: 0.6;
+        font-size: 11px;
+        cursor: grab;
+        padding: 0 4px 0 0;
       }
       .layer-toggle {
         width: 14px;
