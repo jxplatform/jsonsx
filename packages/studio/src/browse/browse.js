@@ -8,6 +8,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform.js";
 import { projectState } from "../store.js";
 import { yamlDefault } from "../settings/schema-field-ui.js";
@@ -771,7 +772,9 @@ export async function renderBrowse(container, ctx) {
                 >${loading ? "Loading..." : "No files found"}</sp-table-cell
               ></sp-table-row
             >`
-          : files.map(
+          : repeat(
+              files,
+              (f) => f.path,
               (f) => html`
                 <sp-table-row
                   value=${f.path}
@@ -799,7 +802,13 @@ export async function renderBrowse(container, ctx) {
   const grid =
     files.length === 0
       ? html`<div class="browse-grid-empty">${loading ? "Loading..." : "No files found"}</div>`
-      : html`<div class="browse-grid">${files.map((f) => renderCard(f, container, ctx))}</div>`;
+      : html`<div class="browse-grid">
+          ${repeat(
+            files,
+            (f) => f.path,
+            (f) => renderCard(f, container, ctx),
+          )}
+        </div>`;
 
   const body = viewMode === "grid" ? grid : html`<div class="browse-table">${table}</div>`;
 

@@ -25,7 +25,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 export function renderFieldRow({ prop, label, hasValue, onClear, widget, span, warning }) {
   return html`
     <div
-      class=${classMap({ "style-row": true, "style-row--warning": warning })}
+      class=${classMap({ "style-row": true, "style-row--warning": !!warning })}
       data-prop=${prop}
       style=${span === 2 ? "grid-column: 1 / -1" : ""}
     >
