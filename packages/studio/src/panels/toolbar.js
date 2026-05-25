@@ -10,7 +10,7 @@ import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
 import { getEffectiveMedia } from "../site-context.js";
 import { mediaDisplayName } from "./shared.js";
-import { view } from "../view.js";
+import { view, applyPanelCollapse } from "../view.js";
 import { getRecentProjects } from "../recent-projects.js";
 import { openQuickSearch } from "./quick-search.js";
 import { openBrowseModal } from "../browse/browse-modal.js";
@@ -126,8 +126,8 @@ function toolbarTemplate() {
             ${toolbarIconMap["sp-icon-back"]}Back
           </sp-action-button>
           ${S.documentStack.map(
-            (/** @type {any} */ frame) => html`
-              <span class="breadcrumb-item"
+            (/** @type {any} */ frame, /** @type {number} */ i) => html`
+              <span class="breadcrumb-item clickable" @click=${() => _ctx.navigateToLevel(i)}
                 >${frame.documentPath?.split("/").pop() || "untitled"}</span
               >
               <span class="breadcrumb-sep"> › </span>
@@ -279,6 +279,21 @@ function toolbarTemplate() {
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
     <div class="tb-spacer"></div>
-    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl} ${csdTpl}
+    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
+    <sp-action-button
+      quiet
+      size="s"
+      title="Toggle Right Panel"
+      @click=${() => {
+        view.rightPanelCollapsed = !view.rightPanelCollapsed;
+        applyPanelCollapse();
+        render();
+      }}
+    >
+      ${view.rightPanelCollapsed
+        ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
+        : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
+    </sp-action-button>
+    ${csdTpl}
   `;
 }

@@ -122,6 +122,9 @@ import { IconVisibility } from "@spectrum-web-components/icons-workflow/src/elem
 import { IconVisibilityOff } from "@spectrum-web-components/icons-workflow/src/elements/IconVisibilityOff.js";
 import { IconArtboard } from "@spectrum-web-components/icons-workflow/src/elements/IconArtboard.js";
 import { IconViewList } from "@spectrum-web-components/icons-workflow/src/elements/IconViewList.js";
+import { IconRailRightClose } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightClose.js";
+import { IconRailRightOpen } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightOpen.js";
+import { IconRectangle } from "@spectrum-web-components/icons-workflow/src/elements/IconRectangle.js";
 
 // Inline formatting icons
 import { IconTextBold } from "@spectrum-web-components/icons-workflow/src/elements/IconTextBold.js";
@@ -251,6 +254,9 @@ const components = [
   ["sp-icon-download", IconDownload],
   ["sp-icon-checkmark", IconCheckmark],
   ["sp-icon-view-column", IconViewColumn],
+  ["sp-icon-rail-right-close", IconRailRightClose],
+  ["sp-icon-rail-right-open", IconRailRightOpen],
+  ["sp-icon-rectangle", IconRectangle],
   ["sp-icon-box", IconBox],
   ["sp-icon-visibility", IconVisibility],
   ["sp-icon-visibility-off", IconVisibilityOff],
