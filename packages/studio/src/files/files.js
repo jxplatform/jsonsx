@@ -76,6 +76,7 @@ export async function loadProject() {
     if (info.isSiteProject) {
       await loadDirectory(".");
       await loadComponentRegistry();
+      await openHomePage();
     }
     // If not a site project (monorepo) — show welcome prompt, don't load tree
   } catch {
@@ -144,8 +145,22 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
+
+    await openHomePage();
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);
+  }
+}
+
+export async function openHomePage() {
+  const platform = getPlatform();
+  const candidates = ["pages/index.md", "pages/index.json"];
+  for (const path of candidates) {
+    try {
+      await platform.readFile(path);
+      await openFileInTab(path);
+      return;
+    } catch {}
   }
 }
 

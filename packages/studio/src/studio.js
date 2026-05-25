@@ -41,6 +41,7 @@ import {
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
   openFileInTab,
+  openHomePage,
   setupTreeKeyboard,
   loadDirectory,
 } from "./files/files.js";
@@ -458,7 +459,22 @@ if (_openParam) {
 
         // Read and open the file
         const _fileParam = new URLSearchParams(location.search).get("file");
-        const fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
+        let fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
+
+        // When opening project.json, default to home page instead
+        if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
+          let opened = false;
+          for (const candidate of ["pages/index.md", "pages/index.json"]) {
+            try {
+              await platform.readFile(candidate);
+              fileRelPath = candidate;
+              opened = true;
+              break;
+            } catch {}
+          }
+          if (!opened) fileRelPath = "project.json";
+        }
+
         const content = await platform.readFile(fileRelPath);
         if (content) {
           let parsedDoc, frontmatter;
@@ -584,6 +600,8 @@ async function openRecentProject(/** @type {string} */ root) {
     renderActivityBar();
     renderLeftPanel();
     statusMessage(`Opened project: ${projectState.name}`);
+
+    await openHomePage();
   } catch (/** @type {any} */ e) {
     statusMessage(`Error: ${e.message}`);
   }
