@@ -49,7 +49,7 @@ export function unmount() {
 function render() {
   if (!_host) return;
 
-  if (workspace.tabOrder.length <= 1) {
+  if (workspace.tabOrder.length < 1) {
     litRender(nothing, _host);
     return;
   }
