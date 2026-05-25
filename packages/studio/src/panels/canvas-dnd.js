@@ -73,9 +73,9 @@ export function registerPanelDnD(panel) {
 
     const node = getNodeAtPath(document, elPath);
     const tag = (node?.tagName || "div").toLowerCase();
-    const hasElementChildren = node?.children?.some(
-      (/** @type {unknown} */ c) => c != null && typeof c === "object",
-    );
+    const hasElementChildren =
+      Array.isArray(node?.children) &&
+      node.children.some((/** @type {unknown} */ c) => c != null && typeof c === "object");
     const isLeaf = VOID_ELEMENTS.has(tag) || !hasElementChildren;
 
     const cleanup = dropTargetForElements({

@@ -38,12 +38,9 @@ function dataTypeLabel(/** @type {any} */ value) {
 export function renderDataExplorerTemplate(state, liveScope, callbacks) {
   const { renderCanvas, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
 
-  if (!liveScope) {
-    return html`<div class="empty-state">No live data — render the document in preview mode</div>`;
-  }
-
   const defs = state || {};
   const entries = Object.entries(defs);
+  const scope = liveScope || {};
 
   return html`
     <div class="data-explorer-toolbar">
@@ -63,7 +60,7 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
     ${entries.length === 0
       ? html`<div class="empty-state">No state defined</div>`
       : entries.map(([name, def]) => {
-          const value = liveScope[name];
+          const value = scope[name];
           const unwrapped = unwrapSignal(value);
           const isExpanded = expandedDataKeys.has(name);
           return html`

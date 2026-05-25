@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import {
   buildStylebookElement,
   renderStylebookElementsIntoCanvas,
+  renderComponentPreview,
 } from "../src/panels/stylebook-panel.js";
 import { setProjectState } from "../src/store.js";
 
@@ -205,5 +206,52 @@ describe("renderStylebookElementsIntoCanvas CSS variables", () => {
     const rootStyle2 = { "--color-primary": "#fff" };
     renderStylebookElementsIntoCanvas(canvasEl, rootStyle2, "", false, null);
     expect(canvasEl.style.getPropertyValue("--color-primary")).toBe("#fff");
+  });
+});
+
+// ─── renderComponentPreview ──────────────────────────────────────────────────
+
+describe("renderComponentPreview", () => {
+  test("npm component not registered → returns fallback div", async () => {
+    const el = await renderComponentPreview({ tagName: "sl-button", source: "npm" });
+    expect(el.tagName).toBe("DIV");
+    expect(el.textContent).toBe("<sl-button>");
+  });
+
+  test("npm component not registered → does not throw", async () => {
+    await expect(
+      renderComponentPreview({ tagName: "sl-nonexistent", source: "npm" }),
+    ).resolves.toBeDefined();
+  });
+
+  test("markdown component → returns fallback div without fetch", async () => {
+    const el = await renderComponentPreview({
+      tagName: "todo-app",
+      source: "local",
+      path: "components/todo-app.md",
+    });
+    expect(el.tagName).toBe("DIV");
+    expect(el.textContent).toBe("<todo-app>");
+  });
+
+  test("markdown component with .MD extension → returns fallback", async () => {
+    const el = await renderComponentPreview({
+      tagName: "my-comp",
+      source: "local",
+      path: "components/my-comp.MD",
+    });
+    expect(el.tagName).toBe("DIV");
+    expect(el.textContent).toBe("<my-comp>");
+  });
+
+  test("local component with invalid path → returns fallback (no unhandled error)", async () => {
+    setProjectState({ projectRoot: "test-project", projectConfig: null, expanded: new Set() });
+    const el = await renderComponentPreview({
+      tagName: "missing-comp",
+      source: "local",
+      path: "components/nonexistent.json",
+    });
+    expect(el.tagName).toBe("DIV");
+    expect(el.textContent).toBe("<missing-comp>");
   });
 });

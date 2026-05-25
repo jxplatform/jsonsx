@@ -106,7 +106,8 @@ export function defHint(name, def) {
   if (def.$handler) return "handler (legacy)";
   if (def.$compute)
     return "=" + (def.$compute.length > 20 ? def.$compute.slice(0, 20) + "..." : def.$compute);
-  if (def.$prototype === "Request") return def.method + " " + (def.url || "").slice(0, 20);
+  if (def.$prototype === "Request")
+    return (def.method || "GET") + " " + (def.url || "").slice(0, 20);
   if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
     return def.key || "";
   if (def.$prototype === "IndexedDB") return def.database || "";

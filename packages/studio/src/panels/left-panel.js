@@ -124,6 +124,7 @@ function _render() {
     document: aTab.doc.document,
     mode: aTab.doc.mode,
     selection: aTab.session.selection,
+    canvas: aTab.session.canvas,
   });
   const tab = view.leftTab;
 
