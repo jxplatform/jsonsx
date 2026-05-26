@@ -853,7 +853,7 @@ function routeToOutputPath(urlPattern, outDir, trailingSlash) {
 /**
  * Generate redirect files (HTML meta refresh and _redirects).
  *
- * @param {Record<string, unknown>} redirects
+ * @param {Record<string, string | { destination: string; status?: number }>} redirects
  * @param {string} outDir
  * @returns {number} Number of files written
  */
@@ -863,15 +863,8 @@ function generateRedirects(redirects, outDir) {
   const redirectLines = [];
 
   for (const [source, target] of Object.entries(redirects)) {
-    const dest = /** @type {string} */ (
-      typeof target === "object"
-        ? /** @type {{ destination: string }} */ (target).destination
-        : target
-    );
-    const status =
-      typeof target === "object" && target !== null
-        ? /** @type {{ status?: number }} */ ((target).status ?? 301)
-        : 301;
+    const dest = typeof target === "object" ? target.destination : target;
+    const status = typeof target === "object" ? (target.status ?? 301) : 301;
 
     // Skip patterns with :param or * — these need platform-specific handling
     if (source.includes(":") || source.includes("*")) {
