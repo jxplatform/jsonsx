@@ -34,35 +34,36 @@ import { addPackage, removePackage, listPackages } from "../src/packages";
 const projectRoot = process.argv[2] || process.cwd();
 setProjectRoot(projectRoot);
 
-const handlers: Record<string, (params: any) => Promise<any>> = {
+const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   openProject: () => openProject(),
-  listDirectory: (params) => listDirectory(params),
-  readFile: (params) => handleReadFile(params),
-  writeFile: (params) => handleWriteFile(params),
-  deleteFile: (params) => handleDeleteFile(params),
-  renameFile: (params) => handleRenameFile(params),
-  createDirectory: (params) => handleCreateDirectory(params),
-  uploadFile: (params) => handleUploadFile(params),
-  resolveSiteContext: (params) => handleResolveSiteContext(params),
-  discoverComponents: (params) => discoverComponents(params),
+  listDirectory: (params) => listDirectory(params as { dir: string }),
+  readFile: (params) => handleReadFile(params as { path: string }),
+  writeFile: (params) => handleWriteFile(params as { path: string; content: string }),
+  deleteFile: (params) => handleDeleteFile(params as { path: string }),
+  renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
+  createDirectory: (params) => handleCreateDirectory(params as { path: string }),
+  uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
+  resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
+  discoverComponents: (params) => discoverComponents(params as { dir?: string }),
   codeService: (params) => codeService(params),
-  locateFile: (params) => locateFile(params),
-  fetchPluginSchema: (params) => fetchPluginSchema(params),
+  locateFile: (params) => locateFile(params as { name: string }),
+  fetchPluginSchema: (params) =>
+    fetchPluginSchema(params as { src: string; prototype?: string; base?: string }),
   gitStatus: () => gitStatus(),
   gitBranches: () => gitBranches(),
-  gitLog: (params) => gitLog(params),
-  gitStage: (params) => gitStage(params),
-  gitUnstage: (params) => gitUnstage(params),
-  gitCommit: (params) => gitCommit(params),
+  gitLog: (params) => gitLog(params as { limit?: number }),
+  gitStage: (params) => gitStage(params as { files: string[] }),
+  gitUnstage: (params) => gitUnstage(params as { files: string[] }),
+  gitCommit: (params) => gitCommit(params as { message: string }),
   gitPush: () => gitPush(),
   gitPull: () => gitPull(),
   gitFetch: () => gitFetch(),
-  gitCheckout: (params) => gitCheckout(params),
-  gitCreateBranch: (params) => gitCreateBranch(params),
-  gitDiff: (params) => gitDiff(params),
-  gitDiscard: (params) => gitDiscard(params),
-  addPackage: (params) => addPackage(params),
-  removePackage: (params) => removePackage(params),
+  gitCheckout: (params) => gitCheckout(params as { branch: string }),
+  gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),
+  gitDiff: (params) => gitDiff(params as { path?: string }),
+  gitDiscard: (params) => gitDiscard(params as { files: string[] }),
+  addPackage: (params) => addPackage(params as { name: string }),
+  removePackage: (params) => removePackage(params as { name: string }),
   listPackages: () => listPackages(),
 };
 
@@ -74,7 +75,7 @@ const server = Bun.serve({
   },
   websocket: {
     async message(ws, raw) {
-      let msg: { id: number; method: string; params?: any };
+      let msg: { id: number; method: string; params?: unknown };
       try {
         msg = JSON.parse(raw as string);
       } catch {
@@ -92,9 +93,11 @@ const server = Bun.serve({
       try {
         const result = await handler(msg.params);
         ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
-      } catch (err: any) {
+      } catch (err: unknown) {
         await Bun.sleep(0);
-        ws.send(JSON.stringify({ id: msg.id, error: err.message || String(err) }));
+        ws.send(
+          JSON.stringify({ id: msg.id, error: err instanceof Error ? err.message : String(err) }),
+        );
       }
     },
   },

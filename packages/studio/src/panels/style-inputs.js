@@ -18,7 +18,8 @@ import {
 /**
  * Dual-mode keyword input — shared by select (enum) and combobox (examples) widgets.
  *
- * @param {any} options @param {any} prop @param {any} value @param {any} onChange
+ * @param {string[]} options @param {string} prop @param {string} value @param {(value: string) =>
+ *   void} onChange
  */
 export function renderKeywordInput(options, prop, value, onChange) {
   const cssInitialMap = getCssInitialMap();
@@ -26,10 +27,10 @@ export function renderKeywordInput(options, prop, value, onChange) {
   const font = isTypoPreview ? currentFontFamily() : "";
   const cssProp = isTypoPreview ? camelToKebab(prop) : "";
 
-  const comboOptions = options.map((/** @type {any} */ v) => {
+  const comboOptions = options.map((/** @type {string} */ v) => {
     const label = v.includes("-")
       ? kebabToLabel(v)
-      : v.replace(/^./, (/** @type {any} */ c) => c.toUpperCase());
+      : v.replace(/^./, (/** @type {string} */ c) => c.toUpperCase());
     const style = isTypoPreview ? `${cssProp}: ${v};${font ? ` font-family: ${font}` : ""}` : "";
     return { value: v, label, style };
   });
@@ -39,19 +40,23 @@ export function renderKeywordInput(options, prop, value, onChange) {
     .value=${value || ""}
     placeholder=${cssInitialMap.get(prop) || ""}
     .options=${comboOptions}
-    @change=${(/** @type {any} */ e) => onChange(e.target.value)}
-    @input=${debouncedStyleCommit(`kw:${prop}`, 400, (/** @type {any} */ e) =>
-      onChange(e.target.value),
+    @change=${(/** @type {Event} */ e) =>
+      onChange(/** @type {HTMLInputElement} */ (e.target).value)}
+    @input=${debouncedStyleCommit(`kw:${prop}`, 400, (/** @type {Event} */ e) =>
+      onChange(/** @type {HTMLInputElement} */ (e.target).value),
     )}
   ></jx-value-selector>`;
 }
 
-/** @param {any} entry @param {any} prop @param {any} value @param {any} onChange */
+/**
+ * @param {{ enum?: string[] }} entry @param {string} prop @param {string} value @param {(value:
+ *   string) => void} onChange
+ */
 export function renderSelectInput(entry, prop, value, onChange) {
   return renderKeywordInput(entry.enum || [], prop, value, onChange);
 }
 
-/** @param {any} preset @param {any} onChange */
+/** @param {{ title: string; value: string }} preset @param {(value: string) => void} onChange */
 function handleFontPresetSelection(preset, onChange) {
   const varName = friendlyNameToVar(preset.title, "--font-");
   if (!activeTab.value?.doc.document?.style?.[varName]) {
@@ -60,12 +65,17 @@ function handleFontPresetSelection(preset, onChange) {
   onChange(`var(${varName})`);
 }
 
-/** @param {any} val @param {any} presets @param {any} onChange */
+/**
+ * @param {string} val @param {{ title: string; value: string }[]} presets @param {(value: string)
+ *   => void} onChange
+ */
 function handleFontSelection(val, presets, onChange) {
   if (!val) return;
   if (val.startsWith("__preset__:")) {
     const title = val.slice("__preset__:".length);
-    const preset = presets.find((/** @type {any} */ p) => p.title === title);
+    const preset = presets.find(
+      (/** @type {{ title: string; value: string }} */ p) => p.title === title,
+    );
     if (preset) handleFontPresetSelection(preset, onChange);
     return;
   }
@@ -73,14 +83,17 @@ function handleFontSelection(val, presets, onChange) {
     onChange(`var(${val})`);
     return;
   }
-  const preset = presets.find((/** @type {any} */ p) => p.title === val);
+  const preset = presets.find(
+    (/** @type {{ title: string; value: string }} */ p) => p.title === val,
+  );
   if (preset) {
     handleFontPresetSelection(preset, onChange);
     return;
   }
   const fontVars = getFontVars();
   const matchedVar = fontVars.find(
-    (/** @type {any} */ fv) => varDisplayName(fv.name, "--font-") === val,
+    (/** @type {{ name: string; value: string }} */ fv) =>
+      varDisplayName(fv.name, "--font-") === val,
   );
   if (matchedVar) {
     onChange(`var(${matchedVar.name})`);
@@ -92,19 +105,23 @@ function handleFontSelection(val, presets, onChange) {
 /**
  * Build font options array for jx-value-selector.
  *
- * @param {any[]} fontVars @param {any[]} presets
- * @returns {{ value: string; label: string; style: string }[] | { divider: true }[]}
+ * @param {{ name: string; value: string }[]} fontVars @param {{ title: string; value: string }[]}
+ *   presets
+ * @returns {({ value: string; label: string; style: string } | { divider: true })[]}
  */
 export function buildFontOptions(fontVars, presets) {
-  /** @type {any[]} */
-  const opts = fontVars.map((/** @type {any} */ fv) => ({
+  /** @type {({ value: string; label: string; style: string } | { divider: true })[]} */
+  const opts = fontVars.map((/** @type {{ name: string; value: string }} */ fv) => ({
     value: fv.name,
     label: varDisplayName(fv.name, "--font-"),
     style: `font-family: ${fv.value}`,
   }));
   const unadded = presets.filter(
-    (/** @type {any} */ p) =>
-      !fontVars.some((/** @type {any} */ fv) => fv.name === friendlyNameToVar(p.title, "--font-")),
+    (/** @type {{ title: string; value: string }} */ p) =>
+      !fontVars.some(
+        (/** @type {{ name: string; value: string }} */ fv) =>
+          fv.name === friendlyNameToVar(p.title, "--font-"),
+      ),
   );
   if (unadded.length > 0 && opts.length > 0) opts.push({ divider: true });
   for (const p of unadded) {
@@ -117,7 +134,14 @@ export function buildFontOptions(fontVars, presets) {
   return opts;
 }
 
-/** @param {any} entry @param {any} prop @param {any} value @param {any} onChange */
+/**
+ * @param {{
+ *   enum?: string[];
+ *   examples?: string[];
+ *   presets?: { title: string; value: string }[];
+ * }} entry
+ *   @param {string} prop @param {string} value @param {(value: string) => void} onChange
+ */
 export function renderComboboxInput(entry, prop, value, onChange) {
   const cssInitialMap = getCssInitialMap();
   const fontVars = prop === "fontFamily" ? getFontVars() : [];
@@ -133,9 +157,10 @@ export function renderComboboxInput(entry, prop, value, onChange) {
       .value=${comboValue}
       placeholder=${cssInitialMap.get("fontFamily") || ""}
       .options=${fontOptions}
-      @change=${(/** @type {any} */ e) => handleFontSelection(e.target.value, presets, onChange)}
-      @input=${debouncedStyleCommit("combo:fontFamily", 400, (/** @type {any} */ e) =>
-        onChange(e.target.value),
+      @change=${(/** @type {Event} */ e) =>
+        handleFontSelection(/** @type {HTMLInputElement} */ (e.target).value, presets, onChange)}
+      @input=${debouncedStyleCommit("combo:fontFamily", 400, (/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).value),
       )}
     ></jx-value-selector>`;
   }
@@ -149,8 +174,8 @@ export function renderComboboxInput(entry, prop, value, onChange) {
       size="s"
       placeholder=${cssInitialMap.get(prop) || ""}
       .value=${live(value || "")}
-      @input=${debouncedStyleCommit(`combo:${prop}`, 400, (/** @type {any} */ e) =>
-        onChange(e.target.value),
+      @input=${debouncedStyleCommit(`combo:${prop}`, 400, (/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).value),
       )}
     ></sp-textfield>
   `;
@@ -161,17 +186,24 @@ export function renderComboboxInput(entry, prop, value, onChange) {
  * inputs and CSS initial-value placeholders.
  */
 export function widgetForType(
-  /** @type {any} */ type,
-  /** @type {any} */ entry,
-  /** @type {any} */ prop,
-  /** @type {any} */ value,
-  /** @type {any} */ onCommit,
-  /** @type {any} */ opts = {},
+  /** @type {string} */ type,
+  /** @type {Record<string, unknown>} */ entry,
+  /** @type {string} */ prop,
+  /** @type {string} */ value,
+  /** @type {(value: string) => void} */ onCommit,
+  /** @type {{ placeholder?: string }} */ opts = {},
 ) {
   const cssInitialMap = getCssInitialMap();
-  return _widgetForType(type, entry, prop, value, onCommit, {
-    placeholder: opts.placeholder || cssInitialMap.get(prop) || "",
-    renderSelect: renderSelectInput,
-    renderCombobox: renderComboboxInput,
-  });
+  return _widgetForType(
+    type,
+    entry,
+    prop,
+    value,
+    /** @type {(val: string | number) => void} */ (onCommit),
+    {
+      placeholder: opts.placeholder || cssInitialMap.get(prop) || "",
+      renderSelect: renderSelectInput,
+      renderCombobox: renderComboboxInput,
+    },
+  );
 }

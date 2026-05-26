@@ -15,8 +15,15 @@ import { view } from "../view.js";
 import { getLayerSlot } from "../ui/layers.js";
 import { getActivePanel, findCanvasElement } from "./canvas-helpers.js";
 
-/** @type {any} */
-let _ctx = null;
+/**
+ * @type {{
+ *   getCanvasMode: () => string;
+ *   getZoom: () => number;
+ *   setZoomDirect: (zoom: number) => void;
+ *   renderStylebookOverlays: () => void;
+ * }}
+ */
+let _ctx;
 
 /**
  * Initialize the canvas utils module.
@@ -35,10 +42,10 @@ export function initCanvasUtils(ctx) {
 /**
  * Create the DOM structure for a single canvas panel.
  *
- * @param {any} mediaName
- * @param {any} label
- * @param {any} fullWidth
- * @param {any} width
+ * @param {string | null} mediaName
+ * @param {string | null} label
+ * @param {boolean} fullWidth
+ * @param {number | null} width
  */
 export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   /**
@@ -55,7 +62,7 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
    * }}
    */
   const panel = {
-    mediaName,
+    mediaName: mediaName || "",
     element: null,
     canvas: null,
     overlay: null,

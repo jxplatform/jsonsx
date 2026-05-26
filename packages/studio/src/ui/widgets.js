@@ -23,19 +23,19 @@ import { renderMediaPicker } from "./media-picker.js";
  * Render a plain text input widget.
  *
  * @param {string} prop
- * @param {any} value
+ * @param {string | number | undefined} value
  * @param {(val: string) => void} onChange
  * @param {string} [placeholder]
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderTextInput(prop, value, onChange, placeholder = "") {
   return html`
     <sp-textfield
       size="s"
       placeholder=${placeholder}
-      .value=${live(value || "")}
-      @input=${debouncedStyleCommit(`text:${prop}`, 400, (/** @type {any} */ e) =>
-        onChange(e.target.value),
+      .value=${live(String(value ?? ""))}
+      @input=${debouncedStyleCommit(`text:${prop}`, 400, (/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).value),
       )}
     ></sp-textfield>
   `;
@@ -44,24 +44,27 @@ export function renderTextInput(prop, value, onChange, placeholder = "") {
 /**
  * Render a number input widget (sp-number-field).
  *
- * @param {any} entry
+ * @param {Record<string, unknown>} entry
  * @param {string} prop
- * @param {any} value
- * @param {(val: any) => void} onChange
- * @returns {any}
+ * @param {string | number | undefined} value
+ * @param {(val: string | number) => void} onChange
+ * @param {string} [placeholder]
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderNumberInput(entry, prop, value, onChange, placeholder = "") {
+  const minimum = /** @type {number | undefined} */ (entry.minimum);
+  const maximum = /** @type {number | undefined} */ (entry.maximum);
   return html`
     <sp-number-field
       size="s"
       hide-stepper
       .value=${live(value !== undefined && value !== "" ? Number(value) : undefined)}
       placeholder=${placeholder}
-      min=${ifDefined(entry.minimum)}
-      max=${ifDefined(entry.maximum)}
-      step=${ifDefined(entry.maximum !== undefined && entry.maximum <= 1 ? 0.1 : undefined)}
-      @change=${debouncedStyleCommit(`num:${prop}`, 400, (/** @type {any} */ e) => {
-        const v = e.target.value;
+      min=${ifDefined(minimum)}
+      max=${ifDefined(maximum)}
+      step=${ifDefined(maximum !== undefined && maximum <= 1 ? 0.1 : undefined)}
+      @change=${debouncedStyleCommit(`num:${prop}`, 400, (/** @type {Event} */ e) => {
+        const v = /** @type {HTMLInputElement & { value: number | undefined }} */ (e.target).value;
         if (v === undefined || isNaN(v)) onChange("");
         else onChange(Number(v));
       })}
@@ -73,12 +76,12 @@ export function renderNumberInput(entry, prop, value, onChange, placeholder = ""
  * Dispatch to the appropriate widget based on inferred type.
  *
  * @param {string} type — one of: button-group, color, number-unit, number, select, combobox, text
- * @param {any} entry — css-meta or schema entry
+ * @param {Record<string, unknown>} entry — css-meta or schema entry
  * @param {string} prop — property key
- * @param {any} value — current value
- * @param {(val: any) => void} onCommit — commit callback
+ * @param {string | number | undefined} value — current value
+ * @param {(val: string | number) => void} onCommit — commit callback
  * @param {{ placeholder?: string; renderSelect?: Function; renderCombobox?: Function }} [opts]
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function widgetForType(type, entry, prop, value, onCommit, opts = {}) {
   switch (type) {
@@ -91,7 +94,7 @@ export function widgetForType(type, entry, prop, value, onCommit, opts = {}) {
     case "number":
       return renderNumberInput(entry, prop, value, onCommit, opts.placeholder);
     case "media":
-      return renderMediaPicker(prop, value, onCommit);
+      return renderMediaPicker(prop, String(value ?? ""), onCommit);
     case "select":
       // Allow caller to override select rendering (e.g. for typography preview)
       if (opts.renderSelect) return opts.renderSelect(entry, prop, value, onCommit);

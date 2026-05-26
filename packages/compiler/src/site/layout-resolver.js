@@ -19,14 +19,14 @@ import { resolve } from "node:path";
 /**
  * Resolve a page's layout, wrapping the page content in the layout structure.
  *
- * @param {any} pageDoc - The raw page JSON document
- * @param {any} projectConfig - Site configuration (for defaults.layout)
+ * @param {JxDocument} pageDoc - The raw page JSON document
+ * @param {Record<string, unknown>} projectConfig - Site configuration (for defaults.layout)
  * @param {string} projectRoot - Project root directory
- * @returns {any} The merged document (layout wrapping page content)
+ * @returns {JxDocument} The merged document (layout wrapping page content)
  */
 export function resolveLayout(pageDoc, projectConfig, projectRoot) {
   // Determine which layout to use
-  const layoutRef = pageDoc.$layout ?? projectConfig.defaults?.layout ?? null;
+  const layoutRef = pageDoc.$layout ?? /** @type {any} */ (projectConfig.defaults)?.layout ?? null;
 
   if (!layoutRef) {
     // No layout — return page as-is
@@ -34,17 +34,17 @@ export function resolveLayout(pageDoc, projectConfig, projectRoot) {
   }
 
   // Load the layout file
-  const layoutPath = resolve(projectRoot, layoutRef);
+  const layoutPath = resolve(projectRoot, /** @type {string} */ (layoutRef));
   if (!existsSync(layoutPath)) {
     throw new Error(`Layout not found: ${layoutRef} (resolved to ${layoutPath})`);
   }
 
-  /** @type {any} */
+  /** @type {JxDocument} */
   let layoutDoc;
   try {
     layoutDoc = JSON.parse(readFileSync(layoutPath, "utf8"));
   } catch (e) {
-    const err = /** @type {any} */ (e);
+    const err = /** @type {Error} */ (e);
     throw new Error(`Invalid layout JSON at ${layoutPath}: ${err.message}`);
   }
 
@@ -55,7 +55,9 @@ export function resolveLayout(pageDoc, projectConfig, projectRoot) {
 
   // Distribute page children into layout slots
   const rawChildren = pageDoc.children ?? [];
-  const pageChildren = typeof rawChildren === "string" ? [rawChildren] : rawChildren;
+  const pageChildren = /** @type {(JxElement | string)[]} */ (
+    typeof rawChildren === "string" ? [rawChildren] : Array.isArray(rawChildren) ? rawChildren : []
+  );
   const merged = deepClone(layoutDoc);
 
   distributeSlots(merged, pageChildren);
@@ -102,24 +104,24 @@ export function resolveLayout(pageDoc, projectConfig, projectRoot) {
  * 3. Remaining children go into the default (unnamed) slot
  * 4. Replace each <slot> element with its distributed children
  *
- * @param {any} node - Layout document tree (mutated in place)
- * @param {any[]} children - Page children to distribute
+ * @param {JxElement} node - Layout document tree (mutated in place)
+ * @param {(JxElement | string)[]} children - Page children to distribute
  */
 function distributeSlots(node, children) {
   if (!node || typeof node !== "object") return;
   if (!Array.isArray(node.children)) return;
 
   // Collect named and default children
-  /** @type {Map<string, any[]>} */
+  /** @type {Map<string, (JxElement | string)[]>} */
   const named = new Map(); // slot name → children[]
-  /** @type {any[]} */
+  /** @type {(JxElement | string)[]} */
   const defaults = []; // children without a slot target
 
   for (const child of children) {
     if (child && typeof child === "object" && child.attributes?.slot) {
-      const slotName = child.attributes.slot;
+      const slotName = /** @type {string} */ (child.attributes.slot);
       if (!named.has(slotName)) named.set(slotName, []);
-      /** @type {any[]} */ (named.get(slotName)).push(child);
+      /** @type {(JxElement | string)[]} */ (named.get(slotName)).push(child);
     } else {
       defaults.push(child);
     }
@@ -132,25 +134,27 @@ function distributeSlots(node, children) {
 /**
  * Recursively walk the tree and replace <slot> elements with distributed content.
  *
- * @param {any} node
- * @param {Map<string, any[]>} named
- * @param {any[]} defaults
+ * @param {JxElement} node
+ * @param {Map<string, (JxElement | string)[]>} named
+ * @param {(JxElement | string)[]} defaults
  */
 function fillSlots(node, named, defaults) {
   if (!node || typeof node !== "object") return;
   if (!Array.isArray(node.children)) return;
 
-  /** @type {any[]} */
+  /** @type {(JxElement | string)[]} */
   const newChildren = [];
 
   for (const child of node.children) {
     if (child && typeof child === "object" && child.tagName === "slot") {
       const slotName = child.attributes?.name;
 
-      if (slotName && named.has(slotName)) {
+      if (slotName && named.has(/** @type {string} */ (slotName))) {
         // Named slot — replace with matching children
-        newChildren.push(.../** @type {any[]} */ (named.get(slotName)));
-        named.delete(slotName); // consumed
+        newChildren.push(
+          .../** @type {(JxElement | string)[]} */ (named.get(/** @type {string} */ (slotName))),
+        );
+        named.delete(/** @type {string} */ (slotName)); // consumed
       } else if (!slotName && defaults.length > 0) {
         // Default slot — replace with unassigned children
         newChildren.push(...defaults);
@@ -158,13 +162,13 @@ function fillSlots(node, named, defaults) {
         // but if there are multiple, the first one wins
       } else {
         // No matching content — keep slot's fallback children
-        if (child.children) {
+        if (Array.isArray(child.children)) {
           newChildren.push(...child.children);
         }
       }
     } else {
       // Not a slot — recurse into it
-      fillSlots(child, named, defaults);
+      fillSlots(/** @type {JxElement} */ (child), named, defaults);
       newChildren.push(child);
     }
   }
@@ -175,8 +179,8 @@ function fillSlots(node, named, defaults) {
 /**
  * Deep clone a JSON-serializable object.
  *
- * @param {any} obj
- * @returns {any}
+ * @param {JxDocument} obj
+ * @returns {JxDocument}
  */
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));

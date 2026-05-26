@@ -12,7 +12,7 @@ import { buildSite } from "../src/site/site-build.js";
 
 const TMP = resolve(import.meta.dir, "__test-site__");
 
-/** @param {string} path @param {any} obj */
+/** @param {string} path @param {unknown} obj */
 function writeJSON(path, obj) {
   mkdirSync(resolve(TMP, ...path.split("/").slice(0, -1)), { recursive: true });
   writeFileSync(resolve(TMP, path), JSON.stringify(obj, null, 2), "utf8");
@@ -135,14 +135,14 @@ describe("layout-resolver", () => {
       children: [{ tagName: "p", children: ["Hello"] }],
     };
 
-    const result = resolveLayout(pageDoc, projectConfig, TMP);
+    const result = /** @type {any} */ (resolveLayout(pageDoc, projectConfig, TMP));
 
     // Should have the layout structure
     expect(result.tagName).toBe("div");
     expect(result.children).toHaveLength(3); // header, main, footer
 
     // Main should now contain the page's <p> instead of <slot>
-    const main = result.children[1];
+    const main = /** @type {any} */ (result.children)[1];
     expect(main.tagName).toBe("main");
     expect(main.children[0].tagName).toBe("p");
     expect(main.children[0].children[0]).toBe("Hello");
@@ -164,11 +164,11 @@ describe("head-merger", () => {
       { tagName: "meta", attributes: { name: "description", content: "Page desc" } },
     ];
 
-    const merged = mergeHead(siteHead, [], pageHead, { title: "Test" });
+    const merged = /** @type {any []} */ (mergeHead(siteHead, [], pageHead, { title: "Test" }));
 
     const names = merged
       .filter((e) => e.tagName === "meta" && e.attributes?.name)
-      .map((e) => e.attributes.name);
+      .map((e) => /** @type {any} */ (e).attributes.name);
 
     expect(names).toContain("generator");
     expect(names).toContain("description");
@@ -179,9 +179,9 @@ describe("head-merger", () => {
     const siteHead = [{ tagName: "meta", attributes: { name: "description", content: "Site" } }];
     const pageHead = [{ tagName: "meta", attributes: { name: "description", content: "Page" } }];
 
-    const merged = mergeHead(siteHead, [], pageHead, {});
+    const merged = /** @type {any []} */ (mergeHead(siteHead, [], pageHead, {}));
     const desc = merged.find((e) => e.tagName === "meta" && e.attributes?.name === "description");
-    expect(desc.attributes.content).toBe("Page");
+    expect(/** @type {any} */ (desc).attributes.content).toBe("Page");
   });
 
   it("renders to valid HTML", () => {
@@ -268,7 +268,7 @@ describe("buildSite — server worker", () => {
   beforeAll(() => {
     rmSync(SERVER_TMP, { recursive: true, force: true });
 
-    const writeJ = (/** @type {string} */ p, /** @type {any} */ obj) => {
+    const writeJ = (/** @type {string} */ p, /** @type {unknown} */ obj) => {
       mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
       writeFileSync(resolve(SERVER_TMP, p), JSON.stringify(obj, null, 2), "utf8");
     };
@@ -340,7 +340,7 @@ describe("buildSite — cloudflare-pages adapter", () => {
   beforeAll(() => {
     rmSync(PAGES_TMP, { recursive: true, force: true });
 
-    const writeJ = (/** @type {string} */ p, /** @type {any} */ obj) => {
+    const writeJ = (/** @type {string} */ p, /** @type {unknown} */ obj) => {
       mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
       writeFileSync(resolve(PAGES_TMP, p), JSON.stringify(obj, null, 2), "utf8");
     };

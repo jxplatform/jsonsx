@@ -8,17 +8,23 @@ import { view } from "../view.js";
 import { getEffectiveElements } from "../site-context.js";
 import { componentRegistry } from "../files/components.js";
 
+/** @typedef {import("../files/components.js").ComponentEntry} ComponentEntry */
+
 /**
- * @param {{ webdata: any; defaultDef: (tag: string) => any; rerender: () => void }} ctx
+ * @param {{
+ *   webdata: { elements: Record<string, { tag: string }[]> };
+ *   defaultDef: (tag: string) => JxMutableNode;
+ *   rerender: () => void;
+ * }} ctx
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderElementsTemplate(ctx) {
   const tab = activeTab.value;
 
   const categories = Object.entries(ctx.webdata.elements).map(
-    (/** @type {any} */ [category, elements]) => {
+    (/** @type {[string, { tag: string }[]]} */ [category, elements]) => {
       const filtered = view.elementsFilter
-        ? elements.filter((/** @type {any} */ e) => e.tag.includes(view.elementsFilter))
+        ? elements.filter((/** @type {{ tag: string }} */ e) => e.tag.includes(view.elementsFilter))
         : elements;
       if (filtered.length === 0) return nothing;
 
@@ -26,12 +32,13 @@ export function renderElementsTemplate(ctx) {
         <sp-accordion-item
           label=${category}
           ?open=${!view.elementsCollapsed.has(category)}
-          @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
-            if (e.target.open) view.elementsCollapsed.delete(category);
+          @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
+            if (/** @type {HTMLElement & { open: boolean }} */ (e.target).open)
+              view.elementsCollapsed.delete(category);
             else view.elementsCollapsed.add(category);
           }}
         >
-          ${filtered.map((/** @type {any} */ { tag }) => {
+          ${filtered.map((/** @type {{ tag: string }} */ { tag }) => {
             const def = ctx.defaultDef(tag);
             return html`
               <div
@@ -57,13 +64,15 @@ export function renderElementsTemplate(ctx) {
     },
   );
 
-  const effectiveEls = getEffectiveElements(tab?.doc.document?.$elements);
+  const effectiveEls = getEffectiveElements(
+    /** @type {(string | JxElement)[] | undefined} */ (tab?.doc.document?.$elements),
+  );
   /** @type {Set<string>} */
   const enabledTags = new Set();
   for (const entry of effectiveEls) {
     if (typeof entry !== "string") continue;
     const comp = componentRegistry.find(
-      (/** @type {any} */ c) =>
+      (/** @type {ComponentEntry} */ c) =>
         c.source === "npm" && c.modulePath && entry === `${c.package}/${c.modulePath}`,
     );
     if (comp) {
@@ -77,9 +86,11 @@ export function renderElementsTemplate(ctx) {
   const compsFiltered =
     componentRegistry.length > 0
       ? componentRegistry
-          .filter((/** @type {any} */ c) => c.source !== "npm" || enabledTags.has(c.tagName))
           .filter(
-            (/** @type {any} */ c) =>
+            (/** @type {ComponentEntry} */ c) => c.source !== "npm" || enabledTags.has(c.tagName),
+          )
+          .filter(
+            (/** @type {ComponentEntry} */ c) =>
               !view.elementsFilter || c.tagName.toLowerCase().includes(view.elementsFilter),
           )
       : [];
@@ -90,14 +101,15 @@ export function renderElementsTemplate(ctx) {
           <sp-accordion-item
             label="Components"
             ?open=${!view.elementsCollapsed.has("Components")}
-            @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
-              if (e.target.open) view.elementsCollapsed.delete("Components");
+            @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
+              if (/** @type {HTMLElement & { open: boolean }} */ (e.target).open)
+                view.elementsCollapsed.delete("Components");
               else view.elementsCollapsed.add("Components");
             }}
           >
             <div class="components-section">
               ${compsFiltered.map(
-                (/** @type {any} */ comp) => html`
+                (/** @type {ComponentEntry} */ comp) => html`
                   <div
                     class="element-card"
                     data-component-tag=${comp.tagName}
@@ -112,10 +124,12 @@ export function renderElementsTemplate(ctx) {
                       const instanceDef = {
                         tagName: comp.tagName,
                         $props: Object.fromEntries(
-                          (comp.props || []).map((/** @type {any} */ p) => [
-                            p.name,
-                            p.default !== undefined ? p.default : "",
-                          ]),
+                          (comp.props || []).map(
+                            (/** @type {{ name: string; default?: unknown }} */ p) => [
+                              p.name,
+                              p.default !== undefined ? p.default : "",
+                            ],
+                          ),
                         ),
                       };
                       transactDoc(t, (tr) =>
@@ -142,8 +156,8 @@ export function renderElementsTemplate(ctx) {
       size="s"
       placeholder="Filter elements…"
       value=${view.elementsFilter}
-      @input=${(/** @type {any} */ e) => {
-        view.elementsFilter = e.target.value.toLowerCase();
+      @input=${(/** @type {Event} */ e) => {
+        view.elementsFilter = /** @type {HTMLInputElement} */ (e.target).value.toLowerCase();
         ctx.rerender();
       }}
     ></sp-search>

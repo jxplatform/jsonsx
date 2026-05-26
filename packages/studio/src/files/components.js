@@ -7,7 +7,7 @@ import { projectState } from "../store.js";
  * @typedef {{
  *   tagName: string;
  *   path: string;
- *   props?: { name: string; type?: string; [k: string]: any }[];
+ *   props?: { name: string; type?: string; [k: string]: unknown }[];
  *   source?: string;
  *   package?: string;
  *   modulePath?: string;

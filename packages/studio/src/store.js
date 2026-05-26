@@ -22,6 +22,7 @@ export {
   isAncestor,
   projectState,
   setProjectState,
+  requireProjectState,
   updateFrontmatter,
 } from "./state.js";
 
@@ -47,13 +48,13 @@ export const elToPath = new WeakMap();
  * _width }>
  *
  * @type {{
- *   mediaName: string;
+ *   mediaName: string | null;
  *   canvas: HTMLElement;
  *   overlay: HTMLElement;
  *   overlayClk: HTMLElement;
- *   viewport: HTMLElement;
+ *   viewport: HTMLElement | null;
  *   scrollContainer?: HTMLElement | null;
- *   dropLine: HTMLElement;
+ *   dropLine: HTMLElement | null;
  *   element?: HTMLElement | null;
  *   _width?: number | null;
  * }[]}
@@ -130,8 +131,8 @@ export function cancelStyleDebounce(/** @type {string} */ prop) {
 /**
  * Strip all on* event handler properties from a Jx document tree (deep clone).
  *
- * @param {import("./state.js").JxNode | unknown} node
- * @returns {import("./state.js").JxNode | unknown}
+ * @param {JxMutableNode} node
+ * @returns {JxMutableNode}
  */
 export function stripEventHandlers(node) {
   if (!node || typeof node !== "object") return node;
@@ -218,18 +219,26 @@ export function renderOnly(...names) {
 export function updateSession(patch) {
   const tab = activeTab.value;
   if (tab) {
-    const p = /** @type {any} */ (patch);
-    if (p.selection !== undefined) tab.session.selection = p.selection;
-    if (p.hover !== undefined) tab.session.hover = p.hover;
+    const p = /**
+     * @type {{
+     *   selection?: unknown;
+     *   hover?: unknown;
+     *   clipboard?: unknown;
+     *   ui?: Record<string, unknown>;
+     *   canvas?: Record<string, unknown>;
+     * }}
+     */ (patch);
+    if (p.selection !== undefined) tab.session.selection = /** @type {any} */ (p.selection);
+    if (p.hover !== undefined) tab.session.hover = /** @type {any} */ (p.hover);
     if (p.clipboard !== undefined) tab.session.clipboard = p.clipboard;
     if (p.ui) {
       for (const [k, v] of Object.entries(p.ui)) {
-        /** @type {any} */ (tab.session.ui)[k] = v;
+        /** @type {Record<string, unknown>} */ (tab.session.ui)[k] = v;
       }
     }
     if (p.canvas) {
       for (const [k, v] of Object.entries(p.canvas)) {
-        /** @type {any} */ (tab.session.canvas)[k] = v;
+        /** @type {Record<string, unknown>} */ (tab.session.canvas)[k] = v;
       }
     }
   }
@@ -244,7 +253,7 @@ export function updateSession(patch) {
 export function updateUi(field, value) {
   const tab = activeTab.value;
   if (tab) {
-    /** @type {any} */ (tab.session.ui)[field] = value;
+    /** @type {Record<string, unknown>} */ (tab.session.ui)[field] = value;
   }
 }
 
@@ -257,7 +266,7 @@ export function updateCanvas(patch) {
   const tab = activeTab.value;
   if (tab) {
     for (const [k, v] of Object.entries(patch)) {
-      /** @type {any} */ (tab.session.canvas)[k] = v;
+      /** @type {Record<string, unknown>} */ (tab.session.canvas)[k] = v;
     }
   }
 }

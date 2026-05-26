@@ -44,7 +44,34 @@ import { mediaDisplayName } from "../panels/shared.js";
 import { statusMessage } from "../panels/statusbar.js";
 import * as overlaysPanel from "../panels/overlays.js";
 
-/** @type {any} */
+/** @typedef {import("../panels/canvas-dnd.js").CanvasPanel} CanvasPanel */
+
+/**
+ * @typedef {{
+ *   filePath: string;
+ *   originalContent: string;
+ *   currentContent: string;
+ *   isMarkdown: boolean;
+ *   fileStatus: string;
+ *   originalDoc?: JxMutableNode | null;
+ *   currentDoc?: JxMutableNode | null;
+ *   original?: JxMutableNode | null;
+ * }} GitDiffState
+ */
+
+/**
+ * @typedef {{
+ *   getCanvasMode: () => string;
+ *   setCanvasMode: (mode: string) => void;
+ *   openFileFromTree: (path: string) => void;
+ *   exportFile: () => void;
+ *   closeFunctionEditor: () => void;
+ *   gitDiffState: GitDiffState | null;
+ *   setGitDiffState: (state: GitDiffState | null) => void;
+ * }} CanvasRenderCtx
+ */
+
+/** @type {CanvasRenderCtx | null} */
 let _ctx = null;
 
 let _prevStylebookFilter = "";
@@ -53,15 +80,7 @@ let _prevStylebookCustomizedOnly = false;
 /**
  * Initialize the canvas render module.
  *
- * @param {{
- *   getCanvasMode: () => string;
- *   setCanvasMode: (mode: string) => void;
- *   openFileFromTree: (path: string) => void;
- *   exportFile: () => void;
- *   closeFunctionEditor: () => void;
- *   gitDiffState: any;
- *   setGitDiffState: (state: any) => void;
- * }} ctx
+ * @param {CanvasRenderCtx} ctx
  */
 export function initCanvasRender(ctx) {
   _ctx = ctx;
@@ -70,8 +89,9 @@ export function initCanvasRender(ctx) {
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) return;
+  const ctx = /** @type {CanvasRenderCtx} */ (_ctx);
   const S = { document: tab.doc.document, ui: tab.session.ui, mode: tab.doc.mode };
-  const canvasMode = _ctx.getCanvasMode();
+  const canvasMode = ctx.getCanvasMode();
 
   // Advance render generation so stale async renders from the previous cycle bail out
   ++view.renderGeneration;
@@ -92,7 +112,7 @@ export function renderCanvas() {
 
   // Function editor mode: editing a function body in Monaco (JS)
   if (S.ui.editingFunction) {
-    renderFunctionEditor(_ctx.closeFunctionEditor);
+    renderFunctionEditor(ctx.closeFunctionEditor);
     return;
   }
 
@@ -203,7 +223,7 @@ export function renderCanvas() {
     litRender(
       html`<div class="source-wrap">
         <div class="source-toolbar">
-          <sp-action-button size="s" @click=${_ctx.exportFile}>
+          <sp-action-button size="s" @click=${ctx.exportFile}>
             <sp-icon-export slot="icon"></sp-icon-export>
             Export
           </sp-action-button>
@@ -224,25 +244,30 @@ export function renderCanvas() {
       lang === "json" ? JSON.stringify(S.document, null, 2) : S.document?.toString?.() || "";
     const modelUri = monaco.Uri.parse("file:///" + filePath);
     const model = monaco.editor.createModel(content, lang, modelUri);
-    view.monacoEditor = monaco.editor.create(/** @type {any} */ (editorContainer), {
-      model,
-      theme: "vs-dark",
-      automaticLayout: true,
-      minimap: { enabled: false },
-      fontSize: 12,
-      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-      lineNumbers: "on",
-      scrollBeyondLastLine: false,
-      wordWrap: "on",
-      tabSize: 2,
-    });
+    view.monacoEditor = monaco.editor.create(
+      /** @type {HTMLElement} */ (/** @type {unknown} */ (editorContainer)),
+      {
+        model,
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: false },
+        fontSize: 12,
+        fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+        lineNumbers: "on",
+        scrollBeyondLastLine: false,
+        wordWrap: "on",
+        tabSize: 2,
+      },
+    );
 
     // Debounced sync back to state
-    /** @type {any} */
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     let debounce;
     view.monacoEditor.onDidChangeModelContent(() => {
-      if (view.monacoEditor._ignoreNextChange) {
-        view.monacoEditor._ignoreNextChange = false;
+      const editor = view.monacoEditor;
+      if (!editor) return;
+      if (editor._ignoreNextChange) {
+        editor._ignoreNextChange = false;
         return;
       }
       clearTimeout(debounce);
@@ -250,7 +275,7 @@ export function renderCanvas() {
         const tab = activeTab.value;
         if (lang === "json") {
           try {
-            tab.doc.document = JSON.parse(view.monacoEditor.getValue());
+            tab.doc.document = JSON.parse(editor.getValue());
             tab.doc.dirty = true;
           } catch {
             // Invalid JSON — don't update state
@@ -265,8 +290,8 @@ export function renderCanvas() {
 
   // Git diff mode — render original (left) and current (right) side-by-side on panzoom surface
   if (canvasMode === "git-diff") {
-    if (!_ctx.gitDiffState) {
-      _ctx.setCanvasMode("design");
+    if (!ctx.gitDiffState) {
+      ctx.setCanvasMode("design");
       renderCanvas();
       return;
     }
@@ -276,7 +301,7 @@ export function renderCanvas() {
       canvasWrap.style.overflow = "hidden";
     }
 
-    const gitDiffState = _ctx.gitDiffState;
+    const gitDiffState = ctx.gitDiffState;
     const panelWidth = 800;
 
     const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
@@ -329,8 +354,20 @@ export function renderCanvas() {
       parseContent(gitDiffState.originalContent || ""),
       parseContent(gitDiffState.currentContent || ""),
     ]).then(([originalDoc, currentDoc]) => {
-      renderCanvasIntoPanel(origPanel, new Set(), featureToggles, originalDoc, gitDiffState);
-      renderCanvasIntoPanel(currPanel, new Set(), featureToggles, currentDoc, gitDiffState);
+      renderCanvasIntoPanel(
+        /** @type {any} */ (origPanel),
+        new Set(),
+        featureToggles,
+        originalDoc,
+        gitDiffState,
+      );
+      renderCanvasIntoPanel(
+        /** @type {any} */ (currPanel),
+        new Set(),
+        featureToggles,
+        currentDoc,
+        gitDiffState,
+      );
     });
 
     applyTransform();
@@ -355,7 +392,7 @@ export function renderCanvas() {
       <div
         class="content-edit-canvas"
         ${ref((el) => {
-          panel.scrollContainer = /** @type {HTMLElement | null} */ (el);
+          panel.scrollContainer = /** @type {HTMLElement | null} */ (el || null);
         })}
       >
         <div class="content-edit-column" style="max-width:${baseWidth}px">${panelTpl}</div>
@@ -363,7 +400,7 @@ export function renderCanvas() {
     `;
     litRender(editTpl, canvasWrap);
     canvasPanels.push(/** @type {any} */ (panel));
-    renderCanvasIntoPanel(panel, new Set(), S.ui.featureToggles);
+    renderCanvasIntoPanel(/** @type {any} */ (panel), new Set(), S.ui.featureToggles);
     return;
   }
 
@@ -408,7 +445,7 @@ export function renderCanvas() {
       canvasWrap,
     );
     canvasPanels.push(/** @type {any} */ (panel));
-    renderCanvasIntoPanel(panel, new Set(), featureToggles);
+    renderCanvasIntoPanel(/** @type {any} */ (panel), new Set(), featureToggles);
     applyTransform();
     if (modeChanged) {
       observeCenterUntilStable();
@@ -436,7 +473,6 @@ export function renderCanvas() {
     });
   }
 
-  /** @type {{ tpl: any; panel: any; activeSet: any }[]} */
   const panelEntries = allPanelDefs.map((def) => {
     const label = `${def.displayName} (${def.width}px)`;
     const { tpl, panel } = canvasPanelTemplate(def.name, label, false, def.width);
@@ -459,8 +495,9 @@ export function renderCanvas() {
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(/** @type {any} */ (panel));
-    renderCanvasIntoPanel(panel, activeSet, featureToggles);
+    const p = /** @type {CanvasPanel} */ (panel);
+    canvasPanels.push(/** @type {any} */ (p));
+    renderCanvasIntoPanel(p, activeSet, featureToggles);
   }
 
   // Highlight active panel header
@@ -480,13 +517,13 @@ export function renderCanvas() {
  * Render document into a single canvas panel. Tries runtime rendering first, falls back to
  * structural preview.
  *
- * @param {any} panel
+ * @param {CanvasPanel} panel
  * @param {Set<string>} activeBreakpoints
- * @param {any} featureToggles
- * @param {any} [docOverride] - Optional document to render (for diff mode). Uses active tab doc if
- *   not provided.
- * @param {any} [gitDiffState] - Optional diff state. If provided, computes and applies diff
- *   highlighting.
+ * @param {Record<string, boolean>} featureToggles
+ * @param {JxMutableNode | null} [docOverride] - Optional document to render (for diff mode). Uses
+ *   active tab doc if not provided.
+ * @param {GitDiffState | null} [gitDiffState] - Optional diff state. If provided, computes and
+ *   applies diff highlighting.
  */
 function renderCanvasIntoPanel(
   panel,
@@ -497,15 +534,16 @@ function renderCanvasIntoPanel(
 ) {
   const gen = view.renderGeneration;
   const tab = activeTab.value;
-  const docToRender = docOverride || tab?.doc.document;
+  const docToRender = /** @type {JxMutableNode} */ (docOverride || tab?.doc.document);
+  const canvas = /** @type {HTMLElement} */ (panel.canvas);
 
-  renderCanvasLive(gen, docToRender, panel.canvas)
-    .then((/** @type {any} */ scope) => {
+  renderCanvasLive(gen, docToRender, canvas)
+    .then((/** @type {Record<string, unknown> | null} */ scope) => {
       // Skip post-render setup if a newer render has started
       if (gen !== view.renderGeneration) return;
       if (scope) {
         updateCanvas({ status: "ready", scope, error: null });
-        applyCanvasMediaOverrides(panel.canvas, activeBreakpoints);
+        applyCanvasMediaOverrides(canvas, activeBreakpoints);
         statusMessage("Runtime render OK", 1500);
 
         // Apply diff highlighting if in git-diff mode
@@ -521,28 +559,28 @@ function renderCanvasIntoPanel(
           // Can't iterate WeakMap, so apply styling by walking the canvas
           const { elToPath } = scope;
           if (elToPath instanceof WeakMap) {
-            applyDiffHighlightToCanvas(panel.canvas, diffMap);
+            applyDiffHighlightToCanvas(canvas, diffMap);
           }
         }
       } else {
         // Fallback to structural preview
         updateCanvas({ status: "ready", scope: null, error: null });
-        panel.canvas.innerHTML = "";
-        renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
+        canvas.innerHTML = "";
+        renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       }
       try {
-        registerPanelDnD(panel);
-      } catch (/** @type {any} */ e) {
-        console.warn("registerPanelDnD failed:", e.message);
+        registerPanelDnD(/** @type {any} */ (panel));
+      } catch (/** @type {unknown} */ e) {
+        console.warn("registerPanelDnD failed:", /** @type {Error} */ (e).message);
       }
-      registerPanelEvents(panel);
+      registerPanelEvents(/** @type {any} */ (panel));
       renderOverlays();
       updateForcedPseudoPreview();
 
       // Process pending inline edit when canvas becomes ready
       const currentTab = activeTab.value;
       if (currentTab?.session.ui?.pendingInlineEdit) {
-        const { path, mediaName: mn } = /** @type {{ path: any; mediaName: string }} */ (
+        const { path, mediaName: mn } = /** @type {{ path: JxPath; mediaName: string }} */ (
           currentTab.session.ui.pendingInlineEdit
         );
         currentTab.session.ui.pendingInlineEdit = null;
@@ -554,18 +592,18 @@ function renderCanvasIntoPanel(
         }
       }
     })
-    .catch((/** @type {any} */ err) => {
+    .catch((/** @type {unknown} */ err) => {
       if (gen !== view.renderGeneration) return;
-      console.warn("renderCanvasLive rejected:", err?.message || err);
+      console.warn("renderCanvasLive rejected:", err instanceof Error ? err.message : err);
       updateCanvas({ status: "ready", scope: null, error: null });
-      panel.canvas.innerHTML = "";
-      renderCanvasNode(docToRender, [], panel.canvas, activeBreakpoints, featureToggles);
+      canvas.innerHTML = "";
+      renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       try {
-        registerPanelDnD(panel);
-      } catch (/** @type {any} */ e) {
-        console.warn("registerPanelDnD failed:", e.message);
+        registerPanelDnD(/** @type {any} */ (panel));
+      } catch (/** @type {unknown} */ e) {
+        console.warn("registerPanelDnD failed:", /** @type {Error} */ (e).message);
       }
-      registerPanelEvents(panel);
+      registerPanelEvents(/** @type {any} */ (panel));
       renderOverlays();
       updateForcedPseudoPreview();
     });

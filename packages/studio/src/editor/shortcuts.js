@@ -266,7 +266,7 @@ export function initShortcuts(getContext) {
         e.preventDefault();
         if (tab?.session.selection) {
           const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-          if (node?.children?.length > 0) {
+          if ((node?.children?.length ?? 0) > 0) {
             activeTab.value.session.selection = [...tab.session.selection, "children", 0];
           }
         }

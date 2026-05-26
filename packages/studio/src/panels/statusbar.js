@@ -7,7 +7,7 @@ import { activeTab } from "../workspace/workspace.js";
 // ─── Module state ────────────────────────────────────────────────────────────
 
 let statusMsg = "";
-/** @type {any} */
+/** @type {ReturnType<typeof setTimeout> | undefined} */
 let statusTimeout;
 /** @type {(() => void) | null} */
 let _rerender = null;
@@ -47,7 +47,7 @@ export function unmountStatusbar() {
 
 // ─── Statusbar ───────────────────────────────────────────────────────────────
 
-/** @param {any} text */
+/** @param {string} text */
 function esc(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -58,7 +58,7 @@ export function renderStatusbar() {
   const parts = [];
   if (tab?.doc.mode === "content") parts.push("Content Mode");
   if (tab?.session.selection?.length) {
-    const sel = /** @type {any[]} */ (tab.session.selection);
+    const sel = /** @type {JxPath} */ (tab.session.selection);
     const node = getNodeAtPath(tab.doc.document, sel);
     parts.push(`Selected: ${esc(nodeLabel(node))}`);
 
@@ -98,7 +98,7 @@ statusbarEl?.addEventListener("click", (e) => {
 /**
  * Show a temporary status message.
  *
- * @param {any} msg
+ * @param {string} msg
  * @param {number} [duration]
  */
 export function statusMessage(msg, duration = 3000) {

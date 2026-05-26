@@ -23,7 +23,7 @@ import { getLayerSlot } from "../ui/layers.js";
  *
  * @typedef {import("../state.js").JxPath} JxPath
  *
- * @typedef {{ command: string; tag: string; label: string; icon: string; shortcut?: string }} InlineAction
+ * @typedef {import("../editor/inline-edit.js").InlineAction} InlineAction
  */
 
 /**
@@ -182,7 +182,7 @@ function applyInlineFormat(action) {
     code: "code",
   };
 
-  const tag = cmdToTag[action.command];
+  const tag = action.command ? cmdToTag[action.command] : undefined;
   if (tag) {
     const editableRoot = getActiveElement();
     toggleInlineFormat(tag, editableRoot);
@@ -423,7 +423,7 @@ export function renderBlockActionBar() {
                       @mousedown=${captureSelectionRange}
                       @click=${(/** @type {MouseEvent} */ e) => onFormatClick(e, action)}
                     >
-                      ${formatIconMap[action.icon] ?? nothing}
+                      ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
                     </sp-action-button>
                   `,
                 )}
@@ -437,7 +437,7 @@ export function renderBlockActionBar() {
 
   // Post-render side effects
   requestAnimationFrame(() => {
-    const bar = view.blockActionBarEl?.firstElementChild;
+    const bar = /** @type {HTMLElement | null} */ (view.blockActionBarEl?.firstElementChild);
     if (!bar) return;
     // Clamp to window
     const barRect = bar.getBoundingClientRect();
@@ -447,7 +447,7 @@ export function renderBlockActionBar() {
     // Attach drag handle
     const currentTab = activeTab.value;
     if (currentTab?.session.selection && currentTab.session.selection.length >= 2) {
-      const handle = bar.querySelector(".bar-drag-handle");
+      const handle = /** @type {HTMLElement | null} */ (bar.querySelector(".bar-drag-handle"));
       if (handle) {
         if (view.selDragCleanup) {
           view.selDragCleanup();

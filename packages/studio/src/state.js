@@ -9,28 +9,37 @@
  */
 
 /**
- * @typedef {Record<string, any>} JxNode
- *
  * @typedef {(string | number)[]} JxPath
  *
- * @typedef {{ document: JxNode; selection: JxPath | null }} HistorySnapshot
+ * @typedef {{ document: JxMutableNode; selection: JxPath | null }} HistorySnapshot
  *
  * @typedef {{
- *   document: JxNode;
+ *   document: JxMutableNode;
  *   selection: JxPath | null;
  *   hover: JxPath | null;
  *   history: HistorySnapshot[];
  *   historyIndex: number;
  *   dirty: boolean;
- *   fileHandle: any;
+ *   fileHandle: FileSystemFileHandle | null;
  *   documentPath: string | null;
- *   documentStack: any[];
+ *   documentStack: StudioStackFrame[];
  *   handlersSource: string | null;
  *   mode: string;
- *   content: { frontmatter: Record<string, any> };
- *   ui: Record<string, any>;
- *   canvas: { status: string; scope: any; error: string | null };
+ *   content: { frontmatter: Record<string, unknown> };
+ *   ui: Record<string, unknown>;
+ *   canvas: { status: string; scope: Record<string, unknown> | null; error: string | null };
  * }} StudioState
+ *
+ * @typedef {{
+ *   document: JxMutableNode;
+ *   selection: JxPath | null;
+ *   fileHandle: FileSystemFileHandle | null;
+ *   documentPath: string | null;
+ *   dirty: boolean;
+ *   history: HistorySnapshot[];
+ *   historyIndex: number;
+ *   mode: string;
+ * }} StudioStackFrame
  */
 
 // ─── Path utilities ───────────────────────────────────────────────────────────
@@ -38,14 +47,14 @@
 /**
  * Walk the document tree and return the node at the given path.
  *
- * @param {any} doc
+ * @param {JxMutableNode} doc
  * @param {JxPath} path
- * @returns {any}
+ * @returns {JxMutableNode}
  */
 export function getNodeAtPath(doc, path) {
   let node = doc;
   for (const key of path) {
-    if (node == null) return undefined;
+    if (node == null) return /** @type {JxMutableNode} */ (/** @type {unknown} */ (undefined));
     node = node[key];
   }
   return node;
@@ -114,10 +123,15 @@ export function isAncestor(path, descendant) {
  *
  * NodeType: 'element' (default) | 'map' | 'case' | 'case-ref'
  *
- * @param {any} doc
+ * @param {JxMutableNode | string | number | boolean} doc
  * @param {JxPath} [path]
  * @param {number} [depth]
- * @returns {{ node: any; path: JxPath; depth: number; nodeType: string }[]}
+ * @returns {{
+ *   node: JxMutableNode | string | number | boolean;
+ *   path: JxPath;
+ *   depth: number;
+ *   nodeType: string;
+ * }[]}
  */
 export function flattenTree(doc, path = [], depth = 0) {
   // Text node children: bare primitives get a "text" row
@@ -125,7 +139,14 @@ export function flattenTree(doc, path = [], depth = 0) {
     return [{ node: doc, path, depth, nodeType: "text" }];
   }
 
-  /** @type {{ node: any; path: JxPath; depth: number; nodeType: string }[]} */
+  /**
+   * @type {{
+   *   node: JxMutableNode | string | number | boolean;
+   *   path: JxPath;
+   *   depth: number;
+   *   nodeType: string;
+   * }[]}
+   */
   const rows = [{ node: doc, path, depth, nodeType: "element" }];
 
   // Custom component instances without user-authored children are atomic in the layer tree
@@ -140,12 +161,22 @@ export function flattenTree(doc, path = [], depth = 0) {
       const childPath = [...path, "children", i];
       rows.push(...flattenTree(children[i], childPath, depth + 1));
     }
-  } else if (children && typeof children === "object" && children.$prototype === "Array") {
+  } else if (
+    children &&
+    typeof children === "object" &&
+    /** @type {JxMutableNode} */ (children).$prototype === "Array"
+  ) {
     // $map — emit the map container, then recurse into the template
     rows.push({ node: children, path: [...path, "children"], depth: depth + 1, nodeType: "map" });
-    const mapDef = children.map;
+    const mapDef = /** @type {JxMutableNode} */ (children).map;
     if (mapDef && typeof mapDef === "object") {
-      rows.push(...flattenTree(mapDef, [...path, "children", "map"], depth + 2));
+      rows.push(
+        ...flattenTree(
+          /** @type {JxMutableNode} */ (mapDef),
+          [...path, "children", "map"],
+          depth + 2,
+        ),
+      );
     }
   }
 
@@ -153,7 +184,7 @@ export function flattenTree(doc, path = [], depth = 0) {
   if (doc.$switch && doc.cases && typeof doc.cases === "object") {
     for (const [caseName, caseDef] of Object.entries(doc.cases)) {
       const casePath = [...path, "cases", caseName];
-      if (caseDef && typeof caseDef === "object" && /** @type {any} */ (caseDef).$ref) {
+      if (caseDef && typeof caseDef === "object" && /** @type {JxMutableNode} */ (caseDef).$ref) {
         rows.push({ node: caseDef, path: casePath, depth: depth + 1, nodeType: "case-ref" });
       } else if (caseDef && typeof caseDef === "object") {
         rows.push({ node: caseDef, path: casePath, depth: depth + 1, nodeType: "case" });
@@ -170,7 +201,7 @@ export function flattenTree(doc, path = [], depth = 0) {
 /**
  * Get a display label for a node (for layers + overlays).
  *
- * @param {any} node
+ * @param {JxMutableNode | null} node
  * @returns {string}
  */
 export function nodeLabel(node) {
@@ -193,7 +224,7 @@ export function nodeLabel(node) {
 // ─── State factory ────────────────────────────────────────────────────────────
 
 /**
- * @param {any} doc
+ * @param {JxMutableNode} doc
  * @returns {StudioState}
  */
 export function createState(doc) {
@@ -248,19 +279,19 @@ export function createState(doc) {
 /**
  * Compose a flat StudioState from separate doc and session slices.
  *
- * @param {any} doc
- * @param {any} session
+ * @param {Partial<StudioState>} doc
+ * @param {Partial<StudioState>} session
  * @returns {StudioState}
  */
 export function toFlat(doc, session) {
-  return { ...doc, ...session };
+  return /** @type {StudioState} */ ({ ...doc, ...session });
 }
 
 /**
  * Decompose a flat StudioState into doc and session slices.
  *
  * @param {StudioState} S
- * @returns {{ doc: any; session: any }}
+ * @returns {{ doc: Partial<StudioState>; session: Partial<StudioState> }}
  */
 export function fromFlat(S) {
   const {
@@ -303,12 +334,22 @@ export function fromFlat(S) {
 //          selectedPath: string|null, searchQuery: string }
 // DirEntry: { name, path, type: "file"|"directory", size, modified }
 
-/** @type {any} */
+/** @type {ProjectState | null} */
 export let projectState = null;
 
-/** @param {any} ps */
+/** @param {ProjectState | null} ps */
 export function setProjectState(ps) {
   projectState = ps;
+}
+
+/**
+ * Return the current project state, asserting it is non-null. Only call when a project is known to
+ * be loaded.
+ *
+ * @returns {ProjectState}
+ */
+export function requireProjectState() {
+  return /** @type {ProjectState} */ (projectState);
 }
 
 // ─── Frontmatter mutation ───────────────────────────────────────────────────
@@ -319,7 +360,7 @@ export function setProjectState(ps) {
  *
  * @param {StudioState} state
  * @param {string} field
- * @param {any} value
+ * @param {unknown} value
  * @returns {StudioState}
  */
 export function updateFrontmatter(state, field, value) {
@@ -359,7 +400,7 @@ export function hoverNode(state, path) {
  * Push current document onto the stack and switch to editing a new document.
  *
  * @param {StudioState} state
- * @param {any} doc
+ * @param {JxMutableNode} doc
  * @param {string | null} documentPath
  * @returns {StudioState}
  */

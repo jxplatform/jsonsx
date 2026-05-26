@@ -73,7 +73,7 @@ describe("htmlToJx", () => {
 
   test("className maps to class", () => {
     const result = htmlToJx('<div class="a b c"></div>');
-    expect(result[0].attributes.class).toBe("a b c");
+    expect(/** @type {JxElement} */ (result[0]).attributes?.class).toBe("a b c");
   });
 
   test("skips whitespace-only text nodes", () => {
@@ -110,7 +110,7 @@ describe("htmlToJx", () => {
 
   test("style-only element has no attributes key", () => {
     const result = htmlToJx('<div style="color:red"></div>');
-    expect(result[0].attributes).toBeUndefined();
-    expect(result[0].style).toEqual({ color: "red" });
+    expect(/** @type {JxElement} */ (result[0]).attributes).toBeUndefined();
+    expect(/** @type {JxElement} */ (result[0]).style).toEqual({ color: "red" });
   });
 });

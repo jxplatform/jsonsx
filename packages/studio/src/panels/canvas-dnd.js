@@ -56,7 +56,9 @@ export function registerPanelDnD(panel) {
     onDrop() {
       _activeDropEl?.classList.remove("canvas-drop-target");
       _activeDropEl = null;
-      for (const p of canvasPanels) p.dropLine.style.display = "none";
+      for (const p of canvasPanels) {
+        if (p.dropLine) p.dropLine.style.display = "none";
+      }
       view.lastDragInput = null;
       for (const el of canvas.querySelectorAll("*")) {
         /** @type {HTMLElement} */ (el).style.pointerEvents = "none";

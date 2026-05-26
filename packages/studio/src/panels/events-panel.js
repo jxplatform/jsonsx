@@ -33,7 +33,7 @@ export function eventsSidebarTemplate(helpers) {
   );
 
   // Declared CEM events (custom element docs)
-  /** @type {any} */
+  /** @type {unknown} */
   let declaredEventsT = nothing;
   if (isCustomElementDoc()) {
     const allEmits = [];
@@ -86,8 +86,8 @@ export function eventsSidebarTemplate(helpers) {
                   size="s"
                   class="event-name"
                   .value=${live(evKey)}
-                  @change=${(/** @type {any} */ e) => {
-                    const newKey = e.target.value;
+                  @change=${(/** @type {Event} */ e) => {
+                    const newKey = /** @type {HTMLInputElement} */ (e.target).value;
                     if (newKey && newKey !== evKey) {
                       transactDoc(activeTab.value, (t) => {
                         mutateUpdateProperty(t, selection, evKey, undefined);
@@ -104,8 +104,8 @@ export function eventsSidebarTemplate(helpers) {
                   size="s"
                   class="event-mode"
                   .value=${live(isInline ? "inline" : "ref")}
-                  @change=${(/** @type {any} */ e) => {
-                    if (e.target.value === "inline") {
+                  @change=${(/** @type {Event} */ e) => {
+                    if (/** @type {HTMLInputElement} */ (e.target).value === "inline") {
                       transactDoc(activeTab.value, (t) =>
                         mutateUpdateProperty(t, selection, evKey, {
                           $prototype: "Function",
@@ -149,11 +149,11 @@ export function eventsSidebarTemplate(helpers) {
                         grows
                         placeholder="// handler body"
                         .value=${live(evVal.body || "")}
-                        @input=${(/** @type {any} */ e) => {
+                        @input=${(/** @type {Event} */ e) => {
                           transactDoc(activeTab.value, (t) =>
                             mutateUpdateProperty(t, selection, evKey, {
                               $prototype: "Function",
-                              body: e.target.value,
+                              body: /** @type {HTMLInputElement} */ (e.target).value,
                               parameters: evVal.parameters || [],
                             }),
                           );
@@ -181,10 +181,15 @@ export function eventsSidebarTemplate(helpers) {
                       size="s"
                       class="event-handler"
                       .value=${live(evVal.$ref || "__none__")}
-                      @change=${(/** @type {any} */ e) => {
-                        if (e.target.value && e.target.value !== "__none__") {
+                      @change=${(/** @type {Event} */ e) => {
+                        if (
+                          /** @type {HTMLInputElement} */ (e.target).value &&
+                          /** @type {HTMLInputElement} */ (e.target).value !== "__none__"
+                        ) {
                           transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, selection, evKey, { $ref: e.target.value }),
+                            mutateUpdateProperty(t, selection, evKey, {
+                              $ref: /** @type {HTMLInputElement} */ (e.target).value,
+                            }),
                           );
                         } else {
                           transactDoc(activeTab.value, (t) =>

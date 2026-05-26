@@ -97,6 +97,7 @@ export function parseGitStatus(out) {
  * @param {URL} url
  * @param {string} root
  * @param {string | null} [activeProjectRoot]
+ * @returns {Promise<Response | null>}
  */
 export async function handleStudioApi(req, url, root, activeProjectRoot = null) {
   const path = url.pathname;
@@ -121,8 +122,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const absDir = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(absDir, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 400 },
+      );
     }
     try {
       const projectRoot = fwd(absDir);
@@ -154,8 +158,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       } catch {}
 
       return Response.json({ isSiteProject, projectConfig, directories, projectRoot });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -189,8 +196,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         dir = parent;
       }
       return Response.json({ sitePath: null });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -211,8 +221,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         }
       } catch {}
       return Response.json({ path: null });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -238,8 +251,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         } catch {}
       }
       return Response.json(sites);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -250,8 +266,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const absDir = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(absDir, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 400 },
+      );
     }
 
     /** Report a path relative to the active project root (or server root as fallback). */
@@ -299,8 +318,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         });
       }
       return Response.json(files);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -310,8 +332,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(scanRoot, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 400 },
+      );
     }
     try {
       const glob = new Bun.Glob("**/*.{json,md}");
@@ -325,7 +350,6 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
           continue;
         const fp = resolve(scanRoot, match);
         try {
-          /** @type {any} */
           let content;
           if (match.endsWith(".md")) {
             const source = await readFile(fp, "utf8");
@@ -406,14 +430,17 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
                       source: "npm",
                       package: name,
                       description: decl.description || null,
-                      props: (decl.attributes || []).map((/** @type {any} */ a) => ({
-                        name: a.name,
-                        type: a.type?.text,
-                        default: a.default,
-                        description: a.description || null,
-                      })),
+                      props: (decl.attributes || []).map(
+                        (/** @type {Record<string, unknown>} */ a) => ({
+                          name: a.name,
+                          type: /** @type {Record<string, unknown> | undefined} */ (a.type)?.text,
+                          default: a.default,
+                          description: a.description || null,
+                        }),
+                      ),
                       members: (decl.members || []).filter(
-                        (/** @type {any} */ m) => m.kind === "field" && m.privacy !== "private",
+                        (/** @type {Record<string, unknown>} */ m) =>
+                          m.kind === "field" && m.privacy !== "private",
                       ),
                       slots: decl.slots || [],
                       events: decl.events || [],
@@ -429,8 +456,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       } catch {} // skip if no project package.json
 
       return Response.json(components);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -445,7 +475,14 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       if (!existsSync(pkgPath)) return Response.json([]);
       const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      /** @type {any[]} */
+      /**
+       * @type {{
+       *   name: string;
+       *   version: string;
+       *   hasCem: boolean;
+       *   customElementsPath: string | null;
+       * }[]}
+       */
       const packages = [];
       for (const [name, version] of Object.entries(deps)) {
         const depPkgPath = resolve(scanRoot, "node_modules", ...name.split("/"), "package.json");
@@ -467,8 +504,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         } catch {}
       }
       return Response.json(packages);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -493,8 +533,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       if (!existsSync(cemPath)) return Response.json({ cem: null });
       const cem = JSON.parse(await readFile(cemPath, "utf8"));
       return Response.json({ cem });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -519,8 +562,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         );
       }
       return Response.json({ ok: true });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -543,8 +589,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         );
       }
       return Response.json({ ok: true });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -555,18 +604,21 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const abs = fp.startsWith("~") ? fp.replace("~", process.env.HOME || "") : fp;
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return new Response(e.message, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return new Response(/** @type {{ message?: string }} */ (e).message, { status: 400 });
     }
     try {
       return Response.json({
         content: await readFile(abs, "utf8"),
         path: fp,
       });
-    } catch (/** @type {any} */ e) {
-      return e.code === "ENOENT"
+    } catch (/** @type {unknown} */ e) {
+      return /** @type {{ code?: string }} */ (e).code === "ENOENT"
         ? new Response("Not found", { status: 404 })
-        : Response.json({ error: e.message }, { status: 500 });
+        : Response.json(
+            { error: /** @type {{ message?: string }} */ (e).message },
+            { status: 500 },
+          );
     }
   }
 
@@ -577,15 +629,18 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return new Response(e.message, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return new Response(/** @type {{ message?: string }} */ (e).message, { status: 400 });
     }
     try {
       await mkdir(dirname(abs), { recursive: true });
       await writeFile(abs, await req.text(), "utf8");
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -596,16 +651,19 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return new Response(e.message, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return new Response(/** @type {{ message?: string }} */ (e).message, { status: 400 });
     }
     try {
       await mkdir(dirname(abs), { recursive: true });
       const buffer = await req.arrayBuffer();
       await Bun.write(abs, new Uint8Array(buffer));
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -616,16 +674,19 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return new Response(e.message, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return new Response(/** @type {{ message?: string }} */ (e).message, { status: 400 });
     }
     try {
       await unlink(abs);
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (/** @type {any} */ e) {
-      return e.code === "ENOENT"
+    } catch (/** @type {unknown} */ e) {
+      return /** @type {{ code?: string }} */ (e).code === "ENOENT"
         ? new Response("Not found", { status: 404 })
-        : Response.json({ error: e.message }, { status: 500 });
+        : Response.json(
+            { error: /** @type {{ message?: string }} */ (e).message },
+            { status: 500 },
+          );
     }
   }
 
@@ -644,8 +705,8 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     try {
       assertAccessible(absFrom, root, activeProjectRoot);
       assertAccessible(absTo, root, activeProjectRoot);
-    } catch (/** @type {any} */ e) {
-      return new Response(e.message, { status: 400 });
+    } catch (/** @type {unknown} */ e) {
+      return new Response(/** @type {{ message?: string }} */ (e).message, { status: 400 });
     }
     try {
       await mkdir(dirname(absTo), { recursive: true });
@@ -655,8 +716,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         from: fwd(relative(root, absFrom)),
         to: fwd(relative(root, absTo)),
       });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -684,8 +748,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         path: matches[0],
         ...(matches.length > 1 ? { alternatives: matches } : {}),
       });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -705,8 +772,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       } else {
         moduleAbsPath = resolve(root, src);
       }
-    } catch (/** @type {any} */ e) {
-      return Response.json({ schema: null, error: e.message });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json({
+        schema: null,
+        error: /** @type {{ message?: string }} */ (e).message,
+      });
     }
 
     // .class.json: read and extract schema directly
@@ -715,8 +785,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         const content = readFileSync(moduleAbsPath, "utf8");
         const classDef = JSON.parse(content);
         return Response.json({ schema: extractStudioSchema(classDef, moduleAbsPath) });
-      } catch (/** @type {any} */ e) {
-        return Response.json({ schema: null, error: e.message });
+      } catch (/** @type {unknown} */ e) {
+        return Response.json({
+          schema: null,
+          error: /** @type {{ message?: string }} */ (e).message,
+        });
       }
     }
 
@@ -741,8 +814,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         return Response.json({ schema: null, error: `Export "${exportName}" not found` });
       }
       return Response.json({ schema: ExportedClass.schema ?? null });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ schema: null, error: e.message });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json({
+        schema: null,
+        error: /** @type {{ message?: string }} */ (e).message,
+      });
     }
   }
 
@@ -885,8 +961,11 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         await runGit(["checkout", "--", ...files]);
         return Response.json({ ok: true });
       }
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -898,9 +977,13 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
  * $defs.fields into the flat { description, properties, required } shape that renderSchemaFields()
  * in the studio already consumes.
  *
- * @param {any} classDef
+ * @param {ClassJsonDef} classDef
  * @param {string} classJsonPath
- * @returns {{ description: any; properties: Record<string, any>; required: string[] }}
+ * @returns {{
+ *   description: string | undefined;
+ *   properties: Record<string, Record<string, unknown>>;
+ *   required: string[];
+ * }}
  */
 function extractStudioSchema(classDef, classJsonPath) {
   // If extends.$ref points to a parent, recursively merge
@@ -918,7 +1001,7 @@ function extractStudioSchema(classDef, classJsonPath) {
 
   const params = classDef.$defs?.parameters ?? {};
   const fields = classDef.$defs?.fields ?? {};
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, Record<string, unknown>>} */
   const properties = {};
   /** @type {string[]} */
   const required = [];
@@ -934,6 +1017,7 @@ function extractStudioSchema(classDef, classJsonPath) {
   // Build properties from parameters (constructor config surface)
   for (const [key, param] of Object.entries(params)) {
     const id = param.identifier ?? key;
+    /** @type {Record<string, unknown>} */
     const prop = {};
     if (param.type && typeof param.type === "object") Object.assign(prop, param.type);
     if (param.description) prop.description = param.description;
@@ -947,6 +1031,7 @@ function extractStudioSchema(classDef, classJsonPath) {
     if (field.role !== "field") continue;
     if (field.access === "private") continue;
     const id = field.identifier ?? key;
+    /** @type {Record<string, unknown>} */
     const prop = {};
     if (field.type && typeof field.type === "object") Object.assign(prop, field.type);
     if (field.description) prop.description = field.description;

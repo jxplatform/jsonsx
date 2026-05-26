@@ -13,12 +13,15 @@ import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "../tabs/tran
 import { view } from "../view.js";
 import { codeService, setLintMarkers, getFunctionArgs } from "../services/code-services.js";
 
-function getFunctionBody(/** @type {any} */ editing) {
+/** @typedef {{ type: "def"; defName: string } | { type: "event"; path: JxPath; eventKey: string }} EditingTarget */
+
+/** @param {EditingTarget | null | undefined} editing */
+function getFunctionBody(editing) {
   const document = activeTab.value?.doc.document;
-  if (editing.type === "def") {
+  if (editing?.type === "def") {
     return document?.state?.[editing.defName]?.body || "";
-  } else if (editing.type === "event") {
-    const node = getNodeAtPath(document, editing.path);
+  } else if (editing?.type === "event") {
+    const node = getNodeAtPath(/** @type {JxMutableNode} */ (document), editing.path);
     return node?.[editing.eventKey]?.body || "";
   }
   return "";
@@ -26,7 +29,9 @@ function getFunctionBody(/** @type {any} */ editing) {
 
 /** @param {() => void} closeFunctionEditor */
 export function renderFunctionEditor(closeFunctionEditor) {
-  const editing = activeTab.value?.session.ui.editingFunction;
+  const editing = /** @type {EditingTarget | null | undefined} */ (
+    activeTab.value?.session.ui.editingFunction
+  );
 
   // If editor already exists and matches current target, just sync value
   if (view.functionEditor && view.functionEditor._editingTarget === JSON.stringify(editing)) {
@@ -66,7 +71,7 @@ export function renderFunctionEditor(closeFunctionEditor) {
 
   const tab = activeTab.value;
   const docName = tab?.documentPath?.split("/").pop() || tab?.doc.document?.tagName || "document";
-  const ed = /** @type {any} */ (editing);
+  const ed = /** @type {EditingTarget} */ (editing);
   const funcLabel = ed.type === "def" ? `ƒ ${ed.defName}` : `ƒ ${ed.eventKey}`;
 
   // Editor container
@@ -94,22 +99,26 @@ export function renderFunctionEditor(closeFunctionEditor) {
   );
 
   const body = getFunctionBody(editing);
-  const args = getFunctionArgs(editing, activeTab.value?.doc.document);
+  const args = getFunctionArgs(/** @type {any} */ (editing), activeTab.value?.doc.document);
 
-  view.functionEditor = monaco.editor.create(/** @type {any} */ (editorContainer), {
-    value: body,
-    language: "javascript",
-    theme: "vs-dark",
-    automaticLayout: true,
-    minimap: { enabled: false },
-    fontSize: 12,
-    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
-    lineNumbers: "on",
-    scrollBeyondLastLine: false,
-    wordWrap: "on",
-    tabSize: 2,
-  });
+  view.functionEditor = monaco.editor.create(
+    /** @type {HTMLElement} */ (/** @type {unknown} */ (editorContainer)),
+    {
+      value: body,
+      language: "javascript",
+      theme: "vs-dark",
+      automaticLayout: true,
+      minimap: { enabled: false },
+      fontSize: 12,
+      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+      lineNumbers: "on",
+      scrollBeyondLastLine: false,
+      wordWrap: "on",
+      tabSize: 2,
+    },
+  );
   view.functionEditor._editingTarget = JSON.stringify(editing);
+  const editor = view.functionEditor;
 
   // Format on open — show pretty-printed code, then run initial lint
   codeService("format", { code: body, args }).then((result) => {
@@ -124,25 +133,28 @@ export function renderFunctionEditor(closeFunctionEditor) {
   });
 
   // Debounced sync back to state + lint on edit
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let syncDebounce;
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let lintDebounce;
   let lintGen = 0;
-  view.functionEditor.onDidChangeModelContent(() => {
-    if (view.functionEditor._ignoreNextChange) {
-      view.functionEditor._ignoreNextChange = false;
+  editor.onDidChangeModelContent(() => {
+    if (editor._ignoreNextChange) {
+      editor._ignoreNextChange = false;
       return;
     }
 
     clearTimeout(syncDebounce);
     syncDebounce = setTimeout(() => {
-      const newBody = view.functionEditor.getValue();
-      const ed = /** @type {any} */ (editing);
+      const newBody = editor.getValue();
+      const ed = /** @type {EditingTarget} */ (editing);
       if (ed.type === "def") {
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, ed.defName, { body: newBody }));
       } else if (ed.type === "event") {
-        const node = getNodeAtPath(activeTab.value?.doc.document, ed.path);
+        const node = getNodeAtPath(
+          /** @type {JxMutableNode} */ (activeTab.value?.doc.document),
+          ed.path,
+        );
         const current = node?.[ed.eventKey] || {};
         transactDoc(activeTab.value, (t) =>
           mutateUpdateProperty(t, ed.path, ed.eventKey, {
@@ -158,7 +170,7 @@ export function renderFunctionEditor(closeFunctionEditor) {
     clearTimeout(lintDebounce);
     lintDebounce = setTimeout(() => {
       const gen = ++lintGen;
-      const currentCode = view.functionEditor.getValue();
+      const currentCode = editor.getValue();
       codeService("lint", { code: currentCode, args }).then((result) => {
         if (gen !== lintGen) return;
         if (result?.diagnostics && view.functionEditor)
@@ -187,11 +199,11 @@ export function registerFunctionCompletions() {
       const suggestions = Object.entries(defs).map(([key, def]) => {
         let kind = monaco.languages.CompletionItemKind.Variable;
         if (
-          /** @type {any} */ (def)?.$prototype === "Function" ||
-          /** @type {any} */ (def)?.$handler
+          /** @type {JxPrototypeDef} */ (def)?.$prototype === "Function" ||
+          /** @type {{ $handler?: unknown }} */ (def)?.$handler
         )
           kind = monaco.languages.CompletionItemKind.Function;
-        else if (/** @type {any} */ (def)?.$prototype)
+        else if (/** @type {JxPrototypeDef} */ (def)?.$prototype)
           kind = monaco.languages.CompletionItemKind.Property;
         return {
           label: `state.${key}`,

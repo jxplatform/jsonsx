@@ -21,7 +21,7 @@ import { startLayerTitleEdit } from "../panels/layers-panel.js";
  *
  * @typedef {import("../state.js").JxPath} JxPath
  *
- * @typedef {import("../state.js").JxNode} JxNode
+ * @typedef {JxMutableNode} JxNode
  */
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────

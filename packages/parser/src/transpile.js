@@ -66,10 +66,10 @@ export function mdKey(key) {
  * Expand dot-path attribute keys into nested objects.
  *
  * @param {Record<string, string>} attrs - Flat attribute map from remark-directive
- * @returns {Record<string, any>} Nested object
+ * @returns {Record<string, unknown>} Nested object
  */
 export function expandDotPaths(attrs) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const result = {};
 
   for (const [key, value] of Object.entries(attrs)) {
@@ -86,7 +86,7 @@ export function expandDotPaths(attrs) {
       if (!(seg in target) || typeof target[seg] !== "object") {
         target[seg] = {};
       }
-      target = target[seg];
+      target = /** @type {Record<string, unknown>} */ (target[seg]);
     }
     target[jxKey(segments[segments.length - 1])] = value;
   }
@@ -97,18 +97,18 @@ export function expandDotPaths(attrs) {
 /**
  * Collapse a nested object back to dot-path flat attributes (inverse of expandDotPaths).
  *
- * @param {Record<string, any>} obj - Nested object
+ * @param {Record<string, unknown>} obj - Nested object
  * @returns {Record<string, string>} Flat attribute map
  */
 export function collapseDotPaths(obj) {
   /** @type {Record<string, string>} */
   const result = {};
 
-  function walk(/** @type {Record<string, any>} */ node, /** @type {string} */ prefix) {
+  function walk(/** @type {Record<string, unknown>} */ node, /** @type {string} */ prefix) {
     for (const [key, value] of Object.entries(node)) {
       const path = prefix ? `${prefix}.${key}` : key;
       if (value && typeof value === "object" && !Array.isArray(value)) {
-        walk(value, path);
+        walk(/** @type {Record<string, unknown>} */ (value), path);
       } else {
         result[path] = String(value);
       }
@@ -148,11 +148,11 @@ const CSS_PSEUDO_NAMES = new Set([
  * `:hover` (for known CSS pseudo-class names) - `--dark` → `@--dark` (for custom property / media
  * query keys)
  *
- * @param {Record<string, any>} styleObj
- * @returns {Record<string, any>}
+ * @param {Record<string, unknown>} styleObj
+ * @returns {Record<string, unknown>}
  */
 export function applyStyleKeyMapping(styleObj) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const result = {};
   for (const [key, value] of Object.entries(styleObj)) {
     if (CSS_PSEUDO_NAMES.has(key)) {
@@ -173,7 +173,7 @@ export function applyStyleKeyMapping(styleObj) {
  * cannot appear at the start of remark-directive attribute keys.
  *
  * @param {Record<string, string>} attrs
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 export function expandStylePaths(attrs) {
   return applyStyleKeyMapping(expandDotPaths(attrs));
@@ -185,11 +185,11 @@ export function expandStylePaths(attrs) {
  * Strips `:` prefix from pseudo-class keys and `@` prefix from media keys before flattening with
  * collapseDotPaths.
  *
- * @param {Record<string, any>} styleObj
+ * @param {Record<string, unknown>} styleObj
  * @returns {Record<string, string>}
  */
 export function collapseStylePaths(styleObj) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const normalized = {};
 
   for (const [key, value] of Object.entries(styleObj)) {
@@ -271,24 +271,24 @@ const PHRASING_ELEMENTS = new Set([
  * Route directive attributes to their correct Jx locations.
  *
  * @param {Record<string, string>} attrs
- * @returns {{ props: Record<string, any>; attributes: Record<string, string> }}
+ * @returns {{ props: Record<string, unknown>; attributes: Record<string, string> }}
  */
 function routeAttributes(attrs) {
   const expanded = expandDotPaths(attrs);
 
   // Apply style-key mapping (pseudo-classes, media queries) to the style sub-object
   if (expanded.style && typeof expanded.style === "object") {
-    expanded.style = applyStyleKeyMapping(expanded.style);
+    expanded.style = applyStyleKeyMapping(/** @type {Record<string, unknown>} */ (expanded.style));
   }
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const props = {};
   /** @type {Record<string, string>} */
   const attributes = {};
 
   for (const [key, value] of Object.entries(expanded)) {
     if (HTML_ATTR_PATTERN.test(key)) {
-      attributes[key] = value;
+      attributes[key] = /** @type {string} */ (value);
     } else {
       props[key] = value;
     }
@@ -300,10 +300,10 @@ function routeAttributes(attrs) {
 /**
  * Mdast node-type → Jx tagName mapping.
  *
- * @type {Record<string, (n: any) => string>}
+ * @type {Record<string, (n: MdastNode) => string>}
  */
 const JX_TAG_MAP = {
-  heading: (/** @type {any} */ n) => `h${n.depth}`,
+  heading: (/** @type {MdastNode} */ n) => `h${n.depth}`,
   paragraph: () => "p",
   emphasis: () => "em",
   strong: () => "strong",
@@ -312,21 +312,21 @@ const JX_TAG_MAP = {
   link: () => "a",
   image: () => "img",
   blockquote: () => "blockquote",
-  list: (/** @type {any} */ n) => (n.ordered ? "ol" : "ul"),
+  list: (/** @type {MdastNode} */ n) => (n.ordered ? "ol" : "ul"),
   listItem: () => "li",
   code: () => "pre",
   thematicBreak: () => "hr",
   break: () => "br",
   table: () => "table",
   tableRow: () => "tr",
-  tableCell: (/** @type {any} */ n) => (n.isHeader ? "th" : "td"),
+  tableCell: (/** @type {MdastNode} */ n) => (n.isHeader ? "th" : "td"),
 };
 
 /**
  * Convert a standard mdast node to a Jx element definition.
  *
- * @param {any} node
- * @returns {any} Jx element or null
+ * @param {MdastNode} node
+ * @returns {JxElement | string | (JxElement | string)[] | null} Jx element or null
  */
 export function mdastNodeToJx(node) {
   if (!node || typeof node !== "object") return null;
@@ -342,7 +342,7 @@ export function mdastNodeToJx(node) {
   }
 
   if (node.type === "text") {
-    return node.value;
+    return node.value ?? null;
   }
 
   if (node.type === "html") {
@@ -354,7 +354,7 @@ export function mdastNodeToJx(node) {
   if (!tagFn) return null;
 
   const tag = tagFn(node);
-  /** @type {Record<string, any>} */
+  /** @type {JxElement} */
   const el = { tagName: tag };
 
   switch (node.type) {
@@ -367,7 +367,7 @@ export function mdastNodeToJx(node) {
     case "listItem":
     case "tableRow":
     case "tableCell": {
-      const children = convertChildren(node.children);
+      const children = convertChildren(node.children ?? []);
       if (children.length === 1 && typeof children[0] === "string") {
         el.textContent = children[0];
       } else if (children.length > 0) {
@@ -384,7 +384,7 @@ export function mdastNodeToJx(node) {
       el.attributes = { href: node.url };
       if (node.title) el.attributes.title = node.title;
       {
-        const children = convertChildren(node.children);
+        const children = convertChildren(node.children ?? []);
         if (children.length === 1 && typeof children[0] === "string") {
           el.textContent = children[0];
         } else if (children.length > 0) {
@@ -399,7 +399,7 @@ export function mdastNodeToJx(node) {
       break;
 
     case "list":
-      if (node.children?.length > 0) {
+      if (node.children && node.children.length > 0) {
         el.children = convertChildren(node.children);
       }
       if (node.start != null && node.start !== 1) {
@@ -422,10 +422,10 @@ export function mdastNodeToJx(node) {
       break;
 
     case "table": {
-      const rows = convertChildren(node.children);
+      const rows = convertChildren(node.children ?? []);
       const thead = rows.length > 0 ? { tagName: "thead", children: [rows[0]] } : null;
       const tbody = rows.length > 1 ? { tagName: "tbody", children: rows.slice(1) } : null;
-      el.children = [thead, tbody].filter(Boolean);
+      el.children = /** @type {JxElement[]} */ ([thead, tbody].filter(Boolean));
       break;
     }
   }
@@ -436,16 +436,16 @@ export function mdastNodeToJx(node) {
 /**
  * Convert a directive mdast node to a Jx element.
  *
- * @param {any} node
- * @returns {any}
+ * @param {MdastNode} node
+ * @returns {JxElement}
  */
 function directiveToJx(node) {
-  /** @type {Record<string, any>} */
-  const el = { tagName: node.name };
+  /** @type {JxElement} */
+  const el = { tagName: /** @type {string} */ (node.name) };
 
   if (node.attributes && Object.keys(node.attributes).length > 0) {
     const { props, attributes } = routeAttributes(node.attributes);
-    const isCustomElement = node.name.includes("-");
+    const isCustomElement = /** @type {string} */ (node.name).includes("-");
     if (isCustomElement) {
       // For custom elements:
       //   - style, children, textContent, innerHTML, $-prefixed → element-level
@@ -461,7 +461,7 @@ function directiveToJx(node) {
         ) {
           el[key] = value;
         } else if (key === "props") {
-          el.$props = value;
+          el.$props = /** @type {Record<string, unknown>} */ (value);
         } else {
           if (!el.attributes) el.attributes = {};
           el.attributes[key] = value;
@@ -500,8 +500,8 @@ function directiveToJx(node) {
   }
 
   if (node.type === "textDirective") {
-    if (node.children?.length > 0) {
-      const children = convertChildren(node.children);
+    if (node.children && node.children.length > 0) {
+      const children = convertChildren(node.children ?? []);
       if (children.length === 1 && typeof children[0] === "string") {
         el.textContent = children[0];
       } else if (children.length > 0) {
@@ -515,21 +515,25 @@ function directiveToJx(node) {
     return el;
   }
 
-  if (node.children?.length > 0) {
-    /** @type {any[]} */
+  if (node.children && node.children.length > 0) {
+    /** @type {(JxElement | string)[]} */
     const jxChildren = [];
-    const isPhrasingParent = PHRASING_ELEMENTS.has(node.name);
+    const isPhrasingParent = PHRASING_ELEMENTS.has(/** @type {string} */ (node.name));
 
     for (const child of node.children) {
       if (isPhrasingParent && child.type === "paragraph") {
         // Unwrap: promote paragraph's inline children directly
         for (const inline of child.children ?? []) {
           const converted = mdastNodeToJx(inline);
-          if (converted != null) jxChildren.push(converted);
+          if (converted == null) continue;
+          if (Array.isArray(converted)) jxChildren.push(...converted);
+          else jxChildren.push(converted);
         }
       } else {
         const converted = mdastNodeToJx(child);
-        if (converted != null) jxChildren.push(converted);
+        if (converted == null) continue;
+        if (Array.isArray(converted)) jxChildren.push(...converted);
+        else jxChildren.push(converted);
       }
     }
 
@@ -550,12 +554,14 @@ function directiveToJx(node) {
 /**
  * Convert an array of mdast children to Jx elements/strings.
  *
- * @param {any[]} children
- * @returns {any[]}
+ * @param {MdastNode[]} children
+ * @returns {(JxElement | string)[]}
  */
 export function convertChildren(children) {
   if (!children) return [];
-  return children.flatMap(mdastNodeToJx).filter((c) => c != null);
+  return /** @type {(JxElement | string)[]} */ (
+    children.flatMap(mdastNodeToJx).filter((c) => c != null)
+  );
 }
 
 /**
@@ -579,20 +585,21 @@ export function transpileJxMarkdown(source) {
   const vfile = { data: {} };
   processor.runSync(tree, vfile);
 
-  const frontmatter = /** @type {any} */ (vfile.data)?.frontmatter ?? {};
+  const frontmatter = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (vfile.data))
+    ?.frontmatter ?? {};
 
-  /** @type {Record<string, any>} */
+  /** @type {JxDocument} */
   const doc = {};
 
   for (const [key, value] of Object.entries(frontmatter)) {
     doc[key] = value;
   }
 
-  const bodyNodes = tree.children.filter(
-    (/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml",
+  const bodyNodes = /** @type {MdastNode[]} */ (
+    tree.children.filter((/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml")
   );
 
-  /** @type {any[]} */
+  /** @type {(JxElement | string)[]} */
   const children = [];
 
   for (const node of bodyNodes) {

@@ -65,10 +65,10 @@ const WRAPPER_TAGS = new Set([
  * Convert a Jx node to an array of mdast nodes. Returns an array because wrapper unwrapping can
  * produce multiple children.
  *
- * @param {any} node
- * @param {Map<string, any>} componentDefs
- * @param {any} [scope] - Current resolution scope
- * @returns {any[]}
+ * @param {JxElement | string} node
+ * @param {Map<string, JxElement>} componentDefs
+ * @param {Record<string, unknown> | null} [scope] - Current resolution scope
+ * @returns {MdastNode[]}
  */
 function nodeToMdast(node, componentDefs, scope) {
   // Bare text
@@ -153,8 +153,8 @@ function nodeToMdast(node, componentDefs, scope) {
       return [{ type: "inlineCode", value: text ?? "" }];
 
     case "link": {
-      const href = node.attributes?.href ?? "";
-      const title = node.attributes?.title ?? null;
+      const href = String(node.attributes?.href ?? "");
+      const title = /** @type {string | null} */ (node.attributes?.title ?? null);
       const children =
         text != null
           ? [{ type: "text", value: text }]
@@ -163,9 +163,9 @@ function nodeToMdast(node, componentDefs, scope) {
     }
 
     case "image": {
-      const src = node.attributes?.src ?? "";
-      const alt = node.attributes?.alt ?? "";
-      const title = node.attributes?.title ?? null;
+      const src = String(node.attributes?.src ?? "");
+      const alt = String(node.attributes?.alt ?? "");
+      const title = /** @type {string | null} */ (node.attributes?.title ?? null);
       return [{ type: "image", url: src, alt, title }];
     }
 
@@ -199,10 +199,15 @@ function nodeToMdast(node, componentDefs, scope) {
     case "code": {
       // pre > code → fenced code block
       const codeChild = Array.isArray(node.children)
-        ? node.children.find((/** @type {any} */ c) => c?.tagName === "code")
+        ? node.children.find(
+            (/** @type {JxElement | string} */ c) => /** @type {any} */ (c)?.tagName === "code",
+          )
         : null;
-      const value = codeChild?.textContent ?? text ?? "";
-      const lang = codeChild?.className?.replace("language-", "") ?? null;
+      const value = /** @type {JxElement | undefined} */ (codeChild)?.textContent ?? text ?? "";
+      const lang = /** @type {JxElement | undefined} */ (codeChild)?.className?.replace(
+        "language-",
+        "",
+      ) ?? null;
       return [{ type: "code", lang, value }];
     }
 
@@ -250,10 +255,10 @@ function isInlineType(type) {
 /**
  * Convert a node's children to mdast nodes (block context).
  *
- * @param {any} node
- * @param {Map<string, any>} componentDefs
- * @param {any} [scope]
- * @returns {any[]}
+ * @param {JxElement} node
+ * @param {Map<string, JxElement>} componentDefs
+ * @param {Record<string, unknown> | null} [scope]
+ * @returns {MdastNode[]}
  */
 function convertChildren(node, componentDefs, scope) {
   if (node.textContent != null) {
@@ -262,16 +267,18 @@ function convertChildren(node, componentDefs, scope) {
     return [];
   }
   if (!Array.isArray(node.children)) return [];
-  return node.children.flatMap((/** @type {any} */ c) => nodeToMdast(c, componentDefs, scope));
+  return node.children.flatMap((/** @type {JxElement | string} */ c) =>
+    nodeToMdast(c, componentDefs, scope),
+  );
 }
 
 /**
  * Convert children in inline context — same as convertChildren but for inline content.
  *
- * @param {any} node
- * @param {Map<string, any>} componentDefs
- * @param {any} [scope]
- * @returns {any[]}
+ * @param {JxElement} node
+ * @param {Map<string, JxElement>} componentDefs
+ * @param {Record<string, unknown> | null} [scope]
+ * @returns {MdastNode[]}
  */
 function convertChildrenInline(node, componentDefs, scope) {
   if (node.textContent != null) {
@@ -280,7 +287,9 @@ function convertChildrenInline(node, componentDefs, scope) {
     return [];
   }
   if (!Array.isArray(node.children)) return [];
-  return node.children.flatMap((/** @type {any} */ c) => nodeToMdast(c, componentDefs, scope));
+  return node.children.flatMap((/** @type {JxElement | string} */ c) =>
+    nodeToMdast(c, componentDefs, scope),
+  );
 }
 
 // ─── Component inlining ─────────────────────────────────────────────────────
@@ -288,10 +297,10 @@ function convertChildrenInline(node, componentDefs, scope) {
 /**
  * Inline a custom element by resolving its component definition.
  *
- * @param {any} node - The element instance (with $props, children, etc.)
+ * @param {JxElement} node - The element instance (with $props, children, etc.)
  * @param {string} tag - The tagName
- * @param {Map<string, any>} componentDefs
- * @returns {any[]}
+ * @param {Map<string, JxElement>} componentDefs
+ * @returns {MdastNode[]}
  */
 function inlineComponent(node, tag, componentDefs) {
   const def = componentDefs.get(tag);
@@ -314,10 +323,10 @@ function inlineComponent(node, tag, componentDefs) {
       ) {
         stateDefs[key] = { ...existing, default: value };
       } else {
-        stateDefs[key] = value;
+        stateDefs[key] = /** @type {JxStateDefinition} */ (value);
       }
     } else {
-      stateDefs[key] = value;
+      stateDefs[key] = /** @type {JxStateDefinition} */ (value);
     }
   }
 
@@ -331,10 +340,12 @@ function inlineComponent(node, tag, componentDefs) {
 
   // Convert to mdast, passing instance's own children as potential slot content
   const instanceChildren = node.children;
-  return resolved.flatMap((/** @type {any} */ child) => {
+  return resolved.flatMap((/** @type {JxElement | string} */ child) => {
     // Replace slot elements with instance children
-    if (child?.tagName === "slot" && Array.isArray(instanceChildren)) {
-      return instanceChildren.flatMap((/** @type {any} */ c) => nodeToMdast(c, componentDefs));
+    if (/** @type {any} */ (child)?.tagName === "slot" && Array.isArray(instanceChildren)) {
+      return instanceChildren.flatMap((/** @type {JxElement | string} */ c) =>
+        nodeToMdast(c, componentDefs),
+      );
     }
     return nodeToMdast(child, componentDefs, scope);
   });
@@ -343,35 +354,37 @@ function inlineComponent(node, tag, componentDefs) {
 /**
  * Deep-resolve template expressions in a node tree.
  *
- * @param {any} nodes
- * @param {any} scope
- * @returns {any[]}
+ * @param {(JxElement | string)[]} nodes
+ * @param {Record<string, unknown>} scope
+ * @returns {(JxElement | string)[]}
  */
 function deepResolve(nodes, scope) {
   if (!Array.isArray(nodes)) return [];
-  return nodes.map((/** @type {any} */ node) => resolveNode(node, scope));
+  return nodes.map((/** @type {JxElement | string} */ node) => resolveNode(node, scope));
 }
 
 /**
  * Resolve template expressions in a single node.
  *
- * @param {any} node
- * @param {any} scope
- * @returns {any}
+ * @param {JxElement | string} node
+ * @param {Record<string, unknown>} scope
+ * @returns {JxElement | string}
  */
 function resolveNode(node, scope) {
   if (typeof node === "string") {
-    return isTemplateString(node) ? (evaluateStaticTemplate(node, scope) ?? node) : node;
+    return isTemplateString(node) ? String(evaluateStaticTemplate(node, scope) ?? node) : node;
   }
   if (!node || typeof node !== "object") return node;
 
   const result = { ...node };
 
   if (typeof result.textContent === "string" && isTemplateString(result.textContent)) {
-    result.textContent = evaluateStaticTemplate(result.textContent, scope) ?? result.textContent;
+    result.textContent = String(
+      evaluateStaticTemplate(result.textContent, scope) ?? result.textContent,
+    );
   }
   if (typeof result.innerHTML === "string" && isTemplateString(result.innerHTML)) {
-    result.innerHTML = evaluateStaticTemplate(result.innerHTML, scope) ?? result.innerHTML;
+    result.innerHTML = String(evaluateStaticTemplate(result.innerHTML, scope) ?? result.innerHTML);
   }
   if (result.attributes) {
     result.attributes = { ...result.attributes };
@@ -393,20 +406,20 @@ function resolveNode(node, scope) {
 /**
  * Expand a $prototype: "Array" descriptor into concrete mdast nodes.
  *
- * @param {any} arrayDef
- * @param {Map<string, any>} componentDefs
- * @param {any} [scope]
- * @returns {any[]}
+ * @param {JxElement} arrayDef
+ * @param {Map<string, JxElement>} componentDefs
+ * @param {Record<string, unknown> | null} [scope]
+ * @returns {MdastNode[]}
  */
 function expandArray(arrayDef, componentDefs, scope) {
-  const itemsRef = arrayDef.items?.$ref;
+  const itemsRef = /** @type {any} */ (arrayDef).items?.$ref;
   if (!itemsRef || !scope) return [];
 
   // Resolve the items array from scope
   const items = resolveRef(itemsRef, scope);
   if (!Array.isArray(items)) return [];
 
-  const mapTemplate = arrayDef.map;
+  const mapTemplate = /** @type {any} */ (arrayDef).map;
   if (!mapTemplate) return [];
 
   return items.flatMap((/** @type {any} */ item, /** @type {number} */ index) => {
@@ -436,8 +449,8 @@ function resolveMapNode(node, item) {
 
   // Resolve $ref values
   for (const [key, value] of Object.entries(result)) {
-    if (value && typeof value === "object" && value.$ref) {
-      const ref = value.$ref;
+    if (value && typeof value === "object" && /** @type {Record<string, unknown>} */ (value).$ref) {
+      const ref = /** @type {string} */ (/** @type {Record<string, unknown>} */ (value).$ref);
       if (ref.startsWith("$map/")) {
         const path = ref.slice("$map/".length);
         result[key] = resolvePath(
@@ -466,13 +479,13 @@ function resolveMapNode(node, item) {
 /**
  * Resolve a dot/slash-separated path on an object.
  *
- * @param {any} obj
+ * @param {unknown} obj
  * @param {string} path
- * @returns {any}
+ * @returns {unknown}
  */
 function resolvePath(obj, path) {
   const parts = path.split(/[/.]/);
-  let current = obj;
+  let current = /** @type {any} */ (obj);
   for (const part of parts) {
     if (current == null) return undefined;
     current = current[part];
@@ -484,8 +497,8 @@ function resolvePath(obj, path) {
  * Resolve a $ref string against a scope.
  *
  * @param {string} ref
- * @param {any} scope
- * @returns {any}
+ * @param {Record<string, unknown>} scope
+ * @returns {unknown}
  */
 function resolveRef(ref, scope) {
   if (ref.startsWith("#/state/")) {
@@ -499,10 +512,10 @@ function resolveRef(ref, scope) {
 /**
  * Convert a table element to mdast table node.
  *
- * @param {any} node
- * @param {Map<string, any>} componentDefs
- * @param {any} [scope]
- * @returns {any[]}
+ * @param {JxElement} node
+ * @param {Map<string, JxElement>} componentDefs
+ * @param {Record<string, unknown> | null} [scope]
+ * @returns {MdastNode[]}
  */
 function convertTable(node, componentDefs, scope) {
   // Flatten thead/tbody wrappers to get rows
@@ -516,8 +529,8 @@ function convertTable(node, componentDefs, scope) {
 /**
  * Resolve text content, handling template strings if a scope is available.
  *
- * @param {any} value
- * @param {any} [scope]
+ * @param {unknown} value
+ * @param {Record<string, unknown> | null} [scope]
  * @returns {string | null}
  */
 function resolveText(value, scope) {
@@ -539,10 +552,10 @@ function resolveText(value, scope) {
  * markdown content.
  *
  * @param {string} html
- * @returns {any[]}
+ * @returns {MdastNode[]}
  */
 function htmlToMdast(html) {
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   const nodes = [];
 
   // Simple top-level block parser
@@ -594,7 +607,7 @@ function splitHtmlBlocks(html) {
  * Parse a single HTML element string into mdast node(s).
  *
  * @param {string} html
- * @returns {any[] | null}
+ * @returns {MdastNode[] | null}
  */
 function parseHtmlElement(html) {
   // Heading
@@ -679,10 +692,10 @@ function parseHtmlElement(html) {
  * Parse inline HTML content to mdast inline nodes.
  *
  * @param {string} html
- * @returns {any[]}
+ * @returns {MdastNode[]}
  */
 function parseInlineHtml(html) {
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   const nodes = [];
   let pos = 0;
 
@@ -813,10 +826,10 @@ function findMatchingClose(html, start, tag) {
  * Parse <li> elements from list HTML.
  *
  * @param {string} html
- * @returns {any[]}
+ * @returns {MdastNode[]}
  */
 function parseListItems(html) {
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   const items = [];
   const liPattern = /<li(?:\s[^>]*)?>([\s\S]*?)<\/li>/gi;
   let m;
@@ -835,16 +848,16 @@ function parseListItems(html) {
  * Parse an HTML table to mdast table node.
  *
  * @param {string} html
- * @returns {any[]}
+ * @returns {MdastNode[]}
  */
 function parseHtmlTable(html) {
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   const rows = [];
   const trPattern = /<tr(?:\s[^>]*)?>([\s\S]*?)<\/tr>/gi;
   let m;
   while ((m = trPattern.exec(html)) !== null) {
     const cellPattern = /<(?:th|td)(?:\s[^>]*)?>([\s\S]*?)<\/(?:th|td)>/gi;
-    /** @type {any[]} */
+    /** @type {MdastNode[]} */
     const cells = [];
     let c;
     while ((c = cellPattern.exec(m[1])) !== null) {
@@ -888,8 +901,8 @@ function decodeHtmlEntities(str) {
 /**
  * Compile a fully-resolved Jx document to clean markdown.
  *
- * @param {any} doc - Resolved Jx document (post layout, context, prototypes, templates)
- * @param {Map<string, any>} [componentDefs] - Component definitions for inlining
+ * @param {JxDocument} doc - Resolved Jx document (post layout, context, prototypes, templates)
+ * @param {Map<string, JxElement>} [componentDefs] - Component definitions for inlining
  * @returns {{ content: string }}
  */
 export function compileMarkdown(doc, componentDefs = new Map()) {
@@ -901,14 +914,14 @@ export function compileMarkdown(doc, componentDefs = new Map()) {
   const scope = doc.state ? buildInitialScope(doc.state, null) : null;
 
   // Convert to mdast
-  const mdastChildren = doc.children.flatMap((/** @type {any} */ child) =>
+  const mdastChildren = doc.children.flatMap((/** @type {JxElement | string} */ child) =>
     nodeToMdast(child, componentDefs, scope),
   );
 
   // Clean up: ensure block-level structure (no bare inline nodes at root)
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   const cleaned = [];
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   let inlineBuf = [];
 
   const flushInline = () => {

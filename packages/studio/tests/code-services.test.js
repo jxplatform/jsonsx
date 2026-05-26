@@ -120,15 +120,15 @@ describe("fetchPluginSchema", () => {
 
 describe("setLintMarkers", () => {
   test("does nothing when editor has no model", () => {
-    const editor = { getModel: () => null };
+    const editor = /** @type {any} */ ({ getModel: () => null });
     setLintMarkers(editor, []);
     // Should not throw
   });
 
   test("sets markers from diagnostics", () => {
     const model = {};
-    const editor = { getModel: () => model };
-    const diagnostics = [
+    const editor = /** @type {any} */ ({ getModel: () => model });
+    const diagnostics = /** @type {any} */ ([
       {
         severity: "error",
         message: "Unused variable",
@@ -137,7 +137,7 @@ describe("setLintMarkers", () => {
         code: "no-unused-vars",
         url: null,
       },
-    ];
+    ]);
     setLintMarkers(editor, diagnostics);
     expect(monaco.editor.setModelMarkers).toHaveBeenCalled();
     const call = /** @type {any} */ (monaco.editor.setModelMarkers).mock.calls[0];
@@ -152,7 +152,7 @@ describe("setLintMarkers", () => {
   });
 
   test("handles warning severity", () => {
-    const editor = { getModel: () => ({}) };
+    const editor = /** @type {any} */ ({ getModel: () => ({}) });
     const diagnostics = [
       {
         severity: "warning",
@@ -170,8 +170,8 @@ describe("setLintMarkers", () => {
   });
 
   test("filters diagnostics without labels", () => {
-    const editor = { getModel: () => ({}) };
-    const diagnostics = [
+    const editor = /** @type {any} */ ({ getModel: () => ({}) });
+    const diagnostics = /** @type {any} */ ([
       { severity: "error", message: "No labels", labels: [] },
       { severity: "error", message: "Null labels", labels: null },
       {
@@ -180,7 +180,7 @@ describe("setLintMarkers", () => {
         labels: [{ span: { line: 1, column: 1, length: 1 } }],
         code: "x",
       },
-    ];
+    ]);
     setLintMarkers(editor, diagnostics);
     const call = /** @type {any} */ (monaco.editor.setModelMarkers).mock.calls.at(-1);
     expect(call[2].length).toBe(1);

@@ -16,11 +16,11 @@ import { classMap } from "lit-html/directives/class-map.js";
  *   label: string;
  *   hasValue: boolean;
  *   onClear?: () => void;
- *   widget: any;
+ *   widget: unknown;
  *   span?: number;
  *   warning?: boolean;
  * }} opts
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderFieldRow({ prop, label, hasValue, onClear, widget, span, warning }) {
   return html`
@@ -34,7 +34,7 @@ export function renderFieldRow({ prop, label, hasValue, onClear, widget, span, w
           ? html`<span
               class="set-dot"
               title="Clear ${prop}"
-              @click=${(/** @type {any} */ e) => {
+              @click=${(/** @type {Event} */ e) => {
                 e.stopPropagation();
                 onClear();
               }}

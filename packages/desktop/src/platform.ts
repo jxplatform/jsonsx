@@ -21,7 +21,10 @@ export function createDesktopPlatform() {
   new Electroview({ rpc });
 
   const originalFetch = window.fetch.bind(window);
-  (window as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  (window as unknown as Record<string, unknown>).fetch = async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => {
     const url =
       typeof input === "string"
         ? input
@@ -312,7 +315,7 @@ export function createDesktopPlatform() {
   };
 }
 
-function showUpdateToast(version: string, rpc: any) {
+function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: () => unknown } }) {
   const container = document.createElement("div");
   container.className = "update-toast-container";
   litRender(

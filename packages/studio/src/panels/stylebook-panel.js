@@ -30,37 +30,32 @@ import stylebookMeta from "../../data/stylebook-meta.json";
 export { stylebookMeta };
 
 /**
- * Resolve a nested tag path in a style object. e.g., "table th" → style["table"]["th"]
- *
- * @param {Record<string, any>} style
- * @param {string} tagPath
- * @returns {Record<string, any> | null}
+ * @typedef {{
+ *   tag: string;
+ *   text?: string;
+ *   attributes?: Record<string, string>;
+ *   style?: string;
+ *   children?: StylebookEntry[];
+ * }} StylebookEntry
  */
-function _resolveNestedStyle(style, tagPath) {
-  const parts = tagPath.split(" ");
-  let obj = style;
-  for (const part of parts) {
-    if (!obj || typeof obj !== "object") return null;
-    obj = obj[part];
-  }
-  return obj && typeof obj === "object" ? /** @type {Record<string, any>} */ (obj) : null;
-}
-
-/** @type {any} */
-let _ctx = null;
-
-/** Lookup: tag → entry from stylebookMeta (built once) */
-const _entryByTag = new Map();
-for (const section of stylebookMeta.$sections) {
-  for (const entry of /** @type {any} */ (section.elements)) {
-    _entryByTag.set(entry.tag, entry);
-  }
-}
 
 /**
- * Render the stylebook/settings mode into the canvas.
- *
- * @param {{
+ * @typedef {{
+ *   mediaName: string | null;
+ *   element: HTMLElement | null;
+ *   canvas: HTMLElement;
+ *   overlay: HTMLElement;
+ *   overlayClk: HTMLElement;
+ *   viewport: HTMLElement | null;
+ *   scrollContainer: HTMLElement | null;
+ *   dropLine: HTMLElement | null;
+ *   _width: number | null;
+ *   _lastHoverTag?: string | null;
+ * }} StylebookPanel
+ */
+
+/**
+ * @typedef {{
  *   canvasPanelTemplate: Function;
  *   applyTransform: Function;
  *   observeCenterUntilStable: Function;
@@ -68,7 +63,50 @@ for (const section of stylebookMeta.$sections) {
  *   updateActivePanelHeaders: Function;
  *   overlayBoxDescriptor: Function;
  *   effectiveZoom: Function;
- * }} ctx
+ * }} StylebookCtx
+ */
+
+/**
+ * @typedef {{
+ *   source?: string;
+ *   tagName: string;
+ *   path?: string;
+ *   props?: Array<{ name: string; default?: string }>;
+ * }} ComponentEntry
+ */
+
+/**
+ * Resolve a nested tag path in a style object. e.g., "table th" → style["table"]["th"]
+ *
+ * @param {Record<string, unknown>} style
+ * @param {string} tagPath
+ * @returns {Record<string, unknown> | null}
+ */
+function _resolveNestedStyle(style, tagPath) {
+  const parts = tagPath.split(" ");
+  let obj = style;
+  for (const part of parts) {
+    if (!obj || typeof obj !== "object") return null;
+    obj = /** @type {Record<string, unknown>} */ (obj[part]);
+  }
+  return obj && typeof obj === "object" ? /** @type {Record<string, unknown>} */ (obj) : null;
+}
+
+/** @type {StylebookCtx | null} */
+let _ctx = null;
+
+/** Lookup: tag → entry from stylebookMeta (built once) */
+const _entryByTag = new Map();
+for (const section of stylebookMeta.$sections) {
+  for (const entry of /** @type {StylebookEntry[]} */ (section.elements)) {
+    _entryByTag.set(entry.tag, entry);
+  }
+}
+
+/**
+ * Render the stylebook/settings mode into the canvas.
+ *
+ * @param {StylebookCtx} ctx
  */
 export function renderStylebookMode(ctx) {
   _ctx = ctx;
@@ -85,8 +123,8 @@ export function renderStylebookMode(ctx) {
   );
   const hasMedia = sizeBreakpoints.length > 0;
 
-  const onFilterInput = (/** @type {any} */ e) => {
-    updateUi("stylebookFilter", e.target.value);
+  const onFilterInput = (/** @type {Event} */ e) => {
+    updateUi("stylebookFilter", /** @type {HTMLInputElement} */ (e.target).value);
   };
 
   const onCustomizedToggle = () => {
@@ -116,9 +154,9 @@ export function renderStylebookMode(ctx) {
     </div>
   `;
 
-  /** @type {any} */ (canvasWrap).style.overflow = "hidden";
+  /** @type {HTMLElement} */ (canvasWrap).style.overflow = "hidden";
 
-  /** @type {any[]} */
+  /** @type {{ name: string; displayName: string; width: number; activeSet: Set<string> }[]} */
   const allPanelDefs = [];
   if (hasMedia) {
     allPanelDefs.push({
@@ -137,7 +175,10 @@ export function renderStylebookMode(ctx) {
     }
   }
 
-  const renderIntoPanel = (/** @type {any} */ panel, /** @type {any} */ activeBreakpoints) => {
+  const renderIntoPanel = (
+    /** @type {StylebookPanel} */ panel,
+    /** @type {Set<string>} */ activeBreakpoints,
+  ) => {
     panel.canvas.classList.add("sb-canvas");
     renderStylebookElementsIntoCanvas(
       panel.canvas,
@@ -147,12 +188,18 @@ export function renderStylebookMode(ctx) {
       activeBreakpoints,
     );
     for (const child of panel.canvas.querySelectorAll("*")) {
-      child.style.pointerEvents = "none";
+      /** @type {HTMLElement} */ (child).style.pointerEvents = "none";
     }
     registerStylebookPanelEvents(panel);
   };
 
-  /** @type {{ tpl: any; panel: any; activeSet: any }[]} */
+  /**
+   * @type {{
+   *   tpl: import("lit-html").TemplateResult;
+   *   panel: StylebookPanel;
+   *   activeSet: Set<string>;
+   * }[]}
+   */
   let panelEntries;
   if (!hasMedia) {
     const effectiveMedia = getEffectiveMedia(tab?.doc.document?.$media);
@@ -186,11 +233,11 @@ export function renderStylebookMode(ctx) {
         ${panelEntries.map((e) => e.tpl)}
       </div>
     `,
-    /** @type {any} */ (canvasWrap),
+    /** @type {HTMLElement} */ (canvasWrap),
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(panel);
+    canvasPanels.push(/** @type {any} */ (panel));
     renderIntoPanel(panel, activeSet);
   }
   if (hasMedia) {
@@ -242,7 +289,9 @@ export function refreshStylebookStyles() {
         for (const [prop, val] of Object.entries(tagStyle)) {
           if (typeof val === "string" || typeof val === "number") {
             try {
-              /** @type {any} */ (htmlEl.style)[prop] = val;
+              /** @type {Record<string, string | number>} */ (
+                /** @type {unknown} */ (htmlEl.style)
+              )[prop] = val;
             } catch {}
           }
         }
@@ -253,10 +302,14 @@ export function refreshStylebookStyles() {
             const mediaName = key.slice(1);
             if (mediaName === "--") continue;
             if (activeBreakpoints.has(mediaName)) {
-              for (const [prop, v] of Object.entries(/** @type {any} */ (val))) {
+              for (const [prop, v] of Object.entries(
+                /** @type {Record<string, unknown>} */ (val),
+              )) {
                 if (typeof v === "string" || typeof v === "number") {
                   try {
-                    /** @type {any} */ (htmlEl.style)[prop] = v;
+                    /** @type {Record<string, string | number>} */ (
+                      /** @type {unknown} */ (htmlEl.style)
+                    )[prop] = v;
                   } catch {}
                 }
               }
@@ -271,12 +324,17 @@ export function refreshStylebookStyles() {
           const mediaName = key.slice(1);
           if (mediaName === "--") continue;
           if (activeBreakpoints.has(mediaName)) {
-            const mediaTagStyle = _resolveNestedStyle(/** @type {any} */ (val), tag);
+            const mediaTagStyle = _resolveNestedStyle(
+              /** @type {Record<string, unknown>} */ (val),
+              tag,
+            );
             if (mediaTagStyle && typeof mediaTagStyle === "object") {
               for (const [prop, v] of Object.entries(mediaTagStyle)) {
                 if (typeof v === "string" || typeof v === "number") {
                   try {
-                    /** @type {any} */ (htmlEl.style)[prop] = v;
+                    /** @type {Record<string, string | number>} */ (
+                      /** @type {unknown} */ (htmlEl.style)
+                    )[prop] = v;
                   } catch {}
                 }
               }
@@ -322,7 +380,7 @@ export function renderStylebookOverlays() {
   const selectedTag = activeTab.value?.session.ui.stylebookSelection;
 
   for (const panel of canvasPanels) {
-    const hoverTag = /** @type {any} */ (panel)._lastHoverTag;
+    const hoverTag = /** @type {StylebookPanel} */ (panel)._lastHoverTag;
     /**
      * @type {{
      *   cls: string;
@@ -373,9 +431,9 @@ export function renderStylebookOverlays() {
 /**
  * Build a DOM element tree from a stylebook-meta.json entry.
  *
- * @param {any} entry
- * @param {any} rootStyle
- * @param {any} activeBreakpoints
+ * @param {StylebookEntry} entry
+ * @param {Record<string, unknown>} rootStyle
+ * @param {Set<string> | null} activeBreakpoints
  * @param {string | null} [parentTag]
  */
 export function buildStylebookElement(entry, rootStyle, activeBreakpoints, parentTag = null) {
@@ -397,7 +455,8 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
     for (const [prop, val] of Object.entries(tagStyle)) {
       if (typeof val === "string" || typeof val === "number") {
         try {
-          /** @type {any} */ (el.style)[prop] = val;
+          /** @type {Record<string, string | number>} */ (/** @type {unknown} */ (el.style))[prop] =
+            val;
         } catch {}
       }
     }
@@ -408,10 +467,12 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
         const mediaName = key.slice(1);
         if (mediaName === "--") continue;
         if (activeBreakpoints.has(mediaName)) {
-          for (const [prop, v] of Object.entries(/** @type {any} */ (val))) {
+          for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
             if (typeof v === "string" || typeof v === "number") {
               try {
-                /** @type {any} */ (el.style)[prop] = v;
+                /** @type {Record<string, string | number>} */ (/** @type {unknown} */ (el.style))[
+                  prop
+                ] = v;
               } catch {}
             }
           }
@@ -427,12 +488,17 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
       const mediaName = key.slice(1);
       if (mediaName === "--") continue;
       if (activeBreakpoints.has(mediaName)) {
-        const mediaTagStyle = _resolveNestedStyle(/** @type {any} */ (val), tagPath);
+        const mediaTagStyle = _resolveNestedStyle(
+          /** @type {Record<string, unknown>} */ (val),
+          tagPath,
+        );
         if (mediaTagStyle && typeof mediaTagStyle === "object") {
           for (const [prop, v] of Object.entries(mediaTagStyle)) {
             if (typeof v === "string" || typeof v === "number") {
               try {
-                /** @type {any} */ (el.style)[prop] = v;
+                /** @type {Record<string, string | number>} */ (/** @type {unknown} */ (el.style))[
+                  prop
+                ] = v;
               } catch {}
             }
           }
@@ -451,7 +517,7 @@ export function buildStylebookElement(entry, rootStyle, activeBreakpoints, paren
 /**
  * Render a live component preview by registering its custom element and instantiating it.
  *
- * @param {any} comp
+ * @param {ComponentEntry} comp
  * @returns {Promise<HTMLElement>}
  */
 export async function renderComponentPreview(comp) {
@@ -477,7 +543,7 @@ export async function renderComponentPreview(comp) {
       }
     }
     return el;
-  } catch (/** @type {any} */ e) {
+  } catch (/** @type {unknown} */ e) {
     console.warn("Component preview failed:", comp.tagName, e);
     return _componentFallback(comp.tagName);
   }
@@ -493,26 +559,26 @@ function _componentFallback(tagName) {
 }
 
 /**
- * @param {any} rootStyle
- * @param {any} tag
+ * @param {Record<string, unknown>} rootStyle
+ * @param {string} tag
  */
 function hasTagStyle(rootStyle, tag) {
   const s = _resolveNestedStyle(rootStyle, tag);
   if (s && typeof s === "object" && Object.keys(s).length > 0) return true;
   for (const [key, val] of Object.entries(rootStyle)) {
     if (!key.startsWith("@") || typeof val !== "object") continue;
-    const ms = _resolveNestedStyle(/** @type {any} */ (val), tag);
+    const ms = _resolveNestedStyle(/** @type {Record<string, unknown>} */ (val), tag);
     if (ms && typeof ms === "object" && Object.keys(ms).length > 0) return true;
   }
   return false;
 }
 
 /**
- * @param {any} canvasEl
- * @param {any} rootStyle
- * @param {any} filter
- * @param {any} customizedOnly
- * @param {any} activeBreakpoints
+ * @param {HTMLElement} canvasEl
+ * @param {Record<string, unknown>} rootStyle
+ * @param {string} filter
+ * @param {boolean | undefined} customizedOnly
+ * @param {Set<string> | null} activeBreakpoints
  */
 export function renderStylebookElementsIntoCanvas(
   canvasEl,
@@ -531,19 +597,19 @@ export function renderStylebookElementsIntoCanvas(
   const sectionTemplates = [];
 
   for (const section of stylebookMeta.$sections) {
-    let entries = /** @type {any} */ (section.elements);
+    let entries = /** @type {StylebookEntry[]} */ (section.elements);
     if (filter) {
       entries = entries.filter(
-        (/** @type {any} */ e) =>
+        (/** @type {StylebookEntry} */ e) =>
           e.tag.includes(filter) || section.label.toLowerCase().includes(filter),
       );
     }
     if (customizedOnly) {
-      entries = entries.filter((/** @type {any} */ e) => hasTagStyle(rootStyle, e.tag));
+      entries = entries.filter((/** @type {StylebookEntry} */ e) => hasTagStyle(rootStyle, e.tag));
     }
     if (entries.length === 0) continue;
 
-    const cardTemplates = entries.map((/** @type {any} */ entry) => {
+    const cardTemplates = entries.map((/** @type {StylebookEntry} */ entry) => {
       const el = buildStylebookElement(entry, rootStyle, activeBreakpoints);
       return html`
         <div
@@ -588,11 +654,13 @@ export function renderStylebookElementsIntoCanvas(
   if (componentRegistry.length > 0) {
     let comps = componentRegistry;
     if (filter)
-      comps = comps.filter((/** @type {any} */ c) => c.tagName.toLowerCase().includes(filter));
+      comps = comps.filter((/** @type {ComponentEntry} */ c) =>
+        c.tagName.toLowerCase().includes(filter),
+      );
     if (customizedOnly)
-      comps = comps.filter((/** @type {any} */ c) => hasTagStyle(rootStyle, c.tagName));
+      comps = comps.filter((/** @type {ComponentEntry} */ c) => hasTagStyle(rootStyle, c.tagName));
     if (comps.length > 0) {
-      const compCards = comps.map((/** @type {any} */ comp) => {
+      const compCards = comps.map((/** @type {ComponentEntry} */ comp) => {
         /** @type {HTMLDivElement | null} */
         let previewEl = null;
         const cardTpl = html`
@@ -648,22 +716,22 @@ export function renderStylebookElementsIntoCanvas(
 /**
  * Click handler for stylebook canvas — selects elements via elToPath/view.stylebookElToTag mapping
  *
- * @param {any} panel
+ * @param {StylebookPanel} panel
  */
 function registerStylebookPanelEvents(panel) {
   const { canvas, overlayClk } = panel;
 
-  overlayClk.addEventListener("click", (/** @type {any} */ e) => {
+  overlayClk.addEventListener("click", (/** @type {MouseEvent} */ e) => {
     const els = canvas.querySelectorAll("*");
-    for (const el of els) el.style.pointerEvents = "auto";
+    for (const el of els) /** @type {HTMLElement} */ (el).style.pointerEvents = "auto";
     overlayClk.style.display = "none";
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
     overlayClk.style.display = "";
-    for (const el of els) el.style.pointerEvents = "none";
+    for (const el of els) /** @type {HTMLElement} */ (el).style.pointerEvents = "none";
 
     for (const el of elements) {
       if (!canvas.contains(el) || el === canvas) continue;
-      let cur = /** @type {any} */ (el);
+      let cur = /** @type {Element | null} */ (el);
       while (cur && cur !== canvas) {
         const tag = view.stylebookElToTag.get(cur);
         if (tag) {
@@ -679,18 +747,18 @@ function registerStylebookPanelEvents(panel) {
     renderStylebookOverlays();
   });
 
-  overlayClk.addEventListener("mousemove", (/** @type {any} */ e) => {
+  overlayClk.addEventListener("mousemove", (/** @type {MouseEvent} */ e) => {
     const els = canvas.querySelectorAll("*");
-    for (const el of els) el.style.pointerEvents = "auto";
+    for (const el of els) /** @type {HTMLElement} */ (el).style.pointerEvents = "auto";
     overlayClk.style.display = "none";
     const elements = document.elementsFromPoint(e.clientX, e.clientY);
     overlayClk.style.display = "";
-    for (const el of els) el.style.pointerEvents = "none";
+    for (const el of els) /** @type {HTMLElement} */ (el).style.pointerEvents = "none";
 
     let hoverTag = null;
     for (const el of elements) {
       if (!canvas.contains(el) || el === canvas) continue;
-      let cur = /** @type {any} */ (el);
+      let cur = /** @type {Element | null} */ (el);
       while (cur && cur !== canvas) {
         const tag = view.stylebookElToTag.get(cur);
         if (tag) {
@@ -710,9 +778,9 @@ function registerStylebookPanelEvents(panel) {
 }
 
 /** Find a stylebook element by tag in the canvas */
-function findStylebookEl(/** @type {any} */ canvasEl, /** @type {any} */ tag) {
+function findStylebookEl(/** @type {HTMLElement} */ canvasEl, /** @type {string} */ tag) {
   for (const child of canvasEl.querySelectorAll("*")) {
-    if (view.stylebookElToTag.get(child) === tag) return child;
+    if (view.stylebookElToTag.get(child) === tag) return /** @type {HTMLElement} */ (child);
   }
   return null;
 }

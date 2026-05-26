@@ -9,8 +9,8 @@ import cssMeta from "../../data/css-meta.json";
 let cssInitialMap = new Map();
 
 /** Initialise cssInitialMap from webdata — call once during bootstrap. */
-export function initCssData(/** @type {any} */ webdata) {
-  cssInitialMap = new Map(/** @type {any} */ (webdata.cssProps));
+export function initCssData(/** @type {{ cssProps: string[][] }} */ webdata) {
+  cssInitialMap = new Map(/** @type {[string, string][]} */ (webdata.cssProps));
 }
 
 /** Get the CSS initial-value map (populated by initCssData). */
@@ -20,28 +20,33 @@ export function getCssInitialMap() {
 
 // ─── Condition helpers ──────────────────────────────────────────────────────
 
-/** @param {any} cond @param {any} styles */
+/** @param {{ prop: string; values: string[] }} cond @param {Record<string, string>} styles */
 export function conditionPasses(cond, styles) {
   const val = styles[cond.prop] ?? "";
   if (cond.values.length === 0) return val !== "" && val !== "initial";
   return cond.values.includes(val);
 }
 
-/** @param {any} entry @param {any} styles */
+/**
+ * @param {{ $show?: { prop: string; values: string[] }[] }} entry @param {Record<string, string>}
+ *   styles
+ */
 export function allConditionsPass(entry, styles) {
-  return (entry.$show ?? []).every((/** @type {any} */ c) => conditionPasses(c, styles));
+  return (entry.$show ?? []).every((/** @type {{ prop: string; values: string[] }} */ c) =>
+    conditionPasses(c, styles),
+  );
 }
 
 // ─── Auto-open sections ─────────────────────────────────────────────────────
 
-/** @param {any} node @param {any} currentSections */
+/** @param {JxMutableNode} node @param {Record<string, boolean>} currentSections */
 export function autoOpenSections(node, currentSections) {
   const style = node.style || {};
   const result = { ...currentSections };
   for (const prop of Object.keys(style)) {
     if (typeof style[prop] === "object") continue;
-    const entry = /** @type {Record<string, any>} */ (cssMeta.$defs)[prop];
-    const section = entry?.$section ?? "other";
+    const entry = /** @type {Record<string, Record<string, unknown>>} */ (cssMeta.$defs)[prop];
+    const section = /** @type {string} */ (entry?.$section) ?? "other";
     if (!result[section]) result[section] = true;
   }
   return result;
@@ -50,21 +55,34 @@ export function autoOpenSections(node, currentSections) {
 // ─── Shorthand expand/compress ──────────────────────────────────────────────
 
 /** Get longhands for a shorthand property from css-meta */
-export function getLonghands(/** @type {any} */ shorthandProp) {
-  const entry = /** @type {Record<string, any>} */ (cssMeta.$defs)[shorthandProp];
+export function getLonghands(/** @type {string} */ shorthandProp) {
+  const entry = /** @type {Record<string, Record<string, unknown>>} */ (cssMeta.$defs)[
+    shorthandProp
+  ];
   if (entry?.$longhands) {
-    return entry.$longhands
+    return /** @type {string[]} */ (entry.$longhands)
       .map((/** @type {string} */ name) => ({
         name,
-        entry: /** @type {Record<string, any>} */ (cssMeta.$defs)[name] || { $order: 0 },
+        entry: /** @type {Record<string, Record<string, unknown>>} */ (cssMeta.$defs)[name] || {
+          $order: 0,
+        },
       }))
-      .sort((/** @type {any} */ a, /** @type {any} */ b) => a.entry.$order - b.entry.$order);
+      .sort(
+        (
+          /** @type {{ entry: Record<string, unknown> }} */ a,
+          /** @type {{ entry: Record<string, unknown> }} */ b,
+        ) => /** @type {number} */ (a.entry.$order) - /** @type {number} */ (b.entry.$order),
+      );
   }
   const result = [];
-  for (const [name, e] of /** @type {[string, any][]} */ (Object.entries(cssMeta.$defs))) {
+  for (const [name, e] of /** @type {[string, Record<string, unknown>][]} */ (
+    Object.entries(cssMeta.$defs)
+  )) {
     if (e.$shorthand === shorthandProp) result.push({ name, entry: e });
   }
-  result.sort((a, b) => a.entry.$order - b.entry.$order);
+  result.sort(
+    (a, b) => /** @type {number} */ (a.entry.$order) - /** @type {number} */ (b.entry.$order),
+  );
   return result;
 }
 

@@ -9,7 +9,7 @@ export const GFONTS_PRECONNECT_ORIGINS = [
 /**
  * Check if a `$head` entry is a Google Fonts stylesheet link.
  *
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @returns {boolean}
  */
 export function isGoogleFontEntry(entry) {
@@ -17,21 +17,21 @@ export function isGoogleFontEntry(entry) {
     entry?.tagName === "link" &&
     entry?.attributes?.rel === "stylesheet" &&
     typeof entry?.attributes?.href === "string" &&
-    entry.attributes.href.startsWith(GFONTS_CSS_PREFIX)
+    /** @type {string} */ (entry.attributes.href).startsWith(GFONTS_CSS_PREFIX)
   );
 }
 
 /**
  * Check if a `$head` entry is a Google Fonts preconnect link.
  *
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @returns {boolean}
  */
 export function isGoogleFontPreconnect(entry) {
   return (
     entry?.tagName === "link" &&
     entry?.attributes?.rel === "preconnect" &&
-    GFONTS_PRECONNECT_ORIGINS.includes(entry?.attributes?.href)
+    GFONTS_PRECONNECT_ORIGINS.includes(/** @type {string} */ (entry?.attributes?.href))
   );
 }
 
@@ -60,18 +60,18 @@ export function buildGoogleFontUrl(family) {
 /**
  * Ensure preconnect links exist in a `$head` array for Google Fonts.
  *
- * @param {any[]} head
+ * @param {JxHeadEntry[]} head
  */
 export function ensureGoogleFontPreconnects(head) {
   for (const origin of GFONTS_PRECONNECT_ORIGINS) {
     const exists = head.some(
-      (/** @type {any} */ e) =>
+      (/** @type {JxHeadEntry} */ e) =>
         e?.tagName === "link" &&
         e?.attributes?.rel === "preconnect" &&
         e?.attributes?.href === origin,
     );
     if (!exists) {
-      /** @type {Record<string, any>} */
+      /** @type {Record<string, string | boolean>} */
       const attrs = { rel: "preconnect", href: origin };
       if (origin === "https://fonts.gstatic.com") attrs.crossorigin = "";
       head.push({ tagName: "link", attributes: attrs });
@@ -82,13 +82,13 @@ export function ensureGoogleFontPreconnects(head) {
 /**
  * Remove preconnect links if no Google Font stylesheets remain.
  *
- * @param {any[]} head
- * @returns {any[]}
+ * @param {JxHeadEntry[]} head
+ * @returns {JxHeadEntry[]}
  */
 export function cleanupGoogleFontPreconnects(head) {
-  const hasFont = head.some((/** @type {any} */ e) => isGoogleFontEntry(e));
+  const hasFont = head.some((/** @type {JxHeadEntry} */ e) => isGoogleFontEntry(e));
   if (!hasFont) {
-    return head.filter((/** @type {any} */ e) => !isGoogleFontPreconnect(e));
+    return head.filter((/** @type {JxHeadEntry} */ e) => !isGoogleFontPreconnect(e));
   }
   return head;
 }

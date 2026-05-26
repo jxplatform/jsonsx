@@ -34,16 +34,18 @@ import { transactDoc, mutateInsertNode } from "../tabs/transact.js";
 /**
  * @typedef {Object} InsertionHelperContext
  * @property {() => string} getCanvasMode - Returns the active canvas mode.
- * @property {(fn: Function) => any} withPanelPointerEvents - Executes fn with pointer-events
+ * @property {(fn: Function) => unknown} withPanelPointerEvents - Executes fn with pointer-events
  *   temporarily enabled on the canvas.
  * @property {() => number} effectiveZoom - Returns the current zoom scale factor.
  * @property {(tag: string) => Object} defaultDef - Creates a default element definition for a tag.
- * @property {(path: any[]) => any[] | null} parentElementPath - Returns the parent element path, or
- *   null for root.
- * @property {(path: any[]) => string | number} childIndex - Returns the child index within the
+ * @property {(path: JxPath) => JxPath | null} parentElementPath - Returns the parent element path,
+ *   or null for root.
+ * @property {(path: JxPath) => string | number} childIndex - Returns the child index within the
  *   parent.
- * @property {(doc: any, path: any[]) => any} getNodeAtPath - Retrieves the node at a document path.
- * @property {WeakMap<any, any[]>} elToPath - Maps rendered DOM elements to their document paths.
+ * @property {(doc: JxMutableNode, path: JxPath) => JxMutableNode | null} getNodeAtPath - Retrieves
+ *   the node at a document path.
+ * @property {WeakMap<Element, JxPath>} elToPath - Maps rendered DOM elements to their document
+ *   paths.
  * @property {CanvasPanel} panel - The active canvas panel.
  */
 
@@ -58,7 +60,7 @@ let _helper = null;
 /** @type {HTMLElement | null} */
 let _currentAnchor = null;
 
-/** @type {{ edge: string; path: any[]; parentPath: any[]; idx: number } | null} */
+/** @type {{ edge: string; path: JxPath; parentPath: JxPath; idx: number } | null} */
 let _insertionPoint = null;
 
 /** @type {AbortController | null} */
@@ -133,7 +135,9 @@ function onMouseMove(e) {
   }
 
   const { panel, withPanelPointerEvents, elToPath } = _ctx;
-  const el = withPanelPointerEvents(() => document.elementFromPoint(e.clientX, e.clientY));
+  const el = /** @type {HTMLElement | null} */ (
+    withPanelPointerEvents(() => document.elementFromPoint(e.clientX, e.clientY))
+  );
 
   if (!el || !panel.canvas.contains(el)) {
     hide();
@@ -208,8 +212,8 @@ function onMouseMove(e) {
 /**
  * @param {HTMLElement} el
  * @param {string} edge
- * @param {any[]} path
- * @param {any[]} parentPath
+ * @param {JxPath} path
+ * @param {JxPath} parentPath
  * @param {number} idx
  */
 function showAt(el, edge, path, parentPath, idx) {
@@ -275,8 +279,8 @@ function onHelperClick(/** @type {MouseEvent} */ e) {
 }
 
 /**
- * @param {any} cmd
- * @param {{ edge: string; path: any[]; parentPath: any[]; idx: number }} point
+ * @param {{ label: string; tag: string; description?: string }} cmd
+ * @param {{ edge: string; path: JxPath; parentPath: JxPath; idx: number }} point
  */
 function onSlashSelect(cmd, point) {
   if (!_ctx) return;

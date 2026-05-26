@@ -13,10 +13,23 @@ import { projectState } from "../store.js";
 import { updateSiteConfig } from "../site-context.js";
 import { getPlatform } from "../platform.js";
 
+/** @typedef {import("../files/components.js").ComponentEntry} ComponentEntry */
+
+/** @typedef {string | JxMutableNode | { $ref: string }} ElementsEntry */
+
+/**
+ * @typedef {{
+ *   renderLeftPanel: () => void;
+ *   documentPath: string | null;
+ *   documentElements: ElementsEntry[];
+ *   applyMutation: (fn: (doc: JxMutableNode) => void) => void;
+ * }} ImportsContext
+ */
+
 /**
  * Build the subpath specifier for a component: `<package>/<modulePath>`
  *
- * @param {any} comp
+ * @param {ComponentEntry} comp
  * @returns {string}
  */
 function componentSpecifier(comp) {
@@ -27,8 +40,8 @@ function componentSpecifier(comp) {
  * Check if a component is enabled (present in $elements array). Supports both cherry-picked subpath
  * specifiers and legacy full-package imports.
  *
- * @param {any} comp
- * @param {any[]} elements
+ * @param {ComponentEntry} comp
+ * @param {ElementsEntry[]} elements
  * @returns {boolean}
  */
 function isComponentEnabled(comp, elements) {
@@ -47,10 +60,10 @@ function isComponentEnabled(comp, elements) {
 /**
  * Group npm components by package name.
  *
- * @returns {Map<string, any[]>}
+ * @returns {Map<string, ComponentEntry[]>}
  */
 function groupByPackage() {
-  /** @type {Map<string, any[]>} */
+  /** @type {Map<string, ComponentEntry[]>} */
   const groups = new Map();
   for (const comp of componentRegistry) {
     if (comp.source !== "npm" || !comp.package || !comp.modulePath) continue;
@@ -61,13 +74,8 @@ function groupByPackage() {
 }
 
 /**
- * @param {{
- *   renderLeftPanel: () => void;
- *   documentPath: string | null;
- *   documentElements: any[];
- *   applyMutation: (fn: (doc: any) => void) => void;
- * }} ctx
- * @returns {any}
+ * @param {ImportsContext} ctx
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderImportsTemplate({
   renderLeftPanel,
@@ -95,7 +103,9 @@ export function renderImportsTemplate({
 function renderSiteLevelImports(renderLeftPanel) {
   const siteImports = projectState?.projectConfig?.imports || {};
   const entries = Object.entries(siteImports);
-  const siteElements = projectState?.projectConfig?.$elements || [];
+  const siteElements = /** @type {ElementsEntry[]} */ (
+    projectState?.projectConfig?.$elements || []
+  );
 
   const packageGroups = groupByPackage();
 
@@ -141,10 +151,14 @@ function renderSiteLevelImports(renderLeftPanel) {
             quiet
             size="xs"
             title="Add import"
-            @click=${async (/** @type {any} */ e) => {
-              const form = e.target.closest(".import-add-form");
-              const nameField = form?.querySelector(".import-add-name");
-              const pathField = form?.querySelector(".import-add-path");
+            @click=${async (/** @type {Event} */ e) => {
+              const form = /** @type {HTMLElement} */ (e.target).closest(".import-add-form");
+              const nameField = /** @type {HTMLInputElement} */ (
+                form?.querySelector(".import-add-name")
+              );
+              const pathField = /** @type {HTMLInputElement} */ (
+                form?.querySelector(".import-add-path")
+              );
               const name = nameField?.value?.trim();
               const path = pathField?.value?.trim();
               if (!name || !path) return;
@@ -177,13 +191,16 @@ function renderSiteLevelImports(renderLeftPanel) {
                     await platform.removePackage(pkg);
                     // Also remove all cherry-picked elements for this package
                     const updatedElements = siteElements.filter(
-                      (/** @type {any} */ e) => typeof e !== "string" || !e.startsWith(pkg + "/"),
+                      (/** @type {ElementsEntry} */ e) =>
+                        typeof e !== "string" || !e.startsWith(pkg + "/"),
                     );
                     const { loadComponentRegistry } = await import("../files/components.js");
                     await loadComponentRegistry();
-                    await updateSiteConfig({ $elements: updatedElements });
+                    await updateSiteConfig({
+                      $elements: /** @type {(string | JxElement)[]} */ (updatedElements),
+                    });
                     renderLeftPanel();
-                  } catch (/** @type {any} */ e) {
+                  } catch (/** @type {unknown} */ e) {
                     console.error("Failed to remove package:", e);
                   }
                 }}
@@ -192,7 +209,7 @@ function renderSiteLevelImports(renderLeftPanel) {
               </sp-action-button>
             </div>
             <div class="imports-list imports-component-list">
-              ${comps.map((/** @type {any} */ comp) => {
+              ${comps.map((/** @type {ComponentEntry} */ comp) => {
                 const enabled = isComponentEnabled(comp, siteElements);
                 const specifier = componentSpecifier(comp);
                 return html`
@@ -200,16 +217,20 @@ function renderSiteLevelImports(renderLeftPanel) {
                     <sp-checkbox
                       size="s"
                       .checked=${enabled}
-                      @change=${async (/** @type {any} */ e) => {
+                      @change=${async (/** @type {Event} */ e) => {
                         let updated = [...siteElements];
                         // Remove legacy full-package import if present
-                        updated = updated.filter((/** @type {any} */ el) => el !== pkg);
-                        if (e.target.checked) {
+                        updated = updated.filter((/** @type {ElementsEntry} */ el) => el !== pkg);
+                        if (/** @type {HTMLInputElement} */ (e.target).checked) {
                           if (!updated.includes(specifier)) updated.push(specifier);
                         } else {
-                          updated = updated.filter((/** @type {any} */ el) => el !== specifier);
+                          updated = updated.filter(
+                            (/** @type {ElementsEntry} */ el) => el !== specifier,
+                          );
                         }
-                        await updateSiteConfig({ $elements: updated });
+                        await updateSiteConfig({
+                          $elements: /** @type {(string | JxElement)[]} */ (updated),
+                        });
                         renderLeftPanel();
                       }}
                     >
@@ -233,18 +254,18 @@ function renderSiteLevelImports(renderLeftPanel) {
             placeholder="Package name…"
             size="s"
             style="flex:1"
-            @keydown=${async (/** @type {any} */ e) => {
+            @keydown=${async (/** @type {KeyboardEvent} */ e) => {
               if (e.key !== "Enter") return;
-              const name = e.target.value?.trim();
+              const name = /** @type {HTMLInputElement} */ (e.target).value?.trim();
               if (!name) return;
-              e.target.value = "";
+              /** @type {HTMLInputElement} */ (e.target).value = "";
               try {
                 const platform = getPlatform();
                 await platform.addPackage(name);
                 const { loadComponentRegistry } = await import("../files/components.js");
                 await loadComponentRegistry();
                 renderLeftPanel();
-              } catch (/** @type {any} */ err) {
+              } catch (/** @type {unknown} */ err) {
                 console.error("Failed to add package:", err);
               }
             }}
@@ -253,18 +274,20 @@ function renderSiteLevelImports(renderLeftPanel) {
             quiet
             size="xs"
             title="Add package"
-            @click=${async (/** @type {any} */ e) => {
-              const input = e.target.closest(".import-add-form")?.querySelector("sp-textfield");
-              const name = input?.value?.trim();
+            @click=${async (/** @type {Event} */ e) => {
+              const input = /** @type {HTMLElement} */ (e.target)
+                .closest(".import-add-form")
+                ?.querySelector("sp-textfield");
+              const name = /** @type {HTMLInputElement | null} */ (input)?.value?.trim();
               if (!name) return;
-              input.value = "";
+              /** @type {HTMLInputElement} */ (input).value = "";
               try {
                 const platform = getPlatform();
                 await platform.addPackage(name);
                 const { loadComponentRegistry } = await import("../files/components.js");
                 await loadComponentRegistry();
                 renderLeftPanel();
-              } catch (/** @type {any} */ err) {
+              } catch (/** @type {unknown} */ err) {
                 console.error("Failed to add package:", err);
               }
             }}
@@ -279,14 +302,7 @@ function renderSiteLevelImports(renderLeftPanel) {
 
 // ─── Document-level: Component Imports + npm Component Cherry-pick ───────────
 
-/**
- * @param {{
- *   renderLeftPanel: () => void;
- *   documentPath: string | null;
- *   documentElements: any[];
- *   applyMutation: (fn: (doc: any) => void) => void;
- * }} ctx
- */
+/** @param {ImportsContext} ctx */
 function renderDocumentLevelImports({
   renderLeftPanel,
   documentPath,
@@ -294,14 +310,18 @@ function renderDocumentLevelImports({
   applyMutation,
 }) {
   const refEntries = documentElements.filter(
-    (/** @type {any} */ e) => e && typeof e === "object" && e.$ref,
+    (/** @type {ElementsEntry} */ e) => e && typeof e === "object" && e.$ref,
   );
-  const npmEntries = documentElements.filter((/** @type {any} */ e) => typeof e === "string");
+  const npmEntries = documentElements.filter(
+    (/** @type {ElementsEntry} */ e) => typeof e === "string",
+  );
 
   // Available JX components not yet imported
-  const importedRefs = new Set(refEntries.map((/** @type {any} */ e) => e.$ref));
+  const importedRefs = new Set(
+    refEntries.map((/** @type {ElementsEntry} */ e) => /** @type {{ $ref: string }} */ (e).$ref),
+  );
   const availableComponents = componentRegistry.filter(
-    (/** @type {any} */ c) =>
+    (/** @type {ComponentEntry} */ c) =>
       c.source !== "npm" && !importedRefs.has(`./${c.path}`) && !importedRefs.has(c.path),
   );
 
@@ -309,9 +329,9 @@ function renderDocumentLevelImports({
 
   /** @param {string} ref */
   const removeRef = (ref) => {
-    applyMutation((/** @type {any} */ doc) => {
+    applyMutation((/** @type {JxMutableNode} */ doc) => {
       doc.$elements = (doc.$elements || []).filter(
-        (/** @type {any} */ e) => !(e && typeof e === "object" && e.$ref === ref),
+        (/** @type {ElementsEntry} */ e) => !(e && typeof e === "object" && e.$ref === ref),
       );
     });
     renderLeftPanel();
@@ -329,14 +349,18 @@ function renderDocumentLevelImports({
           ? html`
               <div class="imports-list">
                 ${refEntries.map(
-                  (/** @type {any} */ entry) => html`
+                  (/** @type {ElementsEntry} */ entry) => html`
                     <div class="import-row">
-                      <span class="import-path" title=${entry.$ref}>${entry.$ref}</span>
+                      <span
+                        class="import-path"
+                        title=${/** @type {{ $ref: string }} */ (entry).$ref}
+                        >${/** @type {{ $ref: string }} */ (entry).$ref}</span
+                      >
                       <sp-action-button
                         quiet
                         size="xs"
                         title="Remove"
-                        @click=${() => removeRef(entry.$ref)}
+                        @click=${() => removeRef(/** @type {{ $ref: string }} */ (entry).$ref)}
                       >
                         <sp-icon-close slot="icon" size="xs"></sp-icon-close>
                       </sp-action-button>
@@ -353,16 +377,16 @@ function renderDocumentLevelImports({
                   size="s"
                   label="Add component…"
                   class="import-picker"
-                  @change=${(/** @type {any} */ e) => {
-                    const tag = e.target.value;
+                  @change=${(/** @type {Event} */ e) => {
+                    const tag = /** @type {HTMLInputElement} */ (e.target).value;
                     if (!tag) return;
-                    e.target.value = "";
+                    /** @type {HTMLInputElement} */ (e.target).value = "";
                     const comp = componentRegistry.find(
-                      (/** @type {any} */ c) => c.tagName === tag,
+                      (/** @type {ComponentEntry} */ c) => c.tagName === tag,
                     );
                     if (!comp) return;
                     const relPath = computeRelativePath(documentPath, comp.path);
-                    applyMutation((/** @type {any} */ doc) => {
+                    applyMutation((/** @type {JxMutableNode} */ doc) => {
                       if (!doc.$elements) doc.$elements = [];
                       doc.$elements.push({ $ref: relPath });
                     });
@@ -370,7 +394,7 @@ function renderDocumentLevelImports({
                   }}
                 >
                   ${availableComponents.map(
-                    (/** @type {any} */ c) =>
+                    (/** @type {ComponentEntry} */ c) =>
                       html`<sp-menu-item value=${c.tagName}>&lt;${c.tagName}&gt;</sp-menu-item>`,
                   )}
                 </sp-picker>
@@ -387,7 +411,7 @@ function renderDocumentLevelImports({
               <span class="imports-section-title import-mono">${pkg}</span>
             </div>
             <div class="imports-list imports-component-list">
-              ${comps.map((/** @type {any} */ comp) => {
+              ${comps.map((/** @type {ComponentEntry} */ comp) => {
                 const enabled = isComponentEnabled(comp, npmEntries);
                 const specifier = componentSpecifier(comp);
                 return html`
@@ -395,18 +419,18 @@ function renderDocumentLevelImports({
                     <sp-checkbox
                       size="s"
                       .checked=${enabled}
-                      @change=${(/** @type {any} */ e) => {
-                        applyMutation((/** @type {any} */ doc) => {
+                      @change=${(/** @type {Event} */ e) => {
+                        applyMutation((/** @type {JxMutableNode} */ doc) => {
                           if (!doc.$elements) doc.$elements = [];
                           // Remove legacy full-package import if present
                           doc.$elements = doc.$elements.filter(
-                            (/** @type {any} */ el) => el !== pkg,
+                            (/** @type {ElementsEntry} */ el) => el !== pkg,
                           );
-                          if (e.target.checked) {
+                          if (/** @type {HTMLInputElement} */ (e.target).checked) {
                             if (!doc.$elements.includes(specifier)) doc.$elements.push(specifier);
                           } else {
                             doc.$elements = doc.$elements.filter(
-                              (/** @type {any} */ el) => el !== specifier,
+                              (/** @type {ElementsEntry} */ el) => el !== specifier,
                             );
                           }
                         });

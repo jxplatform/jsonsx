@@ -3,6 +3,45 @@ import { resolve, relative, join, basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
 
+// ─── Internal schema types for class.json parsing ─────────────────────────────
+
+interface ClassFieldDef {
+  identifier?: string;
+  name?: string;
+  type?: Record<string, unknown>;
+  description?: string;
+  examples?: unknown[];
+  format?: string;
+  default?: unknown;
+  initializer?: unknown;
+  role?: string;
+  access?: string;
+}
+
+interface CtorParam {
+  $ref?: string;
+  identifier?: string;
+  name?: string;
+}
+
+interface ClassJsonDef {
+  title?: string;
+  description?: string;
+  extends?: { $ref?: string };
+  $defs?: {
+    parameters?: Record<string, ClassFieldDef>;
+    fields?: Record<string, ClassFieldDef>;
+    constructor?: { parameters?: CtorParam[] };
+  };
+}
+
+export interface StudioSchema {
+  type?: string;
+  description?: string;
+  properties: Record<string, Record<string, unknown>>;
+  required: string[];
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
 let projectRoot: string | null = null;
@@ -211,17 +250,19 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
             .filter(([, d]) => {
               if (d == null) return false;
               if (typeof d !== "object") return true;
-              return !(d as any).$prototype && !(d as any).$handler && !(d as any).$compute;
+              const entry = d as Record<string, unknown>;
+              return !entry.$prototype && !entry.$handler && !entry.$compute;
             })
             .map(([name, d]) => {
               if (typeof d !== "object") {
                 return { name, type: typeof d, default: d };
               }
+              const entry = d as Record<string, unknown>;
               return {
                 name,
-                type: (d as any).type,
-                default: (d as any).default,
-                format: (d as any).format,
+                type: entry.type as string | undefined,
+                default: entry.default,
+                format: entry.format as string | undefined,
               };
             }),
           hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
@@ -233,7 +274,7 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
   return components;
 }
 
-export async function codeService(_params: any): Promise<CodeServiceResult | null> {
+export async function codeService(_params: unknown): Promise<CodeServiceResult | null> {
   return null;
 }
 
@@ -273,7 +314,7 @@ export async function fetchPluginSchema(params: {
   if (moduleAbsPath.endsWith(".class.json")) {
     try {
       const content = readFileSync(moduleAbsPath, "utf8");
-      const classDef = JSON.parse(content);
+      const classDef = JSON.parse(content) as ClassJsonDef;
       return extractStudioSchema(classDef, moduleAbsPath);
     } catch {
       return null;
@@ -285,7 +326,7 @@ export async function fetchPluginSchema(params: {
   if (existsSync(classJsonPath)) {
     try {
       const content = readFileSync(classJsonPath, "utf8");
-      const classDef = JSON.parse(content);
+      const classDef = JSON.parse(content) as ClassJsonDef;
       return extractStudioSchema(classDef, classJsonPath);
     } catch {}
   }
@@ -302,51 +343,50 @@ export async function fetchPluginSchema(params: {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function extractStudioSchema(classDef: any, classJsonPath: string): any {
-  let parentSchema: any = null;
+function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): StudioSchema {
+  let parentSchema: StudioSchema | null = null;
   if (classDef.extends?.["$ref"]) {
     try {
       const parentPath = resolve(dirname(classJsonPath), classDef.extends["$ref"]);
       const parentContent = readFileSync(parentPath, "utf8");
-      const parentDef = JSON.parse(parentContent);
+      const parentDef = JSON.parse(parentContent) as ClassJsonDef;
       parentSchema = extractStudioSchema(parentDef, parentPath);
     } catch {}
   }
 
   const params = classDef.$defs?.parameters ?? {};
   const fields = classDef.$defs?.fields ?? {};
-  const properties: Record<string, any> = {};
+  const properties: Record<string, Record<string, unknown>> = {};
   const required: string[] = [];
 
   if (parentSchema?.properties) Object.assign(properties, parentSchema.properties);
   if (parentSchema?.required) required.push(...parentSchema.required);
 
   for (const [key, param] of Object.entries(params)) {
-    const p = param as any;
-    const id = p.identifier ?? key;
-    const prop: any = {};
-    if (p.type && typeof p.type === "object") Object.assign(prop, p.type);
-    if (p.description) prop.description = p.description;
-    if (p.examples) prop.examples = p.examples;
-    if (p.format) prop.format = p.format;
+    const id = param.identifier ?? key;
+    const prop: Record<string, unknown> = {};
+    if (param.type && typeof param.type === "object") Object.assign(prop, param.type);
+    if (param.description) prop.description = param.description;
+    if (param.examples) prop.examples = param.examples;
+    if (param.format) prop.format = param.format;
     properties[id] = prop;
   }
 
   for (const [key, field] of Object.entries(fields)) {
-    const f = field as any;
-    if (f.role !== "field") continue;
-    if (f.access === "private") continue;
-    const id = f.identifier ?? key;
-    const prop: any = {};
-    if (f.type && typeof f.type === "object") Object.assign(prop, f.type);
-    if (f.description) prop.description = f.description;
-    if (f.default !== undefined) prop.default = f.default;
-    if (f.initializer !== undefined && prop.default === undefined) prop.default = f.initializer;
-    if (f.examples) prop.examples = f.examples;
+    if (field.role !== "field") continue;
+    if (field.access === "private") continue;
+    const id = field.identifier ?? key;
+    const prop: Record<string, unknown> = {};
+    if (field.type && typeof field.type === "object") Object.assign(prop, field.type);
+    if (field.description) prop.description = field.description;
+    if (field.default !== undefined) prop.default = field.default;
+    if (field.initializer !== undefined && prop.default === undefined)
+      prop.default = field.initializer;
+    if (field.examples) prop.examples = field.examples;
     properties[id] = prop;
   }
 
-  const ctorParams: any[] = classDef.$defs?.constructor?.parameters ?? [];
+  const ctorParams: CtorParam[] = classDef.$defs?.constructor?.parameters ?? [];
   const requiredSet = new Set(required);
   for (const p of ctorParams) {
     const name = p.$ref ? p.$ref.split("/").pop() : (p.identifier ?? p.name);

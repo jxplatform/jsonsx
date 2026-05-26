@@ -15,25 +15,26 @@ export const UNIT_RE = /^(-?[\d.]+)(px|rem|em|%|vw|vh|svw|svh|dvh|ms|s|fr|ch|ex|
 /**
  * Render a number + unit selector widget.
  *
- * @param {any} entry — css-meta entry with $units and $keywords arrays
+ * @param {Record<string, unknown>} entry — css-meta entry with $units and $keywords arrays
  * @param {string} prop — property key (for debounce namespace)
- * @param {any} value — current value (e.g. "12px", "auto", "")
+ * @param {string | number | undefined} value — current value (e.g. "12px", "auto", "")
  * @param {(val: string) => void} onChange — commit callback
- * @returns {any}
+ * @param {string} [placeholder]
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderUnitSelector(
-  /** @type {any} */ entry,
-  /** @type {any} */ prop,
-  /** @type {any} */ value,
-  /** @type {any} */ onChange,
+  /** @type {Record<string, unknown>} */ entry,
+  /** @type {string} */ prop,
+  /** @type {string | number | undefined} */ value,
+  /** @type {(val: string) => void} */ onChange,
   /** @type {string} */ placeholder = "",
 ) {
-  const units = entry.$units || [];
-  const keywords = entry.$keywords || [];
+  const units = /** @type {string[]} */ (entry.$units || []);
+  const keywords = /** @type {string[]} */ (entry.$keywords || []);
   const strVal = String(value ?? "");
   const match = strVal.match(UNIT_RE);
   const isKeyword = !match && strVal !== "" && keywords.includes(strVal);
-  const isNumericVal = (/** @type {any} */ v) => /^-?\d*\.?\d*$/.test(v);
+  const isNumericVal = (/** @type {string} */ v) => /^-?\d*\.?\d*$/.test(v);
 
   const currentUnit = isKeyword ? units[0] || "" : match ? match[2] || "" : units[0] || "";
   let displayValue;
@@ -55,8 +56,8 @@ export function renderUnitSelector(
           size="s"
           placeholder=${placeholder || "0"}
           .value=${live(displayValue)}
-          @input=${debouncedStyleCommit(`nui:${prop}`, 400, (/** @type {any} */ e) => {
-            const val = (e.target.value ?? "").trim();
+          @input=${debouncedStyleCommit(`nui:${prop}`, 400, (/** @type {Event} */ e) => {
+            const val = /** @type {HTMLInputElement} */ ((e.target).value ?? "").trim();
             if (val === "") {
               onChange("");
               return;
@@ -74,8 +75,8 @@ export function renderUnitSelector(
                 <sp-popover style="min-width: var(--spectrum-component-width-900, 64px)">
                   <sp-menu
                     label="CSS unit"
-                    @change=${(/** @type {any} */ e) => {
-                      const chosen = e.target.value;
+                    @change=${(/** @type {Event} */ e) => {
+                      const chosen = /** @type {HTMLInputElement} */ (e.target).value;
                       if (keywords.includes(chosen)) {
                         onChange(chosen);
                       } else if (units.includes(chosen)) {
@@ -86,13 +87,14 @@ export function renderUnitSelector(
                     }}
                   >
                     ${units.map(
-                      (/** @type {any} */ u) => html`<sp-menu-item value=${u}>${u}</sp-menu-item>`,
+                      (/** @type {string} */ u) =>
+                        html`<sp-menu-item value=${u}>${u}</sp-menu-item>`,
                     )}
                     ${keywords.length > 0 && units.length > 0
                       ? html`<sp-menu-divider></sp-menu-divider>`
                       : nothing}
                     ${keywords.map(
-                      (/** @type {any} */ kw) =>
+                      (/** @type {string} */ kw) =>
                         html`<sp-menu-item value=${kw}>${kw}</sp-menu-item>`,
                     )}
                   </sp-menu>

@@ -1,7 +1,7 @@
 export function createDesktopPlatform() {
   const ws = new WebSocket(`ws://${location.host}`);
   let nextId = 1;
-  const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
   ws.addEventListener("message", (event) => {
     const msg = JSON.parse(event.data);
@@ -19,7 +19,7 @@ export function createDesktopPlatform() {
     ws.addEventListener("open", () => resolve());
   });
 
-  function request(method: string, params?: any): Promise<any> {
+  function request(method: string, params?: Record<string, unknown>): Promise<unknown> {
     return ready.then(
       () =>
         new Promise((resolve, reject) => {
@@ -44,7 +44,7 @@ export function createDesktopPlatform() {
     async probeRootProject() {
       try {
         const content = await request("readFile", { path: "project.json" });
-        const config = JSON.parse(content);
+        const config = JSON.parse(content as string);
         return {
           meta: { root: ".", name: config.name || "project" },
           info: { isSiteProject: true, projectConfig: config, directories: [] },

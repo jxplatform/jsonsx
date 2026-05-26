@@ -8,8 +8,9 @@
 /**
  * Compile a .class.json schema to a JavaScript ES module string.
  *
- * @param {any} classDef - Parsed .class.json content (must have $prototype: "Class")
- * @param {any} [_opts]
+ * @param {Record<string, unknown>} classDef - Parsed .class.json content (must have $prototype:
+ *   "Class")
+ * @param {Record<string, unknown>} [_opts]
  * @returns {string} JavaScript module source code
  */
 export function compileClassJson(classDef, _opts = {}) {
@@ -17,9 +18,10 @@ export function compileClassJson(classDef, _opts = {}) {
   if (!className) throw new Error("compileClassJson: missing title (class name)");
 
   const baseClass = resolveBaseClass(classDef.extends);
-  const fields = classDef.$defs?.fields ?? {};
-  const ctor = classDef.$defs?.constructor;
-  const methods = classDef.$defs?.methods ?? {};
+  const defs = /** @type {Record<string, unknown> | undefined} */ (classDef.$defs);
+  const fields = /** @type {Record<string, unknown>} */ (defs?.fields ?? {});
+  const ctor = /** @type {any} */ (defs?.constructor);
+  const methods = /** @type {Record<string, unknown>} */ (defs?.methods ?? {});
 
   /** @type {string[]} */
   const lines = [];
@@ -140,15 +142,15 @@ export function compileClassJson(classDef, _opts = {}) {
 /**
  * Resolve the base class name from an extends value.
  *
- * @param {any} ext
+ * @param {unknown} ext
  * @returns {string}
  */
 function resolveBaseClass(ext) {
   if (!ext) return "Object";
   if (typeof ext === "string") return ext;
-  // { $ref: "./Parent.class.json" } — extract title from filename as best guess
-  if (ext.$ref) {
-    const ref = ext.$ref;
+  const e = /** @type {any} */ (ext);
+  if (e.$ref) {
+    const ref = e.$ref;
     const match = ref.match(/([A-Za-z0-9_]+)\.class\.json/);
     return match ? match[1] : "Object";
   }
@@ -158,7 +160,7 @@ function resolveBaseClass(ext) {
 /**
  * Resolve parameter names from $ref or inline definitions.
  *
- * @param {any[]} params
+ * @param {unknown[]} params
  * @returns {string}
  */
 function resolveParams(params) {
@@ -173,19 +175,19 @@ function resolveParams(params) {
 /**
  * Resolve body from string or array of strings.
  *
- * @param {any} body
+ * @param {unknown} body
  * @returns {string[]}
  */
 function resolveBody(body) {
   if (!body) return [""];
   if (Array.isArray(body)) return body;
-  return [body];
+  return [/** @type {string} */ (body)];
 }
 
 /**
  * Simple heuristic: does the method body contain await?
  *
- * @param {any} method
+ * @param {{ body?: string | string[] }} method
  * @returns {boolean}
  */
 function isMethodAsync(method) {

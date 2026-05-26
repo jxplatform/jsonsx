@@ -1,6 +1,10 @@
 /**
  * Content inline edit bridge — extracted from studio.js (Phase 4k). Rich-text editing entry point
  * for edit/content mode. Bridges startEditing() with Jx document state mutations.
+ *
+ * @typedef {import("./inline-edit.js").JxContentResult} JxContentResult
+ *
+ * @typedef {import("./inline-edit.js").SlashCommand} SlashCommand
  */
 
 import {
@@ -22,8 +26,8 @@ import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers.js";
 /**
  * Enter rich-text inline editing on a canvas element (edit/content mode).
  *
- * @param {any} el
- * @param {any} path
+ * @param {HTMLElement} el
+ * @param {JxPath} path
  */
 export function enterInlineEdit(el, path) {
   // Restore raw template expressions before editing.
@@ -39,9 +43,9 @@ export function enterInlineEdit(el, path) {
 
   startEditing(el, path, {
     onCommit(
-      /** @type {any} */ commitPath,
-      /** @type {any} */ children,
-      /** @type {any} */ textContent,
+      /** @type {JxPath} */ commitPath,
+      /** @type {(JxMutableNode | string)[] | null} */ children,
+      /** @type {string | null} */ textContent,
     ) {
       const node = getNodeAtPath(activeTab.value?.doc.document, commitPath);
       if (children) {
@@ -59,13 +63,17 @@ export function enterInlineEdit(el, path) {
       }
     },
 
-    onSplit(/** @type {any} */ splitPath, /** @type {any} */ before, /** @type {any} */ after) {
+    onSplit(
+      /** @type {JxPath} */ splitPath,
+      /** @type {JxContentResult} */ before,
+      /** @type {JxContentResult} */ after,
+    ) {
       const tag = "p";
 
       // Insert new element after with "after" content
-      const parentPath = /** @type {any} */ (parentElementPath(splitPath));
+      const parentPath = /** @type {JxPath} */ (parentElementPath(splitPath));
       const idx = /** @type {number} */ (childIndex(splitPath));
-      /** @type {any} */
+      /** @type {JxMutableNode} */
       const newNode = { tagName: tag };
       if (after.textContent != null) {
         newNode.textContent = after.textContent;
@@ -108,7 +116,11 @@ export function enterInlineEdit(el, path) {
       });
     },
 
-    onInsert(/** @type {any} */ afterPath, /** @type {any} */ cmd, /** @type {any} */ commitData) {
+    onInsert(
+      /** @type {JxPath} */ afterPath,
+      /** @type {SlashCommand} */ cmd,
+      /** @type {JxContentResult | undefined} */ commitData,
+    ) {
       const isEmpty =
         !commitData ||
         (commitData.textContent != null && commitData.textContent.trim() === "") ||
@@ -148,7 +160,7 @@ export function enterInlineEdit(el, path) {
       }
 
       const elementDef = defaultDef(cmd.tag);
-      const parentPath = /** @type {any} */ (parentElementPath(afterPath));
+      const parentPath = /** @type {JxPath} */ (parentElementPath(afterPath));
       const idx = /** @type {number} */ (childIndex(afterPath));
       const newPath = [...parentPath, "children", idx + 1];
 

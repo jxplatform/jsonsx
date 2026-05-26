@@ -13,7 +13,7 @@ import { renderPopover } from "../ui/layers.js";
 import remarkDirective from "remark-directive";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd } from "../markdown/md-convert.js";
-import { createState, projectState, setProjectState } from "../store.js";
+import { createState, projectState, setProjectState, requireProjectState } from "../store.js";
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
@@ -105,7 +105,7 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
     replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
 
     setProjectState({
-      ...projectState,
+      .../** @type {ProjectState} */ (projectState),
       projectRoot: handle.root,
       isSiteProject: true,
       projectConfig: config,
@@ -129,26 +129,26 @@ export async function openProject({ renderActivityBar, renderLeftPanel }) {
       "public",
       "styles",
     ];
-    const entries = projectState.dirs.get(".") || [];
+    const entries = requireProjectState().dirs.get(".") || [];
     const foundDirs = [];
     for (const e of entries) {
       if (e.type === "directory" && conventionalDirs.includes(e.name)) {
         foundDirs.push(e.name);
-        projectState.expanded.add(e.path || e.name);
+        requireProjectState().expanded.add(e.path || e.name);
         await loadDirectory(e.path || e.name);
       }
     }
-    projectState.projectDirs = foundDirs;
+    requireProjectState().projectDirs = foundDirs;
 
     view.leftTab = "files";
-    addRecentProject(projectState.name, projectState.projectRoot);
+    addRecentProject(requireProjectState().name, requireProjectState().projectRoot);
     renderActivityBar();
     renderLeftPanel();
-    statusMessage(`Opened project: ${projectState.name}`);
+    statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -251,9 +251,9 @@ export function renderFilesTemplate({
           size="xs"
           label="Refresh"
           @click=${async () => {
-            projectState.dirs.clear();
+            requireProjectState().dirs.clear();
             await loadDirectory(".");
-            for (const dir of projectState.expanded) await loadDirectory(dir);
+            for (const dir of requireProjectState().expanded) await loadDirectory(dir);
             renderLeftPanel();
           }}
         >
@@ -264,9 +264,9 @@ export function renderFilesTemplate({
         size="s"
         quiet
         placeholder="Filter files…"
-        value=${projectState.searchQuery}
+        value=${requireProjectState().searchQuery}
         @input=${(/** @type {Event} */ e) => {
-          projectState.searchQuery = /** @type {HTMLInputElement} */ (e.target).value;
+          requireProjectState().searchQuery = /** @type {HTMLInputElement} */ (e.target).value;
           renderLeftPanel();
         }}
         @submit=${(/** @type {Event} */ e) => e.preventDefault()}
@@ -284,7 +284,7 @@ function renderTreeLevelTemplate(
   /** @type {number} */ depth,
   /** @type {{ openFileFn: (path: string) => void; renderLeftPanel: () => void }} */ ctx,
 ) {
-  const entries = projectState.dirs.get(dirPath);
+  const entries = requireProjectState().dirs.get(dirPath);
   if (!entries) {
     loadDirectory(dirPath).then(() => ctx.renderLeftPanel());
     return html`<div
@@ -301,15 +301,15 @@ function renderTreeLevelTemplate(
     return a.name.localeCompare(b.name);
   });
 
-  const query = projectState.searchQuery.toLowerCase();
+  const query = requireProjectState().searchQuery.toLowerCase();
   const filtered = query
     ? sorted.filter((e) => e.type === "directory" || e.name.toLowerCase().includes(query))
     : sorted;
 
   return filtered.map((entry) => {
     const isDir = entry.type === "directory";
-    const isExpanded = projectState.expanded.has(entry.path);
-    const isSelected = projectState.selectedPath === entry.path;
+    const isExpanded = requireProjectState().expanded.has(entry.path);
+    const isSelected = requireProjectState().selectedPath === entry.path;
 
     return html`
       <div
@@ -324,10 +324,10 @@ function renderTreeLevelTemplate(
         @click=${async (/** @type {MouseEvent} */ e) => {
           e.stopPropagation();
           if (isDir) {
-            if (isExpanded) projectState.expanded.delete(entry.path);
+            if (isExpanded) requireProjectState().expanded.delete(entry.path);
             else {
-              projectState.expanded.add(entry.path);
-              if (!projectState.dirs.has(entry.path)) await loadDirectory(entry.path);
+              requireProjectState().expanded.add(entry.path);
+              if (!requireProjectState().dirs.has(entry.path)) await loadDirectory(entry.path);
             }
             ctx.renderLeftPanel();
           } else {
@@ -372,8 +372,8 @@ export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
       case "ArrowRight":
         if (focused.dataset.type === "directory") {
           const path = /** @type {string} */ (focused.dataset.path);
-          if (!projectState.expanded.has(path)) {
-            projectState.expanded.add(path);
+          if (!requireProjectState().expanded.has(path)) {
+            requireProjectState().expanded.add(path);
             loadDirectory(path).then(() => {
               const panel = tree.closest(".panel-body");
               if (panel)
@@ -386,9 +386,9 @@ export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
         break;
       case "ArrowLeft":
         if (focused.dataset.type === "directory") {
-          const path = focused.dataset.path;
-          if (projectState.expanded.has(path)) {
-            projectState.expanded.delete(path);
+          const path = /** @type {string} */ (focused.dataset.path);
+          if (requireProjectState().expanded.has(path)) {
+            requireProjectState().expanded.delete(path);
             // renderLeftPanel will be called by the caller who sets up keyboard
           }
         }
@@ -504,8 +504,8 @@ async function createNewFile(dirPath = ".", /** @type {() => void} */ renderLeft
     await loadDirectory(dirPath);
     renderLeftPanel();
     statusMessage(`Created ${path}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -524,13 +524,13 @@ async function renameFile(
     const platform = getPlatform();
     await platform.renameFile(entry.path, newPath);
     await loadDirectory(parentDir);
-    if (projectState.selectedPath === entry.path) {
-      projectState.selectedPath = newPath;
+    if (requireProjectState().selectedPath === entry.path) {
+      requireProjectState().selectedPath = newPath;
     }
     renderLeftPanel();
     statusMessage(`Renamed to ${newName}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -545,13 +545,13 @@ async function deleteFile(
     const delPath = entry.path.replaceAll("\\", "/");
     const parentDir = delPath.includes("/") ? delPath.substring(0, delPath.lastIndexOf("/")) : ".";
     await loadDirectory(parentDir);
-    if (projectState.selectedPath === entry.path) {
-      projectState.selectedPath = null;
+    if (requireProjectState().selectedPath === entry.path) {
+      requireProjectState().selectedPath = null;
     }
     renderLeftPanel();
     statusMessage(`Deleted ${entry.name}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -561,10 +561,10 @@ async function deleteFile(
  * Open a file from the file tree — auto-saves current dirty doc, then loads the new one.
  *
  * @param {{
- *   S: any;
- *   commit: (s: any) => void;
+ *   S: import("../state.js").StudioState;
+ *   commit: (s: import("../state.js").StudioState) => void;
  *   render: () => void;
- *   loadMarkdown: (source: string, handle: any) => void;
+ *   loadMarkdown: (source: string, handle: unknown) => void;
  * }} ctx
  * @param {string} path
  */
@@ -576,11 +576,11 @@ export async function openFileFromTree(ctx, path) {
       const isContent = ctx.S.mode === "content";
       let output;
       if (isContent) {
-        const mdast = jxToMd(ctx.S.document);
+        const mdast = jxToMd(/** @type {any} */ (ctx.S.document));
         const md = unified()
           .use(remarkDirective)
           .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-          .stringify(mdast);
+          .stringify(/** @type {any} */ (mdast));
         const fm = ctx.S.content?.frontmatter;
         const hasFrontmatter = fm && Object.keys(fm).length > 0;
         output = hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;
@@ -588,8 +588,8 @@ export async function openFileFromTree(ctx, path) {
         output = JSON.stringify(ctx.S.document, null, 2);
       }
       await platform.writeFile(ctx.S.documentPath, output);
-    } catch (/** @type {any} */ e) {
-      statusMessage(`Save error: ${e.message}`);
+    } catch (/** @type {unknown} */ e) {
+      statusMessage(`Save error: ${/** @type {Error} */ (e).message}`);
     }
   }
 
@@ -612,12 +612,12 @@ export async function openFileFromTree(ctx, path) {
     }
 
     // Update tree selection
-    projectState.selectedPath = path;
+    requireProjectState().selectedPath = path;
 
     ctx.render();
     statusMessage(`Opened ${path}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -630,7 +630,7 @@ export async function openFileInTab(path) {
   for (const [id, tab] of workspace.tabs.entries()) {
     if (tab.documentPath === path) {
       activateTab(id);
-      projectState.selectedPath = path;
+      requireProjectState().selectedPath = path;
       return;
     }
   }
@@ -657,7 +657,7 @@ export async function openFileInTab(path) {
       frontmatter,
       sourceFormat: path.endsWith(".md") ? "md" : null,
     });
-    projectState.selectedPath = path;
+    requireProjectState().selectedPath = path;
     trackRecentFile({ path, name: path.split("/").pop() || path });
     view.leftTab = "layers";
 
@@ -667,7 +667,7 @@ export async function openFileInTab(path) {
     }
 
     statusMessage(`Opened ${path.split("/").pop()}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }

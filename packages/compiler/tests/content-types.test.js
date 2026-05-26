@@ -237,22 +237,22 @@ describe("content-loader", () => {
   describe("loadContentTypes", () => {
     it("loads Markdown content type entries", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
       expect(blog).toBeDefined();
       expect(blog.length).toBe(3); // hello-world, second-post, draft-post
 
-      const hello = blog.find((e) => e.id === "hello-world");
+      const hello = /** @type {any} */ (blog.find((e) => e.id === "hello-world"));
       expect(hello).toBeDefined();
       expect(hello.data.title).toBe("Hello World");
       expect(hello.data.pubDate).toBe("2024-01-15");
       expect(Array.isArray(hello.$children)).toBe(true);
-      expect(hello.$children.some((/** @type {any} */ n) => n.tagName === "h1")).toBe(true);
+      expect(hello.$children.some((/** @type {JxElement} */ n) => n.tagName === "h1")).toBe(true);
       expect(hello.body).toContain("# Hello World");
     });
 
     it("loads JSON content type entries", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const authors = /** @type {any[]} */ (contentTypes.get("authors"));
+      const authors = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("authors"));
       expect(authors).toBeDefined();
       expect(authors.length).toBe(1);
       expect(authors[0].id).toBe("jane");
@@ -261,11 +261,11 @@ describe("content-loader", () => {
 
     it("loads CSV content type entries with type coercion", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const products = /** @type {any[]} */ (contentTypes.get("products"));
+      const products = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("products"));
       expect(products).toBeDefined();
       expect(products.length).toBe(3);
 
-      const widget = products.find((e) => e.id === "WIDGET-1");
+      const widget = /** @type {any} */ (products.find((e) => e.id === "WIDGET-1"));
       expect(widget).toBeDefined();
       expect(widget.data.name).toBe("Blue Widget");
       expect(widget.data.price).toBe(9.99); // coerced to number
@@ -276,7 +276,7 @@ describe("content-loader", () => {
   describe("queryContentType", () => {
     it("filters entries", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
       const published = queryContentType(blog, { filter: { draft: false } });
       expect(published.length).toBe(2);
       expect(published.every((e) => e.data.draft === false)).toBe(true);
@@ -284,23 +284,27 @@ describe("content-loader", () => {
 
     it("sorts entries", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
-      const sorted = queryContentType(blog, {
-        sort: { field: "pubDate", order: "desc" },
-      });
-      expect(sorted[0].data.pubDate >= sorted[1].data.pubDate).toBe(true);
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
+      const sorted = /** @type {ContentLoaderEntry[]} */ (
+        queryContentType(blog, {
+          sort: { field: "pubDate", order: "desc" },
+        })
+      );
+      expect(
+        /** @type {any} */ (sorted[0].data.pubDate) >= /** @type {any} */ (sorted[1].data.pubDate),
+      ).toBe(true);
     });
 
     it("limits entries", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
       const limited = queryContentType(blog, { limit: 1 });
       expect(limited.length).toBe(1);
     });
 
     it("combines filter + sort + limit", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
       const result = queryContentType(blog, {
         filter: { draft: false },
         sort: { field: "pubDate", order: "desc" },
@@ -314,15 +318,15 @@ describe("content-loader", () => {
   describe("findEntry", () => {
     it("finds entry by ID", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
-      const entry = findEntry(blog, "hello-world");
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
+      const entry = /** @type {any} */ (findEntry(blog, "hello-world"));
       expect(entry).not.toBeNull();
-      expect(entry.data.title).toBe("Hello World");
+      expect(/** @type {any} */ (entry).data.title).toBe("Hello World");
     });
 
     it("returns null for missing ID", async () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
       expect(findEntry(blog, "nonexistent")).toBeNull();
     });
   });
@@ -333,8 +337,8 @@ describe("content-loader", () => {
       const contentConfig = /** @type {any} */ (loadContentConfig(TMP, getProjectConfig()));
       resolveContentTypeRefs(contentTypes, contentConfig.config);
 
-      const blog = /** @type {any[]} */ (contentTypes.get("blog"));
-      const hello = blog.find((e) => e.id === "hello-world");
+      const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
+      const hello = /** @type {any} */ (blog.find((e) => e.id === "hello-world"));
       // Author "jane" should be resolved to the full author entry
       expect(hello.data.author).toBeDefined();
       expect(typeof hello.data.author).toBe("object");
@@ -535,7 +539,7 @@ describe("content-loader edge cases", () => {
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (contentTypes.get("items"));
+      const items = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(2);
       // First item: multiline field preserved correctly
       expect(items[0].data.name).toBe("Line1\nLine2");
@@ -572,7 +576,7 @@ describe("content-loader edge cases", () => {
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (contentTypes.get("items"));
+      const items = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(2);
       expect(items[0].id).toContain("list-0");
       expect(items[1].id).toContain("list-1");
@@ -645,7 +649,7 @@ describe("content-loader edge cases", () => {
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const items = /** @type {any[]} */ (contentTypes.get("items"));
+      const items = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("items"));
       expect(items.length).toBe(1);
       expect(items[0].id).toBe("bad");
     } finally {
@@ -655,11 +659,15 @@ describe("content-loader edge cases", () => {
 
   it("sorts entries in ascending order (comparison branches)", async () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
-    const blog = /** @type {any[]} */ (contentTypes.get("blog"));
-    const sorted = queryContentType(blog, {
-      sort: { field: "pubDate", order: "asc" },
-    });
-    expect(sorted[0].data.pubDate <= sorted[1].data.pubDate).toBe(true);
+    const blog = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("blog"));
+    const sorted = /** @type {ContentLoaderEntry[]} */ (
+      queryContentType(blog, {
+        sort: { field: "pubDate", order: "asc" },
+      })
+    );
+    expect(
+      /** @type {any} */ (sorted[0].data.pubDate) <= /** @type {any} */ (sorted[1].data.pubDate),
+    ).toBe(true);
   });
 
   it("loadCollection with $elements passes allowedNames", async () => {
@@ -686,7 +694,7 @@ describe("content-loader edge cases", () => {
         TMP2,
         JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
       );
-      const docs = /** @type {any[]} */ (contentTypes.get("docs"));
+      const docs = /** @type {ContentLoaderEntry[]} */ (contentTypes.get("docs"));
       expect(docs.length).toBe(1);
       expect(docs[0].data.title).toBe("Intro");
     } finally {
@@ -721,7 +729,7 @@ describe("content-loader edge cases", () => {
     /** @type {string[]} */
     const warnings = [];
     const origWarn = console.warn;
-    console.warn = (/** @type {any} */ msg) => warnings.push(msg);
+    console.warn = (/** @type {string} */ msg) => warnings.push(msg);
     try {
       const contentTypes = await loadContentTypes(
         TMP3,
@@ -736,10 +744,11 @@ describe("content-loader edge cases", () => {
   });
 
   it("sorts entries in descending order", async () => {
+    /** @type {any []} */
     const entries = [
-      { id: "a", data: { score: 10 } },
-      { id: "b", data: { score: 30 } },
-      { id: "c", data: { score: 20 } },
+      { id: "a", data: { score: 10 }, body: null },
+      { id: "b", data: { score: 30 }, body: null },
+      { id: "c", data: { score: 20 }, body: null },
     ];
     const ascSorted = queryContentType(entries, { sort: { field: "score", order: "asc" } });
     expect(ascSorted[0].data.score).toBe(10);

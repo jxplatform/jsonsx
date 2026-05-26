@@ -232,7 +232,7 @@ export { hasSchemaKeywords };
  *
  * @param {string} str
  * @param {Record<string, any>} state
- * @returns {any}
+ * @returns {string}
  */
 function evaluateTemplate(str, state) {
   const fn = new Function("state", "$map", `return \`${str}\``);
@@ -254,7 +254,7 @@ const _moduleCache = new Map();
  * @param {Record<string, any>} state - Reactive scope proxy
  * @param {string} key - Def key name
  * @param {string} [base] - Base URL for resolving $src imports
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveFunction(def, state, key, base) {
   if (def.body && def.$src) {
@@ -448,7 +448,7 @@ export function renderNode(def, state, options) {
 /**
  * Check if a value is a template string (contains ${}).
  *
- * @param {any} val
+ * @param {unknown} val
  * @returns {boolean}
  */
 function isTemplateString(val) {
@@ -548,9 +548,10 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
       else el.style.setProperty(prop, val);
     } else if (isTemplateString(val))
       effect(() => {
-        /** @type {any} */ (el.style)[prop] = evaluateTemplate(val, state);
+        /** @type {Record<string, string>} */ (/** @type {unknown} */ (el.style))[prop] =
+          evaluateTemplate(val, state);
       });
-    else /** @type {any} */ (el.style)[prop] = val;
+    else /** @type {Record<string, string>} */ (/** @type {unknown} */ (el.style))[prop] = val;
   }
 
   const hasNested = Object.keys(nested).length > 0;
@@ -732,7 +733,7 @@ function renderSwitch(def, state, options) {
           const childOpts = options ? { ...options, _path: [...path, "cases", key] } : undefined;
           container.appendChild(renderNode(doc, childScope, childOpts));
         })
-        .catch((/** @type {any} */ e) =>
+        .catch((/** @type {unknown} */ e) =>
           console.error("Jx $switch: failed to load external case", caseDef.$ref, e),
         );
       return;
@@ -757,7 +758,7 @@ function renderSwitch(def, state, options) {
  * @param {Record<string, any>} state - Reactive scope proxy
  * @param {string} key - Def key (for diagnostics)
  * @param {string} [base] - Base URL for resolving $src imports
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 export async function resolvePrototype(def, state, key, base) {
   // ── External class via $src ─────────────────────────────────────────────────
@@ -903,7 +904,7 @@ export async function resolvePrototype(def, state, key, base) {
       const req = indexedDB.open(database, version);
       req.onupgradeneeded = (e) => {
         /** @type {any} */
-        const db = /** @type {any} */ (e.target)?.result;
+        const db = /** @type {IDBRequest} */ (e.target)?.result;
         if (!db.objectStoreNames.contains(store)) {
           const os = db.createObjectStore(store, { keyPath, autoIncrement });
           for (const i of indexes) os.createIndex(i.name, i.keyPath, { unique: i.unique ?? false });
@@ -911,7 +912,7 @@ export async function resolvePrototype(def, state, key, base) {
       };
       req.onsuccess = (e) => {
         /** @type {any} */
-        const db = /** @type {any} */ (e.target)?.result;
+        const db = /** @type {IDBRequest} */ (e.target)?.result;
         idbState.value = {
           database,
           store,
@@ -976,7 +977,7 @@ const EXTERNAL_RESERVED = new Set([
  * @param {Record<string, any>} state
  * @param {string} key
  * @param {string} [base]
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveExternalPrototype(def, state, key, base) {
   const src = def.$src;
@@ -1000,7 +1001,7 @@ async function resolveExternalPrototype(def, state, key, base) {
  * @param {string} src - JS module URL to import
  * @param {string} exportName - Export name to look up
  * @param {string} [base] - Base URL for resolution
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function importAndInstantiate(def, src, exportName, base) {
   let mod;
@@ -1049,7 +1050,7 @@ async function importAndInstantiate(def, src, exportName, base) {
   /** @type {import("@vue/reactivity").Ref<any>} */
   const s = ref(value);
   if (typeof instance.subscribe === "function") {
-    instance.subscribe((/** @type {any} */ newVal) => {
+    instance.subscribe((/** @type {unknown} */ newVal) => {
       s.value = newVal;
     });
   }
@@ -1064,7 +1065,7 @@ async function importAndInstantiate(def, src, exportName, base) {
  * @param {Record<string, any>} state
  * @param {string} key
  * @param {string} [base]
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveClassJson(def, state, key, base) {
   const src = def.$src;
@@ -1116,7 +1117,7 @@ async function resolveClassJson(def, state, key, base) {
   /** @type {import("@vue/reactivity").Ref<any>} */
   const s = ref(value);
   if (typeof instance.subscribe === "function") {
-    instance.subscribe((/** @type {any} */ newVal) => {
+    instance.subscribe((/** @type {unknown} */ newVal) => {
       s.value = newVal;
     });
   }
@@ -1142,12 +1143,15 @@ function classFromSchema(classDef) {
         const typedField = field;
         const id = typedField.identifier ?? key;
         const propName = typedField.access === "private" ? `_${id}` : id;
-        if (config[id] !== undefined) /** @type {any} */ (this)[propName] = config[id];
+        if (config[id] !== undefined)
+          /** @type {Record<string, unknown>} */ (this)[propName] = config[id];
         else if (typedField.initializer !== undefined)
-          /** @type {any} */ (this)[propName] = typedField.initializer;
+          /** @type {Record<string, unknown>} */ (this)[propName] = typedField.initializer;
         else if (typedField.default !== undefined)
-          /** @type {any} */ (this)[propName] = structuredClone(typedField.default);
-        else /** @type {any} */ (this)[propName] = null;
+          /** @type {Record<string, unknown>} */ (this)[propName] = structuredClone(
+            typedField.default,
+          );
+        else /** @type {Record<string, unknown>} */ (this)[propName] = null;
       }
       if (ctor?.body) {
         const bodyStr = Array.isArray(ctor.body) ? ctor.body.join("\n") : ctor.body;
@@ -1160,10 +1164,12 @@ function classFromSchema(classDef) {
     /** @type {any} */
     const typedMethod = method;
     const name = typedMethod.identifier ?? key;
-    const params = (typedMethod.parameters ?? []).map((/** @type {any} */ p) => {
-      if (p.$ref) return p.$ref.split("/").pop();
-      return p.identifier ?? p.name ?? "arg";
-    });
+    const params = (typedMethod.parameters ?? []).map(
+      (/** @type {Record<string, unknown>} */ p) => {
+        if (p.$ref) return /** @type {string} */ (p.$ref).split("/").pop();
+        return p.identifier ?? p.name ?? "arg";
+      },
+    );
     const bodyStr = Array.isArray(typedMethod.body)
       ? typedMethod.body.join("\n")
       : (typedMethod.body ?? "");
@@ -1175,15 +1181,16 @@ function classFromSchema(classDef) {
         descriptor.get = /** @type {any} */ (new Function(typedMethod.getter.body));
       if (typedMethod.setter) {
         const sp = (typedMethod.setter.parameters ?? []).map(
-          (/** @type {any} */ p) => p.$ref?.split("/").pop() ?? "v",
+          (/** @type {Record<string, unknown>} */ p) =>
+            /** @type {string} */ (p.$ref)?.split("/").pop() ?? "v",
         );
         descriptor.set = /** @type {any} */ (new Function(...sp, typedMethod.setter.body));
       }
       Object.defineProperty(DynClass.prototype, name, { ...descriptor, configurable: true });
     } else if (typedMethod.scope === "static") {
-      /** @type {any} */ (DynClass)[name] = new Function(...params, bodyStr);
+      /** @type {DynamicClass} */ (DynClass)[name] = new Function(...params, bodyStr);
     } else {
-      /** @type {any} */ (DynClass.prototype)[name] = new Function(...params, bodyStr);
+      /** @type {DynamicClass} */ (DynClass).prototype[name] = new Function(...params, bodyStr);
     }
   }
 
@@ -1200,7 +1207,7 @@ function classFromSchema(classDef) {
  * @param {Record<string, any>} state
  * @param {string} key
  * @param {string} [base]
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveViaDevProxy(def, state, key, base) {
   /** @type {Record<string, any>} */
@@ -1209,7 +1216,9 @@ async function resolveViaDevProxy(def, state, key, base) {
     if (!EXTERNAL_RESERVED.has(k)) config[k] = v;
   }
 
-  const hasTemplates = Object.values(config).some((/** @type {any} */ v) => isTemplateString(v));
+  const hasTemplates = Object.values(config).some((/** @type {unknown} */ v) =>
+    isTemplateString(v),
+  );
 
   /** @param {Record<string, any>} resolvedConfig */
   const doResolve = (resolvedConfig) =>
@@ -1239,17 +1248,17 @@ async function resolveViaDevProxy(def, state, key, base) {
         resolvedConfig[k] = isTemplateString(v) ? evaluateTemplate(v, state) : v;
       }
       doResolve(resolvedConfig)
-        .then((/** @type {any} */ value) => {
+        .then((/** @type {unknown} */ value) => {
           s.value = value;
         })
-        .catch((/** @type {any} */ e) => console.error("Jx dev proxy:", e));
+        .catch((/** @type {unknown} */ e) => console.error("Jx dev proxy:", e));
     });
   } else {
     doResolve(config)
-      .then((/** @type {any} */ value) => {
+      .then((/** @type {unknown} */ value) => {
         s.value = value;
       })
-      .catch((/** @type {any} */ e) => console.error("Jx dev proxy:", e));
+      .catch((/** @type {unknown} */ e) => console.error("Jx dev proxy:", e));
   }
   return s;
 }
@@ -1264,7 +1273,7 @@ async function resolveViaDevProxy(def, state, key, base) {
  * @param {Record<string, any>} state
  * @param {string} key
  * @param {string} [base]
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveServerFunction(def, state, key, base) {
   const src = def.$src;
@@ -1298,12 +1307,12 @@ async function resolveServerFunction(def, state, key, base) {
     throw new Error(`Jx: "${exportName}" from "${src}" is not a function`);
 
   const rawArgs = def.arguments ?? {};
-  const hasReactiveArg = Object.values(rawArgs).some((/** @type {any} */ v) => isRefObj(v));
+  const hasReactiveArg = Object.values(rawArgs).some((/** @type {unknown} */ v) => isRefObj(v));
   const resolveArgs = () => {
     /** @type {Record<string, any>} */
     const args = {};
     for (const [k, v] of Object.entries(rawArgs)) {
-      args[k] = isRefObj(v) ? resolveRef(/** @type {any} */ (v).$ref, state) : v;
+      args[k] = isRefObj(v) ? resolveRef(/** @type {{ $ref: string }} */ (v).$ref, state) : v;
     }
     return args;
   };
@@ -1316,7 +1325,7 @@ async function resolveServerFunction(def, state, key, base) {
       const args = resolveArgs();
       onEffectCleanup(() => {});
       fn(args)
-        .then((/** @type {any} */ result) => {
+        .then((/** @type {unknown} */ result) => {
           s.value = result;
         })
         .catch(() => {});
@@ -1336,17 +1345,17 @@ async function resolveServerFunction(def, state, key, base) {
  * @param {Record<string, any>} state
  * @param {string} key
  * @param {string} [base]
- * @returns {Promise<any>}
+ * @returns {Promise<unknown>}
  */
 async function resolveServerFunctionViaProxy(def, state, key, base) {
   const rawArgs = def.arguments ?? {};
-  const hasReactiveArg = Object.values(rawArgs).some((/** @type {any} */ v) => isRefObj(v));
+  const hasReactiveArg = Object.values(rawArgs).some((/** @type {unknown} */ v) => isRefObj(v));
 
   const resolveArgs = () => {
     /** @type {Record<string, any>} */
     const args = {};
     for (const [k, v] of Object.entries(rawArgs)) {
-      args[k] = isRefObj(v) ? resolveRef(/** @type {any} */ (v).$ref, state) : v;
+      args[k] = isRefObj(v) ? resolveRef(/** @type {{ $ref: string }} */ (v).$ref, state) : v;
     }
     return args;
   };
@@ -1375,17 +1384,17 @@ async function resolveServerFunctionViaProxy(def, state, key, base) {
       const args = resolveArgs();
       onEffectCleanup(() => {});
       doResolve(args)
-        .then((/** @type {any} */ result) => {
+        .then((/** @type {unknown} */ result) => {
           s.value = result;
         })
-        .catch((/** @type {any} */ e) => console.error("Jx server proxy:", e));
+        .catch((/** @type {unknown} */ e) => console.error("Jx server proxy:", e));
     });
   } else {
     doResolve(resolveArgs())
-      .then((/** @type {any} */ result) => {
+      .then((/** @type {unknown} */ result) => {
         s.value = result;
       })
-      .catch((/** @type {any} */ e) => console.error("Jx server proxy:", e));
+      .catch((/** @type {unknown} */ e) => console.error("Jx server proxy:", e));
   }
   return s;
 }
@@ -1426,7 +1435,7 @@ export function resolveRef(ref, state) {
 /**
  * Check if v is a Vue ref (including computed).
  *
- * @param {any} v
+ * @param {unknown} v
  * @returns {boolean}
  */
 export function isSignal(v) {
@@ -1450,12 +1459,12 @@ function isNestedSelector(k) {
 }
 
 /**
- * @param {any} obj
+ * @param {unknown} obj
  * @param {string} path
  * @returns {any}
  */
 function getPath(obj, path) {
-  return path.split(/[./]/).reduce((o, k) => o?.[k], obj);
+  return path.split(/[./]/).reduce((o, k) => /** @type {Record<string, unknown>} */ (o)?.[k], obj);
 }
 
 /**
@@ -1484,7 +1493,7 @@ export function camelToKebab(s) {
 /**
  * Convert a style rules object to a CSS text string (skipping nested selectors).
  *
- * @param {Record<string, any>} rules
+ * @param {Record<string, unknown> | object} rules
  * @returns {string}
  */
 export function toCSSText(rules) {
@@ -1630,8 +1639,8 @@ export async function defineElement(source, base) {
 
       // Merge $props set as JS properties by parent before connection
       for (const key of Object.keys(def.state ?? {})) {
-        if (key in this && /** @type {any} */ (this)[key] !== undefined) {
-          state[key] = /** @type {any} */ (this)[key];
+        if (key in this && /** @type {Record<string, unknown>} */ (this)[key] !== undefined) {
+          state[key] = /** @type {Record<string, unknown>} */ (this)[key];
         }
       }
       // Set up property getters/setters that forward into reactive state
@@ -1639,7 +1648,7 @@ export async function defineElement(source, base) {
         if (!(key in HTMLElement.prototype)) {
           Object.defineProperty(this, key, {
             get: () => state[key],
-            set: (/** @type {any} */ v) => {
+            set: (/** @type {unknown} */ v) => {
               state[key] = v;
             },
             configurable: true,
@@ -1647,7 +1656,7 @@ export async function defineElement(source, base) {
         }
       }
 
-      /** @type {any} */ (this)._state = state;
+      /** @type {Record<string, unknown>} */ (this)._state = state;
 
       // Capture light DOM children (for slot distribution) before rendering
       const slottedChildren = Array.from(this.childNodes);
@@ -1721,11 +1730,10 @@ export async function defineElement(source, base) {
  * @param {Record<string, any>} def
  * @param {Record<string, any>} state
  * @param {any} [options]
- * @param {any[]} [path]
+ * @param {JxPath} [path]
  * @returns {HTMLElement}
  */
 function renderCustomElementWithProps(def, state, options, path) {
-  /** @type {any} */
   const el = document.createElement(def.tagName);
 
   if (options?.onNodeCreated) options.onNodeCreated(el, path, def);
@@ -1734,17 +1742,17 @@ function renderCustomElementWithProps(def, state, options, path) {
   for (const [key, val] of Object.entries(def.$props ?? {})) {
     if (isRefObj(val)) {
       const resolved = resolveRef(val.$ref, state);
-      el[key] = resolved;
+      /** @type {Record<string, unknown>} */ (el)[key] = resolved;
       // Reactive forwarding: re-set the property when the source changes
       effect(() => {
-        el[key] = resolveRef(val.$ref, state);
+        /** @type {Record<string, unknown>} */ (el)[key] = resolveRef(val.$ref, state);
       });
     } else if (isTemplateString(val)) {
       effect(() => {
-        el[key] = evaluateTemplate(val, state);
+        /** @type {Record<string, unknown>} */ (el)[key] = evaluateTemplate(val, state);
       });
     } else {
-      el[key] = val;
+      /** @type {Record<string, unknown>} */ (el)[key] = val;
     }
   }
 

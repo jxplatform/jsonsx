@@ -279,7 +279,7 @@ const components = [
 ];
 
 for (const [tag, ctor] of /** @type {[string, CustomElementConstructor][]} */ (components)) {
-  if (!customElements.get(tag)) defineElement(tag, /** @type {any} */ (ctor));
+  if (!customElements.get(tag)) defineElement(tag, /** @type {CustomElementConstructor} */ (ctor));
 }
 
 // Register theme fragments (these are also side-effect-only in the original modules)

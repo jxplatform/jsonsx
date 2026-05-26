@@ -118,6 +118,7 @@ function _flush() {
     const boxes = [];
 
     // Batch layout reads: read viewport geometry once per panel
+    if (!p.viewport) continue;
     const vpRect = p.viewport.getBoundingClientRect();
     const scrollTop = p.viewport.scrollTop;
     const scrollLeft = p.viewport.scrollLeft;

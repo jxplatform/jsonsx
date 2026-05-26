@@ -139,7 +139,7 @@ setNotifyWebview((version) => rpc.send.updateReady({ version }));
 
 // ─── Handle file associations (open-url) ─────────────────────────────────────
 
-Electrobun.events.on("open-url", (e: any) => {
+Electrobun.events.on("open-url", (e: { data: { url: string } }) => {
   const url = new URL(e.data.url);
   if (url.protocol === "file:") {
     const filePath = decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
