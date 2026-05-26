@@ -869,7 +869,9 @@ function generateRedirects(redirects, outDir) {
         : target
     );
     const status =
-      typeof target === "object" ? /** @type {{ status?: number }} */ (target.status ?? 301) : 301;
+      typeof target === "object" && target !== null
+        ? /** @type {{ status?: number }} */ ((target).status ?? 301)
+        : 301;
 
     // Skip patterns with :param or * — these need platform-specific handling
     if (source.includes(":") || source.includes("*")) {
