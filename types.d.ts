@@ -241,8 +241,8 @@ interface JxMutableNode {
   textContent?: string | null;
   innerHTML?: string;
   children?: (JxMutableNode | string)[];
-  style?: Record<string, any>;
-  attributes?: Record<string, any>;
+  style?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  attributes?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   className?: string;
   id?: string;
   $ref?: string;
@@ -253,12 +253,12 @@ interface JxMutableNode {
   $title?: string;
   $id?: string;
   $src?: string;
-  state?: Record<string, any>;
+  state?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   $elements?: (JxMutableNode | string | { $ref: string })[];
   $head?: JxHeadEntry[];
   $media?: Record<string, string>;
-  $defs?: Record<string, any>;
-  [key: string]: any;
+  $defs?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 // ─── State Shapes ────────────────────────────────────────────────────────────
@@ -357,7 +357,7 @@ interface ContentTypeDef {
 }
 
 interface ContentTypeSchema {
-  properties?: Record<string, any>;
+  properties?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   required?: string[];
   [key: string]: unknown;
 }
@@ -408,7 +408,7 @@ interface ProjectConfig {
   $media?: Record<string, string>;
   $elements?: (string | JxElement)[];
   $head?: JxHeadEntry[];
-  $defs?: Record<string, any>;
+  $defs?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   build?: { adapter?: string; [key: string]: unknown };
   images?: ImageConfig;
   imports?: Record<string, string>;
