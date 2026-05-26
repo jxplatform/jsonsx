@@ -259,6 +259,31 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
     }
   }
 
+  // Create a new project
+  if (path === "/__studio/create-project" && req.method === "POST") {
+    try {
+      const body = await req.json();
+      const { name, description, url: siteUrl, adapter, directory } = body;
+      if (!name || !directory) {
+        return Response.json({ error: "name and directory are required" }, { status: 400 });
+      }
+      const destPath = resolve(root, directory);
+      assertAccessible(destPath, root, activeProjectRoot);
+
+      const { generateProject } = await import("@jxsuite/create/generate");
+      await generateProject(destPath, { name, description, url: siteUrl, adapter });
+
+      const config = JSON.parse(await readFile(resolve(destPath, "project.json"), "utf8"));
+      const projectRoot = fwd(relative(root, destPath));
+      return Response.json({ root: projectRoot, config });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
+    }
+  }
+
   // List files
   if (path === "/__studio/files" && req.method === "GET") {
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;

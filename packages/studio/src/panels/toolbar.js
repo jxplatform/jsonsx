@@ -16,6 +16,7 @@ import { openQuickSearch } from "./quick-search.js";
 import { getPlatform } from "../platform.js";
 import { refreshGitStatus } from "./git-panel.js";
 import { openBrowseModal } from "../browse/browse-modal.js";
+import { openNewProjectModal } from "../new-project/new-project-modal.js";
 
 /** @type {HTMLElement | null} */
 let _rootEl = null;
@@ -128,6 +129,13 @@ export function render() {
     litRender(toolbarTemplate(), _rootEl);
   } catch (e) {
     console.error("toolbar render error:", e);
+  }
+}
+
+async function handleNewProject() {
+  const result = await openNewProjectModal();
+  if (result && _ctx) {
+    await _ctx.openRecentProject(result.root);
   }
 }
 
@@ -283,32 +291,32 @@ function toolbarTemplate() {
     : nothing;
 
   const recentProjects = getRecentProjects();
-  const recentProjectsTpl = recentProjects.length
-    ? html`
-        <overlay-trigger placement="bottom-start" triggered-by="click">
-          <sp-action-button
-            size="s"
-            slot="trigger"
-            title="Recent projects"
-            class="tb-split-trigger"
-          >
-            <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
-          </sp-action-button>
-          <sp-popover slot="click-content" tip>
-            <sp-menu
-              @change=${(/** @type {Event} */ e) =>
-                ctx.openRecentProject(
-                  /** @type {HTMLInputElement} */ (/** @type {unknown} */ (e.target)).value,
-                )}
-            >
-              ${recentProjects.map(
-                (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
-              )}
-            </sp-menu>
-          </sp-popover>
-        </overlay-trigger>
-      `
-    : nothing;
+  const recentProjectsTpl = html`
+    <overlay-trigger placement="bottom-start" triggered-by="click">
+      <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
+        <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
+      </sp-action-button>
+      <sp-popover slot="click-content" tip>
+        <sp-menu
+          @change=${(/** @type {Event} */ e) => {
+            const val = /** @type {HTMLInputElement} */ (/** @type {unknown} */ (e.target)).value;
+            if (val === "__new__") {
+              handleNewProject();
+            } else {
+              ctx.openRecentProject(val);
+            }
+          }}
+        >
+          <sp-menu-item value="__new__">New Project…</sp-menu-item>
+          ${recentProjects.length
+            ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
+                  (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
+                )}`
+            : nothing}
+        </sp-menu>
+      </sp-popover>
+    </overlay-trigger>
+  `;
 
   return html`
     <div class="tb-split-btn">

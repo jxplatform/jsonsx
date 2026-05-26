@@ -11,10 +11,18 @@
     }
   ],
   "$elements": [
-    { "$ref": "../components/section-label.json" },
-    { "$ref": "../components/stat-card.json" },
-    { "$ref": "../components/check-item.json" },
-    { "$ref": "../components/cta-button.json" }
+    {
+      "$ref": "../components/section-label.json"
+    },
+    {
+      "$ref": "../components/stat-card.json"
+    },
+    {
+      "$ref": "../components/check-item.json"
+    },
+    {
+      "$ref": "../components/cta-button.json"
+    }
   ],
   "tagName": "div",
   "children": [
@@ -28,11 +36,16 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "800px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "section-label",
-              "attributes": { "props.text": "Compare" }
+              "attributes": {
+                "props.text": "Compare"
+              }
             },
             {
               "tagName": "h1",
@@ -70,15 +83,23 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "div",
-              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "style": {
+                "textAlign": "center",
+                "marginBottom": "3rem"
+              },
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Feature Matrix" }
+                  "attributes": {
+                    "props.text": "Feature Matrix"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -114,7 +135,9 @@
                       "children": [
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "th",
@@ -203,134 +226,208 @@
                       "children": [
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "600"
+                              },
                               "textContent": "WordPress"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Heavy"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Patchy"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "High"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             }
                           ]
                         },
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "600"
+                              },
                               "textContent": "Webflow"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Light"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Strong"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Total"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "✗"
                             }
                           ]
                         },
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "600"
+                              },
                               "textContent": "Wix / Squarespace"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Light"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Slow"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Total"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "✗"
                             }
                           ]
                         },
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "600"
+                              },
                               "textContent": "Headless + Next.js"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "✗"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "Heavy"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Strong"
                             },
                             {
@@ -343,50 +440,75 @@
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             }
                           ]
                         },
                         {
                           "tagName": "tr",
-                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "style": {
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "600"
+                              },
                               "textContent": "Astro / Hugo"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-muted)"
+                              },
                               "textContent": "✗"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Light"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Strong"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "Open"
                             },
                             {
                               "tagName": "td",
-                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)"
+                              },
                               "textContent": "✓"
                             }
                           ]
                         },
                         {
                           "tagName": "tr",
-                          "style": { "backgroundColor": "var(--color-bg-surface)" },
+                          "style": {
+                            "backgroundColor": "var(--color-bg-surface)"
+                          },
                           "children": [
                             {
                               "tagName": "td",
@@ -463,15 +585,23 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "div",
-              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "style": {
+                "textAlign": "center",
+                "marginBottom": "3rem"
+              },
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Cost of Ownership" }
+                  "attributes": {
+                    "props.text": "Cost of Ownership"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -528,7 +658,11 @@
                     },
                     {
                       "tagName": "div",
-                      "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "1rem"
+                      },
                       "children": [
                         {
                           "tagName": "div",
@@ -541,7 +675,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Managed hosting"
                             },
                             {
@@ -565,7 +701,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Premium plugins"
                             },
                             {
@@ -589,7 +727,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Maintenance & updates"
                             },
                             {
@@ -613,7 +753,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Security monitoring"
                             },
                             {
@@ -681,7 +823,11 @@
                     },
                     {
                       "tagName": "div",
-                      "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "1rem"
+                      },
                       "children": [
                         {
                           "tagName": "div",
@@ -694,7 +840,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Static hosting (Cloudflare Pages)"
                             },
                             {
@@ -718,7 +866,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Plugins"
                             },
                             {
@@ -742,7 +892,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Maintenance & updates"
                             },
                             {
@@ -766,7 +918,9 @@
                           "children": [
                             {
                               "tagName": "span",
-                              "style": { "color": "var(--color-text-secondary)" },
+                              "style": {
+                                "color": "var(--color-text-secondary)"
+                              },
                               "textContent": "Security monitoring"
                             },
                             {
@@ -826,15 +980,23 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "div",
-              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "style": {
+                "textAlign": "center",
+                "marginBottom": "3rem"
+              },
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "The Exit Hatch" }
+                  "attributes": {
+                    "props.text": "The Exit Hatch"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -1012,7 +1174,10 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "560px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "h2",

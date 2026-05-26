@@ -406,6 +406,7 @@
     hash = "sha512-6hY4Kl4HPBvtfS62asS/R22JzNNy8vi/Ssev7x6EobfCp+9QIB2hKvI2EtbdJ0VSQacxVNtqhE/NmF/NZ0gm6g==";
   };
   "@jxsuite/compiler" = copyPathToStore ./packages/compiler;
+  "@jxsuite/create" = copyPathToStore ./packages/create;
   "@jxsuite/desktop" = copyPathToStore ./packages/desktop;
   "@jxsuite/examples" = copyPathToStore ./examples;
   "@jxsuite/parser" = copyPathToStore ./packages/parser;

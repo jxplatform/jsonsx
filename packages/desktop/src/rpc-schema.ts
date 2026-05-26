@@ -226,6 +226,16 @@ export type StudioRPC = {
         params: void;
         response: PackageInfo[];
       };
+      createProject: {
+        params: {
+          name: string;
+          description?: string;
+          url?: string;
+          adapter?: string;
+          directory: string;
+        };
+        response: { root: string; config: ProjectConfig };
+      };
       // Updates
       updaterGetLocalInfo: {
         params: void;

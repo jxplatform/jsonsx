@@ -95,6 +95,13 @@ interface StudioPlatform {
   gitDiff(path?: string): Promise<string>;
   gitShow(opts: { path: string; ref?: string }): Promise<string>;
   gitDiscard(files: string[]): Promise<void>;
+  createProject(opts: {
+    name: string;
+    description?: string;
+    url?: string;
+    adapter?: string;
+    directory: string;
+  }): Promise<{ root: string; config: ProjectConfig }>;
 }
 
 // ─── Studio UI Types ────────────────────────────────────────────────────────

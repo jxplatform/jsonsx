@@ -13,6 +13,7 @@ import { locateDocument } from "../services/code-services.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { getPlatform } from "../platform.js";
 import { activeTab, openTab } from "../workspace/workspace.js";
+import { isEditing, stopEditing } from "../editor/inline-edit.js";
 
 /** Open a file via the File System Access API (or fallback input). */
 export async function openFile() {
@@ -104,6 +105,7 @@ export async function loadMarkdown(source) {
 
 /** Save the current document back to its source location. */
 export async function saveFile() {
+  if (isEditing()) stopEditing();
   const tab = activeTab.value;
   if (!tab) return;
   try {

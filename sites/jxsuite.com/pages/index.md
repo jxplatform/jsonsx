@@ -60,7 +60,7 @@ The freedom of hand-coded HTML. The speed of a visual builder. The power of a fr
 $
 :::
 
-bun create jx-suite my-site
+bun create @jxsuite my-site
 ::::
 :::::
 ::::::
