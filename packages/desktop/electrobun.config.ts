@@ -54,9 +54,9 @@ export default {
       },
     },
     win: {
-      bundleCEF: true,
-      defaultRenderer: "cef",
-      icon: "icon.png",
+      bundleCEF: false,
+      defaultRenderer: "native",
+      icon: "icon.ico",
     },
 
     // preBuild copies compiled studio + runtime assets into assets/ before these run.
@@ -79,17 +79,18 @@ export default {
 
   // electrobun-builder-for-windows configuration
   // @ts-expect-error
+  id: "AvunuLLC.JxStudio",
   name: "Jx Studio",
   version: pkg.version,
-  author: "jxsuite",
+  author: "Avunu LLC",
   windows: {
     icon: "icon.png",
     productId: "com.jxsuite.jx-studio",
-    installDir: "com.jxsuite.jx-studio",
+    installDir: "JxStudio",
     msix: {
-      publisher: "CN=jxsuite",
-      publisherDisplayName: "jxsuite",
-      identityName: "com.jxsuite.jx-studio",
+      publisher: "CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4",
+      publisherDisplayName: "Avunu LLC",
+      identityName: "AvunuLLC.JxStudio",
       capabilities: ["internetClient"],
     },
   },
