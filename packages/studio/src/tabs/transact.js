@@ -6,8 +6,6 @@ import { getNodeAtPath, parentElementPath, childIndex, pathsEqual, isAncestor } 
  *
  * @typedef {import("../state.js").JxPath} JxPath
  *
- * @typedef {import("../state.js").JxNode} JxNode
- *
  * @typedef {string | number | boolean | object | null | undefined} JsonValue
  */
 
@@ -19,11 +17,12 @@ const HISTORY_LIMIT = 100;
  * Apply a document mutation transactionally: push to history and mark dirty. The mutationFn
  * receives the tab and should mutate tab.doc.document in place.
  *
- * @param {Tab} tab
+ * @param {Tab | null} tab
  * @param {(tab: Tab) => void} mutationFn
  * @param {{ skipHistory?: boolean }} [opts]
  */
 export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
+  if (!tab) return;
   mutationFn(tab);
 
   // Replace the document root reference so effects tracking tab.doc.document re-trigger.
@@ -49,8 +48,8 @@ export function transactDoc(tab, mutationFn, { skipHistory = false } = {}) {
 /**
  * Convenience: transact with a mutation fn that receives the document directly.
  *
- * @param {Tab} tab
- * @param {(doc: JxNode) => void} fn
+ * @param {Tab | null} tab
+ * @param {(doc: JxMutableNode) => void} fn
  * @param {{ skipHistory?: boolean }} [opts]
  */
 export function transact(tab, fn, opts) {
@@ -85,7 +84,7 @@ export function redo(tab) {
  * @param {Tab} tab
  * @param {JxPath} parentPath
  * @param {number} index
- * @param {JxNode} nodeDef
+ * @param {JxMutableNode} nodeDef
  */
 export function mutateInsertNode(tab, parentPath, index, nodeDef) {
   const parent = getNodeAtPath(tab.doc.document, parentPath);
@@ -101,7 +100,10 @@ export function mutateRemoveNode(tab, path) {
   if (!path || path.length < 2) return;
   const elemPath = /** @type {JxPath} */ (parentElementPath(path));
   const idx = /** @type {number} */ (childIndex(path));
-  getNodeAtPath(tab.doc.document, elemPath).children.splice(idx, 1);
+  /** @type {JxMutableNode[]} */ (getNodeAtPath(tab.doc.document, elemPath).children).splice(
+    idx,
+    1,
+  );
   if (tab.session.selection && isAncestor(path, tab.session.selection)) {
     tab.session.selection = null;
   }
@@ -118,7 +120,11 @@ export function mutateDuplicateNode(tab, path) {
   const elemPath = /** @type {JxPath} */ (parentElementPath(path));
   const idx = /** @type {number} */ (childIndex(path));
   const clone = structuredClone(toRaw(node));
-  getNodeAtPath(tab.doc.document, elemPath).children.splice(idx + 1, 0, clone);
+  /** @type {JxMutableNode[]} */ (getNodeAtPath(tab.doc.document, elemPath).children).splice(
+    idx + 1,
+    0,
+    clone,
+  );
   tab.session.selection = [...elemPath, "children", idx + 1];
 }
 
@@ -134,7 +140,11 @@ export function mutateWrapNode(tab, path, wrapperTag = "div") {
   const elemPath = /** @type {JxPath} */ (parentElementPath(path));
   const idx = /** @type {number} */ (childIndex(path));
   const wrapper = { tagName: wrapperTag, children: [structuredClone(toRaw(node))] };
-  getNodeAtPath(tab.doc.document, elemPath).children.splice(idx, 1, wrapper);
+  /** @type {JxMutableNode[]} */ (getNodeAtPath(tab.doc.document, elemPath).children).splice(
+    idx,
+    1,
+    wrapper,
+  );
   tab.session.selection = [...elemPath, "children", idx];
 }
 
@@ -149,7 +159,7 @@ export function mutateMoveNode(tab, fromPath, toParentPath, toIndex) {
   const fromParentPath = /** @type {JxPath} */ (parentElementPath(fromPath));
   const fromIdx = /** @type {number} */ (childIndex(fromPath));
   const fromParent = getNodeAtPath(doc, fromParentPath);
-  const [node] = fromParent.children.splice(fromIdx, 1);
+  const [node] = /** @type {JxMutableNode[]} */ (fromParent.children).splice(fromIdx, 1);
   const toParent = getNodeAtPath(doc, toParentPath);
   if (!toParent.children) toParent.children = [];
   let adjustedIndex = toIndex;
@@ -351,7 +361,7 @@ export function mutateUpdateMediaNestedStylePath(tab, path, mediaName, stylePath
 /**
  * @param {Tab} tab
  * @param {JxPath} path
- * @param {Record<string, any> | undefined} style
+ * @param {Record<string, string | undefined> | undefined} style
  */
 export function mutateReplaceStyle(tab, path, style) {
   const node = getNodeAtPath(tab.doc.document, path);
@@ -388,7 +398,7 @@ export function mutateRemoveDef(tab, name) {
 /**
  * @param {Tab} tab
  * @param {string} name
- * @param {Record<string, any>} updates
+ * @param {Record<string, JsonValue>} updates
  */
 export function mutateUpdateDef(tab, name, updates) {
   const doc = tab.doc.document;
@@ -452,7 +462,7 @@ export function mutateUpdateProp(tab, path, propName, value) {
  * @param {Tab} tab
  * @param {JxPath} path
  * @param {string} caseName
- * @param {JxNode} [caseDef]
+ * @param {JxMutableNode} [caseDef]
  */
 export function mutateAddSwitchCase(tab, path, caseName, caseDef) {
   const node = getNodeAtPath(tab.doc.document, path);

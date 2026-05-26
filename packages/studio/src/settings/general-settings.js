@@ -9,7 +9,7 @@ import { closeSettingsModal } from "./settings-modal.js";
 
 /** @param {HTMLElement} container */
 export function renderGeneralSettings(container) {
-  const config = projectState.projectConfig || {};
+  const config = /** @type {ProjectConfig} */ (projectState?.projectConfig || {});
 
   const onFaviconUpload = async () => {
     const input = document.createElement("input");
@@ -26,7 +26,7 @@ export function renderGeneralSettings(container) {
     input.click();
   };
 
-  const onAdapterChange = (/** @type {any} */ e) => {
+  const onAdapterChange = (/** @type {Event & { target: { value: string } }} */ e) => {
     updateSiteConfig({ build: { ...config.build, adapter: e.target.value } });
   };
 

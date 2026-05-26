@@ -78,9 +78,9 @@ describe("addPackage", () => {
       await addPackage({ name: "is-number" });
       const pkgJson = JSON.parse(await Bun.file(join(FIXTURES, "package.json")).text());
       expect(pkgJson.dependencies["is-number"]).toBeDefined();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Accept network failures in CI
-      expect(e.message).toContain("Failed to add package");
+      expect(e instanceof Error ? e.message : String(e)).toContain("Failed to add package");
     }
   });
 });

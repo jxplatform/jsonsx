@@ -21,7 +21,10 @@ export function createDesktopPlatform() {
   new Electroview({ rpc });
 
   const originalFetch = window.fetch.bind(window);
-  (window as any).fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  (window as unknown as Record<string, unknown>).fetch = async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => {
     const url =
       typeof input === "string"
         ? input
@@ -159,19 +162,19 @@ export function createDesktopPlatform() {
     async probeRootProject() {
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
-        const config = JSON.parse(content as string);
+        const config = JSON.parse(content as string) as ProjectConfig;
         return {
           meta: { root: ".", name: config.name || "project" },
           info: {
-            isSiteProject: true,
+            isSiteProject: true as const,
             projectConfig: config,
-            directories: [],
+            directories: [] as string[],
           },
         };
       } catch {
         return {
           meta: { root: ".", name: "project" },
-          info: { isSiteProject: false, projectConfig: null, directories: [] },
+          info: { isSiteProject: false as const, projectConfig: null, directories: [] as string[] },
         };
       }
     },
@@ -284,6 +287,14 @@ export function createDesktopPlatform() {
       return rpc.request.gitDiscard({ files });
     },
 
+    async gitShow(opts: { path: string; ref?: string }) {
+      return rpc.request.gitShow(opts);
+    },
+
+    async searchFiles(query: string) {
+      return rpc.request.searchFiles({ query });
+    },
+
     async addPackage(name: string) {
       return rpc.request.addPackage({ name });
     },
@@ -312,7 +323,7 @@ export function createDesktopPlatform() {
   };
 }
 
-function showUpdateToast(version: string, rpc: any) {
+function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: () => unknown } }) {
   const container = document.createElement("div");
   container.className = "update-toast-container";
   litRender(

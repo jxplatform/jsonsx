@@ -12,16 +12,16 @@ import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils.js";
 
 /** @param {HTMLElement} container */
 export function renderCssVarsEditor(container) {
-  const config = projectState.projectConfig || {};
+  const config = projectState?.projectConfig || {};
   const rootStyle = config.style || {};
   const media = getEffectiveMedia(config.$media);
 
   /**
    * @type {{
-   *   color: [string, any][];
-   *   font: [string, any][];
-   *   size: [string, any][];
-   *   other: [string, any][];
+   *   color: [string, string | number][];
+   *   font: [string, string | number][];
+   *   size: [string, string | number][];
+   *   other: [string, string | number][];
    * }}
    */
   const groups = { color: [], font: [], size: [], other: [] };
@@ -81,7 +81,7 @@ export function renderCssVarsEditor(container) {
 }
 
 /**
- * @param {[string, any][]} vars
+ * @param {[string, string | number][]} vars
  * @param {Function} updateVar
  * @param {Function} deleteVar
  * @param {Function} addVar
@@ -96,15 +96,17 @@ function renderColorSection(vars, updateVar, deleteVar, addVar) {
             <div class="css-var-swatch" style="background:${val}">
               <input
                 type="color"
-                .value=${val && val.startsWith("#") ? val : "#007acc"}
-                @input=${(/** @type {any} */ e) => updateVar(name, e.target.value)}
+                .value=${val && String(val).startsWith("#") ? val : "#007acc"}
+                @input=${(/** @type {Event} */ e) =>
+                  updateVar(name, /** @type {HTMLInputElement} */ (e.target).value)}
               />
             </div>
             <span class="css-var-name">${varDisplayName(name, "--color-")}</span>
             <sp-textfield
               size="s"
               .value=${String(val)}
-              @change=${(/** @type {any} */ e) => updateVar(name, e.target.value)}
+              @change=${(/** @type {Event} */ e) =>
+                updateVar(name, /** @type {HTMLInputElement} */ (e.target).value)}
               style="flex:1;max-width:160px"
             ></sp-textfield>
             <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
@@ -119,7 +121,7 @@ function renderColorSection(vars, updateVar, deleteVar, addVar) {
 }
 
 /**
- * @param {[string, any][]} vars
+ * @param {[string, string | number][]} vars
  * @param {Function} updateVar
  * @param {Function} deleteVar
  * @param {Function} addVar
@@ -135,7 +137,8 @@ function renderFontSection(vars, updateVar, deleteVar, addVar) {
             <sp-textfield
               size="s"
               .value=${String(val)}
-              @change=${(/** @type {any} */ e) => updateVar(name, e.target.value)}
+              @change=${(/** @type {Event} */ e) =>
+                updateVar(name, /** @type {HTMLInputElement} */ (e.target).value)}
               style="flex:1"
             ></sp-textfield>
             <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
@@ -153,11 +156,11 @@ function renderFontSection(vars, updateVar, deleteVar, addVar) {
 }
 
 /**
- * @param {[string, any][]} vars
+ * @param {[string, string | number][]} vars
  * @param {Function} updateVar
  * @param {Function} deleteVar
  * @param {Function} addVar
- * @param {any} rootStyle
+ * @param {JxStyle} rootStyle
  * @param {string[]} mediaNames
  */
 function renderSizeSection(vars, updateVar, deleteVar, addVar, rootStyle, mediaNames) {
@@ -176,7 +179,8 @@ function renderSizeSection(vars, updateVar, deleteVar, addVar, rootStyle, mediaN
             <sp-textfield
               size="s"
               .value=${String(val)}
-              @change=${(/** @type {any} */ e) => updateVar(name, e.target.value)}
+              @change=${(/** @type {Event} */ e) =>
+                updateVar(name, /** @type {HTMLInputElement} */ (e.target).value)}
               style="max-width:120px"
             ></sp-textfield>
             <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
@@ -192,11 +196,11 @@ function renderSizeSection(vars, updateVar, deleteVar, addVar, rootStyle, mediaN
 }
 
 /**
- * @param {[string, any][]} vars
+ * @param {[string, string | number][]} vars
  * @param {Function} updateVar
  * @param {Function} deleteVar
  * @param {Function} addVar
- * @param {any} rootStyle
+ * @param {JxStyle} rootStyle
  * @param {string[]} mediaNames
  */
 function renderOtherSection(vars, updateVar, deleteVar, addVar, rootStyle, mediaNames) {
@@ -210,7 +214,8 @@ function renderOtherSection(vars, updateVar, deleteVar, addVar, rootStyle, media
             <sp-textfield
               size="s"
               .value=${String(val)}
-              @change=${(/** @type {any} */ e) => updateVar(name, e.target.value)}
+              @change=${(/** @type {Event} */ e) =>
+                updateVar(name, /** @type {HTMLInputElement} */ (e.target).value)}
               style="flex:1"
             ></sp-textfield>
             <sp-action-button quiet size="s" @click=${() => deleteVar(name)}>
@@ -227,7 +232,7 @@ function renderOtherSection(vars, updateVar, deleteVar, addVar, rootStyle, media
 
 /**
  * @param {string} varName
- * @param {any} rootStyle
+ * @param {JxStyle} rootStyle
  * @param {string[]} mediaNames
  */
 function renderMediaOverrides(varName, rootStyle, mediaNames) {
@@ -251,9 +256,10 @@ function renderMediaOverrides(varName, rootStyle, mediaNames) {
             <sp-textfield
               size="s"
               .value=${String(o.value)}
-              @change=${(/** @type {any} */ e) => {
+              @change=${(/** @type {Event} */ e) => {
                 if (!rootStyle[`@${o.mediaName}`]) rootStyle[`@${o.mediaName}`] = {};
-                rootStyle[`@${o.mediaName}`][varName] = e.target.value;
+                /** @type {Record<string, unknown>} */ (rootStyle[`@${o.mediaName}`])[varName] =
+                  /** @type {HTMLInputElement} */ (e.target).value;
                 updateSiteConfig({ style: { ...rootStyle } });
               }}
               style="max-width:120px"
@@ -272,9 +278,9 @@ function renderMediaOverrides(varName, rootStyle, mediaNames) {
  * @param {Function} addVar
  */
 function renderAddRow(prefix, placeholder, valuePlaceholder, addVar) {
-  /** @type {any} */
+  /** @type {HTMLInputElement | null} */
   let nameEl = null;
-  /** @type {any} */
+  /** @type {HTMLInputElement | null} */
   let valEl = null;
 
   return html`
@@ -283,14 +289,14 @@ function renderAddRow(prefix, placeholder, valuePlaceholder, addVar) {
         size="s"
         placeholder=${placeholder}
         ${ref((el) => {
-          if (el) nameEl = el;
+          if (el) nameEl = /** @type {HTMLInputElement} */ (el);
         })}
       ></sp-textfield>
       <sp-textfield
         size="s"
         placeholder=${valuePlaceholder}
         ${ref((el) => {
-          if (el) valEl = el;
+          if (el) valEl = /** @type {HTMLInputElement} */ (el);
         })}
       ></sp-textfield>
       <sp-action-button

@@ -55,7 +55,7 @@ export function injectSSE(html) {
  * Create the file watcher + SSE system.
  *
  * @param {string} root - Absolute path to watch
- * @param {any[]} builds - Build entries (for selective rebuild)
+ * @param {BuildEntry[]} builds - Build entries (for selective rebuild)
  * @param {{ ignore?: string[]; debounce?: number; reloadOnAnyChange?: boolean }} [opts]
  * @returns {{
  *   broadcast: () => void;
@@ -77,7 +77,7 @@ export function createWatcher(root, builds, opts = {}) {
   }
 
   function handleSSE() {
-    /** @type {any} */
+    /** @type {((msg: string) => void) | undefined} */
     let send;
     const stream = new ReadableStream({
       start(c) {
@@ -96,7 +96,7 @@ export function createWatcher(root, builds, opts = {}) {
         }, 15_000);
       },
       cancel() {
-        clients.delete(send);
+        if (send) clients.delete(send);
       },
     });
     return new Response(stream, {
@@ -108,7 +108,7 @@ export function createWatcher(root, builds, opts = {}) {
     });
   }
 
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null;
   const watcher = chokidar.watch(root, {
     ignored: (watchedPath) => shouldIgnore(watchedPath, ignore),
@@ -123,7 +123,7 @@ export function createWatcher(root, builds, opts = {}) {
   watcher.on("all", (_, changedPath) => {
     const filename = relative(root, changedPath);
     if (!filename || filename.startsWith("..")) return;
-    clearTimeout(timer);
+    clearTimeout(timer ?? undefined);
     timer = setTimeout(async () => {
       if (builds.length > 0) {
         const result = await rebuild(builds, filename);

@@ -16,24 +16,26 @@ import {
 
 /** @param {HTMLElement} container */
 export function renderHeadEditor(container) {
-  const config = projectState.projectConfig || {};
-  const headEntries = config.$head || [];
+  const config = /** @type {ProjectConfig} */ (projectState?.projectConfig || {});
+  const headEntries = /** @type {JxHeadEntry[]} */ (config.$head || []);
 
   const save = () => {
     updateSiteConfig({ $head: headEntries });
   };
 
   const addEntry = (/** @type {string} */ tag) => {
-    /** @type {any} */
-    const entry = { tagName: tag, attributes: {} };
+    /** @type {Record<string, string | boolean>} */
+    const attrs = {};
+    /** @type {JxHeadEntry} */
+    const entry = { tagName: tag, attributes: attrs };
     if (tag === "link") {
-      entry.attributes.rel = "stylesheet";
-      entry.attributes.href = "";
+      attrs.rel = "stylesheet";
+      attrs.href = "";
     } else if (tag === "meta") {
-      entry.attributes.name = "";
-      entry.attributes.content = "";
+      attrs.name = "";
+      attrs.content = "";
     } else if (tag === "script") {
-      entry.attributes.src = "";
+      attrs.src = "";
     } else if (tag === "style") {
       entry.content = "";
     }
@@ -80,7 +82,7 @@ export function renderHeadEditor(container) {
 
       <div class="head-entries">
         ${headEntries.map(
-          (/** @type {any} */ entry, /** @type {number} */ idx) => html`
+          (/** @type {JxHeadEntry} */ entry, /** @type {number} */ idx) => html`
             <div class="head-entry">
               <div class="head-entry-header">
                 <span class="head-entry-tag">&lt;${entry.tagName}&gt;</span>
@@ -107,17 +109,17 @@ export function renderHeadEditor(container) {
 }
 
 /**
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @param {number} idx
  * @param {(idx: number, key: string, val: string) => void} updateEntry
  */
 function renderEntryFields(entry, idx, updateEntry) {
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounce;
-  const onFieldChange = (/** @type {string} */ key) => (/** @type {any} */ e) => {
+  const onFieldChange = (/** @type {string} */ key) => (/** @type {Event} */ e) => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-      updateEntry(idx, key, e.target.value);
+      updateEntry(idx, key, /** @type {HTMLInputElement} */ (e.target).value);
     }, 300);
   };
 
@@ -208,7 +210,7 @@ function renderEntryFields(entry, idx, updateEntry) {
 /**
  * Render the Google Fonts management section.
  *
- * @param {any[]} headEntries
+ * @param {JxHeadEntry[]} headEntries
  * @param {() => void} save
  * @param {() => void} rerender
  */
@@ -225,7 +227,7 @@ function renderGoogleFontsSection(headEntries, save, rerender) {
     rerender();
   };
 
-  const removeFont = (/** @type {any} */ entry) => {
+  const removeFont = (/** @type {JxHeadEntry} */ entry) => {
     const idx = headEntries.indexOf(entry);
     if (idx >= 0) headEntries.splice(idx, 1);
     const cleaned = cleanupGoogleFontPreconnects(headEntries);
@@ -243,7 +245,9 @@ function renderGoogleFontsSection(headEntries, save, rerender) {
         ? fontEntries.map(
             (entry) => html`
               <div class="head-entry" style="flex-direction:row;align-items:center;gap:8px">
-                <span style="flex:1">${extractFontFamily(entry.attributes.href)}</span>
+                <span style="flex:1"
+                  >${extractFontFamily(String(entry.attributes?.href || ""))}</span
+                >
                 <sp-action-button quiet size="s" @click=${() => removeFont(entry)}>
                   <sp-icon-delete slot="icon"></sp-icon-delete>
                 </sp-action-button>
@@ -257,21 +261,23 @@ function renderGoogleFontsSection(headEntries, save, rerender) {
         size="s"
         placeholder="Font family name…"
         style="flex:1"
-        @keydown=${(/** @type {any} */ e) => {
+        @keydown=${(/** @type {KeyboardEvent} */ e) => {
           if (e.key !== "Enter") return;
-          const family = e.target.value?.trim();
+          const family = /** @type {HTMLInputElement} */ (e.target).value?.trim();
           if (!family) return;
-          e.target.value = "";
+          /** @type {HTMLInputElement} */ (e.target).value = "";
           addFont(family);
         }}
       ></sp-textfield>
       <sp-action-button
         size="s"
-        @click=${(/** @type {any} */ e) => {
-          const input = e.target.closest("div")?.querySelector("sp-textfield");
-          const family = input?.value?.trim();
+        @click=${(/** @type {MouseEvent} */ e) => {
+          const input = /** @type {HTMLElement} */ (e.target)
+            .closest("div")
+            ?.querySelector("sp-textfield");
+          const family = /** @type {HTMLInputElement | null} */ (input)?.value?.trim();
           if (!family) return;
-          input.value = "";
+          /** @type {HTMLInputElement} */ (input).value = "";
           addFont(family);
         }}
       >

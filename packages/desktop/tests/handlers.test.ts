@@ -2,6 +2,7 @@ import { describe, test, expect, mock } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import type { DirEntry, ComponentMeta } from "../src/rpc-schema.ts";
+import type { StudioSchema } from "../src/handlers.ts";
 
 mock.module("electrobun/bun", () => ({
   Utils: { openFileDialog: async () => [] },
@@ -425,7 +426,7 @@ describe("fetchPluginSchema", () => {
         }),
       );
 
-      const schema = (await fetchPluginSchema({ src: "./Counter.class.json" })) as any;
+      const schema = (await fetchPluginSchema({ src: "./Counter.class.json" })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.description).toBe("A counter component");
       expect(schema.properties.initial).toBeDefined();
@@ -469,7 +470,7 @@ describe("fetchPluginSchema", () => {
       const schema = (await fetchPluginSchema({
         src: "./Widget.class.json",
         base: "file:///components/page.json",
-      })) as any;
+      })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.size.default).toBe("md");
     } finally {
@@ -506,7 +507,7 @@ describe("fetchPluginSchema", () => {
         }),
       );
 
-      const schema = (await fetchPluginSchema({ src: "./Child.class.json" })) as any;
+      const schema = (await fetchPluginSchema({ src: "./Child.class.json" })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.baseField).toBeDefined();
       expect(schema.properties.childField).toBeDefined();
@@ -539,7 +540,7 @@ describe("fetchPluginSchema", () => {
       const schema = (await fetchPluginSchema({
         src: "./something.ts",
         prototype: "Timer",
-      })) as any;
+      })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.interval.default).toBe(1000);
     } finally {
@@ -568,7 +569,7 @@ describe("fetchPluginSchema", () => {
       const schema = (await fetchPluginSchema({
         src: "./MyPlugin.ts",
         prototype: "MyPlugin",
-      })) as any;
+      })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.type).toBe("object");
     } finally {

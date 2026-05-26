@@ -7,13 +7,18 @@ import { classMap } from "lit-html/directives/class-map.js";
 const expandedDataKeys = new Set();
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
-function unwrapSignal(/** @type {any} */ value) {
-  if (value && typeof value === "object" && value.__v_isRef) return value.value;
+function unwrapSignal(/** @type {unknown} */ value) {
+  if (
+    value &&
+    typeof value === "object" &&
+    /** @type {Record<string, unknown>} */ (value).__v_isRef
+  )
+    return /** @type {Record<string, unknown>} */ (value).value;
   return value;
 }
 
 /** Type label for a signal value in the data explorer. */
-function dataTypeLabel(/** @type {any} */ value) {
+function dataTypeLabel(/** @type {unknown} */ value) {
   const v = unwrapSignal(value);
   if (v === null) return "null";
   if (v === undefined) return "pending";
@@ -25,15 +30,15 @@ function dataTypeLabel(/** @type {any} */ value) {
 /**
  * Render the data explorer tab showing live resolved values.
  *
- * @param {Record<string, any>} state - S.document.state (the $defs definitions)
- * @param {Record<string, any> | null} liveScope - Cached live scope from runtime rendering
+ * @param {Record<string, unknown>} state - S.document.state (the $defs definitions)
+ * @param {Record<string, unknown> | null} liveScope - Cached live scope from runtime rendering
  * @param {{
  *   renderCanvas: () => void;
  *   renderLeftPanel: () => void;
- *   defCategory: (def: any) => string;
- *   defBadgeLabel: (def: any) => string;
+ *   defCategory: (def: unknown) => string;
+ *   defBadgeLabel: (def: unknown) => string;
  * }} callbacks
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderDataExplorerTemplate(state, liveScope, callbacks) {
   const { renderCanvas, renderLeftPanel, defCategory, defBadgeLabel } = callbacks;
@@ -91,11 +96,11 @@ export function renderDataExplorerTemplate(state, liveScope, callbacks) {
 /**
  * Recursively render a JSON value as a tree view (Lit template).
  *
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderDataTreeTemplate(
-  /** @type {any} */ value,
-  /** @type {any} */ depth,
+  /** @type {unknown} */ value,
+  /** @type {number} */ depth,
   maxDepth = 5,
 ) {
   const indent = `${(depth + 1) * 12}px`;
@@ -150,10 +155,11 @@ export function renderDataTreeTemplate(
   }
 
   // Object
-  const keys = Object.keys(value);
+  const obj = /** @type {Record<string, unknown>} */ (value);
+  const keys = Object.keys(obj);
   const cap = 30;
   const items = keys.slice(0, cap).map((key) => {
-    const v = value[key];
+    const v = obj[key];
     if (v === null || v === undefined || typeof v !== "object") {
       const valText =
         typeof v === "string" && v.length > 80 ? `"${v.slice(0, 80)}\u2026"` : JSON.stringify(v);

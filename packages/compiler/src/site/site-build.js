@@ -121,7 +121,7 @@ export async function buildSite(projectRoot, options = {}) {
   const compiledComponentTags = [];
   /** @type {Map<string, string>} */
   const componentCSS = new Map(); // tagName → CSS text
-  /** @type {Map<string, any>} */
+  /** @type {Map<string, JxElement>} */
   const componentDefs = new Map(); // tagName → parsed component definition
   if (existsSync(componentsDir)) {
     log("Compiling components...");
@@ -160,7 +160,7 @@ export async function buildSite(projectRoot, options = {}) {
           }
         }
       } catch (e) {
-        const err = /** @type {any} */ (e);
+        const err = /** @type {Error} */ (e);
         errors.push(`Error compiling component ${file}: ${err.message}`);
         console.error(`Error compiling component ${file}: ${err.message}`);
       }
@@ -232,7 +232,7 @@ export async function buildSite(projectRoot, options = {}) {
           fileCount++;
         }
       } catch (e) {
-        const err = /** @type {any} */ (e);
+        const err = /** @type {Error} */ (e);
         errors.push(`Error exporting markdown for ${route.urlPattern}: ${err.message}`);
       }
 
@@ -251,7 +251,7 @@ export async function buildSite(projectRoot, options = {}) {
         fileCount++;
       }
     } catch (e) {
-      const err = /** @type {any} */ (e);
+      const err = /** @type {Error} */ (e);
       const msg = `Error compiling ${route.urlPattern}: ${err.message}`;
       errors.push(msg);
       console.error(msg);
@@ -361,13 +361,19 @@ export async function buildSite(projectRoot, options = {}) {
  *
  * Pipeline: load JSON → resolve layout → inject context → merge head → compile
  *
- * @param {any} route
- * @param {any} projectConfig
+ * @param {SiteRoute} route
+ * @param {ProjectConfig} projectConfig
  * @param {string} projectRoot
- * @param {Map<string, any[]>} [contentTypes]
+ * @param {Map<string, ContentLoaderEntry[]>} [contentTypes]
  * @param {import("./image-cache.js").CacheManifest | null} [imageCache]
  * @param {string} [outDir]
- * @returns {Promise<{ html: string; files: any[]; serverHandler: string | null; doc: any }>}
+ * @param {Map<string, JxElement>} [componentDefs]
+ * @returns {Promise<{
+ *   html: string;
+ *   files: { path: string; content: string; tagName?: string }[];
+ *   serverHandler: string | null;
+ *   doc: JxDocument;
+ * }>}
  */
 async function compilePage(
   route,
@@ -380,20 +386,20 @@ async function compilePage(
 ) {
   // Load the raw page document
   let pageDoc;
-  if (route.sourcePath.endsWith(".md")) {
+  if (/** @type {string} */ (route.sourcePath).endsWith(".md")) {
     const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-    pageDoc = transpileJxMarkdown(readFileSync(route.sourcePath, "utf8"));
+    pageDoc = transpileJxMarkdown(readFileSync(/** @type {string} */ (route.sourcePath), "utf8"));
   } else {
-    pageDoc = JSON.parse(readFileSync(route.sourcePath, "utf8"));
+    pageDoc = JSON.parse(readFileSync(/** @type {string} */ (route.sourcePath), "utf8"));
   }
 
   // Resolve layout (wraps page in layout with slot distribution)
   const layoutDoc = resolveLayout(pageDoc, projectConfig, projectRoot);
 
   // Extract head arrays before they get lost in the merge
-  const pageHead = pageDoc.$head ?? layoutDoc._pageHead ?? [];
+  const pageHead = /** @type {JxHeadEntry[]} */ (pageDoc.$head ?? layoutDoc._pageHead ?? []);
   const layoutHead = layoutDoc.$head ?? [];
-  const pageTitle = pageDoc.title ?? layoutDoc._pageTitle ?? null;
+  const pageTitle = /** @type {string | null} */ (pageDoc.title ?? layoutDoc._pageTitle ?? null);
 
   // Clean up internal properties
   delete layoutDoc._pageHead;
@@ -411,7 +417,7 @@ async function compilePage(
   // Determine the page title — resolve template strings against the scope
   let title = pageTitle ?? projectConfig.name ?? "Jx Site";
   if (typeof title === "string" && isTemplateString(title)) {
-    title = evaluateStaticTemplate(title, scope) ?? title;
+    title = /** @type {string} */ (evaluateStaticTemplate(title, scope) ?? title);
   }
 
   // Resolve template strings in $head entries
@@ -434,7 +440,7 @@ async function compilePage(
         def &&
         typeof def === "object" &&
         !Array.isArray(def) &&
-        /** @type {any} */ (def).timing === "compiler"
+        /** @type {JxMutableNode} */ (def).timing === "compiler"
       ) {
         delete layoutDoc.state[key];
       }
@@ -475,18 +481,19 @@ async function compilePage(
 
   // Inject <script type="module"> for npm $elements (cherry-picked component imports)
   const npmElements = (layoutDoc.$elements ?? []).filter(
-    (/** @type {any} */ e) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
+    (/** @type {JxElement | string} */ e) =>
+      typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
   );
   if (npmElements.length > 0) {
-    result.html = injectNpmElementScripts(result.html, npmElements);
+    result.html = injectNpmElementScripts(result.html, /** @type {string[]} */ (npmElements));
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
   /** @type {string | null} */
   let serverHandler = null;
-  if (!projectConfig.build.adapter) {
+  if (!projectConfig.build?.adapter) {
     try {
-      const serverResult = await compileServer(route.sourcePath);
+      const serverResult = await compileServer(/** @type {string} */ (route.sourcePath));
       if (serverResult) {
         serverHandler = serverResult;
       }
@@ -501,25 +508,28 @@ async function compilePage(
 /**
  * Resolve template strings in $head entries against the compiled scope.
  *
- * @param {any[]} headEntries
- * @param {any} scope
- * @returns {any[]}
+ * @param {JxHeadEntry[]} headEntries
+ * @param {Record<string, unknown>} scope
+ * @returns {JxHeadEntry[]}
  */
 function resolveHeadTemplates(headEntries, scope) {
-  return headEntries.map((/** @type {any} */ entry) => {
+  return headEntries.map((/** @type {JxHeadEntry} */ entry) => {
     if (!entry || typeof entry !== "object") return entry;
     const resolved = { ...entry };
     if (resolved.attributes) {
       resolved.attributes = { ...resolved.attributes };
       for (const [k, v] of Object.entries(resolved.attributes)) {
         if (typeof v === "string" && isTemplateString(v)) {
-          resolved.attributes[k] = evaluateStaticTemplate(v, scope) ?? v;
+          resolved.attributes[k] = /** @type {string | boolean} */ (
+            evaluateStaticTemplate(v, scope) ?? v
+          );
         }
       }
     }
     if (typeof resolved.textContent === "string" && isTemplateString(resolved.textContent)) {
-      resolved.textContent =
-        evaluateStaticTemplate(resolved.textContent, scope) ?? resolved.textContent;
+      resolved.textContent = /** @type {string | undefined} */ (
+        evaluateStaticTemplate(resolved.textContent, scope) ?? resolved.textContent
+      );
     }
     return resolved;
   });
@@ -530,11 +540,11 @@ function resolveHeadTemplates(headEntries, scope) {
  * "@shoelace-style/shoelace/dist/themes/light.css" →
  * "/node_modules/@shoelace-style/shoelace/dist/themes/light.css"
  *
- * @param {any[]} headEntries
- * @returns {any[]}
+ * @param {JxHeadEntry[]} headEntries
+ * @returns {JxHeadEntry[]}
  */
 function resolveHeadBareSpecifiers(headEntries) {
-  return headEntries.map((/** @type {any} */ entry) => {
+  return headEntries.map((/** @type {JxHeadEntry} */ entry) => {
     if (!entry || typeof entry !== "object" || !entry.attributes) return entry;
     const resolved = { ...entry, attributes: { ...entry.attributes } };
     for (const key of ["href", "src"]) {
@@ -567,8 +577,8 @@ function isBareSpecifier(s) {
  * Recursively resolve template strings in a document tree against a scope. Mutates the document in
  * place — evaluates ${...} in innerHTML, textContent, style values, and attribute values.
  *
- * @param {any} node
- * @param {any} scope
+ * @param {JxElement | string} node
+ * @param {Record<string, unknown>} scope
  */
 function resolveDocTemplates(node, scope) {
   if (!node || typeof node !== "object") return;
@@ -579,16 +589,20 @@ function resolveDocTemplates(node, scope) {
       // Encode any remaining `${` as HTML entities so the compile phase won't
       // re-interpret them as template expressions. After resolution, any `${` in the
       // result is literal content (e.g., code examples), not an intentional template.
-      node.innerHTML = resolved.replaceAll("${", "&#36;{");
+      node.innerHTML = String(resolved).replaceAll("${", "&#36;{");
     }
   }
   if (typeof node.textContent === "string" && isTemplateString(node.textContent)) {
-    node.textContent = evaluateStaticTemplate(node.textContent, scope) ?? node.textContent;
+    node.textContent = /** @type {string | null} */ (
+      evaluateStaticTemplate(node.textContent, scope) ?? node.textContent
+    );
   }
   if (node.style && typeof node.style === "object") {
     for (const [k, v] of Object.entries(node.style)) {
       if (typeof v === "string" && isTemplateString(v)) {
-        node.style[k] = evaluateStaticTemplate(v, scope) ?? v;
+        node.style[k] = /** @type {string | number | JxStyle} */ (
+          evaluateStaticTemplate(v, scope) ?? v
+        );
       }
     }
   }
@@ -599,11 +613,13 @@ function resolveDocTemplates(node, scope) {
       }
     }
   }
-  if (typeof node.children === "string" && isTemplateString(node.children)) {
-    const resolved = evaluateStaticTemplate(node.children, scope);
+  const rawChildren = /** @type {unknown} */ (node.children);
+  if (typeof rawChildren === "string" && isTemplateString(rawChildren)) {
+    const resolved = evaluateStaticTemplate(rawChildren, scope);
     if (Array.isArray(resolved)) {
-      node.children = resolved;
-      for (const child of node.children) {
+      const resolvedNodes = /** @type {(JxElement | string)[]} */ (resolved);
+      node.children = resolvedNodes;
+      for (const child of resolvedNodes) {
         resolveDocTemplates(child, scope);
       }
     }
@@ -614,11 +630,12 @@ function resolveDocTemplates(node, scope) {
       if (typeof child === "string" && isTemplateString(child)) {
         const resolved = evaluateStaticTemplate(child, scope);
         if (Array.isArray(resolved)) {
-          node.children.splice(i, 1, ...resolved);
-          for (const spliced of resolved) {
+          const resolvedNodes = /** @type {(JxElement | string)[]} */ (resolved);
+          node.children.splice(i, 1, ...resolvedNodes);
+          for (const spliced of resolvedNodes) {
             resolveDocTemplates(spliced, scope);
           }
-          i += resolved.length;
+          i += resolvedNodes.length;
           continue;
         }
       }
@@ -632,8 +649,8 @@ function resolveDocTemplates(node, scope) {
  * Walk the document tree and expand registered custom elements in-place. Applies $props via
  * preRenderComponentHtml, marks static/prerendered.
  *
- * @param {any} node
- * @param {Map<string, any>} componentDefs
+ * @param {JxElement | string} node
+ * @param {Map<string, JxElement>} componentDefs
  */
 function expandComponents(node, componentDefs) {
   if (!node || typeof node !== "object") return;
@@ -649,11 +666,13 @@ function expandComponents(node, componentDefs) {
     }
   }
 
-  const def = componentDefs.get(node.tagName);
+  const def = componentDefs.get(/** @type {string} */ (node.tagName));
   if (def) {
     const slotContent =
       Array.isArray(node.children) && node.children.length > 0
-        ? node.children.map((/** @type {any} */ c) => renderStaticNode(c, {}, null)).join("\n")
+        ? node.children
+            .map((/** @type {JxElement | string} */ c) => renderStaticNode(c, {}, null))
+            .join("\n")
         : null;
 
     const innerHTML = preRenderComponentHtml(def, node.$props || null, slotContent);
@@ -664,13 +683,14 @@ function expandComponents(node, componentDefs) {
 
     // Resolve template-string host styles with props (per-instance values like background-image)
     if (def.style && node.$props) {
+      /** @type {Record<string, JxStateDefinition>} */
       let stateDefs = { ...def.state };
       for (const [key, value] of Object.entries(node.$props)) {
-        if (key in stateDefs) stateDefs[key] = value;
-        else stateDefs[key] = value;
+        if (key in stateDefs) stateDefs[key] = /** @type {JxStateDefinition} */ (value);
+        else stateDefs[key] = /** @type {JxStateDefinition} */ (value);
       }
       const scope = buildInitialScope(stateDefs, null);
-      /** @type {Record<string, any>} */
+      /** @type {Record<string, unknown>} */
       const resolvedStyle = {};
       for (const [prop, value] of Object.entries(def.style)) {
         if (typeof value === "string" && isTemplateString(value)) {
@@ -679,7 +699,7 @@ function expandComponents(node, componentDefs) {
         }
       }
       if (Object.keys(resolvedStyle).length > 0) {
-        node.style = { ...node.style, ...resolvedStyle };
+        node.style = /** @type {JxStyle} */ ({ ...node.style, ...resolvedStyle });
       }
     }
 
@@ -771,7 +791,7 @@ function injectNpmElementScripts(html, npmElements) {
  * Replaces the compiler's default <head> section with our merged version.
  *
  * @param {string} html
- * @param {any[]} headEntries
+ * @param {JxHeadEntry[]} headEntries
  * @param {string} lang
  * @returns {string}
  */
@@ -833,7 +853,7 @@ function routeToOutputPath(urlPattern, outDir, trailingSlash) {
 /**
  * Generate redirect files (HTML meta refresh and _redirects).
  *
- * @param {Record<string, any>} redirects
+ * @param {Record<string, unknown>} redirects
  * @param {string} outDir
  * @returns {number} Number of files written
  */
@@ -843,8 +863,15 @@ function generateRedirects(redirects, outDir) {
   const redirectLines = [];
 
   for (const [source, target] of Object.entries(redirects)) {
-    const dest = typeof target === "object" ? target.destination : target;
-    const status = typeof target === "object" ? (target.status ?? 301) : 301;
+    const dest = /** @type {string} */ (
+      typeof target === "object"
+        ? /** @type {{ destination: string }} */ (target).destination
+        : target
+    );
+    const status =
+      typeof target === "object" && target !== null
+        ? /** @type {{ status?: number }} */ ((target).status ?? 301)
+        : 301;
 
     // Skip patterns with :param or * — these need platform-specific handling
     if (source.includes(":") || source.includes("*")) {

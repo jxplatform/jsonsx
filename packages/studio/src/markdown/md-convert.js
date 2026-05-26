@@ -21,10 +21,10 @@ import { htmlToJx } from "@jxsuite/parser/transpile";
 /**
  * Mdast node-type → Jx tagName mapping
  *
- * @type {Record<string, (n: any) => string>}
+ * @type {Record<string, (n: MdastNode) => string>}
  */
 const MDAST_TAG_MAP = {
-  heading: (/** @type {any} */ n) => `h${n.depth}`,
+  heading: (/** @type {MdastNode} */ n) => `h${n.depth}`,
   paragraph: () => "p",
   text: () => "span",
   emphasis: () => "em",
@@ -34,37 +34,39 @@ const MDAST_TAG_MAP = {
   link: () => "a",
   image: () => "img",
   blockquote: () => "blockquote",
-  list: (/** @type {any} */ n) => (n.ordered ? "ol" : "ul"),
+  list: (/** @type {MdastNode} */ n) => (n.ordered ? "ol" : "ul"),
   listItem: () => "li",
   code: () => "pre",
   thematicBreak: () => "hr",
   table: () => "table",
   tableRow: () => "tr",
-  tableCell: (/** @type {any} */ n) => (n.isHeader ? "th" : "td"),
+  tableCell: (/** @type {MdastNode} */ n) => (n.isHeader ? "th" : "td"),
   break: () => "br",
 };
 
 /**
  * Convert an mdast tree to a Jx element tree.
  *
- * @param {any} mdast - Root mdast node (type: 'root')
- * @returns {any} Jx element tree
+ * @param {MdastNode} mdast - Root mdast node (type: 'root')
+ * @returns {JxElement} Jx element tree
  */
 export function mdToJx(mdast) {
   if (mdast.type === "root") {
     return {
-      children: (mdast.children ?? [])
-        .filter((/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml")
-        .flatMap(convertMdastNode)
-        .filter(Boolean),
+      children: /** @type {(JxElement | string)[]} */ (
+        (mdast.children ?? [])
+          .filter((/** @type {MdastNode} */ n) => n.type !== "yaml" && n.type !== "toml")
+          .flatMap(convertMdastNode)
+          .filter(Boolean)
+      ),
     };
   }
-  return convertMdastNode(mdast);
+  return /** @type {JxElement} */ (convertMdastNode(mdast));
 }
 
 /**
- * @param {any} node
- * @returns {any}
+ * @param {MdastNode} node
+ * @returns {JxElement | null}
  */
 function convertMdastNode(node) {
   if (!node) return null;
@@ -81,14 +83,16 @@ function convertMdastNode(node) {
   if (node.type === "html") {
     if (!node.value) return null;
     const nodes = htmlToJx(node.value);
-    return nodes.length === 1 ? nodes[0] : { tagName: "div", children: nodes };
+    return nodes.length === 1
+      ? /** @type {JxElement} */ (nodes[0])
+      : { tagName: "div", children: nodes };
   }
 
   const tagFn = MDAST_TAG_MAP[node.type];
   if (!tagFn) return null;
 
   const tag = tagFn(node);
-  /** @type {Record<string, any>} */
+  /** @type {JxElement} */
   const el = { tagName: tag };
 
   switch (node.type) {
@@ -97,8 +101,10 @@ function convertMdastNode(node) {
       // If contains only a single text child, flatten to textContent
       if (node.children?.length === 1 && node.children[0].type === "text") {
         el.textContent = node.children[0].value;
-      } else if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      } else if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
     }
@@ -112,8 +118,10 @@ function convertMdastNode(node) {
     case "delete": {
       if (node.children?.length === 1 && node.children[0].type === "text") {
         el.textContent = node.children[0].value;
-      } else if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      } else if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
     }
@@ -123,30 +131,36 @@ function convertMdastNode(node) {
       break;
 
     case "link":
-      el.attributes = { href: node.url };
+      el.attributes = { href: node.url ?? "" };
       if (node.title) el.attributes.title = node.title;
       if (node.children?.length === 1 && node.children[0].type === "text") {
         el.textContent = node.children[0].value;
-      } else if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      } else if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
 
     case "image":
-      el.attributes = { src: node.url, alt: node.alt ?? "" };
+      el.attributes = { src: node.url ?? "", alt: node.alt ?? "" };
       if (node.title) el.attributes.title = node.title;
       break;
 
     case "blockquote":
     case "listItem":
-      if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
 
     case "list":
-      if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       if (node.start != null && node.start !== 1) {
         el.attributes = { start: String(node.start) };
@@ -171,24 +185,36 @@ function convertMdastNode(node) {
 
     case "table": {
       // Mdast tables have rows directly; split into thead/tbody
-      const rows = (node.children ?? []).flatMap(convertMdastNode).filter(Boolean);
-      const thead = rows.length > 0 ? { tagName: "thead", children: [rows[0]] } : null;
-      const tbody = rows.length > 1 ? { tagName: "tbody", children: rows.slice(1) } : null;
-      el.children = [thead, tbody].filter(Boolean);
+      const rows = /** @type {JxElement[]} */ (
+        (node.children ?? []).flatMap(convertMdastNode).filter(Boolean)
+      );
+      const thead =
+        rows.length > 0
+          ? { tagName: "thead", children: /** @type {(JxElement | string)[]} */ ([rows[0]]) }
+          : null;
+      const tbody =
+        rows.length > 1
+          ? { tagName: "tbody", children: /** @type {(JxElement | string)[]} */ (rows.slice(1)) }
+          : null;
+      el.children = /** @type {(JxElement | string)[]} */ ([thead, tbody].filter(Boolean));
       break;
     }
 
     case "tableRow":
-      if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
 
     case "tableCell":
       if (node.children?.length === 1 && node.children[0].type === "text") {
         el.textContent = node.children[0].value;
-      } else if (node.children?.length > 0) {
-        el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+      } else if (node.children?.length) {
+        el.children = /** @type {(JxElement | string)[]} */ (
+          node.children.flatMap(convertMdastNode).filter(Boolean)
+        );
       }
       break;
   }
@@ -197,11 +223,11 @@ function convertMdastNode(node) {
 }
 
 /**
- * @param {any} node
- * @returns {any}
+ * @param {MdastNode} node
+ * @returns {JxElement | null}
  */
 function convertDirective(node) {
-  /** @type {Record<string, any>} */
+  /** @type {JxElement} */
   const el = { tagName: node.name };
   if (node.attributes && Object.keys(node.attributes).length > 0) {
     el.attributes = { ...node.attributes };
@@ -210,11 +236,15 @@ function convertDirective(node) {
     // Text directives place label as textContent
     if (node.children?.length === 1 && node.children[0].type === "text") {
       el.textContent = node.children[0].value;
-    } else if (node.children?.length > 0) {
-      el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+    } else if (node.children?.length) {
+      el.children = /** @type {(JxElement | string)[]} */ (
+        node.children.flatMap(convertMdastNode).filter(Boolean)
+      );
     }
-  } else if (node.type === "containerDirective" && node.children?.length > 0) {
-    el.children = node.children.flatMap(convertMdastNode).filter(Boolean);
+  } else if (node.type === "containerDirective" && node.children?.length) {
+    el.children = /** @type {(JxElement | string)[]} */ (
+      node.children.flatMap(convertMdastNode).filter(Boolean)
+    );
   }
   return el;
 }
@@ -274,13 +304,18 @@ const TAG_MDAST_MAP = {
 /**
  * Convert a Jx element tree to an mdast tree.
  *
- * @param {any} jx - Jx element tree (root content div)
- * @returns {any} Mdast root node
+ * @param {JxElement} jx - Jx element tree (root content div)
+ * @returns {MdastNode} Mdast root node
  */
 export function jxToMd(jx) {
-  const children = (jx.children ?? [])
-    .map((/** @type {any} */ child, /** @type {number} */ _i) => convertJxNode(child, true))
-    .filter(Boolean);
+  const childArray = /** @type {(JxElement | string)[]} */ (
+    Array.isArray(jx.children) ? jx.children : []
+  );
+  const children = /** @type {MdastNode[]} */ (
+    childArray
+      .map((/** @type {JxElement | string} */ child) => convertJxNode(child, true))
+      .filter(Boolean)
+  );
 
   return { type: "root", children };
 }
@@ -289,7 +324,7 @@ export function jxToMd(jx) {
  * Check if a Jx element has extra properties beyond the standard mdast-compatible ones. Elements
  * with style, event handlers, state bindings, etc. need directive syntax.
  *
- * @param {any} el
+ * @param {JxElement} el
  * @returns {boolean}
  */
 function hasJxProps(el) {
@@ -310,9 +345,9 @@ function hasJxProps(el) {
 /**
  * Convert a single Jx element to an mdast node.
  *
- * @param {any} el - Jx element
+ * @param {JxElement | string | number} el - Jx element
  * @param {boolean} isBlock - Whether this element is in a block context
- * @returns {any} Mdast node
+ * @returns {MdastNode | null} Mdast node
  */
 function convertJxNode(el, isBlock) {
   // Bare string/number text nodes → mdast text nodes
@@ -362,17 +397,17 @@ function convertJxNode(el, isBlock) {
     case "link":
       return {
         type: "link",
-        url: el.attributes?.href ?? "",
-        title: el.attributes?.title ?? null,
+        url: /** @type {string} */ (el.attributes?.href) ?? "",
+        title: /** @type {string | null} */ (el.attributes?.title) ?? null,
         children: inlineChildren(el),
       };
 
     case "image":
       return {
         type: "image",
-        url: el.attributes?.src ?? "",
-        alt: el.attributes?.alt ?? "",
-        title: el.attributes?.title ?? null,
+        url: /** @type {string} */ (el.attributes?.src) ?? "",
+        alt: /** @type {string} */ (el.attributes?.alt) ?? "",
+        title: /** @type {string | null} */ (el.attributes?.title) ?? null,
       };
 
     case "blockquote":
@@ -385,11 +420,14 @@ function convertJxNode(el, isBlock) {
       return {
         type: "list",
         ordered: tag === "ol",
-        start: tag === "ol" ? parseInt(el.attributes?.start, 10) || 1 : null,
+        start:
+          tag === "ol" ? parseInt(/** @type {string} */ (el.attributes?.start), 10) || 1 : null,
         spread: false,
-        children: (el.children ?? [])
-          .map((/** @type {any} */ c) => convertJxNode(c, true))
-          .filter(Boolean),
+        children: /** @type {MdastNode[]} */ (
+          /** @type {(JxElement | string)[]} */ (el.children ?? [])
+            .map((/** @type {JxElement | string} */ c) => convertJxNode(c, true))
+            .filter(Boolean)
+        ),
       };
 
     case "listItem":
@@ -401,8 +439,10 @@ function convertJxNode(el, isBlock) {
 
     case "code": {
       // pre > code → fenced code block
-      const codeChild = el.children?.[0];
-      const langClass = codeChild?.attributes?.class ?? "";
+      const codeChild = /** @type {JxElement | undefined} */ (
+        Array.isArray(el.children) ? el.children[0] : undefined
+      );
+      const langClass = /** @type {string} */ (codeChild?.attributes?.class) ?? "";
       const lang = langClass.replace("language-", "") || null;
       return {
         type: "code",
@@ -419,11 +459,12 @@ function convertJxNode(el, isBlock) {
 
     case "table": {
       // Flatten thead/tbody back to rows
-      /** @type {any[]} */
+      /** @type {MdastNode[]} */
       const rows = [];
-      for (const section of el.children ?? []) {
+      for (const section of /** @type {(JxElement | string)[]} */ (el.children ?? [])) {
+        if (typeof section === "string") continue;
         if (section.tagName === "thead" || section.tagName === "tbody") {
-          for (const row of section.children ?? []) {
+          for (const row of /** @type {(JxElement | string)[]} */ (section.children ?? [])) {
             const mdRow = convertJxNode(row, true);
             if (mdRow) {
               // Mark header cells
@@ -439,7 +480,6 @@ function convertJxNode(el, isBlock) {
       }
       return {
         type: "table",
-        align: null,
         children: rows,
       };
     }
@@ -447,9 +487,11 @@ function convertJxNode(el, isBlock) {
     case "tableRow":
       return {
         type: "tableRow",
-        children: (el.children ?? [])
-          .map((/** @type {any} */ c) => convertJxNode(c, false))
-          .filter(Boolean),
+        children: /** @type {MdastNode[]} */ (
+          /** @type {(JxElement | string)[]} */ (el.children ?? [])
+            .map((/** @type {JxElement | string} */ c) => convertJxNode(c, false))
+            .filter(Boolean)
+        ),
       };
 
     case "tableCell":
@@ -466,28 +508,36 @@ function convertJxNode(el, isBlock) {
  * Get inline children from a Jx element as mdast nodes. Handles both textContent shorthand and
  * explicit children array.
  *
- * @param {any} el
- * @returns {any[]}
+ * @param {JxElement} el
+ * @returns {MdastNode[]}
  */
 function inlineChildren(el) {
   if (el.textContent != null) {
     return [{ type: "text", value: String(el.textContent) }];
   }
-  return (el.children ?? []).map((/** @type {any} */ c) => convertJxNode(c, false)).filter(Boolean);
+  return /** @type {MdastNode[]} */ (
+    /** @type {(JxElement | string)[]} */ (el.children ?? [])
+      .map((/** @type {JxElement | string} */ c) => convertJxNode(c, false))
+      .filter(Boolean)
+  );
 }
 
 /**
  * Get block children from a Jx element as mdast nodes.
  *
- * @param {any} el
- * @returns {any[]}
+ * @param {JxElement} el
+ * @returns {MdastNode[]}
  */
 function blockChildren(el) {
   if (el.textContent != null) {
     // Wrap bare text in a paragraph
     return [{ type: "paragraph", children: [{ type: "text", value: String(el.textContent) }] }];
   }
-  return (el.children ?? []).map((/** @type {any} */ c) => convertJxNode(c, true)).filter(Boolean);
+  return /** @type {MdastNode[]} */ (
+    /** @type {(JxElement | string)[]} */ (el.children ?? [])
+      .map((/** @type {JxElement | string} */ c) => convertJxNode(c, true))
+      .filter(Boolean)
+  );
 }
 
 /**
@@ -495,11 +545,11 @@ function blockChildren(el) {
  * handlers, etc.) and HTML attributes into a flat dot-path attribute map suitable for
  * remark-directive.
  *
- * @param {any} el
+ * @param {JxElement} el
  * @returns {Record<string, string>}
  */
 function collectDirectiveAttrs(el) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const propsObj = {};
 
   for (const [key, value] of Object.entries(el)) {
@@ -516,7 +566,9 @@ function collectDirectiveAttrs(el) {
 
   // Merge HTML attributes
   if (el.attributes) {
-    for (const [key, value] of Object.entries(el.attributes)) {
+    for (const [key, value] of Object.entries(
+      /** @type {Record<string, unknown>} */ (el.attributes),
+    )) {
       propsObj[key] = value;
     }
   }
@@ -528,12 +580,12 @@ function collectDirectiveAttrs(el) {
  * Convert a Jx element to a directive node, preserving all Jx-specific properties as collapsed
  * dot-path directive attributes.
  *
- * @param {any} el
+ * @param {JxElement} el
  * @param {boolean} isBlock
- * @returns {any}
+ * @returns {MdastNode}
  */
 function convertToDirective(el, isBlock) {
-  const tag = el.tagName ?? "div";
+  const tag = /** @type {string} */ (el.tagName) ?? "div";
   const attrs = collectDirectiveAttrs(el);
 
   if (!isBlock) {
@@ -545,14 +597,17 @@ function convertToDirective(el, isBlock) {
       children:
         el.textContent != null
           ? [{ type: "text", value: String(el.textContent) }]
-          : (el.children ?? [])
-              .map((/** @type {any} */ c) => convertJxNode(c, false))
-              .filter(Boolean),
+          : /** @type {MdastNode[]} */ (
+              /** @type {(JxElement | string)[]} */ (el.children ?? [])
+                .map((/** @type {JxElement | string} */ c) => convertJxNode(c, false))
+                .filter(Boolean)
+            ),
     };
   }
 
   // Block without children → leafDirective
-  if (!el.children?.length && el.textContent == null) {
+  const childArray = /** @type {(JxElement | string)[] | undefined} */ (el.children);
+  if (!childArray?.length && el.textContent == null) {
     return {
       type: "leafDirective",
       name: tag,
@@ -562,7 +617,7 @@ function convertToDirective(el, isBlock) {
   }
 
   // Block with children → containerDirective
-  /** @type {any[]} */
+  /** @type {MdastNode[]} */
   let directiveChildren;
   if (el.textContent != null) {
     directiveChildren = [
@@ -571,15 +626,19 @@ function convertToDirective(el, isBlock) {
   } else if (INLINE_CONTENT_TAGS.has(tag)) {
     // Tags with inline content model: wrap all children in a single paragraph
     // so remark serializes them as one continuous inline flow
-    const inlineNodes = (el.children ?? [])
-      .map((/** @type {any} */ c) => convertJxNode(c, false))
-      .filter(Boolean);
+    const inlineNodes = /** @type {MdastNode[]} */ (
+      /** @type {(JxElement | string)[]} */ (el.children ?? [])
+        .map((/** @type {JxElement | string} */ c) => convertJxNode(c, false))
+        .filter(Boolean)
+    );
     directiveChildren =
       inlineNodes.length > 0 ? [{ type: "paragraph", children: inlineNodes }] : [];
   } else {
-    directiveChildren = (el.children ?? [])
-      .map((/** @type {any} */ c) => convertJxNode(c, true))
-      .filter(Boolean);
+    directiveChildren = /** @type {MdastNode[]} */ (
+      /** @type {(JxElement | string)[]} */ (el.children ?? [])
+        .map((/** @type {JxElement | string} */ c) => convertJxNode(c, true))
+        .filter(Boolean)
+    );
   }
 
   return {
@@ -633,7 +692,7 @@ const JX_ANNOTATION_KEYS = new Set(["$title", "$description"]);
  * top-level props and uses remark-stringify with remark-directive for the body — standard markdown
  * elements emit as native syntax, Jx-decorated elements emit as directives.
  *
- * @param {any} doc - Jx JSON document
+ * @param {JxMutableNode} doc - Jx JSON document
  * @returns {string} Jx Markdown source
  */
 export function jxDocToMd(doc) {
@@ -643,7 +702,7 @@ export function jxDocToMd(doc) {
   const lines = [];
 
   // Emit YAML frontmatter
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const frontmatter = {};
   for (const [key, value] of Object.entries(doc)) {
     if (key === "children") continue;
@@ -659,17 +718,21 @@ export function jxDocToMd(doc) {
 
   // Convert children to mdast and stringify with remark
   if (Array.isArray(doc.children) && doc.children.length > 0) {
-    const mdastChildren = doc.children
-      .map((/** @type {any} */ child) => convertJxNode(child, true))
-      .filter(Boolean);
+    const mdastChildren = /** @type {MdastNode[]} */ (
+      doc.children
+        .map((/** @type {JxMutableNode | string} */ child) =>
+          convertJxNode(/** @type {JxElement | string} */ (child), true),
+        )
+        .filter(Boolean)
+    );
 
-    const mdast = /** @type {any} */ ({ type: "root", children: mdastChildren });
+    const mdast = { type: "root", children: mdastChildren };
     const md = unified()
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(mdast);
+      .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
 
-    lines.push(md);
+    lines.push(/** @type {string} */ (md));
   }
 
   return (
@@ -683,9 +746,9 @@ export function jxDocToMd(doc) {
 /**
  * Lazy import of yaml stringify — avoids importing at module load.
  *
- * @returns {{ stringify: (v: any) => string }}
+ * @returns {{ stringify: (v: unknown) => string }}
  */
-let _yaml = /** @type {any} */ (null);
+let _yaml = /** @type {{ stringify: (v: unknown) => string } | null} */ (null);
 function yamlImport() {
   if (!_yaml) {
     // Dynamic require avoided; use the yaml package already available in studio
@@ -698,7 +761,7 @@ function yamlImport() {
  * Simple YAML stringifier for frontmatter. Handles the subset of YAML needed for Jx frontmatter
  * (scalars, arrays, nested objects).
  *
- * @param {any} value
+ * @param {unknown} value
  * @param {number} indent
  * @returns {string}
  */
@@ -735,7 +798,7 @@ function yamlStringifySimple(value, indent = 0) {
   }
 
   if (typeof value === "object") {
-    const entries = Object.entries(value);
+    const entries = Object.entries(/** @type {Record<string, unknown>} */ (value));
     if (entries.length === 0) return "{}";
     return entries
       .map(([k, v]) => {
@@ -755,14 +818,14 @@ function yamlStringifySimple(value, indent = 0) {
  * Collapse a Jx props object to a flat directive attribute map. Applies key mapping: strips `$`
  * from Jx keywords, `:` from pseudo-classes, `@` from media queries.
  *
- * @param {Record<string, any>} propsObj
+ * @param {Record<string, unknown>} propsObj
  * @returns {Record<string, string>}
  */
 function collapsePropsToAttrMap(propsObj) {
   /** @type {Record<string, string>} */
   const result = {};
 
-  function walk(/** @type {Record<string, any>} */ obj, /** @type {string} */ prefix) {
+  function walk(/** @type {Record<string, unknown>} */ obj, /** @type {string} */ prefix) {
     for (const [key, value] of Object.entries(obj)) {
       let mdAttrKey = key;
       // Strip $ prefix for Jx keywords
@@ -785,7 +848,7 @@ function collapsePropsToAttrMap(propsObj) {
       const fullKey = prefix ? `${prefix}.${mdAttrKey}` : mdAttrKey;
 
       if (value && typeof value === "object" && !Array.isArray(value)) {
-        walk(value, fullKey);
+        walk(/** @type {Record<string, unknown>} */ (value), fullKey);
       } else {
         result[fullKey] = String(value);
       }

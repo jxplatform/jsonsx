@@ -19,8 +19,8 @@ export async function refreshGitStatus() {
     const [status, branches] = await Promise.all([plat.gitStatus(), plat.gitBranches()]);
     updateUi("gitStatus", status);
     updateUi("gitBranches", branches);
-  } catch (/** @type {any} */ e) {
-    updateUi("gitError", e.message);
+  } catch (/** @type {unknown} */ e) {
+    updateUi("gitError", /** @type {Error} */ (e).message);
   } finally {
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
@@ -29,27 +29,48 @@ export async function refreshGitStatus() {
 
 /**
  * @param {string} action
- * @param {any} [body]
+ * @param {unknown} [body]
  */
 async function gitAction(action, body) {
-  const plat = getPlatform();
+  const plat = /** @type {Record<string, Function> & StudioPlatform} */ (getPlatform());
   updateUi("gitLoading", true);
   updateUi("gitError", null);
   try {
     await plat[action](body);
     await refreshGitStatus();
-  } catch (/** @type {any} */ e) {
-    updateUi("gitError", e.message);
+  } catch (/** @type {unknown} */ e) {
+    updateUi("gitError", /** @type {Error} */ (e).message);
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
   }
 }
 
-let _pollTimer = /** @type {any} */ (null);
+let _pollTimer = /** @type {ReturnType<typeof setInterval> | null} */ (null);
+
+/** @typedef {{ path: string; status: string; staged: boolean }} GitFileEntry */
 
 /**
- * @param {any} S
- * @param {any} ctx
+ * @typedef {{
+ *   gitStatus?: {
+ *     files?: GitFileEntry[];
+ *     branch?: string;
+ *     ahead?: number;
+ *     behind?: number;
+ *   } | null;
+ *   gitBranches?: { current?: string; branches?: string[] } | null;
+ *   gitLoading?: boolean;
+ *   gitError?: string | null;
+ *   gitCommitMessage?: string;
+ *   [key: string]: unknown;
+ * }} GitUiState
+ */
+
+/**
+ * @param {{ ui: GitUiState }} S
+ * @param {{
+ *   setCanvasMode?: (mode: string) => void;
+ *   setGitDiffState?: (state: unknown) => void;
+ * }} ctx
  */
 export function renderGitPanel(S, ctx) {
   const status = S.ui.gitStatus;
@@ -67,8 +88,8 @@ export function renderGitPanel(S, ctx) {
     }, 30000);
   }
 
-  const stagedFiles = status?.files?.filter((/** @type {any} */ f) => f.staged) || [];
-  const unstagedFiles = status?.files?.filter((/** @type {any} */ f) => !f.staged) || [];
+  const stagedFiles = status?.files?.filter((/** @type {GitFileEntry} */ f) => f.staged) || [];
+  const unstagedFiles = status?.files?.filter((/** @type {GitFileEntry} */ f) => !f.staged) || [];
   const totalChanges = status?.files?.length || 0;
 
   const doCommit = async () => {
@@ -85,10 +106,10 @@ export function renderGitPanel(S, ctx) {
       quiet
       class="git-branch-picker"
       .value=${live(branches?.current || "")}
-      @change=${async (/** @type {any} */ e) => {
-        const val = e.target.value;
+      @change=${async (/** @type {Event} */ e) => {
+        const val = /** @type {HTMLInputElement} */ (e.target).value;
         if (val === "__new__") {
-          e.target.value = branches?.current || "";
+          /** @type {HTMLInputElement} */ (e.target).value = branches?.current || "";
           const name = prompt("New branch name:");
           if (name?.trim()) await gitAction("gitCreateBranch", name.trim());
           return;
@@ -140,8 +161,9 @@ export function renderGitPanel(S, ctx) {
         class="git-commit-input"
         placeholder='Message (Ctrl+Enter to commit on "${status?.branch || ""}")'
         .value=${live(S.ui.gitCommitMessage || "")}
-        @input=${(/** @type {any} */ e) => updateUi("gitCommitMessage", e.target.value)}
-        @keydown=${(/** @type {any} */ e) => {
+        @input=${(/** @type {Event} */ e) =>
+          updateUi("gitCommitMessage", /** @type {HTMLInputElement} */ (e.target).value)}
+        @keydown=${(/** @type {KeyboardEvent} */ e) => {
           if (e.ctrlKey && e.key === "Enter") {
             e.preventDefault();
             doCommit();
@@ -155,7 +177,7 @@ export function renderGitPanel(S, ctx) {
     </div>
   `;
 
-  const fileRowT = (/** @type {any} */ file) => {
+  const fileRowT = (/** @type {GitFileEntry} */ file) => {
     const parts = file.path.split("/");
     const name = parts.pop();
     const dir = parts.join("/");
@@ -190,8 +212,8 @@ export function renderGitPanel(S, ctx) {
           if (ctx.setGitDiffState) ctx.setGitDiffState(diffState);
           ctx.setCanvasMode("git-diff");
         }
-      } catch (/** @type {any} */ e) {
-        updateUi("gitError", `Failed to load diff: ${e.message}`);
+      } catch (/** @type {unknown} */ e) {
+        updateUi("gitError", `Failed to load diff: ${/** @type {Error} */ (e).message}`);
       } finally {
         updateUi("gitLoading", false);
       }
@@ -263,13 +285,13 @@ export function renderGitPanel(S, ctx) {
                 @click=${() =>
                   gitAction(
                     "gitUnstage",
-                    stagedFiles.map((/** @type {any} */ f) => f.path),
+                    stagedFiles.map((/** @type {GitFileEntry} */ f) => f.path),
                   )}
               >
                 <sp-icon-remove slot="icon" size="xs"></sp-icon-remove>
               </sp-action-button>
             </div>
-            ${repeat(stagedFiles, (/** @type {any} */ f) => f.path, fileRowT)}
+            ${repeat(stagedFiles, (/** @type {GitFileEntry} */ f) => f.path, fileRowT)}
           </div>
         `
       : nothing}
@@ -286,13 +308,13 @@ export function renderGitPanel(S, ctx) {
                 @click=${() =>
                   gitAction(
                     "gitStage",
-                    unstagedFiles.map((/** @type {any} */ f) => f.path),
+                    unstagedFiles.map((/** @type {GitFileEntry} */ f) => f.path),
                   )}
               >
                 <sp-icon-add slot="icon" size="xs"></sp-icon-add>
               </sp-action-button>
             </div>
-            ${repeat(unstagedFiles, (/** @type {any} */ f) => f.path, fileRowT)}
+            ${repeat(unstagedFiles, (/** @type {GitFileEntry} */ f) => f.path, fileRowT)}
           </div>
         `
       : nothing}

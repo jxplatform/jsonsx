@@ -83,9 +83,9 @@ describe("isTemplateString", () => {
 
 describe("isDynamic", () => {
   test("returns false for null/non-object", () => {
-    expect(isDynamic(null)).toBe(false);
+    expect(isDynamic(/** @type {any} */ (null))).toBe(false);
     expect(isDynamic("string")).toBe(false);
-    expect(isDynamic(42)).toBe(false);
+    expect(isDynamic(/** @type {any} */ (42))).toBe(false);
   });
 
   test("returns true for state with $prototype", () => {
@@ -113,7 +113,9 @@ describe("isDynamic", () => {
   });
 
   test("returns true for $ref bindings", () => {
-    expect(isDynamic({ tagName: "span", textContent: { $ref: "#/state/label" } })).toBe(true);
+    expect(
+      isDynamic(/** @type {any} */ ({ tagName: "span", textContent: { $ref: "#/state/label" } })),
+    ).toBe(true);
   });
 
   test("returns true for template strings in properties", () => {
@@ -140,10 +142,12 @@ describe("isDynamic", () => {
 
   test("returns true when child is dynamic", () => {
     expect(
-      isDynamic({
-        tagName: "div",
-        children: [{ tagName: "span", textContent: { $ref: "#/state/label" } }],
-      }),
+      isDynamic(
+        /** @type {any} */ ({
+          tagName: "div",
+          children: [{ tagName: "span", textContent: { $ref: "#/state/label" } }],
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -163,10 +167,12 @@ describe("isDynamic", () => {
 describe("isNodeDynamic", () => {
   test("does not recurse into children", () => {
     expect(
-      isNodeDynamic({
-        tagName: "div",
-        children: [{ tagName: "span", textContent: { $ref: "#/state/x" } }],
-      }),
+      isNodeDynamic(
+        /** @type {any} */ ({
+          tagName: "div",
+          children: [{ tagName: "span", textContent: { $ref: "#/state/x" } }],
+        }),
+      ),
     ).toBe(false);
   });
 
@@ -200,13 +206,15 @@ describe("hasAnyIsland", () => {
 
   test("returns true if any descendant is dynamic", () => {
     expect(
-      hasAnyIsland({
-        tagName: "div",
-        children: [
-          { tagName: "p", textContent: "static" },
-          { tagName: "span", textContent: { $ref: "#/state/x" } },
-        ],
-      }),
+      hasAnyIsland(
+        /** @type {any} */ ({
+          tagName: "div",
+          children: [
+            { tagName: "p", textContent: "static" },
+            { tagName: "span", textContent: { $ref: "#/state/x" } },
+          ],
+        }),
+      ),
     ).toBe(true);
   });
 
@@ -237,7 +245,7 @@ describe("buildInitialScope", () => {
 
   test("array values are cloned", () => {
     const items = [1, 2, 3];
-    const scope = buildInitialScope({ items });
+    const scope = buildInitialScope(/** @type {any} */ ({ items }));
     expect(scope.items).toEqual([1, 2, 3]);
     expect(scope.items).not.toBe(items);
   });
@@ -384,7 +392,7 @@ describe("getPathValue", () => {
 describe("cloneValue", () => {
   test("clones objects deeply", () => {
     const obj = { a: { b: 1 } };
-    const clone = cloneValue(obj);
+    const clone = /** @type {any} */ (cloneValue(obj));
     expect(clone).toEqual(obj);
     expect(clone).not.toBe(obj);
     expect(clone.a).not.toBe(obj.a);
@@ -567,7 +575,7 @@ describe("buildComponentCSS", () => {
 
   test("returns empty for null/undefined style", () => {
     expect(buildComponentCSS("my-comp", null)).toBe("");
-    expect(buildComponentCSS("my-comp", undefined)).toBe("");
+    expect(buildComponentCSS("my-comp", /** @type {any} */ (undefined))).toBe("");
   });
 });
 
@@ -575,39 +583,47 @@ describe("buildComponentCSS", () => {
 
 describe("buildAttrs", () => {
   test("returns empty string for no attributes", () => {
-    expect(buildAttrs({}, null)).toBe("");
+    expect(buildAttrs({}, /** @type {any} */ (null))).toBe("");
   });
 
   test("builds id attribute", () => {
-    expect(buildAttrs({ id: "main" }, null)).toBe(' id="main"');
+    expect(buildAttrs({ id: "main" }, /** @type {any} */ (null))).toBe(' id="main"');
   });
 
   test("builds className as class attribute", () => {
-    expect(buildAttrs({ className: "card active" }, null)).toBe(' class="card active"');
+    expect(buildAttrs({ className: "card active" }, /** @type {any} */ (null))).toBe(
+      ' class="card active"',
+    );
   });
 
   test("builds hidden attribute", () => {
-    expect(buildAttrs({ hidden: true }, null)).toContain("hidden");
+    expect(buildAttrs({ hidden: true }, /** @type {any} */ (null))).toContain("hidden");
   });
 
   test("builds tabIndex attribute", () => {
-    expect(buildAttrs({ tabIndex: 0 }, null)).toBe(' tabindex="0"');
+    expect(buildAttrs({ tabIndex: 0 }, /** @type {any} */ (null))).toBe(' tabindex="0"');
   });
 
   test("builds title, lang, dir", () => {
-    const result = buildAttrs({ title: "Tip", lang: "en", dir: "ltr" }, null);
+    const result = buildAttrs({ title: "Tip", lang: "en", dir: "ltr" }, /** @type {any} */ (null));
     expect(result).toContain('title="Tip"');
     expect(result).toContain('lang="en"');
     expect(result).toContain('dir="ltr"');
   });
 
   test("no longer emits inline style (styles are in CSS rules)", () => {
-    const result = buildAttrs({ style: { color: "red", fontSize: "16px" } }, null);
+    const result = buildAttrs(
+      { style: { color: "red", fontSize: "16px" } },
+      /** @type {any} */ (null),
+    );
     expect(result).not.toContain("style=");
   });
 
   test("excludes pseudo-selectors from output", () => {
-    const result = buildAttrs({ style: { color: "red", ":hover": { color: "blue" } } }, null);
+    const result = buildAttrs(
+      { style: { color: "red", ":hover": { color: "blue" } } },
+      /** @type {any} */ (null),
+    );
     expect(result).not.toContain("style=");
     expect(result).not.toContain(":hover");
   });
@@ -615,35 +631,38 @@ describe("buildAttrs", () => {
   test("excludes media-overridden properties from inline style", () => {
     const result = buildAttrs(
       { style: { fontSize: "14px", "@(min-width: 768px)": { fontSize: "18px" } } },
-      null,
+      /** @type {any} */ (null),
     );
     expect(result).not.toContain("font-size: 14px");
   });
 
   test("builds custom attributes", () => {
-    const result = buildAttrs({ attributes: { "data-id": "123", role: "button" } }, null);
+    const result = buildAttrs(
+      { attributes: { "data-id": "123", role: "button" } },
+      /** @type {any} */ (null),
+    );
     expect(result).toContain('data-id="123"');
     expect(result).toContain('role="button"');
   });
 
   test("escapes HTML in attribute values", () => {
-    const result = buildAttrs({ id: '<script>"alert"</script>' }, null);
+    const result = buildAttrs({ id: '<script>"alert"</script>' }, /** @type {any} */ (null));
     expect(result).toContain("&lt;script&gt;");
     expect(result).toContain("&quot;alert&quot;");
   });
 
   test("builds $static marker attribute", () => {
-    const result = buildAttrs({ $static: true }, null);
+    const result = buildAttrs({ $static: true }, /** @type {any} */ (null));
     expect(result).toContain("data-jx-static");
   });
 
   test("builds $prerendered marker attribute", () => {
-    const result = buildAttrs({ $prerendered: true }, null);
+    const result = buildAttrs({ $prerendered: true }, /** @type {any} */ (null));
     expect(result).toContain("data-jx-prerendered");
   });
 
   test("resolves scope values in attributes", () => {
-    const scope = buildInitialScope({ color: "blue" }, null);
+    const scope = buildInitialScope({ color: "blue" });
     const result = buildAttrs(
       { id: "test", attributes: { "data-color": "${state.color}" } },
       scope,
@@ -657,19 +676,19 @@ describe("buildAttrs", () => {
 describe("buildInner", () => {
   test("returns escaped textContent", () => {
     const def = { textContent: "Hello <world>" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { scope: /** @type {any} */ (null), scopeDefs: {}, media: {} };
     expect(buildInner(def, null, context, () => "")).toBe("Hello &lt;world&gt;");
   });
 
   test("returns innerHTML directly", () => {
     const def = { innerHTML: "<b>Bold</b>" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { scope: /** @type {any} */ (null), scopeDefs: {}, media: {} };
     expect(buildInner(def, null, context, () => "")).toBe("<b>Bold</b>");
   });
 
   test("compiles children with childCompiler", () => {
     const def = { children: [{ tagName: "p" }, { tagName: "span" }] };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { scope: /** @type {any} */ (null), scopeDefs: {}, media: {} };
     const compiler = (/** @type {any} */ d) => `<${d.tagName}>`;
     const result = buildInner(def, null, context, compiler);
     expect(result).toContain("<p>");
@@ -677,15 +696,15 @@ describe("buildInner", () => {
   });
 
   test("returns empty for no content", () => {
-    const def = {};
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const def = /** @type {any} */ ({});
+    const context = { scope: /** @type {any} */ (null), scopeDefs: {}, media: {} };
     expect(buildInner(def, null, context, () => "")).toBe("");
   });
 
   test("uses raw node when provided", () => {
     const def = { textContent: "override" };
     const raw = { textContent: "original" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { scope: /** @type {any} */ (null), scopeDefs: {}, media: {} };
     expect(buildInner(def, raw, context, () => "")).toBe("original");
   });
 });
@@ -819,51 +838,53 @@ describe("compileStyles", () => {
 
 describe("renderStaticNode", () => {
   test("renders text string escaped", () => {
-    expect(renderStaticNode("Hello <world>", null)).toBe("Hello &lt;world&gt;");
+    expect(renderStaticNode("Hello <world>", /** @type {any} */ (null))).toBe(
+      "Hello &lt;world&gt;",
+    );
   });
 
   test("renders number", () => {
-    expect(renderStaticNode(42, null)).toBe("42");
+    expect(renderStaticNode(/** @type {any} */ (42), /** @type {any} */ (null))).toBe("42");
   });
 
   test("renders boolean", () => {
-    expect(renderStaticNode(true, null)).toBe("true");
+    expect(renderStaticNode(/** @type {any} */ (true), /** @type {any} */ (null))).toBe("true");
   });
 
   test("renders array of nodes", () => {
     const result = renderStaticNode(
-      [
+      /** @type {any} */ ([
         { tagName: "p", textContent: "One" },
         { tagName: "p", textContent: "Two" },
-      ],
-      null,
+      ]),
+      /** @type {any} */ (null),
     );
     expect(result).toContain("<p>One</p>");
     expect(result).toContain("<p>Two</p>");
   });
 
   test("returns empty for null/undefined", () => {
-    expect(renderStaticNode(null, null)).toBe("");
-    expect(renderStaticNode(undefined, null)).toBe("");
+    expect(renderStaticNode(/** @type {any} */ (null), /** @type {any} */ (null))).toBe("");
+    expect(renderStaticNode(/** @type {any} */ (undefined), /** @type {any} */ (null))).toBe("");
   });
 
   test("renders basic element with textContent", () => {
     const node = { tagName: "p", textContent: "Hello" };
-    expect(renderStaticNode(node, null)).toBe("<p>Hello</p>");
+    expect(renderStaticNode(node, /** @type {any} */ (null))).toBe("<p>Hello</p>");
   });
 
   test("renders self-closing tags", () => {
-    expect(renderStaticNode({ tagName: "br" }, null)).toBe("<br>");
-    expect(renderStaticNode({ tagName: "img" }, null)).toBe(
+    expect(renderStaticNode({ tagName: "br" }, /** @type {any} */ (null))).toBe("<br>");
+    expect(renderStaticNode({ tagName: "img" }, /** @type {any} */ (null))).toBe(
       '<img loading="lazy" decoding="async">',
     );
-    expect(renderStaticNode({ tagName: "input" }, null)).toBe("<input>");
-    expect(renderStaticNode({ tagName: "hr" }, null)).toBe("<hr>");
+    expect(renderStaticNode({ tagName: "input" }, /** @type {any} */ (null))).toBe("<input>");
+    expect(renderStaticNode({ tagName: "hr" }, /** @type {any} */ (null))).toBe("<hr>");
   });
 
   test("renders innerHTML directly", () => {
     const node = { tagName: "div", innerHTML: "<b>Bold</b>" };
-    expect(renderStaticNode(node, null)).toBe("<div><b>Bold</b></div>");
+    expect(renderStaticNode(node, /** @type {any} */ (null))).toBe("<div><b>Bold</b></div>");
   });
 
   test("renders nested children", () => {
@@ -874,7 +895,7 @@ describe("renderStaticNode", () => {
         { tagName: "span", textContent: "Child 2" },
       ],
     };
-    const result = renderStaticNode(node, null);
+    const result = renderStaticNode(node, /** @type {any} */ (null));
     expect(result).toContain("<div>");
     expect(result).toContain("<p>Child 1</p>");
     expect(result).toContain("<span>Child 2</span>");
@@ -883,34 +904,36 @@ describe("renderStaticNode", () => {
 
   test("replaces slot with slotContent", () => {
     const node = { tagName: "slot" };
-    expect(renderStaticNode(node, null, "<p>Slotted</p>")).toBe("<p>Slotted</p>");
+    expect(renderStaticNode(node, /** @type {any} */ (null), "<p>Slotted</p>")).toBe(
+      "<p>Slotted</p>",
+    );
   });
 
   test("renders slot normally when no slotContent", () => {
     const node = { tagName: "slot" };
-    expect(renderStaticNode(node, null, null)).toBe("<slot></slot>");
+    expect(renderStaticNode(node, /** @type {any} */ (null), null)).toBe("<slot></slot>");
   });
 
   test("skips $prototype Array nodes", () => {
     const node = { $prototype: "Array", items: {} };
-    expect(renderStaticNode(node, null)).toBe("");
+    expect(renderStaticNode(/** @type {any} */ (node), /** @type {any} */ (null))).toBe("");
   });
 
   test("renders with id and className attributes", () => {
     const node = { tagName: "div", id: "app", className: "container" };
-    const result = renderStaticNode(node, null);
+    const result = renderStaticNode(node, /** @type {any} */ (null));
     expect(result).toContain('id="app"');
     expect(result).toContain('class="container"');
   });
 
   test("resolves state values in textContent", () => {
-    const scope = buildInitialScope({ name: "World" }, null);
+    const scope = buildInitialScope({ name: "World" });
     const node = { tagName: "span", textContent: "${state.name}" };
     expect(renderStaticNode(node, scope)).toBe("<span>World</span>");
   });
 
   test("resolves template strings in children array", () => {
-    const scope = buildInitialScope({ status: "idle" }, null);
+    const scope = buildInitialScope({ status: "idle" });
     const node = {
       tagName: "button",
       children: ["${state.status === 'submitting' ? 'Sending...' : 'Submit'}"],

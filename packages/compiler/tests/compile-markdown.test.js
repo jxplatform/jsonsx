@@ -482,7 +482,7 @@ describe("compileMarkdown", () => {
         },
       ],
     };
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("- Apple");
     expect(content).toContain("- Banana");
     expect(content).toContain("- Cherry");
@@ -492,7 +492,7 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [{ tagName: "p", children: [42] }],
     };
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("42");
   });
 
@@ -500,7 +500,7 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [null, undefined, { tagName: "p", textContent: "Valid" }],
     };
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("Valid");
   });
 
@@ -890,7 +890,7 @@ describe("compileMarkdown", () => {
       ],
     };
 
-    const { content } = compileMarkdown(doc, componentDefs);
+    const { content } = compileMarkdown(/** @type {any} */ (doc), componentDefs);
     expect(content).toContain("Alpha");
     expect(content).toContain("Beta");
   });
@@ -915,7 +915,7 @@ describe("compileMarkdown", () => {
       ],
     };
 
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("- Apple");
     expect(content).toContain("- Pear");
   });
@@ -940,7 +940,7 @@ describe("compileMarkdown", () => {
       ],
     };
 
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("### One");
     expect(content).toContain("### Two");
   });
@@ -1229,7 +1229,7 @@ describe("compileMarkdown", () => {
         },
       ],
     };
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("- Direct");
   });
 
@@ -1237,7 +1237,7 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [{ tagName: "p", textContent: 42 }],
     };
-    const { content } = compileMarkdown(doc);
+    const { content } = compileMarkdown(/** @type {any} */ (doc));
     expect(content).toContain("42");
   });
 

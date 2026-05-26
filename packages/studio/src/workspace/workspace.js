@@ -16,9 +16,9 @@ export const workspace = reactive({
   projectConfig: null,
   /** @type {ComponentEntry[]} */
   componentRegistry: [],
-  /** @type {import("../state.js").JxNode | null} */
+  /** @type {JxMutableNode | null} */
   clipboard: null,
-  /** @type {Record<string, any> | null} */
+  /** @type {JxStyle | null} */
   styleClipboard: null,
   fileTree: {
     /** @type {Map<string, FileEntry[]>} */
@@ -41,9 +41,11 @@ export const workspace = reactive({
 });
 
 /** @type {import("@vue/reactivity").ComputedRef<Tab>} */
-export const activeTab = /** @type {any} */ (
-  computed(() =>
-    workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
+export const activeTab = /** @type {import("@vue/reactivity").ComputedRef<Tab>} */ (
+  /** @type {unknown} */ (
+    computed(() =>
+      workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
+    )
   )
 );
 
@@ -54,7 +56,7 @@ export const activeTab = /** @type {any} */ (
  *   id: string;
  *   documentPath?: string | null;
  *   fileHandle?: FileSystemFileHandle | null;
- *   document: Record<string, any>;
+ *   document: Record<string, unknown>;
  *   frontmatter?: Record<string, unknown>;
  *   sourceFormat?: string | null;
  * }} opts
@@ -102,7 +104,7 @@ export function closeAllTabs() {
  * @param {{
  *   id: string;
  *   documentPath?: string | null;
- *   document: Record<string, any>;
+ *   document: Record<string, unknown>;
  *   frontmatter?: Record<string, unknown>;
  *   sourceFormat?: string | null;
  * }} newTabOpts

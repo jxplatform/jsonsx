@@ -39,15 +39,17 @@ export async function convertToComponent() {
   transact(tab, (doc) => {
     // Navigate to parent's children array and replace the node
     const pp = parentElementPath(selectionPath) ?? [];
-    const idx = childIndex(selectionPath);
+    const idx = /** @type {number} */ (childIndex(selectionPath));
     let parent = doc;
     for (const seg of pp) parent = parent[seg];
+    if (!parent.children) parent.children = [];
     parent.children[idx] = { tagName: name };
 
     // Ensure $elements exists and add the $ref
     if (!doc.$elements) doc.$elements = [];
     const alreadyReferenced = doc.$elements.some(
-      (/** @type {any} */ el) => el && el.$ref === refPath,
+      (/** @type {JxMutableNode | string | { $ref: string }} */ el) =>
+        el && typeof el === "object" && "$ref" in el && el.$ref === refPath,
     );
     if (!alreadyReferenced) {
       doc.$elements.push({ $ref: refPath });
@@ -60,15 +62,15 @@ export async function convertToComponent() {
     await platform.writeFile(componentFile, JSON.stringify(componentDef, null, 2));
     await loadComponentRegistry();
     statusMessage(`Converted to <${name}>`);
-  } catch (/** @type {any} */ err) {
-    statusMessage(`Error saving component: ${err.message}`);
+  } catch (/** @type {unknown} */ err) {
+    statusMessage(`Error saving component: ${/** @type {Error} */ (err).message}`);
   }
 }
 
 /**
  * Derive a default tag name from a node.
  *
- * @param {any} node
+ * @param {JxMutableNode} node
  * @returns {string}
  */
 function deriveDefaultName(node) {
@@ -80,8 +82,8 @@ function deriveDefaultName(node) {
 /**
  * Deep clone a node and strip page-specific keys.
  *
- * @param {any} node
- * @returns {any}
+ * @param {JxMutableNode} node
+ * @returns {JxMutableNode}
  */
 function extractComponentDef(node) {
   const clone = structuredClone(node);
@@ -105,7 +107,7 @@ function validateName(val) {
   if (!VALID_NAME.test(val)) {
     return { valid: false, error: "Lowercase letters, digits, and hyphens only" };
   }
-  const exists = componentRegistry.some((/** @type {any} */ c) => c.tagName === val);
+  const exists = componentRegistry.some((/** @type {JxMutableNode} */ c) => c.tagName === val);
   if (exists) {
     return { valid: false, error: `Component <${val}> already exists` };
   }
@@ -134,7 +136,7 @@ function promptComponentName(defaultName) {
     }
 
     function onInput(/** @type {Event} */ e) {
-      value = /** @type {any} */ (e.target).value || "";
+      value = /** @type {HTMLInputElement} */ (e.target).value || "";
       const result = validateName(value);
       error = result.valid ? "" : result.error;
       rerender();
@@ -179,7 +181,7 @@ function promptComponentName(defaultName) {
 
     requestAnimationFrame(() => {
       const layer = document.getElementById("layer-dialog");
-      const tf = /** @type {any} */ (layer?.querySelector("sp-textfield"));
+      const tf = /** @type {HTMLElement | null} */ (layer?.querySelector("sp-textfield"));
       if (tf) {
         tf.focus();
         const input = tf.shadowRoot?.querySelector("input");

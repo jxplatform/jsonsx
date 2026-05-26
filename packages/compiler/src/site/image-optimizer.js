@@ -20,7 +20,7 @@ async function getSharp() {
     return _sharp;
   } catch (e) {
     throw new Error(
-      `Sharp is required for image optimization but failed to load: ${/** @type {any} */ (e).message}`,
+      `Sharp is required for image optimization but failed to load: ${/** @type {Error} */ (e).message}`,
     );
   }
 }
@@ -152,7 +152,7 @@ export async function processImage(srcPath, outDir, config) {
       const quality = config.quality[/** @type {keyof ImageConfig["quality"]} */ (format)] ?? 80;
       const task = sharp(srcPath)
         .resize(width)
-        .toFormat(/** @type {any} */ (format), { quality })
+        .toFormat(/** @type {keyof import("sharp").FormatEnum} */ (format), { quality })
         .toFile(absolutePath)
         .then(() => {});
 

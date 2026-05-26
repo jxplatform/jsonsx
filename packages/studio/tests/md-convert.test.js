@@ -419,7 +419,7 @@ describe("jxToMd bare text nodes", () => {
   test("bare number children become text nodes", () => {
     /** @type {any} */
     const result = jxToMd({
-      children: [{ tagName: "p", children: ["Score: ", 42] }],
+      children: [{ tagName: "p", children: /** @type {any} */ (["Score: ", 42]) }],
     });
     const p = result.children[0];
     expect(p.children[0]).toEqual({ type: "text", value: "Score: " });
@@ -429,7 +429,7 @@ describe("jxToMd bare text nodes", () => {
   test("null and undefined children are filtered out", () => {
     /** @type {any} */
     const result = jxToMd({
-      children: [{ tagName: "p", children: ["text", null, undefined] }],
+      children: [{ tagName: "p", children: /** @type {any} */ (["text", null, undefined]) }],
     });
     expect(result.children[0].children).toEqual([{ type: "text", value: "text" }]);
   });

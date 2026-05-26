@@ -12,11 +12,11 @@ import { resolveDefaultForCanvas } from "../panels/signals-panel.js";
  * Recursively render a Jx node to the canvas DOM. Media-aware: applies base styles + active
  * breakpoint/feature overrides.
  *
- * @param {any} node
- * @param {any} path
- * @param {any} parent
- * @param {any} activeBreakpoints
- * @param {any} featureToggles
+ * @param {JxMutableNode | string | number | boolean | null | undefined} node
+ * @param {JxPath} path
+ * @param {HTMLElement} parent
+ * @param {Set<string>} activeBreakpoints
+ * @param {Record<string, boolean>} featureToggles
  */
 export function renderCanvasNode(node, path, parent, activeBreakpoints, featureToggles) {
   if (typeof node === "string" || typeof node === "number" || typeof node === "boolean") {
@@ -32,15 +32,15 @@ export function renderCanvasNode(node, path, parent, activeBreakpoints, featureT
 
   if (typeof node.textContent === "string") {
     el.textContent = node.textContent;
-  } else if (typeof node.textContent === "object" && node.textContent?.$ref) {
-    const resolved = resolveDefaultForCanvas(
-      node.textContent,
-      activeTab.value?.doc.document?.state,
-    );
-    el.textContent = resolved;
-    el.style.opacity = "0.7";
-    el.style.fontStyle = "italic";
-    el.title = `Bound: ${node.textContent.$ref}`;
+  } else if (typeof node.textContent === "object" && node.textContent !== null) {
+    const tc = /** @type {Record<string, unknown>} */ (node.textContent);
+    if (tc.$ref) {
+      const resolved = resolveDefaultForCanvas(tc, activeTab.value?.doc.document?.state);
+      el.textContent = /** @type {string | null} */ (resolved);
+      el.style.opacity = "0.7";
+      el.style.fontStyle = "italic";
+      el.title = `Bound: ${tc.$ref}`;
+    }
   }
 
   if (node.id) el.id = node.id;
@@ -51,9 +51,13 @@ export function renderCanvasNode(node, path, parent, activeBreakpoints, featureT
   if (node.attributes && typeof node.attributes === "object") {
     for (const [attr, val] of Object.entries(node.attributes)) {
       try {
-        if (typeof val === "object" && val?.$ref) {
+        if (
+          typeof val === "object" &&
+          val !== null &&
+          /** @type {Record<string, unknown>} */ (val).$ref
+        ) {
           const resolved = resolveDefaultForCanvas(val, activeTab.value?.doc.document?.state);
-          el.setAttribute(attr, resolved);
+          el.setAttribute(attr, /** @type {string} */ (resolved));
         } else {
           el.setAttribute(attr, val);
         }
@@ -74,9 +78,10 @@ export function renderCanvasNode(node, path, parent, activeBreakpoints, featureT
   } else if (
     node.children &&
     typeof node.children === "object" &&
-    node.children.$prototype === "Array"
+    /** @type {Record<string, unknown>} */ (node.children).$prototype === "Array"
   ) {
-    const template = node.children.map;
+    const childrenObj = /** @type {Record<string, unknown>} */ (node.children);
+    const template = childrenObj.map;
     if (template && typeof template === "object") {
       const wrapper = document.createElement("div");
       wrapper.className = "repeater-perimeter";

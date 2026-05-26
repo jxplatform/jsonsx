@@ -6,7 +6,61 @@
  * store.js) makes renderer dependencies explicit.
  */
 
-/** @type {any} */
+/**
+ * @typedef {{
+ *   panzoomWrap: HTMLElement | null;
+ *   renderGeneration: number;
+ *   centerObserver: ResizeObserver | null;
+ *   needsCenter: boolean;
+ *   panX: number;
+ *   panY: number;
+ *   prevCanvasMode: string | null;
+ *   monacoEditor:
+ *     | (import("monaco-editor").editor.IStandaloneCodeEditor & { _ignoreNextChange?: boolean })
+ *     | null;
+ *   functionEditor:
+ *     | (import("monaco-editor").editor.IStandaloneCodeEditor & {
+ *         _ignoreNextChange?: boolean;
+ *         _editingTarget?: string | null;
+ *       })
+ *     | null;
+ *   componentInlineEdit: {
+ *     el: HTMLElement;
+ *     path: (string | number)[];
+ *     originalText: string;
+ *     mediaName: string | null;
+ *     _outsideHandler?: ((e: MouseEvent) => void) | null;
+ *     [k: string]: unknown;
+ *   } | null;
+ *   inlineEditCleanup: (() => void) | null;
+ *   blockActionBarEl: HTMLElement | null;
+ *   selDragCleanup: (() => void) | null;
+ *   dndCleanups: (() => void)[];
+ *   canvasDndCleanups: (() => void)[];
+ *   canvasEventCleanups: (() => void)[];
+ *   forcedStyleTag: HTMLStyleElement | null;
+ *   forcedAttrEl: HTMLElement | null;
+ *   elementsCollapsed: Set<string>;
+ *   elementsFilter: string;
+ *   lastDragInput: { clientX: number; clientY: number; [k: string]: unknown } | null;
+ *   _currentDropTargetRow: HTMLElement | null;
+ *   layerDragSourceHeight: number;
+ *   savedRange: Range | null;
+ *   _completionRegistered: boolean;
+ *   stylebookElToTag: WeakMap<Element, string>;
+ *   showAddBreakpointForm: boolean;
+ *   addBreakpointPreview: string;
+ *   layoutSelection: unknown;
+ *   leftTab: string;
+ *   leftPanelCollapsed: boolean;
+ *   rightPanelCollapsed: boolean;
+ *   autosaveTimer: ReturnType<typeof setTimeout> | null;
+ *   _layersCollapsed: Set<string> | null;
+ *   [key: string]: unknown;
+ * }} ViewState
+ */
+
+/** @type {ViewState} */
 export const view = {
   // Canvas infrastructure
   panzoomWrap: null,
@@ -70,6 +124,9 @@ export const view = {
 
   // Autosave
   autosaveTimer: null,
+
+  // Layers panel collapsed state
+  _layersCollapsed: null,
 };
 
 const COLLAPSE_STORAGE_KEY = "jx-studio-panel-widths";

@@ -55,7 +55,7 @@ export {
  * (lit-html) 3. Otherwise → pre-rendered HTML with reactive bindings
  *
  * @param {string | any} sourcePath - Path to .json file, URL, or raw object
- * @param {any} [opts]
+ * @param {Record<string, unknown>} [opts]
  * @returns {Promise<{
  *   html: string;
  *   files: { path: string; content: string; tagName?: string }[];
@@ -67,7 +67,7 @@ export async function compile(sourcePath, opts = {}) {
     reactivitySrc = DEFAULT_REACTIVITY_SRC,
     litHtmlSrc = DEFAULT_LIT_HTML_SRC,
     projectStyle = null,
-  } = opts;
+  } = /** @type {JxMutableNode} */ (opts);
 
   let raw;
   if (typeof sourcePath === "string") {

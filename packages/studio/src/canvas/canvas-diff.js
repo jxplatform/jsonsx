@@ -6,7 +6,7 @@
  */
 
 /**
- * @typedef {Record<string, any>} JxNode
+ * @typedef {JxMutableNode} JxNode
  *
  * @typedef {"added" | "removed" | "modified"} DiffStatus
  *
@@ -16,8 +16,8 @@
 /**
  * Deep equality check for two values. Ignores function and ref properties.
  *
- * @param {any} a
- * @param {any} b
+ * @param {unknown} a
+ * @param {unknown} b
  * @returns {boolean}
  */
 function valuesEqual(a, b) {
@@ -26,38 +26,46 @@ function valuesEqual(a, b) {
   if (Array.isArray(a) !== Array.isArray(b)) return false;
 
   if (Array.isArray(a)) {
-    if (a.length !== b.length) return false;
-    return a.every((/** @type {any} */ v, /** @type {number} */ i) => valuesEqual(v, b[i]));
+    const bArr = /** @type {unknown[]} */ (b);
+    if (a.length !== bArr.length) return false;
+    return a.every((/** @type {unknown} */ v, /** @type {number} */ i) => valuesEqual(v, bArr[i]));
   }
 
-  const keysA = Object.keys(a).filter(
+  const aObj = /** @type {Record<string, unknown>} */ (a);
+  const bObj = /** @type {Record<string, unknown>} */ (b);
+
+  const keysA = Object.keys(aObj).filter(
     (/** @type {string} */ k) => !k.startsWith("on") && k !== "$ref",
   );
-  const keysB = Object.keys(b).filter(
+  const keysB = Object.keys(bObj).filter(
     (/** @type {string} */ k) => !k.startsWith("on") && k !== "$ref",
   );
 
   if (keysA.length !== keysB.length) return false;
   if (!keysA.every((/** @type {string} */ k) => keysB.includes(k))) return false;
 
-  return keysA.every((/** @type {string} */ k) => valuesEqual(a[k], b[k]));
+  return keysA.every((/** @type {string} */ k) => valuesEqual(aObj[k], bObj[k]));
 }
 
 /**
  * Filter element children from a node's children array.
  *
- * @param {any} node
- * @returns {any[]}
+ * @param {JxMutableNode | undefined} node
+ * @returns {JxMutableNode[]}
  */
 function elementChildren(node) {
   if (!node?.children || !Array.isArray(node.children)) return [];
-  return node.children.filter((/** @type {any} */ c) => c != null && typeof c === "object");
+  return /** @type {JxMutableNode[]} */ (
+    node.children.filter(
+      (/** @type {JxMutableNode | string} */ c) => c != null && typeof c === "object",
+    )
+  );
 }
 
 /**
  * Mark an entire subtree with a diff status.
  *
- * @param {any} node
+ * @param {JxMutableNode} node
  * @param {DiffStatus} status
  * @param {string} path
  * @param {Map<string, DiffStatus>} diffMap
@@ -76,8 +84,8 @@ function markRecursive(node, status, path, diffMap, allPaths) {
 /**
  * Compute structural diff between original and current documents.
  *
- * @param {any} originalDoc - Original document (from git)
- * @param {any} currentDoc - Current document (in memory/on disk)
+ * @param {JxMutableNode | undefined} originalDoc - Original document (from git)
+ * @param {JxMutableNode | undefined} currentDoc - Current document (in memory/on disk)
  * @returns {DiffResult}
  */
 export function computeDocumentDiff(originalDoc, currentDoc) {
@@ -89,8 +97,8 @@ export function computeDocumentDiff(originalDoc, currentDoc) {
   /**
    * Walk both trees in parallel and mark differences.
    *
-   * @param {any} origNode
-   * @param {any} currNode
+   * @param {JxMutableNode | undefined} origNode
+   * @param {JxMutableNode | undefined} currNode
    * @param {string} path
    */
   const walk = (origNode, currNode, path = "") => {

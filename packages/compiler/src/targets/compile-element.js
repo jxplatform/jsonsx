@@ -12,22 +12,22 @@ import { escapeHtml, tagNameToClassName, isSchemaOnly, collectStyles } from "../
  * Compile a Jx custom element document to a JS module string.
  *
  * @param {string | any} sourcePath - Path to .json file or raw object
- * @param {any} [opts]
+ * @param {Record<string, unknown>} [opts]
  * @returns {Promise<{ files: { path: string; content: string; tagName: string }[] }>}
  */
 export async function compileElement(sourcePath, opts = {}) {
-  const { resolveElementPath } = opts;
+  const { resolveElementPath } = /** @type {JxMutableNode} */ (opts);
   /** @type {{ path: string; content: string; tagName: string }[]} */
   const files = [];
   /** @type {Set<string>} */
   const visited = new Set();
 
   /**
-   * @param {any} srcPath
+   * @param {string | any} srcPath
    * @param {string | null} parentDir
    */
   async function processElement(srcPath, parentDir) {
-    /** @type {any} */
+    /** @type {JxMutableNode} */
     let doc;
     /** @type {string | null} */
     let filePath;
@@ -46,8 +46,8 @@ export async function compileElement(sourcePath, opts = {}) {
     } else {
       doc = srcPath;
       filePath = null;
-      if (visited.has(doc.tagName)) return;
-      visited.add(doc.tagName);
+      if (visited.has(/** @type {string} */ (doc.tagName))) return;
+      visited.add(/** @type {string} */ (doc.tagName));
     }
 
     const tagName = doc.tagName;
@@ -63,7 +63,7 @@ export async function compileElement(sourcePath, opts = {}) {
     const elementImports = [];
     if (Array.isArray(doc.$elements)) {
       for (const elRef of doc.$elements) {
-        const refPath = elRef.$ref ?? elRef;
+        const refPath = /** @type {JxMutableNode} */ (elRef).$ref ?? elRef;
         if (typeof refPath !== "string") continue;
 
         if (currentDir) {
@@ -87,7 +87,7 @@ export async function compileElement(sourcePath, opts = {}) {
     files.push({ path: outputPath, content: jsContent, tagName });
   }
 
-  await processElement(sourcePath, opts.basePath ?? null);
+  await processElement(sourcePath, /** @type {string | null} */ (opts.basePath ?? null));
   return { files };
 }
 
@@ -96,7 +96,7 @@ export async function compileElement(sourcePath, opts = {}) {
  * dependencies.
  *
  * @param {string | any} sourcePath
- * @param {any} [opts]
+ * @param {Record<string, unknown>} [opts]
  * @returns {Promise<{
  *   html: string;
  *   files: { path: string; content: string; tagName: string }[];
@@ -107,7 +107,7 @@ export async function compileElementPage(sourcePath, opts = {}) {
     title = "Jx App",
     reactivitySrc = "https://esm.sh/@vue/reactivity@3.5.13",
     litHtmlSrc = "https://esm.sh/lit-html@3.3.0",
-  } = opts;
+  } = /** @type {JxMutableNode} */ (opts);
 
   const result = await compileElement(sourcePath, opts);
   const root = result.files[result.files.length - 1];
@@ -146,7 +146,7 @@ export async function compileElementPage(sourcePath, opts = {}) {
  * like { type, default, description } now correctly extract the `default` value instead of dumping
  * the whole object.
  *
- * @param {any} def
+ * @param {JxMutableNode} def
  * @returns {string | undefined}
  */
 function extractInitialValue(def) {
@@ -175,7 +175,7 @@ function extractInitialValue(def) {
 /**
  * Generate a complete ES module string for a custom element.
  *
- * @param {any} doc
+ * @param {JxMutableNode | Record<string, any>} doc
  * @param {string} className
  * @param {string[]} elementImports
  * @returns {string}
@@ -196,7 +196,7 @@ export function emitElementModule(doc, className, elementImports) {
   const srcImportMap = new Map();
   const defs = doc.state ?? {};
   for (const [key, def] of Object.entries(defs)) {
-    const d = /** @type {any} */ (def);
+    const d = /** @type {JxMutableNode} */ (def);
     if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function" && d.$src) {
       const srcPath = d.$src;
       if (!srcImportMap.has(srcPath)) srcImportMap.set(srcPath, []);
@@ -226,7 +226,7 @@ export function emitElementModule(doc, className, elementImports) {
   const functionEntries = [];
 
   for (const [key, def] of Object.entries(defs)) {
-    const d = /** @type {any} */ (def);
+    const d = /** @type {JxMutableNode} */ (def);
     if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function") {
       if (typeof d.body === "string" && d.body.includes("return")) {
         computedEntries.push([key, d]);
@@ -391,25 +391,27 @@ export function emitElementModule(doc, className, elementImports) {
 /**
  * Convert Jx children to lit-html template content.
  *
- * @param {any} children
- * @param {any} parentStyle
+ * @param {(JxMutableNode | string)[] | JxMutableNode | undefined} children
+ * @param {JxStyle | Record<string, any> | null | undefined} parentStyle
  * @param {string} indent
  * @returns {string}
  */
 function emitLitChildren(children, parentStyle, indent) {
   if (!children) return "";
 
-  if (children.$prototype === "Array") {
-    return emitMappedArray(children, indent);
+  if (/** @type {JxMutableNode} */ (children).$prototype === "Array") {
+    return emitMappedArray(/** @type {JxMutableNode} */ (children), indent);
   }
 
   if (!Array.isArray(children)) return "";
 
-  return children.map((/** @type {any} */ child) => emitLitNode(child, indent)).join("\n");
+  return children
+    .map((/** @type {JxMutableNode | string} */ child) => emitLitNode(child, indent))
+    .join("\n");
 }
 
 /**
- * @param {any} def
+ * @param {JxMutableNode | string} def
  * @param {string} indent
  * @returns {string}
  */
@@ -458,8 +460,10 @@ function emitLitNode(def, indent) {
     )
       continue;
 
-    if (val && typeof val === "object" && /** @type {any} */ (val).$ref) {
-      parts.push(`.${key}="\${${refToExpr(/** @type {any} */ (val).$ref)}}"`);
+    if (val && typeof val === "object" && /** @type {JxMutableNode} */ (val).$ref) {
+      parts.push(
+        `.${key}="\${${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}}"`,
+      );
     } else if (typeof val === "string" && val.includes("${")) {
       parts.push(`.${key}="${toLitExpr(val)}"`);
     }
@@ -467,8 +471,10 @@ function emitLitNode(def, indent) {
 
   if (def.$props) {
     for (const [key, val] of Object.entries(def.$props)) {
-      if (val && typeof val === "object" && /** @type {any} */ (val).$ref) {
-        parts.push(`.${key}="\${${refToExpr(/** @type {any} */ (val).$ref)}}"`);
+      if (val && typeof val === "object" && /** @type {JxMutableNode} */ (val).$ref) {
+        parts.push(
+          `.${key}="\${${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}}"`,
+        );
       } else {
         parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
       }
@@ -478,14 +484,18 @@ function emitLitNode(def, indent) {
   for (const [key, val] of Object.entries(def)) {
     if (!key.startsWith("on") || key === "observedAttributes") continue;
     const eventName = key.slice(2).toLowerCase();
-    if (val && typeof val === "object" && /** @type {any} */ (val).$ref) {
-      parts.push(`@${eventName}="\${(e) => ${refToExpr(/** @type {any} */ (val).$ref)}(s, e)}"`);
+    if (val && typeof val === "object" && /** @type {JxMutableNode} */ (val).$ref) {
+      parts.push(
+        `@${eventName}="\${(e) => ${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}(s, e)}"`,
+      );
     } else if (
       val &&
       typeof val === "object" &&
-      /** @type {any} */ (val).$prototype === "Function"
+      /** @type {JxMutableNode} */ (val).$prototype === "Function"
     ) {
-      parts.push(`@${eventName}="\${(e) => { ${inlineHandlerBody(/** @type {any} */ (val))} }}"`);
+      parts.push(
+        `@${eventName}="\${(e) => { ${inlineHandlerBody(/** @type {JxMutableNode} */ (val))} }}"`,
+      );
     }
   }
 
@@ -512,7 +522,7 @@ function emitLitNode(def, indent) {
 }
 
 /**
- * @param {any} arrayDef
+ * @param {JxMutableNode} arrayDef
  * @param {string} indent
  * @returns {string}
  */
@@ -528,8 +538,10 @@ function emitMappedArray(arrayDef, indent) {
 
   if (mapDef.$props) {
     for (const [key, val] of Object.entries(mapDef.$props)) {
-      if (val && typeof val === "object" && /** @type {any} */ (val).$ref) {
-        parts.push(`.${key}="\${${mapRefToExpr(/** @type {any} */ (val).$ref)}}"`);
+      if (val && typeof val === "object" && /** @type {JxMutableNode} */ (val).$ref) {
+        parts.push(
+          `.${key}="\${${mapRefToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}}"`,
+        );
       } else {
         parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
       }
@@ -542,8 +554,10 @@ function emitMappedArray(arrayDef, indent) {
   for (const [key, val] of Object.entries(mapDef)) {
     if (!key.startsWith("on")) continue;
     const eventName = key.slice(2).toLowerCase();
-    if (val && typeof val === "object" && /** @type {any} */ (val).$ref) {
-      parts.push(`@${eventName}="\${(e) => ${refToExpr(/** @type {any} */ (val).$ref)}(s, e)}"`);
+    if (val && typeof val === "object" && /** @type {JxMutableNode} */ (val).$ref) {
+      parts.push(
+        `@${eventName}="\${(e) => ${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}(s, e)}"`,
+      );
     }
   }
 
@@ -602,13 +616,17 @@ function toLitExpr(str) {
  * Convert textContent value to lit-html text content. Bug fix: handles $ref objects, which
  * previously produced [object Object].
  *
- * @param {any} value
+ * @param {unknown} value
  * @returns {string}
  */
 function toLitTextContent(value) {
   // Handle $ref objects → emit as lit expression
-  if (value !== null && typeof value === "object" && typeof value.$ref === "string") {
-    return `\${${refToExpr(value.$ref)}}`;
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (/** @type {JxMutableNode} */ (value).$ref) === "string"
+  ) {
+    return `\${${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (value).$ref))}}`;
   }
   if (typeof value === "string" && value.includes("${")) {
     return toLitExpr(value);
@@ -617,7 +635,7 @@ function toLitTextContent(value) {
 }
 
 /**
- * @param {any} def
+ * @param {JxMutableNode} def
  * @returns {string}
  */
 function inlineHandlerBody(def) {
@@ -626,7 +644,7 @@ function inlineHandlerBody(def) {
 }
 
 /**
- * @param {any} styleDef
+ * @param {JxStyle | Record<string, any> | null | undefined} styleDef
  * @returns {string}
  */
 function emitStyleString(styleDef) {
@@ -658,7 +676,7 @@ function emitStyleString(styleDef) {
 /**
  * Check if a children tree contains a `<slot>` element.
  *
- * @param {any} children
+ * @param {(JxMutableNode | string)[] | undefined} children
  * @returns {boolean}
  */
 function treeHasSlot(children) {

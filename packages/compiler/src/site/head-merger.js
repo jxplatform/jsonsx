@@ -17,14 +17,15 @@
 /**
  * Merge $head arrays from site, layout, and page levels.
  *
- * @param {any[]} [siteHead] - Site.json $head entries
- * @param {any[]} [layoutHead] - Layout $head entries (may be empty)
- * @param {any[]} [pageHead] - Page $head entries (may be empty)
- * @param {any} [context] - { title, lang, charset, url, pageUrl }
- * @returns {any[]} Merged, deduplicated $head array
+ * @param {JxHeadEntry[]} [siteHead] - Site.json $head entries
+ * @param {JxHeadEntry[]} [layoutHead] - Layout $head entries (may be empty)
+ * @param {JxHeadEntry[]} [pageHead] - Page $head entries (may be empty)
+ * @param {HeadMergeContext} [context] - { title, lang, charset, url, pageUrl }
+ * @returns {JxHeadEntry[]} Merged, deduplicated $head array
  */
 export function mergeHead(siteHead = [], layoutHead = [], pageHead = [], context = {}) {
   // Start with auto-injected defaults
+  /** @type {JxHeadEntry[]} */
   const defaults = [
     { tagName: "meta", attributes: { charset: context.charset ?? "utf-8" } },
     {
@@ -34,7 +35,7 @@ export function mergeHead(siteHead = [], layoutHead = [], pageHead = [], context
   ];
 
   // Merge layers: site → layout → page (later wins)
-  /** @type {Map<string, any>} */
+  /** @type {Map<string, JxHeadEntry>} */
   const merged = new Map();
 
   for (const entry of [...defaults, ...siteHead, ...layoutHead, ...pageHead]) {
@@ -62,7 +63,7 @@ export function mergeHead(siteHead = [], layoutHead = [], pageHead = [], context
  * Generate a deduplication key for a <head> element. Elements with the same key are considered
  * duplicates; the last one wins.
  *
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @returns {string}
  */
 function headEntryKey(entry) {
@@ -118,17 +119,17 @@ function simpleHash(str) {
 /**
  * Render a merged $head array to HTML string for insertion into <head>.
  *
- * @param {any[]} headEntries - Merged head entries
+ * @param {JxHeadEntry[]} headEntries - Merged head entries
  * @returns {string} HTML string
  */
 export function renderHead(headEntries) {
-  return headEntries.map((/** @type {any} */ e) => renderHeadEntry(e)).join("\n  ");
+  return headEntries.map((/** @type {JxHeadEntry} */ e) => renderHeadEntry(e)).join("\n  ");
 }
 
 /**
  * Render a single $head entry to an HTML string.
  *
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @returns {string}
  */
 function renderHeadEntry(entry) {
@@ -138,7 +139,7 @@ function renderHeadEntry(entry) {
   const tag = entry.tagName;
   const attrs = entry.attributes ?? {};
   const attrStr = Object.entries(attrs)
-    .map(([k, v]) => (v === true ? k : `${k}="${escapeAttr(/** @type {any} */ (v))}"`))
+    .map(([k, v]) => (v === true ? k : `${k}="${escapeAttr(v)}"`))
     .join(" ");
 
   const open = attrStr ? `<${tag} ${attrStr}>` : `<${tag}>`;
@@ -153,7 +154,7 @@ function renderHeadEntry(entry) {
 }
 
 /**
- * @param {any} val
+ * @param {unknown} val
  * @returns {string}
  */
 function escapeAttr(val) {

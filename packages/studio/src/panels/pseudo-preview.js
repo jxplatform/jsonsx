@@ -34,7 +34,7 @@ export function updateForcedPseudoPreview() {
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node?.style) return;
   const activeMedia = tab.session.ui.activeMedia;
-  /** @type {any} */
+  /** @type {JxStyle} */
   const ctx = activeMedia ? node.style[`@${activeMedia}`] || {} : node.style;
   const rules = ctx[sel];
   if (!rules || typeof rules !== "object") return;
@@ -43,7 +43,7 @@ export function updateForcedPseudoPreview() {
     .filter(([k]) => typeof rules[k] === "string" || typeof rules[k] === "number")
     .map(
       ([k, v]) =>
-        `${k.replace(/[A-Z]/g, (/** @type {any} */ c) => `-${c.toLowerCase()}`)}: ${v} !important`,
+        `${k.replace(/[A-Z]/g, (/** @type {string} */ c) => `-${c.toLowerCase()}`)}: ${v} !important`,
     )
     .join("; ");
   if (!cssProps) return;

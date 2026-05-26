@@ -18,15 +18,20 @@ import { emitElementModule } from "./compile-element.js";
 /**
  * Compile a static document to HTML, with dynamic subtrees as islands.
  *
- * @param {any} raw - Raw JSON document (with $ref pointers preserved)
- * @param {any} opts
+ * @param {JxMutableNode | Record<string, any>} raw - Raw JSON document (with $ref pointers
+ *   preserved)
+ * @param {Record<string, unknown>} opts
  * @returns {{ html: string; files: { path: string; content: string; tagName: string }[] }}
  */
 export function compileStaticPage(raw, opts) {
-  const { title, reactivitySrc, litHtmlSrc } = opts;
+  const { title, reactivitySrc, litHtmlSrc } = /** @type {JxMutableNode} */ (opts);
 
   const rootContext = createCompileContext(raw, null, raw.state ?? {}, raw.$media ?? {});
-  const styleBlock = compileStyles(raw, raw.$media ?? {}, opts.projectStyle ?? null);
+  const styleBlock = compileStyles(
+    raw,
+    raw.$media ?? {},
+    /** @type {JxStyle | null} */ (opts.projectStyle ?? null),
+  );
   /** @type {{ def: any; tagName: string; className: string }[]} */
   const islands = [];
   const bodyContent = compileNode(raw, false, raw, rootContext, islands);
@@ -83,9 +88,9 @@ export function compileStaticPage(raw, opts) {
  * Compile a single Jx node to an HTML string. Dynamic nodes become hydration islands; static nodes
  * become plain HTML.
  *
- * @param {any} def
+ * @param {JxMutableNode} def
  * @param {boolean} dynamic
- * @param {any} raw
+ * @param {JxMutableNode} raw
  * @param {any} context
  * @param {{ def: any; tagName: string; className: string }[]} islands
  * @returns {string}
@@ -127,8 +132,8 @@ function compileNode(def, dynamic, raw, context, islands) {
  * Build the inner HTML (textContent or children) for a node. For children, emit islands only for
  * those that are actually dynamic.
  *
- * @param {any} def
- * @param {any} raw
+ * @param {JxMutableNode} def
+ * @param {JxMutableNode} raw
  * @param {any} context
  * @param {{ def: any; tagName: string; className: string }[]} islands
  * @returns {string}
@@ -141,14 +146,20 @@ function buildInnerWithIslands(def, raw, context, islands) {
     return value == null ? "" : escapeHtml(String(value));
   }
   if (source.innerHTML)
-    return resolveStaticValue(source.innerHTML, context.scope) ?? source.innerHTML;
+    return (
+      /** @type {string} */ (resolveStaticValue(source.innerHTML, context.scope)) ??
+      source.innerHTML
+    );
   if (Array.isArray(source.children)) {
     const rawChildren = raw?.children;
     return source.children
-      .map((/** @type {any} */ c, /** @type {number} */ i) => {
-        const childDynamic = isNodeDynamic(c);
-        const childRaw = rawChildren?.[i] ?? c;
-        return compileNode(c, childDynamic, childRaw, context, islands);
+      .map((c, /** @type {number} */ i) => {
+        const child = /** @type {JxMutableNode} */ (/** @type {unknown} */ (c));
+        const childDynamic = isNodeDynamic(child);
+        const childRaw = /** @type {JxMutableNode} */ (
+          /** @type {unknown} */ (rawChildren?.[i] ?? c)
+        );
+        return compileNode(child, childDynamic, childRaw, context, islands);
       })
       .join("\n  ");
   }
