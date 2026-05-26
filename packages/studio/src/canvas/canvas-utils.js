@@ -208,6 +208,15 @@ export function fitToScreen() {
   applyTransform();
 }
 
+/** Reset zoom to 100% and re-center horizontally. */
+export function resetZoom() {
+  if (!view.panzoomWrap) return;
+  _ctx.setZoomDirect(1);
+  centerCanvas();
+  applyTransform();
+  renderZoomIndicator();
+}
+
 /** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
 export function resetZoomIndicator() {
   litRender(nothing, getLayerSlot("popover", "zoom-indicator"));
@@ -280,14 +289,21 @@ export function renderZoomIndicator() {
   litRender(
     html`
       <div class="zoom-indicator">
+        <span class="zoom-indicator-action" title="Reset to 100%" @click=${resetZoom}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <circle cx="8" cy="8" r="5.5" />
+            <path d="M8 5.5v5M5.5 8h5" />
+          </svg>
+        </span>
         <span class="zoom-indicator-label">${Math.round(zoom * 100)}%</span>
-        <sp-action-button
-          quiet
-          size="s"
-          class="zoom-fit-btn"
-          title="Fit to screen"
-          @click=${fitToScreen}
-        >
+        <span class="zoom-indicator-action" title="Fit to screen" @click=${fitToScreen}>
           <svg
             width="14"
             height="14"
@@ -299,7 +315,7 @@ export function renderZoomIndicator() {
             <rect x="2" y="2" width="12" height="12" rx="1" />
             <path d="M2 6h12M6 2v12" />
           </svg>
-        </sp-action-button>
+        </span>
       </div>
     `,
     host,

@@ -1,0 +1,387 @@
+{
+  "title": "Jx Studio — A visual IDE for the web.",
+  "$layout": "./layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Jx Studio is a visual IDE for designing, editing, and scripting websites. Design on a canvas. Save as plain JSON files. No lock-in."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/mode-card.json" },
+    { "$ref": "../components/check-item.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 4rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Jx Studio" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2.25rem, 5vw, 3.75rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.5rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "A visual IDE for the people who build websites."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.0625rem, 2vw, 1.25rem)",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto 2.5rem",
+                "maxWidth": "640px"
+              },
+              "textContent": "Design components on a canvas. Edit content inline. Write event handlers. Everything saves to plain JSON files — the same files your compiler reads, your git tracks, and your team reviews."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "aspectRatio": "16/9",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "color": "var(--color-text-muted)",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.8125rem",
+                "maxWidth": "900px",
+                "margin": "0 auto"
+              },
+              "textContent": "[ Jx Studio Interface ]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Four Modes" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "The right surface for every part of the build."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "maxWidth": "560px",
+                    "margin": "0 auto",
+                    "fontSize": "1.0625rem"
+                  },
+                  "textContent": "Switch between modes as the work changes — from file management to content authoring to visual design to scripting."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fit, minmax(260px, 1fr))",
+                "gap": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.number": "Mode 01",
+                    "props.name": "Manage",
+                    "props.description": "Project explorer, content collections, and file operations. Create pages, organize assets, manage your content — the CMS layer without the CMS."
+                  }
+                },
+                {
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.number": "Mode 02",
+                    "props.name": "Edit",
+                    "props.description": "Click any text, type. Slash commands for blocks. Frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as Markdown."
+                  }
+                },
+                {
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.number": "Mode 03",
+                    "props.name": "Design",
+                    "props.description": "Visual canvas with live rendering. Edit CSS properties, responsive breakpoints, hover states, and design tokens. Everything you'd do in DevTools — but persistent."
+                  }
+                },
+                {
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.number": "Mode 04",
+                    "props.name": "Script",
+                    "props.description": "Monaco-powered code editor for event handlers, computed state, and API integrations. When a client asks for 'one little interactive thing' — you stop saying no."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Philosophy" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "The visual builder that doesn't own your files."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Most visual builders create a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON files you'd write by hand. Close the app — your files are still there, still readable, still yours."
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Opens any Jx project from disk — no import step"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Saves standard JSON — readable by any tool" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Works offline — no cloud dependency" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Git-friendly output — clean diffs, no binary blobs"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "Workflow"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.8125rem",
+                        "lineHeight": "2",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "textContent": "1. Design in Studio\n2. git commit -m \"update hero\"\n3. git push → CI builds\n4. Live on CDN in <30 seconds"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "No servers required"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.9375rem",
+                        "lineHeight": "1.6",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "textContent": "No database. No PHP runtime. No origin server. Static HTML on a global CDN — fast everywhere, costs pennies, online forever."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.03em",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "Try it now."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "margin": "0 0 2rem",
+                "fontSize": "1.0625rem",
+                "lineHeight": "1.7"
+              },
+              "textContent": "Clone the repo, open a project, and start designing. No accounts, no subscriptions, no vendor approval."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "justifyContent": "center",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/docs/getting-started",
+                    "props.label": "Get Started",
+                    "props.variant": "primary"
+                  }
+                },
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/features",
+                    "props.label": "See All Features",
+                    "props.variant": "secondary"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

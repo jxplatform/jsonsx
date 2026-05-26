@@ -153,6 +153,30 @@ export function createDevServerPlatform() {
       }
     },
 
+    // ─── Project creation ─────────────────────────────────────────────────
+
+    /**
+     * @param {{
+     *   name: string;
+     *   description?: string;
+     *   url?: string;
+     *   adapter?: string;
+     *   directory: string;
+     * }} opts
+     */
+    async createProject(opts) {
+      const res = await fetch("/__studio/create-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create project");
+      }
+      return await res.json();
+    },
+
     // ─── File operations ──────────────────────────────────────────────────
 
     /** @param {string} dir */

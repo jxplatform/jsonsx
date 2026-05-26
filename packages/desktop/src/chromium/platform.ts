@@ -187,5 +187,15 @@ export function createDesktopPlatform(): StudioPlatform {
     async listPackages() {
       return request("listPackages") as Promise<PackageInfo[]>;
     },
+
+    async createProject(opts: {
+      name: string;
+      description?: string;
+      url?: string;
+      adapter?: string;
+      directory: string;
+    }) {
+      return request("createProject", opts) as Promise<{ root: string; config: ProjectConfig }>;
+    },
   };
 }

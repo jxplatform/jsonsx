@@ -26,6 +26,9 @@ import {
 import { componentRegistry, computeRelativePath } from "../files/components.js";
 import { prepareForEditMode } from "../utils/edit-display.js";
 import { getActiveElement } from "../editor/inline-edit.js";
+import { buildNestedSiteCSS } from "./nested-site-style.js";
+
+export { buildNestedSiteCSS } from "./nested-site-style.js";
 
 /** @type {{ getCanvasMode: () => string } | null} */
 let _ctx = null;
@@ -294,6 +297,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       viewport.style.cssText = "";
       if (siteStyle && typeof siteStyle === "object") {
         for (const [k, v] of Object.entries(siteStyle)) {
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
           if (k.startsWith("--")) {
             viewport.style.setProperty(k, String(v));
           } else {
@@ -306,6 +310,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     if (editSurface) {
       if (siteStyle && typeof siteStyle === "object") {
         for (const [k, v] of Object.entries(siteStyle)) {
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
           if (k.startsWith("--")) {
             editSurface.style.setProperty(k, String(v));
           } else {
@@ -317,10 +322,27 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     }
     if (siteStyle && typeof siteStyle === "object") {
       for (const [k, v] of Object.entries(siteStyle)) {
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
         if (!k.startsWith("--")) {
           /** @type {Record<string, string>} */ (/** @type {unknown} */ (canvasEl.style))[k] =
             String(v);
         }
+      }
+    }
+
+    // Generate a <style> tag for nested selector rules (e.g. table, thead, etc.)
+    if (siteStyle && typeof siteStyle === "object") {
+      const scopeAttr = `data-jx-site`;
+      canvasEl.setAttribute(scopeAttr, "");
+      const css = buildNestedSiteCSS(siteStyle, `[${scopeAttr}]`);
+
+      if (css) {
+        const existingStyleEl = document.getElementById("jx-site-style");
+        if (existingStyleEl) existingStyleEl.remove();
+        const styleEl = document.createElement("style");
+        styleEl.id = "jx-site-style";
+        styleEl.textContent = css;
+        document.head.appendChild(styleEl);
       }
     }
 

@@ -15,7 +15,7 @@ import {
   undo as tabUndo,
   redo as tabRedo,
 } from "../tabs/transact.js";
-import { isEditing } from "./inline-edit.js";
+import { isEditing, stopEditing } from "./inline-edit.js";
 import { copyNode, cutNode, pasteNode } from "./context-menu.js";
 import { openQuickSearch } from "../panels/quick-search.js";
 
@@ -132,6 +132,7 @@ export function initShortcuts(getContext) {
     if (isEditing()) {
       if (mod && e.key === "s") {
         e.preventDefault();
+        stopEditing();
         saveFile();
       }
       if (mod && e.key === "w") {
@@ -142,6 +143,7 @@ export function initShortcuts(getContext) {
     if (componentInlineEdit) {
       if (mod && e.key === "s") {
         e.preventDefault();
+        stopEditing();
         saveFile();
       }
       if (mod && e.key === "w") {

@@ -307,6 +307,16 @@ export function createDesktopPlatform() {
       return rpc.request.listPackages();
     },
 
+    async createProject(opts: {
+      name: string;
+      description?: string;
+      url?: string;
+      adapter?: string;
+      directory: string;
+    }) {
+      return rpc.request.createProject(opts) as Promise<{ root: string; config: ProjectConfig }>;
+    },
+
     updater: {
       getLocalInfo: () => rpc.request.updaterGetLocalInfo(),
       checkForUpdate: () => rpc.request.updaterCheckForUpdate(),
