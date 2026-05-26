@@ -35,20 +35,20 @@ function visit(tree, typeOrVisitor, maybeVisitor) {
   const type = typeof typeOrVisitor === "string" ? typeOrVisitor : null;
   const visitor = type ? maybeVisitor : typeOrVisitor;
 
-  function walk(/** @type {any} */ node) {
+  function walk(/** @type {MdastNode} */ node) {
     if (!node || typeof node !== "object") return;
     if (!type || node.type === type) /** @type {Function} */ (visitor)(node);
     if (Array.isArray(node.children)) {
       for (const child of node.children) walk(child);
     }
   }
-  walk(tree);
+  walk(/** @type {MdastNode} */ (tree));
 }
 
 /**
  * Serialize an mdast tree to plain text.
  *
- * @param {any} node
+ * @param {MdastNode} node
  * @returns {string}
  */
 function mdastToString(node) {
@@ -135,17 +135,21 @@ function processMarkdown(source, filePath, config = {}) {
 
   const tree = processor.parse(source);
   const vfile = { data: {} };
-  processor.runSync(tree, /** @type {any} */ (vfile));
+  // @ts-ignore - vfile shape satisfies unified's internal contract
+  processor.runSync(tree, vfile);
 
   const vfileData = /** @type {Record<string, unknown>} */ (vfile.data);
   const frontmatter = /** @type {Record<string, unknown>} */ (vfileData.frontmatter ?? {});
-  const plainText = mdastToString(tree);
+  const mdTree = /** @type {MdastNode} */ (/** @type {unknown} */ (tree));
+  const plainText = mdastToString(mdTree);
   const toc = extractToc(tree);
   const excerpt = extractExcerpt(tree);
   const slug = basename(filePath, extname(filePath));
 
   const bodyNodes = /** @type {MdastNode[]} */ (
-    tree.children.filter((/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml")
+    tree.children.filter(
+      (/** @type {{ type: string }} */ n) => n.type !== "yaml" && n.type !== "toml",
+    )
   );
   const $children = /** @type {(JxElement | string)[]} */ (
     bodyNodes.map(/** @type {(n: MdastNode) => any} */ (mdastNodeToJx)).filter(Boolean)
@@ -273,8 +277,8 @@ export class MarkdownCollection {
 
     // Sort
     filtered.sort((a, b) => {
-      const aVal = /** @type {any} */ (getNestedValue(a, sortBy) ?? "");
-      const bVal = /** @type {any} */ (getNestedValue(b, sortBy) ?? "");
+      const aVal = /** @type {string | number} */ (getNestedValue(a, sortBy) ?? "");
+      const bVal = /** @type {string | number} */ (getNestedValue(b, sortBy) ?? "");
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;

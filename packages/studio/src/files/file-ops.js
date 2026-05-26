@@ -193,14 +193,14 @@ export function serializeDocument(tab) {
   if (tab.doc.sourceFormat === "md") {
     const fm = tab.doc.content?.frontmatter || {};
     const fullDoc = { ...fm, children: tab.doc.document.children ?? [] };
-    return jxDocToMd(/** @type {any} */ (fullDoc));
+    return jxDocToMd(/** @type {JxMutableNode} */ (fullDoc));
   }
   if (tab.doc.mode === "content") {
-    const mdast = jxToMd(/** @type {any} */ (tab.doc.document));
+    const mdast = jxToMd(/** @type {JxElement} */ (tab.doc.document));
     const md = unified()
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(/** @type {any} */ (mdast));
+      .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
     const fm = tab.doc.content?.frontmatter;
     const hasFrontmatter = fm && Object.keys(fm).length > 0;
     return hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;

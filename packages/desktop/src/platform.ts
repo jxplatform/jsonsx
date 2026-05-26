@@ -162,19 +162,19 @@ export function createDesktopPlatform() {
     async probeRootProject() {
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
-        const config = JSON.parse(content as string);
+        const config = JSON.parse(content as string) as ProjectConfig;
         return {
           meta: { root: ".", name: config.name || "project" },
           info: {
-            isSiteProject: true,
+            isSiteProject: true as const,
             projectConfig: config,
-            directories: [],
+            directories: [] as string[],
           },
         };
       } catch {
         return {
           meta: { root: ".", name: "project" },
-          info: { isSiteProject: false, projectConfig: null, directories: [] },
+          info: { isSiteProject: false as const, projectConfig: null, directories: [] as string[] },
         };
       }
     },
@@ -285,6 +285,14 @@ export function createDesktopPlatform() {
 
     async gitDiscard(files: string[]) {
       return rpc.request.gitDiscard({ files });
+    },
+
+    async gitShow(opts: { path: string; ref?: string }) {
+      return rpc.request.gitShow(opts);
+    },
+
+    async searchFiles(query: string) {
+      return rpc.request.searchFiles({ query });
     },
 
     async addPackage(name: string) {

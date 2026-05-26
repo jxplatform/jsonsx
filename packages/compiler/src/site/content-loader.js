@@ -94,20 +94,26 @@ function parseCSV(csv) {
 
 // ─── Markdown loader ──────────────────────────────────────────────────────────
 
-/** @type {any} */
+/**
+ * @type {{
+ *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
+ * } | null}
+ */
 let _mdModule = null;
 
 /**
  * Lazily import @jxsuite/parser for Markdown support. This avoids hard dependency — only loads when
  * MD content types exist.
  *
- * @returns {Promise< any >}
+ * @returns {Promise<{
+ *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
+ * }>}
  */
 async function getMarkdownModule() {
   if (!_mdModule) {
-    _mdModule = await import("@jxsuite/parser");
+    _mdModule = /** @type {any} */ (await import("@jxsuite/parser"));
   }
-  return _mdModule;
+  return /** @type {NonNullable<typeof _mdModule>} */ (_mdModule);
 }
 
 /**
@@ -146,17 +152,19 @@ async function loadMarkdownEntry(filePath, directiveOptions) {
 function loadJSONEntries(filePath) {
   const raw = JSON.parse(readFileSync(filePath, "utf-8"));
   if (Array.isArray(raw)) {
-    return raw.map((/** @type {any} */ item, /** @type {number} */ i) => ({
-      id: item.id ?? basename(filePath, ".json") + "-" + i,
+    return raw.map((/** @type {Record<string, unknown>} */ item, /** @type {number} */ i) => ({
+      id: /** @type {string} */ (item.id) ?? basename(filePath, ".json") + "-" + i,
       data: item,
       body: null,
     }));
   }
   // Single object file — filename is the id
+  /** @type {Record<string, unknown>} */
+  const rawObj = raw;
   return [
     {
-      id: raw.id ?? basename(filePath, ".json"),
-      data: raw,
+      id: /** @type {string} */ (rawObj.id) ?? basename(filePath, ".json"),
+      data: rawObj,
       body: null,
     },
   ];
@@ -185,7 +193,9 @@ function loadCSVEntries(filePath, schema) {
       }
     }
     // Use `id` column, `sku` column, or row index as the entry ID
-    const id = /** @type {string} */ data.id ?? (data.sku) ?? String(i);
+    const id = /** @type {string | undefined} */ (data.id) ??
+    /** @type {string | undefined} */ (data.sku) ??
+    String(i);
     return { id, data, body: null };
   });
 }
@@ -269,9 +279,11 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
     ? {
         allowedNames: contentTypeDef.$elements
           .filter(
-            (e) => typeof e === "string" || (typeof e === "object" && /** @type {any} */ (e)?.$ref),
+            (e) =>
+              typeof e === "string" ||
+              (typeof e === "object" && /** @type {JxMutableNode} */ (e)?.$ref),
           )
-          .map((e) => (typeof e === "string" ? e : /** @type {any} */ (e).$ref)),
+          .map((e) => (typeof e === "string" ? e : /** @type {JxMutableNode} */ (e).$ref)),
       }
     : undefined;
 
@@ -387,8 +399,8 @@ export function queryContentType(entries, query = {}) {
   if (query.sort) {
     const { field, order = "asc" } = query.sort;
     result.sort((a, b) => {
-      const aVal = /** @type {any} */ (a.data[field] ?? "");
-      const bVal = /** @type {any} */ (b.data[field] ?? "");
+      const aVal = /** @type {string | number} */ (a.data[field] ?? "");
+      const bVal = /** @type {string | number} */ (b.data[field] ?? "");
       if (aVal < bVal) return order === "asc" ? -1 : 1;
       if (aVal > bVal) return order === "asc" ? 1 : -1;
       return 0;

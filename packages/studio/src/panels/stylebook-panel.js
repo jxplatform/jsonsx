@@ -237,7 +237,7 @@ export function renderStylebookMode(ctx) {
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(/** @type {any} */ (panel));
+    canvasPanels.push(/** @type {import("./canvas-dnd.js").CanvasPanel} */ (panel));
     renderIntoPanel(panel, activeSet);
   }
   if (hasMedia) {

@@ -40,25 +40,10 @@ export const statusbarEl = /** @type {HTMLElement} */ (document.querySelector("#
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────
 
-/** WeakMap<HTMLElement, Array> — maps rendered DOM elements to their JSON paths */
+/** @type {WeakMap<Element, JxPath>} */
 export const elToPath = new WeakMap();
 
-/**
- * Canvas panels: Array<{ mediaName, canvas, overlay, overlayClk, viewport, dropLine, element,
- * _width }>
- *
- * @type {{
- *   mediaName: string | null;
- *   canvas: HTMLElement;
- *   overlay: HTMLElement;
- *   overlayClk: HTMLElement;
- *   viewport: HTMLElement | null;
- *   scrollContainer?: HTMLElement | null;
- *   dropLine: HTMLElement | null;
- *   element?: HTMLElement | null;
- *   _width?: number | null;
- * }[]}
- */
+/** @type {import("./panels/canvas-dnd.js").CanvasPanel[]} */
 export const canvasPanels = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────
@@ -228,8 +213,9 @@ export function updateSession(patch) {
      *   canvas?: Record<string, unknown>;
      * }}
      */ (patch);
-    if (p.selection !== undefined) tab.session.selection = /** @type {any} */ (p.selection);
-    if (p.hover !== undefined) tab.session.hover = /** @type {any} */ (p.hover);
+    if (p.selection !== undefined)
+      tab.session.selection = /** @type {JxPath | null} */ (p.selection);
+    if (p.hover !== undefined) tab.session.hover = /** @type {JxPath | null} */ (p.hover);
     if (p.clipboard !== undefined) tab.session.clipboard = p.clipboard;
     if (p.ui) {
       for (const [k, v] of Object.entries(p.ui)) {

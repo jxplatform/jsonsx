@@ -596,7 +596,11 @@ export function transpileJxMarkdown(source) {
   }
 
   const bodyNodes = /** @type {MdastNode[]} */ (
-    tree.children.filter((/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml")
+    /** @type {unknown} */ (
+      tree.children.filter(
+        (/** @type {{ type: string }} */ n) => n.type !== "yaml" && n.type !== "toml",
+      )
+    )
   );
 
   /** @type {(JxElement | string)[]} */

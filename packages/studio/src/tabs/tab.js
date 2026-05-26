@@ -7,7 +7,7 @@ import { reactive, effectScope } from "../reactivity.js";
  *   zoom: number;
  *   activeMedia: string | null;
  *   activeSelector: string | null;
- *   editingFunction: object | null;
+ *   editingFunction: FunctionEditDef | null;
  *   featureToggles: Record<string, boolean>;
  *   styleSections: Record<string, boolean>;
  *   inspectorSections: Record<string, boolean>;
@@ -19,12 +19,13 @@ import { reactive, effectScope } from "../reactivity.js";
  *   stylebookFilter: string;
  *   stylebookCustomizedOnly: boolean;
  *   settingsTab: string;
- *   gitStatus: object | null;
- *   gitBranches: object | null;
+ *   gitStatus: GitStatusResult | null;
+ *   gitBranches: GitBranchesResult | null;
  *   gitCommitMessage: string;
  *   gitLoading: boolean;
  *   gitError: string | null;
- *   pendingInlineEdit: object | null;
+ *   gitDiffState: GitDiffState | null;
+ *   pendingInlineEdit: InlineEditDef | null;
  * }} TabUi
  */
 
@@ -53,13 +54,13 @@ import { reactive, effectScope } from "../reactivity.js";
  *     selection: (string | number)[] | null;
  *     hover: (string | number)[] | null;
  *     clipboard: JxMutableNode | null;
- *     documentStack: object[];
+ *     documentStack: DocumentStackEntry[];
  *     ui: TabUi;
  *     canvas: {
  *       status: string;
  *       scope: { stop(): void; [k: string]: unknown } | null;
  *       error: string | null;
- *       pendingInlineEdit: object | null;
+ *       pendingInlineEdit: InlineEditDef | null;
  *     };
  *   };
  *   history: {
@@ -94,6 +95,7 @@ function createDefaultUi() {
     gitCommitMessage: "",
     gitLoading: false,
     gitError: null,
+    gitDiffState: null,
     pendingInlineEdit: null,
   };
 }

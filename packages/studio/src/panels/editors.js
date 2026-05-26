@@ -3,6 +3,8 @@
  * completion provider for state scope variables.
  */
 
+/** @typedef {import("../services/code-services.js").OxLintDiagnostic} OxLintDiagnostic */
+
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
@@ -99,7 +101,10 @@ export function renderFunctionEditor(closeFunctionEditor) {
   );
 
   const body = getFunctionBody(editing);
-  const args = getFunctionArgs(/** @type {any} */ (editing), activeTab.value?.doc.document);
+  const args = getFunctionArgs(
+    /** @type {EditingTarget} */ (editing),
+    activeTab.value?.doc.document,
+  );
 
   view.functionEditor = monaco.editor.create(
     /** @type {HTMLElement} */ (/** @type {unknown} */ (editorContainer)),
@@ -129,7 +134,7 @@ export function renderFunctionEditor(closeFunctionEditor) {
   });
   codeService("lint", { code: body, args }).then((result) => {
     if (result?.diagnostics && view.functionEditor)
-      setLintMarkers(view.functionEditor, result.diagnostics);
+      setLintMarkers(view.functionEditor, /** @type {OxLintDiagnostic[]} */ (result.diagnostics));
   });
 
   // Debounced sync back to state + lint on edit
@@ -174,7 +179,10 @@ export function renderFunctionEditor(closeFunctionEditor) {
       codeService("lint", { code: currentCode, args }).then((result) => {
         if (gen !== lintGen) return;
         if (result?.diagnostics && view.functionEditor)
-          setLintMarkers(view.functionEditor, result.diagnostics);
+          setLintMarkers(
+            view.functionEditor,
+            /** @type {OxLintDiagnostic[]} */ (result.diagnostics),
+          );
       });
     }, 750);
   });

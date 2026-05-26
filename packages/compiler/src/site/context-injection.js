@@ -123,11 +123,7 @@ export function injectContext(
  */
 function resolveContentPrototypes(state, contentTypes, params) {
   for (const [key, value] of Object.entries(state)) {
-    if (
-      !value ||
-      typeof value !== "object" ||
-      !(/** @type {Record<string, unknown>} */ (value).$prototype)
-    )
+    if (!value || typeof value !== "object" || !(/** @type {JxMutableNode} */ (value).$prototype))
       continue;
     const v = /** @type {JxPrototypeDef} */ (value);
 

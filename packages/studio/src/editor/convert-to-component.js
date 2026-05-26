@@ -48,7 +48,8 @@ export async function convertToComponent() {
     // Ensure $elements exists and add the $ref
     if (!doc.$elements) doc.$elements = [];
     const alreadyReferenced = doc.$elements.some(
-      (/** @type {any} */ el) => el && el.$ref === refPath,
+      (/** @type {JxMutableNode | string | { $ref: string }} */ el) =>
+        el && typeof el === "object" && "$ref" in el && el.$ref === refPath,
     );
     if (!alreadyReferenced) {
       doc.$elements.push({ $ref: refPath });

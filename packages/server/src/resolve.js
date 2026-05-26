@@ -202,10 +202,13 @@ function classFromSchema(classDef) {
     if (method.role === "accessor") {
       /** @type {PropertyDescriptor} */
       const descriptor = {};
-      if (method.getter) descriptor.get = /** @type {any} */ (new Function(method.getter.body));
+      if (method.getter)
+        descriptor.get = /** @type {() => unknown} */ (new Function(method.getter.body));
       if (method.setter) {
         const sp = (method.setter.parameters ?? []).map((p) => p.$ref?.split("/").pop() ?? "v");
-        descriptor.set = /** @type {any} */ (new Function(...sp, method.setter.body));
+        descriptor.set = /** @type {(v: unknown) => void} */ (
+          new Function(...sp, method.setter.body)
+        );
       }
       Object.defineProperty(DynClass.prototype, name, { ...descriptor, configurable: true });
     } else if (method.scope === "static") {

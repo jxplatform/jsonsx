@@ -332,8 +332,8 @@ export function renderCanvas() {
       canvasWrap,
     );
 
-    canvasPanels.push(/** @type {any} */ (origPanel));
-    canvasPanels.push(/** @type {any} */ (currPanel));
+    canvasPanels.push(/** @type {CanvasPanel} */ (origPanel));
+    canvasPanels.push(/** @type {CanvasPanel} */ (currPanel));
 
     /** @param {string} content */
     const parseContent = (content) => {
@@ -355,14 +355,14 @@ export function renderCanvas() {
       parseContent(gitDiffState.currentContent || ""),
     ]).then(([originalDoc, currentDoc]) => {
       renderCanvasIntoPanel(
-        /** @type {any} */ (origPanel),
+        /** @type {CanvasPanel} */ (origPanel),
         new Set(),
         featureToggles,
         originalDoc,
         gitDiffState,
       );
       renderCanvasIntoPanel(
-        /** @type {any} */ (currPanel),
+        /** @type {CanvasPanel} */ (currPanel),
         new Set(),
         featureToggles,
         currentDoc,
@@ -399,8 +399,8 @@ export function renderCanvas() {
       </div>
     `;
     litRender(editTpl, canvasWrap);
-    canvasPanels.push(/** @type {any} */ (panel));
-    renderCanvasIntoPanel(/** @type {any} */ (panel), new Set(), S.ui.featureToggles);
+    canvasPanels.push(/** @type {CanvasPanel} */ (panel));
+    renderCanvasIntoPanel(/** @type {CanvasPanel} */ (panel), new Set(), S.ui.featureToggles);
     return;
   }
 
@@ -444,8 +444,8 @@ export function renderCanvas() {
       `,
       canvasWrap,
     );
-    canvasPanels.push(/** @type {any} */ (panel));
-    renderCanvasIntoPanel(/** @type {any} */ (panel), new Set(), featureToggles);
+    canvasPanels.push(/** @type {CanvasPanel} */ (panel));
+    renderCanvasIntoPanel(/** @type {CanvasPanel} */ (panel), new Set(), featureToggles);
     applyTransform();
     if (modeChanged) {
       observeCenterUntilStable();
@@ -496,7 +496,7 @@ export function renderCanvas() {
 
   for (const { panel, activeSet } of panelEntries) {
     const p = /** @type {CanvasPanel} */ (panel);
-    canvasPanels.push(/** @type {any} */ (p));
+    canvasPanels.push(p);
     renderCanvasIntoPanel(p, activeSet, featureToggles);
   }
 
@@ -569,23 +569,22 @@ function renderCanvasIntoPanel(
         renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       }
       try {
-        registerPanelDnD(/** @type {any} */ (panel));
+        registerPanelDnD(/** @type {CanvasPanel} */ (panel));
       } catch (/** @type {unknown} */ e) {
         console.warn("registerPanelDnD failed:", /** @type {Error} */ (e).message);
       }
-      registerPanelEvents(/** @type {any} */ (panel));
+      registerPanelEvents(/** @type {CanvasPanel} */ (panel));
       renderOverlays();
       updateForcedPseudoPreview();
 
       // Process pending inline edit when canvas becomes ready
       const currentTab = activeTab.value;
       if (currentTab?.session.ui?.pendingInlineEdit) {
-        const { path, mediaName: mn } = /** @type {{ path: JxPath; mediaName: string }} */ (
+        const { path, mediaName: mn } = /** @type {InlineEditDef} */ (
           currentTab.session.ui.pendingInlineEdit
         );
         currentTab.session.ui.pendingInlineEdit = null;
-        const targetPanel =
-          canvasPanels.find((/** @type {any} */ p) => p.mediaName === mn) || canvasPanels[0];
+        const targetPanel = canvasPanels.find((p) => p.mediaName === mn) || canvasPanels[0];
         if (targetPanel) {
           const el = findCanvasElement(path, targetPanel.canvas);
           if (el) enterComponentInlineEdit(el, path);
@@ -599,11 +598,11 @@ function renderCanvasIntoPanel(
       canvas.innerHTML = "";
       renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       try {
-        registerPanelDnD(/** @type {any} */ (panel));
+        registerPanelDnD(/** @type {CanvasPanel} */ (panel));
       } catch (/** @type {unknown} */ e) {
         console.warn("registerPanelDnD failed:", /** @type {Error} */ (e).message);
       }
-      registerPanelEvents(/** @type {any} */ (panel));
+      registerPanelEvents(/** @type {CanvasPanel} */ (panel));
       renderOverlays();
       updateForcedPseudoPreview();
     });

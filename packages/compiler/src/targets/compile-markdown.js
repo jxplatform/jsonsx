@@ -200,7 +200,8 @@ function nodeToMdast(node, componentDefs, scope) {
       // pre > code → fenced code block
       const codeChild = Array.isArray(node.children)
         ? node.children.find(
-            (/** @type {JxElement | string} */ c) => /** @type {any} */ (c)?.tagName === "code",
+            (/** @type {JxElement | string} */ c) =>
+              /** @type {JxMutableNode} */ (c)?.tagName === "code",
           )
         : null;
       const value = /** @type {JxElement | undefined} */ (codeChild)?.textContent ?? text ?? "";
@@ -342,7 +343,10 @@ function inlineComponent(node, tag, componentDefs) {
   const instanceChildren = node.children;
   return resolved.flatMap((/** @type {JxElement | string} */ child) => {
     // Replace slot elements with instance children
-    if (/** @type {any} */ (child)?.tagName === "slot" && Array.isArray(instanceChildren)) {
+    if (
+      /** @type {JxMutableNode} */ (child)?.tagName === "slot" &&
+      Array.isArray(instanceChildren)
+    ) {
       return instanceChildren.flatMap((/** @type {JxElement | string} */ c) =>
         nodeToMdast(c, componentDefs),
       );
@@ -412,17 +416,17 @@ function resolveNode(node, scope) {
  * @returns {MdastNode[]}
  */
 function expandArray(arrayDef, componentDefs, scope) {
-  const itemsRef = /** @type {any} */ (arrayDef).items?.$ref;
+  const itemsRef = /** @type {JxMutableNode} */ (arrayDef).items?.$ref;
   if (!itemsRef || !scope) return [];
 
   // Resolve the items array from scope
   const items = resolveRef(itemsRef, scope);
   if (!Array.isArray(items)) return [];
 
-  const mapTemplate = /** @type {any} */ (arrayDef).map;
+  const mapTemplate = /** @type {JxMutableNode} */ (arrayDef).map;
   if (!mapTemplate) return [];
 
-  return items.flatMap((/** @type {any} */ item, /** @type {number} */ index) => {
+  return items.flatMap((/** @type {JxMutableNode} */ item, /** @type {number} */ index) => {
     // Create a scope with $map values
     const mapScope = Object.create(scope);
     mapScope.item = item;
@@ -437,8 +441,8 @@ function expandArray(arrayDef, componentDefs, scope) {
 /**
  * Resolve $map/ references in a map template node.
  *
- * @param {any} node
- * @param {any} item
+ * @param {JxMutableNode} node
+ * @param {Record<string, unknown>} item
  * @returns {any}
  */
 function resolveMapNode(node, item) {
@@ -449,8 +453,8 @@ function resolveMapNode(node, item) {
 
   // Resolve $ref values
   for (const [key, value] of Object.entries(result)) {
-    if (value && typeof value === "object" && /** @type {Record<string, unknown>} */ (value).$ref) {
-      const ref = /** @type {string} */ (/** @type {Record<string, unknown>} */ (value).$ref);
+    if (value && typeof value === "object" && /** @type {JxMutableNode} */ (value).$ref) {
+      const ref = /** @type {string} */ (/** @type {JxMutableNode} */ (value).$ref);
       if (ref.startsWith("$map/")) {
         const path = ref.slice("$map/".length);
         result[key] = resolvePath(
@@ -470,7 +474,9 @@ function resolveMapNode(node, item) {
   }
 
   if (Array.isArray(result.children)) {
-    result.children = result.children.map((/** @type {any} */ c) => resolveMapNode(c, item));
+    result.children = result.children.map((c) =>
+      resolveMapNode(/** @type {JxMutableNode} */ (/** @type {unknown} */ (c)), item),
+    );
   }
 
   return result;
@@ -481,11 +487,11 @@ function resolveMapNode(node, item) {
  *
  * @param {unknown} obj
  * @param {string} path
- * @returns {unknown}
+ * @returns {any}
  */
 function resolvePath(obj, path) {
   const parts = path.split(/[/.]/);
-  let current = /** @type {any} */ (obj);
+  let current = /** @type {JxMutableNode} */ (obj);
   for (const part of parts) {
     if (current == null) return undefined;
     current = current[part];
@@ -941,7 +947,9 @@ export function compileMarkdown(doc, componentDefs = new Map()) {
   }
   flushInline();
 
-  const mdast = /** @type {any} */ ({ type: "root", children: cleaned });
+  const mdast = /** @type {import("mdast").Root} */ (
+    /** @type {unknown} */ ({ type: "root", children: cleaned })
+  );
 
   const md = unified()
     .use(remarkGfm)

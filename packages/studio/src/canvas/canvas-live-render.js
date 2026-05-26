@@ -175,7 +175,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       if (
         node.children &&
         typeof node.children === "object" &&
-        /** @type {any} */ (node.children).$prototype === "Array"
+        /** @type {{ $prototype?: string }} */ (node.children).$prototype === "Array"
       ) {
         mapParentPaths.add(path.join("/"));
       }
@@ -200,7 +200,9 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     const docBase = S.documentPath ? `${location.origin}/${docPrefix}${S.documentPath}` : undefined;
 
     // Register custom elements so the runtime can render them
-    let effectiveElements = getEffectiveElements(/** @type {any} */ (renderDoc.$elements));
+    let effectiveElements = getEffectiveElements(
+      /** @type {(JxElement | string)[]} */ (renderDoc.$elements),
+    );
 
     // In content mode (markdown), auto-discover components for directive-based
     // custom elements that have no explicit $elements registration.
@@ -239,7 +241,9 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     }
 
     if (effectiveElements.length) {
-      renderDoc.$elements = /** @type {any} */ (effectiveElements);
+      renderDoc.$elements = /** @type {(JxMutableNode | string | { $ref: string })[]} */ (
+        /** @type {unknown} */ (effectiveElements)
+      );
       for (const entry of effectiveElements) {
         if (typeof entry === "string") {
           try {
@@ -356,10 +360,11 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     const el = /** @type {HTMLElement} */ (
       runtimeRenderNode(renderDoc, $defs, {
         onNodeCreated(
-          /** @type {HTMLElement} */ el,
+          /** @type {HTMLElement | Text} */ el,
           /** @type {(string | number)[]} */ path,
-          /** @type {JxMutableNode | undefined} */ def,
+          /** @type {Record<string, unknown>} */ def,
         ) {
+          if (!(el instanceof HTMLElement)) return;
           // Track layout-originated elements — don't store in elToPath to avoid
           // path collisions with remapped page content paths
           if (layoutWrapped && def?.$__layout) {

@@ -8,8 +8,7 @@
 /**
  * Compile a .class.json schema to a JavaScript ES module string.
  *
- * @param {Record<string, unknown>} classDef - Parsed .class.json content (must have $prototype:
- *   "Class")
+ * @param {JxMutableNode} classDef - Parsed .class.json content (must have $prototype: "Class")
  * @param {Record<string, unknown>} [_opts]
  * @returns {string} JavaScript module source code
  */
@@ -19,9 +18,9 @@ export function compileClassJson(classDef, _opts = {}) {
 
   const baseClass = resolveBaseClass(classDef.extends);
   const defs = /** @type {Record<string, unknown> | undefined} */ (classDef.$defs);
-  const fields = /** @type {Record<string, unknown>} */ (defs?.fields ?? {});
-  const ctor = /** @type {any} */ (defs?.constructor);
-  const methods = /** @type {Record<string, unknown>} */ (defs?.methods ?? {});
+  const fields = /** @type {Record<string, JxMutableNode>} */ (defs?.fields ?? {});
+  const ctor = /** @type {JxMutableNode | undefined} */ (defs?.constructor);
+  const methods = /** @type {Record<string, JxMutableNode>} */ (defs?.methods ?? {});
 
   /** @type {string[]} */
   const lines = [];
@@ -35,7 +34,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Static fields
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope !== "static") continue;
     const name = f.identifier ?? key;
     const prefix = f.access === "private" ? "#" : "";
@@ -50,7 +49,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Instance field declarations (private)
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope === "static") continue;
     if (f.access !== "private") continue;
     const name = f.identifier ?? key;
@@ -68,7 +67,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Initialize instance fields from config or defaults
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope === "static") continue;
     const name = f.identifier ?? key;
     const prefix = f.access === "private" ? "#" : "";
@@ -94,13 +93,17 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Methods
   for (const [key, method] of Object.entries(methods)) {
-    const m = /** @type {any} */ (method);
+    const m = /** @type {JxMutableNode} */ (method);
     const name = m.identifier ?? key;
     const isStatic = m.scope === "static";
     const isPrivate = m.access === "private";
     const prefix = isPrivate ? "#" : "";
     const staticPrefix = isStatic ? "static " : "";
-    const asyncPrefix = m.returnType?.$ref?.includes("Promise") || isMethodAsync(m) ? "async " : "";
+    const asyncPrefix =
+      m.returnType?.$ref?.includes("Promise") ||
+      isMethodAsync(/** @type {{ body?: string | string[] }} */ (/** @type {unknown} */ (m)))
+        ? "async "
+        : "";
 
     const params = resolveParams(m.parameters ?? []);
     const bodyStr = resolveBody(m.body);
@@ -148,7 +151,7 @@ export function compileClassJson(classDef, _opts = {}) {
 function resolveBaseClass(ext) {
   if (!ext) return "Object";
   if (typeof ext === "string") return ext;
-  const e = /** @type {any} */ (ext);
+  const e = /** @type {JxMutableNode} */ (ext);
   if (e.$ref) {
     const ref = e.$ref;
     const match = ref.match(/([A-Za-z0-9_]+)\.class\.json/);
@@ -165,9 +168,10 @@ function resolveBaseClass(ext) {
  */
 function resolveParams(params) {
   return params
-    .map((/** @type {any} */ p) => {
-      if (p.$ref) return p.$ref.split("/").pop();
-      return p.identifier ?? p.name ?? "arg";
+    .map((p) => {
+      const param = /** @type {JxMutableNode} */ (p);
+      if (param.$ref) return param.$ref.split("/").pop();
+      return param.identifier ?? param.name ?? "arg";
     })
     .join(", ");
 }

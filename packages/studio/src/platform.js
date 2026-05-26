@@ -11,8 +11,6 @@
  * See spec/desktop.md §3 for the full StudioPlatform interface.
  */
 
-/** @typedef {any} StudioPlatform */
-
 /** @type {{ __jxPlatform?: StudioPlatform }} */
 const g = /** @type {{ __jxPlatform?: StudioPlatform }} */ (/** @type {unknown} */ (globalThis));
 

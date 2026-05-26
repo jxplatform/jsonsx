@@ -16,11 +16,15 @@ import { effectiveZoom } from "../canvas/canvas-helpers.js";
 
 /**
  * @typedef {{
+ *   mediaName: string | null;
+ *   element: HTMLElement | null;
  *   canvas: HTMLElement;
- *   overlayClk: HTMLElement;
  *   overlay: HTMLElement;
+ *   overlayClk: HTMLElement;
  *   viewport: HTMLElement;
+ *   scrollContainer: HTMLElement | null;
  *   dropLine: HTMLElement;
+ *   _width: number | null;
  * }} CanvasPanel
  *
  * @typedef {(string | number)[]} JxPath

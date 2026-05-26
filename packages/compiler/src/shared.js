@@ -75,7 +75,7 @@ export function isTemplateString(val) {
 /**
  * Determine whether a node (or any of its descendants) requires client-side JavaScript.
  *
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function isDynamic(def) {
@@ -117,7 +117,7 @@ export function isDynamic(def) {
     if (
       val !== null &&
       typeof val === "object" &&
-      typeof (/** @type {Record<string, unknown>} */ (val).$ref) === "string"
+      typeof (/** @type {JxMutableNode} */ (val).$ref) === "string"
     )
       return true;
     if (isTemplateString(val)) return true;
@@ -141,7 +141,7 @@ export function isDynamic(def) {
 /**
  * Shallow variant of isDynamic — checks only this node's own properties, not its children.
  *
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function isNodeDynamic(def) {
@@ -159,7 +159,7 @@ export function isNodeDynamic(def) {
     if (
       val !== null &&
       typeof val === "object" &&
-      typeof (/** @type {Record<string, unknown>} */ (val).$ref) === "string"
+      typeof (/** @type {JxMutableNode} */ (val).$ref) === "string"
     )
       return true;
     if (isTemplateString(val)) return true;
@@ -183,7 +183,7 @@ export function isNodeDynamic(def) {
 /**
  * Returns true if any node in the tree will need dynamic handling.
  *
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function hasAnyIsland(def) {
@@ -196,7 +196,7 @@ export function hasAnyIsland(def) {
 // ─── Scope / value resolution ─────────────────────────────────────────────────
 
 /**
- * @param {JxElement | null} raw
+ * @param {JxElement | JxMutableNode | null} raw
  * @param {Record<string, unknown> | null} [parentScope]
  * @param {Record<string, unknown>} [scopeDefs]
  * @param {Record<string, string>} [media]
@@ -297,8 +297,7 @@ export function defineLazyScopeValue(scope, key, getter) {
  * @returns {unknown}
  */
 export function resolveStaticValue(value, scope) {
-  if (isRefObject(value))
-    return resolveRefValue(/** @type {Record<string, unknown>} */ (value).$ref, scope);
+  if (isRefObject(value)) return resolveRefValue(/** @type {JxMutableNode} */ (value).$ref, scope);
   if (isTemplateString(value)) return evaluateStaticTemplate(/** @type {string} */ (value), scope);
   return value;
 }
@@ -311,7 +310,7 @@ export function isRefObject(value) {
   return (
     value !== null &&
     typeof value === "object" &&
-    typeof (/** @type {Record<string, unknown>} */ (value).$ref) === "string"
+    typeof (/** @type {JxMutableNode} */ (value).$ref) === "string"
   );
 }
 
@@ -348,10 +347,10 @@ export function evaluateStaticTemplate(str, scope) {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
       const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`);
-      return fn(scope, /** @type {any} */ (scope)?.$map);
+      return fn(scope, scope?.$map);
     }
     const fn = new Function("state", "$map", `return \`${str}\``);
-    return fn(scope, /** @type {any} */ (scope)?.$map);
+    return fn(scope, scope?.$map);
   } catch {
     return null;
   }
@@ -364,12 +363,15 @@ export function evaluateStaticTemplate(str, scope) {
  */
 export function getPathValue(base, path) {
   if (!path) return base;
-  return path
-    .split("/")
-    .reduce(
-      (/** @type {any} */ acc, /** @type {string} */ key) => (acc == null ? undefined : acc[key]),
-      base,
-    );
+  return path.split("/").reduce(
+    /**
+     * @param {Record<string, unknown>} acc
+     * @param {string} key
+     * @returns {Record<string, unknown>}
+     */
+    (acc, key) => (/** @type {Record<string, unknown>} */ (acc == null ? undefined : acc[key])),
+    /** @type {Record<string, unknown>} */ (base),
+  );
 }
 
 /**
@@ -386,9 +388,8 @@ export function cloneValue(value) {
 /**
  * Build an HTML attribute string from a static element definition.
  *
- * @param {JxElement} def
- * @param {Record<string, unknown>} scope
- * @returns {string}
+ * @param {JxElement | JxMutableNode} def
+ * @param {Record<string, unknown>} scope @returns {string}
  */
 export function buildAttrs(def, scope) {
   let out = "";
@@ -469,7 +470,7 @@ export function buildAttrs(def, scope) {
  *   scopeDefs: Record<string, unknown>;
  *   media: Record<string, string>;
  * }} context
- * @param {(def: JxElement | string, raw: JxElement | string | null, context: any) => string} childCompiler
+ * @param {(def: any, raw: any, context: any) => string} childCompiler
  * @returns {string}
  */
 export function buildInner(def, raw, context, childCompiler) {
@@ -484,8 +485,8 @@ export function buildInner(def, raw, context, childCompiler) {
   if (Array.isArray(source.children)) {
     const rawChildren = raw?.children;
     return source.children
-      .map((/** @type {JxElement | string} */ c, /** @type {number} */ i) => {
-        const childRaw = /** @type {any} */ (rawChildren)?.[i] ?? c;
+      .map((/** @type {JxElement | JxMutableNode | string} */ c, /** @type {number} */ i) => {
+        const childRaw = /** @type {(JxElement | string)[] | undefined} */ (rawChildren)?.[i] ?? c;
         return childCompiler(c, childRaw, context);
       })
       .join("\n  ");
@@ -498,7 +499,7 @@ export function buildInner(def, raw, context, childCompiler) {
 /**
  * Walk the entire document tree and collect all static nested CSS rules.
  *
- * @param {JxElement} doc
+ * @param {JxElement | JxMutableNode} doc
  * @param {Record<string, string>} [mediaQueries]
  * @param {JxStyle | null} [projectStyle]
  * @returns {string}
@@ -511,10 +512,7 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
   // everything else on body.  Project-level style is implicitly :root, so a
   // flat object like { "--bg": "#000", "margin": "0" } is the expected format.
   if (projectStyle && typeof projectStyle === "object") {
-    function emitProjectRules(
-      /** @type {string} */ selector,
-      /** @type {Record<string, unknown>} */ obj,
-    ) {
+    function emitProjectRules(/** @type {string} */ selector, /** @type {JxMutableNode} */ obj) {
       const props = toCSSText(obj);
       if (props) rules.push(`${selector} { ${props} }`);
       for (const [key, val] of Object.entries(obj)) {
@@ -549,7 +547,7 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
 
     for (const [key, val] of Object.entries(projectStyle)) {
       if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
-        emitProjectRules(key, /** @type {any} */ (val));
+        emitProjectRules(key, /** @type {Record<string, unknown>} */ (val));
       } else if (
         val !== null &&
         typeof val === "object" &&
@@ -640,7 +638,7 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
 }
 
 /**
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @param {string[]} rules
  * @param {Record<string, string>} mediaQueries
  * @param {string} [_parentSel]
@@ -724,7 +722,7 @@ export function collectStyles(
   }
 
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {JxElement | string} */ c) => {
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) => {
       collectStyles(c, rules, mediaQueries, selector, counter, prefix);
     });
   }
@@ -786,7 +784,7 @@ export function collectSrcImports(doc) {
 }
 
 /**
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @param {Set<string>} srcs
  */
 function _walkSrc(def, srcs) {
@@ -796,15 +794,17 @@ function _walkSrc(def, srcs) {
       if (
         d &&
         typeof d === "object" &&
-        /** @type {any} */ (d).$prototype === "Function" &&
-        /** @type {any} */ (d).$src
+        /** @type {JxMutableNode} */ (d).$prototype === "Function" &&
+        /** @type {JxMutableNode} */ (d).$src
       ) {
-        srcs.add(/** @type {string} */ (/** @type {any} */ (d).$src));
+        srcs.add(/** @type {string} */ (/** @type {JxMutableNode} */ (d).$src));
       }
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {JxElement | string} */ c) => _walkSrc(c, srcs));
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      _walkSrc(c, srcs),
+    );
   }
 }
 
@@ -822,14 +822,14 @@ export function collectServerEntries(doc) {
 }
 
 /**
- * @param {JxElement | string} def
+ * @param {JxElement | JxMutableNode | string} def
  * @param {Map<string, { key: string; exportName: string; src: string }>} entries
  */
 function _walkServerEntries(def, entries) {
   if (!def || typeof def !== "object") return;
   if (def.state) {
     for (const [key, d] of Object.entries(def.state)) {
-      const entry = /** @type {any} */ (d);
+      const entry = /** @type {JxMutableNode} */ (d);
       if (
         entry &&
         typeof entry === "object" &&
@@ -843,7 +843,9 @@ function _walkServerEntries(def, entries) {
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {JxElement | string} */ c) => _walkServerEntries(c, entries));
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      _walkServerEntries(c, entries),
+    );
   }
 }
 
@@ -855,7 +857,7 @@ const SELF_CLOSING = new Set(["input", "br", "hr", "img", "meta", "link", "area"
 /**
  * Recursively render a Jx node tree to static HTML for pre-rendering.
  *
- * @param {JxElement | string} node
+ * @param {JxElement | JxMutableNode | string} node
  * @param {Record<string, unknown>} scope
  * @param {string | null} [slotContent] - HTML to substitute for `<slot>` elements
  * @returns {string}
@@ -871,7 +873,9 @@ export function renderStaticNode(node, scope, slotContent = null) {
   if (typeof node === "number" || typeof node === "boolean") return escapeHtml(String(node));
   if (Array.isArray(node))
     return node
-      .map((/** @type {JxElement | string} */ c) => renderStaticNode(c, scope, slotContent))
+      .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+        renderStaticNode(c, scope, slotContent),
+      )
       .join("\n");
   if (!node || typeof node !== "object") return "";
 
@@ -896,7 +900,9 @@ export function renderStaticNode(node, scope, slotContent = null) {
     inner = val != null ? String(val) : /** @type {string} */ (node.innerHTML);
   } else if (Array.isArray(node.children)) {
     inner = node.children
-      .map((/** @type {JxElement | string} */ c) => renderStaticNode(c, scope, slotContent))
+      .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+        renderStaticNode(c, scope, slotContent),
+      )
       .join("\n");
   }
 
@@ -938,7 +944,9 @@ export function preRenderComponentHtml(doc, propsOverride = null, slotContent = 
   const scope = buildInitialScope(stateDefs, null);
   if (!Array.isArray(doc.children)) return "";
   return doc.children
-    .map((/** @type {JxElement | string} */ c) => renderStaticNode(c, scope, slotContent))
+    .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      renderStaticNode(c, scope, slotContent),
+    )
     .join("\n");
 }
 
@@ -972,7 +980,7 @@ function _isStaticNode(node) {
   if (node.state) {
     for (const def of Object.values(node.state)) {
       if (!def || typeof def !== "object") continue;
-      const d = /** @type {any} */ (def);
+      const d = /** @type {JxMutableNode} */ (def);
       if (d.$prototype) return false;
       if (d.$ref) return false;
     }

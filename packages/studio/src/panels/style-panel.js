@@ -113,7 +113,7 @@ function renderStyleRow(
  * @param {Record<string, unknown>} style
  * @param {(t: Tab, prop: string, val: string | Record<string, unknown> | undefined) => void} mutateFn
  * @param {() => void} _deleteFn
- * @param {Record<string, string>} inherited
+ * @param {Record<string, string | number>} inherited
  */
 function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inherited = {}) {
   const tab = activeTab.value;
@@ -449,7 +449,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
     ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && mediaTab && mediaNames.length > 0) {
     activeStyle = /** @type {Record<string, unknown>} */ (
-      /** @type {Record<string, unknown>} */ ((style[`@${mediaTab}`]) || {})[activeSelector]
+      /** @type {Record<string, unknown>} */ (style[`@${mediaTab}`] || {})[activeSelector]
     ) || {};
     commitMutate = (
       /** @type {Tab} */ t,
@@ -519,7 +519,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
   }
 
   // ── Compute inherited style from higher breakpoints ──────────────────────
-  /** @type {any} */
+  /** @type {Record<string, string | number>} */
   const inheritedStyle = computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
 
   // Auto-open sections that have properties
@@ -596,7 +596,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
       for (const { prop, entry } of entries) {
         const val = activeStyle[prop];
         const hasVal = val !== undefined;
-        const condMet = allConditionsPass(entry, /** @type {any} */ (activeStyle));
+        const condMet = allConditionsPass(entry, activeStyle);
         const type = inferInputType(entry);
         if (!hasVal && !condMet) continue;
 

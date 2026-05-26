@@ -28,8 +28,8 @@ import {
 /**
  * Compile a Jx document to pre-rendered HTML + reactive JS module.
  *
- * @param {any} raw
- * @param {any} opts
+ * @param {JxMutableNode | Record<string, any>} raw
+ * @param {Record<string, unknown>} opts
  * @returns {{ html: string; files: { path: string; content: string }[] }}
  */
 export function compileClient(raw, opts) {
@@ -38,10 +38,14 @@ export function compileClient(raw, opts) {
     reactivitySrc = DEFAULT_REACTIVITY_SRC,
     litHtmlSrc = DEFAULT_LIT_HTML_SRC,
     modulePath = "app.js",
-  } = opts;
+  } = /** @type {JxMutableNode} */ (opts);
 
   const context = createCompileContext(raw, null, raw.state ?? {}, raw.$media ?? {});
-  const styleBlock = compileStyles(raw, raw.$media ?? {}, opts.projectStyle ?? null);
+  const styleBlock = compileStyles(
+    raw,
+    raw.$media ?? {},
+    /** @type {JxStyle | null} */ (opts.projectStyle ?? null),
+  );
 
   // Collectors for bindings and handlers
   const counter = { t: 0, s: 0, h: 0, m: 0, sw: 0, l: 0, needsLit: false };
@@ -79,7 +83,7 @@ export function compileClient(raw, opts) {
       continue;
     }
 
-    const d = /** @type {any} */ (def);
+    const d = /** @type {JxMutableNode} */ (def);
 
     // $prototype: "Function"
     if (d.$prototype === "Function") {
@@ -197,12 +201,20 @@ ${importmapEntries.join(",\n")}
 // ─── HTML tree walker ─────────────────────────────────────────────────────────
 
 /**
- * @param {any} def
- * @param {any} raw
+ * @param {JxMutableNode} def
+ * @param {JxMutableNode} raw
  * @param {any} context
  * @param {Map<string, string>} bindings
  * @param {Map<string, any>} handlers
- * @param {any} counter
+ * @param {{
+ *   t: number;
+ *   s: number;
+ *   h: number;
+ *   m: number;
+ *   sw: number;
+ *   l: number;
+ *   needsLit: boolean;
+ * }} counter
  * @returns {string}
  */
 function buildClientNode(def, raw, context, bindings, handlers, counter) {
@@ -228,11 +240,13 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
 
   // textContent bindings
   if (def.textContent !== undefined) {
-    const tc = raw?.textContent ?? def.textContent;
+    const tc = /** @type {JxMutableNode} */ (
+      /** @type {unknown} */ (raw?.textContent ?? def.textContent)
+    );
     if (isRefObject(tc)) {
-      const key = refToBindingKey(tc.$ref);
+      const key = refToBindingKey(/** @type {string} */ (tc.$ref));
       bindAttrs.push(`:text-content="${key}"`);
-      addRefBinding(bindings, key, tc.$ref);
+      addRefBinding(bindings, key, /** @type {string} */ (tc.$ref));
       needsBind = true;
     } else if (isTemplateString(tc)) {
       const key = `_t${counter.t++}`;
@@ -247,15 +261,15 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
     if (!prop.startsWith("on") || prop === "observedAttributes") continue;
     const eventName = prop.slice(2).toLowerCase();
     if (isRefObject(val)) {
-      const key = refToBindingKey(/** @type {any} */ (val).$ref);
+      const key = refToBindingKey(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref));
       bindAttrs.push(`@${eventName}="${key}"`);
       needsBind = true;
     } else if (
       val &&
       typeof val === "object" &&
-      /** @type {any} */ (val).$prototype === "Function"
+      /** @type {JxMutableNode} */ (val).$prototype === "Function"
     ) {
-      const v = /** @type {any} */ (val);
+      const v = /** @type {JxMutableNode} */ (val);
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
       handlers.set(key, { args: v.parameters ?? v.arguments ?? ["state", "event"], body: v.body });
@@ -288,9 +302,15 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
   if (def.attributes && typeof def.attributes === "object") {
     for (const [attr, val] of Object.entries(def.attributes)) {
       if (isRefObject(val)) {
-        const key = refToBindingKey(/** @type {any} */ (val).$ref);
+        const key = refToBindingKey(
+          /** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref),
+        );
         bindAttrs.push(`:attr.${attr}="${key}"`);
-        addRefBinding(bindings, key, /** @type {any} */ (val).$ref);
+        addRefBinding(
+          bindings,
+          key,
+          /** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref),
+        );
         needsBind = true;
       } else if (isTemplateString(val)) {
         const key = `_t${counter.t++}`;
@@ -318,9 +338,9 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
     )
       continue;
     if (isRefObject(val)) {
-      const key = refToBindingKey(/** @type {any} */ (val).$ref);
+      const key = refToBindingKey(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref));
       bindAttrs.push(`:${camelToKebab(prop)}="${key}"`);
-      addRefBinding(bindings, key, /** @type {any} */ (val).$ref);
+      addRefBinding(bindings, key, /** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref));
       needsBind = true;
     } else if (isTemplateString(val)) {
       const key = `_t${counter.t++}`;
@@ -347,17 +367,18 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
   } else if (source.innerHTML) {
     // resolveStaticValue may return null if innerHTML contains `${` from rendered content
     // (e.g., code examples) that isn't an actual template expression. Fall back to raw value.
-    inner = resolveStaticValue(source.innerHTML, nextContext.scope) ?? source.innerHTML;
+    inner = /** @type {string} */ (resolveStaticValue(source.innerHTML, nextContext.scope)) ??
+    source.innerHTML;
   } else if (
     source.children &&
     typeof source.children === "object" &&
     !Array.isArray(source.children) &&
-    source.children.$prototype === "Array"
+    /** @type {JxMutableNode} */ (source.children).$prototype === "Array"
   ) {
     // ─── Mapped array → lit-html render binding ───
     counter.needsLit = true;
     const listKey = `_list${counter.l++}`;
-    const arrayDef = source.children;
+    const arrayDef = /** @type {JxMutableNode} */ (source.children);
 
     // Resolve items source expression
     let itemsExpr;
@@ -388,9 +409,16 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
   } else if (Array.isArray(source.children)) {
     const rawChildren = raw?.children;
     inner = source.children
-      .map((/** @type {any} */ c, /** @type {number} */ i) => {
+      .map((c, i) => {
         const childRaw = rawChildren?.[i] ?? c;
-        return buildClientNode(c, childRaw, nextContext, bindings, handlers, counter);
+        return buildClientNode(
+          /** @type {JxMutableNode} */ (/** @type {unknown} */ (c)),
+          /** @type {JxMutableNode} */ (/** @type {unknown} */ (childRaw)),
+          nextContext,
+          bindings,
+          handlers,
+          counter,
+        );
       })
       .join("\n  ");
   }
@@ -410,7 +438,7 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
  * Compile a map definition to a lit-html template string. Converts $map.item → item, $map.index →
  * index.
  *
- * @param {any} def
+ * @param {JxMutableNode} def
  * @returns {string}
  */
 function emitLitMapTemplate(def) {
@@ -463,14 +491,14 @@ function emitLitMapTemplate(def) {
     if (!prop.startsWith("on") || prop === "observedAttributes") continue;
     const eventName = prop.slice(2).toLowerCase();
     if (isRefObject(val)) {
-      const key = refToBindingKey(/** @type {any} */ (val).$ref);
+      const key = refToBindingKey(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref));
       attrs += " @" + eventName + "=${(e) => { state.$map = { item, index }; on." + key + "(e); }}";
     } else if (
       val &&
       typeof val === "object" &&
-      /** @type {any} */ (val).$prototype === "Function"
+      /** @type {JxMutableNode} */ (val).$prototype === "Function"
     ) {
-      const body = mapRefsToLit(/** @type {any} */ (val).body);
+      const body = mapRefsToLit(/** @type {string} */ (/** @type {JxMutableNode} */ (val).body));
       attrs += " @" + eventName + "=${(e) => { " + body + " }}";
     }
   }
@@ -487,7 +515,11 @@ function emitLitMapTemplate(def) {
     if (isTemplateString(tc)) {
       inner = mapRefsToLit(tc);
     } else if (isRefObject(def.textContent)) {
-      const path = refToBindingKey(def.textContent.$ref);
+      const path = refToBindingKey(
+        /** @type {string} */ (
+          /** @type {JxMutableNode} */ (/** @type {unknown} */ (def.textContent)).$ref
+        ),
+      );
       inner = "${state." + path + "}";
     } else {
       inner = escapeHtml(tc);
@@ -497,7 +529,9 @@ function emitLitMapTemplate(def) {
   } else if (Array.isArray(def.children)) {
     inner =
       "\n      " +
-      def.children.map((/** @type {any} */ c) => emitLitMapTemplate(c)).join("\n      ") +
+      def.children
+        .map((c) => emitLitMapTemplate(/** @type {JxMutableNode} */ (c)))
+        .join("\n      ") +
       "\n    ";
   }
 
@@ -525,7 +559,15 @@ function mapRefsToLit(str) {
  * @param {[string, any][]} onEntries
  * @param {string[]} initBlocks
  * @param {Map<string, Set<string>>} srcImportMap
- * @param {any} counter
+ * @param {{
+ *   t: number;
+ *   s: number;
+ *   h: number;
+ *   m: number;
+ *   sw: number;
+ *   l: number;
+ *   needsLit: boolean;
+ * }} counter
  * @param {string} _reactivitySrc
  * @returns {string}
  */
@@ -663,7 +705,7 @@ function emitClientModule(
 
 /**
  * @param {string} key
- * @param {any} def
+ * @param {JxMutableNode} def
  * @returns {string}
  */
 function emitRequestInit(key, def) {
@@ -713,7 +755,7 @@ function emitRequestInit(key, def) {
  * @param {string} key
  * @param {string} storeName
  * @param {string} storageKey
- * @param {any} defaultVal
+ * @param {unknown} defaultVal
  * @returns {string}
  */
 function emitStorageInit(key, storeName, storageKey, defaultVal) {
@@ -743,7 +785,7 @@ function emitStorageInit(key, storeName, storageKey, defaultVal) {
 /**
  * @param {string} key
  * @param {string} cookieName
- * @param {any} defaultVal
+ * @param {unknown} defaultVal
  * @returns {string}
  */
 function emitCookieInit(key, cookieName, defaultVal) {

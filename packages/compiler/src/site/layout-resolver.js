@@ -26,7 +26,10 @@ import { resolve } from "node:path";
  */
 export function resolveLayout(pageDoc, projectConfig, projectRoot) {
   // Determine which layout to use
-  const layoutRef = pageDoc.$layout ?? /** @type {any} */ (projectConfig.defaults)?.layout ?? null;
+  const layoutRef =
+    pageDoc.$layout ??
+    /** @type {Record<string, unknown>} */ (projectConfig.defaults)?.layout ??
+    null;
 
   if (!layoutRef) {
     // No layout — return page as-is

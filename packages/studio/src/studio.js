@@ -197,7 +197,7 @@ async function navigateToLevel(targetIndex) {
     }
   }
 
-  const frame = /** @type {Record<string, unknown>} */ (stack[targetIndex]);
+  const frame = /** @type {DocumentStackEntry} */ (stack[targetIndex]);
   tab.session.documentStack = stack.slice(0, targetIndex);
   tab.doc.document = /** @type {JxMutableNode} */ (frame.document);
   tab.doc.dirty = /** @type {boolean} */ (frame.dirty);
@@ -475,7 +475,7 @@ if (_openParam) {
             name: siteCtx.projectConfig?.name || "Project",
             projectRoot: siteCtx.sitePath,
             isSiteProject: true,
-            projectConfig: siteCtx.projectConfig,
+            projectConfig: siteCtx.projectConfig || null,
             projectDirs: [],
             dirs: new Map(),
             expanded: new Set(),

@@ -33,7 +33,8 @@ function convertHastChildren(children) {
  */
 function convertHastNode(node) {
   if (node.type === "text") {
-    if (whitespace(/** @type {any} */ (node))) return null;
+    if (whitespace(/** @type {import("hast").Nodes} */ (/** @type {unknown} */ (node))))
+      return null;
     return node.value ?? null;
   }
 

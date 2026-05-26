@@ -140,7 +140,7 @@ export function buildFontOptions(fontVars, presets) {
  *   examples?: string[];
  *   presets?: { title: string; value: string }[];
  * }} entry
- *   @param {string} prop @param {string} value @param {(value: string) => void} onChange
+ * @param {string} prop @param {string} value @param {(value: string) => void} onChange
  */
 export function renderComboboxInput(entry, prop, value, onChange) {
   const cssInitialMap = getCssInitialMap();

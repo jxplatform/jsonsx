@@ -20,15 +20,15 @@ export function getCssInitialMap() {
 
 // ─── Condition helpers ──────────────────────────────────────────────────────
 
-/** @param {{ prop: string; values: string[] }} cond @param {Record<string, string>} styles */
+/** @param {{ prop: string; values: string[] }} cond @param {Record<string, unknown>} styles */
 export function conditionPasses(cond, styles) {
-  const val = styles[cond.prop] ?? "";
+  const val = /** @type {string} */ (styles[cond.prop] ?? "");
   if (cond.values.length === 0) return val !== "" && val !== "initial";
   return cond.values.includes(val);
 }
 
 /**
- * @param {{ $show?: { prop: string; values: string[] }[] }} entry @param {Record<string, string>}
+ * @param {{ $show?: { prop: string; values: string[] }[] }} entry @param {Record<string, unknown>}
  *   styles
  */
 export function allConditionsPass(entry, styles) {

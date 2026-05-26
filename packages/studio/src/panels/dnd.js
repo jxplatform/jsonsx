@@ -3,6 +3,19 @@
  * on layer rows, component cards, and element cards.
  */
 
+/**
+ * @typedef {{ element: HTMLElement; input: { clientX: number; clientY: number } }} DragCanDragArgs
+ *
+ * @typedef {{ source: { data: Record<string, unknown>; element: HTMLElement } }} DragDropSourceArgs
+ *
+ * @typedef {{ self: { data: Record<string, unknown> } }} DragSelfArgs
+ *
+ * @typedef {{
+ *   source: { data: Record<string, unknown>; element: HTMLElement };
+ *   location: { current: { dropTargets: { data: Record<string, unknown> }[] } };
+ * }} DragMonitorDropArgs
+ */
+
 import {
   draggable,
   dropTargetForElements,
@@ -51,7 +64,7 @@ export function registerLayersDnD() {
         const cleanup = combine(
           draggable({
             element: row,
-            canDrag(/** @type {any} */ { element: _el, input }) {
+            canDrag(/** @type {DragCanDragArgs} */ { element: _el, input }) {
               const target = /** @type {HTMLElement} */ (
                 document.elementFromPoint(input.clientX, input.clientY)
               );
@@ -77,13 +90,13 @@ export function registerLayersDnD() {
           }),
           dropTargetForElements({
             element: row,
-            canDrop(/** @type {any} */ { source }) {
+            canDrop(/** @type {DragDropSourceArgs} */ { source }) {
               const srcPath = /** @type {JxPath | undefined} */ (source.data.path);
               if (srcPath && isAncestor(srcPath, rowPath)) return false;
               return true;
             },
             getData(/** @type {any} */ { input, element }) {
-              return /** @type {any} */ (
+              return /** @type {Record<string | symbol, unknown>} */ (
                 attachInstruction(
                   { path: rowPath },
                   {
@@ -97,10 +110,10 @@ export function registerLayersDnD() {
                 )
               );
             },
-            onDragEnter(/** @type {any} */ { self }) {
+            onDragEnter(/** @type {DragSelfArgs} */ { self }) {
               showLayerDropGap(row, self.data, container);
             },
-            onDrag(/** @type {any} */ { self }) {
+            onDrag(/** @type {DragSelfArgs} */ { self }) {
               showLayerDropGap(row, self.data, container);
             },
             onDragLeave() {
@@ -117,7 +130,7 @@ export function registerLayersDnD() {
 
     // Global monitor
     const monitorCleanup = monitorForElements({
-      onDrop(/** @type {any} */ { source, location }) {
+      onDrop(/** @type {DragMonitorDropArgs} */ { source, location }) {
         clearLayerDropGap(container);
         const target = location.current.dropTargets[0];
         if (!target) return;

@@ -155,7 +155,7 @@ function toolbarTemplate() {
             ${toolbarIconMap["sp-icon-back"]}Back
           </sp-action-button>
           ${S.documentStack.map(
-            (/** @type {{ documentPath?: string }} */ frame, /** @type {number} */ i) => html`
+            (/** @type {DocumentStackEntry} */ frame, /** @type {number} */ i) => html`
               <span class="breadcrumb-item clickable" @click=${() => ctx.navigateToLevel(i)}
                 >${frame.documentPath?.split("/").pop() || "untitled"}</span
               >
@@ -318,7 +318,7 @@ function toolbarTemplate() {
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
-    ${(/** @type {{ behind?: number }} */ (activeTab.value?.session.ui.gitStatus)?.behind ?? 0) > 0
+    ${(activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
       ? html`<sp-action-button
           size="s"
           @click=${async () => {

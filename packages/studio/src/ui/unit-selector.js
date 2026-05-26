@@ -57,7 +57,7 @@ export function renderUnitSelector(
           placeholder=${placeholder || "0"}
           .value=${live(displayValue)}
           @input=${debouncedStyleCommit(`nui:${prop}`, 400, (/** @type {Event} */ e) => {
-            const val = /** @type {HTMLInputElement} */ ((e.target).value ?? "").trim();
+            const val = /** @type {HTMLInputElement} */ (e.target).value.trim();
             if (val === "") {
               onChange("");
               return;

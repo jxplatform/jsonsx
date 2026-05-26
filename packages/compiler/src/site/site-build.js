@@ -440,7 +440,7 @@ async function compilePage(
         def &&
         typeof def === "object" &&
         !Array.isArray(def) &&
-        /** @type {any} */ (def).timing === "compiler"
+        /** @type {JxMutableNode} */ (def).timing === "compiler"
       ) {
         delete layoutDoc.state[key];
       }
@@ -864,9 +864,12 @@ function generateRedirects(redirects, outDir) {
 
   for (const [source, target] of Object.entries(redirects)) {
     const dest = /** @type {string} */ (
-      typeof target === "object" ? /** @type {any} */ (target).destination : target
+      typeof target === "object"
+        ? /** @type {{ destination: string }} */ (target).destination
+        : target
     );
-    const status = typeof target === "object" ? /** @type {any} */ ((target).status ?? 301) : 301;
+    const status =
+      typeof target === "object" ? /** @type {{ status?: number }} */ (target.status ?? 301) : 301;
 
     // Skip patterns with :param or * — these need platform-specific handling
     if (source.includes(":") || source.includes("*")) {

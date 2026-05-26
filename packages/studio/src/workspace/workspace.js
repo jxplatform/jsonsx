@@ -41,9 +41,11 @@ export const workspace = reactive({
 });
 
 /** @type {import("@vue/reactivity").ComputedRef<Tab>} */
-export const activeTab = /** @type {any} */ (
-  computed(() =>
-    workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
+export const activeTab = /** @type {import("@vue/reactivity").ComputedRef<Tab>} */ (
+  /** @type {unknown} */ (
+    computed(() =>
+      workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
+    )
   )
 );
 

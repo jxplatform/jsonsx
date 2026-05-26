@@ -1302,7 +1302,7 @@ export function renderExternalPrototypeEditorTemplate(
       >
         Loading schema…
       </div>`;
-      fetchPluginSchema(def, /** @type {any} */ (S)).then((schema) => {
+      fetchPluginSchema(def, /** @type {{ documentPath?: string }} */ (S)).then((schema) => {
         if (schema) ctx.renderLeftPanel();
       });
     }

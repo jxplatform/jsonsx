@@ -2,7 +2,155 @@ declare module "three";
 declare module "@webref/elements";
 declare module "@webref/css";
 declare module "@webref/idl";
-declare module "@jxsuite/studio/platform.js";
+
+// ─── Git & Platform Types ───────────────────────────────────────────────────
+
+interface GitFileStatus {
+  status: string;
+  path: string;
+  staged?: boolean;
+}
+
+interface GitStatusResult {
+  branch: string;
+  files: GitFileStatus[];
+  ahead: number;
+  behind: number;
+}
+
+interface GitBranchesResult {
+  current: string;
+  branches: string[];
+}
+
+interface GitLogEntry {
+  hash: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+interface ComponentMeta {
+  tagName: string;
+  $id?: string | null;
+  path: string;
+  props?: { name: string; type?: string; default?: unknown }[];
+  hasElements?: boolean;
+}
+
+interface PackageInfo {
+  name: string;
+  version: string;
+}
+
+interface CodeServiceResult {
+  code?: string;
+  diagnostics?: unknown[];
+  [key: string]: unknown;
+}
+
+// ─── Studio Platform ────────────────────────────────────────────────────────
+
+interface StudioPlatform {
+  id: string;
+  projectRoot: string;
+  activate(root?: string): Promise<void>;
+  openProject(): Promise<{
+    config: ProjectConfig;
+    handle: { root: string; name: string; projectConfig: ProjectConfig };
+  } | null>;
+  probeRootProject(): Promise<{
+    meta: { root: string; name: string };
+    info: { isSiteProject: boolean; projectConfig?: ProjectConfig | null; directories?: string[] };
+  } | null>;
+  listDirectory(dir: string): Promise<DirEntry[]>;
+  readFile(path: string): Promise<string>;
+  writeFile(path: string, content: string): Promise<void>;
+  uploadFile(path: string, data: string | File | Blob | ArrayBuffer): Promise<unknown>;
+  deleteFile(path: string): Promise<void>;
+  renameFile(from: string, to: string): Promise<void>;
+  createDirectory(path: string): Promise<void>;
+  discoverComponents(dir?: string): Promise<ComponentMeta[]>;
+  addPackage(name: string): Promise<unknown>;
+  removePackage(name: string): Promise<unknown>;
+  listPackages(): Promise<PackageInfo[]>;
+  codeService(action: string, payload: unknown): Promise<CodeServiceResult | null>;
+  resolveSiteContext(
+    filePath: string,
+  ): Promise<{ sitePath: string | null; projectConfig?: ProjectConfig; fileRelPath?: string }>;
+  locateFile(name: string): Promise<string | null>;
+  searchFiles(query: string): Promise<DirEntry[]>;
+  fetchPluginSchema(src: string, prototype?: string, base?: string): Promise<unknown>;
+  gitStatus(): Promise<GitStatusResult>;
+  gitBranches(): Promise<GitBranchesResult>;
+  gitLog(limit?: number): Promise<GitLogEntry[]>;
+  gitStage(files: string[]): Promise<void>;
+  gitUnstage(files: string[]): Promise<void>;
+  gitCommit(message: string): Promise<void>;
+  gitPush(): Promise<void>;
+  gitPull(): Promise<void>;
+  gitFetch(): Promise<void>;
+  gitCheckout(branch: string): Promise<void>;
+  gitCreateBranch(name: string): Promise<void>;
+  gitDiff(path?: string): Promise<string>;
+  gitShow(opts: { path: string; ref?: string }): Promise<string>;
+  gitDiscard(files: string[]): Promise<void>;
+}
+
+// ─── Studio UI Types ────────────────────────────────────────────────────────
+
+interface InlineEditDef {
+  path: JxPath;
+  mediaName?: string;
+}
+
+interface FunctionEditDef {
+  type: string;
+  defName?: string;
+  path?: JxPath;
+  eventKey?: string;
+  key?: string;
+  body?: string;
+  parameters?: string[];
+}
+
+interface DocumentStackEntry {
+  document: JxMutableNode;
+  documentPath: string | null;
+  selection: JxPath | null;
+  dirty?: boolean;
+  mode?: string;
+  sourceFormat?: string | null;
+}
+
+interface GitDiffState {
+  filePath: string;
+  originalContent: string;
+  currentContent: string;
+  isMarkdown: boolean;
+  fileStatus: string;
+}
+
+// ─── Canvas Panel ───────────────────────────────────────────────────────────
+
+interface CanvasPanel {
+  mediaName: string;
+  element: HTMLElement | null;
+  canvas: HTMLElement | null;
+  overlay: HTMLElement | null;
+  overlayClk: HTMLElement | null;
+  viewport: HTMLElement | null;
+  scrollContainer: HTMLElement | null;
+  dropLine: HTMLElement | null;
+  _width: number | null;
+}
+
+// ─── Render Options ─────────────────────────────────────────────────────────
+
+interface JxRenderOptions {
+  _path?: JxPath;
+  onNodeCreated?: (el: HTMLElement | Text, path: JxPath, def: Record<string, unknown>) => void;
+}
 
 // ─── Jx Domain Types ────────────────────────────────────────────────────────
 
@@ -98,7 +246,7 @@ interface JxMutableNode {
   className?: string;
   id?: string;
   $ref?: string;
-  $props?: Record<string, any>;
+  $props?: Record<string, unknown>;
   $switch?: string | { $ref: string };
   cases?: Record<string, JxMutableNode>;
   $prototype?: string;
@@ -241,7 +389,7 @@ interface DirEntry {
   path: string;
   type: "file" | "directory";
   size?: number;
-  modified?: number;
+  modified?: string;
 }
 
 interface ImageConfig {

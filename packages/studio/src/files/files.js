@@ -65,7 +65,7 @@ export async function loadProject() {
       name: info.isSiteProject ? info.projectConfig?.name || meta.name : meta.name,
       projectRoot: ".",
       isSiteProject: info.isSiteProject,
-      projectConfig: info.isSiteProject ? info.projectConfig : null,
+      projectConfig: (info.isSiteProject ? info.projectConfig : null) || null,
       projectDirs: info.directories || [],
       dirs: new Map(),
       expanded: new Set(),
@@ -576,11 +576,11 @@ export async function openFileFromTree(ctx, path) {
       const isContent = ctx.S.mode === "content";
       let output;
       if (isContent) {
-        const mdast = jxToMd(/** @type {any} */ (ctx.S.document));
+        const mdast = jxToMd(/** @type {JxElement} */ (ctx.S.document));
         const md = unified()
           .use(remarkDirective)
           .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-          .stringify(/** @type {any} */ (mdast));
+          .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
         const fm = ctx.S.content?.frontmatter;
         const hasFrontmatter = fm && Object.keys(fm).length > 0;
         output = hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;

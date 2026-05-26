@@ -730,7 +730,7 @@ export function jxDocToMd(doc) {
     const md = unified()
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(/** @type {any} */ (mdast));
+      .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
 
     lines.push(/** @type {string} */ (md));
   }

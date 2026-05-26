@@ -954,7 +954,7 @@ export function renderPropertiesPanelTemplate(ctx) {
   const isMapParent =
     node.children &&
     typeof node.children === "object" &&
-    /** @type {any} */ (node.children).$prototype === "Array";
+    /** @type {{ $prototype?: string }} */ (node.children).$prototype === "Array";
   const isSwitchNode = !!node.$switch;
   const isCustomInstance = (node.tagName || "").includes("-");
   const isRoot = path.length === 0;

@@ -32,7 +32,7 @@ export async function refreshGitStatus() {
  * @param {unknown} [body]
  */
 async function gitAction(action, body) {
-  const plat = getPlatform();
+  const plat = /** @type {Record<string, Function> & StudioPlatform} */ (getPlatform());
   updateUi("gitLoading", true);
   updateUi("gitError", null);
   try {

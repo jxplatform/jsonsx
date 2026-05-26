@@ -47,7 +47,7 @@ export function registerPanelEvents(panel) {
   const ctx = /** @type {PanelEventsCtx} */ (_ctx);
   const canvas = /** @type {HTMLElement} */ (panel.canvas);
   const overlayClk = /** @type {HTMLElement} */ (panel.overlayClk);
-  const { mediaName } = /** @type {any} */ (panel);
+  const { mediaName } = panel;
   const ac = new AbortController();
   const opts = { signal: ac.signal };
   view.canvasEventCleanups.push(() => ac.abort());
@@ -272,8 +272,10 @@ export function registerPanelEvents(panel) {
     parentElementPath,
     childIndex,
     getNodeAtPath,
-    elToPath: /** @type {any} */ (elToPath),
-    panel: /** @type {any} */ (panel),
+    elToPath,
+    panel: /** @type {import("../editor/insertion-helper.js").CanvasPanel} */ (
+      /** @type {unknown} */ (panel)
+    ),
   });
   view.canvasEventCleanups.push(() => insertionHelper.unmount());
 }

@@ -149,7 +149,7 @@ function _render() {
     content =
       ctx.getCanvasMode() === "stylebook"
         ? renderStylebookLayersTemplate(
-            /** @type {any} */ ({
+            /** @type {Parameters<typeof renderStylebookLayersTemplate>[0]} */ ({
               selectStylebookTag,
               stylebookMeta,
             }),
@@ -170,7 +170,7 @@ function _render() {
   else if (tab === "files") content = ctx.renderFilesTemplate();
   else if (tab === "blocks")
     content = renderElementsTemplate(
-      /** @type {any} */ ({
+      /** @type {Parameters<typeof renderElementsTemplate>[0]} */ ({
         webdata: ctx.webdata,
         defaultDef: ctx.defaultDef,
         rerender: render,

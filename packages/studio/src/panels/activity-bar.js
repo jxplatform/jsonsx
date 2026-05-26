@@ -92,8 +92,7 @@ export function renderActivityBar() {
   const tab = activeTab.value;
   if (!tab) return;
   const leftTab = view.leftTab;
-  const gitFileCount = /** @type {{ files?: unknown[] } | null} */ (tab?.session.ui.gitStatus)
-    ?.files?.length || 0;
+  const gitFileCount = tab?.session.ui.gitStatus?.files?.length || 0;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },

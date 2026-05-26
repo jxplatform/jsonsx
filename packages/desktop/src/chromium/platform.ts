@@ -1,4 +1,4 @@
-export function createDesktopPlatform() {
+export function createDesktopPlatform(): StudioPlatform {
   const ws = new WebSocket(`ws://${location.host}`);
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
@@ -38,135 +38,154 @@ export function createDesktopPlatform() {
     async activate() {},
 
     async openProject() {
-      return request("openProject");
+      return request("openProject") as Promise<{
+        config: ProjectConfig;
+        handle: { root: string; name: string; projectConfig: ProjectConfig };
+      } | null>;
     },
 
     async probeRootProject() {
       try {
         const content = await request("readFile", { path: "project.json" });
-        const config = JSON.parse(content as string);
+        const config = JSON.parse(content as string) as { name?: string };
         return {
           meta: { root: ".", name: config.name || "project" },
-          info: { isSiteProject: true, projectConfig: config, directories: [] },
+          info: {
+            isSiteProject: true as const,
+            projectConfig: config as ProjectConfig,
+            directories: [] as string[],
+          },
         };
       } catch {
         return {
           meta: { root: ".", name: "project" },
-          info: { isSiteProject: false, projectConfig: null, directories: [] },
+          info: { isSiteProject: false as const, projectConfig: null, directories: [] as string[] },
         };
       }
     },
 
     async resolveSiteContext(filePath: string) {
-      return request("resolveSiteContext", { filePath });
+      return request("resolveSiteContext", { filePath }) as Promise<{
+        sitePath: string | null;
+        projectConfig?: ProjectConfig;
+        fileRelPath?: string;
+      }>;
     },
 
     async listDirectory(dir: string) {
-      return request("listDirectory", { dir });
+      return request("listDirectory", { dir }) as Promise<DirEntry[]>;
     },
 
     async readFile(path: string) {
-      return request("readFile", { path });
+      return request("readFile", { path }) as Promise<string>;
     },
 
     async writeFile(path: string, content: string) {
-      return request("writeFile", { path, content });
+      return request("writeFile", { path, content }) as Promise<void>;
     },
 
     async uploadFile(path: string, data: string) {
-      return request("uploadFile", { path, data });
+      return request("uploadFile", { path, data }) as Promise<unknown>;
     },
 
     async deleteFile(path: string) {
-      return request("deleteFile", { path });
+      return request("deleteFile", { path }) as Promise<void>;
     },
 
     async renameFile(from: string, to: string) {
-      return request("renameFile", { from, to });
+      return request("renameFile", { from, to }) as Promise<void>;
     },
 
     async createDirectory(path: string) {
-      return request("createDirectory", { path });
+      return request("createDirectory", { path }) as Promise<void>;
     },
 
     async discoverComponents(dir?: string) {
-      return request("discoverComponents", { dir });
+      return request("discoverComponents", { dir }) as Promise<ComponentMeta[]>;
     },
 
     async codeService(action: string, payload: unknown) {
-      return request("codeService", { action, payload });
+      return request("codeService", { action, payload }) as Promise<CodeServiceResult | null>;
     },
 
     async locateFile(name: string) {
-      return request("locateFile", { name });
+      return request("locateFile", { name }) as Promise<string | null>;
     },
 
     async fetchPluginSchema(src: string, prototype?: string, base?: string) {
-      return request("fetchPluginSchema", { src, prototype, base });
+      return request("fetchPluginSchema", { src, prototype, base }) as Promise<unknown>;
     },
 
     async gitStatus() {
-      return request("gitStatus");
+      return request("gitStatus") as Promise<GitStatusResult>;
     },
 
     async gitBranches() {
-      return request("gitBranches");
+      return request("gitBranches") as Promise<GitBranchesResult>;
     },
 
     async gitLog(limit?: number) {
-      return request("gitLog", { limit });
+      return request("gitLog", { limit }) as Promise<GitLogEntry[]>;
     },
 
     async gitStage(files: string[]) {
-      return request("gitStage", { files });
+      return request("gitStage", { files }) as Promise<void>;
     },
 
     async gitUnstage(files: string[]) {
-      return request("gitUnstage", { files });
+      return request("gitUnstage", { files }) as Promise<void>;
     },
 
     async gitCommit(message: string) {
-      return request("gitCommit", { message });
+      return request("gitCommit", { message }) as Promise<void>;
     },
 
     async gitPush() {
-      return request("gitPush");
+      return request("gitPush") as Promise<void>;
     },
 
     async gitPull() {
-      return request("gitPull");
+      return request("gitPull") as Promise<void>;
     },
 
     async gitFetch() {
-      return request("gitFetch");
+      return request("gitFetch") as Promise<void>;
     },
 
     async gitCheckout(branch: string) {
-      return request("gitCheckout", { branch });
+      return request("gitCheckout", { branch }) as Promise<void>;
     },
 
     async gitCreateBranch(name: string) {
-      return request("gitCreateBranch", { name });
+      return request("gitCreateBranch", { name }) as Promise<void>;
     },
 
     async gitDiff(path?: string) {
-      return request("gitDiff", { path });
+      return request("gitDiff", { path }) as Promise<string>;
     },
 
     async gitDiscard(files: string[]) {
-      return request("gitDiscard", { files });
+      return request("gitDiscard", { files }) as Promise<void>;
+    },
+
+    async gitShow(opts: { path: string; ref?: string }) {
+      return request("gitShow", opts) as Promise<string>;
+    },
+
+    async searchFiles(query: string) {
+      return request("searchFiles", { query }) as Promise<DirEntry[]>;
     },
 
     async addPackage(name: string) {
-      return request("addPackage", { name });
+      return request("addPackage", { name }) as Promise<unknown>;
     },
 
     async removePackage(name: string) {
-      return request("removePackage", { name });
+      return request("removePackage", { name }) as Promise<unknown>;
     },
 
     async listPackages() {
-      return request("listPackages");
+      return request("listPackages") as Promise<PackageInfo[]>;
     },
   };
 }

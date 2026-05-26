@@ -24,14 +24,14 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
 describe("codeService", () => {
   test("returns null when platform has no codeService", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     const result = await codeService("lint", { code: "x" });
     expect(result).toBeNull();
   });
 
   test("delegates to platform.codeService", async () => {
     const mockFn = mock(() => ({ diagnostics: [] }));
-    registerPlatform({ codeService: mockFn });
+    registerPlatform(/** @type {any} */ ({ codeService: mockFn }));
     const result = await codeService("lint", { code: "x" });
     expect(result).toEqual({ diagnostics: [] });
     expect(mockFn).toHaveBeenCalledWith("lint", { code: "x" });
@@ -42,16 +42,16 @@ describe("codeService", () => {
 
 describe("locateDocument", () => {
   test("returns null when platform has no locateFile", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     const result = await locateDocument("page.json");
     expect(result).toBeNull();
   });
 
   test("delegates to platform.locateFile", async () => {
     const mockFn = mock(() => ({ path: "pages/page.json" }));
-    registerPlatform({ locateFile: mockFn });
+    registerPlatform(/** @type {any} */ ({ locateFile: mockFn }));
     const result = await locateDocument("page.json");
-    expect(result).toEqual({ path: "pages/page.json" });
+    expect(/** @type {any} */ (result)).toEqual({ path: "pages/page.json" });
     expect(mockFn).toHaveBeenCalledWith("page.json");
   });
 });
@@ -64,19 +64,19 @@ describe("fetchPluginSchema", () => {
   });
 
   test("returns null when def has no $src", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     const result = await fetchPluginSchema({ $prototype: "Foo" }, {});
     expect(result).toBeNull();
   });
 
   test("returns null when def has no $prototype", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     const result = await fetchPluginSchema({ $src: "./foo.js" }, {});
     expect(result).toBeNull();
   });
 
   test("returns null when platform has no fetchPluginSchema", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     const result = await fetchPluginSchema({ $src: "./foo.js", $prototype: "Foo" }, {});
     expect(result).toBeNull();
     expect(pluginSchemaCache.get("./foo.js::Foo")).toBeNull();
@@ -85,7 +85,7 @@ describe("fetchPluginSchema", () => {
   test("fetches and caches schema from platform", async () => {
     const schema = { properties: { url: { type: "string" } } };
     const mockFn = mock(() => schema);
-    registerPlatform({ fetchPluginSchema: mockFn });
+    registerPlatform(/** @type {any} */ ({ fetchPluginSchema: mockFn }));
     const result = await fetchPluginSchema(
       { $src: "./DataSource.class.json", $prototype: "DataSource" },
       { documentPath: "pages/index.json" },
@@ -97,7 +97,7 @@ describe("fetchPluginSchema", () => {
   test("returns cached schema on second call", async () => {
     const schema = { properties: {} };
     const mockFn = mock(() => schema);
-    registerPlatform({ fetchPluginSchema: mockFn });
+    registerPlatform(/** @type {any} */ ({ fetchPluginSchema: mockFn }));
     const def = { $src: "./cached.js", $prototype: "Cached" };
     await fetchPluginSchema(def, {});
     await fetchPluginSchema(def, {});
@@ -108,7 +108,7 @@ describe("fetchPluginSchema", () => {
     const mockFn = mock(() => {
       throw new Error("network");
     });
-    registerPlatform({ fetchPluginSchema: mockFn });
+    registerPlatform(/** @type {any} */ ({ fetchPluginSchema: mockFn }));
     const def = { $src: "./err.js", $prototype: "Err" };
     const result = await fetchPluginSchema(def, {});
     expect(result).toBeNull();

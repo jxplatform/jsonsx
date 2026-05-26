@@ -87,7 +87,7 @@ export function prepareForEditMode(node) {
         if (
           firstCase &&
           typeof firstCase === "object" &&
-          !/** @type {Record<string, unknown>} */ (firstCase).$ref
+          !(/** @type {Record<string, unknown>} */ (firstCase).$ref)
         ) {
           out.children = [prepareForEditMode(firstCase)];
         } else {
