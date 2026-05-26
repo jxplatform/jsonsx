@@ -42,7 +42,7 @@ export const SCHEMA_KEYWORDS = new Set([
 /**
  * Returns true if a $src path points to a .class.json schema-defined class.
  *
- * @param {any} src
+ * @param {unknown} src
  * @returns {boolean}
  */
 export function isClassJsonSrc(src) {
@@ -52,7 +52,7 @@ export function isClassJsonSrc(src) {
 /**
  * Returns true if an object contains only schema keywords (no `default`, no `$prototype`).
  *
- * @param {any} obj
+ * @param {Record<string, unknown>} obj
  * @returns {boolean}
  */
 export function isSchemaOnly(obj) {
@@ -65,7 +65,7 @@ export function isSchemaOnly(obj) {
 /**
  * Returns true if a string contains a ${} template expression.
  *
- * @param {any} val
+ * @param {unknown} val
  * @returns {boolean}
  */
 export function isTemplateString(val) {
@@ -75,7 +75,7 @@ export function isTemplateString(val) {
 /**
  * Determine whether a node (or any of its descendants) requires client-side JavaScript.
  *
- * @param {any} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function isDynamic(def) {
@@ -90,22 +90,26 @@ export function isDynamic(def) {
         d &&
         typeof d === "object" &&
         !Array.isArray(d) &&
-        /** @type {any} */ (d).timing === "compiler"
+        /** @type {JxPrototypeDef} */ (d).timing === "compiler"
       )
         continue;
       if (typeof d !== "object" || d === null || Array.isArray(d)) return true;
-      if (/** @type {any} */ (d).$prototype) return true;
-      if ("default" in /** @type {any} */ (d)) return true;
+      if (/** @type {JxPrototypeDef} */ (d).$prototype) return true;
+      if ("default" in /** @type {object} */ (d)) return true;
       if (isSchemaOnly(d)) continue;
       return true;
     }
   }
 
   if (def.$switch) return true;
-  if (def.children?.$prototype === "Array") return true;
+  if (
+    !Array.isArray(def.children) &&
+    /** @type {JxMappedArray | undefined} */ (def.children)?.$prototype === "Array"
+  )
+    return true;
 
   if (Array.isArray(def.children)) {
-    if (def.children.some(/** @param {any} c */ (c) => isDynamic(c))) return true;
+    if (def.children.some((c) => isDynamic(c))) return true;
   }
 
   for (const [key, val] of Object.entries(def)) {
@@ -113,7 +117,7 @@ export function isDynamic(def) {
     if (
       val !== null &&
       typeof val === "object" &&
-      typeof (/** @type {any} */ (val).$ref) === "string"
+      typeof (/** @type {JxMutableNode} */ (val).$ref) === "string"
     )
       return true;
     if (isTemplateString(val)) return true;
@@ -137,21 +141,25 @@ export function isDynamic(def) {
 /**
  * Shallow variant of isDynamic — checks only this node's own properties, not its children.
  *
- * @param {any} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function isNodeDynamic(def) {
   if (!def || typeof def !== "object") return false;
 
   if (def.$switch) return true;
-  if (def.children?.$prototype === "Array") return true;
+  if (
+    !Array.isArray(def.children) &&
+    /** @type {JxMappedArray | undefined} */ (def.children)?.$prototype === "Array"
+  )
+    return true;
 
   for (const [key, val] of Object.entries(def)) {
     if (RESERVED_KEYS.has(key)) continue;
     if (
       val !== null &&
       typeof val === "object" &&
-      typeof (/** @type {any} */ (val).$ref) === "string"
+      typeof (/** @type {JxMutableNode} */ (val).$ref) === "string"
     )
       return true;
     if (isTemplateString(val)) return true;
@@ -175,25 +183,28 @@ export function isNodeDynamic(def) {
 /**
  * Returns true if any node in the tree will need dynamic handling.
  *
- * @param {any} def
+ * @param {JxElement | JxMutableNode | string} def
  * @returns {boolean}
  */
 export function hasAnyIsland(def) {
   if (!def || typeof def !== "object") return false;
   if (isDynamic(def)) return true;
-  if (Array.isArray(def.children))
-    return def.children.some(/** @param {any} c */ (c) => hasAnyIsland(c));
+  if (Array.isArray(def.children)) return def.children.some((c) => hasAnyIsland(c));
   return false;
 }
 
 // ─── Scope / value resolution ─────────────────────────────────────────────────
 
 /**
- * @param {any} raw
- * @param {any} [parentScope]
- * @param {Record<string, any>} [scopeDefs]
- * @param {Record<string, any>} [media]
- * @returns {{ scope: any; scopeDefs: Record<string, any>; media: Record<string, any> }}
+ * @param {JxElement | JxMutableNode | null} raw
+ * @param {Record<string, unknown> | null} [parentScope]
+ * @param {Record<string, unknown>} [scopeDefs]
+ * @param {Record<string, string>} [media]
+ * @returns {{
+ *   scope: Record<string, unknown>;
+ *   scopeDefs: Record<string, unknown>;
+ *   media: Record<string, string>;
+ * }}
  */
 export function createCompileContext(raw, parentScope = null, scopeDefs = {}, media = {}) {
   const scope = raw?.state
@@ -203,9 +214,9 @@ export function createCompileContext(raw, parentScope = null, scopeDefs = {}, me
 }
 
 /**
- * @param {Record<string, any>} [defs]
- * @param {any} [parentScope]
- * @returns {any}
+ * @param {Record<string, JxStateDefinition>} [defs]
+ * @param {Record<string, unknown> | null} [parentScope]
+ * @returns {Record<string, unknown>}
  */
 export function buildInitialScope(defs = {}, parentScope = null) {
   const scope = Object.create(parentScope ?? null);
@@ -215,12 +226,13 @@ export function buildInitialScope(defs = {}, parentScope = null) {
       setOwnScopeValue(scope, key, cloneValue(def));
       continue;
     }
-    if ("default" in def) {
-      setOwnScopeValue(scope, key, cloneValue(def.default));
+    const d = /** @type {JxStateObject & JxPrototypeDef} */ (def);
+    if ("default" in d) {
+      setOwnScopeValue(scope, key, cloneValue(d.default));
       continue;
     }
-    if (!def.$prototype && !isSchemaOnly(def)) {
-      setOwnScopeValue(scope, key, cloneValue(def));
+    if (!d.$prototype && !isSchemaOnly(d)) {
+      setOwnScopeValue(scope, key, cloneValue(d));
     }
   }
 
@@ -230,21 +242,22 @@ export function buildInitialScope(defs = {}, parentScope = null) {
       continue;
     }
     if (!def || typeof def !== "object") continue;
-    if (def.$prototype === "Function") {
-      if (def.body) {
-        const fn = new Function("state", ...(def.parameters ?? def.arguments ?? []), def.body);
-        if (def.body.includes("return")) {
+    const d = /** @type {JxStateObject & JxPrototypeDef} */ (def);
+    if (d.$prototype === "Function") {
+      if (d.body) {
+        const fn = new Function("state", ...(d.parameters ?? d.arguments ?? []), d.body);
+        if (d.body.includes("return")) {
           defineLazyScopeValue(scope, key, () => fn(scope));
         } else {
           setOwnScopeValue(scope, key, fn);
         }
-      } else if (!def.body?.includes("return")) {
+      } else if (!d.body?.includes("return")) {
         setOwnScopeValue(scope, key, () => {});
       }
       continue;
     }
-    if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
-      setOwnScopeValue(scope, key, cloneValue(def.default ?? null));
+    if (d.$prototype === "LocalStorage" || d.$prototype === "SessionStorage") {
+      setOwnScopeValue(scope, key, cloneValue(d.default ?? null));
     }
   }
 
@@ -252,9 +265,9 @@ export function buildInitialScope(defs = {}, parentScope = null) {
 }
 
 /**
- * @param {any} scope
+ * @param {Record<string, unknown>} scope
  * @param {string} key
- * @param {any} value
+ * @param {unknown} value
  */
 export function setOwnScopeValue(scope, key, value) {
   Object.defineProperty(scope, key, {
@@ -266,9 +279,9 @@ export function setOwnScopeValue(scope, key, value) {
 }
 
 /**
- * @param {any} scope
+ * @param {Record<string, unknown>} scope
  * @param {string} key
- * @param {() => any} getter
+ * @param {() => unknown} getter
  */
 export function defineLazyScopeValue(scope, key, getter) {
   Object.defineProperty(scope, key, {
@@ -279,35 +292,40 @@ export function defineLazyScopeValue(scope, key, getter) {
 }
 
 /**
- * @param {any} value
- * @param {any} scope
- * @returns {any}
+ * @param {unknown} value
+ * @param {Record<string, unknown>} scope
+ * @returns {unknown}
  */
 export function resolveStaticValue(value, scope) {
-  if (isRefObject(value)) return resolveRefValue(value.$ref, scope);
-  if (isTemplateString(value)) return evaluateStaticTemplate(value, scope);
+  if (isRefObject(value)) return resolveRefValue(/** @type {JxMutableNode} */ (value).$ref, scope);
+  if (isTemplateString(value)) return evaluateStaticTemplate(/** @type {string} */ (value), scope);
   return value;
 }
 
 /**
- * @param {any} value
+ * @param {unknown} value
  * @returns {boolean}
  */
 export function isRefObject(value) {
-  return value !== null && typeof value === "object" && typeof value.$ref === "string";
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (/** @type {JxMutableNode} */ (value).$ref) === "string"
+  );
 }
 
 /**
- * @param {any} refValue
- * @param {any} scope
- * @returns {any}
+ * @param {unknown} refValue
+ * @param {Record<string, unknown>} scope
+ * @returns {unknown}
  */
 export function resolveRefValue(refValue, scope) {
   if (typeof refValue !== "string") return refValue;
   if (refValue.startsWith("$map/")) {
     const parts = refValue.split("/");
     const key = parts[1];
-    const base = scope.$map?.[key] ?? scope["$map/" + key];
+    const base = /** @type {Record<string, unknown> | undefined} */ (scope.$map)?.[key] ??
+    scope["$map/" + key];
     return parts.length > 2 ? getPathValue(base, parts.slice(2).join("/")) : base;
   }
   if (refValue.startsWith("#/state/")) {
@@ -321,13 +339,11 @@ export function resolveRefValue(refValue, scope) {
 
 /**
  * @param {string} str
- * @param {any} scope
- * @returns {any}
+ * @param {Record<string, unknown>} scope
+ * @returns {unknown}
  */
 export function evaluateStaticTemplate(str, scope) {
   try {
-    // When the entire string is a single ${...} expression, evaluate it directly
-    // to preserve the return type (boolean, number, etc.) instead of stringifying.
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
       const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`);
@@ -341,23 +357,26 @@ export function evaluateStaticTemplate(str, scope) {
 }
 
 /**
- * @param {any} base
+ * @param {unknown} base
  * @param {string} path
- * @returns {any}
+ * @returns {unknown}
  */
 export function getPathValue(base, path) {
   if (!path) return base;
-  return path
-    .split("/")
-    .reduce(
-      (/** @type {any} */ acc, /** @type {string} */ key) => (acc == null ? undefined : acc[key]),
-      base,
-    );
+  return path.split("/").reduce(
+    /**
+     * @param {Record<string, unknown>} acc
+     * @param {string} key
+     * @returns {Record<string, unknown>}
+     */
+    (acc, key) => (/** @type {Record<string, unknown>} */ (acc == null ? undefined : acc[key])),
+    /** @type {Record<string, unknown>} */ (base),
+  );
 }
 
 /**
- * @param {any} value
- * @returns {any}
+ * @param {unknown} value
+ * @returns {unknown}
  */
 export function cloneValue(value) {
   if (value === null || typeof value !== "object") return value;
@@ -369,9 +388,8 @@ export function cloneValue(value) {
 /**
  * Build an HTML attribute string from a static element definition.
  *
- * @param {any} def
- * @param {any} scope
- * @returns {string}
+ * @param {JxElement | JxMutableNode} def
+ * @param {Record<string, unknown>} scope @returns {string}
  */
 export function buildAttrs(def, scope) {
   let out = "";
@@ -384,14 +402,14 @@ export function buildAttrs(def, scope) {
   const lang = resolveStaticValue(def.lang, scope);
   const dir = resolveStaticValue(def.dir, scope);
 
-  if (id) out += ` id="${escapeHtml(id)}"`;
-  if (className) out += ` class="${escapeHtml(className)}"`;
+  if (id) out += ` id="${escapeHtml(String(id))}"`;
+  if (className) out += ` class="${escapeHtml(String(className))}"`;
   if (hidden) out += " hidden";
   if (tabIndex !== undefined && tabIndex !== null)
     out += ` tabindex="${escapeHtml(String(tabIndex))}"`;
-  if (title) out += ` title="${escapeHtml(title)}"`;
-  if (lang) out += ` lang="${escapeHtml(lang)}"`;
-  if (dir) out += ` dir="${escapeHtml(dir)}"`;
+  if (title) out += ` title="${escapeHtml(String(title))}"`;
+  if (lang) out += ` lang="${escapeHtml(String(lang))}"`;
+  if (dir) out += ` dir="${escapeHtml(String(dir))}"`;
 
   if (def.style && scope) {
     const inline = Object.entries(def.style)
@@ -445,9 +463,13 @@ export function buildAttrs(def, scope) {
 /**
  * Build the inner HTML (textContent or children) for a node.
  *
- * @param {any} def
- * @param {any} raw
- * @param {{ scope: any; scopeDefs: Record<string, any>; media: Record<string, any> }} context
+ * @param {JxElement} def
+ * @param {JxElement | null} raw
+ * @param {{
+ *   scope: Record<string, unknown>;
+ *   scopeDefs: Record<string, unknown>;
+ *   media: Record<string, string>;
+ * }} context
  * @param {(def: any, raw: any, context: any) => string} childCompiler
  * @returns {string}
  */
@@ -458,12 +480,13 @@ export function buildInner(def, raw, context, childCompiler) {
     const value = resolveStaticValue(source.textContent, context.scope);
     return value == null ? "" : escapeHtml(String(value));
   }
-  if (source.innerHTML) return resolveStaticValue(source.innerHTML, context.scope) ?? "";
+  if (source.innerHTML)
+    return /** @type {string} */ (resolveStaticValue(source.innerHTML, context.scope)) ?? "";
   if (Array.isArray(source.children)) {
     const rawChildren = raw?.children;
     return source.children
-      .map((/** @type {any} */ c, /** @type {number} */ i) => {
-        const childRaw = rawChildren?.[i] ?? c;
+      .map((/** @type {JxElement | JxMutableNode | string} */ c, /** @type {number} */ i) => {
+        const childRaw = /** @type {(JxElement | string)[] | undefined} */ (rawChildren)?.[i] ?? c;
         return childCompiler(c, childRaw, context);
       })
       .join("\n  ");
@@ -476,8 +499,9 @@ export function buildInner(def, raw, context, childCompiler) {
 /**
  * Walk the entire document tree and collect all static nested CSS rules.
  *
- * @param {any} doc
- * @param {Record<string, any>} [mediaQueries]
+ * @param {JxElement | JxMutableNode} doc
+ * @param {Record<string, string>} [mediaQueries]
+ * @param {JxStyle | null} [projectStyle]
  * @returns {string}
  */
 export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
@@ -488,11 +512,8 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
   // everything else on body.  Project-level style is implicitly :root, so a
   // flat object like { "--bg": "#000", "margin": "0" } is the expected format.
   if (projectStyle && typeof projectStyle === "object") {
-    function emitProjectRules(
-      /** @type {string} */ selector,
-      /** @type {Record<string, any>} */ obj,
-    ) {
-      const props = toCSSText(/** @type {any} */ (obj));
+    function emitProjectRules(/** @type {string} */ selector, /** @type {JxMutableNode} */ obj) {
+      const props = toCSSText(obj);
       if (props) rules.push(`${selector} { ${props} }`);
       for (const [key, val] of Object.entries(obj)) {
         if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
@@ -500,9 +521,9 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
           const query = key.startsWith("@--")
             ? (mediaQueries[key.slice(1)] ?? key.slice(1))
             : key.slice(1);
-          const mProps = toCSSText(/** @type {any} */ (val));
+          const mProps = toCSSText(val);
           if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
-          for (const [sel, sub] of Object.entries(/** @type {Record<string, any>} */ (val))) {
+          for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
             if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
             if (sel.startsWith("@")) continue;
             const resolved = sel.startsWith("&")
@@ -510,7 +531,7 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
               : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
                 ? `${selector}${sel}`
                 : `${selector} ${sel}`;
-            const subProps = toCSSText(/** @type {any} */ (sub));
+            const subProps = toCSSText(sub);
             if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
           }
           continue;
@@ -520,13 +541,13 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
           : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
             ? `${selector}${key}`
             : `${selector} ${key}`;
-        emitProjectRules(resolved, val);
+        emitProjectRules(resolved, /** @type {Record<string, unknown>} */ (val));
       }
     }
 
     for (const [key, val] of Object.entries(projectStyle)) {
       if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
-        emitProjectRules(key, /** @type {any} */ (val));
+        emitProjectRules(key, /** @type {Record<string, unknown>} */ (val));
       } else if (
         val !== null &&
         typeof val === "object" &&
@@ -540,14 +561,14 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
         const query = key.startsWith("@--")
           ? (mediaQueries[key.slice(1)] ?? key.slice(1))
           : key.slice(1);
-        rules.push(`@media ${query} { body { ${toCSSText(/** @type {any} */ (val))} } }`);
+        rules.push(`@media ${query} { body { ${toCSSText(/** @type {object} */ (val))} } }`);
       }
     }
     // Collect CSS custom properties into :root {}
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     const rootProps = {};
     // Collect direct CSS properties into body {}
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, unknown>} */
     const bodyProps = {};
     for (const [key, val] of Object.entries(projectStyle)) {
       if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[") || key.startsWith("@"))
@@ -559,11 +580,11 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
         bodyProps[key] = val;
       }
     }
-    const rootCSS = toCSSText(/** @type {any} */ (rootProps));
+    const rootCSS = toCSSText(rootProps);
     if (rootCSS) {
       rules.push(`:root { ${rootCSS} }`);
     }
-    const bodyCSS = toCSSText(/** @type {any} */ (bodyProps));
+    const bodyCSS = toCSSText(bodyProps);
     if (bodyCSS) {
       rules.push(`body { ${bodyCSS} }`);
     }
@@ -579,12 +600,12 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
  * Recursively emit CSS rules for a nested element selector.
  *
  * @param {string} selector
- * @param {Record<string, any>} obj
+ * @param {Record<string, unknown>} obj
  * @param {string[]} rules
- * @param {Record<string, any>} mediaQueries
+ * @param {Record<string, string>} mediaQueries
  */
 function emitNestedElement(selector, obj, rules, mediaQueries) {
-  const props = toCSSText(/** @type {any} */ (obj));
+  const props = toCSSText(obj);
   if (props) rules.push(`${selector} { ${props} }`);
   for (const [key, val] of Object.entries(obj)) {
     if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
@@ -592,9 +613,9 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
       const query = key.startsWith("@--")
         ? (mediaQueries[key.slice(1)] ?? key.slice(1))
         : key.slice(1);
-      const mProps = toCSSText(/** @type {any} */ (val));
+      const mProps = toCSSText(val);
       if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
-      for (const [sel, sub] of Object.entries(/** @type {Record<string, any>} */ (val))) {
+      for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
         if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
         if (sel.startsWith("@")) continue;
         const resolved = sel.startsWith("&")
@@ -602,7 +623,7 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
           : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
             ? `${selector}${sel}`
             : `${selector} ${sel}`;
-        const subProps = toCSSText(/** @type {any} */ (sub));
+        const subProps = toCSSText(sub);
         if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
       }
       continue;
@@ -612,14 +633,14 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
       : key.startsWith(":") || key.startsWith(".") || key.startsWith("[")
         ? `${selector}${key}`
         : `${selector} ${key}`;
-    emitNestedElement(resolved, val, rules, mediaQueries);
+    emitNestedElement(resolved, /** @type {Record<string, unknown>} */ (val), rules, mediaQueries);
   }
 }
 
 /**
- * @param {any} def
+ * @param {JxElement | JxMutableNode | string} def
  * @param {string[]} rules
- * @param {Record<string, any>} mediaQueries
+ * @param {Record<string, string>} mediaQueries
  * @param {string} [_parentSel]
  * @param {{ n: number }} [counter]
  */
@@ -670,8 +691,10 @@ export function collectStyles(
         const query = prop.startsWith("@--")
           ? (mediaQueries[prop.slice(1)] ?? prop.slice(1))
           : prop.slice(1);
-        rules.push(`@media ${query} { ${selector} { ${toCSSText(/** @type {any} */ (val))} } }`);
-        for (const [sel, nestedRules] of Object.entries(/** @type {Record<string, any>} */ (val))) {
+        rules.push(`@media ${query} { ${selector} { ${toCSSText(val)} } }`);
+        for (const [sel, nestedRules] of Object.entries(
+          /** @type {Record<string, unknown>} */ (val),
+        )) {
           if (nestedRules === null || typeof nestedRules !== "object" || Array.isArray(nestedRules))
             continue;
           if (sel.startsWith("@")) continue;
@@ -680,9 +703,7 @@ export function collectStyles(
             : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
               ? `${selector}${sel}`
               : `${selector} ${sel}`;
-          rules.push(
-            `@media ${query} { ${resolved} { ${toCSSText(/** @type {any} */ (nestedRules))} } }`,
-          );
+          rules.push(`@media ${query} { ${resolved} { ${toCSSText(nestedRules)} } }`);
         }
       } else {
         const resolved = prop.startsWith("&")
@@ -690,13 +711,18 @@ export function collectStyles(
           : prop.startsWith(":") || prop.startsWith(".") || prop.startsWith("[")
             ? `${selector}${prop}`
             : `${selector} ${prop}`;
-        emitNestedElement(resolved, val, rules, mediaQueries);
+        emitNestedElement(
+          resolved,
+          /** @type {Record<string, unknown>} */ (val),
+          rules,
+          mediaQueries,
+        );
       }
     }
   }
 
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {any} */ c) => {
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) => {
       collectStyles(c, rules, mediaQueries, selector, counter, prefix);
     });
   }
@@ -747,7 +773,7 @@ export function tagNameToClassName(tagName) {
 /**
  * Recursively collect unique $src values from $prototype: "Function" entries.
  *
- * @param {any} doc
+ * @param {JxElement} doc
  * @returns {string[]}
  */
 export function collectSrcImports(doc) {
@@ -758,7 +784,7 @@ export function collectSrcImports(doc) {
 }
 
 /**
- * @param {any} def
+ * @param {JxElement | JxMutableNode | string} def
  * @param {Set<string>} srcs
  */
 function _walkSrc(def, srcs) {
@@ -768,40 +794,42 @@ function _walkSrc(def, srcs) {
       if (
         d &&
         typeof d === "object" &&
-        /** @type {any} */ (d).$prototype === "Function" &&
-        /** @type {any} */ (d).$src
+        /** @type {JxMutableNode} */ (d).$prototype === "Function" &&
+        /** @type {JxMutableNode} */ (d).$src
       ) {
-        srcs.add(/** @type {any} */ (d).$src);
+        srcs.add(/** @type {string} */ (/** @type {JxMutableNode} */ (d).$src));
       }
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {any} */ c) => _walkSrc(c, srcs));
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      _walkSrc(c, srcs),
+    );
   }
 }
 
 /**
  * Recursively collect all `timing: "server"` entries from the document tree.
  *
- * @param {any} doc
- * @returns {any[]}
+ * @param {JxElement} doc
+ * @returns {{ key: string; exportName: string; src: string }[]}
  */
 export function collectServerEntries(doc) {
-  /** @type {Map<string, any>} */
+  /** @type {Map<string, { key: string; exportName: string; src: string }>} */
   const entries = new Map();
   _walkServerEntries(doc, entries);
   return [...entries.values()];
 }
 
 /**
- * @param {any} def
- * @param {Map<string, any>} entries
+ * @param {JxElement | JxMutableNode | string} def
+ * @param {Map<string, { key: string; exportName: string; src: string }>} entries
  */
 function _walkServerEntries(def, entries) {
   if (!def || typeof def !== "object") return;
   if (def.state) {
     for (const [key, d] of Object.entries(def.state)) {
-      const entry = /** @type {any} */ (d);
+      const entry = /** @type {JxMutableNode} */ (d);
       if (
         entry &&
         typeof entry === "object" &&
@@ -815,7 +843,9 @@ function _walkServerEntries(def, entries) {
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((/** @type {any} */ c) => _walkServerEntries(c, entries));
+    def.children.forEach((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      _walkServerEntries(c, entries),
+    );
   }
 }
 
@@ -827,8 +857,8 @@ const SELF_CLOSING = new Set(["input", "br", "hr", "img", "meta", "link", "area"
 /**
  * Recursively render a Jx node tree to static HTML for pre-rendering.
  *
- * @param {any} node
- * @param {any} scope
+ * @param {JxElement | JxMutableNode | string} node
+ * @param {Record<string, unknown>} scope
  * @param {string | null} [slotContent] - HTML to substitute for `<slot>` elements
  * @returns {string}
  */
@@ -842,7 +872,11 @@ export function renderStaticNode(node, scope, slotContent = null) {
   }
   if (typeof node === "number" || typeof node === "boolean") return escapeHtml(String(node));
   if (Array.isArray(node))
-    return node.map((/** @type {any} */ c) => renderStaticNode(c, scope, slotContent)).join("\n");
+    return node
+      .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+        renderStaticNode(c, scope, slotContent),
+      )
+      .join("\n");
   if (!node || typeof node !== "object") return "";
 
   // Skip mapped arrays — can't pre-render dynamic lists
@@ -863,10 +897,12 @@ export function renderStaticNode(node, scope, slotContent = null) {
     inner = val != null ? escapeHtml(String(val)) : "";
   } else if (node.innerHTML) {
     const val = resolveStaticValue(node.innerHTML, scope);
-    inner = val != null ? val : node.innerHTML;
+    inner = val != null ? String(val) : /** @type {string} */ (node.innerHTML);
   } else if (Array.isArray(node.children)) {
     inner = node.children
-      .map((/** @type {any} */ c) => renderStaticNode(c, scope, slotContent))
+      .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+        renderStaticNode(c, scope, slotContent),
+      )
       .join("\n");
   }
 
@@ -876,39 +912,41 @@ export function renderStaticNode(node, scope, slotContent = null) {
 /**
  * Pre-render a component definition to static HTML for its inner content.
  *
- * @param {any} doc - Component JSON definition
- * @param {Record<string, any> | null} [propsOverride] - Instance-specific prop values to merge into
- *   state
+ * @param {JxElement} doc - Component JSON definition
+ * @param {Record<string, unknown> | null} [propsOverride] - Instance-specific prop values to merge
+ *   into state
  * @param {string | null} [slotContent] - HTML to substitute for `<slot>` elements
  * @returns {string} The pre-rendered innerHTML
  */
 export function preRenderComponentHtml(doc, propsOverride = null, slotContent = null) {
+  /** @type {Record<string, JxStateDefinition>} */
   let stateDefs = doc.state ?? {};
   if (propsOverride) {
     stateDefs = { ...stateDefs };
     for (const [key, value] of Object.entries(propsOverride)) {
       if (key in stateDefs) {
         const existing = stateDefs[key];
-        // If the existing definition is an expanded signal with "default", override the default
         if (
           existing &&
           typeof existing === "object" &&
           !Array.isArray(existing) &&
           "default" in existing
         ) {
-          stateDefs[key] = { ...existing, default: value };
+          stateDefs[key] = { .../** @type {JxStateObject} */ (existing), default: value };
         } else {
-          stateDefs[key] = value;
+          stateDefs[key] = /** @type {JxStateDefinition} */ (value);
         }
       } else {
-        stateDefs[key] = value;
+        stateDefs[key] = /** @type {JxStateDefinition} */ (value);
       }
     }
   }
   const scope = buildInitialScope(stateDefs, null);
   if (!Array.isArray(doc.children)) return "";
   return doc.children
-    .map((/** @type {any} */ c) => renderStaticNode(c, scope, slotContent))
+    .map((/** @type {JxElement | JxMutableNode | string} */ c) =>
+      renderStaticNode(c, scope, slotContent),
+    )
     .join("\n");
 }
 
@@ -918,7 +956,7 @@ export function preRenderComponentHtml(doc, propsOverride = null, slotContent = 
  * Returns true when: no event handlers, no $prototype entries (Functions, Request, Storage), no
  * $ref values. Conservative — returns false when uncertain.
  *
- * @param {any} doc - Component JSON definition
+ * @param {JxElement} doc - Component JSON definition
  * @returns {boolean}
  */
 export function isComponentFullyStatic(doc) {
@@ -926,7 +964,7 @@ export function isComponentFullyStatic(doc) {
 }
 
 /**
- * @param {any} node
+ * @param {JxElement | string | (JxElement | string)[]} node
  * @returns {boolean}
  */
 function _isStaticNode(node) {
@@ -942,7 +980,7 @@ function _isStaticNode(node) {
   if (node.state) {
     for (const def of Object.values(node.state)) {
       if (!def || typeof def !== "object") continue;
-      const d = /** @type {any} */ (def);
+      const d = /** @type {JxMutableNode} */ (def);
       if (d.$prototype) return false;
       if (d.$ref) return false;
     }
@@ -969,9 +1007,9 @@ function _isStaticNode(node) {
  * styles using .jx-N selectors via collectStyles.
  *
  * @param {string} tagName - The custom element tag name (used as CSS selector)
- * @param {any} styleDef - The component's style object
- * @param {any} [doc] - The full component document (for walking children)
- * @param {Record<string, any>} [mediaQueries] - Project media query definitions
+ * @param {JxStyle | null} styleDef - The component's style object
+ * @param {JxElement | null} [doc] - The full component document (for walking children)
+ * @param {Record<string, string>} [mediaQueries] - Project media query definitions
  * @returns {string} CSS text, or empty string if no styles
  */
 export function buildComponentCSS(tagName, styleDef, doc = null, mediaQueries = {}) {
@@ -1003,7 +1041,7 @@ export function buildComponentCSS(tagName, styleDef, doc = null, mediaQueries = 
         const query = prop.startsWith("@--")
           ? (mediaQueries[prop.slice(1)] ?? prop.slice(1))
           : prop.slice(1);
-        rules.push(`@media ${query} { ${tagName} { ${toCSSText(/** @type {any} */ (val))} } }`);
+        rules.push(`@media ${query} { ${tagName} { ${toCSSText(/** @type {object} */ (val))} } }`);
       } else if (
         prop.startsWith(":") ||
         prop.startsWith(".") ||
@@ -1011,7 +1049,7 @@ export function buildComponentCSS(tagName, styleDef, doc = null, mediaQueries = 
         prop.startsWith("[")
       ) {
         const resolved = prop.startsWith("&") ? prop.replace("&", tagName) : `${tagName}${prop}`;
-        rules.push(`${resolved} { ${toCSSText(/** @type {any} */ (val))} }`);
+        rules.push(`${resolved} { ${toCSSText(/** @type {object} */ (val))} }`);
       }
     }
   }

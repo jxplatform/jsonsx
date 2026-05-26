@@ -29,8 +29,11 @@ export async function handleResolve(req, root) {
     } else {
       moduleAbsPath = resolve(root, $src);
     }
-  } catch (/** @type {any} */ e) {
-    return new Response(`Cannot resolve $src "${$src}": ${e.message}`, { status: 400 });
+  } catch (/** @type {unknown} */ e) {
+    return new Response(
+      `Cannot resolve $src "${$src}": ${/** @type {{ message?: string }} */ (e).message}`,
+      { status: 400 },
+    );
   }
 
   // Rebase relative config paths from doc-relative to CWD-relative
@@ -74,7 +77,9 @@ export async function handleResolve(req, root) {
 
       // Self-contained: construct class from schema
       const DynClass = classFromSchema(classDef);
-      const instance = /** @type {any} */ (new DynClass(config));
+      const instance = /** @type {{ resolve?: () => unknown; value?: unknown }} */ (
+        new DynClass(config)
+      );
       const value =
         typeof instance.resolve === "function"
           ? await instance.resolve()
@@ -82,8 +87,11 @@ export async function handleResolve(req, root) {
             ? instance.value
             : instance;
       return Response.json(value);
-    } catch (/** @type {any} */ e) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json(
+        { error: /** @type {{ message?: string }} */ (e).message },
+        { status: 500 },
+      );
     }
   }
 
@@ -122,15 +130,20 @@ export async function handleServerFunction(req, root) {
     } else {
       moduleAbsPath = resolve(root, $src);
     }
-  } catch (/** @type {any} */ e) {
-    return new Response(`Cannot resolve $src: ${e.message}`, { status: 400 });
+  } catch (/** @type {unknown} */ e) {
+    return new Response(`Cannot resolve $src: ${/** @type {{ message?: string }} */ (e).message}`, {
+      status: 400,
+    });
   }
 
   let mod;
   try {
     mod = await import(moduleAbsPath);
-  } catch (/** @type {any} */ e) {
-    return new Response(`Failed to import "${$src}": ${e.message}`, { status: 500 });
+  } catch (/** @type {unknown} */ e) {
+    return new Response(
+      `Failed to import "${$src}": ${/** @type {{ message?: string }} */ (e).message}`,
+      { status: 500 },
+    );
   }
 
   const fn = mod[xport] ?? mod.default?.[xport];
@@ -141,8 +154,11 @@ export async function handleServerFunction(req, root) {
   try {
     const result = await fn(args);
     return Response.json(result ?? null);
-  } catch (/** @type {any} */ e) {
-    return Response.json({ error: e.message }, { status: 500 });
+  } catch (/** @type {unknown} */ e) {
+    return Response.json(
+      { error: /** @type {{ message?: string }} */ (e).message },
+      { status: 500 },
+    );
   }
 }
 
@@ -150,7 +166,7 @@ export async function handleServerFunction(req, root) {
  * Dynamically construct a class from a .class.json schema definition. Server-side variant — no
  * private field limitations.
  *
- * @param {any} classDef
+ * @param {ClassJsonDef} classDef
  */
 function classFromSchema(classDef) {
   const fields = classDef.$defs?.fields ?? {};
@@ -159,8 +175,8 @@ function classFromSchema(classDef) {
 
   class DynClass {
     constructor(config = {}) {
-      const self = /** @type {any} */ (this);
-      const cfg = /** @type {Record<string, any>} */ (config);
+      const self = /** @type {Record<string, unknown>} */ (this);
+      const cfg = /** @type {Record<string, unknown>} */ (config);
       for (const [key, field] of Object.entries(fields)) {
         const id = field.identifier ?? key;
         if (cfg[id] !== undefined) self[id] = cfg[id];
@@ -177,27 +193,28 @@ function classFromSchema(classDef) {
 
   for (const [key, method] of Object.entries(methods)) {
     const name = method.identifier ?? key;
-    const params = (method.parameters ?? []).map((/** @type {any} */ p) => {
-      if (p.$ref) return p.$ref.split("/").pop();
+    const params = (method.parameters ?? []).map((p) => {
+      if (p.$ref) return p.$ref.split("/").pop() ?? "arg";
       return p.identifier ?? p.name ?? "arg";
     });
     const bodyStr = Array.isArray(method.body) ? method.body.join("\n") : (method.body ?? "");
 
     if (method.role === "accessor") {
-      /** @type {any} */
+      /** @type {PropertyDescriptor} */
       const descriptor = {};
-      if (method.getter) descriptor.get = new Function(method.getter.body);
+      if (method.getter)
+        descriptor.get = /** @type {() => unknown} */ (new Function(method.getter.body));
       if (method.setter) {
-        const sp = (method.setter.parameters ?? []).map(
-          (/** @type {any} */ p) => p.$ref?.split("/").pop() ?? "v",
+        const sp = (method.setter.parameters ?? []).map((p) => p.$ref?.split("/").pop() ?? "v");
+        descriptor.set = /** @type {(v: unknown) => void} */ (
+          new Function(...sp, method.setter.body)
         );
-        descriptor.set = new Function(...sp, method.setter.body);
       }
       Object.defineProperty(DynClass.prototype, name, { ...descriptor, configurable: true });
     } else if (method.scope === "static") {
-      /** @type {any} */ (DynClass)[name] = new Function(...params, bodyStr);
+      /** @type {DynamicClass} */ (DynClass)[name] = new Function(...params, bodyStr);
     } else {
-      /** @type {any} */ (DynClass.prototype)[name] = new Function(...params, bodyStr);
+      /** @type {DynamicClass} */ (DynClass).prototype[name] = new Function(...params, bodyStr);
     }
   }
 

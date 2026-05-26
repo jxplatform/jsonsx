@@ -78,10 +78,15 @@ describe("addPackage", () => {
       await addPackage({ name: "is-number" });
       const pkgJson = JSON.parse(await Bun.file(join(FIXTURES, "package.json")).text());
       expect(pkgJson.dependencies["is-number"]).toBeDefined();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Accept network failures in CI
-      expect(e.message).toContain("Failed to add package");
+      expect(e instanceof Error ? e.message : String(e)).toContain("Failed to add package");
     }
+  });
+
+  test("throws with stderr when bun add fails", async () => {
+    writeFileSync(join(FIXTURES, "package.json"), "INVALID JSON");
+    await expect(addPackage({ name: "foo" })).rejects.toThrow("Failed to add package");
   });
 });
 
@@ -91,5 +96,25 @@ describe("removePackage", () => {
   test("throws when no project root", async () => {
     setProjectRoot(null);
     await expect(removePackage({ name: "lodash" })).rejects.toThrow("No project open");
+  });
+
+  test("runs bun remove in project root", async () => {
+    writeFileSync(
+      join(FIXTURES, "package.json"),
+      JSON.stringify({ name: "test", dependencies: { "is-number": "^7.0.0" } }),
+    );
+    try {
+      await removePackage({ name: "is-number" });
+      const pkgJson = JSON.parse(await Bun.file(join(FIXTURES, "package.json")).text());
+      const deps = pkgJson.dependencies || {};
+      expect(deps["is-number"]).toBeUndefined();
+    } catch (e: unknown) {
+      expect(e instanceof Error ? e.message : String(e)).toContain("Failed to remove package");
+    }
+  });
+
+  test("throws with stderr when bun remove fails", async () => {
+    writeFileSync(join(FIXTURES, "package.json"), "INVALID JSON");
+    await expect(removePackage({ name: "foo" })).rejects.toThrow("Failed to remove package");
   });
 });

@@ -704,6 +704,29 @@ The runtime performs manual light DOM slot distribution: capturing host children
 
 > **Status: Implemented.** Runtime `distributeSlots()` handles light DOM slot distribution.
 
+### 8.6 Annotations
+
+Any element may carry `$title` and `$description` as developer-facing metadata annotations, inspired by JSON Schema's annotation keywords:
+
+```json
+{
+  "tagName": "section",
+  "$title": "Hero Section",
+  "$description": "Primary landing area with headline and call-to-action buttons",
+  "children": [...]
+}
+```
+
+**Rules:**
+
+- Both are plain strings (not reactive, not `$ref`-resolvable)
+- Neither is applied to the DOM or compiled to HTML output
+- `$title` provides a human-friendly label for tooling (e.g., Jx Studio layers panel)
+- `$description` provides extended documentation for the element's purpose
+- In markdown remark directives, these map to `--title` and `--description` attributes
+
+> **Status: Implemented.** Runtime RESERVED_KEYS includes both; schema validates them on ElementDef.
+
 ---
 
 ## 9. Styling

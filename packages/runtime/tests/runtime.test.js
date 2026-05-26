@@ -873,7 +873,7 @@ describe("resolvePrototype", () => {
       "fd",
     );
     expect(result).toBeInstanceOf(FormData);
-    expect(result.get("name")).toBe("Alice");
+    expect(/** @type {any} */ (result).get("name")).toBe("Alice");
   });
 
   test("Blob: returns Blob", async () => {
@@ -895,7 +895,9 @@ describe("resolvePrototype", () => {
   test("unknown $prototype: warns and returns ref(null)", async () => {
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     const state = reactive(/** @type {Record<string, any>} */ ({}));
-    const result = await resolvePrototype({ $prototype: "Unknown" }, state, "u");
+    const result = /** @type {any} */ (
+      await resolvePrototype({ $prototype: "Unknown" }, state, "u")
+    );
     expect(isRef(result)).toBe(true);
     expect(result.value).toBeNull();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("Unknown"));

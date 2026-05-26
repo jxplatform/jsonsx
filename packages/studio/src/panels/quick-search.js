@@ -8,7 +8,7 @@ import { getLayerSlot } from "../ui/layers.js";
 
 let _open = false;
 let _query = "";
-/** @type {any[]} */
+/** @type {{ path: string; name?: string }[]} */
 let _results = [];
 let _selectedIndex = 0;
 let _debounceTimer = 0;
@@ -60,7 +60,9 @@ async function doSearch(/** @type {string} */ query) {
 function onInput(/** @type {Event} */ e) {
   _query = /** @type {HTMLInputElement} */ (e.target).value;
   clearTimeout(_debounceTimer);
-  _debounceTimer = /** @type {any} */ (setTimeout(() => doSearch(_query), 150));
+  _debounceTimer = /** @type {number} */ (
+    /** @type {unknown} */ (setTimeout(() => doSearch(_query), 150))
+  );
   renderOverlay();
 }
 
@@ -88,10 +90,10 @@ function onKeydown(/** @type {KeyboardEvent} */ e) {
   }
 }
 
-function selectItem(/** @type {any} */ item) {
+function selectItem(/** @type {{ path: string; name?: string }} */ item) {
   closeQuickSearch();
   const path = item.path;
-  trackRecentFile({ path, name: path.split("/").pop() });
+  trackRecentFile({ path, name: path.split("/").pop() || "" });
   openFileInTab(path);
 }
 
@@ -156,7 +158,7 @@ function renderOverlay() {
                 }}
               >
                 <span class="quick-search-icon"
-                  >${fileIcon(item.name || item.path.split("/").pop())}</span
+                  >${fileIcon(item.name || item.path.split("/").pop() || "")}</span
                 >
                 <span class="quick-search-name">${item.name || item.path.split("/").pop()}</span>
                 <span class="quick-search-path">${dirPart(item.path)}</span>

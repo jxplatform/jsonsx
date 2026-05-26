@@ -7,7 +7,7 @@ import { reactive, effectScope } from "../reactivity.js";
  *   zoom: number;
  *   activeMedia: string | null;
  *   activeSelector: string | null;
- *   editingFunction: object | null;
+ *   editingFunction: FunctionEditDef | null;
  *   featureToggles: Record<string, boolean>;
  *   styleSections: Record<string, boolean>;
  *   inspectorSections: Record<string, boolean>;
@@ -19,18 +19,19 @@ import { reactive, effectScope } from "../reactivity.js";
  *   stylebookFilter: string;
  *   stylebookCustomizedOnly: boolean;
  *   settingsTab: string;
- *   gitStatus: object | null;
- *   gitBranches: object | null;
+ *   gitStatus: GitStatusResult | null;
+ *   gitBranches: GitBranchesResult | null;
  *   gitCommitMessage: string;
  *   gitLoading: boolean;
  *   gitError: string | null;
- *   pendingInlineEdit: object | null;
+ *   gitDiffState: GitDiffState | null;
+ *   pendingInlineEdit: InlineEditDef | null;
  * }} TabUi
  */
 
 /**
  * @typedef {{
- *   document: Record<string, any>;
+ *   document: Record<string, unknown>;
  *   selection: (string | number)[] | null;
  * }} HistorySnapshot
  */
@@ -40,9 +41,9 @@ import { reactive, effectScope } from "../reactivity.js";
  *   id: string;
  *   documentPath: string | null;
  *   fileHandle: FileSystemFileHandle | null;
- *   scope: { stop(): void; run<T>(fn: () => T): T | undefined; [k: string]: any };
+ *   scope: { stop(): void; run<T>(fn: () => T): T | undefined; [k: string]: unknown };
  *   doc: {
- *     document: Record<string, any>;
+ *     document: JxMutableNode;
  *     content: { frontmatter: Record<string, unknown> };
  *     mode: string;
  *     sourceFormat: string | null;
@@ -52,14 +53,14 @@ import { reactive, effectScope } from "../reactivity.js";
  *   session: {
  *     selection: (string | number)[] | null;
  *     hover: (string | number)[] | null;
- *     clipboard: object | null;
- *     documentStack: object[];
+ *     clipboard: JxMutableNode | null;
+ *     documentStack: DocumentStackEntry[];
  *     ui: TabUi;
  *     canvas: {
  *       status: string;
- *       scope: { stop(): void; [k: string]: any } | null;
+ *       scope: { stop(): void; [k: string]: unknown } | null;
  *       error: string | null;
- *       pendingInlineEdit: object | null;
+ *       pendingInlineEdit: InlineEditDef | null;
  *     };
  *   };
  *   history: {
@@ -94,6 +95,7 @@ function createDefaultUi() {
     gitCommitMessage: "",
     gitLoading: false,
     gitError: null,
+    gitDiffState: null,
     pendingInlineEdit: null,
   };
 }
@@ -105,7 +107,7 @@ function createDefaultUi() {
  *   id: string;
  *   documentPath?: string | null;
  *   fileHandle?: FileSystemFileHandle | null;
- *   document: Record<string, any>;
+ *   document: Record<string, unknown>;
  *   frontmatter?: Record<string, unknown>;
  *   sourceFormat?: string | null;
  * }} opts
@@ -122,37 +124,39 @@ export function createTab({
   const scope = effectScope();
 
   const tab = /** @type {Tab} */ (
-    scope.run(() => ({
-      id,
-      documentPath,
-      fileHandle,
-      scope,
-      doc: reactive({
-        document,
-        sourceFormat,
-        content: { frontmatter: frontmatter || {} },
-        mode:
-          sourceFormat === "md"
-            ? "content"
-            : documentPath?.endsWith(".md")
+    /** @type {unknown} */ (
+      scope.run(() => ({
+        id,
+        documentPath,
+        fileHandle,
+        scope,
+        doc: reactive({
+          document,
+          sourceFormat,
+          content: { frontmatter: frontmatter || {} },
+          mode:
+            sourceFormat === "md"
               ? "content"
-              : "component",
-        handlersSource: null,
-        dirty: false,
-      }),
-      session: reactive({
-        selection: null,
-        hover: null,
-        clipboard: null,
-        documentStack: [],
-        ui: createDefaultUi(),
-        canvas: { status: "idle", scope: null, error: null, pendingInlineEdit: null },
-      }),
-      history: reactive({
-        snapshots: [{ document: structuredClone(document), selection: null }],
-        index: 0,
-      }),
-    }))
+              : documentPath?.endsWith(".md")
+                ? "content"
+                : "component",
+          handlersSource: null,
+          dirty: false,
+        }),
+        session: reactive({
+          selection: null,
+          hover: null,
+          clipboard: null,
+          documentStack: [],
+          ui: createDefaultUi(),
+          canvas: { status: "idle", scope: null, error: null, pendingInlineEdit: null },
+        }),
+        history: reactive({
+          snapshots: [{ document: structuredClone(document), selection: null }],
+          index: 0,
+        }),
+      }))
+    )
   );
 
   return tab;

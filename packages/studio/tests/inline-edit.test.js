@@ -59,9 +59,9 @@ describe("isInlineInContext", () => {
 
 describe("isInlineElement", () => {
   test("returns false for non-objects", () => {
-    expect(isInlineElement(null)).toBe(false);
-    expect(isInlineElement("text")).toBe(false);
-    expect(isInlineElement(42)).toBe(false);
+    expect(isInlineElement(/** @type {any} */ (null))).toBe(false);
+    expect(isInlineElement(/** @type {any} */ ("text"))).toBe(false);
+    expect(isInlineElement(/** @type {any} */ (42))).toBe(false);
   });
 
   test("returns true for inline tag nodes without parent", () => {

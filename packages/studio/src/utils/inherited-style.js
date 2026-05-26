@@ -9,43 +9,44 @@
 /**
  * Compute the inherited style object for a given breakpoint tab.
  *
- * @param {Record<string, any>} style — full style object (flat props + @media blocks + selectors)
+ * @param {JxStyle} style — full style object (flat props + @media blocks + selectors)
  * @param {string[]} mediaNames — ordered breakpoint names (from parseMediaEntries, respects cascade
  *   direction)
  * @param {string | null} activeTab — current breakpoint tab name, or null for base
  * @param {string | null} activeSelector — current nested selector, or null
- * @returns {Record<string, any>} Inherited style map (prop → value)
+ * @returns {Record<string, string | number>} Inherited style map (prop → value)
  */
 export function computeInheritedStyle(style, mediaNames, activeTab, activeSelector = null) {
   if (activeTab === null || mediaNames.length === 0) return {};
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, string | number>} */
   let inherited = {};
 
   if (!activeSelector) {
     // Start with base flat props
     for (const [p, v] of Object.entries(style)) {
-      if (typeof v !== "object") inherited[p] = v;
+      if (typeof v !== "object") inherited[p] = v ?? "";
     }
     // Layer each media block in order until current tab
     for (const name of mediaNames) {
       if (name === activeTab) break;
       const block = style[`@${name}`] || {};
       for (const [p, v] of Object.entries(block)) {
-        if (typeof v !== "object") inherited[p] = v;
+        if (typeof v !== "object") inherited[p] = v ?? "";
       }
     }
   } else {
     // Selector inheritance: base selector → each media's selector block in order
     const baseSel = style[activeSelector] || {};
     for (const [p, v] of Object.entries(baseSel)) {
-      if (typeof v !== "object") inherited[p] = v;
+      if (typeof v !== "object") inherited[p] = v ?? "";
     }
     for (const name of mediaNames) {
       if (name === activeTab) break;
-      const selBlock = (style[`@${name}`] || {})[activeSelector] || {};
+      const selBlock =
+        /** @type {Record<string, unknown>} */ (style[`@${name}`] || {})[activeSelector] || {};
       for (const [p, v] of Object.entries(selBlock)) {
-        if (typeof v !== "object") inherited[p] = v;
+        if (typeof v !== "object") inherited[p] = v ?? "";
       }
     }
   }

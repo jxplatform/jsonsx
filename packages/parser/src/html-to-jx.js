@@ -6,19 +6,19 @@ import { find, html as htmlInfo } from "property-information";
  * Convert an HTML string into an array of Jx tree nodes.
  *
  * @param {string} htmlString
- * @returns {any[]}
+ * @returns {(JxElement | string)[]}
  */
 export function htmlToJx(htmlString) {
   const hast = fromHtml(htmlString, { fragment: true });
-  return convertHastChildren(hast.children);
+  return convertHastChildren(/** @type {HastNode[]} */ (hast.children));
 }
 
 /**
- * @param {any[]} children
- * @returns {any[]}
+ * @param {HastNode[]} children
+ * @returns {(JxElement | string)[]}
  */
 function convertHastChildren(children) {
-  /** @type {any[]} */
+  /** @type {(JxElement | string)[]} */
   const result = [];
   for (const child of children) {
     const converted = convertHastNode(child);
@@ -28,17 +28,18 @@ function convertHastChildren(children) {
 }
 
 /**
- * @param {any} node
- * @returns {any}
+ * @param {HastNode} node
+ * @returns {JxElement | string | null}
  */
 function convertHastNode(node) {
   if (node.type === "text") {
-    if (whitespace(node)) return null;
-    return node.value;
+    if (whitespace(/** @type {import("hast").Nodes} */ (/** @type {unknown} */ (node))))
+      return null;
+    return node.value ?? null;
   }
 
   if (node.type === "element") {
-    /** @type {Record<string, any>} */
+    /** @type {JxElement} */
     const el = { tagName: node.tagName };
 
     if (node.properties && Object.keys(node.properties).length > 0) {
@@ -52,7 +53,7 @@ function convertHastNode(node) {
     if (kids.length === 1 && typeof kids[0] === "string") {
       el.textContent = kids[0];
     } else if (kids.length > 0) {
-      el.children = kids;
+      el.children = /** @type {JxElement[]} */ (kids);
     }
 
     return el;
@@ -62,7 +63,7 @@ function convertHastNode(node) {
 }
 
 /**
- * @param {Record<string, any>} properties
+ * @param {Record<string, unknown>} properties
  * @returns {{ style: Record<string, string>; attrs: Record<string, string> }}
  */
 function hastPropsToJx(properties) {

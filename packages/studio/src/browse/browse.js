@@ -15,6 +15,8 @@ import { yamlDefault } from "../settings/schema-field-ui.js";
 import { invalidateMediaCache } from "../ui/media-picker.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { componentRegistry } from "../files/components.js";
+
+/** @typedef {import("../files/components.js").ComponentEntry} ComponentEntry */
 import { showDialog, renderPopover } from "../ui/layers.js";
 import { renderComponentPreview } from "../panels/stylebook-panel.js";
 import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime";
@@ -150,7 +152,7 @@ function contentTypeFor(filePath) {
   const config = projectState?.projectConfig;
   if (!config?.contentTypes) return null;
   for (const [name, def] of Object.entries(config.contentTypes)) {
-    const d = /** @type {any} */ (def);
+    const d = /** @type {ContentTypeDef} */ (def);
     if (!d.source) continue;
     const prefix = d.source.replace(/^\.\//, "").split("/**")[0].split("/*")[0];
     if (filePath.startsWith(prefix + "/") || filePath === prefix) {
@@ -215,8 +217,8 @@ function buildFrontmatterYaml(contentTypeName) {
 
   let yaml = "";
   for (const [field, def] of Object.entries(col.schema.properties)) {
-    const d = /** @type {any} */ (def);
-    yaml += `${field}: ${yamlDefault(d.type, d.format)}\n`;
+    const d = /** @type {{ type?: string; format?: string }} */ (def);
+    yaml += `${field}: ${yamlDefault(d.type || "", d.format || "")}\n`;
   }
   return yaml || "title: Untitled\n";
 }
@@ -230,7 +232,7 @@ function getContentTypeTypes() {
   const config = projectState?.projectConfig;
   if (!config?.contentTypes) return [];
   return Object.entries(config.contentTypes).map(([name, def]) => {
-    const d = /** @type {any} */ (def);
+    const d = /** @type {ContentTypeDef} */ (def);
     const dir = d.source ? d.source.replace(/^\.\//, "").split("/")[0] : name;
     return {
       key: `contentType:${name}`,
@@ -415,8 +417,8 @@ async function browseRenameFile(file, container, ctx) {
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Renamed to ${newName}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -439,8 +441,8 @@ async function browseDuplicateFile(file, container, ctx) {
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Duplicated as ${copyName}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -458,8 +460,8 @@ async function browseDeleteFile(file, container, ctx) {
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Deleted ${file.name}`);
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -495,7 +497,7 @@ function showRenameDialog(currentName) {
           style="width:100%"
           value=${value}
           @input=${(/** @type {Event} */ e) => {
-            value = /** @type {any} */ (e.target).value || "";
+            value = /** @type {HTMLInputElement} */ (e.target).value || "";
           }}
           @keydown=${(/** @type {KeyboardEvent} */ e) => {
             if (e.key === "Enter") confirm();
@@ -506,7 +508,7 @@ function showRenameDialog(currentName) {
 
     requestAnimationFrame(() => {
       const layer = document.getElementById("layer-dialog");
-      const tf = /** @type {any} */ (layer?.querySelector("sp-textfield"));
+      const tf = /** @type {HTMLElement | null} */ (layer?.querySelector("sp-textfield"));
       if (tf) {
         tf.focus();
         const input = tf.shadowRoot?.querySelector("input");
@@ -587,7 +589,9 @@ async function loadPreview(el, file) {
   let preview = _previewCache.get(file.path);
   if (!preview) {
     try {
-      const comp = componentRegistry.find((/** @type {any} */ c) => c.path === file.path);
+      const comp = componentRegistry.find(
+        (/** @type {ComponentEntry} */ c) => c.path === file.path,
+      );
       if (comp) {
         preview = /** @type {HTMLElement | undefined} */ (await renderComponentPreview(comp));
       } else {
@@ -686,8 +690,8 @@ export async function renderBrowse(container, ctx) {
       size="s"
       placeholder="Filter files..."
       .value=${searchQuery}
-      @input=${(/** @type {any} */ e) => {
-        searchQuery = e.target.value;
+      @input=${(/** @type {Event} */ e) => {
+        searchQuery = /** @type {HTMLInputElement} */ (e.target).value;
         renderBrowse(container, ctx);
       }}
       @submit=${(/** @type {Event} */ e) => e.preventDefault()}
@@ -698,7 +702,8 @@ export async function renderBrowse(container, ctx) {
       </sp-action-button>
       <sp-popover slot="click-content" tip>
         <sp-menu
-          @change=${(/** @type {any} */ e) => handleNewEntity(e.target.value, container, ctx)}
+          @change=${(/** @type {Event} */ e) =>
+            handleNewEntity(/** @type {HTMLSelectElement} */ (e.target).value, container, ctx)}
         >
           ${ENTITY_TYPES.map((t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`)}
           ${contentTypeTypes.length
@@ -726,9 +731,10 @@ export async function renderBrowse(container, ctx) {
       accept=${UPLOAD_ACCEPT}
       class="browse-upload-input"
       style="display:none"
-      @change=${(/** @type {any} */ e) => {
-        if (e.target.files?.length) handleUpload(e.target.files, container, ctx);
-        e.target.value = "";
+      @change=${(/** @type {Event} */ e) => {
+        const input = /** @type {HTMLInputElement} */ (e.target);
+        if (input.files?.length) handleUpload(input.files, container, ctx);
+        input.value = "";
       }}
     />
     <div class="browse-view-switcher">

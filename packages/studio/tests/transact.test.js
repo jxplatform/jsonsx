@@ -40,7 +40,7 @@ describe("transactDoc", () => {
     expect(tab.history.index).toBe(1);
     expect(tab.history.snapshots).toHaveLength(2);
     expect(tab.doc.document.children).toHaveLength(2);
-    expect(tab.doc.document.children[1].tagName).toBe("span");
+    expect(/** @type {any} */ (tab.doc.document).children[1].tagName).toBe("span");
 
     disposeTab(tab);
   });
@@ -129,8 +129,8 @@ describe("mutateInsertNode", () => {
   test("inserts at given index", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateInsertNode(t, [], 0, { tagName: "header" }));
-    expect(tab.doc.document.children[0].tagName).toBe("header");
-    expect(tab.doc.document.children[1].tagName).toBe("p");
+    expect(/** @type {any} */ (tab.doc.document).children[0].tagName).toBe("header");
+    expect(/** @type {any} */ (tab.doc.document).children[1].tagName).toBe("p");
     disposeTab(tab);
   });
 
@@ -164,7 +164,7 @@ describe("mutateDuplicateNode", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateDuplicateNode(t, ["children", 0]));
     expect(tab.doc.document.children).toHaveLength(2);
-    expect(tab.doc.document.children[1].tagName).toBe("p");
+    expect(/** @type {any} */ (tab.doc.document).children[1].tagName).toBe("p");
     expect(tab.session.selection).toEqual(["children", 1]);
     disposeTab(tab);
   });
@@ -174,8 +174,8 @@ describe("mutateWrapNode", () => {
   test("wraps node in new element", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateWrapNode(t, ["children", 0], "section"));
-    expect(tab.doc.document.children[0].tagName).toBe("section");
-    expect(tab.doc.document.children[0].children[0].tagName).toBe("p");
+    expect(/** @type {any} */ (tab.doc.document).children[0].tagName).toBe("section");
+    expect(/** @type {any} */ (tab.doc.document).children[0].children[0].tagName).toBe("p");
     disposeTab(tab);
   });
 });
@@ -192,7 +192,9 @@ describe("mutateMoveNode", () => {
     const tab = makeTab(doc);
     transactDoc(tab, (t) => mutateMoveNode(t, ["children", 1], ["children", 0], 0));
     expect(tab.doc.document.children).toHaveLength(1);
-    expect(tab.doc.document.children[0].children[0].textContent).toBe("move me");
+    expect(/** @type {any} */ (tab.doc.document).children[0].children[0].textContent).toBe(
+      "move me",
+    );
     disposeTab(tab);
   });
 });
@@ -201,14 +203,14 @@ describe("mutateUpdateProperty", () => {
   test("sets a property", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", "World"));
-    expect(tab.doc.document.children[0].textContent).toBe("World");
+    expect(/** @type {any} */ (tab.doc.document).children[0].textContent).toBe("World");
     disposeTab(tab);
   });
 
   test("deletes property when value is empty", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 0], "textContent", ""));
-    expect(tab.doc.document.children[0].textContent).toBeUndefined();
+    expect(/** @type {any} */ (tab.doc.document).children[0].textContent).toBeUndefined();
     disposeTab(tab);
   });
 });
@@ -217,7 +219,7 @@ describe("mutateUpdateStyle", () => {
   test("sets and removes style", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateStyle(t, [], "color", "red"));
-    expect(tab.doc.document.style.color).toBe("red");
+    expect(/** @type {any} */ (tab.doc.document).style.color).toBe("red");
 
     transactDoc(tab, (t) => mutateUpdateStyle(t, [], "color", ""));
     expect(tab.doc.document.style).toBeUndefined();
@@ -229,10 +231,10 @@ describe("mutateUpdateAttribute", () => {
   test("sets and removes attribute", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateAttribute(t, ["children", 0], "id", "main"));
-    expect(tab.doc.document.children[0].attributes.id).toBe("main");
+    expect(/** @type {any} */ (tab.doc.document).children[0].attributes.id).toBe("main");
 
     transactDoc(tab, (t) => mutateUpdateAttribute(t, ["children", 0], "id", ""));
-    expect(tab.doc.document.children[0].attributes).toBeUndefined();
+    expect(/** @type {any} */ (tab.doc.document).children[0].attributes).toBeUndefined();
     disposeTab(tab);
   });
 });
@@ -241,7 +243,7 @@ describe("mutateUpdateMediaStyle", () => {
   test("sets media-scoped style", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateMediaStyle(t, [], "--md", "display", "flex"));
-    expect(tab.doc.document.style["@--md"].display).toBe("flex");
+    expect(/** @type {any} */ (tab.doc.document).style["@--md"].display).toBe("flex");
     disposeTab(tab);
   });
 });
@@ -250,7 +252,7 @@ describe("state definitions", () => {
   test("mutateAddDef / mutateRemoveDef", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateAddDef(t, "count", { $value: 0 }));
-    expect(tab.doc.document.state.count.$value).toBe(0);
+    expect(/** @type {any} */ (tab.doc.document).state.count.$value).toBe(0);
 
     transactDoc(tab, (t) => mutateRemoveDef(t, "count"));
     expect(tab.doc.document.state).toBeUndefined();
@@ -261,7 +263,7 @@ describe("state definitions", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateAddDef(t, "name", { $value: "hello" }));
     transactDoc(tab, (t) => mutateUpdateDef(t, "name", { $value: "world" }));
-    expect(tab.doc.document.state.name.$value).toBe("world");
+    expect(/** @type {any} */ (tab.doc.document).state.name.$value).toBe("world");
     disposeTab(tab);
   });
 
@@ -269,8 +271,8 @@ describe("state definitions", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateAddDef(t, "old", { $value: 1 }));
     transactDoc(tab, (t) => mutateRenameDef(t, "old", "new"));
-    expect(tab.doc.document.state.new.$value).toBe(1);
-    expect(tab.doc.document.state.old).toBeUndefined();
+    expect(/** @type {any} */ (tab.doc.document).state.new.$value).toBe(1);
+    expect(/** @type {any} */ (tab.doc.document).state.old).toBeUndefined();
     disposeTab(tab);
   });
 });
@@ -280,7 +282,7 @@ describe("mutateUpdateProp", () => {
     const doc = { tagName: "my-button", $props: { label: "Click" } };
     const tab = makeTab(doc);
     transactDoc(tab, (t) => mutateUpdateProp(t, [], "label", "Submit"));
-    expect(tab.doc.document.$props.label).toBe("Submit");
+    expect(/** @type {any} */ (tab.doc.document).$props.label).toBe("Submit");
 
     transactDoc(tab, (t) => mutateUpdateProp(t, [], "label", ""));
     expect(tab.doc.document.$props).toBeUndefined();

@@ -20,10 +20,10 @@ import { globSync } from "glob";
  * with commas and newlines.
  *
  * @param {string} csv - Raw CSV text
- * @returns {Record<string, any>[]} Array of row objects
+ * @returns {Record<string, string>[]} Array of row objects
  */
 function parseCSV(csv) {
-  /** @type {Record<string, any>[]} */
+  /** @type {Record<string, string>[]} */
   const rows = [];
   let current = "";
   let inQuotes = false;
@@ -82,7 +82,7 @@ function parseCSV(csv) {
   const headers = parseRow(lines[0]);
   for (let i = 1; i < lines.length; i++) {
     const fields = parseRow(lines[i]);
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, string>} */
     const obj = {};
     for (let j = 0; j < headers.length; j++) {
       obj[headers[j].trim()] = fields[j]?.trim() ?? "";
@@ -94,35 +94,35 @@ function parseCSV(csv) {
 
 // ─── Markdown loader ──────────────────────────────────────────────────────────
 
-/** @type {any} */
+/**
+ * @type {{
+ *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
+ * } | null}
+ */
 let _mdModule = null;
 
 /**
  * Lazily import @jxsuite/parser for Markdown support. This avoids hard dependency — only loads when
  * MD content types exist.
  *
- * @returns {Promise<any>}
+ * @returns {Promise<{
+ *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
+ * }>}
  */
 async function getMarkdownModule() {
   if (!_mdModule) {
-    _mdModule = await import("@jxsuite/parser");
+    _mdModule = /** @type {any} */ (await import("@jxsuite/parser"));
   }
-  return _mdModule;
+  return /** @type {NonNullable<typeof _mdModule>} */ (_mdModule);
 }
 
-/**
- * Load a single markdown file into a ContentEntry.
- *
- * @param {string} filePath - Absolute path to .md file
- * @returns {Promise<object>} ContentEntry shape
- */
 /**
  * Load a markdown file into a ContentEntry. If directiveOptions are provided, they control which
  * custom element directives are available in the markdown.
  *
  * @param {string} filePath - Absolute path to .md file
- * @param {any} [directiveOptions] - Options for the MarkdownDirective plugin
- * @returns {Promise<object>} ContentEntry shape
+ * @param {unknown} [directiveOptions] - Options for the MarkdownDirective plugin
+ * @returns {Promise<ContentLoaderEntry>} ContentEntry shape
  */
 async function loadMarkdownEntry(filePath, directiveOptions) {
   const { MarkdownFile } = await getMarkdownModule();
@@ -147,22 +147,24 @@ async function loadMarkdownEntry(filePath, directiveOptions) {
  * an object with an `id` field, it's a single entry.
  *
  * @param {string} filePath - Absolute path to .json file
- * @returns {object[]} Array of ContentEntry shapes
+ * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
  */
 function loadJSONEntries(filePath) {
   const raw = JSON.parse(readFileSync(filePath, "utf-8"));
   if (Array.isArray(raw)) {
-    return raw.map((/** @type {any} */ item, /** @type {number} */ i) => ({
-      id: item.id ?? basename(filePath, ".json") + "-" + i,
+    return raw.map((/** @type {Record<string, unknown>} */ item, /** @type {number} */ i) => ({
+      id: /** @type {string} */ (item.id) ?? basename(filePath, ".json") + "-" + i,
       data: item,
       body: null,
     }));
   }
   // Single object file — filename is the id
+  /** @type {Record<string, unknown>} */
+  const rawObj = raw;
   return [
     {
-      id: raw.id ?? basename(filePath, ".json"),
-      data: raw,
+      id: /** @type {string} */ (rawObj.id) ?? basename(filePath, ".json"),
+      data: rawObj,
       body: null,
     },
   ];
@@ -172,26 +174,29 @@ function loadJSONEntries(filePath) {
  * Load a CSV file into ContentEntry(s).
  *
  * @param {string} filePath - Absolute path to .csv file
- * @param {any} [schema] - Content type schema (for type coercion)
- * @returns {object[]} Array of ContentEntry shapes
+ * @param {ContentTypeSchema} [schema] - Content type schema (for type coercion)
+ * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
  */
 function loadCSVEntries(filePath, schema) {
   const csv = readFileSync(filePath, "utf-8");
   const rows = parseCSV(csv);
-  return rows.map((/** @type {Record<string, any>} */ row, /** @type {number} */ i) => {
+  return rows.map((/** @type {Record<string, string>} */ row, /** @type {number} */ i) => {
     // Apply type coercion based on schema if available
+    /** @type {Record<string, unknown>} */
+    const data = { ...row };
     if (schema?.properties) {
       for (const [key, def] of Object.entries(schema.properties)) {
-        const d = /** @type {any} */ (def);
-        if (key in row) {
-          if (d.type === "number") row[key] = Number(row[key]);
-          else if (d.type === "boolean") row[key] = row[key] === "true";
+        if (key in data) {
+          if (def.type === "number") data[key] = Number(data[key]);
+          else if (def.type === "boolean") data[key] = data[key] === "true";
         }
       }
     }
     // Use `id` column, `sku` column, or row index as the entry ID
-    const id = row.id ?? row.sku ?? String(i);
-    return { id, data: row, body: null };
+    const id = /** @type {string | undefined} */ (data.id) ??
+    /** @type {string | undefined} */ (data.sku) ??
+    String(i);
+    return { id, data, body: null };
   });
 }
 
@@ -201,14 +206,16 @@ function loadCSVEntries(filePath, schema) {
  * Load and parse content types config from project.json.
  *
  * @param {string} projectRoot - Project root directory
- * @param {Record<string, any>} [projectConfig] - Already-loaded project config with `contentTypes`
- *   key
- * @returns {{ config: any; contentDir: string } | null} Parsed config or null if no content dir
+ * @param {ProjectConfig} [projectConfig] - Already-loaded project config with `contentTypes` key
+ * @returns {{
+ *   config: { contentTypes: Record<string, ContentTypeDef> };
+ *   contentDir: string;
+ * } | null}
+ *   Parsed config or null if no content dir
  */
 export function loadContentConfig(projectRoot, projectConfig = undefined) {
   const contentDir = resolve(projectRoot, "content");
 
-  /** @type {any} */
   const config = { contentTypes: projectConfig?.contentTypes ?? {} };
 
   return { config, contentDir };
@@ -220,19 +227,20 @@ export function loadContentConfig(projectRoot, projectConfig = undefined) {
  * Load all content types defined in project.json.
  *
  * @param {string} projectRoot - Project root directory
- * @param {Record<string, any>} [projectConfig] - Already-loaded project config
- * @returns {Promise<Map<string, any[]>>} Map of content type name → array of ContentEntry
+ * @param {ProjectConfig} [projectConfig] - Already-loaded project config
+ * @returns {Promise<Map<string, ContentLoaderEntry[]>>} Map of content type name → array of
+ *   ContentEntry
  */
 export async function loadContentTypes(projectRoot, projectConfig = undefined) {
   const result = loadContentConfig(projectRoot, projectConfig);
   if (!result) return new Map();
 
   const { config } = result;
-  /** @type {Map<string, any[]>} */
+  /** @type {Map<string, ContentLoaderEntry[]>} */
   const contentTypes = new Map();
 
   for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
-    const entries = await loadContentType(name, /** @type {any} */ (contentTypeDef), projectRoot);
+    const entries = await loadContentType(name, contentTypeDef, projectRoot);
     contentTypes.set(name, entries);
   }
 
@@ -244,8 +252,8 @@ export async function loadContentTypes(projectRoot, projectConfig = undefined) {
  *
  * @param {string} projectRoot - Project root directory
  * @param {string} contentTypeName - Name of the content type
- * @param {Record<string, any>} [projectConfig] - Already-loaded project config
- * @returns {any[] | undefined}
+ * @param {ProjectConfig} [projectConfig] - Already-loaded project config
+ * @returns {(string | JxElement)[] | undefined}
  */
 export function getContentTypeElements(projectRoot, contentTypeName, projectConfig = undefined) {
   const result = loadContentConfig(projectRoot, projectConfig);
@@ -258,21 +266,24 @@ export function getContentTypeElements(projectRoot, contentTypeName, projectConf
  * Load a single content type by its definition.
  *
  * @param {string} name - Content type name
- * @param {any} contentTypeDef - Content type definition from project.json
+ * @param {ContentTypeDef} contentTypeDef - Content type definition from project.json
  * @param {string} projectRoot - Absolute path to project root directory
- * @returns {Promise<any[]>} Array of ContentEntry
+ * @returns {Promise<ContentLoaderEntry[]>} Array of ContentEntry
  */
 async function loadContentType(name, contentTypeDef, projectRoot) {
   const source = contentTypeDef.source;
   const schema = contentTypeDef.schema;
 
   // Derive directive allowedNames from content type $elements (tag names from npm packages)
-  /** @type {any} */
   const directiveOptions = contentTypeDef.$elements?.length
     ? {
         allowedNames: contentTypeDef.$elements
-          .filter((/** @type {any} */ e) => typeof e === "string" || e?.$ref)
-          .map((/** @type {any} */ e) => (typeof e === "string" ? e : e.$ref)),
+          .filter(
+            (e) =>
+              typeof e === "string" ||
+              (typeof e === "object" && /** @type {JxMutableNode} */ (e)?.$ref),
+          )
+          .map((e) => (typeof e === "string" ? e : /** @type {JxMutableNode} */ (e).$ref)),
       }
     : undefined;
 
@@ -280,7 +291,7 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
   const pattern = resolve(projectRoot, source).split("\\").join("/");
   const files = globSync(pattern, { absolute: true });
 
-  /** @type {any[]} */
+  /** @type {ContentLoaderEntry[]} */
   const entries = [];
 
   for (const filePath of files) {
@@ -309,8 +320,8 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
  * Validate content entries against their content type schema. Logs warnings for missing required
  * fields and type mismatches.
  *
- * @param {any[]} entries - Array of ContentEntry
- * @param {any} schema - JSON Schema for the content type
+ * @param {ContentLoaderEntry[]} entries - Array of ContentEntry
+ * @param {ContentTypeSchema} schema - JSON Schema for the content type
  * @param {string} contentTypeName - For error messages
  */
 function validateEntries(entries, schema, contentTypeName) {
@@ -329,23 +340,22 @@ function validateEntries(entries, schema, contentTypeName) {
 
     // Check types
     for (const [field, def] of Object.entries(properties)) {
-      const d = /** @type {any} */ (def);
       const value = entry.data[field];
       if (value == null) continue;
 
-      if (d.type === "string" && typeof value !== "string") {
+      if (def.type === "string" && typeof value !== "string") {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected string, got ${typeof value}`,
         );
-      } else if (d.type === "number" && typeof value !== "number") {
+      } else if (def.type === "number" && typeof value !== "number") {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected number, got ${typeof value}`,
         );
-      } else if (d.type === "boolean" && typeof value !== "boolean") {
+      } else if (def.type === "boolean" && typeof value !== "boolean") {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected boolean, got ${typeof value}`,
         );
-      } else if (d.type === "array" && !Array.isArray(value)) {
+      } else if (def.type === "array" && !Array.isArray(value)) {
         console.warn(
           `Content validation: "${contentTypeName}/${entry.id}" field "${field}" expected array, got ${typeof value}`,
         );
@@ -360,18 +370,23 @@ function validateEntries(entries, schema, contentTypeName) {
  * Query a loaded content type with filter, sort, and limit. Implements the ContentCollection
  * $prototype resolution.
  *
- * @param {any[]} entries - Full content type entries
- * @param {any} [query] - Query options
- * @returns {any[]} Filtered, sorted, limited entries
+ * @param {ContentLoaderEntry[]} entries - Full content type entries
+ * @param {{
+ *   filter?: Record<string, unknown>;
+ *   sort?: { field: string; order?: string };
+ *   limit?: number;
+ * }} [query]
+ *   - Query options
+ * @returns {ContentLoaderEntry[]} Filtered, sorted, limited entries
  */
 export function queryContentType(entries, query = {}) {
   let result = [...entries];
 
   // Filter
   if (query.filter && typeof query.filter === "object") {
-    result = result.filter((/** @type {any} */ entry) => {
+    result = result.filter((entry) => {
       for (const [key, expected] of Object.entries(
-        /** @type {Record<string, any>} */ (query.filter),
+        /** @type {Record<string, unknown>} */ (query.filter),
       )) {
         const actual = entry.data[key];
         if (actual !== expected) return false;
@@ -383,9 +398,9 @@ export function queryContentType(entries, query = {}) {
   // Sort
   if (query.sort) {
     const { field, order = "asc" } = query.sort;
-    result.sort((/** @type {any} */ a, /** @type {any} */ b) => {
-      const aVal = a.data[field] ?? "";
-      const bVal = b.data[field] ?? "";
+    result.sort((a, b) => {
+      const aVal = /** @type {string | number} */ (a.data[field] ?? "");
+      const bVal = /** @type {string | number} */ (b.data[field] ?? "");
       if (aVal < bVal) return order === "asc" ? -1 : 1;
       if (aVal > bVal) return order === "asc" ? 1 : -1;
       return 0;
@@ -403,12 +418,12 @@ export function queryContentType(entries, query = {}) {
 /**
  * Find a single entry by ID in a content type. Implements the ContentEntry $prototype resolution.
  *
- * @param {any[]} entries - Full content type entries
+ * @param {ContentLoaderEntry[]} entries - Full content type entries
  * @param {string} id - Entry ID to find
- * @returns {any | null} The matching entry or null
+ * @returns {ContentLoaderEntry | null} The matching entry or null
  */
 export function findEntry(entries, id) {
-  return entries.find((/** @type {any} */ e) => e.id === id) ?? null;
+  return entries.find((e) => e.id === id) ?? null;
 }
 
 // ─── Content Type Reference Resolution ──────────────────────────────────────
@@ -418,29 +433,27 @@ export function findEntry(entries, id) {
  * "jane-doe"` with a schema `$ref` to the authors content type gets resolved to the full author
  * entry.
  *
- * @param {Map<string, any[]>} contentTypes - All loaded content types @param {any} config -
- * Content.config.json
+ * @param {Map<string, ContentLoaderEntry[]>} contentTypes - All loaded content types @param {{
+ * contentTypes: Record<string, ContentTypeDef> }} config - Content config
  */
 export function resolveContentTypeRefs(contentTypes, config) {
   for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
-    const cd = /** @type {any} */ (contentTypeDef);
-    const schema = cd.schema;
+    const schema = contentTypeDef.schema;
     if (!schema?.properties) continue;
 
     const entries = contentTypes.get(name);
     if (!entries) continue;
 
     for (const [field, def] of Object.entries(schema.properties)) {
-      const d = /** @type {any} */ (def);
-      if (!d.$ref?.startsWith("#/contentTypes/")) continue;
-      const refContentType = d.$ref.replace("#/contentTypes/", "");
+      if (!def.$ref?.startsWith("#/contentTypes/")) continue;
+      const refContentType = def.$ref.replace("#/contentTypes/", "");
       const refEntries = contentTypes.get(refContentType);
       if (!refEntries) continue;
 
       for (const entry of entries) {
         const refId = entry.data[field];
         if (typeof refId === "string") {
-          const resolved = refEntries.find((/** @type {any} */ e) => e.id === refId);
+          const resolved = refEntries.find((e) => e.id === refId);
           if (resolved) {
             entry.data[field] = resolved;
           }

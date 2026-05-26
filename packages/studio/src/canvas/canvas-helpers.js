@@ -7,7 +7,7 @@ import { canvasPanels, elToPath, pathsEqual, getNodeAtPath, parentElementPath } 
 import { activeTab } from "../workspace/workspace.js";
 import { isInlineInContext } from "../editor/inline-edit.js";
 
-/** @type {any} */
+/** @type {{ getCanvasMode: () => string; getZoom: () => number } | null} */
 let _ctx = null;
 
 /**
@@ -21,9 +21,10 @@ export function initCanvasHelpers(ctx) {
 
 /** Effective zoom scale — always 1 in edit (content) mode, actual zoom otherwise. */
 export function effectiveZoom() {
-  return _ctx.getCanvasMode() === "edit"
+  const ctx = /** @type {{ getCanvasMode: () => string; getZoom: () => number }} */ (_ctx);
+  return ctx.getCanvasMode() === "edit"
     ? 1
-    : (_ctx.getZoom?.() ?? activeTab.value?.session.ui.zoom ?? 1);
+    : (ctx.getZoom?.() ?? activeTab.value?.session.ui.zoom ?? 1);
 }
 
 /** Return the active canvas panel based on the current activeMedia setting. */
@@ -42,10 +43,11 @@ export function getActivePanel() {
  * Walk up the tree from a path, bubbling past inline elements until we find the nearest non-inline
  * ancestor. Returns the original path if already non-inline.
  *
- * @param {any} doc
- * @param {any} path
+ * @param {JxMutableNode | undefined} doc
+ * @param {JxPath} path
  */
 export function bubbleInlinePath(doc, path) {
+  if (!doc) return path;
   let currentPath = path;
   while (currentPath.length >= 2) {
     const node = getNodeAtPath(doc, currentPath);
@@ -55,7 +57,7 @@ export function bubbleInlinePath(doc, path) {
     const childTag = (node.tagName ?? "div").toLowerCase();
     const parentTag = (parentNode.tagName ?? "div").toLowerCase();
     if (!isInlineInContext(childTag, parentTag)) break;
-    currentPath = pPath;
+    currentPath = /** @type {JxPath} */ (pPath);
   }
   return currentPath;
 }
@@ -63,11 +65,13 @@ export function bubbleInlinePath(doc, path) {
 /**
  * Find a canvas DOM element by its document path.
  *
- * @param {any} path
- * @param {any} canvasEl
+ * @param {JxPath} path
+ * @param {HTMLElement} canvasEl
+ * @returns {HTMLElement | null}
  */
 export function findCanvasElement(path, canvasEl) {
-  let el = canvasEl.firstElementChild;
+  /** @type {HTMLElement | null | undefined} */
+  let el = /** @type {HTMLElement | null} */ (canvasEl.firstElementChild);
   if (!el) return null;
   if (path.length === 0) return el;
 
@@ -75,11 +79,11 @@ export function findCanvasElement(path, canvasEl) {
     if (path[i] !== "children" && path[i] !== "cases") return null;
     const idx = path[i + 1];
     if (idx === undefined) {
-      el = el.children[0];
+      el = /** @type {HTMLElement | undefined} */ (el.children[0]);
     } else if (idx === "map") {
-      el = el.children[0]?.children[0];
+      el = /** @type {HTMLElement | undefined} */ (el.children[0]?.children[0]);
     } else {
-      el = el.children[idx];
+      el = /** @type {HTMLElement | undefined} */ (el.children[/** @type {number} */ (idx)]);
     }
     if (!el) break;
   }
@@ -91,7 +95,7 @@ export function findCanvasElement(path, canvasEl) {
 
   for (const candidate of canvasEl.querySelectorAll("*")) {
     const p = elToPath.get(candidate);
-    if (p && pathsEqual(p, path)) return candidate;
+    if (p && pathsEqual(p, path)) return /** @type {HTMLElement} */ (candidate);
   }
   return null;
 }
@@ -99,18 +103,19 @@ export function findCanvasElement(path, canvasEl) {
 /**
  * Build an overlay box descriptor (no DOM creation).
  *
- * @param {any} el
- * @param {any} type
- * @param {any} panel
+ * @param {Element} el
+ * @param {string} type
+ * @param {import("./canvas-render.js").CanvasPanel} panel
  */
 export function overlayBoxDescriptor(el, type, panel) {
-  const vpRect = panel.viewport.getBoundingClientRect();
+  const viewport = /** @type {HTMLElement} */ (panel.viewport);
+  const vpRect = viewport.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
   const scale = effectiveZoom();
   return {
     cls: `overlay-box overlay-${type}`,
-    top: `${(elRect.top - vpRect.top + panel.viewport.scrollTop) / scale}px`,
-    left: `${(elRect.left - vpRect.left + panel.viewport.scrollLeft) / scale}px`,
+    top: `${(elRect.top - vpRect.top + viewport.scrollTop) / scale}px`,
+    left: `${(elRect.left - vpRect.left + viewport.scrollLeft) / scale}px`,
     width: `${elRect.width / scale}px`,
     height: `${elRect.height / scale}px`,
   };

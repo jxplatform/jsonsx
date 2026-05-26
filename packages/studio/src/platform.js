@@ -11,10 +11,8 @@
  * See spec/desktop.md §3 for the full StudioPlatform interface.
  */
 
-/** @typedef {Record<string, any>} StudioPlatform */
-
-/** @type {any} */
-const g = globalThis;
+/** @type {{ __jxPlatform?: StudioPlatform }} */
+const g = /** @type {{ __jxPlatform?: StudioPlatform }} */ (/** @type {unknown} */ (globalThis));
 
 /** @param {StudioPlatform} platform */
 export function registerPlatform(platform) {

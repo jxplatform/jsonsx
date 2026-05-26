@@ -53,7 +53,7 @@ export function activeBreakpointsForWidth(sizeBreakpoints, canvasWidth) {
  * first, then matching media overrides in source order.
  *
  * @param {HTMLElement} el
- * @param {Record<string, any>} styleDef
+ * @param {JxStyle | null | undefined} styleDef
  * @param {Set<string>} activeBreakpoints
  * @param {Record<string, boolean>} featureToggles
  */
@@ -63,7 +63,7 @@ export function applyCanvasStyle(el, styleDef, activeBreakpoints, featureToggles
     if (typeof val === "string" || typeof val === "number") {
       try {
         if (prop.startsWith("--")) el.style.setProperty(prop, String(val));
-        else /** @type {any} */ (el.style)[prop] = val;
+        else /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (el.style))[prop] = val;
       } catch {}
     }
   }
@@ -72,11 +72,12 @@ export function applyCanvasStyle(el, styleDef, activeBreakpoints, featureToggles
     const mediaName = key.slice(1);
     if (mediaName === "--") continue;
     if (activeBreakpoints.has(mediaName) || featureToggles[mediaName]) {
-      for (const [prop, v] of Object.entries(/** @type {any} */ (val))) {
+      for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
         if (typeof v === "string" || typeof v === "number") {
           try {
             if (prop.startsWith("--")) el.style.setProperty(prop, String(v));
-            else /** @type {any} */ (el.style)[prop] = v;
+            else
+              /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (el.style))[prop] = v;
           } catch {}
         }
       }

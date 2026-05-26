@@ -16,11 +16,15 @@ import { effectiveZoom } from "../canvas/canvas-helpers.js";
 
 /**
  * @typedef {{
+ *   mediaName: string | null;
+ *   element: HTMLElement | null;
  *   canvas: HTMLElement;
- *   overlayClk: HTMLElement;
  *   overlay: HTMLElement;
+ *   overlayClk: HTMLElement;
  *   viewport: HTMLElement;
+ *   scrollContainer: HTMLElement | null;
  *   dropLine: HTMLElement;
+ *   _width: number | null;
  * }} CanvasPanel
  *
  * @typedef {(string | number)[]} JxPath
@@ -56,7 +60,9 @@ export function registerPanelDnD(panel) {
     onDrop() {
       _activeDropEl?.classList.remove("canvas-drop-target");
       _activeDropEl = null;
-      for (const p of canvasPanels) p.dropLine.style.display = "none";
+      for (const p of canvasPanels) {
+        if (p.dropLine) p.dropLine.style.display = "none";
+      }
       view.lastDragInput = null;
       for (const el of canvas.querySelectorAll("*")) {
         /** @type {HTMLElement} */ (el).style.pointerEvents = "none";

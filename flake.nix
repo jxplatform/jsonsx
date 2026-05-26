@@ -50,7 +50,7 @@
             default = pkgs.callPackage ./packages/desktop/package.nix { };
           };
 
-          process-compose.devServices = {
+          process-compose.start-services = {
             settings.processes = {
               chrome-debugging.command = ''
                 rm -rf "''${STATE_DIR}/chrome-devtools"
@@ -88,7 +88,7 @@
                 rm -rf "$ICONSET"
                 mkdir -p "$ICONSET"
 
-                for size in 16 32 128 256 512; do
+                for size in 16 32 48 128 256 512; do
                   rsvg-convert -w $size -h $size "$SRC" -o "$ICONSET/icon_''${size}x''${size}.png"
                   double=$((size * 2))
                   rsvg-convert -w $double -h $double "$SRC" -o "$ICONSET/icon_''${size}x''${size}@2x.png"
@@ -96,15 +96,18 @@
 
                 cp "$ICONSET/icon_512x512.png" "packages/desktop/icon.png"
 
-                echo "Generated icons in $ICONSET/ and packages/desktop/icon.png"
+                magick "$ICONSET/icon_16x16.png" "$ICONSET/icon_32x32.png" "$ICONSET/icon_48x48.png" "$ICONSET/icon_256x256.png" "packages/desktop/icon.ico"
+
+                echo "Generated icons in $ICONSET/, packages/desktop/icon.png, and packages/desktop/icon.ico"
               '')
             ];
 
             packages = with pkgs; [
-              self'.packages.devServices
+              self'.packages.start-services
               bun
               google-chrome
               husky
+              imagemagick
               librsvg
               mcp-server-fetch
               mcp-server-filesystem

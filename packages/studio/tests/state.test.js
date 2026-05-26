@@ -63,7 +63,7 @@ describe("getNodeAtPath", () => {
   });
 
   test("resolves a non-children key", () => {
-    expect(getNodeAtPath(doc, ["tagName"])).toBe("div");
+    expect(/** @type {any} */ (getNodeAtPath(doc, ["tagName"]))).toBe("div");
   });
 });
 
@@ -168,7 +168,7 @@ describe("flattenTree", () => {
     expect(rows.length).toBe(5); // root + h1 + section + p + span
     expect(rows[0].nodeType).toBe("element");
     expect(rows[0].depth).toBe(0);
-    expect(rows[1].node.tagName).toBe("h1");
+    expect(/** @type {JxMutableNode} */ (rows[1].node).tagName).toBe("h1");
     expect(rows[1].depth).toBe(1);
   });
 
@@ -181,12 +181,14 @@ describe("flattenTree", () => {
         map: { tagName: "li", textContent: "item" },
       },
     };
-    const rows = flattenTree(doc);
+    const rows = flattenTree(/** @type {any} */ (doc));
     expect(rows.some((r) => r.nodeType === "map")).toBe(true);
     const mapRow = rows.find((r) => r.nodeType === "map");
     expect(/** @type {any} */ (mapRow).depth).toBe(1);
     // Template element should be at depth 2
-    const templateRow = rows.find((r) => r.node.tagName === "li" && r.depth === 2);
+    const templateRow = rows.find(
+      (r) => /** @type {JxMutableNode} */ (r.node).tagName === "li" && r.depth === 2,
+    );
     expect(templateRow).toBeDefined();
   });
 
@@ -237,7 +239,7 @@ describe("flattenTree", () => {
     const rows = flattenTree(doc);
     // Should have the root + the slotted p child
     expect(rows.length).toBe(2);
-    expect(rows[1].node.tagName).toBe("p");
+    expect(/** @type {JxMutableNode} */ (rows[1].node).tagName).toBe("p");
     expect(rows[1].path).toEqual(["children", 0]);
   });
 

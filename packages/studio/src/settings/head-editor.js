@@ -1,32 +1,41 @@
 /**
  * Head editor — structured form for managing $head entries (link, meta, script, style tags) with
- * Monaco editor for script/style bodies.
+ * Monaco editor for script/style bodies. Also manages project-level Google Fonts.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { projectState } from "../store.js";
 import { updateSiteConfig } from "../site-context.js";
+import {
+  isGoogleFontEntry,
+  extractFontFamily,
+  buildGoogleFontUrl,
+  ensureGoogleFontPreconnects,
+  cleanupGoogleFontPreconnects,
+} from "../utils/google-fonts.js";
 
 /** @param {HTMLElement} container */
 export function renderHeadEditor(container) {
-  const config = projectState.projectConfig || {};
-  const headEntries = config.$head || [];
+  const config = /** @type {ProjectConfig} */ (projectState?.projectConfig || {});
+  const headEntries = /** @type {JxHeadEntry[]} */ (config.$head || []);
 
   const save = () => {
     updateSiteConfig({ $head: headEntries });
   };
 
   const addEntry = (/** @type {string} */ tag) => {
-    /** @type {any} */
-    const entry = { tagName: tag, attributes: {} };
+    /** @type {Record<string, string | boolean>} */
+    const attrs = {};
+    /** @type {JxHeadEntry} */
+    const entry = { tagName: tag, attributes: attrs };
     if (tag === "link") {
-      entry.attributes.rel = "stylesheet";
-      entry.attributes.href = "";
+      attrs.rel = "stylesheet";
+      attrs.href = "";
     } else if (tag === "meta") {
-      entry.attributes.name = "";
-      entry.attributes.content = "";
+      attrs.name = "";
+      attrs.content = "";
     } else if (tag === "script") {
-      entry.attributes.src = "";
+      attrs.src = "";
     } else if (tag === "style") {
       entry.content = "";
     }
@@ -58,6 +67,14 @@ export function renderHeadEditor(container) {
 
   const tpl = html`
     <div class="settings-section">
+      <h3 class="settings-section-title">Google Fonts</h3>
+      <p class="settings-field-desc">
+        Manage Google Fonts imported across all pages in this project.
+      </p>
+      ${renderGoogleFontsSection(headEntries, save, () => renderHeadEditor(container))}
+    </div>
+
+    <div class="settings-section">
       <h3 class="settings-section-title">Head</h3>
       <p class="settings-field-desc">
         Manage global &lt;head&gt; tags — stylesheets, meta tags, scripts, and inline styles.
@@ -65,7 +82,7 @@ export function renderHeadEditor(container) {
 
       <div class="head-entries">
         ${headEntries.map(
-          (/** @type {any} */ entry, /** @type {number} */ idx) => html`
+          (/** @type {JxHeadEntry} */ entry, /** @type {number} */ idx) => html`
             <div class="head-entry">
               <div class="head-entry-header">
                 <span class="head-entry-tag">&lt;${entry.tagName}&gt;</span>
@@ -92,17 +109,17 @@ export function renderHeadEditor(container) {
 }
 
 /**
- * @param {any} entry
+ * @param {JxHeadEntry} entry
  * @param {number} idx
  * @param {(idx: number, key: string, val: string) => void} updateEntry
  */
 function renderEntryFields(entry, idx, updateEntry) {
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounce;
-  const onFieldChange = (/** @type {string} */ key) => (/** @type {any} */ e) => {
+  const onFieldChange = (/** @type {string} */ key) => (/** @type {Event} */ e) => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-      updateEntry(idx, key, e.target.value);
+      updateEntry(idx, key, /** @type {HTMLInputElement} */ (e.target).value);
     }, 300);
   };
 
@@ -188,4 +205,84 @@ function renderEntryFields(entry, idx, updateEntry) {
     default:
       return nothing;
   }
+}
+
+/**
+ * Render the Google Fonts management section.
+ *
+ * @param {JxHeadEntry[]} headEntries
+ * @param {() => void} save
+ * @param {() => void} rerender
+ */
+function renderGoogleFontsSection(headEntries, save, rerender) {
+  const fontEntries = headEntries.filter((e) => isGoogleFontEntry(e));
+
+  const addFont = (/** @type {string} */ family) => {
+    ensureGoogleFontPreconnects(headEntries);
+    headEntries.push({
+      tagName: "link",
+      attributes: { rel: "stylesheet", href: buildGoogleFontUrl(family) },
+    });
+    save();
+    rerender();
+  };
+
+  const removeFont = (/** @type {JxHeadEntry} */ entry) => {
+    const idx = headEntries.indexOf(entry);
+    if (idx >= 0) headEntries.splice(idx, 1);
+    const cleaned = cleanupGoogleFontPreconnects(headEntries);
+    if (cleaned !== headEntries) {
+      headEntries.length = 0;
+      headEntries.push(...cleaned);
+    }
+    save();
+    rerender();
+  };
+
+  return html`
+    <div class="head-entries" style="margin-bottom:12px">
+      ${fontEntries.length > 0
+        ? fontEntries.map(
+            (entry) => html`
+              <div class="head-entry" style="flex-direction:row;align-items:center;gap:8px">
+                <span style="flex:1"
+                  >${extractFontFamily(String(entry.attributes?.href || ""))}</span
+                >
+                <sp-action-button quiet size="s" @click=${() => removeFont(entry)}>
+                  <sp-icon-delete slot="icon"></sp-icon-delete>
+                </sp-action-button>
+              </div>
+            `,
+          )
+        : html`<p class="settings-field-desc" style="margin:0">No fonts imported.</p>`}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <sp-textfield
+        size="s"
+        placeholder="Font family name…"
+        style="flex:1"
+        @keydown=${(/** @type {KeyboardEvent} */ e) => {
+          if (e.key !== "Enter") return;
+          const family = /** @type {HTMLInputElement} */ (e.target).value?.trim();
+          if (!family) return;
+          /** @type {HTMLInputElement} */ (e.target).value = "";
+          addFont(family);
+        }}
+      ></sp-textfield>
+      <sp-action-button
+        size="s"
+        @click=${(/** @type {MouseEvent} */ e) => {
+          const input = /** @type {HTMLElement} */ (e.target)
+            .closest("div")
+            ?.querySelector("sp-textfield");
+          const family = /** @type {HTMLInputElement | null} */ (input)?.value?.trim();
+          if (!family) return;
+          /** @type {HTMLInputElement} */ (input).value = "";
+          addFont(family);
+        }}
+      >
+        + Add
+      </sp-action-button>
+    </div>
+  `;
 }

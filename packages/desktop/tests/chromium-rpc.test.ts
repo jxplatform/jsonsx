@@ -2,13 +2,14 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
+import type { DirEntry, ComponentMeta } from "../src/rpc-schema.ts";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_chromium_rpc");
 
 let server: Subprocess;
 let serverPort: number;
 
-function rpc(ws: WebSocket, method: string, params?: any): Promise<any> {
+function rpc(ws: WebSocket, method: string, params?: Record<string, unknown>): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const id = Math.floor(Math.random() * 100000);
     const handler = (event: MessageEvent) => {
@@ -89,7 +90,7 @@ describe("chromium RPC server", () => {
   test("listDirectory returns entries", async () => {
     const ws = await connect();
     const entries = await rpc(ws, "listDirectory", { dir: "." });
-    const names = entries.map((e: any) => e.name);
+    const names = (entries as DirEntry[]).map((e) => e.name);
     expect(names).toContain("hello.txt");
     expect(names).toContain("subdir");
     expect(names).toContain("project.json");
@@ -109,7 +110,7 @@ describe("chromium RPC server", () => {
     await rpc(ws, "writeFile", { path: "to-delete.txt", content: "temp" });
     await rpc(ws, "deleteFile", { path: "to-delete.txt" });
     const entries = await rpc(ws, "listDirectory", { dir: "." });
-    const names = entries.map((e: any) => e.name);
+    const names = (entries as DirEntry[]).map((e) => e.name);
     expect(names).not.toContain("to-delete.txt");
     ws.close();
   });
@@ -127,7 +128,7 @@ describe("chromium RPC server", () => {
     const ws = await connect();
     await rpc(ws, "createDirectory", { path: "new-dir/nested" });
     const entries = await rpc(ws, "listDirectory", { dir: "new-dir" });
-    expect(entries.map((e: any) => e.name)).toContain("nested");
+    expect((entries as DirEntry[]).map((e) => e.name)).toContain("nested");
     ws.close();
   });
 
@@ -142,7 +143,9 @@ describe("chromium RPC server", () => {
 
   test("resolveSiteContext finds project.json", async () => {
     const ws = await connect();
-    const result = await rpc(ws, "resolveSiteContext", { filePath: "subdir/nested.json" });
+    const result = (await rpc(ws, "resolveSiteContext", {
+      filePath: "subdir/nested.json",
+    })) as Record<string, unknown>;
     expect(result.sitePath).toBe(".");
     ws.close();
   });
@@ -154,7 +157,7 @@ describe("chromium RPC server", () => {
       content: JSON.stringify({ tagName: "my-widget", children: [] }),
     });
     const components = await rpc(ws, "discoverComponents", { dir: "." });
-    const widget = components.find((c: any) => c.tagName === "my-widget");
+    const widget = (components as ComponentMeta[]).find((c) => c.tagName === "my-widget");
     expect(widget).toBeDefined();
     ws.close();
   });
@@ -168,22 +171,24 @@ describe("chromium RPC server", () => {
 
   test("returns error for unknown method", async () => {
     const ws = await connect();
-    const result = await new Promise<any>((resolve, reject) => {
-      const id = Math.floor(Math.random() * 100000);
-      const timeout = setTimeout(() => {
-        ws.removeEventListener("message", handler);
-        reject(new Error("timeout"));
-      }, 3000);
-      const handler = (event: MessageEvent) => {
-        const msg = JSON.parse(event.data);
-        if (msg.id !== id) return;
-        clearTimeout(timeout);
-        ws.removeEventListener("message", handler);
-        resolve(msg);
-      };
-      ws.addEventListener("message", handler);
-      ws.send(JSON.stringify({ id, method: "nonexistentMethod", params: {} }));
-    }).catch((e) => e);
+    const result = await new Promise<{ id: number; error?: string; result?: unknown }>(
+      (resolve, reject) => {
+        const id = Math.floor(Math.random() * 100000);
+        const timeout = setTimeout(() => {
+          ws.removeEventListener("message", handler);
+          reject(new Error("timeout"));
+        }, 3000);
+        const handler = (event: MessageEvent) => {
+          const msg = JSON.parse(event.data) as { id: number; error?: string; result?: unknown };
+          if (msg.id !== id) return;
+          clearTimeout(timeout);
+          ws.removeEventListener("message", handler);
+          resolve(msg);
+        };
+        ws.addEventListener("message", handler);
+        ws.send(JSON.stringify({ id, method: "nonexistentMethod", params: {} }));
+      },
+    ).catch((e: unknown) => e);
     // On some platforms (Windows/Bun) error responses may not deliver;
     // verify either we got the error response or the connection stays healthy
     if (result instanceof Error) {
@@ -191,34 +196,36 @@ describe("chromium RPC server", () => {
       const content = await rpc(ws, "readFile", { path: "hello.txt" });
       expect(content).toBe("Hello World");
     } else {
-      expect(result.error).toContain("Unknown method");
+      expect((result as Record<string, unknown>).error).toContain("Unknown method");
     }
     ws.close();
   });
 
   test("returns error for path traversal", async () => {
     const ws = await connect();
-    const result = await new Promise<any>((resolve, reject) => {
-      const id = Math.floor(Math.random() * 100000);
-      const timeout = setTimeout(() => {
-        ws.removeEventListener("message", handler);
-        reject(new Error("timeout"));
-      }, 3000);
-      const handler = (event: MessageEvent) => {
-        const msg = JSON.parse(event.data);
-        if (msg.id !== id) return;
-        clearTimeout(timeout);
-        ws.removeEventListener("message", handler);
-        resolve(msg);
-      };
-      ws.addEventListener("message", handler);
-      ws.send(JSON.stringify({ id, method: "readFile", params: { path: "../../etc/passwd" } }));
-    }).catch((e) => e);
+    const result = await new Promise<{ id: number; error?: string; result?: unknown }>(
+      (resolve, reject) => {
+        const id = Math.floor(Math.random() * 100000);
+        const timeout = setTimeout(() => {
+          ws.removeEventListener("message", handler);
+          reject(new Error("timeout"));
+        }, 3000);
+        const handler = (event: MessageEvent) => {
+          const msg = JSON.parse(event.data) as { id: number; error?: string; result?: unknown };
+          if (msg.id !== id) return;
+          clearTimeout(timeout);
+          ws.removeEventListener("message", handler);
+          resolve(msg);
+        };
+        ws.addEventListener("message", handler);
+        ws.send(JSON.stringify({ id, method: "readFile", params: { path: "../../etc/passwd" } }));
+      },
+    ).catch((e: unknown) => e);
     if (result instanceof Error) {
       const content = await rpc(ws, "readFile", { path: "hello.txt" });
       expect(content).toBe("Hello World");
     } else {
-      expect(result.error).toContain("Path outside project root");
+      expect((result as Record<string, unknown>).error).toContain("Path outside project root");
     }
     ws.close();
   });
@@ -231,8 +238,8 @@ describe("chromium RPC server", () => {
       rpc(ws, "listDirectory", { dir: "." }),
     ]);
     expect(content1).toBe("Hello World");
-    expect(JSON.parse(content2)).toEqual({ key: "value" });
-    expect(entries.length).toBeGreaterThan(0);
+    expect(JSON.parse(content2 as string)).toEqual({ key: "value" });
+    expect((entries as DirEntry[]).length).toBeGreaterThan(0);
     ws.close();
   });
 });

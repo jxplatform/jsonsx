@@ -29,7 +29,7 @@ let newContentTypeName = "";
 
 async function saveProjectConfig() {
   const platform = getPlatform();
-  const config = /** @type {any} */ (projectState).projectConfig;
+  const config = /** @type {{ projectConfig: ProjectConfig }} */ (projectState).projectConfig;
   await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
 }
 
@@ -138,7 +138,7 @@ function handleRenameField(oldName, newName, rerender) {
   const schema = getSelectedSchema();
   if (!schema?.properties || !newName || schema.properties[newName]) return;
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const newProps = {};
   for (const [key, val] of Object.entries(schema.properties)) {
     newProps[key === oldName ? newName : key] = val;
@@ -276,7 +276,7 @@ function handleRenameNested(parentName, oldChild, newChild, rerender) {
   const parent = schema?.properties?.[parentName];
   if (!parent?.properties || !newChild || parent.properties[newChild]) return;
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const newProps = {};
   for (const [key, val] of Object.entries(parent.properties)) {
     newProps[key === oldChild ? newChild : key] = val;
@@ -382,10 +382,10 @@ export function renderContentTypesEditor(container) {
                 size="s"
                 placeholder="content-type-name"
                 .value=${newContentTypeName}
-                @input=${(/** @type {any} */ e) => {
-                  newContentTypeName = e.target.value;
+                @input=${(/** @type {Event} */ e) => {
+                  newContentTypeName = /** @type {HTMLInputElement} */ (e.target).value;
                 }}
-                @keydown=${(/** @type {any} */ e) => {
+                @keydown=${(/** @type {KeyboardEvent} */ e) => {
                   if (e.key === "Enter") handleNewContentType(rerender);
                   if (e.key === "Escape") {
                     showNewContentType = false;
@@ -445,7 +445,7 @@ export function renderContentTypesEditor(container) {
       ([name, def]) =>
         fieldCardTpl(
           name,
-          /** @type {any} */ (def),
+          /** @type {import("./schema-field-ui.js").SchemaProperty} */ (def),
           required.includes(name),
           handlers,
           contentTypeNames,

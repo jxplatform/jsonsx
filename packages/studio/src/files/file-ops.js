@@ -18,7 +18,9 @@ import { activeTab, openTab } from "../workspace/workspace.js";
 export async function openFile() {
   try {
     if ("showOpenFilePicker" in window) {
-      const [handle] = await /** @type {any} */ (window).showOpenFilePicker({
+      const [handle] = await /** @type {{ showOpenFilePicker: Function }} */ (
+        /** @type {unknown} */ (window)
+      ).showOpenFilePicker({
         types: [
           { description: "Jx Component", accept: { "application/json": [".json"] } },
           { description: "Markdown Content", accept: { "text/markdown": [".md"] } },
@@ -66,8 +68,9 @@ export async function openFile() {
       };
       input.click();
     }
-  } catch (/** @type {any} */ e) {
-    if (e.name !== "AbortError") statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    if (/** @type {Error} */ (e).name !== "AbortError")
+      statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -75,11 +78,11 @@ export async function openFile() {
  * Parse a markdown string into document + frontmatter (pure — no side effects).
  *
  * @param {string} source Markdown text
- * @returns {Promise<{ document: any; frontmatter: Record<string, any> }>}
+ * @returns {Promise<{ document: JxMutableNode; frontmatter: Record<string, unknown> }>}
  */
 export async function loadMarkdown(source) {
   const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-  const doc = /** @type {any} */ (transpileJxMarkdown(source));
+  const doc = /** @type {JxMutableNode} */ (transpileJxMarkdown(source));
 
   const isComponent = doc.tagName && String(doc.tagName).includes("-");
 
@@ -90,7 +93,7 @@ export async function loadMarkdown(source) {
   // Content markdown — children form the root-level document body
   const contentDoc = { children: doc.children ?? [] };
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const frontmatter = {};
   for (const [key, value] of Object.entries(doc)) {
     if (key !== "children") frontmatter[key] = value;
@@ -112,7 +115,15 @@ export async function saveFile() {
       tab.doc.dirty = false;
       statusMessage("Saved");
     } else if (tab.fileHandle && "createWritable" in tab.fileHandle) {
-      const writable = await /** @type {any} */ (tab.fileHandle).createWritable();
+      const writable =
+        await /**
+         * @type {{
+         *   createWritable: () => Promise<{
+         *     write: (s: string) => Promise<void>;
+         *     close: () => Promise<void>;
+         *   }>;
+         * }}
+         */ (tab.fileHandle).createWritable();
       await writable.write(output);
       await writable.close();
       tab.doc.dirty = false;
@@ -120,8 +131,9 @@ export async function saveFile() {
     } else {
       statusMessage("No save target — use Export");
     }
-  } catch (/** @type {any} */ e) {
-    if (e.name !== "AbortError") statusMessage(`Save error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    if (/** @type {Error} */ (e).name !== "AbortError")
+      statusMessage(`Save error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -142,7 +154,9 @@ export async function exportFile() {
         : isContent
           ? "content.md"
           : "component.json";
-      const handle = await /** @type {any} */ (window).showSaveFilePicker({
+      const handle = await /** @type {{ showSaveFilePicker: Function }} */ (
+        /** @type {unknown} */ (window)
+      ).showSaveFilePicker({
         suggestedName,
         types: [{ description, accept: { [mimeType]: [ext] } }],
       });
@@ -163,8 +177,9 @@ export async function exportFile() {
       tab.doc.dirty = false;
       statusMessage("Downloaded");
     }
-  } catch (/** @type {any} */ e) {
-    if (e.name !== "AbortError") statusMessage(`Export error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    if (/** @type {Error} */ (e).name !== "AbortError")
+      statusMessage(`Export error: ${/** @type {Error} */ (e).message}`);
   }
 }
 
@@ -178,14 +193,14 @@ export function serializeDocument(tab) {
   if (tab.doc.sourceFormat === "md") {
     const fm = tab.doc.content?.frontmatter || {};
     const fullDoc = { ...fm, children: tab.doc.document.children ?? [] };
-    return jxDocToMd(fullDoc);
+    return jxDocToMd(/** @type {JxMutableNode} */ (fullDoc));
   }
   if (tab.doc.mode === "content") {
-    const mdast = jxToMd(tab.doc.document);
+    const mdast = jxToMd(/** @type {JxElement} */ (tab.doc.document));
     const md = unified()
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(mdast);
+      .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
     const fm = tab.doc.content?.frontmatter;
     const hasFrontmatter = fm && Object.keys(fm).length > 0;
     return hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;

@@ -5,8 +5,8 @@ import { getNodeAtPath } from "../store.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
 /**
- * @param {any} action
- * @param {any} payload
+ * @param {string} action
+ * @param {unknown} payload
  */
 export async function codeService(action, payload) {
   const platform = getPlatform();
@@ -17,7 +17,7 @@ export async function codeService(action, payload) {
 /**
  * Ask the server to locate a document by filename within the project root.
  *
- * @param {any} name
+ * @param {string} name
  */
 export async function locateDocument(name) {
   const platform = getPlatform();
@@ -31,8 +31,8 @@ export const pluginSchemaCache = new Map();
 /**
  * Fetch and cache the schema for an external $prototype + $src module via the server.
  *
- * @param {any} def
- * @param {any} state
+ * @param {{ $src?: string; $prototype?: string }} def
+ * @param {{ documentPath?: string }} state
  */
 export async function fetchPluginSchema(def, state) {
   if (!def.$src || !def.$prototype) return null;
@@ -56,8 +56,19 @@ export async function fetchPluginSchema(def, state) {
 }
 
 /**
- * @param {any} editor
- * @param {any[]} diagnostics
+ * @typedef {{
+ *   severity: string;
+ *   message: string;
+ *   help?: string;
+ *   code?: string;
+ *   url?: string;
+ *   labels?: { span: { line: number; column: number; length?: number } }[];
+ * }} OxLintDiagnostic
+ */
+
+/**
+ * @param {import("monaco-editor").editor.IStandaloneCodeEditor} editor
+ * @param {OxLintDiagnostic[]} diagnostics
  */
 export function setLintMarkers(editor, diagnostics) {
   const model = editor.getModel();
@@ -80,19 +91,26 @@ export function setLintMarkers(editor, diagnostics) {
       };
     })
     .filter(Boolean);
-  monaco.editor.setModelMarkers(model, "oxlint", /** @type {any} */ (markers));
+  monaco.editor.setModelMarkers(
+    model,
+    "oxlint",
+    /** @type {import("monaco-editor").editor.IMarkerData[]} */ (markers),
+  );
 }
 
 /**
- * @param {any} editing
- * @param {any} document
+ * @param {{ type: string; defName?: string; path?: JxPath; eventKey?: string }} editing
+ * @param {JxMutableNode | null | undefined} document
  */
 export function getFunctionArgs(editing, document) {
   if (editing.type === "def") {
-    return document?.state?.[editing.defName]?.parameters || ["state", "event"];
+    const defName = editing.defName;
+    return (defName && document?.state?.[defName]?.parameters) || ["state", "event"];
   } else if (editing.type === "event") {
+    if (!document || !editing.path) return ["state", "event"];
     const node = getNodeAtPath(document, editing.path);
-    return node?.[editing.eventKey]?.parameters || ["state", "event"];
+    const eventKey = editing.eventKey;
+    return (eventKey && node?.[eventKey]?.parameters) || ["state", "event"];
   }
   return ["state", "event"];
 }

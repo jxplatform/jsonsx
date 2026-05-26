@@ -10,10 +10,14 @@ import {
   gitStage,
   gitUnstage,
   gitCommit,
+  gitPush,
+  gitPull,
+  gitFetch,
   gitCheckout,
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitShow,
 } from "../src/git";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_git");
@@ -194,6 +198,41 @@ describe("gitCreateBranch / gitCheckout", () => {
     await gitCheckout({ branch: defaultBranch });
     const status = await gitStatus();
     expect(status.branch).toBe(defaultBranch);
+  });
+});
+
+// ─── gitShow ───────────────────────────────────────────────────────────────
+
+describe("gitShow", () => {
+  test("shows file content at HEAD", async () => {
+    const content = await gitShow({ path: "initial.txt" });
+    expect(content.trim()).toBe("hello");
+  });
+
+  test("shows file at a specific ref", async () => {
+    const log = await gitLog({ limit: 1 });
+    const content = await gitShow({ path: "initial.txt", ref: log[0].hash });
+    expect(content.trim()).toBe("hello");
+  });
+
+  test("throws for non-existent path", async () => {
+    await expect(gitShow({ path: "nonexistent.txt" })).rejects.toThrow();
+  });
+});
+
+// ─── gitPush / gitPull / gitFetch ──────────────────────────────────────────
+
+describe("gitPush / gitPull / gitFetch", () => {
+  test("gitPush throws when no remote configured", async () => {
+    await expect(gitPush()).rejects.toThrow();
+  });
+
+  test("gitPull throws when no remote configured", async () => {
+    await expect(gitPull()).rejects.toThrow();
+  });
+
+  test("gitFetch succeeds even without remote", async () => {
+    await gitFetch();
   });
 });
 

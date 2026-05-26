@@ -14,13 +14,14 @@ import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
 import { componentRegistry } from "../files/components.js";
 import { renderPopover } from "../ui/layers.js";
+import { startLayerTitleEdit } from "../panels/layers-panel.js";
 
 /**
  * @typedef {import("../state.js").StudioState} StudioState
  *
  * @typedef {import("../state.js").JxPath} JxPath
  *
- * @typedef {import("../state.js").JxNode} JxNode
+ * @typedef {JxMutableNode} JxNode
  */
 
 // ─── Clipboard ────────────────────────────────────────────────────────────────
@@ -100,7 +101,7 @@ export function dismissContextMenu() {
 /**
  * @param {MouseEvent} e
  * @param {JxPath} path
- * @param {{ onEditComponent?: (path: string) => void }} [opts]
+ * @param {{ onEditComponent?: (path: string) => void; rerender?: () => void }} [opts]
  */
 export function showContextMenu(e, path, opts = {}) {
   e.preventDefault();
@@ -167,6 +168,12 @@ export function showContextMenu(e, path, opts = {}) {
     items.push({
       label: "Wrap in Div",
       action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
+    });
+    items.push({
+      label: "Set Title",
+      action: () => {
+        if (opts.rerender) startLayerTitleEdit(path, opts.rerender);
+      },
     });
     if (node.tagName) {
       const isComponent =

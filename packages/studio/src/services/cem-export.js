@@ -1,21 +1,26 @@
 /** Collect slot elements from the document tree. */
-export function collectSlots(/** @type {any} */ node, /** @type {any} */ slots = []) {
+export function collectSlots(
+  /** @type {JxMutableNode | null | undefined} */ node,
+  /** @type {string[]} */ slots = [],
+) {
   if (node?.tagName === "slot") {
     slots.push(node.attributes?.name || "");
   }
   if (Array.isArray(node?.children))
-    node.children.forEach((/** @type {any} */ c) => collectSlots(c, slots));
+    node.children.forEach((/** @type {JxMutableNode | string} */ c) =>
+      collectSlots(typeof c === "string" ? undefined : c, slots),
+    );
   return slots;
 }
 
 /**
  * Generate and download a CEM 2.1.0 manifest for the current document.
  *
- * @param {any} S - Studio state
+ * @param {{ document: JxMutableNode }} S - Studio state
  * @param {{
- *   defCategory: (d: any) => string;
- *   normParam: (p: any) => any;
- *   collectCssParts: (node: any) => any[];
+ *   defCategory: (d: unknown) => string;
+ *   normParam: (p: unknown) => unknown;
+ *   collectCssParts: (node: JxMutableNode) => { name: string }[];
  * }} helpers
  */
 export function exportCemManifest(S, helpers) {
@@ -83,7 +88,7 @@ export function exportCemManifest(S, helpers) {
 
   // Slots
   const slotNames = collectSlots(doc);
-  const slots = slotNames.map((/** @type {any} */ name) => ({
+  const slots = slotNames.map((/** @type {string} */ name) => ({
     name: name || "",
     ...(name ? {} : { description: "Default slot" }),
   }));

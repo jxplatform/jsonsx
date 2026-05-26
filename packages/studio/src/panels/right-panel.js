@@ -120,7 +120,14 @@ function rightPanelTemplate() {
   const ctx = /** @type {RightPanelCtx} */ (_ctx);
   const aTab = activeTab.value;
   if (!aTab) return nothing;
-  const S = /** @type {any} */ ({
+  const S = /**
+   * @type {{
+   *   ui: Record<string, unknown>;
+   *   document: JxMutableNode;
+   *   mode: string;
+   *   selection: (string | number)[] | null;
+   * }}
+   */ ({
     ui: aTab.session.ui,
     document: aTab.doc.document,
     mode: aTab.doc.mode,

@@ -31,7 +31,7 @@ describe("loadMarkdown", () => {
 
 describe("openFile", () => {
   beforeEach(() => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     delete (/** @type {any} */ (window).showOpenFilePicker);
     // Close any existing tabs
     for (const id of activeTab.value ? [activeTab.value.id] : []) {
@@ -98,11 +98,13 @@ describe("saveFile", () => {
   test("saves via platform when documentPath exists", async () => {
     /** @type {any} */
     let written = null;
-    registerPlatform({
-      writeFile: (/** @type {any} */ path, /** @type {any} */ content) => {
-        written = { path, content };
-      },
-    });
+    registerPlatform(
+      /** @type {any} */ ({
+        writeFile: (/** @type {any} */ path, /** @type {any} */ content) => {
+          written = { path, content };
+        },
+      }),
+    );
 
     openTab({
       id: "test-save",
@@ -129,7 +131,7 @@ describe("saveFile", () => {
       }),
     };
 
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     openTab({
       id: "test-save-fs",
       fileHandle: /** @type {any} */ (mockHandle),
@@ -144,7 +146,7 @@ describe("saveFile", () => {
   });
 
   test("shows message when no save target", async () => {
-    registerPlatform({});
+    registerPlatform(/** @type {any} */ ({}));
     openTab({
       id: "test-no-target",
       document: { tagName: "div" },
@@ -156,11 +158,13 @@ describe("saveFile", () => {
 
   test("serializes markdown source format with jxDocToMd", async () => {
     let writtenContent = null;
-    registerPlatform({
-      writeFile: (/** @type {any} */ _path, /** @type {any} */ content) => {
-        writtenContent = content;
-      },
-    });
+    registerPlatform(
+      /** @type {any} */ ({
+        writeFile: (/** @type {any} */ _path, /** @type {any} */ content) => {
+          writtenContent = content;
+        },
+      }),
+    );
 
     openTab({
       id: "test-md-save",
@@ -177,11 +181,13 @@ describe("saveFile", () => {
   });
 
   test("handles save error gracefully", async () => {
-    registerPlatform({
-      writeFile: () => {
-        throw new Error("disk full");
-      },
-    });
+    registerPlatform(
+      /** @type {any} */ ({
+        writeFile: () => {
+          throw new Error("disk full");
+        },
+      }),
+    );
 
     openTab({
       id: "test-error",

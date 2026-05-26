@@ -131,8 +131,8 @@ describe("computeDocumentDiff", () => {
   });
 
   test("null children are skipped in element filtering", () => {
-    const orig = { tagName: "div", children: [null, { tagName: "p" }] };
-    const curr = { tagName: "div", children: [null, { tagName: "p" }] };
+    const orig = /** @type {any} */ ({ tagName: "div", children: [null, { tagName: "p" }] });
+    const curr = /** @type {any} */ ({ tagName: "div", children: [null, { tagName: "p" }] });
     const { byPath } = computeDocumentDiff(orig, curr);
     expect(byPath.size).toBe(0);
   });

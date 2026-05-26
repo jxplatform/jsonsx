@@ -48,7 +48,7 @@ async function resolveManifest(absoluteSrc, src, config, outDir, cache) {
 /**
  * Check if a src value should be skipped for optimization.
  *
- * @param {any} src
+ * @param {string} src
  * @returns {boolean}
  */
 function shouldSkip(src) {
@@ -81,7 +81,7 @@ function resolveImagePath(src, projectRoot) {
  * Mutates img nodes in place, injecting srcset, sizes, width, height, loading, and decoding.
  * Returns a set of absolute source paths that need processing.
  *
- * @param {any} doc - The Jx document tree (mutated in place)
+ * @param {JxMutableNode | JxDocument} doc - The Jx document tree (mutated in place)
  * @param {ImageConfig} config
  * @param {string} projectRoot
  * @param {string} outDir
@@ -100,7 +100,7 @@ export async function transformImageNodes(doc, config, projectRoot, outDir, cach
 }
 
 /**
- * @param {any} node
+ * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
  * @param {string} outDir
@@ -127,13 +127,14 @@ async function walkAndTransform(node, config, projectRoot, outDir, cache, imageR
 
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
+      if (typeof child === "string") continue;
       await walkAndTransform(child, config, projectRoot, outDir, cache, imageRefs);
     }
   }
 }
 
 /**
- * @param {any} node
+ * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
  * @param {string} outDir

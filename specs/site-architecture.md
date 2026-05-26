@@ -1417,6 +1417,39 @@ dist/
 
 ---
 
+## Appendix: Element Annotations
+
+Jx elements support `$title` and `$description` as developer-facing annotation metadata. These are inspired by JSON Schema's annotation keywords and are never compiled to HTML output.
+
+| Property       | Type     | Purpose                                                   |
+| -------------- | -------- | --------------------------------------------------------- |
+| `$title`       | `string` | Human-friendly label. Displayed in studio layers panel.   |
+| `$description` | `string` | Extended description. Reserved for future studio tooltip. |
+
+**Behavior:**
+
+- Both are `$`-prefixed, signaling they are JX-specific metadata (not DOM properties)
+- Neither appears in compiled HTML or is applied to the DOM at runtime
+- `$title` takes priority over `$id` and `textContent` as the layer label in Jx Studio
+- In the studio layers panel, double-click a layer item to edit `$title` inline
+- The context menu provides a "Set Title" action for the same purpose
+
+**Markdown remark directive mapping:**
+
+- `$title` → `--title` attribute on the directive
+- `$description` → `--description` attribute on the directive
+
+**Example:**
+
+```json
+{
+  "tagName": "section",
+  "$title": "Hero Section",
+  "$description": "Main landing page hero with CTA button",
+  "children": [...]
+}
+```
+
 ## Appendix A: New Keywords Summary
 
 This spec introduces the following new reserved keywords:

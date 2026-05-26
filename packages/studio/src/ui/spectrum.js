@@ -63,6 +63,7 @@ import { IconFileCode } from "@spectrum-web-components/icons-workflow/src/elemen
 import { IconFileTxt } from "@spectrum-web-components/icons-workflow/src/elements/IconFileTxt.js";
 import { IconImage } from "@spectrum-web-components/icons-workflow/src/elements/IconImage.js";
 import { IconFileSingleWebPage } from "@spectrum-web-components/icons-workflow/src/elements/IconFileSingleWebPage.js";
+import { IconViewAllTags } from "@spectrum-web-components/icons-workflow/src/elements/IconViewAllTags.js";
 import { IconRefresh } from "@spectrum-web-components/icons-workflow/src/elements/IconRefresh.js";
 import { IconAdd } from "@spectrum-web-components/icons-workflow/src/elements/IconAdd.js";
 import { IconUpload } from "@spectrum-web-components/icons-workflow/src/elements/IconUpload.js";
@@ -89,6 +90,7 @@ import { IconSettings } from "@spectrum-web-components/icons-workflow/src/elemen
 import { IconBack } from "@spectrum-web-components/icons-workflow/src/elements/IconBack.js";
 import { IconProperties } from "@spectrum-web-components/icons-workflow/src/elements/IconProperties.js";
 import { IconEvent } from "@spectrum-web-components/icons-workflow/src/elements/IconEvent.js";
+import { IconMore } from "@spectrum-web-components/icons-workflow/src/elements/IconMore.js";
 
 // Layout / alignment icons
 import { IconArrowRight } from "@spectrum-web-components/icons-workflow/src/elements/IconArrowRight.js";
@@ -200,6 +202,7 @@ const components = [
   ["sp-icon-file-txt", IconFileTxt],
   ["sp-icon-image", IconImage],
   ["sp-icon-file-single-web-page", IconFileSingleWebPage],
+  ["sp-icon-view-all-tags", IconViewAllTags],
   ["sp-icon-refresh", IconRefresh],
   ["sp-icon-add", IconAdd],
   ["sp-icon-upload", IconUpload],
@@ -226,6 +229,7 @@ const components = [
   ["sp-icon-back", IconBack],
   ["sp-icon-properties", IconProperties],
   ["sp-icon-event", IconEvent],
+  ["sp-icon-more", IconMore],
   ["sp-icon-arrow-right", IconArrowRight],
   ["sp-icon-arrow-left", IconArrowLeft],
   ["sp-icon-arrow-down", IconArrowDown],
@@ -277,7 +281,7 @@ const components = [
 ];
 
 for (const [tag, ctor] of /** @type {[string, CustomElementConstructor][]} */ (components)) {
-  if (!customElements.get(tag)) defineElement(tag, /** @type {any} */ (ctor));
+  if (!customElements.get(tag)) defineElement(tag, /** @type {CustomElementConstructor} */ (ctor));
 }
 
 // Register theme fragments (these are also side-effect-only in the original modules)
