@@ -1,0 +1,1069 @@
+{
+  "title": "Compare — Jx Suite vs. WordPress, Webflow, and the rest.",
+  "$layout": "./layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "See how Jx Suite compares to WordPress, Webflow, Wix, and static site generators on cost, performance, lock-in, and maintenance."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/stat-card.json" },
+    { "$ref": "../components/check-item.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 4rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Compare" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2.25rem, 5vw, 3.75rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.5rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "The right tool for 2010 is the wrong tool for 2026."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.0625rem, 2vw, 1.25rem)",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "640px"
+              },
+              "textContent": "WordPress, Webflow, and Wix solved real problems — but they come with hidden costs, vendor lock-in, and architectural debt. Here's how Jx compares."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Feature Matrix" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "margin": "0"
+                  },
+                  "textContent": "Capabilities at a glance."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "overflowX": "auto",
+                "borderRadius": "var(--radius-lg)",
+                "border": "1px solid var(--color-border)"
+              },
+              "children": [
+                {
+                  "tagName": "table",
+                  "style": {
+                    "width": "100%",
+                    "borderCollapse": "collapse",
+                    "fontSize": "0.875rem",
+                    "textAlign": "left"
+                  },
+                  "children": [
+                    {
+                      "tagName": "thead",
+                      "children": [
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": ""
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": "Visual Builder"
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": "Maintenance"
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": "Performance"
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": "Lock-in"
+                            },
+                            {
+                              "tagName": "th",
+                              "style": {
+                                "padding": "1rem",
+                                "fontFamily": "var(--font-mono)",
+                                "fontSize": "0.6875rem",
+                                "letterSpacing": "0.08em",
+                                "textTransform": "uppercase",
+                                "color": "var(--color-text-muted)",
+                                "fontWeight": "500"
+                              },
+                              "textContent": "Open Source"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tbody",
+                      "children": [
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "textContent": "WordPress"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Heavy"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Patchy"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "High"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "textContent": "Webflow"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Light"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Strong"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Total"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "✗"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "textContent": "Wix / Squarespace"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Light"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Slow"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Total"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "✗"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "textContent": "Headless + Next.js"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "✗"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "Heavy"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Strong"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-text-secondary)"
+                              },
+                              "textContent": "Medium"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "tr",
+                          "style": { "borderBottom": "1px solid var(--color-border)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "fontWeight": "600" },
+                              "textContent": "Astro / Hugo"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-text-muted)" },
+                              "textContent": "✗"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Light"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Strong"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "Open"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": { "padding": "1rem", "color": "var(--color-accent)" },
+                              "textContent": "✓"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "tr",
+                          "style": { "backgroundColor": "var(--color-bg-surface)" },
+                          "children": [
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "fontWeight": "700",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "Jx Suite"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "✓ Studio"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "Zero"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "100/100"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "None"
+                            },
+                            {
+                              "tagName": "td",
+                              "style": {
+                                "padding": "1rem",
+                                "color": "var(--color-accent)",
+                                "fontWeight": "600"
+                              },
+                              "textContent": "MIT"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Cost of Ownership" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "What you'd actually pay."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "maxWidth": "560px",
+                    "margin": "0 auto",
+                    "fontSize": "1.0625rem"
+                  },
+                  "textContent": "A typical 40-page brochure site for a small business. Real numbers."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": "1.5rem",
+                "borderRadius": "var(--radius-lg)",
+                "overflow": "hidden"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "2rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius-lg)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-text-muted)",
+                        "marginBottom": "1.5rem"
+                      },
+                      "textContent": "WordPress Stack"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Managed hosting"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "$80/mo"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Premium plugins"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "$200/yr"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Maintenance & updates"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "$4,000/yr"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Security monitoring"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "$300/yr"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "paddingTop": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontWeight": "700",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "Annual total"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "fontWeight": "700",
+                                "color": "var(--color-text-primary)",
+                                "fontSize": "1.25rem"
+                              },
+                              "textContent": "~$5,460"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "2rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-accent)",
+                    "borderRadius": "var(--radius-lg)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "1.5rem"
+                      },
+                      "textContent": "Jx Suite"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Static hosting (Cloudflare Pages)"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "$0/mo"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Plugins"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "$0"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Maintenance & updates"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "$0"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "borderBottom": "1px solid var(--color-border)",
+                            "paddingBottom": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": { "color": "var(--color-text-secondary)" },
+                              "textContent": "Security monitoring"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "color": "var(--color-accent)"
+                              },
+                              "textContent": "N/A — static HTML"
+                            }
+                          ]
+                        },
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "display": "flex",
+                            "justifyContent": "space-between",
+                            "paddingTop": "0.75rem"
+                          },
+                          "children": [
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontWeight": "700",
+                                "color": "var(--color-text-primary)"
+                              },
+                              "textContent": "Annual total"
+                            },
+                            {
+                              "tagName": "span",
+                              "style": {
+                                "fontFamily": "var(--font-mono)",
+                                "fontWeight": "700",
+                                "color": "var(--color-accent)",
+                                "fontSize": "1.25rem"
+                              },
+                              "textContent": "$0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "The Exit Hatch" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "If Jx disappeared tomorrow, you'd still have your sites."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "maxWidth": "600px",
+                    "margin": "0 auto",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7"
+                  },
+                  "textContent": "Your content is Markdown. Your components are JSON. Your output is HTML. Every layer is a standard format that other tools can read. There is no proprietary intermediate representation."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fit, minmax(220px, 1fr))",
+                "gap": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "License"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.9375rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.6"
+                      },
+                      "textContent": "MIT open source. Use it, fork it, sell sites built with it. Forever."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "Output"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.9375rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.6"
+                      },
+                      "textContent": "Plain HTML, CSS, and JavaScript. Deployable on any web server in the world."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "Source"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.9375rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.6"
+                      },
+                      "textContent": "JSON + Markdown in git. Human-readable, machine-parseable, version-controlled."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.5rem",
+                    "borderRadius": "var(--radius)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "letterSpacing": "0.1em",
+                        "textTransform": "uppercase",
+                        "color": "var(--color-accent)",
+                        "marginBottom": "0.75rem"
+                      },
+                      "textContent": "Trust"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.9375rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.6"
+                      },
+                      "textContent": "No proprietary IR. No black box. No vendor that can raise prices or shut down."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.03em",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "Ready to switch?"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "margin": "0 0 2rem",
+                "fontSize": "1.0625rem",
+                "lineHeight": "1.7"
+              },
+              "textContent": "Start your first project in under a minute. The entire framework is free, forever."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "justifyContent": "center",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/docs/getting-started",
+                    "props.label": "Get Started",
+                    "props.variant": "primary"
+                  }
+                },
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/features",
+                    "props.label": "See All Features",
+                    "props.variant": "secondary"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

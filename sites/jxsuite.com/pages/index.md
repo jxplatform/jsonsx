@@ -1,55 +1,58 @@
 ---
-title: Jx Suite — Design visually. Ship as static HTML.
+title: "Jx Suite — The full-stack website framework. Open source. Zero lock-in."
 $head:
   - tagName: meta
     attributes:
       name: description
-      content: An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default.
+      content: "A complete website framework: file-based CMS, reactive components, visual composer, and static site generator. MIT licensed. Deploy anywhere."
   - tagName: meta
     attributes:
       property: "og:title"
-      content: Jx Suite — Design visually. Ship as static HTML.
+      content: "Jx Suite — The full-stack website framework."
   - tagName: meta
     attributes:
       property: "og:description"
-      content: An open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default.
+      content: "File-based CMS. Reactive framework. Visual composer. Static generator. Open source. Zero lock-in."
   - tagName: meta
     attributes:
       property: "og:type"
       content: website
 $elements:
-  - $ref: ../components/cta-button.json
-
-  - $ref: ../components/feature-card.json
-
-  - $ref: ../components/step-card.json
-
-  - $ref: ../components/check-item.json
-
-  - $ref: ../components/code-panel.json
+  - "$ref": "../components/cta-button.json"
+  - "$ref": "../components/feature-card.json"
+  - "$ref": "../components/step-card.json"
+  - "$ref": "../components/check-item.json"
+  - "$ref": "../components/code-panel.json"
+  - "$ref": "../components/stat-card.json"
+  - "$ref": "../components/pillar-card.json"
+  - "$ref": "../components/section-label.json"
 ---
 
-::::::hero-section{style.padding="clamp(4rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent)"}
-:::::div{style.maxWidth="800px" style.margin="0 auto"}
+::::::hero{style.padding="clamp(5rem, 12vw, 10rem) clamp(1rem, 3vw, 2rem) clamp(4rem, 8vw, 6rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
+:::::div{style.maxWidth="900px" style.margin="0 auto"}
 :::div{style.display="inline-flex" style.alignItems="center" style.gap="0.5rem" style.padding="0.375rem 0.875rem" style.borderRadius="999px" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.fontSize="0.8125rem" style.color="var(--color-text-secondary)" style.marginBottom="2rem"}
 ::span{style.width="6px" style.height="6px" style.borderRadius="50%" style.backgroundColor="#22c55e" style.display="inline-block"}
 
-Open source · MIT License
+Open source · MIT License · Deploy anywhere
 :::
 
-:::h1{style.fontSize="clamp(2.25rem, 5vw, 3.75rem)" style.fontWeight="700" style.letterSpacing="-0.035em" style.lineHeight="1.1" style.margin="0 0 1.5rem" style.color="var(--color-text-primary)"}
-Design visually.\
-:span[Ship as static HTML.]{style.color="var(--color-text-secondary)"}
+:::h1{style.fontSize="clamp(2.5rem, 6vw, 4.5rem)" style.fontWeight="700" style.letterSpacing="-0.04em" style.lineHeight="1.05" style.margin="0 0 1.5rem" style.color="var(--color-text-primary)"}
+Build any website.\
+:span[Ship as static HTML.]{style.color="var(--color-accent)"}
 :::
 
-:::p{style.fontSize="clamp(1.0625rem, 2vw, 1.25rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto 2.5rem" style.maxWidth="600px"}
-Jx Suite is an open-source visual IDE and declarative JSON framework for building fast, maintainable websites. Zero runtime by default. No lock-in.
+:::p{style.fontSize="clamp(1.0625rem, 2vw, 1.3125rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto 1rem" style.maxWidth="680px"}
+Jx Suite is a complete website framework — file-based CMS, reactive components, visual composer, and static site generator — in one open-source toolkit.
+:::
+
+:::p{style.fontSize="1rem" style.color="var(--color-text-muted)" style.margin="0 auto 2.5rem" style.maxWidth="600px" style.fontFamily="var(--font-mono)" style.letterSpacing="0.02em"}
+The freedom of hand-coded HTML. The speed of a visual builder. The power of a framework.
 :::
 
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="3rem"}
 ::cta-button{props.href="/docs/getting-started" props.label="Get Started" props.variant="primary"}
 
-::cta-button{props.href="https://github.com/jxsuite/jx" props.label="View on GitHub" props.variant="secondary"}
+::cta-button{props.href="https://github.com/nickshanks347/jx" props.label="View on GitHub" props.variant="secondary"}
 :::
 
 ::::div{style.backgroundColor="var(--color-bg-surface)" style.border="1px solid var(--color-border)" style.borderRadius="var(--radius)" style.padding="0.75rem 1.25rem" style.fontFamily="var(--font-mono)" style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.display="inline-flex" style.alignItems="center" style.gap="0.75rem"}
@@ -62,92 +65,108 @@ bun create jx-suite my-site
 :::::
 ::::::
 
-:::::::product-showcase{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" --title="showcase"}
-::::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
-:::::div{style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="clamp(2rem, 4vw, 4rem)" style.alignItems="center" style.--md.gridTemplateColumns="1fr"}
-::::div
-:::div{style.fontSize="0.75rem" style.fontWeight="600" style.color="var(--color-accent)" style.textTransform="uppercase" style.letterSpacing="0.08em" style.fontFamily="var(--font-mono)" style.marginBottom="1rem"}
-JX Studio
+::::::pillars{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+::::div{style.textAlign="center" style.marginBottom="3rem"}
+::section-label{props.text="The Four Pillars"}
+
+:::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
+Everything a website needs. Nothing it doesn't.
 :::
 
-:::h2{style.fontSize="clamp(1.5rem, 3vw, 2.25rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.lineHeight="1.2" style.margin="0 0 1rem"}
-A visual IDE for the web
-:::
-
-:::p{style.color="var(--color-text-secondary)" style.fontSize="1.0625rem" style.lineHeight="1.7" style.margin="0 0 2rem"}
-Design components on a canvas. Inspect and edit properties. See changes live. Everything saves to plain JSON files on disk — no database, no lock-in.
-:::
-
-:::div{style.display="flex" style.flexDirection="column" style.gap="0.75rem"}
-::check-item{props.text="Visual canvas with drag-and-drop component editing"}
-
-::check-item{props.text="Property inspector with live style editing"}
-
-::check-item{props.text="Responsive breakpoint preview"}
-
-::check-item{props.text="File-based — everything is JSON on disk"}
+:::p{style.color="var(--color-text-secondary)" style.maxWidth="600px" style.margin="0 auto" style.fontSize="1.0625rem" style.lineHeight="1.7"}
+Four integrated systems that replace the WordPress stack, the headless CMS, the build tool, and the page builder — with plain files in git.
 :::
 ::::
 
-:::div{style.backgroundColor="var(--color-bg-secondary)" style.border="1px solid var(--color-border)" style.borderRadius="var(--radius-lg)" style.aspectRatio="16/10" style.display="flex" style.alignItems="center" style.justifyContent="center" style.overflow="hidden"}
-::img{style.objectFit="contain" src="/studio.png" width="100%" height="100%"}
+:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" style.gap="1rem"}
+::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No database. No admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
+
+::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Signals-based reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="TC39 Signals · Web Components · Template literals · Zero JS by default"}
+
+::pillar-card{props.icon="🎨" props.title="Visual Composer" props.description="Jx Studio — a visual IDE for designing, editing, and scripting websites. Every change saves to plain JSON files on disk." props.features="Design mode · Content editing · Script editor · Responsive preview"}
+
+::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Code splitting · <100ms builds"}
 :::
 :::::
 ::::::
-:::::::
 
-:::::feature-grid-section{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
-::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
-:::h2{style.fontSize="clamp(1.5rem, 3vw, 2rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.margin="0 0 0.75rem" style.textAlign="center"}
-Everything you need, nothing you don't
+::::::comparison{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+::::div{style.textAlign="center" style.marginBottom="3rem"}
+::section-label{props.text="The Landscape"}
+
+:::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
+The only tool that checks every box.
 :::
 
-:::p{style.color="var(--color-text-secondary)" style.textAlign="center" style.maxWidth="560px" style.margin="0 auto 3rem" style.fontSize="1.0625rem"}
-A complete toolkit for building modern static websites — from visual design to production deploy.
-:::
-
-:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" style.gap="1px" style.backgroundColor="var(--color-border)" style.borderRadius="var(--radius-lg)" style.overflow="hidden" style.border="1px solid var(--color-border)"}
-::feature-card{props.icon="{ }" props.iconBg="rgba(59, 130, 246, 0.1)" props.iconColor="var(--color-accent)" props.iconSize="0.75rem" props.title="Declarative JSON" props.description="Define UI, state, and behavior as structured JSON. No JSX, no templates, no build-step syntax."}
-
-::feature-card{props.icon="0kb" props.iconBg="rgba(34, 197, 94, 0.1)" props.iconColor="#22c55e" props.title="Zero Runtime" props.description="Compiles to plain HTML and CSS. No JavaScript ships by default. Reactive islands hydrate only where needed."}
-
-::feature-card{props.icon="IDE" props.iconBg="rgba(168, 85, 247, 0.1)" props.iconColor="#a855f7" props.title="Visual Studio" props.description="Design on a visual canvas. Inspect properties, edit styles, drag and drop — all in the browser."}
-
-::feature-card{props.icon="</>" props.iconBg="rgba(251, 146, 60, 0.1)" props.iconColor="#fb923c" props.title="Web Components" props.description="Compile JSON to standard custom elements. Use them in any framework, static HTML, or standalone."}
-
-::feature-card{props.icon="⚡" props.iconBg="rgba(234, 179, 8, 0.1)" props.iconColor="#eab308" props.iconSize="0.8125rem" props.title="Reactive Islands" props.description="Vue-powered reactivity ships only where you need it. Static by default, interactive on demand."}
-
-::feature-card{props.icon="/·/" props.iconBg="rgba(14, 165, 233, 0.1)" props.iconColor="#0ea5e9" props.title="File-Based Routing" props.description="Drop a JSON file in pages/ and it becomes a route. Dynamic params, layouts, and content collections built in."}
+:::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
+Every alternative solves one problem and creates another. Jx is the synthesis.
 :::
 ::::
+
+::::div{style.overflowX="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)"}
+
+|                    | Visual Builder | Low Maintenance | Fast Output   | No Lock-in |
+| ------------------ | -------------- | --------------- | ------------- | ---------- |
+| WordPress          | ✓              | ✗ Heavy         | ✗ Patchy      | ✗ High     |
+| Headless + Next.js | ✗ None         | ✗ Heavy         | ✓ Strong      | ~ Medium   |
+| Astro / Hugo       | ✗ None         | ✓ Light         | ✓ Strong      | ✓ Open     |
+| Webflow            | ✓ Yes          | ✓ Light         | ✓ Strong      | ✗ Total    |
+| Wix / Squarespace  | ✓ Yes          | ✓ Light         | ✗ Slow        | ✗ Total    |
+| **Jx Suite**       | **✓ Yes**      | **✓ Zero**      | **✓ Perfect** | **✓ MIT**  |
+
+::::
 :::::
+::::::
 
-::::::code-example{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+::::::stats{style.padding="clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
-:::h2{style.fontSize="clamp(1.5rem, 3vw, 2rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.margin="0 0 0.75rem" style.textAlign="center"}
-JSON in, HTML out
+:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" style.gap="1rem"}
+::stat-card{props.value="100" props.label="Lighthouse score out of the box"}
+
+::stat-card{props.value="$0/yr" props.label="Maintenance cost — no plugins, no patches"}
+
+::stat-card{props.value="MIT" props.label="Licensed forever — no vendor, no fees"}
+
+::stat-card{props.value="<1s" props.label="Build time for a typical 50-page site"}
+:::
+:::::
+::::::
+
+::::::code-example{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+::::div{style.textAlign="center" style.marginBottom="3rem"}
+::section-label{props.text="How It Works"}
+
+:::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
+JSON in, HTML out.
 :::
 
-:::p{style.color="var(--color-text-secondary)" style.textAlign="center" style.maxWidth="560px" style.margin="0 auto 3rem" style.fontSize="1.0625rem"}
-Write a JSON document. The compiler produces static HTML with zero JavaScript — or a reactive web component when you need interactivity.
+:::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
+Write a JSON document — or design it visually in Studio. The compiler produces static HTML with zero JavaScript by default.
 :::
+::::
 
 ::::div{style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="1.5rem" style.--md.gridTemplateColumns="1fr"}
-:::code-panel{props.filename="counter.json" props.badge="INPUT"}
+:::code-panel{props.filename="hero.json" props.badge="INPUT"}
 
 ```
 {
-  "tagName": "my-counter",
-  "state": {
-    "count": 0,
-    "increment": {
-      "$prototype": "Function",
-      "body": "state.count++"
-    }
+  "tagName": "section",
+  "style": {
+    "padding": "4rem 2rem",
+    "textAlign": "center"
   },
   "children": [
-    { "tagName": "span", "textContent": "${state.count}" },
-    { "tagName": "button", "textContent": "+" }
+    {
+      "tagName": "h1",
+      "textContent": "Welcome to ${state.name}"
+    },
+    {
+      "tagName": "p",
+      "textContent": "${state.description}"
+    }
   ]
 }
 ```
@@ -157,17 +176,14 @@ Write a JSON document. The compiler produces static HTML with zero JavaScript �
 :::code-panel{props.filename="index.html" props.badge="OUTPUT"}
 
 ```
-<!-- Static output: zero JS -->
-<my-counter>
-  <span>0</span>
-  <button>+</button>
-</my-counter>
+<section style="padding:4rem 2rem;
+  text-align:center">
+  <h1>Welcome to Acme Corp</h1>
+  <p>We build things that matter.</p>
+</section>
 
-<!-- Reactive island: ~5kb hydration -->
-<script type="module">
-  import { MyCounter } from
-    './counter.js'
-</script>
+<!-- Zero JavaScript. Pure HTML + CSS.
+     Deploys to any static host. -->
 ```
 
 :::
@@ -175,40 +191,41 @@ Write a JSON document. The compiler produces static HTML with zero JavaScript �
 :::::
 ::::::
 
-:::::how-it-works{style.padding="clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
-::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
-:::h2{style.fontSize="clamp(1.5rem, 3vw, 2rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.margin="0 0 0.75rem" style.textAlign="center"}
-How it works
-:::
+::::::workflow{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
+::::div{style.textAlign="center" style.marginBottom="3rem"}
+::section-label{props.text="Workflow"}
 
-:::p{style.color="var(--color-text-secondary)" style.textAlign="center" style.maxWidth="480px" style.margin="0 auto 3rem" style.fontSize="1.0625rem"}
-Three steps from JSON to production.
-:::
-
-:::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="1fr"}
-::step-card{props.number="1" props.title="Write JSON" props.description="Define components, pages, state, and behavior as structured JSON documents. Or design them visually in Studio."}
-
-::step-card{props.number="2" props.title="Compile" props.description="The compiler produces static HTML and CSS with zero JavaScript by default. Reactive islands hydrate only where needed."}
-
-::step-card{props.number="3" props.title="Deploy" props.description="Ship to any static host — Netlify, Vercel, Cloudflare Pages, or a plain web server. No server runtime required."}
+:::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
+Three steps to production.
 :::
 ::::
-:::::
 
-:::::cta-banner{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" style.textAlign="center" style.background="radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.08), transparent)"}
-::::div{style.maxWidth="560px" style.margin="0 auto"}
-:::h2{style.fontSize="clamp(1.5rem, 3vw, 2.25rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.margin="0 0 1rem"}
-Ready to build?
+:::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="1fr"}
+::step-card{props.number="1" props.title="Author" props.description="Design visually in Studio, write JSON by hand, or author content in Markdown. Every format is a plain file in git."}
+
+::step-card{props.number="2" props.title="Commit" props.description="Push to your repository. CI builds static HTML in under a second. No origin server, no database migrations, no deploy scripts."}
+
+::step-card{props.number="3" props.title="Live" props.description="Ship to Cloudflare Pages, GitHub Pages, Vercel, or any web server. Static files on a CDN — fast everywhere, costs pennies."}
+:::
+:::::
+::::::
+
+::::::bottom-cta{style.padding="clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)" style.textAlign="center" style.background="radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.1), transparent)"}
+:::::div{style.maxWidth="640px" style.margin="0 auto"}
+:::h2{style.fontSize="clamp(2rem, 4vw, 3rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1.5rem" style.lineHeight="1.1"}
+The websites of 2030\
+:span[are built in 2026.]{style.color="var(--color-accent)"}
 :::
 
-:::p{style.color="var(--color-text-secondary)" style.margin="0 0 2rem" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-Start building your next site with Jx Suite. JSON in, HTML out. Zero lock-in.
+:::p{style.color="var(--color-text-secondary)" style.margin="0 0 2.5rem" style.fontSize="1.0625rem" style.lineHeight="1.7"}
+Start building with Jx Suite. No accounts, no subscriptions, no vendor approval. Clone the repo and go.
 :::
 
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap"}
 ::cta-button{props.href="/docs/getting-started" props.label="Get Started" props.variant="primary"}
 
-::cta-button{props.href="/docs/spec" props.label="Read the Spec" props.variant="secondary"}
+::cta-button{props.href="/features" props.label="Explore Features" props.variant="secondary"}
 :::
-::::
 :::::
+::::::

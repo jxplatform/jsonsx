@@ -1,0 +1,642 @@
+{
+  "title": "Features — Jx Suite",
+  "$layout": "./layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Everything Jx Suite offers: file-based CMS, reactive framework, visual composer, and static site generator. One toolkit, zero lock-in."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/check-item.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 4rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.12), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Features" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2.25rem, 5vw, 3.75rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.5rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "Four systems. One framework. Zero lock-in."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.0625rem, 2vw, 1.25rem)",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "640px"
+              },
+              "textContent": "Jx Suite replaces the CMS, the build tool, the page builder, and the framework — with plain files in a git repository."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Pillar 01 — CMS" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "File-based content management."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Your content lives as JSON documents and Markdown files in a git repository. No database to manage, no admin panel to secure, no migration scripts to run. Branch, review, merge — the same workflow you use for code."
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Markdown with remark directives for rich content"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Content collections with frontmatter schemas" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Dynamic routes from file system structure" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Git history is your audit trail and rollback" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "AI-native: Markdown is the canonical LLM format"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "padding": "2rem",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.8125rem",
+                "lineHeight": "1.7",
+                "color": "var(--color-text-secondary)",
+                "whiteSpace": "pre-wrap"
+              },
+              "textContent": "my-site/\n├── pages/\n│   ├── index.md\n│   ├── about.json\n│   └── blog/\n│       └── [slug].json\n├── content/\n│   └── posts/\n│       ├── hello-world.md\n│       └── launch-day.md\n├── components/\n│   ├── hero.json\n│   └── card.json\n├── layouts/\n│   └── base.json\n└── project.json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "padding": "2rem",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "lineHeight": "1.8",
+                "color": "var(--color-text-secondary)",
+                "whiteSpace": "pre-wrap"
+              },
+              "textContent": "{\n  \"tagName\": \"like-button\",\n  \"state\": {\n    \"count\": 0,\n    \"liked\": false,\n    \"toggle\": {\n      \"$prototype\": \"Function\",\n      \"body\": \"state.liked = !state.liked; state.count += state.liked ? 1 : -1\"\n    }\n  },\n  \"children\": [\n    {\n      \"tagName\": \"button\",\n      \"onclick\": { \"$ref\": \"#/state/toggle\" },\n      \"textContent\": \"${state.liked ? '♥' : '♡'} ${state.count}\"\n    }\n  ]\n}"
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Pillar 02 — Framework" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Reactive without the runtime tax."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Declare state, bind it to the DOM with template strings, and let the compiler figure out the rest. Static by default — reactive islands hydrate only where you need interactivity."
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Signals-based reactivity (TC39 aligned)" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Compiles to standard Web Components" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Template literal bindings — no JSX, no DSL" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Zero JavaScript ships unless you add interactivity"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Built-in prototypes: Request, LocalStorage, FormData"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Pillar 03 — Visual Composer" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Design visually. Save as plain files."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Jx Studio is a visual IDE that runs in your browser. Design on a canvas, edit content inline, write event handlers — everything saves to the same JSON files your compiler reads. No proprietary format. No export step."
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Visual canvas with live component rendering" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Property inspector with full CSS editing" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Inline content editing — click any text, type"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Responsive breakpoint preview" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Script editor for event handlers and logic" }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "aspectRatio": "16/10",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "color": "var(--color-text-muted)",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.8125rem"
+              },
+              "textContent": "[ Jx Studio Screenshot ]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-secondary)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "padding": "2rem",
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.75rem",
+                "lineHeight": "1.8",
+                "color": "var(--color-text-secondary)",
+                "whiteSpace": "pre-wrap"
+              },
+              "textContent": "$ jx build\n\n✓ Compiled 47 pages\n✓ Optimized 23 images (webp, avif)\n✓ Generated sitemap.xml\n✓ Output: ./dist (312kb total)\n\nDone in 0.8s\n\n$ deploy ./dist  # Any static host works"
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Pillar 04 — Static Generator" }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Compiles to HTML. Deploys anywhere."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "The build step produces pure HTML and CSS — no origin server, no serverless functions, no database connections. Static files on a CDN. Fast everywhere. Costs pennies. Online forever."
+                },
+                {
+                  "tagName": "div",
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Sub-second builds for typical sites" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Automatic image optimization (WebP, AVIF)" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "100/100 Lighthouse scores by default" }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Deploy to GitHub Pages, Cloudflare, Vercel, anywhere"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "No PHP, no Node server, no containers" }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "textAlign": "center"
+          },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "What You Can Build" }
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.03em",
+                "margin": "0 0 3rem"
+              },
+              "textContent": "From brochure sites to interactive applications."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fit, minmax(200px, 1fr))",
+                "gap": "1px",
+                "backgroundColor": "var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "overflow": "hidden",
+                "border": "1px solid var(--color-border)",
+                "textAlign": "left"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Marketing sites"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Documentation"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Blogs & portfolios"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "E-commerce catalogs"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Interactive dashboards"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Multi-language sites"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Calculators & tools"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Landing pages"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1.25rem",
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "fontSize": "0.9375rem"
+                  },
+                  "textContent": "Component libraries"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(5rem, 10vw, 8rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 60% 50% at 50% 100%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.03em",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "Ready to build?"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "margin": "0 0 2rem",
+                "fontSize": "1.0625rem",
+                "lineHeight": "1.7"
+              },
+              "textContent": "Start your first project in under a minute. No accounts. No credit card. Just code."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "justifyContent": "center",
+                "flexWrap": "wrap"
+              },
+              "children": [
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/docs/getting-started",
+                    "props.label": "Get Started",
+                    "props.variant": "primary"
+                  }
+                },
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/compare",
+                    "props.label": "See the Comparison",
+                    "props.variant": "secondary"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
