@@ -13,8 +13,10 @@ mock.module("electrobun/bun", () => ({
 const {
   setProjectRoot,
   getProjectRoot,
+  setFileDialog,
   listDirectory,
   handleReadFile,
+  handleReadFileAsDataUrl,
   handleWriteFile,
   handleDeleteFile,
   handleRenameFile,
@@ -25,6 +27,7 @@ const {
   codeService,
   locateFile,
   fetchPluginSchema,
+  openProject,
 } = await import("../src/handlers");
 
 const FIXTURES = join(import.meta.dir, "_fixtures_handlers");
@@ -347,6 +350,35 @@ describe("discoverComponents", () => {
       cleanup();
     }
   });
+
+  test("handles primitive state values", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "primitive-state.json"),
+        JSON.stringify({
+          tagName: "my-counter",
+          state: {
+            count: 5,
+            label: "hello",
+          },
+          children: [],
+        }),
+      );
+
+      const components = await discoverComponents({ dir: "." });
+      const counter = components.find((c: ComponentMeta) => c.tagName === "my-counter")!;
+      expect(counter).toBeDefined();
+      const countProp = counter.props!.find((p) => p.name === "count")!;
+      expect(countProp.type).toBe("number");
+      expect(countProp.default).toBe(5);
+      const labelProp = counter.props!.find((p) => p.name === "label")!;
+      expect(labelProp.type).toBe("string");
+      expect(labelProp.default).toBe("hello");
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 // ─── codeService ───────────────────────────────────────────────────────────
@@ -558,6 +590,28 @@ describe("fetchPluginSchema", () => {
     }
   });
 
+  test("returns null when prototype .class.json is malformed", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "Broken.class.json"), "not valid json {{{");
+      const schema = await fetchPluginSchema({ src: "./something.ts", prototype: "Broken" });
+      expect(schema).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns null when module import fails", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "bad-module.ts"), "export syntax error %%%");
+      const schema = await fetchPluginSchema({ src: "./bad-module.ts", prototype: "BadModule" });
+      expect(schema).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+
   test("resolves JS module with static schema property", async () => {
     setup();
     try {
@@ -664,6 +718,162 @@ describe("handleResolveSiteContext", () => {
       const result = await handleResolveSiteContext({ filePath: "orphan/file.json" });
       expect(result.sitePath).toBeNull();
     } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── handleReadFileAsDataUrl ──────────────────────────────────────────────
+
+describe("handleReadFileAsDataUrl", () => {
+  test("returns data URL for PNG file", async () => {
+    setup();
+    try {
+      const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+      writeFileSync(join(FIXTURES, "image.png"), pngData);
+      const result = await handleReadFileAsDataUrl({ path: "image.png" });
+      expect(result).toStartWith("data:image/png;base64,");
+      const base64 = result.replace("data:image/png;base64,", "");
+      expect(Buffer.from(base64, "base64")).toEqual(pngData);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("detects JPEG mime type", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "photo.jpg"), Buffer.from([0xff, 0xd8]));
+      const result = await handleReadFileAsDataUrl({ path: "photo.jpg" });
+      expect(result).toStartWith("data:image/jpeg;base64,");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("detects SVG mime type", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "icon.svg"), "<svg></svg>");
+      const result = await handleReadFileAsDataUrl({ path: "icon.svg" });
+      expect(result).toStartWith("data:image/svg+xml;base64,");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("uses octet-stream for unknown extensions", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "file.xyz"), "data");
+      const result = await handleReadFileAsDataUrl({ path: "file.xyz" });
+      expect(result).toStartWith("data:application/octet-stream;base64,");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("falls back to public/ directory", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "public"), { recursive: true });
+      writeFileSync(join(FIXTURES, "public", "logo.png"), Buffer.from([0x89, 0x50]));
+      const result = await handleReadFileAsDataUrl({ path: "logo.png" });
+      expect(result).toStartWith("data:image/png;base64,");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("throws for non-existent file in both root and public/", async () => {
+    setup();
+    try {
+      await expect(handleReadFileAsDataUrl({ path: "missing.png" })).rejects.toThrow(
+        "File not found",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("rejects path traversal", async () => {
+    setup();
+    try {
+      await expect(handleReadFileAsDataUrl({ path: "../../etc/passwd" })).rejects.toThrow(
+        "Path outside project root",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+// ─── openProject ──────────────────────────────────────────────────────────
+
+describe("openProject", () => {
+  test("throws when no file dialog configured", async () => {
+    setup();
+    try {
+      await expect(openProject()).rejects.toThrow("No file dialog configured");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("returns null when dialog is cancelled", async () => {
+    setup();
+    try {
+      setFileDialog(async () => null);
+      const result = await openProject();
+      expect(result).toBeNull();
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("throws when selected file is not project.json", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "other.json"), "{}");
+      setFileDialog(async () => join(FIXTURES, "other.json"));
+      await expect(openProject()).rejects.toThrow("not a project.json");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("opens project.json and sets root", async () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({ name: "My Project", url: "http://localhost:3000" }),
+      );
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+      const result = await openProject();
+      expect(result).not.toBeNull();
+      expect(result!.config.name).toBe("My Project");
+      expect(result!.handle.name).toBe("My Project");
+      expect(result!.handle.root).toBe(".");
+      expect(getProjectRoot()).toBe(FIXTURES);
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+
+  test("uses directory basename when config has no name", async () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({}));
+      setFileDialog(async () => join(FIXTURES, "project.json"));
+      const result = await openProject();
+      expect(result).not.toBeNull();
+      expect(result!.handle.name).toBe("_fixtures_handlers");
+    } finally {
+      setFileDialog(null as unknown as () => Promise<string | null>);
       cleanup();
     }
   });

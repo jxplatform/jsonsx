@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@jxsuite/server": "workspace:^",
-    "electrobun-builder-for-windows": "^0.3.7"
+    "electrobun-builder-for-windows": "^0.3.7",
+    "msw": "^2.14.6"
   }
 }
