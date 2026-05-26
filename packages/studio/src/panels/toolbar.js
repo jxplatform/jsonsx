@@ -286,7 +286,12 @@ function toolbarTemplate() {
   const recentProjectsTpl = recentProjects.length
     ? html`
         <overlay-trigger placement="bottom-start" triggered-by="click">
-          <sp-action-button size="s" slot="trigger" title="Recent projects">
+          <sp-action-button
+            size="s"
+            slot="trigger"
+            title="Recent projects"
+            class="tb-split-trigger"
+          >
             <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
           </sp-action-button>
           <sp-popover slot="click-content" tip>
@@ -306,7 +311,12 @@ function toolbarTemplate() {
     : nothing;
 
   return html`
-    ${tbBtnTpl("Open Project", ctx.openProject, "sp-icon-folder-open")} ${recentProjectsTpl}
+    <div class="tb-split-btn">
+      <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
+        ${toolbarIconMap["sp-icon-folder-open"]} Open Project
+      </sp-action-button>
+      ${recentProjectsTpl}
+    </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
     ${tbBtnTpl("Save", ctx.saveFile, "sp-icon-save-floppy")}
     <sp-action-group compact size="s">
