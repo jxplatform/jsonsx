@@ -1,6 +1,6 @@
 /**
- * Git panel — Source control sidebar with status, staging, commit, push/pull, and branch
- * management.
+ * Git panel — Source control sidebar with sync status, branch selector, Local Changes / History
+ * tabs, commit form, and changed-components view.
  */
 
 import { html, nothing } from "lit-html";
@@ -19,6 +19,7 @@ export async function refreshGitStatus() {
     const [status, branches] = await Promise.all([plat.gitStatus(), plat.gitBranches()]);
     updateUi("gitStatus", status);
     updateUi("gitBranches", branches);
+    _lastUpdated = new Date();
   } catch (/** @type {unknown} */ e) {
     updateUi("gitError", /** @type {Error} */ (e).message);
   } finally {
@@ -46,8 +47,11 @@ async function gitAction(action, body) {
 }
 
 let _pollTimer = /** @type {ReturnType<typeof setInterval> | null} */ (null);
+let _lastUpdated = /** @type {Date | null} */ (null);
+let _gitSubTab = "changes";
 
 /** @typedef {{ path: string; status: string; staged: boolean }} GitFileEntry */
+/** @typedef {{ hash: string; message: string; author: string; date: string }} GitLogEntry */
 
 /**
  * @typedef {{
@@ -61,9 +65,22 @@ let _pollTimer = /** @type {ReturnType<typeof setInterval> | null} */ (null);
  *   gitLoading?: boolean;
  *   gitError?: string | null;
  *   gitCommitMessage?: string;
+ *   gitLogEntries?: GitLogEntry[] | null;
  *   [key: string]: unknown;
  * }} GitUiState
  */
+
+async function fetchGitLog() {
+  const plat = getPlatform();
+  try {
+    const entries = await plat.gitLog(30);
+    updateUi("gitLogEntries", entries);
+    renderOnly("leftPanel");
+  } catch (/** @type {unknown} */ e) {
+    updateUi("gitError", /** @type {Error} */ (e).message);
+    renderOnly("leftPanel");
+  }
+}
 
 /**
  * @param {{ ui: GitUiState }} S
@@ -100,35 +117,53 @@ export function renderGitPanel(S, ctx) {
     await gitAction("gitCommit", msg);
   };
 
-  const branchPickerT = html`
-    <sp-picker
-      size="s"
-      quiet
-      class="git-branch-picker"
-      .value=${live(branches?.current || "")}
-      @change=${async (/** @type {Event} */ e) => {
-        const val = /** @type {HTMLInputElement} */ (e.target).value;
-        if (val === "__new__") {
-          /** @type {HTMLInputElement} */ (e.target).value = branches?.current || "";
-          const name = prompt("New branch name:");
-          if (name?.trim()) await gitAction("gitCreateBranch", name.trim());
-          return;
-        }
-        if (val !== branches?.current) await gitAction("gitCheckout", val);
-      }}
-    >
-      ${(branches?.branches || []).map(
-        (/** @type {string} */ b) => html`<sp-menu-item value=${b}>${b}</sp-menu-item>`,
-      )}
-      <sp-menu-divider></sp-menu-divider>
-      <sp-menu-item value="__new__">+ New branch...</sp-menu-item>
-    </sp-picker>
-  `;
+  const doCommitAndSync = async () => {
+    const tab = activeTab.value;
+    const msg = tab?.session.ui.gitCommitMessage?.trim();
+    if (!msg) return;
+    updateUi("gitCommitMessage", "");
+    updateUi("gitLoading", true);
+    updateUi("gitError", null);
+    const plat = getPlatform();
+    try {
+      await plat.gitCommit(msg);
+      await plat.gitPush();
+      await refreshGitStatus();
+    } catch (/** @type {unknown} */ e) {
+      updateUi("gitError", /** @type {Error} */ (e).message);
+      updateUi("gitLoading", false);
+      renderOnly("leftPanel");
+    }
+  };
 
-  const toolbarT = html`
-    <div class="git-toolbar">
-      ${branchPickerT}
-      <sp-action-group size="xs" quiet>
+  // ─── 1. Sync status bar ──────────────────────────────────────────────────
+  const isUpToDate = !status?.ahead && !status?.behind;
+  const syncLabel = isUpToDate
+    ? "Up to date"
+    : `${status?.ahead ? `${status.ahead} ahead` : ""}${status?.ahead && status?.behind ? ", " : ""}${status?.behind ? `${status.behind} behind` : ""}`;
+  const lastUpdatedStr = _lastUpdated
+    ? _lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const syncBarT = html`
+    <div class="git-sync-bar">
+      <sp-action-button
+        size="s"
+        quiet
+        class="git-sync-icon"
+        title="Refresh"
+        @click=${() => refreshGitStatus()}
+        ?disabled=${loading}
+      >
+        <sp-icon-refresh slot="icon"></sp-icon-refresh>
+      </sp-action-button>
+      <div class="git-sync-text">
+        <span class="git-sync-label">${syncLabel}</span>
+        ${lastUpdatedStr
+          ? html`<span class="git-sync-time">Last updated ${lastUpdatedStr}</span>`
+          : nothing}
+      </div>
+      <sp-action-group size="xs" quiet class="git-sync-actions">
         <sp-action-button title="Fetch" @click=${() => gitAction("gitFetch")} ?disabled=${loading}>
           <sp-icon-download slot="icon" size="xs"></sp-icon-download>
         </sp-action-button>
@@ -146,20 +181,92 @@ export function renderGitPanel(S, ctx) {
         >
           <sp-icon-arrow-up slot="icon" size="xs"></sp-icon-arrow-up>
         </sp-action-button>
-        <sp-action-button title="Refresh" @click=${() => refreshGitStatus()} ?disabled=${loading}>
-          <sp-icon-refresh slot="icon" size="xs"></sp-icon-refresh>
-        </sp-action-button>
       </sp-action-group>
     </div>
   `;
 
+  // ─── 2. Branch selector ──────────────────────────────────────────────────
+  const branchSelectorT = html`
+    <div class="git-branch-row">
+      <svg
+        class="git-branch-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <line x1="6" y1="3" x2="6" y2="15"></line>
+        <circle cx="18" cy="6" r="3"></circle>
+        <circle cx="6" cy="18" r="3"></circle>
+        <path d="M18 9a9 9 0 0 1-9 9"></path>
+      </svg>
+      <div class="git-branch-text">
+        <span class="git-branch-label">Active branch</span>
+        <span class="git-branch-name">${branches?.current || status?.branch || "—"}</span>
+      </div>
+      <sp-picker
+        size="s"
+        quiet
+        class="git-branch-picker"
+        .value=${live(branches?.current || "")}
+        @change=${async (/** @type {Event} */ e) => {
+          const val = /** @type {HTMLInputElement} */ (e.target).value;
+          if (val === "__new__") {
+            /** @type {HTMLInputElement} */ (e.target).value = branches?.current || "";
+            const name = prompt("New branch name:");
+            if (name?.trim()) await gitAction("gitCreateBranch", name.trim());
+            return;
+          }
+          if (val !== branches?.current) await gitAction("gitCheckout", val);
+        }}
+      >
+        ${(branches?.branches || []).map(
+          (/** @type {string} */ b) => html`<sp-menu-item value=${b}>${b}</sp-menu-item>`,
+        )}
+        <sp-menu-divider></sp-menu-divider>
+        <sp-menu-item value="__new__">+ New branch...</sp-menu-item>
+      </sp-picker>
+    </div>
+  `;
+
+  // ─── 3. Tabs: Local Changes / History ────────────────────────────────────
+  const switchTab = (/** @type {string} */ tab) => {
+    _gitSubTab = tab;
+    if (tab === "history" && !S.ui.gitLogEntries) fetchGitLog();
+    renderOnly("leftPanel");
+  };
+
+  const tabsT = html`
+    <div class="git-tabs">
+      <button
+        class="git-tab ${_gitSubTab === "changes" ? "active" : ""}"
+        @click=${() => switchTab("changes")}
+      >
+        Local Changes${totalChanges > 0 ? ` (${totalChanges})` : ""}
+      </button>
+      <button
+        class="git-tab ${_gitSubTab === "history" ? "active" : ""}"
+        @click=${() => switchTab("history")}
+      >
+        History
+      </button>
+    </div>
+  `;
+
+  // ─── 4. Commit form ──────────────────────────────────────────────────────
   const commitT = html`
     <div class="git-commit-area">
+      <label class="git-commit-label">Please write a commit message</label>
       <sp-textfield
         size="s"
         multiline
         class="git-commit-input"
-        placeholder='Message (Ctrl+Enter to commit on "${status?.branch || ""}")'
+        placeholder="Describe your changes"
         .value=${live(S.ui.gitCommitMessage || "")}
         @input=${(/** @type {Event} */ e) =>
           updateUi("gitCommitMessage", /** @type {HTMLInputElement} */ (e.target).value)}
@@ -170,13 +277,47 @@ export function renderGitPanel(S, ctx) {
           }
         }}
       ></sp-textfield>
-      <sp-action-button class="git-commit-btn" @click=${doCommit} ?disabled=${loading}>
-        <sp-icon-checkmark slot="icon" size="xs"></sp-icon-checkmark>
-        Commit
-      </sp-action-button>
+      <div class="git-commit-actions">
+        <div class="git-split-btn">
+          <sp-action-button
+            class="git-commit-btn"
+            size="s"
+            @click=${doCommitAndSync}
+            ?disabled=${loading}
+          >
+            Commit and sync
+          </sp-action-button>
+          <sp-action-button
+            class="git-split-trigger"
+            size="s"
+            @click=${(/** @type {Event} */ e) => {
+              const menu = /** @type {HTMLElement} */ (
+                /** @type {HTMLElement} */ (e.currentTarget).parentElement
+              ).querySelector(".git-split-menu");
+              if (menu) menu.toggleAttribute("hidden");
+            }}
+          >
+            <sp-icon-chevron-down slot="icon" size="xs"></sp-icon-chevron-down>
+          </sp-action-button>
+          <div class="git-split-menu" hidden>
+            <button
+              class="git-split-menu-item"
+              @click=${(/** @type {Event} */ e) => {
+                /** @type {HTMLElement} */ (
+                  /** @type {HTMLElement} */ (e.currentTarget).parentElement
+                ).setAttribute("hidden", "");
+                doCommit();
+              }}
+            >
+              Commit (don't sync)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `;
 
+  // ─── 5. Changed Components ───────────────────────────────────────────────
   const fileRowT = (/** @type {GitFileEntry} */ file) => {
     const parts = file.path.split("/");
     const name = parts.pop();
@@ -271,6 +412,27 @@ export function renderGitPanel(S, ctx) {
     `;
   };
 
+  /** Group files by component (parent directory for .json/.class.json, or "Other") */
+  const groupFilesByComponent = (/** @type {GitFileEntry[]} */ files) => {
+    /** @type {Map<string, GitFileEntry[]>} */
+    const groups = new Map();
+    for (const f of files) {
+      const parts = f.path.split("/");
+      let component;
+      if (f.path.endsWith(".json") || f.path.endsWith(".class.json") || f.path.endsWith(".md")) {
+        component = parts.length > 1 ? `/${parts[parts.length - 2]}` : `/${parts[0]}`;
+      } else {
+        component = "Other";
+      }
+      if (!groups.has(component)) groups.set(component, []);
+      /** @type {GitFileEntry[]} */ (groups.get(component)).push(f);
+    }
+    return groups;
+  };
+
+  const allFiles = [...stagedFiles, ...unstagedFiles];
+  const componentGroups = groupFilesByComponent(allFiles);
+
   const changesT = html`
     ${stagedFiles.length > 0
       ? html`
@@ -295,12 +457,12 @@ export function renderGitPanel(S, ctx) {
           </div>
         `
       : nothing}
-    ${unstagedFiles.length > 0
-      ? html`
-          <div class="git-section">
-            <div class="git-section-header">
-              <span>Changes</span>
-              <span class="git-count">${unstagedFiles.length}</span>
+    <div class="git-section">
+      <div class="git-section-header">
+        <span>Changed Components</span>
+        <span class="git-count">${allFiles.length}</span>
+        ${unstagedFiles.length > 0
+          ? html`
               <sp-action-button
                 size="xs"
                 quiet
@@ -313,31 +475,77 @@ export function renderGitPanel(S, ctx) {
               >
                 <sp-icon-add slot="icon" size="xs"></sp-icon-add>
               </sp-action-button>
-            </div>
-            ${repeat(unstagedFiles, (/** @type {GitFileEntry} */ f) => f.path, fileRowT)}
-          </div>
-        `
-      : nothing}
-    ${totalChanges === 0 && !loading ? html`<div class="git-empty">No changes</div>` : nothing}
+            `
+          : nothing}
+      </div>
+      ${allFiles.length > 0
+        ? html`
+            ${[...componentGroups.entries()].map(
+              ([comp, files]) => html`
+                <div class="git-component-group">
+                  <div class="git-component-header">
+                    <sp-action-button
+                      size="xs"
+                      quiet
+                      class="git-component-overflow"
+                      title="Actions"
+                    >
+                      <sp-icon-more slot="icon" size="xs"></sp-icon-more>
+                    </sp-action-button>
+                    <span class="git-component-name">${comp}</span>
+                  </div>
+                  ${repeat(files, (/** @type {GitFileEntry} */ f) => f.path, fileRowT)}
+                </div>
+              `,
+            )}
+          `
+        : html`<div class="git-empty">No changes</div>`}
+    </div>
   `;
 
-  const syncInfoT =
-    status?.ahead || status?.behind
-      ? html`
-          <div class="git-sync-info">
-            ${status.ahead ? html`<span title="Commits ahead">↑${status.ahead}</span>` : nothing}
-            ${status.behind ? html`<span title="Commits behind">↓${status.behind}</span>` : nothing}
-          </div>
-        `
-      : nothing;
+  // ─── 6. History tab content ──────────────────────────────────────────────
+  const logEntries = S.ui.gitLogEntries || [];
+  const historyT = html`
+    <div class="git-history">
+      ${logEntries.length === 0
+        ? html`<div class="git-empty">No history</div>`
+        : repeat(
+            logEntries,
+            (/** @type {GitLogEntry} */ e) => e.hash,
+            (/** @type {GitLogEntry} */ entry) => html`
+              <div class="git-history-entry">
+                <span class="git-history-hash">${entry.hash.slice(0, 7)}</span>
+                <span class="git-history-message">${entry.message}</span>
+                <span class="git-history-meta">${entry.author} · ${_relativeDate(entry.date)}</span>
+              </div>
+            `,
+          )}
+    </div>
+  `;
 
   return html`
     <div class="git-panel">
-      ${toolbarT} ${syncInfoT} ${commitT}
+      ${syncBarT} ${branchSelectorT} ${tabsT}
+      ${_gitSubTab === "changes" ? html`${commitT}${changesT}` : historyT}
       ${loading ? html`<div class="git-loading">Loading...</div>` : nothing}
-      ${S.ui.gitError ? html`<div class="git-error">${S.ui.gitError}</div>` : nothing} ${changesT}
+      ${S.ui.gitError ? html`<div class="git-error">${S.ui.gitError}</div>` : nothing}
     </div>
   `;
+}
+
+/** @param {string} iso */
+function _relativeDate(iso) {
+  const d = new Date(iso);
+  const now = Date.now();
+  const diff = now - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString();
 }
 
 export function cleanupGitPanel() {
