@@ -55,6 +55,7 @@ import { exportCemManifest as _exportCemManifest } from "./services/cem-export.j
 import { registerPlatform, getPlatform, hasPlatform } from "./platform.js";
 import { parseMediaEntries } from "./utils/canvas-media.js";
 import { createDevServerPlatform } from "./platforms/devserver.js";
+import { mountResizeEdges } from "./resize-edges.js";
 import { codeService } from "./services/code-services.js";
 import { defCategory, defBadgeLabel, renderSignalsTemplate } from "./panels/signals-panel.js";
 import { loadComponentRegistry } from "./files/components.js";
@@ -280,6 +281,8 @@ initCssData(webdata);
 if (!hasPlatform()) {
   registerPlatform(createDevServerPlatform());
 }
+
+mountResizeEdges();
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
