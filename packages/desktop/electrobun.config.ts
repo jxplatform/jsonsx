@@ -56,7 +56,7 @@ export default {
     win: {
       bundleCEF: true,
       defaultRenderer: "cef",
-      icon: "icon.png",
+      icon: "icon.ico",
     },
 
     // preBuild copies compiled studio + runtime assets into assets/ before these run.
@@ -76,21 +76,4 @@ export default {
   release: {
     baseUrl: "https://github.com/jxsuite/jx/releases/latest/download/",
   },
-
-  // electrobun-builder-for-windows configuration
-  // @ts-expect-error
-  name: "Jx Studio",
-  version: pkg.version,
-  author: "jxsuite",
-  windows: {
-    icon: "icon.png",
-    productId: "com.jxsuite.jx-studio",
-    installDir: "com.jxsuite.jx-studio",
-    msix: {
-      publisher: "CN=jxsuite",
-      publisherDisplayName: "jxsuite",
-      identityName: "com.jxsuite.jx-studio",
-      capabilities: ["internetClient"],
-    },
-  },
-} satisfies ElectrobunConfig as ElectrobunConfig & Record<string, unknown>;
+} satisfies ElectrobunConfig;
