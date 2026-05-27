@@ -9,7 +9,7 @@ import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
-import { renderPopover } from "../ui/layers.js";
+import { renderPopover, showDialog } from "../ui/layers.js";
 import remarkDirective from "remark-directive";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd } from "../markdown/md-convert.js";
@@ -21,6 +21,7 @@ import {
   workspace,
   openTab,
   activateTab,
+  renameTab,
   replaceAllTabs,
   activeTab,
 } from "../workspace/workspace.js";
@@ -509,11 +510,57 @@ async function createNewFile(dirPath = ".", /** @type {() => void} */ renderLeft
   }
 }
 
+/** @param {string} currentName @returns {Promise<string | null>} */
+function showRenameFileDialog(currentName) {
+  let value = currentName;
+  return showDialog((done) => {
+    function confirm() {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      done(trimmed);
+    }
+    const tpl = html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline="Rename"
+        confirm-label="Rename"
+        cancel-label="Cancel"
+        size="s"
+        @confirm=${confirm}
+        @cancel=${() => done(null)}
+        @close=${() => done(null)}
+      >
+        <sp-textfield
+          style="width:100%"
+          value=${currentName}
+          @input=${(/** @type {Event} */ e) => {
+            value = /** @type {HTMLInputElement} */ (e.target).value || "";
+          }}
+          @keydown=${(/** @type {KeyboardEvent} */ e) => {
+            if (e.key === "Enter") confirm();
+          }}
+        ></sp-textfield>
+      </sp-dialog-wrapper>
+    `;
+    requestAnimationFrame(() => {
+      const layer = document.getElementById("layer-dialog");
+      const tf = /** @type {HTMLElement | null} */ (layer?.querySelector("sp-textfield"));
+      if (tf) {
+        tf.focus();
+        const input = tf.shadowRoot?.querySelector("input");
+        if (input) input.select();
+      }
+    });
+    return tpl;
+  });
+}
+
 async function renameFile(
   /** @type {{ name: string; path: string; type: string }} */ entry,
   /** @type {() => void} */ renderLeftPanel,
 ) {
-  const newName = prompt("New name:", entry.name);
+  const newName = await showRenameFileDialog(entry.name);
   if (!newName || newName === entry.name) return;
   const entryPath = entry.path.replaceAll("\\", "/");
   const parentDir = entryPath.includes("/")
@@ -526,6 +573,9 @@ async function renameFile(
     await loadDirectory(parentDir);
     if (requireProjectState().selectedPath === entry.path) {
       requireProjectState().selectedPath = newPath;
+    }
+    if (workspace.tabs.has(entry.path)) {
+      renameTab(entry.path, newPath, newPath);
     }
     renderLeftPanel();
     statusMessage(`Renamed to ${newName}`);

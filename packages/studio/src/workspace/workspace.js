@@ -139,3 +139,22 @@ export function replaceAllTabs(newTabOpts) {
 export function activateTab(tabId) {
   if (workspace.tabs.has(tabId)) workspace.activeTabId = tabId;
 }
+
+/**
+ * Re-key a tab after its backing file has been renamed. Preserves all tab state including unsaved
+ * changes.
+ *
+ * @param {string} oldId
+ * @param {string} newId
+ * @param {string} newDocumentPath
+ */
+export function renameTab(oldId, newId, newDocumentPath) {
+  const tab = workspace.tabs.get(oldId);
+  if (!tab) return;
+  tab.id = newId;
+  tab.documentPath = newDocumentPath;
+  workspace.tabs.delete(oldId);
+  workspace.tabs.set(newId, tab);
+  workspace.tabOrder = workspace.tabOrder.map((id) => (id === oldId ? newId : id));
+  if (workspace.activeTabId === oldId) workspace.activeTabId = newId;
+}
