@@ -53,6 +53,8 @@ export interface GitStatusResult {
   files: GitFileStatus[];
   ahead: number;
   behind: number;
+  isRepo: boolean;
+  remotes: string[];
 }
 
 export interface GitBranchesResult {
@@ -177,7 +179,7 @@ export type StudioRPC = {
         response: void;
       };
       gitPush: {
-        params: void;
+        params: { setUpstream?: boolean };
         response: void;
       };
       gitPull: {
@@ -206,6 +208,14 @@ export type StudioRPC = {
       };
       gitDiscard: {
         params: { files: string[] };
+        response: void;
+      };
+      gitInit: {
+        params: void;
+        response: void;
+      };
+      gitAddRemote: {
+        params: { name: string; url: string };
         response: void;
       };
       // Files

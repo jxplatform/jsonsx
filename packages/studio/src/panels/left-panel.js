@@ -41,6 +41,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
  *   setGitDiffState: (state: import("../canvas/canvas-render.js").GitDiffState | null) => void;
+ *   cloneRepository?: () => void;
  * }} LeftPanelCtx
  */
 
@@ -124,6 +125,15 @@ function _flush() {
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
   const aTab = activeTab.value;
+  const tab = view.leftTab;
+
+  if ((!aTab || aTab.id === "welcome") && tab === "git") {
+    const S = { ui: aTab?.session?.ui || {} };
+    const content = ctx.renderGitPanel(S, ctx);
+    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+    return;
+  }
+
   if (!aTab || aTab.id === "welcome") {
     litRender(html`<div class="panel-body"></div>`, leftPanel);
     return;
@@ -145,7 +155,6 @@ function _render() {
     selection: aTab.session.selection,
     canvas: aTab.session.canvas,
   });
-  const tab = view.leftTab;
 
   /** @type {TemplateResult | typeof nothing} */
   let content;

@@ -140,8 +140,8 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("gitCommit", { message }) as Promise<void>;
     },
 
-    async gitPush() {
-      return request("gitPush") as Promise<void>;
+    async gitPush(opts?: { setUpstream?: boolean }) {
+      return request("gitPush", opts || {}) as Promise<void>;
     },
 
     async gitPull() {
@@ -170,6 +170,14 @@ export function createDesktopPlatform(): StudioPlatform {
 
     async gitShow(opts: { path: string; ref?: string }) {
       return request("gitShow", opts) as Promise<string>;
+    },
+
+    async gitInit() {
+      await request("gitInit");
+    },
+
+    async gitAddRemote(name: string, url: string) {
+      await request("gitAddRemote", { name, url });
     },
 
     async searchFiles(query: string) {

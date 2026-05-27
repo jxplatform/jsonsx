@@ -418,6 +418,7 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
+  cloneRepository: () => cloneRepository({ openRecentProject }),
   setGitDiffState: (
     /** @type {import("./canvas/canvas-render.js").GitDiffState | null} */ state,
   ) => {

@@ -2898,6 +2898,63 @@
         font-size: 12px;
       }
 
+      .git-panel-empty {
+        justify-content: center;
+        align-items: center;
+      }
+      .git-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 24px 16px;
+        text-align: center;
+        color: var(--fg-dim);
+      }
+      .git-empty-state p {
+        margin: 0;
+        font-size: 12px;
+      }
+      .git-sync-bar--no-remote {
+        gap: 8px;
+      }
+
+      /* GitHub auth dialog */
+      .github-auth-dialog {
+        text-align: center;
+        padding: 16px 0;
+      }
+      .github-auth-dialog p {
+        margin: 8px 0;
+        font-size: 13px;
+      }
+      .github-auth-code {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        font-family: var(--mono-font, monospace);
+        padding: 12px 16px;
+        background: var(--hover-bg);
+        border-radius: var(--radius);
+        display: inline-block;
+        margin: 8px 0;
+      }
+      .github-auth-waiting {
+        color: var(--fg-dim);
+        font-style: italic;
+      }
+
+      /* GitHub publish dialog */
+      .github-publish-dialog {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px 0;
+      }
+      .github-publish-dialog sp-textfield {
+        width: 100%;
+      }
+
       /* ─── Feature toggle (stylebook) ─────────────── */
       .tb-toggle {
         padding: 3px 8px;

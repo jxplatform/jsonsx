@@ -259,8 +259,8 @@ export function createDesktopPlatform() {
       return rpc.request.gitCommit({ message });
     },
 
-    async gitPush() {
-      return rpc.request.gitPush();
+    async gitPush(opts?: { setUpstream?: boolean }) {
+      return rpc.request.gitPush(opts || {});
     },
 
     async gitPull() {
@@ -289,6 +289,14 @@ export function createDesktopPlatform() {
 
     async gitShow(opts: { path: string; ref?: string }) {
       return rpc.request.gitShow(opts);
+    },
+
+    async gitInit() {
+      await rpc.request.gitInit();
+    },
+
+    async gitAddRemote(name: string, url: string) {
+      await rpc.request.gitAddRemote({ name, url });
     },
 
     async searchFiles(query: string) {

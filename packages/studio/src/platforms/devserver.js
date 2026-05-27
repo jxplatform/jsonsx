@@ -427,8 +427,13 @@ export function createDevServerPlatform() {
       return await res.json();
     },
 
-    async gitPush() {
-      const res = await fetch("/__studio/git/push", { method: "POST" });
+    /** @param {{ setUpstream?: boolean }} [opts] */
+    async gitPush(opts) {
+      const res = await fetch("/__studio/git/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts || {}),
+      });
       if (!res.ok) throw new Error((await res.json()).error);
       return await res.json();
     },
@@ -504,6 +509,24 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       return await res.json();
+    },
+
+    async gitInit() {
+      const res = await fetch("/__studio/git/init", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error);
+    },
+
+    /**
+     * @param {string} name
+     * @param {string} url
+     */
+    async gitAddRemote(name, url) {
+      const res = await fetch("/__studio/git/add-remote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
     },
   };
 }
