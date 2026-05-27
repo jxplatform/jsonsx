@@ -269,23 +269,27 @@ describe("getEffectiveElements", () => {
   });
 
   test("returns site elements when doc has none", () => {
-    setProjectState({
-      projectConfig: { $elements: [{ $ref: "./components/hero.json" }] },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: { $elements: [{ $ref: "./components/hero.json" }] },
+      }),
+    );
     const result = getEffectiveElements(undefined);
     expect(result).toEqual([{ $ref: "./components/hero.json" }]);
   });
 
   test("merges site and doc elements with dedup", () => {
-    setProjectState({
-      projectConfig: {
-        $elements: [{ $ref: "./components/hero.json" }, { $ref: "./components/footer.json" }],
-      },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          $elements: [{ $ref: "./components/hero.json" }, { $ref: "./components/footer.json" }],
+        },
+      }),
+    );
     const docEls = [{ $ref: "./components/hero.json" }, { $ref: "./components/nav.json" }];
     const result = getEffectiveElements(docEls);
     expect(result.length).toBe(3);
-    const refs = result.map((e) => e.$ref);
+    const refs = result.map((e) => /** @type {{ $ref: string }} */ (e).$ref);
     expect(refs).toContain("./components/hero.json");
     expect(refs).toContain("./components/footer.json");
     expect(refs).toContain("./components/nav.json");
@@ -313,7 +317,7 @@ describe("loadMarkdown state", () => {
     const result = await loadMarkdown(md);
     const doc = result.document;
     expect(doc.tagName).toBeUndefined();
-    const tags = doc.children.map((/** @type {any} */ c) => c.tagName);
+    const tags = doc.children?.map((/** @type {any} */ c) => c.tagName);
     expect(tags).toContain("hero");
     expect(tags).toContain("cta-banner");
   });
@@ -405,44 +409,52 @@ describe("getEffectiveStyle", () => {
   });
 
   test("returns site style when doc has none", () => {
-    setProjectState({
-      projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
+      }),
+    );
     expect(getEffectiveStyle(undefined)).toEqual({ color: "blue", fontFamily: "sans-serif" });
   });
 
   test("doc style overrides site style on conflict", () => {
-    setProjectState({
-      projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
+      }),
+    );
     const result = getEffectiveStyle({ color: "red" });
     expect(result.color).toBe("red");
     expect(result.fontFamily).toBe("sans-serif");
   });
 
   test("shallow-merges nested selector objects (e.g. & li)", () => {
-    setProjectState({
-      projectConfig: {
-        style: { "& li": { margin: "0", padding: "4px" } },
-      },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          style: { "& li": { margin: "0", padding: "4px" } },
+        },
+      }),
+    );
     const result = getEffectiveStyle({ "& li": { margin: "8px", color: "red" } });
-    expect(result["& li"].margin).toBe("8px");
-    expect(result["& li"].padding).toBe("4px");
-    expect(result["& li"].color).toBe("red");
+    expect(/** @type {JxStyle} */ (result["& li"]).margin).toBe("8px");
+    expect(/** @type {JxStyle} */ (result["& li"]).padding).toBe("4px");
+    expect(/** @type {JxStyle} */ (result["& li"]).color).toBe("red");
   });
 
   test("flat CSS custom properties from site config (project style is implicitly :root)", () => {
-    setProjectState({
-      projectConfig: {
-        style: {
-          "--bg-primary": "#0a0a0a",
-          "--text-primary": "#fafafa",
-          fontFamily: "system-ui",
-          backgroundColor: "var(--bg-primary)",
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          style: {
+            "--bg-primary": "#0a0a0a",
+            "--text-primary": "#fafafa",
+            fontFamily: "system-ui",
+            backgroundColor: "var(--bg-primary)",
+          },
         },
-      },
-    });
+      }),
+    );
     const result = getEffectiveStyle(undefined);
     expect(result["--bg-primary"]).toBe("#0a0a0a");
     expect(result["--text-primary"]).toBe("#fafafa");
@@ -473,11 +485,13 @@ describe("flat project style (implicit :root)", () => {
   });
 
   test("doc style overrides project CSS variables on conflict", () => {
-    setProjectState({
-      projectConfig: {
-        style: { "--bg": "#000", "--text": "#fff", color: "var(--text)" },
-      },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          style: { "--bg": "#000", "--text": "#fff", color: "var(--text)" },
+        },
+      }),
+    );
     const result = getEffectiveStyle({ "--bg": "#111" });
     expect(result["--bg"]).toBe("#111");
     expect(result["--text"]).toBe("#fff");
@@ -485,17 +499,19 @@ describe("flat project style (implicit :root)", () => {
   });
 
   test("full pipeline: flat site config → effective style", () => {
-    setProjectState({
-      projectConfig: {
-        style: {
-          "--bg-primary": "#0a0a0a",
-          "--text-primary": "#fafafa",
-          fontFamily: "system-ui",
-          backgroundColor: "var(--bg-primary)",
-          color: "var(--text-primary)",
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          style: {
+            "--bg-primary": "#0a0a0a",
+            "--text-primary": "#fafafa",
+            fontFamily: "system-ui",
+            backgroundColor: "var(--bg-primary)",
+            color: "var(--text-primary)",
+          },
         },
-      },
-    });
+      }),
+    );
     const result = getEffectiveStyle(undefined);
     expect(result["--bg-primary"]).toBe("#0a0a0a");
     expect(result["--text-primary"]).toBe("#fafafa");
@@ -521,11 +537,13 @@ describe("getEffectiveMedia", () => {
   });
 
   test("returns site media when doc has none", () => {
-    setProjectState({
-      projectConfig: {
-        $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
-      },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
+        },
+      }),
+    );
     expect(getEffectiveMedia(undefined)).toEqual({
       "--sm": "(min-width: 640px)",
       "--md": "(min-width: 768px)",
@@ -533,11 +551,13 @@ describe("getEffectiveMedia", () => {
   });
 
   test("doc media overrides site media on conflict", () => {
-    setProjectState({
-      projectConfig: {
-        $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
-      },
-    });
+    setProjectState(
+      /** @type {any} */ ({
+        projectConfig: {
+          $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
+        },
+      }),
+    );
     const result = getEffectiveMedia({ "--sm": "(min-width: 600px)" });
     expect(result["--sm"]).toBe("(min-width: 600px)");
     expect(result["--md"]).toBe("(min-width: 768px)");

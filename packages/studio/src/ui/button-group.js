@@ -6,41 +6,44 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
 import { abbreviateValue, kebabToLabel } from "../utils/studio-utils.js";
 import icons from "./icons.js";
 
 /**
  * Render a button group widget with optional overflow menu.
  *
- * @param {any} entry — css-meta entry with $buttonValues, enum, $icons
+ * @param {Record<string, unknown>} entry — css-meta entry with $buttonValues, enum, $icons
  * @param {string} prop — property key (for menu ID namespace)
- * @param {any} value — current value
+ * @param {string | number | undefined} value — current value
  * @param {(val: string) => void} onChange — commit callback
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderButtonGroup(
-  /** @type {any} */ entry,
-  /** @type {any} */ prop,
-  /** @type {any} */ value,
-  /** @type {any} */ onChange,
+  /** @type {Record<string, unknown>} */ entry,
+  /** @type {string} */ prop,
+  /** @type {string | number | undefined} */ value,
+  /** @type {(val: string) => void} */ onChange,
 ) {
-  const values = entry.$buttonValues || entry.enum || [];
-  /** @type {Record<string, any>} */
-  const iconMap = entry.$icons || {};
+  const values = /** @type {string[]} */ (entry.$buttonValues || entry.enum || []);
+  /** @type {Record<string, string>} */
+  const iconMap = /** @type {Record<string, string>} */ (entry.$icons || {});
+  const buttonValues = /** @type {string[] | undefined} */ (entry.$buttonValues);
+  const enumValues = /** @type {string[] | undefined} */ (entry.enum);
   const extra =
-    entry.$buttonValues && entry.enum && entry.enum.length > entry.$buttonValues.length
-      ? entry.enum.filter((/** @type {any} */ v) => !entry.$buttonValues.includes(v))
+    buttonValues && enumValues && enumValues.length > buttonValues.length
+      ? enumValues.filter((/** @type {string} */ v) => !buttonValues.includes(v))
       : [];
 
   const menuId = `style-btngrp-${prop}`;
   const hasExtra = extra.length > 0;
-  const extraSelected = hasExtra && extra.includes(value);
+  const extraSelected = hasExtra && extra.includes(/** @type {string} */ (value));
 
   return html`
-    <div class="button-group-combo ${hasExtra ? "has-overflow" : ""}">
+    <div class=${classMap({ "button-group-combo": true, "has-overflow": hasExtra })}>
       <sp-action-group size="s" compact>
         ${values.map(
-          (/** @type {any} */ v) => html`
+          (/** @type {string} */ v) => html`
             <sp-action-button
               size="s"
               value=${v}
@@ -48,12 +51,9 @@ export function renderButtonGroup(
               ?selected=${v === value}
               @click=${() => onChange(v === value ? "" : v)}
             >
-              ${
-                /** @type {any} */ (iconMap)[v] &&
-                /** @type {any} */ (icons)[/** @type {any} */ (iconMap)[v]]
-                  ? /** @type {any} */ (icons)[/** @type {any} */ (iconMap)[v]]
-                  : abbreviateValue(v)
-              }
+              ${iconMap[v] && /** @type {Record<string, unknown>} */ (icons)[iconMap[v]]
+                ? /** @type {Record<string, unknown>} */ (icons)[iconMap[v]]
+                : abbreviateValue(v)}
             </sp-action-button>
           `,
         )}
@@ -63,20 +63,21 @@ export function renderButtonGroup(
             <sp-picker-button
               size="s"
               id=${menuId}
-              class=${extraSelected ? "has-selection" : ""}
+              class=${classMap({ "has-selection": extraSelected })}
             ></sp-picker-button>
             <sp-overlay trigger="${menuId}@click" placement="bottom-end" type="auto">
               <sp-popover>
                 <sp-menu
-                  @change=${(/** @type {any} */ e) => {
-                    if (e.target.value) onChange(e.target.value);
+                  @change=${(/** @type {Event} */ e) => {
+                    if (/** @type {HTMLInputElement} */ (e.target).value)
+                      onChange(/** @type {HTMLInputElement} */ (e.target).value);
                   }}
                 >
                   <sp-menu-item value="__none__">—</sp-menu-item>
-                  ${extra.map((/** @type {any} */ v) => {
+                  ${extra.map((/** @type {string} */ v) => {
                     const label = v.includes("-")
                       ? kebabToLabel(v)
-                      : v.replace(/^./, (/** @type {any} */ c) => c.toUpperCase());
+                      : v.replace(/^./, (/** @type {string} */ c) => c.toUpperCase());
                     return html`<sp-menu-item value=${v} ?selected=${v === value}
                       >${label}</sp-menu-item
                     >`;

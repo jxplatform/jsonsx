@@ -24,7 +24,7 @@ import { isSlashMenuOpen, showSlashMenu, dismissSlashMenu } from "./slash-menu.j
 import { renderBlockActionBar } from "../panels/block-action-bar.js";
 import { defaultDef } from "../panels/shared.js";
 
-/** @type {any} */
+/** @type {{ findCanvasElement: Function } | null} */
 let _ctx = null;
 
 /**
@@ -39,8 +39,8 @@ export function initComponentInlineEdit(ctx) {
 /**
  * Enter plaintext inline editing on a canvas element.
  *
- * @param {any} el
- * @param {any} path
+ * @param {HTMLElement} el
+ * @param {JxPath} path
  */
 export function enterComponentInlineEdit(el, path) {
   if (view.componentInlineEdit && view.componentInlineEdit.el === el) {
@@ -56,7 +56,7 @@ export function enterComponentInlineEdit(el, path) {
   if (node.children && typeof node.children === "object") return;
   if (tc && typeof tc === "object") return;
   const voids = new Set(["img", "input", "br", "hr", "video", "audio", "source", "embed", "slot"]);
-  if (voids.has(node.tagName)) return;
+  if (voids.has(node.tagName || "")) return;
 
   for (const p of canvasPanels) {
     const boxes = /** @type {NodeListOf<HTMLElement>} */ (
@@ -96,14 +96,15 @@ export function enterComponentInlineEdit(el, path) {
   el.addEventListener("keydown", componentInlineKeydown);
   el.addEventListener("input", componentInlineInput);
 
-  const outsideHandler = (/** @type {any} */ evt) => {
+  const outsideHandler = (/** @type {MouseEvent} */ evt) => {
     if (!view.componentInlineEdit) {
       document.removeEventListener("mousedown", outsideHandler, true);
       return;
     }
-    if (view.componentInlineEdit.el.contains(evt.target)) return;
+    if (view.componentInlineEdit.el.contains(/** @type {Node} */ (evt.target))) return;
     if (isSlashMenuOpen()) return;
-    if (view.blockActionBarEl && view.blockActionBarEl.contains(evt.target)) return;
+    if (view.blockActionBarEl && view.blockActionBarEl.contains(/** @type {Node} */ (evt.target)))
+      return;
     document.removeEventListener("mousedown", outsideHandler, true);
 
     /** @type {(string | number)[] | null} */
@@ -185,7 +186,7 @@ export function enterComponentInlineEdit(el, path) {
   renderBlockActionBar();
 }
 
-/** @param {any} e */
+/** @param {KeyboardEvent} e */
 function componentInlineKeydown(e) {
   if (isSlashMenuOpen()) {
     if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) return;
@@ -205,10 +206,10 @@ function splitParagraph() {
   if (!view.componentInlineEdit) return;
   const { el, path, mediaName } = view.componentInlineEdit;
 
-  const sel = /** @type {any} */ (el.ownerDocument.defaultView?.getSelection());
+  const sel = /** @type {Selection | null} */ (el.ownerDocument.defaultView?.getSelection());
   const fullText = el.textContent || "";
   let offset = fullText.length;
-  if (sel.rangeCount) {
+  if (sel && sel.rangeCount) {
     const range = sel.getRangeAt(0);
     const preRange = document.createRange();
     preRange.selectNodeContents(el);
@@ -220,7 +221,7 @@ function splitParagraph() {
   const textAfter = fullText.slice(offset);
 
   const tag = "p";
-  const pPath = /** @type {any} */ (parentElementPath(path));
+  const pPath = /** @type {JxPath} */ (parentElementPath(path));
   const idx = /** @type {number} */ (childIndex(path));
   if (!pPath) return;
 
@@ -266,7 +267,7 @@ function cancelComponentInlineEdit() {
   renderOnly("overlays");
 }
 
-/** @param {any} el */
+/** @param {HTMLElement} el */
 function cleanupComponentInlineEdit(el) {
   el.removeEventListener("keydown", componentInlineKeydown);
   el.removeEventListener("input", componentInlineInput);
@@ -304,7 +305,7 @@ function componentInlineInput() {
   }
 }
 
-/** @param {any} cmd */
+/** @param {{ tag: string; label: string; description: string }} cmd */
 function handleComponentSlashSelect(cmd) {
   if (!view.componentInlineEdit) return;
   const { el, path, mediaName } = view.componentInlineEdit;

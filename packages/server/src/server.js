@@ -94,6 +94,15 @@ function resolveNpmPath(root, urlPath) {
     // Fall back to direct path
     const direct = join(pkgDir, subpath);
     if (existsSync(direct)) return direct;
+    // CEM-relative: subpath may be relative to the custom elements manifest directory
+    try {
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+      if (pkgJson.customElements) {
+        const cemDir = pkgJson.customElements.replace(/\/[^/]+$/, "");
+        const cemRelative = join(pkgDir, cemDir, subpath);
+        if (existsSync(cemRelative)) return cemRelative;
+      }
+    } catch {}
   }
 
   // Bare package (no subpath): resolve entry point
@@ -261,7 +270,7 @@ export async function createDevServer(options) {
               if (result.success && result.outputs.length > 0) {
                 bundleCache.set(cacheKey, await result.outputs[0].text());
               }
-            } catch (/** @type {any} */ e) {
+            } catch (/** @type {unknown} */ e) {
               console.error("Bundle failed for", resolved, e);
             }
           }

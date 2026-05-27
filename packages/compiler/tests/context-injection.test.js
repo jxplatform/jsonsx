@@ -100,6 +100,7 @@ describe("injectContext", () => {
   });
 
   test("page imports win on collision", () => {
+    /** @type {any} */
     const doc = { imports: { Parser: "./my-parser.class.json" } };
     const project = {
       ...baseProject,
@@ -189,7 +190,7 @@ describe("injectContext", () => {
         post: { $prototype: "ContentEntry", contentType: "nonexistent", id: "abc" },
       },
     };
-    const contentTypes = new Map([["posts", [{ id: "x", data: {} }]]]);
+    const contentTypes = /** @type {any} */ (new Map([["posts", [{ id: "x", data: {} }]]]));
     injectContext(doc, baseProject, baseRoute, contentTypes);
     expect(doc.state.post).toBeNull();
   });

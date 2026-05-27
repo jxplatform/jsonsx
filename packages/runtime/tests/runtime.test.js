@@ -335,7 +335,73 @@ describe("buildScope", () => {
     expect(state.doubled).toBe(10);
   });
 
-  test("Shape 4: Function with $src → loads external function", async () => {
+  test("Shape 4: Function with return + parameters → callable (not computed)", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          items: { type: "array", default: [{ id: 1, text: "a" }] },
+          addItem: {
+            $prototype: "Function",
+            parameters: ["event"],
+            body: "if (event.key !== 'Enter') return; state.items.push({ id: 2, text: 'b' });",
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.addItem).toBe("function");
+  });
+
+  test("Shape 4: Function with return + parameters is not auto-evaluated", async () => {
+    const state = await buildScope(
+      {
+        state: {
+          handler: {
+            $prototype: "Function",
+            parameters: ["event"],
+            body: "return event.target.value;",
+          },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.handler).toBe("function");
+    const result = state.handler(state, { target: { value: "hello" } });
+    expect(result).toBe("hello");
+  });
+
+  test("Shape 4: Function with $src → computed via introspection (has return, ≤1 param)", async () => {
+    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const state = await buildScope(
+      {
+        state: {
+          items: { type: "array", default: [1, 2, 3] },
+          total: { $prototype: "Function", $src: srcUrl, $export: "total" },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(state.total).toBe(3);
+  });
+
+  test("Shape 4: Function with $src + parameters in def → callable (not computed)", async () => {
+    const srcUrl = new URL("./_test_handlers_fn.js", import.meta.url).href;
+    const state = await buildScope(
+      {
+        state: {
+          handler: { $prototype: "Function", $src: srcUrl, $export: "myFn", parameters: ["event"] },
+        },
+      },
+      {},
+      BASE,
+    );
+    expect(typeof state.handler).toBe("function");
+  });
+
+  test("Shape 4: Function with $src → computed when fn has return and ≤1 param", async () => {
     const srcUrl = new URL("./_test_handlers_fn.js", import.meta.url).href;
     const state = await buildScope(
       {
@@ -346,7 +412,7 @@ describe("buildScope", () => {
       {},
       BASE,
     );
-    expect(typeof state.myFn).toBe("function");
+    expect(state.myFn).toBe(42);
   });
 
   test("Shape 4: Function with both body and $src → throws", async () => {
@@ -497,7 +563,7 @@ describe("applyStyle", () => {
     const uid = el.dataset.jx;
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
     expect(style).not.toBeNull();
-    expect(style.textContent).toContain(`[data-jx="${uid}"] :hover`);
+    expect(style.textContent).toContain(`[data-jx="${uid}"]:hover`);
     expect(style.textContent).toContain("color: blue");
   });
 
@@ -505,7 +571,7 @@ describe("applyStyle", () => {
     applyStyle(el, { ".child": { marginTop: "4px" } });
     const uid = el.dataset.jx;
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
-    expect(style.textContent).toContain(`[data-jx="${uid}"] .child`);
+    expect(style.textContent).toContain(`[data-jx="${uid}"].child`);
   });
 
   test("emits scoped <style> for &.compound selector", () => {
@@ -551,7 +617,7 @@ describe("applyStyle", () => {
     );
     expect(el.style.color).toBe("green");
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
-    expect(style.textContent).toContain("] :focus");
+    expect(style.textContent).toContain("]:focus");
     expect(style.textContent).toContain("@media (min-width: 640px)");
   });
 
@@ -568,7 +634,7 @@ describe("applyStyle", () => {
     expect(css).toContain("font-size: 2rem");
     // Nested selector within media
     expect(css).toMatch(
-      /@media \(min-width: 768px\) \{ \[data-jx="[^"]+"\] :hover \{ color: blue \} \}/,
+      /@media \(min-width: 768px\) \{ \[data-jx="[^"]+"\]:hover \{ color: blue \} \}/,
     );
   });
 
@@ -807,7 +873,7 @@ describe("resolvePrototype", () => {
       "fd",
     );
     expect(result).toBeInstanceOf(FormData);
-    expect(result.get("name")).toBe("Alice");
+    expect(/** @type {any} */ (result).get("name")).toBe("Alice");
   });
 
   test("Blob: returns Blob", async () => {
@@ -829,7 +895,9 @@ describe("resolvePrototype", () => {
   test("unknown $prototype: warns and returns ref(null)", async () => {
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     const state = reactive(/** @type {Record<string, any>} */ ({}));
-    const result = await resolvePrototype({ $prototype: "Unknown" }, state, "u");
+    const result = /** @type {any} */ (
+      await resolvePrototype({ $prototype: "Unknown" }, state, "u")
+    );
     expect(isRef(result)).toBe(true);
     expect(result.value).toBeNull();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("Unknown"));
@@ -1119,6 +1187,63 @@ describe("renderNode", () => {
     expect(el.children.length).toBe(0);
   });
 
+  test("Array map with computed signal items updates reactively", async () => {
+    const allItems = reactive([
+      { id: 1, text: "alpha" },
+      { id: 2, text: "beta" },
+      { id: 3, text: "gamma" },
+    ]);
+    const filterTerm = ref("");
+    const filteredItems = computed(() => {
+      const term = filterTerm.value.toLowerCase();
+      if (!term) return allItems;
+      return allItems.filter((i) => i.text.includes(term));
+    });
+    const state = reactive({ filteredItems });
+    const el = renderNode(
+      {
+        tagName: "div",
+        children: {
+          $prototype: "Array",
+          items: { $ref: "#/state/filteredItems" },
+          map: { tagName: "div", textContent: "${$map.item.text}" },
+        },
+      },
+      state,
+    );
+    expect(el.children.length).toBe(3);
+    filterTerm.value = "alph";
+    await wait();
+    expect(el.children.length).toBe(1);
+    expect(el.children[0].textContent).toBe("alpha");
+  });
+
+  test("Array map with paginated computed slice", async () => {
+    const items = Array.from({ length: 25 }, (_, i) => ({ id: i + 1 }));
+    const page = ref(1);
+    const perPage = 10;
+    const paginatedItems = computed(() => {
+      const start = (page.value - 1) * perPage;
+      return items.slice(start, start + perPage);
+    });
+    const state = reactive({ paginatedItems });
+    const el = renderNode(
+      {
+        tagName: "div",
+        children: {
+          $prototype: "Array",
+          items: { $ref: "#/state/paginatedItems" },
+          map: { tagName: "div" },
+        },
+      },
+      state,
+    );
+    expect(el.children.length).toBe(10);
+    page.value = 3;
+    await wait();
+    expect(el.children.length).toBe(5);
+  });
+
   test("$props merges into scope", () => {
     const state = reactive({ count: 10 });
     const def = {
@@ -1133,6 +1258,105 @@ describe("renderNode", () => {
   test("style object applied", () => {
     const el = renderNode({ tagName: "div", style: { color: "green" } }, reactive({}));
     expect(el.style.color).toBe("green");
+  });
+});
+
+// ─── Integration: computed $src functions + Array map (fetch-demo pattern) ────
+
+describe("computed $src + Array map integration", () => {
+  const BASE = "http://localhost/";
+
+  test("computed function filters items for Array map rendering", async () => {
+    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const doc = {
+      state: {
+        allPosts: {
+          type: "array",
+          default: [
+            { id: 1, title: "Hello World", body: "first" },
+            { id: 2, title: "Goodbye", body: "second" },
+            { id: 3, title: "Hello Again", body: "third" },
+          ],
+        },
+        searchTerm: { type: "string", default: "" },
+        filteredPosts: { $prototype: "Function", $src: srcUrl },
+      },
+      tagName: "div",
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/filteredPosts" },
+        map: { tagName: "div", textContent: "${$map.item.title}" },
+      },
+    };
+    const state = await buildScope(doc, {}, BASE);
+    expect(state.filteredPosts).toHaveLength(3);
+
+    const el = renderNode(doc, state);
+    expect(el.children.length).toBe(3);
+    expect(el.children[0].textContent).toBe("Hello World");
+
+    state.searchTerm = "hello";
+    await wait();
+    expect(state.filteredPosts).toHaveLength(2);
+    expect(el.children.length).toBe(2);
+    expect(el.children[0].textContent).toBe("Hello World");
+    expect(el.children[1].textContent).toBe("Hello Again");
+  });
+
+  test("computed function paginates items reactively", async () => {
+    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const doc = {
+      state: {
+        allItems: {
+          type: "array",
+          default: Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` })),
+        },
+        currentPage: { type: "integer", default: 1 },
+        perPage: { type: "integer", default: 5 },
+        paginatedItems: { $prototype: "Function", $src: srcUrl },
+      },
+      tagName: "div",
+      children: {
+        $prototype: "Array",
+        items: { $ref: "#/state/paginatedItems" },
+        map: { tagName: "span", textContent: "${$map.item.name}" },
+      },
+    };
+    const state = await buildScope(doc, {}, BASE);
+    const el = renderNode(doc, state);
+    expect(el.children.length).toBe(5);
+    expect(el.children[0].textContent).toBe("Item 1");
+
+    state.currentPage = 2;
+    await wait();
+    expect(el.children.length).toBe(5);
+    expect(el.children[0].textContent).toBe("Item 6");
+
+    state.currentPage = 3;
+    await wait();
+    expect(el.children.length).toBe(2);
+    expect(el.children[0].textContent).toBe("Item 11");
+  });
+
+  test("event handler with parameters + return is callable, not computed", async () => {
+    const doc = {
+      state: {
+        items: { type: "array", default: [] },
+        addItem: {
+          $prototype: "Function",
+          parameters: ["event"],
+          body: "if (!event.text) return; state.items = [...state.items, { text: event.text }]; return true;",
+        },
+      },
+      tagName: "div",
+    };
+    const state = await buildScope(doc, {}, BASE);
+    expect(typeof state.addItem).toBe("function");
+    expect(state.items).toHaveLength(0);
+    const result = state.addItem(state, { text: "new item" });
+    expect(result).toBe(true);
+    expect(state.items).toHaveLength(1);
+    expect(state.items[0].text).toBe("new item");
   });
 });
 

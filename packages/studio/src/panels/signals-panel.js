@@ -5,6 +5,9 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
   transactDoc,
@@ -17,17 +20,82 @@ import { renderFieldRow } from "../ui/field-row.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.js";
 
+/**
+ * @typedef {{
+ *   document: JxMutableNode;
+ *   ui?: Record<string, unknown>;
+ *   mode?: string;
+ *   selection?: (string | number)[] | null;
+ *   canvas?: Record<string, unknown>;
+ *   _collapsedSignalCats?: Set<string>;
+ *   documentPath?: string | null;
+ * }} SignalsPanelState
+ *
+ * @typedef {{ renderLeftPanel(): void; renderCanvas(): void; updateSession(patch: object): void }} SignalsPanelCtx
+ *
+ * @typedef {Record<string, unknown> & {
+ *   $prototype?: string;
+ *   $compute?: string;
+ *   $deps?: string[];
+ *   $handler?: unknown;
+ *   $src?: string;
+ *   $export?: string;
+ *   type?: string;
+ *   default?: unknown;
+ *   description?: string;
+ *   attribute?: string;
+ *   reflects?: boolean;
+ *   deprecated?: string | boolean;
+ *   format?: string;
+ *   url?: string;
+ *   method?: string;
+ *   timing?: string;
+ *   key?: string;
+ *   database?: string;
+ *   store?: string;
+ *   version?: number;
+ *   name?: string;
+ *   body?: string;
+ *   parameters?: Record<string, unknown>[];
+ *   emits?: Record<string, unknown>[];
+ *   fields?: unknown;
+ * }} SignalDef
+ *
+ * @typedef {{ name: string; type?: { text?: string }; description?: string; optional?: boolean }} CemParameter
+ *
+ * @typedef {{ name: string; type?: { text?: string }; description?: string }} CemEvent
+ *
+ * @typedef {{
+ *   type?: string;
+ *   properties?: Record<string, SchemaProperty>;
+ *   required?: string[];
+ *   description?: string;
+ * }} JsonSchema
+ *
+ * @typedef {{
+ *   type?: string;
+ *   enum?: string[];
+ *   default?: unknown;
+ *   format?: string;
+ *   minimum?: number;
+ *   maximum?: number;
+ *   description?: string;
+ *   examples?: string[];
+ *   name?: string;
+ * }} SchemaProperty
+ */
+
 // ─── Module-local state ─────────────────────────────────────────────────────
 
 /** Expanded signal editor state (persists across renders). */
-/** @type {any} */
+/** @type {string | null} */
 let expandedSignal = null;
 
 /** Track which functions have the advanced param editor open. */
 const advancedParamOpen = new Set();
 
 /** Default templates for creating new signal definitions. */
-const DEF_TEMPLATES = /** @type {Record<string, any>} */ ({
+const DEF_TEMPLATES = /** @type {Record<string, SignalDef>} */ ({
   state: { type: "string", default: "" },
   computed: { $compute: "", $deps: [] },
   request: { $prototype: "Request", url: "", method: "GET", timing: "client" },
@@ -64,34 +132,36 @@ const STUDIO_RESERVED_KEYS = new Set([
 /**
  * Classify a state entry into a category string.
  *
- * @param {any} def
+ * @param {SignalDef | unknown} def
  */
 export function defCategory(def) {
   if (!def) return "state";
-  if (def.$handler || def.$prototype === "Function") return "function";
-  if (def.$compute) return "computed";
-  if (def.$prototype) return "data";
+  const d = /** @type {SignalDef} */ (def);
+  if (d.$handler || d.$prototype === "Function") return "function";
+  if (d.$compute) return "computed";
+  if (d.$prototype) return "data";
   return "state";
 }
 
 /**
  * Badge label for a def category.
  *
- * @param {any} def
+ * @param {SignalDef | unknown} def
  */
 export function defBadgeLabel(def) {
   if (!def) return "S";
-  if (def.$handler || def.$prototype === "Function") return "F";
-  if (def.$compute) return "C";
-  if (def.$prototype) return def.$prototype.charAt(0);
+  const d = /** @type {SignalDef} */ (def);
+  if (d.$handler || d.$prototype === "Function") return "F";
+  if (d.$compute) return "C";
+  if (d.$prototype) return d.$prototype.charAt(0);
   return "S";
 }
 
 /**
  * Hint text for a signal row.
  *
- * @param {any} name
- * @param {any} def
+ * @param {string} name
+ * @param {SignalDef | null | undefined} def
  */
 export function defHint(name, def) {
   if (!def) return "";
@@ -103,7 +173,8 @@ export function defHint(name, def) {
   if (def.$handler) return "handler (legacy)";
   if (def.$compute)
     return "=" + (def.$compute.length > 20 ? def.$compute.slice(0, 20) + "..." : def.$compute);
-  if (def.$prototype === "Request") return def.method + " " + (def.url || "").slice(0, 20);
+  if (def.$prototype === "Request")
+    return (def.method || "GET") + " " + (def.url || "").slice(0, 20);
   if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
     return def.key || "";
   if (def.$prototype === "IndexedDB") return def.database || "";
@@ -116,7 +187,7 @@ export function defHint(name, def) {
 /**
  * Whether the current document defines a custom element (hyphenated tagName).
  *
- * @param {any} S
+ * @param {SignalsPanelState} S
  */
 export function isCustomElementDoc(S) {
   return (S.document.tagName || "").includes("-");
@@ -125,14 +196,16 @@ export function isCustomElementDoc(S) {
 /**
  * Recursively collect CSS `part` attributes from the document tree.
  *
- * @param {any} node
- * @param {any[]} [parts]
+ * @param {JxMutableNode | null | undefined} node
+ * @param {{ name: string; tag: string }[]} [parts]
  */
 export function collectCssParts(node, parts = []) {
   if (node?.attributes?.part)
     parts.push({ name: node.attributes.part, tag: node.tagName || "div" });
   if (Array.isArray(node?.children))
-    node.children.forEach((/** @type {any} */ c) => collectCssParts(c, parts));
+    node.children.forEach((c) => {
+      if (typeof c !== "string") collectCssParts(c, parts);
+    });
   return parts;
 }
 
@@ -140,13 +213,14 @@ export function collectCssParts(node, parts = []) {
  * Resolve a $ref value to a display string using signal defaults. Used by the canvas to show real
  * values instead of raw refs.
  *
- * @param {any} value
- * @param {any} defs
+ * @param {unknown} value
+ * @param {Record<string, SignalDef> | null | undefined} defs
  */
 export function resolveDefaultForCanvas(value, defs) {
-  if (!value || typeof value !== "object" || !value.$ref) return value;
-  const ref = value.$ref;
-  /** @type {any} */
+  if (!value || typeof value !== "object" || !(/** @type {Record<string, unknown>} */ (value).$ref))
+    return value;
+  const ref = /** @type {string} */ (/** @type {Record<string, unknown>} */ (value).$ref);
+  /** @type {string | undefined} */
   let defName;
   if (ref.startsWith("#/state/")) defName = ref.slice(8);
   else if (ref.startsWith("$")) defName = ref;
@@ -183,11 +257,11 @@ export function resolveDefaultForCanvas(value, defs) {
 
 /** Simple field row for signal editors — vertical stacked layout. */
 export function signalFieldRow(
-  /** @type {any} */ label,
-  /** @type {any} */ value,
-  /** @type {any} */ onChange,
+  /** @type {string} */ label,
+  /** @type {string} */ value,
+  /** @type {(value: string) => void} */ onChange,
 ) {
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounce;
   return renderFieldRow({
     prop: label,
@@ -197,9 +271,12 @@ export function signalFieldRow(
       <sp-textfield
         size="s"
         value=${value}
-        @input=${(/** @type {any} */ e) => {
+        @input=${(/** @type {Event} */ e) => {
           clearTimeout(debounce);
-          debounce = setTimeout(() => onChange(e.target.value), 400);
+          debounce = setTimeout(
+            () => onChange(/** @type {HTMLInputElement} */ (e.target).value),
+            400,
+          );
         }}
       ></sp-textfield>
     `,
@@ -207,22 +284,22 @@ export function signalFieldRow(
 }
 
 /** Normalize a parameter entry to a CEM object. */
-export function normParam(/** @type {any} */ p) {
-  return typeof p === "string" ? { name: p } : p;
+export function normParam(/** @type {string | Record<string, unknown>} */ p) {
+  return typeof p === "string" ? { name: p } : /** @type {CemParameter} */ (p);
 }
 
 // ─── Left panel: Signals ─────────────────────────────────────────────────────
 
 /**
- * @param {any} S
- * @param {any} ctx
+ * @param {SignalsPanelState} S
+ * @param {SignalsPanelCtx} ctx
  */
 export function renderSignalsTemplate(S, ctx) {
   const defs = S.document.state || {};
   const entries = Object.entries(defs);
 
   // Group by category
-  const groups = /** @type {Record<string, any[]>} */ ({
+  const groups = /** @type {Record<string, [string, SignalDef][]>} */ ({
     state: [],
     computed: [],
     data: [],
@@ -255,11 +332,11 @@ export function renderSignalsTemplate(S, ctx) {
           }}
         >
           ${items.map(([name, def]) => {
-            /** @type {any} */
+            /** @type {boolean} */
             const isExpanded = expandedSignal === name;
             return html`
               <div
-                class="signal-row${isExpanded ? " expanded" : ""}"
+                class=${classMap({ "signal-row": true, expanded: isExpanded })}
                 @click=${() => {
                   expandedSignal = isExpanded ? null : name;
                   ctx.renderLeftPanel();
@@ -272,7 +349,7 @@ export function renderSignalsTemplate(S, ctx) {
                   quiet
                   size="xs"
                   class="signal-del"
-                  @click=${(/** @type {any} */ e) => {
+                  @click=${(/** @type {Event} */ e) => {
                     e.stopPropagation();
                     transactDoc(activeTab.value, (t) => mutateRemoveDef(t, name));
                   }}
@@ -300,8 +377,8 @@ export function renderSignalsTemplate(S, ctx) {
           size="s"
           label="+ Add…"
           placeholder="+ Add…"
-          @change=${(/** @type {any} */ e) => {
-            const type = e.target.value;
+          @change=${(/** @type {Event} */ e) => {
+            const type = /** @type {HTMLInputElement} */ (e.target).value;
             if (!type) return;
             const template = DEF_TEMPLATES[type];
             if (!template) return;
@@ -312,7 +389,13 @@ export function renderSignalsTemplate(S, ctx) {
             while (S.document.state && S.document.state[n]) {
               n = nameBase + i++;
             }
-            transactDoc(activeTab.value, (t) => mutateAddDef(t, n, structuredClone(template)));
+            transactDoc(activeTab.value, (t) =>
+              mutateAddDef(
+                t,
+                n,
+                /** @type {Record<string, JsonValue>} */ (structuredClone(template)),
+              ),
+            );
             expandedSignal = n;
             ctx.renderLeftPanel();
           }}
@@ -339,10 +422,10 @@ export function renderSignalsTemplate(S, ctx) {
 
 /** Render inline editor fields for a specific signal/def type. */
 function renderSignalEditorTemplate(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
-  /** @type {any} */ ctx,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {SignalsPanelCtx} */ ctx,
 ) {
   if (typeof def !== "object" || def === null) {
     def = { default: def };
@@ -351,10 +434,10 @@ function renderSignalEditorTemplate(
 
   // Helper for picker rows
   const pickerRow = (
-    /** @type {any} */ label,
-    /** @type {any} */ options,
-    /** @type {any} */ currentVal,
-    /** @type {any} */ onChange,
+    /** @type {string} */ label,
+    /** @type {string[]} */ options,
+    /** @type {string} */ currentVal,
+    /** @type {(value: string) => void} */ onChange,
   ) => {
     return renderFieldRow({
       prop: label,
@@ -364,10 +447,11 @@ function renderSignalEditorTemplate(
         <sp-picker
           size="s"
           value=${currentVal}
-          @change=${(/** @type {any} */ e) => onChange(e.target.value)}
+          @change=${(/** @type {Event} */ e) =>
+            onChange(/** @type {HTMLInputElement} */ (e.target).value)}
         >
           ${options.map(
-            (/** @type {any} */ opt) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`,
+            (/** @type {string} */ opt) => html`<sp-menu-item value=${opt}>${opt}</sp-menu-item>`,
           )}
         </sp-picker>
       `,
@@ -376,12 +460,12 @@ function renderSignalEditorTemplate(
 
   // Helper for textarea rows
   const textareaRow = (
-    /** @type {any} */ label,
-    /** @type {any} */ value,
-    /** @type {any} */ onChange,
-    /** @type {any} */ opts = {},
+    /** @type {string} */ label,
+    /** @type {string} */ value,
+    /** @type {(value: string) => void} */ onChange,
+    /** @type {{ minHeight?: string; mono?: boolean }} */ opts = {},
   ) => {
-    /** @type {any} */
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     let debounce;
     return renderFieldRow({
       prop: label,
@@ -390,13 +474,20 @@ function renderSignalEditorTemplate(
       widget: html`
         <textarea
           class="field-input"
-          style="min-height:${opts.minHeight || "40px"};${opts.mono
-            ? "font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px;"
-            : ""}"
+          style=${styleMap({
+            minHeight: opts.minHeight || "40px",
+            ...(opts.mono && {
+              fontFamily: "'SF Mono','Fira Code','Consolas',monospace",
+              fontSize: "11px",
+            }),
+          })}
           .value=${value}
-          @input=${(/** @type {any} */ e) => {
+          @input=${(/** @type {Event} */ e) => {
             clearTimeout(debounce);
-            debounce = setTimeout(() => onChange(e.target.value), 500);
+            debounce = setTimeout(
+              () => onChange(/** @type {HTMLInputElement} */ (e.target).value),
+              500,
+            );
           }}
         ></textarea>
       `,
@@ -404,14 +495,14 @@ function renderSignalEditorTemplate(
   };
 
   // Name field (common to all)
-  const nameField = signalFieldRow("Name", name, (/** @type {any} */ v) => {
+  const nameField = signalFieldRow("Name", name, (/** @type {string} */ v) => {
     if (v && v !== name && !(S.document.state && S.document.state[v])) {
       expandedSignal = v;
       transactDoc(activeTab.value, (t) => mutateRenameDef(t, name, v));
     }
   });
 
-  /** @type {any} */
+  /** @type {import("lit-html").TemplateResult | typeof nothing} */
   let fields = nothing;
 
   if (cat === "state") {
@@ -424,7 +515,7 @@ function renderSignalEditorTemplate(
 
     const cemFields = isCustomElementDoc(S)
       ? html`
-          ${signalFieldRow("Attribute", def.attribute || "", (/** @type {any} */ v) =>
+          ${signalFieldRow("Attribute", def.attribute || "", (/** @type {string} */ v) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateDef(t, name, { attribute: v || undefined }),
             ),
@@ -437,9 +528,11 @@ function renderSignalEditorTemplate(
               <sp-checkbox
                 class="field-check"
                 ?checked=${!!def.reflects}
-                @change=${(/** @type {any} */ e) =>
+                @change=${(/** @type {Event} */ e) =>
                   transactDoc(activeTab.value, (t) =>
-                    mutateUpdateDef(t, name, { reflects: e.target.checked || undefined }),
+                    mutateUpdateDef(t, name, {
+                      reflects: /** @type {HTMLInputElement} */ (e.target).checked || undefined,
+                    }),
                   )}
               ></sp-checkbox>
             `,
@@ -447,7 +540,7 @@ function renderSignalEditorTemplate(
           ${signalFieldRow(
             "Deprecated",
             typeof def.deprecated === "string" ? def.deprecated : "",
-            (/** @type {any} */ v) =>
+            (/** @type {string} */ v) =>
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { deprecated: v || undefined }),
               ),
@@ -460,7 +553,7 @@ function renderSignalEditorTemplate(
         "Type",
         ["string", "integer", "number", "boolean", "array", "object"],
         def.type || "string",
-        (/** @type {any} */ v) =>
+        (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { type: v })),
       )}
       ${def.type === "string" || !def.type
@@ -468,7 +561,7 @@ function renderSignalEditorTemplate(
             "Format",
             ["", "image", "date", "color"],
             def.format || "",
-            (/** @type {any} */ v) =>
+            (/** @type {string} */ v) =>
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { format: v || undefined }),
               ),
@@ -479,13 +572,14 @@ function renderSignalEditorTemplate(
             prop: "Default",
             label: "Default",
             hasValue: false,
-            widget: renderMediaPicker("default", defaultVal, (/** @type {any} */ v) => {
+            widget: renderMediaPicker("default", defaultVal, (/** @type {string} */ v) => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { default: v || undefined }),
               );
             }),
           })
-        : signalFieldRow("Default", defaultVal, (/** @type {any} */ v) => {
+        : signalFieldRow("Default", defaultVal, (/** @type {string} */ v) => {
+            /** @type {unknown} */
             let parsed = v;
             if (def.type === "integer") parsed = parseInt(v, 10) || 0;
             else if (def.type === "number") parsed = parseFloat(v) || 0;
@@ -497,9 +591,11 @@ function renderSignalEditorTemplate(
                 parsed = v;
               }
             }
-            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: parsed }));
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateDef(t, name, { default: /** @type {JsonValue} */ (parsed) }),
+            );
           })}
-      ${signalFieldRow("Description", def.description || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Description", def.description || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { description: v || undefined }),
         ),
@@ -507,7 +603,7 @@ function renderSignalEditorTemplate(
       ${cemFields}
     `;
   } else if (cat === "computed") {
-    /** @type {any} */
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
     let debounce;
     fields = html`
       ${renderFieldRow({
@@ -519,10 +615,10 @@ function renderSignalEditorTemplate(
             class="field-input"
             style="min-height:40px"
             .value=${def.$compute || ""}
-            @input=${(/** @type {any} */ e) => {
+            @input=${(/** @type {Event} */ e) => {
               clearTimeout(debounce);
               debounce = setTimeout(() => {
-                const expr = e.target.value;
+                const expr = /** @type {HTMLInputElement} */ (e.target).value;
                 const depMatches = expr.match(/\$[a-zA-Z_]\w*/g) || [];
                 const deps = [...new Set(depMatches)].map((d) => `#/state/${d}`);
                 transactDoc(activeTab.value, (t) =>
@@ -541,7 +637,7 @@ function renderSignalEditorTemplate(
             widget: html`
               <span class="signal-hint" style="flex:1;max-width:none"
                 >${def.$deps
-                  .map((/** @type {any} */ d) => d.replace("#/state/", ""))
+                  .map((/** @type {string} */ d) => d.replace("#/state/", ""))
                   .join(", ")}</span
               >
             `,
@@ -559,29 +655,33 @@ function renderSignalEditorTemplate(
 
 /** Data source fields for signal editor */
 function renderDataSourceFields(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
-  /** @type {any} */ textareaRow,
-  /** @type {any} */ pickerRow,
-  /** @type {any} */ ctx,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {Function} */ textareaRow,
+  /** @type {Function} */ pickerRow,
+  /** @type {SignalsPanelCtx} */ ctx,
 ) {
   const proto = def.$prototype;
 
   if (proto === "Request") {
     return html`
-      ${signalFieldRow("URL", def.url || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("URL", def.url || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { url: v })),
       )}
       ${pickerRow(
         "Method",
         ["GET", "POST", "PUT", "DELETE", "PATCH"],
         def.method || "GET",
-        (/** @type {any} */ v) =>
+        (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { method: v })),
       )}
-      ${pickerRow("Timing", ["client", "server"], def.timing || "client", (/** @type {any} */ v) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { timing: v })),
+      ${pickerRow(
+        "Timing",
+        ["client", "server"],
+        def.timing || "client",
+        (/** @type {string} */ v) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { timing: v })),
       )}
     `;
   }
@@ -593,10 +693,10 @@ function renderDataSourceFields(
           : String(def.default)
         : "";
     return html`
-      ${signalFieldRow("Key", def.key || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Key", def.key || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { key: v })),
       )}
-      ${textareaRow("Default", defaultStr, (/** @type {any} */ v) => {
+      ${textareaRow("Default", defaultStr, (/** @type {string} */ v) => {
         try {
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: JSON.parse(v) }));
         } catch {
@@ -607,13 +707,13 @@ function renderDataSourceFields(
   }
   if (proto === "IndexedDB") {
     return html`
-      ${signalFieldRow("Database", def.database || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Database", def.database || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { database: v })),
       )}
-      ${signalFieldRow("Store", def.store || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Store", def.store || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { store: v })),
       )}
-      ${signalFieldRow("Version", String(def.version || 1), (/** @type {any} */ v) =>
+      ${signalFieldRow("Version", String(def.version || 1), (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { version: parseInt(v, 10) || 1 }),
         ),
@@ -622,10 +722,10 @@ function renderDataSourceFields(
   }
   if (proto === "Cookie") {
     return html`
-      ${signalFieldRow("Cookie", def.name || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Cookie", def.name || "", (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { name: v })),
       )}
-      ${signalFieldRow("Default", def.default || "", (/** @type {any} */ v) =>
+      ${signalFieldRow("Default", String(def.default || ""), (/** @type {string} */ v) =>
         transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { default: v })),
       )}
     `;
@@ -639,7 +739,7 @@ function renderDataSourceFields(
         : proto === "FormData"
           ? JSON.stringify(def.fields || {}, null, 2)
           : "";
-    return textareaRow(fieldLabel, defaultStr, (/** @type {any} */ v) => {
+    return textareaRow(fieldLabel, defaultStr, (/** @type {string} */ v) => {
       try {
         transactDoc(activeTab.value, (t) =>
           mutateUpdateDef(t, name, { [fieldName]: JSON.parse(v) }),
@@ -653,16 +753,16 @@ function renderDataSourceFields(
 
 /** Function fields for signal editor */
 function renderFunctionFields(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
-  /** @type {any} */ textareaRow,
-  /** @type {any} */ ctx,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {Function} */ textareaRow,
+  /** @type {SignalsPanelCtx} */ ctx,
 ) {
   const descriptionField = signalFieldRow(
     "Description",
     def.description || "",
-    (/** @type {any} */ v) =>
+    (/** @type {string} */ v) =>
       transactDoc(activeTab.value, (t) =>
         mutateUpdateDef(t, name, { description: v || undefined }),
       ),
@@ -670,10 +770,10 @@ function renderFunctionFields(
 
   const bodyField = def.$src
     ? html`
-        ${signalFieldRow("Source", def.$src || "", (/** @type {any} */ v) =>
+        ${signalFieldRow("Source", def.$src || "", (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined })),
         )}
-        ${signalFieldRow("Export", def.$export || "", (/** @type {any} */ v) =>
+        ${signalFieldRow("Export", def.$export || "", (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) =>
             mutateUpdateDef(t, name, { $export: v || undefined }),
           ),
@@ -698,8 +798,8 @@ function renderFunctionFields(
           class="field-input"
           style="min-height:60px;font-family:monospace;font-size:11px"
           .value=${def.body || ""}
-          @input=${(/** @type {any} */ e) => {
-            const v = e.target.value;
+          @input=${(/** @type {Event} */ e) => {
+            const v = /** @type {HTMLInputElement} */ (e.target).value;
             transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { body: v }));
           }}
         ></textarea>
@@ -715,10 +815,10 @@ function renderFunctionFields(
 
 /** Render CEM parameter editor with basic/advanced toggle. */
 function renderParameterEditorTemplate(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
-  /** @type {any} */ ctx,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {SignalsPanelCtx} */ ctx,
 ) {
   const params = (def.parameters || []).map(normParam);
   const isAdvanced = advancedParamOpen.has(name);
@@ -732,7 +832,7 @@ function renderParameterEditorTemplate(
       widget: html`
         <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
           ${params.map(
-            (/** @type {any} */ p, /** @type {any} */ i) => html`
+            (/** @type {CemParameter} */ p, /** @type {number} */ i) => html`
               <span
                 style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:3px;background:var(--bg-hover);font-size:11px;font-family:monospace"
               >
@@ -743,9 +843,11 @@ function renderParameterEditorTemplate(
                     transactDoc(activeTab.value, (t) =>
                       mutateUpdateDef(t, name, {
                         parameters: params.filter(
-                          (/** @type {any} */ _, /** @type {any} */ j) => j !== i,
+                          (/** @type {unknown} */ _, /** @type {number} */ j) => j !== i,
                         ).length
-                          ? params.filter((/** @type {any} */ _, /** @type {any} */ j) => j !== i)
+                          ? params.filter(
+                              (/** @type {unknown} */ _, /** @type {number} */ j) => j !== i,
+                            )
                           : undefined,
                       }),
                     );
@@ -759,11 +861,14 @@ function renderParameterEditorTemplate(
             class="field-input"
             style="width:60px;flex:0 0 auto;font-size:11px"
             placeholder="+"
-            @keydown=${(/** @type {any} */ e) => {
-              if (e.key === "Enter" && e.target.value.trim()) {
+            @keydown=${(/** @type {KeyboardEvent} */ e) => {
+              if (e.key === "Enter" && /** @type {HTMLInputElement} */ (e.target).value.trim()) {
                 transactDoc(activeTab.value, (t) =>
                   mutateUpdateDef(t, name, {
-                    parameters: [...params, { name: e.target.value.trim() }],
+                    parameters: [
+                      ...params,
+                      { name: /** @type {HTMLInputElement} */ (e.target).value.trim() },
+                    ],
                   }),
                 );
               }
@@ -790,16 +895,16 @@ function renderParameterEditorTemplate(
     widget: html`
       <div style="display:flex;flex-direction:column;gap:4px">
         ${params.map(
-          (/** @type {any} */ p, /** @type {any} */ i) => html`
+          (/** @type {CemParameter} */ p, /** @type {number} */ i) => html`
             <div style="display:flex;gap:4px;align-items:center">
               <input
                 class="field-input"
                 .value=${p.name || ""}
                 placeholder="name"
                 style="flex:1"
-                @change=${(/** @type {any} */ e) => {
+                @change=${(/** @type {Event} */ e) => {
                   const next = [...params];
-                  next[i] = { ...next[i], name: e.target.value };
+                  next[i] = { ...next[i], name: /** @type {HTMLInputElement} */ (e.target).value };
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -810,11 +915,13 @@ function renderParameterEditorTemplate(
                 .value=${p.type?.text || ""}
                 placeholder="type"
                 style="flex:1"
-                @change=${(/** @type {any} */ e) => {
+                @change=${(/** @type {Event} */ e) => {
                   const next = [...params];
                   next[i] = {
                     ...next[i],
-                    type: e.target.value ? { text: e.target.value } : undefined,
+                    type: /** @type {HTMLInputElement} */ (e.target).value
+                      ? { text: /** @type {HTMLInputElement} */ (e.target).value }
+                      : undefined,
                   };
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
@@ -826,9 +933,12 @@ function renderParameterEditorTemplate(
                 .value=${p.description || ""}
                 placeholder="desc"
                 style="flex:2"
-                @change=${(/** @type {any} */ e) => {
+                @change=${(/** @type {Event} */ e) => {
                   const next = [...params];
-                  next[i] = { ...next[i], description: e.target.value || undefined };
+                  next[i] = {
+                    ...next[i],
+                    description: /** @type {HTMLInputElement} */ (e.target).value || undefined,
+                  };
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -838,9 +948,12 @@ function renderParameterEditorTemplate(
                 type="checkbox"
                 title="optional"
                 .checked=${!!p.optional}
-                @change=${(/** @type {any} */ e) => {
+                @change=${(/** @type {Event} */ e) => {
                   const next = [...params];
-                  next[i] = { ...next[i], optional: e.target.checked || undefined };
+                  next[i] = {
+                    ...next[i],
+                    optional: /** @type {HTMLInputElement} */ (e.target).checked || undefined,
+                  };
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -850,7 +963,7 @@ function renderParameterEditorTemplate(
                 style="cursor:pointer;opacity:0.5"
                 @click=${() => {
                   const next = params.filter(
-                    (/** @type {any} */ _, /** @type {any} */ j) => j !== i,
+                    (/** @type {unknown} */ _, /** @type {number} */ j) => j !== i,
                   );
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next.length ? next : undefined }),
@@ -885,11 +998,11 @@ function renderParameterEditorTemplate(
 
 /** Render CEM emits editor for function state entries. */
 function renderEmitsEditorTemplate(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
 ) {
-  const emits = def.emits || [];
+  const emits = /** @type {CemEvent[]} */ (def.emits || []);
   if (emits.length === 0 && !isCustomElementDoc(S)) return nothing;
 
   return html`
@@ -899,16 +1012,16 @@ function renderEmitsEditorTemplate(
       Emits
     </div>
     ${emits.map(
-      (/** @type {any} */ ev, /** @type {any} */ i) => html`
+      (/** @type {CemEvent} */ ev, /** @type {number} */ i) => html`
         <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
           <input
             class="field-input"
             .value=${ev.name || ""}
             placeholder="event name"
             style="flex:1"
-            @change=${(/** @type {any} */ e) => {
+            @change=${(/** @type {Event} */ e) => {
               const next = [...emits];
-              next[i] = { ...next[i], name: e.target.value };
+              next[i] = { ...next[i], name: /** @type {HTMLInputElement} */ (e.target).value };
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -917,9 +1030,14 @@ function renderEmitsEditorTemplate(
             .value=${ev.type?.text || ""}
             placeholder="type"
             style="flex:1"
-            @change=${(/** @type {any} */ e) => {
+            @change=${(/** @type {Event} */ e) => {
               const next = [...emits];
-              next[i] = { ...next[i], type: e.target.value ? { text: e.target.value } : undefined };
+              next[i] = {
+                ...next[i],
+                type: /** @type {HTMLInputElement} */ (e.target).value
+                  ? { text: /** @type {HTMLInputElement} */ (e.target).value }
+                  : undefined,
+              };
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -928,9 +1046,12 @@ function renderEmitsEditorTemplate(
             .value=${ev.description || ""}
             placeholder="description"
             style="flex:2"
-            @change=${(/** @type {any} */ e) => {
+            @change=${(/** @type {Event} */ e) => {
               const next = [...emits];
-              next[i] = { ...next[i], description: e.target.value || undefined };
+              next[i] = {
+                ...next[i],
+                description: /** @type {HTMLInputElement} */ (e.target).value || undefined,
+              };
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -939,9 +1060,10 @@ function renderEmitsEditorTemplate(
             @click=${() => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, {
-                  emits: emits.filter((/** @type {any} */ _, /** @type {any} */ j) => j !== i)
-                    .length
-                    ? emits.filter((/** @type {any} */ _, /** @type {any} */ j) => j !== i)
+                  emits: emits.filter(
+                    (/** @type {unknown} */ _, /** @type {number} */ j) => j !== i,
+                  ).length
+                    ? emits.filter((/** @type {unknown} */ _, /** @type {number} */ j) => j !== i)
                     : undefined,
                 }),
               );
@@ -970,10 +1092,10 @@ function renderEmitsEditorTemplate(
  * appropriate form controls.
  */
 export function renderSchemaFieldsTemplate(
-  /** @type {any} */ schema,
-  /** @type {any} */ def,
-  /** @type {any} */ name,
-  /** @type {any} */ _S,
+  /** @type {JsonSchema | null | undefined} */ schema,
+  /** @type {SignalDef} */ def,
+  /** @type {string} */ name,
+  /** @type {SignalsPanelState} */ _S,
 ) {
   if (!schema?.properties) return nothing;
 
@@ -995,42 +1117,48 @@ export function renderSchemaFieldsTemplate(
               : ps.default !== undefined
                 ? String(ps.default)
                 : "__none__"}
-            @change=${(/** @type {any} */ e) =>
+            @change=${(/** @type {Event} */ e) =>
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, {
-                  [prop]: e.target.value === "__none__" ? undefined : e.target.value,
+                  [prop]: /** @type {HTMLInputElement} */ (e.target).value === "__none__"
+                    ? undefined
+                    : /** @type {HTMLInputElement} */ (e.target).value,
                 }),
               )}
           >
             ${!required.has(prop) ? html`<sp-menu-item value="__none__">—</sp-menu-item>` : nothing}
             ${ps.enum.map(
-              (/** @type {any} */ val) => html`<sp-menu-item value=${val}>${val}</sp-menu-item>`,
+              (/** @type {string} */ val) => html`<sp-menu-item value=${val}>${val}</sp-menu-item>`,
             )}
           </sp-picker>
         `;
       } else if (ps.type === "boolean") {
         control = html`<sp-checkbox
           ?checked=${currentValue ?? ps.default ?? false}
-          @change=${(/** @type {any} */ e) =>
+          @change=${(/** @type {Event} */ e) =>
             transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, { [prop]: e.target.checked }),
+              mutateUpdateDef(t, name, {
+                [prop]: /** @type {HTMLInputElement} */ (e.target).checked,
+              }),
             )}
         ></sp-checkbox>`;
       } else if (ps.type === "integer" || ps.type === "number") {
-        /** @type {any} */
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce;
         control = html`<sp-number-field
           size="s"
-          min=${ps.minimum !== undefined ? ps.minimum : nothing}
-          max=${ps.maximum !== undefined ? ps.maximum : nothing}
+          min=${ifDefined(ps.minimum)}
+          max=${ifDefined(ps.maximum)}
           step=${ps.type === "integer" ? "1" : nothing}
           .value=${currentValue !== undefined ? currentValue : nothing}
           placeholder=${ps.default !== undefined ? String(ps.default) : nothing}
-          @change=${(/** @type {any} */ e) => {
+          @change=${(/** @type {Event} */ e) => {
             clearTimeout(debounce);
             debounce = setTimeout(() => {
               const parsed =
-                ps.type === "integer" ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+                ps.type === "integer"
+                  ? parseInt(/** @type {HTMLInputElement} */ (e.target).value, 10)
+                  : parseFloat(/** @type {HTMLInputElement} */ (e.target).value);
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { [prop]: isNaN(parsed) ? undefined : parsed }),
               );
@@ -1040,15 +1168,18 @@ export function renderSchemaFieldsTemplate(
       } else if (ps.format === "json-schema") {
         const hasValue =
           currentValue && typeof currentValue === "object" && Object.keys(currentValue).length > 0;
-        const isRef = currentValue && typeof currentValue === "object" && currentValue.$ref;
-        /** @type {any} */
+        const cv = /** @type {Record<string, unknown>} */ (currentValue);
+        const isRef = hasValue && cv.$ref;
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce;
         control = html`
           <div class="schema-param-editor">
-            ${hasValue && !isRef && currentValue.properties
+            ${hasValue && !isRef && cv.properties
               ? html`
                   <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">
-                    ${Object.entries(currentValue.properties).map(
+                    ${Object.entries(
+                      /** @type {Record<string, Record<string, unknown>>} */ (cv.properties),
+                    ).map(
                       ([k, v]) => html`
                         <span
                           style="background:var(--bg-alt);padding:1px 6px;border-radius:3px;font-size:10px;color:var(--fg-dim)"
@@ -1062,15 +1193,21 @@ export function renderSchemaFieldsTemplate(
             <sp-textfield
               multiline
               size="s"
-              style="min-height:${hasValue ? "80px" : "40px"};font-family:monospace;font-size:11px"
+              style=${styleMap({
+                minHeight: hasValue ? "80px" : "40px",
+                fontFamily: "monospace",
+                fontSize: "11px",
+              })}
               .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
               placeholder=${ps.description ?? "JSON Schema defining the data shape\u2026"}
-              @input=${(/** @type {any} */ e) => {
+              @input=${(/** @type {Event} */ e) => {
                 clearTimeout(debounce);
                 debounce = setTimeout(() => {
                   try {
                     transactDoc(activeTab.value, (t) =>
-                      mutateUpdateDef(t, name, { [prop]: JSON.parse(e.target.value) }),
+                      mutateUpdateDef(t, name, {
+                        [prop]: JSON.parse(/** @type {HTMLInputElement} */ (e.target).value),
+                      }),
                     );
                   } catch {}
                 }, 500);
@@ -1079,7 +1216,7 @@ export function renderSchemaFieldsTemplate(
           </div>
         `;
       } else if (ps.type === "array" || ps.type === "object") {
-        /** @type {any} */
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce;
         control = html`<sp-textfield
           multiline
@@ -1087,19 +1224,21 @@ export function renderSchemaFieldsTemplate(
           style="min-height:40px"
           .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
           placeholder=${ps.default !== undefined ? JSON.stringify(ps.default) : nothing}
-          @input=${(/** @type {any} */ e) => {
+          @input=${(/** @type {Event} */ e) => {
             clearTimeout(debounce);
             debounce = setTimeout(() => {
               try {
                 transactDoc(activeTab.value, (t) =>
-                  mutateUpdateDef(t, name, { [prop]: JSON.parse(e.target.value) }),
+                  mutateUpdateDef(t, name, {
+                    [prop]: JSON.parse(/** @type {HTMLInputElement} */ (e.target).value),
+                  }),
                 );
               } catch {}
             }, 500);
           }}
         ></sp-textfield>`;
       } else {
-        /** @type {any} */
+        /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce;
         const ph = ps.default !== undefined ? String(ps.default) : (ps.examples?.[0] ?? "");
         control = html`<sp-textfield
@@ -1107,12 +1246,14 @@ export function renderSchemaFieldsTemplate(
           .value=${currentValue ?? ""}
           placeholder=${ph || nothing}
           title=${ps.description || nothing}
-          @input=${(/** @type {any} */ e) => {
+          @input=${(/** @type {Event} */ e) => {
             clearTimeout(debounce);
             debounce = setTimeout(
               () =>
                 transactDoc(activeTab.value, (t) =>
-                  mutateUpdateDef(t, name, { [prop]: e.target.value || undefined }),
+                  mutateUpdateDef(t, name, {
+                    [prop]: /** @type {HTMLInputElement} */ (e.target).value || undefined,
+                  }),
                 ),
               400,
             );
@@ -1121,7 +1262,7 @@ export function renderSchemaFieldsTemplate(
       }
 
       return renderFieldRow({
-        prop: ps.name,
+        prop: ps.name || prop,
         label: labelText,
         hasValue: false,
         widget: control,
@@ -1134,13 +1275,13 @@ export function renderSchemaFieldsTemplate(
  * schema-driven config fields.
  */
 export function renderExternalPrototypeEditorTemplate(
-  /** @type {any} */ S,
-  /** @type {any} */ name,
-  /** @type {any} */ def,
-  /** @type {any} */ ctx,
+  /** @type {SignalsPanelState} */ S,
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {SignalsPanelCtx} */ ctx,
 ) {
   // Schema-driven config fields (async with cache)
-  /** @type {any} */
+  /** @type {import("lit-html").TemplateResult | typeof nothing} */
   let schemaContent = nothing;
   if (def.$src && def.$prototype) {
     const cacheKey = `${def.$src}::${def.$prototype}`;
@@ -1161,23 +1302,23 @@ export function renderExternalPrototypeEditorTemplate(
       >
         Loading schema…
       </div>`;
-      fetchPluginSchema(def, S).then((schema) => {
+      fetchPluginSchema(def, /** @type {{ documentPath?: string }} */ (S)).then((schema) => {
         if (schema) ctx.renderLeftPanel();
       });
     }
   }
 
   return html`
-    ${signalFieldRow("Source", def.$src || "", (/** @type {any} */ v) => {
+    ${signalFieldRow("Source", def.$src || "", (/** @type {string} */ v) => {
       transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined }));
       pluginSchemaCache.delete(`${v}::${def.$prototype}`);
     })}
-    ${signalFieldRow("Prototype", def.$prototype || "", (/** @type {any} */ v) => {
+    ${signalFieldRow("Prototype", def.$prototype || "", (/** @type {string} */ v) => {
       transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $prototype: v || undefined }));
       pluginSchemaCache.delete(`${def.$src}::${v}`);
     })}
     ${def.$export
-      ? signalFieldRow("Export", def.$export || "", (/** @type {any} */ v) =>
+      ? signalFieldRow("Export", def.$export || "", (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) =>
             mutateUpdateDef(t, name, { $export: v || undefined }),
           ),

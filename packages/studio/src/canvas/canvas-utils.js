@@ -5,19 +5,25 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
+import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
 import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { getLayerSlot } from "../ui/layers.js";
+import { getActivePanel, findCanvasElement } from "./canvas-helpers.js";
 
-/** @type {any} */
-let _ctx = null;
-
-let zoomIndicatorHost = document.createElement("div");
-zoomIndicatorHost.style.display = "contents";
-document.body.appendChild(zoomIndicatorHost);
+/**
+ * @type {{
+ *   getCanvasMode: () => string;
+ *   getZoom: () => number;
+ *   setZoomDirect: (zoom: number) => void;
+ *   renderStylebookOverlays: () => void;
+ * }}
+ */
+let _ctx;
 
 /**
  * Initialize the canvas utils module.
@@ -36,10 +42,10 @@ export function initCanvasUtils(ctx) {
 /**
  * Create the DOM structure for a single canvas panel.
  *
- * @param {any} mediaName
- * @param {any} label
- * @param {any} fullWidth
- * @param {any} width
+ * @param {string | null} mediaName
+ * @param {string | null} label
+ * @param {boolean} fullWidth
+ * @param {number | null} width
  */
 export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   /**
@@ -50,23 +56,25 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
    *   overlay: HTMLElement | null;
    *   overlayClk: HTMLElement | null;
    *   viewport: HTMLElement | null;
+   *   scrollContainer: HTMLElement | null;
    *   dropLine: HTMLElement | null;
    *   _width: number | null;
    * }}
    */
   const panel = {
-    mediaName,
+    mediaName: mediaName || "",
     element: null,
     canvas: null,
     overlay: null,
     overlayClk: null,
     viewport: null,
+    scrollContainer: null,
     dropLine: null,
     _width: width || null,
   };
   const tpl = html`
     <div
-      class=${`canvas-panel${fullWidth ? " full-width" : ""}`}
+      class=${classMap({ "canvas-panel": true, "full-width": fullWidth })}
       data-media=${ifDefined(mediaName !== null ? mediaName : undefined)}
       ${ref((el) => {
         if (el) panel.element = /** @type {HTMLElement} */ (el);
@@ -124,19 +132,15 @@ export function canvasPanelTemplate(mediaName, label, fullWidth, width = null) {
   return { tpl, panel };
 }
 
-/** Center canvas in viewport. */
+/** Center canvas horizontally in viewport, top-aligned vertically. */
 export function centerCanvas() {
   if (!view.panzoomWrap) return;
   const wrapWidth = canvasWrap.clientWidth;
-  const wrapHeight = canvasWrap.clientHeight;
   const contentWidth = view.panzoomWrap.scrollWidth;
-  const contentHeight = view.panzoomWrap.scrollHeight;
   const zoom = _ctx.getZoom();
   const scaledWidth = contentWidth * zoom;
-  const scaledHeight = contentHeight * zoom;
   view.panX = Math.max(16, (wrapWidth - scaledWidth) / 2);
-  const verticalCenter = (wrapHeight - scaledHeight) / 2;
-  view.panY = verticalCenter > 16 ? verticalCenter : 16;
+  view.panY = 0;
 }
 
 /**
@@ -170,7 +174,7 @@ export function applyTransform() {
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
   renderZoomIndicator();
   renderOnly("overlays");
-  if (_ctx.getCanvasMode() === "settings") _ctx.renderStylebookOverlays();
+  if (_ctx.getCanvasMode() === "stylebook") _ctx.renderStylebookOverlays();
 }
 
 /** Calculate zoom + pan to fit all panels within the viewport. */
@@ -204,9 +208,75 @@ export function fitToScreen() {
   applyTransform();
 }
 
+/** Reset zoom to 100% and re-center horizontally. */
+export function resetZoom() {
+  if (!view.panzoomWrap) return;
+  _ctx.setZoomDirect(1);
+  centerCanvas();
+  applyTransform();
+  renderZoomIndicator();
+}
+
 /** Reset the zoom indicator (clear its content). Called when switching to non-panzoom modes. */
 export function resetZoomIndicator() {
-  litRender(nothing, zoomIndicatorHost);
+  litRender(nothing, getLayerSlot("popover", "zoom-indicator"));
+}
+
+/**
+ * Smoothly pan/scroll the canvas vertically to center the given DOM element.
+ *
+ * @param {HTMLElement} el
+ * @param {{ scrollContainer?: HTMLElement | null }} [panel]
+ */
+function _panToEl(el, panel) {
+  const wrapRect = canvasWrap.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
+  const vpCenterY = wrapRect.height / 2;
+  const offsetY = vpCenterY - elCenterY;
+
+  if (panel?.scrollContainer) {
+    panel.scrollContainer.scrollTo({
+      top: panel.scrollContainer.scrollTop - offsetY,
+      behavior: "smooth",
+    });
+  } else {
+    const startY = view.panY;
+    const targetY = startY + offsetY;
+    const start = performance.now();
+    const duration = 250;
+    function step(/** @type {number} */ now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = t * (2 - t);
+      view.panY = startY + (targetY - startY) * ease;
+      applyTransform();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+}
+
+/**
+ * Pan the canvas vertically so the element at `path` is centered in the viewport.
+ *
+ * @param {(string | number)[]} path
+ */
+export function panToElement(path) {
+  const panel = getActivePanel();
+  if (!panel?.canvas) return;
+  const el = findCanvasElement(path, panel.canvas);
+  if (!el) return;
+  _panToEl(el, panel);
+}
+
+/**
+ * Pan the canvas vertically to center a specific DOM element (e.g. stylebook elements).
+ *
+ * @param {HTMLElement} el
+ */
+export function panToCanvasEl(el) {
+  const panel = getActivePanel();
+  _panToEl(el, panel ?? undefined);
 }
 
 /**
@@ -215,20 +285,25 @@ export function resetZoomIndicator() {
  */
 export function renderZoomIndicator() {
   const zoom = _ctx.getZoom();
-  if (!zoomIndicatorHost.isConnected) {
-    document.body.appendChild(zoomIndicatorHost);
-  }
+  const host = getLayerSlot("popover", "zoom-indicator");
   litRender(
     html`
       <div class="zoom-indicator">
+        <span class="zoom-indicator-action" title="Reset to 100%" @click=${resetZoom}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <circle cx="8" cy="8" r="5.5" />
+            <path d="M8 5.5v5M5.5 8h5" />
+          </svg>
+        </span>
         <span class="zoom-indicator-label">${Math.round(zoom * 100)}%</span>
-        <sp-action-button
-          quiet
-          size="s"
-          class="zoom-fit-btn"
-          title="Fit to screen"
-          @click=${fitToScreen}
-        >
+        <span class="zoom-indicator-action" title="Fit to screen" @click=${fitToScreen}>
           <svg
             width="14"
             height="14"
@@ -240,10 +315,10 @@ export function renderZoomIndicator() {
             <rect x="2" y="2" width="12" height="12" rx="1" />
             <path d="M2 6h12M6 2v12" />
           </svg>
-        </sp-action-button>
+        </span>
       </div>
     `,
-    zoomIndicatorHost,
+    host,
   );
   positionZoomIndicator();
 }

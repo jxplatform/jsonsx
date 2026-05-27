@@ -1,22 +1,25 @@
 import { html, render as litRender, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { live } from "lit-html/directives/live.js";
 import { getPlatform } from "../platform.js";
 import { openFileInTab } from "../files/files.js";
 import { getRecentFiles, trackRecentFile } from "../recent-projects.js";
+import { getLayerSlot } from "../ui/layers.js";
 
 let _open = false;
 let _query = "";
-/** @type {any[]} */
+/** @type {{ path: string; name?: string }[]} */
 let _results = [];
 let _selectedIndex = 0;
 let _debounceTimer = 0;
 
-/** @type {HTMLElement | null} */
-let _container = null;
+/** @returns {HTMLElement} */
+function getContainer() {
+  return getLayerSlot("popover", "quick-search");
+}
 
 export function initQuickSearch() {
-  _container = document.createElement("div");
-  _container.style.display = "contents";
-  (document.querySelector("sp-theme") || document.body).appendChild(_container);
+  // No-op — container is now provided by the layer system
 }
 
 export function openQuickSearch() {
@@ -26,7 +29,7 @@ export function openQuickSearch() {
   _selectedIndex = 0;
   renderOverlay();
   requestAnimationFrame(() => {
-    const input = _container?.querySelector(".quick-search-input");
+    const input = getContainer().querySelector(".quick-search-input");
     if (input) /** @type {HTMLInputElement} */ (input).focus();
   });
 }
@@ -57,7 +60,9 @@ async function doSearch(/** @type {string} */ query) {
 function onInput(/** @type {Event} */ e) {
   _query = /** @type {HTMLInputElement} */ (e.target).value;
   clearTimeout(_debounceTimer);
-  _debounceTimer = /** @type {any} */ (setTimeout(() => doSearch(_query), 150));
+  _debounceTimer = /** @type {number} */ (
+    /** @type {unknown} */ (setTimeout(() => doSearch(_query), 150))
+  );
   renderOverlay();
 }
 
@@ -85,10 +90,10 @@ function onKeydown(/** @type {KeyboardEvent} */ e) {
   }
 }
 
-function selectItem(/** @type {any} */ item) {
+function selectItem(/** @type {{ path: string; name?: string }} */ item) {
   closeQuickSearch();
   const path = item.path;
-  trackRecentFile({ path, name: path.split("/").pop() });
+  trackRecentFile({ path, name: path.split("/").pop() || "" });
   openFileInTab(path);
 }
 
@@ -111,9 +116,9 @@ function dirPart(/** @type {string} */ path) {
 }
 
 function renderOverlay() {
-  if (!_container) return;
+  const container = getContainer();
   if (!_open) {
-    litRender(nothing, _container);
+    litRender(nothing, container);
     return;
   }
 
@@ -128,7 +133,7 @@ function renderOverlay() {
           class="quick-search-input"
           type="text"
           placeholder="Search project files…"
-          .value=${_query}
+          .value=${live(_query)}
           @input=${onInput}
           @keydown=${onKeydown}
         />
@@ -145,7 +150,7 @@ function renderOverlay() {
           ${items.map(
             (item, i) => html`
               <div
-                class="quick-search-item ${i === _selectedIndex ? "selected" : ""}"
+                class=${classMap({ "quick-search-item": true, selected: i === _selectedIndex })}
                 @click=${() => selectItem(item)}
                 @mouseenter=${() => {
                   _selectedIndex = i;
@@ -153,7 +158,7 @@ function renderOverlay() {
                 }}
               >
                 <span class="quick-search-icon"
-                  >${fileIcon(item.name || item.path.split("/").pop())}</span
+                  >${fileIcon(item.name || item.path.split("/").pop() || "")}</span
                 >
                 <span class="quick-search-name">${item.name || item.path.split("/").pop()}</span>
                 <span class="quick-search-path">${dirPart(item.path)}</span>
@@ -166,5 +171,5 @@ function renderOverlay() {
     </div>
   `;
 
-  litRender(tpl, _container);
+  litRender(tpl, container);
 }

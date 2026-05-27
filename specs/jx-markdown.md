@@ -153,6 +153,25 @@ DOM properties like `src`, `id`, and `export` are **not** mapped — they pass t
 ::children{prototype="Array" items.ref="#/state/items"}
 ```
 
+### `--` Annotation Keys
+
+Element annotations use the `--` prefix in markdown directives to avoid collision with the HTML `title` attribute:
+
+| Markdown attribute | Jx property    |
+| ------------------ | -------------- |
+| `--title`          | `$title`       |
+| `--description`    | `$description` |
+
+These are developer-facing metadata annotations, dropped during HTML compilation. `$title` is displayed as the element label in Jx Studio's layers panel.
+
+```markdown
+:::section{--title="Hero Section" --description="Primary landing area with CTA"}
+
+# Welcome
+
+:::
+```
+
 ### Dot-Path Attributes
 
 Nested objects are encoded as dot-separated attribute keys:

@@ -4,6 +4,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { canvasPanels, pathsEqual } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
@@ -83,7 +84,7 @@ function _flush() {
   const { stylebookTab } = tab.session.ui;
   const canvasMode = _ctx.getCanvasMode();
 
-  if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "settings") {
+  if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "stylebook") {
     for (const p of canvasPanels) {
       litRender(nothing, p.overlay);
       p.overlayClk.style.pointerEvents = "none";
@@ -95,7 +96,7 @@ function _flush() {
     return;
   }
 
-  if (canvasMode === "settings") {
+  if (canvasMode === "stylebook") {
     const enable = stylebookTab === "elements";
     for (const p of canvasPanels) {
       p.overlayClk.style.pointerEvents = enable ? "" : "none";
@@ -117,6 +118,7 @@ function _flush() {
     const boxes = [];
 
     // Batch layout reads: read viewport geometry once per panel
+    if (!p.viewport) continue;
     const vpRect = p.viewport.getBoundingClientRect();
     const scrollTop = p.viewport.scrollTop;
     const scrollLeft = p.viewport.scrollLeft;
@@ -164,9 +166,13 @@ function _flush() {
           (b) => html`
             <div
               class="${b.cls}${b.isLayout ? " overlay-layout" : ""}"
-              style="top:${b.top};left:${b.left};width:${b.width};height:${b.height}${b.border
-                ? `;border:${b.border}`
-                : ""}"
+              style=${styleMap({
+                top: b.top,
+                left: b.left,
+                width: b.width,
+                height: b.height,
+                border: b.border,
+              })}
             >
               ${b.isLayout ? html`<span class="overlay-layout-badge">Layout</span>` : nothing}
             </div>

@@ -4,7 +4,9 @@ import { html, render as litRender, nothing } from "lit-html";
 import { activityBar, renderOnly } from "../store.js";
 import { effect, effectScope } from "../reactivity.js";
 import { activeTab } from "../workspace/workspace.js";
-import { view } from "../view.js";
+import { view, applyPanelCollapse } from "../view.js";
+import { openSettingsModal } from "../settings/settings-modal.js";
+import { refreshGitStatus } from "./git-panel.js";
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
 let _scope = null;
@@ -15,6 +17,10 @@ export function mount() {
     effect(() => {
       const tab = activeTab.value;
       if (!tab) return;
+      const gs = tab.session.ui.gitStatus;
+      if (!gs && !tab.session.ui.gitLoading) {
+        refreshGitStatus();
+      }
       renderActivityBar();
     });
   });
@@ -25,7 +31,7 @@ export function unmount() {
   _scope = null;
 }
 
-const gitBranchIcon = (/** @type {any} */ s) => html`
+const gitBranchIcon = (/** @type {string} */ s) => html`
   <svg
     slot="icon"
     xmlns="http://www.w3.org/2000/svg"
@@ -46,33 +52,35 @@ const gitBranchIcon = (/** @type {any} */ s) => html`
 `;
 
 /**
- * @param {any} tag
- * @param {any} size
+ * @param {string} tag
+ * @param {string} [size]
  */
 export function tabIcon(tag, size) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, (s: string) => import("lit-html").TemplateResult>} */
   const m = {
-    "sp-icon-folder": (/** @type {any} */ s) =>
+    "sp-icon-folder": (/** @type {string} */ s) =>
       html`<sp-icon-folder slot="icon" size=${s}></sp-icon-folder>`,
-    "sp-icon-layers": (/** @type {any} */ s) =>
+    "sp-icon-layers": (/** @type {string} */ s) =>
       html`<sp-icon-layers slot="icon" size=${s}></sp-icon-layers>`,
-    "sp-icon-view-grid": (/** @type {any} */ s) =>
+    "sp-icon-view-grid": (/** @type {string} */ s) =>
       html`<sp-icon-view-grid slot="icon" size=${s}></sp-icon-view-grid>`,
-    "sp-icon-brackets": (/** @type {any} */ s) =>
+    "sp-icon-brackets": (/** @type {string} */ s) =>
       html`<sp-icon-brackets slot="icon" size=${s}></sp-icon-brackets>`,
-    "sp-icon-data": (/** @type {any} */ s) =>
+    "sp-icon-data": (/** @type {string} */ s) =>
       html`<sp-icon-data slot="icon" size=${s}></sp-icon-data>`,
-    "sp-icon-properties": (/** @type {any} */ s) =>
+    "sp-icon-properties": (/** @type {string} */ s) =>
       html`<sp-icon-properties slot="icon" size=${s}></sp-icon-properties>`,
-    "sp-icon-event": (/** @type {any} */ s) =>
+    "sp-icon-event": (/** @type {string} */ s) =>
       html`<sp-icon-event slot="icon" size=${s}></sp-icon-event>`,
-    "sp-icon-brush": (/** @type {any} */ s) =>
+    "sp-icon-brush": (/** @type {string} */ s) =>
       html`<sp-icon-brush slot="icon" size=${s}></sp-icon-brush>`,
-    "sp-icon-file-single-web-page": (/** @type {any} */ s) =>
+    "sp-icon-file-single-web-page": (/** @type {string} */ s) =>
       html`<sp-icon-file-single-web-page slot="icon" size=${s}></sp-icon-file-single-web-page>`,
-    "sp-icon-artboard": (/** @type {any} */ s) =>
+    "sp-icon-view-all-tags": (/** @type {string} */ s) =>
+      html`<sp-icon-view-all-tags slot="icon" size=${s}></sp-icon-view-all-tags>`,
+    "sp-icon-artboard": (/** @type {string} */ s) =>
       html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
-    "sp-icon-box": (/** @type {any} */ s) =>
+    "sp-icon-box": (/** @type {string} */ s) =>
       html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
     "sp-icon-git-branch": gitBranchIcon,
   };
@@ -84,6 +92,7 @@ export function renderActivityBar() {
   const tab = activeTab.value;
   if (!tab) return;
   const leftTab = view.leftTab;
+  const gitFileCount = tab?.session.ui.gitStatus?.files?.length || 0;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },
@@ -91,28 +100,51 @@ export function renderActivityBar() {
     { value: "blocks", icon: "sp-icon-view-grid", label: "Elements" },
     { value: "state", icon: "sp-icon-brackets", label: "State" },
     { value: "data", icon: "sp-icon-data", label: "Data" },
-    { value: "head", icon: "sp-icon-file-single-web-page", label: "Head" },
+    { value: "head", icon: "sp-icon-view-all-tags", label: "Document" },
     { value: "git", icon: "sp-icon-git-branch", label: "Source Control" },
   ];
   const tpl = html`
     <sp-tabs
-      selected=${leftTab}
+      selected=${view.leftPanelCollapsed ? "" : leftTab}
       direction="vertical"
       quiet
-      @change=${(/** @type {any} */ e) => {
-        view.leftTab = e.target.selected;
-        renderOnly("leftPanel");
-        renderActivityBar();
+      @change=${(/** @type {Event} */ e) => {
+        const clicked = /** @type {HTMLElement & { selected: string }} */ (e.target).selected;
+        if (clicked === view.leftTab && !view.leftPanelCollapsed) {
+          view.leftPanelCollapsed = true;
+          applyPanelCollapse();
+          renderActivityBar();
+        } else {
+          view.leftTab = clicked;
+          view.leftPanelCollapsed = false;
+          applyPanelCollapse();
+          renderOnly("leftPanel");
+          renderActivityBar();
+        }
       }}
     >
       ${tabs.map(
         (t) => html`
           <sp-tab value=${t.value} title=${t.label} aria-label=${t.label}>
             ${tabIcon(t.icon, "m")}
+            ${t.value === "git" && gitFileCount > 0
+              ? html`<span class="activity-badge">${gitFileCount}</span>`
+              : nothing}
           </sp-tab>
         `,
       )}
     </sp-tabs>
+    <div style="margin-top:auto;padding:8px 0;display:flex;justify-content:center">
+      <sp-action-button
+        quiet
+        size="m"
+        title="Settings"
+        aria-label="Settings"
+        @click=${() => openSettingsModal()}
+      >
+        <sp-icon-settings slot="icon"></sp-icon-settings>
+      </sp-action-button>
+    </div>
   `;
-  litRender(tpl, /** @type {any} */ (activityBar));
+  litRender(tpl, activityBar);
 }

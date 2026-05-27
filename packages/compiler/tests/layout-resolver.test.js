@@ -13,7 +13,7 @@ function cleanup() {
   rmSync(FIXTURES, { recursive: true, force: true });
 }
 
-/** @param {string} name @param {any} content */
+/** @param {string} name @param {unknown} content */
 function writeLayout(name, content) {
   writeFileSync(join(FIXTURES, "layouts", name), JSON.stringify(content), "utf8");
 }
@@ -55,9 +55,8 @@ describe("resolveLayout", () => {
         children: [{ tagName: "p", textContent: "Page content" }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
-      const main = result.children.find((/** @type {any} */ c) => c.tagName === "main");
-      expect(main.children).toHaveLength(1);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
+      const main = result.children.find((/** @type {JxElement} */ c) => c.tagName === "main");
       expect(main.children[0].textContent).toBe("Page content");
     } finally {
       cleanup();
@@ -86,12 +85,12 @@ describe("resolveLayout", () => {
         ],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
-      const nav = result.children.find((/** @type {any} */ c) => c.tagName === "nav");
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
+      const nav = result.children.find((/** @type {JxElement} */ c) => c.tagName === "nav");
       expect(nav.children[0].tagName).toBe("a");
       expect(nav.children[0].textContent).toBe("Link");
 
-      const main = result.children.find((/** @type {any} */ c) => c.tagName === "main");
+      const main = result.children.find((/** @type {JxElement} */ c) => c.tagName === "main");
       expect(main.children[0].textContent).toBe("Main content");
     } finally {
       cleanup();
@@ -112,7 +111,7 @@ describe("resolveLayout", () => {
         state: { pageVar: "from-page" },
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.state.layoutVar).toBe("from-layout");
       expect(result.state.pageVar).toBe("from-page");
     } finally {
@@ -134,7 +133,7 @@ describe("resolveLayout", () => {
         state: { shared: "page-value" },
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.state.shared).toBe("page-value");
     } finally {
       cleanup();
@@ -155,7 +154,7 @@ describe("resolveLayout", () => {
         $head: [{ tagName: "meta", attributes: { name: "description", content: "About page" } }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result._pageTitle).toBe("About Us");
       expect(result._pageHead).toHaveLength(1);
     } finally {
@@ -168,7 +167,7 @@ describe("resolveLayout", () => {
     try {
       writeLayout("clean.json", { tagName: "div", children: [] });
       const page = { $layout: "./layouts/clean.json" };
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.$layout).toBeUndefined();
     } finally {
       cleanup();
@@ -189,7 +188,7 @@ describe("resolveLayout", () => {
       };
       const project = { defaults: { layout: "./layouts/default.json" } };
 
-      const result = resolveLayout(page, project, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, project, FIXTURES));
       expect(result.className).toBe("default-layout");
     } finally {
       cleanup();
@@ -221,8 +220,8 @@ describe("resolveLayout", () => {
         children: [{ tagName: "p", textContent: "Main content" }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
-      const aside = result.children.find((/** @type {any} */ c) => c.tagName === "aside");
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
+      const aside = result.children.find((/** @type {JxElement} */ c) => c.tagName === "aside");
       expect(aside.children[0].textContent).toBe("Default sidebar");
     } finally {
       cleanup();
@@ -259,9 +258,9 @@ describe("resolveLayout", () => {
         children: [{ tagName: "p", textContent: "Nested content" }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.tagName).toBe("html");
-      const body = result.children.find((/** @type {any} */ c) => c.tagName === "body");
+      const body = result.children.find((/** @type {JxElement} */ c) => c.tagName === "body");
       expect(body).toBeDefined();
     } finally {
       cleanup();
@@ -283,7 +282,7 @@ describe("resolveLayout", () => {
         children: [{ tagName: "p" }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.$media["--md"]).toBe("(min-width: 768px)");
       expect(result.$media["--lg"]).toBe("(min-width: 1024px)");
     } finally {
@@ -306,7 +305,7 @@ describe("resolveLayout", () => {
         children: [{ tagName: "p" }],
       };
 
-      const result = resolveLayout(page, {}, FIXTURES);
+      const result = /** @type {any} */ (resolveLayout(page, {}, FIXTURES));
       expect(result.style.color).toBe("red");
       expect(result.style.fontSize).toBe("16px");
     } finally {

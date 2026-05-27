@@ -33,8 +33,8 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
       updateReady: info.updateReady,
       error: info.error || null,
     };
-  } catch (e: any) {
-    cachedStatus = { ...cachedStatus, error: e.message };
+  } catch (e: unknown) {
+    cachedStatus = { ...cachedStatus, error: e instanceof Error ? e.message : String(e) };
   }
   return cachedStatus;
 }
@@ -49,8 +49,8 @@ export async function downloadUpdate(): Promise<UpdateStatus> {
       updateReady: info.updateReady,
       error: info.error || null,
     };
-  } catch (e: any) {
-    cachedStatus = { ...cachedStatus, error: e.message };
+  } catch (e: unknown) {
+    cachedStatus = { ...cachedStatus, error: e instanceof Error ? e.message : String(e) };
   }
   return cachedStatus;
 }

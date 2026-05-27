@@ -24,15 +24,15 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  * @typedef {{
  *   getCanvasMode: () => string;
  *   setCanvasMode: (mode: string) => void;
- *   renderImportsTemplate: (...args: any[]) => TemplateResult;
- *   renderFilesTemplate: () => TemplateResult;
- *   renderSignalsTemplate: (...args: any[]) => TemplateResult;
- *   renderDataExplorerTemplate: (...args: any[]) => TemplateResult;
- *   renderHeadTemplate: (...args: any[]) => TemplateResult;
- *   renderGitPanel: (...args: any[]) => TemplateResult;
+ *   renderImportsTemplate: Function;
+ *   renderFilesTemplate: Function;
+ *   renderSignalsTemplate: Function;
+ *   renderDataExplorerTemplate: Function;
+ *   renderHeadTemplate: Function;
+ *   renderGitPanel: Function;
  *   renderCanvas: () => void;
- *   defCategory: (tag: string) => string;
- *   defBadgeLabel: (tag: string) => string;
+ *   defCategory: (def: unknown) => string;
+ *   defBadgeLabel: (def: unknown) => string;
  *   navigateToComponent: (path: string) => void;
  *   webdata: object;
  *   defaultDef: (tag: string) => object;
@@ -40,7 +40,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerElementsDnD: () => void;
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
- *   setGitDiffState: (state: any) => void;
+ *   setGitDiffState: (state: import("../canvas/canvas-render.js").GitDiffState | null) => void;
  * }} LeftPanelCtx
  */
 
@@ -113,17 +113,33 @@ function _flush() {
   } finally {
     _rendering = false;
   }
+
+  if (view.leftTab === "layers") {
+    const sel = leftPanel.querySelector(".layer-row.selected");
+    if (sel) sel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
 }
 
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
   const aTab = activeTab.value;
   if (!aTab) return;
-  const S = /** @type {any} */ ({
+  const S = /**
+   * @type {{
+   *   ui: unknown;
+   *   document: JxMutableNode;
+   *   mode: string;
+   *   selection: JxPath | null;
+   *   canvas: { scope?: object } | null;
+   *   content?: { frontmatter?: Record<string, unknown> };
+   *   documentPath?: string;
+   * }}
+   */ ({
     ui: aTab.session.ui,
     document: aTab.doc.document,
     mode: aTab.doc.mode,
     selection: aTab.session.selection,
+    canvas: aTab.session.canvas,
   });
   const tab = view.leftTab;
 
@@ -131,11 +147,13 @@ function _render() {
   let content;
   if (tab === "layers")
     content =
-      ctx.getCanvasMode() === "settings"
-        ? renderStylebookLayersTemplate({
-            selectStylebookTag,
-            stylebookMeta,
-          })
+      ctx.getCanvasMode() === "stylebook"
+        ? renderStylebookLayersTemplate(
+            /** @type {Parameters<typeof renderStylebookLayersTemplate>[0]} */ ({
+              selectStylebookTag,
+              stylebookMeta,
+            }),
+          )
         : renderLayersTemplate({
             navigateToComponent: ctx.navigateToComponent,
             rerender: render,
@@ -151,11 +169,13 @@ function _render() {
     });
   else if (tab === "files") content = ctx.renderFilesTemplate();
   else if (tab === "blocks")
-    content = renderElementsTemplate({
-      webdata: ctx.webdata,
-      defaultDef: ctx.defaultDef,
-      rerender: render,
-    });
+    content = renderElementsTemplate(
+      /** @type {Parameters<typeof renderElementsTemplate>[0]} */ ({
+        webdata: ctx.webdata,
+        defaultDef: ctx.defaultDef,
+        rerender: render,
+      }),
+    );
   else if (tab === "state")
     content = ctx.renderSignalsTemplate(S, {
       renderLeftPanel: render,
@@ -178,13 +198,14 @@ function _render() {
       applyMutation: isContent
         ? (/** @type {(doc: object) => void} */ fn) => {
             const tab = activeTab.value;
-            const fm = /** @type {Record<string, any>} */ (tab.doc.content?.frontmatter ?? {});
-            const tmp = { title: fm.title, $head: fm.$head ? [...fm.$head] : undefined };
+            const fm = /** @type {Record<string, unknown>} */ (tab.doc.content?.frontmatter ?? {});
+            const fmHead = /** @type {unknown[] | undefined} */ (fm.$head);
+            const tmp = { title: fm.title, $head: fmHead ? [...fmHead] : undefined };
             fn(tmp);
             if (tmp.title !== fm.title)
-              mutateUpdateFrontmatter(tab, "title", /** @type {any} */ (tmp.title));
+              mutateUpdateFrontmatter(tab, "title", /** @type {JsonValue} */ (tmp.title));
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
-            mutateUpdateFrontmatter(tab, "$head", newHead);
+            mutateUpdateFrontmatter(tab, "$head", /** @type {JsonValue} */ (newHead));
           }
         : (/** @type {(doc: object) => void} */ fn) => {
             transact(activeTab.value, fn);
@@ -197,7 +218,7 @@ function _render() {
   litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
 
   // Post-render side effects
-  if (tab === "layers" && ctx.getCanvasMode() !== "settings") ctx.registerLayersDnD();
+  if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") ctx.registerLayersDnD();
   else if (tab === "imports") {
     /* no post-render DnD needed */
   } else if (tab === "blocks") {

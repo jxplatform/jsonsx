@@ -120,9 +120,9 @@ describe("stripEventHandlers", () => {
   });
 
   test("returns primitives unchanged", () => {
-    expect(stripEventHandlers(null)).toBe(null);
-    expect(stripEventHandlers("string")).toBe("string");
-    expect(stripEventHandlers(42)).toBe(42);
+    expect(/** @type {any} */ (stripEventHandlers(/** @type {any} */ (null)))).toBe(null);
+    expect(/** @type {any} */ (stripEventHandlers(/** @type {any} */ ("string")))).toBe("string");
+    expect(/** @type {any} */ (stripEventHandlers(/** @type {any} */ (42)))).toBe(42);
   });
 
   test("preserves state, style, attributes, $media", () => {

@@ -14,7 +14,7 @@ export const FORMAT_OPTIONS = ["", "image", "date", "color"];
  *   type?: string;
  *   properties?: Record<string, SchemaProperty>;
  *   required?: string[];
- *   items?: any;
+ *   items?: SchemaProperty;
  *   format?: string;
  *   $ref?: string;
  * }} SchemaProperty
@@ -70,7 +70,7 @@ export function detectFieldFormat(schema) {
  * @param {boolean} isRequired
  * @param {FieldHandlers} handlers
  * @param {string[]} [contentTypeNames] - Available content type names for reference target picker
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, contentTypeNames = []) {
   const type = detectFieldType(fieldSchema);
@@ -89,16 +89,18 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, conte
           quiet
           value=${fieldName}
           class="schema-field-name-input"
-          @change=${(/** @type {any} */ e) => {
-            const newName = e.target.value.trim();
+          @change=${(/** @type {Event} */ e) => {
+            const target = /** @type {HTMLInputElement} */ (e.target);
+            const newName = target.value.trim();
             if (newName && newName !== fieldName) handlers.onRename(fieldName, newName);
-            else e.target.value = fieldName;
+            else target.value = fieldName;
           }}
-          @keydown=${(/** @type {any} */ e) => {
-            if (e.key === "Enter") e.target.blur();
+          @keydown=${(/** @type {KeyboardEvent} */ e) => {
+            const target = /** @type {HTMLInputElement} */ (e.target);
+            if (e.key === "Enter") target.blur();
             if (e.key === "Escape") {
-              e.target.value = fieldName;
-              e.target.blur();
+              target.value = fieldName;
+              target.blur();
             }
           }}
         ></sp-textfield>
@@ -131,9 +133,12 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, conte
                 size="s"
                 label="Target"
                 value=${refTarget}
-                @change=${(/** @type {any} */ e) => {
+                @change=${(/** @type {Event} */ e) => {
                   if (handlers.onChangeRefTarget)
-                    handlers.onChangeRefTarget(fieldName, e.target.value);
+                    handlers.onChangeRefTarget(
+                      fieldName,
+                      /** @type {HTMLInputElement} */ (e.target).value,
+                    );
                 }}
               >
                 ${contentTypeNames.map((n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`)}
@@ -170,7 +175,7 @@ export function fieldCardTpl(fieldName, fieldSchema, isRequired, handlers, conte
  * @param {SchemaProperty} childSchema
  * @param {boolean} isRequired
  * @param {FieldHandlers} handlers
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, handlers) {
   const type = detectFieldType(childSchema);
@@ -184,19 +189,21 @@ function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, hand
           quiet
           value=${childName}
           class="schema-field-name-input"
-          @change=${(/** @type {any} */ e) => {
-            const newName = e.target.value.trim();
+          @change=${(/** @type {Event} */ e) => {
+            const target = /** @type {HTMLInputElement} */ (e.target);
+            const newName = target.value.trim();
             if (newName && newName !== childName && handlers.onRenameNested) {
               handlers.onRenameNested(parentName, childName, newName);
             } else {
-              e.target.value = childName;
+              target.value = childName;
             }
           }}
-          @keydown=${(/** @type {any} */ e) => {
-            if (e.key === "Enter") e.target.blur();
+          @keydown=${(/** @type {KeyboardEvent} */ e) => {
+            const target = /** @type {HTMLInputElement} */ (e.target);
+            if (e.key === "Enter") target.blur();
             if (e.key === "Escape") {
-              e.target.value = childName;
-              e.target.blur();
+              target.value = childName;
+              target.blur();
             }
           }}
         ></sp-textfield>
@@ -240,7 +247,7 @@ function nestedFieldCardTpl(parentName, childName, childSchema, isRequired, hand
  *
  * @param {string} parentName
  * @param {FieldHandlers} handlers
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 function nestedAddFieldTpl(parentName, handlers) {
   return html`
@@ -249,15 +256,18 @@ function nestedAddFieldTpl(parentName, handlers) {
         size="s"
         placeholder="field name"
         class="schema-nested-add-name"
-        @keydown=${(/** @type {any} */ e) => {
+        @keydown=${(/** @type {KeyboardEvent} */ e) => {
           if (e.key === "Enter") {
-            const row = e.target.closest(".schema-nested-add");
-            const name = e.target.value.trim();
-            const typePicker = row?.querySelector("sp-picker");
+            const target = /** @type {HTMLInputElement} */ (e.target);
+            const row = target.closest(".schema-nested-add");
+            const name = target.value.trim();
+            const typePicker = /** @type {HTMLInputElement | null} */ (
+              row?.querySelector("sp-picker")
+            );
             const type = typePicker?.value || "string";
             if (name && handlers.onAddNestedField) {
               handlers.onAddNestedField(parentName, { name, type, required: false });
-              e.target.value = "";
+              target.value = "";
             }
           }
         }}
@@ -267,15 +277,20 @@ function nestedAddFieldTpl(parentName, handlers) {
         size="xs"
         quiet
         title="Add nested field"
-        @click=${(/** @type {any} */ e) => {
-          const row = e.target.closest(".schema-nested-add");
-          const nameInput = /** @type {any} */ (row?.querySelector(".schema-nested-add-name"));
-          const typePicker = /** @type {any} */ (row?.querySelector("sp-picker"));
+        @click=${(/** @type {Event} */ e) => {
+          const target = /** @type {HTMLElement} */ (e.target);
+          const row = target.closest(".schema-nested-add");
+          const nameInput = /** @type {HTMLInputElement | null} */ (
+            row?.querySelector(".schema-nested-add-name")
+          );
+          const typePicker = /** @type {HTMLInputElement | null} */ (
+            row?.querySelector("sp-picker")
+          );
           const name = nameInput?.value?.trim();
           const type = typePicker?.value || "string";
           if (name && handlers.onAddNestedField) {
             handlers.onAddNestedField(parentName, { name, type, required: false });
-            nameInput.value = "";
+            if (nameInput) nameInput.value = "";
           }
         }}
       >
@@ -290,7 +305,7 @@ function nestedAddFieldTpl(parentName, handlers) {
  *
  * @param {string} value
  * @param {(type: string) => void} onChange
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function typePickerTpl(value, onChange) {
   return html`
@@ -298,7 +313,8 @@ export function typePickerTpl(value, onChange) {
       size="s"
       label="Type"
       value=${value}
-      @change=${(/** @type {any} */ e) => onChange(e.target.value)}
+      @change=${(/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).value)}
     >
       ${FIELD_TYPES.map((t) => html`<sp-menu-item value=${t}>${t}</sp-menu-item>`)}
     </sp-picker>
@@ -310,7 +326,7 @@ export function typePickerTpl(value, onChange) {
  *
  * @param {string} value
  * @param {(format: string) => void} onChange
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function formatPickerTpl(value, onChange) {
   return html`
@@ -318,7 +334,8 @@ export function formatPickerTpl(value, onChange) {
       size="s"
       label="Format"
       value=${value}
-      @change=${(/** @type {any} */ e) => onChange(e.target.value)}
+      @change=${(/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).value)}
     >
       ${FORMAT_OPTIONS.map((f) => html`<sp-menu-item value=${f}>${f || "(none)"}</sp-menu-item>`)}
     </sp-picker>
@@ -330,11 +347,11 @@ export function formatPickerTpl(value, onChange) {
  *
  * @param {{ name: string; type: string; format: string; required: boolean }} state
  * @param {{
- *   onInput: (field: string, value: any) => void;
+ *   onInput: (field: string, value: string | boolean) => void;
  *   onConfirm: () => void;
  *   onCancel: () => void;
  * }} handlers
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function addFieldFormTpl(state, handlers) {
   return html`
@@ -343,8 +360,9 @@ export function addFieldFormTpl(state, handlers) {
         size="s"
         placeholder="Field name"
         .value=${state.name}
-        @input=${(/** @type {any} */ e) => handlers.onInput("name", e.target.value)}
-        @keydown=${(/** @type {any} */ e) => {
+        @input=${(/** @type {Event} */ e) =>
+          handlers.onInput("name", /** @type {HTMLInputElement} */ (e.target).value)}
+        @keydown=${(/** @type {KeyboardEvent} */ e) => {
           if (e.key === "Enter") handlers.onConfirm();
           if (e.key === "Escape") handlers.onCancel();
         }}
@@ -356,7 +374,8 @@ export function addFieldFormTpl(state, handlers) {
       <sp-switch
         size="s"
         ?checked=${state.required}
-        @change=${(/** @type {any} */ e) => handlers.onInput("required", e.target.checked)}
+        @change=${(/** @type {Event} */ e) =>
+          handlers.onInput("required", /** @type {HTMLInputElement} */ (e.target).checked)}
       >
         Required
       </sp-switch>

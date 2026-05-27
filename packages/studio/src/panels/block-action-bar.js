@@ -4,6 +4,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { styleMap } from "lit-html/directives/style-map.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
 import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store.js";
@@ -15,20 +16,20 @@ import { toggleInlineFormat, isTagActiveInSelection } from "../editor/inline-for
 import { componentRegistry } from "../files/components.js";
 import { convertToComponent } from "../editor/convert-to-component.js";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers.js";
+import { getLayerSlot } from "../ui/layers.js";
 
 /**
  * @typedef {import("../state.js").StudioState} StudioState
  *
  * @typedef {import("../state.js").JxPath} JxPath
  *
- * @typedef {{ command: string; tag: string; label: string; icon: string; shortcut?: string }} InlineAction
+ * @typedef {import("../editor/inline-edit.js").InlineAction} InlineAction
  */
 
 /**
  * @type {{
  *   getCanvasMode: () => string;
  *   navigateToComponent: (path: string) => void;
- *   createFloatingContainer: () => HTMLElement;
  * } | null}
  */
 let _ctx = null;
@@ -39,14 +40,10 @@ let _ctx = null;
  * @param {{
  *   getCanvasMode: () => string;
  *   navigateToComponent: (path: string) => void;
- *   createFloatingContainer: () => HTMLElement;
  * }} ctx
  */
 export function initBlockActionBar(ctx) {
   _ctx = ctx;
-  view.linkPopoverHost = document.createElement("div");
-  view.linkPopoverHost.style.display = "contents";
-  (document.querySelector("sp-theme") || document.body).appendChild(view.linkPopoverHost);
 }
 
 /** Pre-built icon templates for inline format buttons (avoids unsafeStatic) */
@@ -185,7 +182,7 @@ function applyInlineFormat(action) {
     code: "code",
   };
 
-  const tag = cmdToTag[action.command];
+  const tag = action.command ? cmdToTag[action.command] : undefined;
   if (tag) {
     const editableRoot = getActiveElement();
     toggleInlineFormat(tag, editableRoot);
@@ -195,7 +192,8 @@ function applyInlineFormat(action) {
 
 /** Dismiss the link popover if open. */
 export function dismissLinkPopover() {
-  if (view.linkPopoverHost) litRender(nothing, view.linkPopoverHost);
+  const host = getLayerSlot("popover", "link-popover");
+  litRender(nothing, host);
 }
 
 /** Dismiss the block action bar. */
@@ -205,7 +203,8 @@ export function dismissBlockActionBar() {
 
 /** @param {HTMLElement} anchorBtn */
 function showLinkPopover(anchorBtn) {
-  litRender(nothing, view.linkPopoverHost);
+  const host = getLayerSlot("popover", "link-popover");
+  litRender(nothing, host);
 
   const sel = window.getSelection();
   /** @type {HTMLAnchorElement | null} */
@@ -228,16 +227,14 @@ function showLinkPopover(anchorBtn) {
   const rect = anchorBtn.getBoundingClientRect();
 
   const onApply = () => {
-    const field = /** @type {HTMLInputElement | null} */ (
-      view.linkPopoverHost.querySelector("sp-textfield")
-    );
+    const field = /** @type {HTMLInputElement | null} */ (host.querySelector("sp-textfield"));
     const url = field?.value || "";
     if (existingLink) {
       existingLink.setAttribute("href", url);
     } else if (url) {
       document.execCommand("createLink", false, url);
     }
-    litRender(nothing, view.linkPopoverHost);
+    litRender(nothing, host);
     renderBlockActionBar();
   };
 
@@ -246,14 +243,14 @@ function showLinkPopover(anchorBtn) {
     const frag = document.createDocumentFragment();
     while (existingLink.firstChild) frag.appendChild(existingLink.firstChild);
     existingLink.parentNode.replaceChild(frag, existingLink);
-    litRender(nothing, view.linkPopoverHost);
+    litRender(nothing, host);
     renderBlockActionBar();
   };
 
   const onKeydown = (/** @type {KeyboardEvent} */ e) => {
     if (e.key === "Enter") onApply();
     else if (e.key === "Escape") {
-      litRender(nothing, view.linkPopoverHost);
+      litRender(nothing, host);
     }
   };
 
@@ -262,7 +259,12 @@ function showLinkPopover(anchorBtn) {
       <sp-popover
         class="link-popover"
         open
-        style="position:fixed; left:${rect.left}px; top:${rect.bottom + 4}px; z-index:30"
+        style=${styleMap({
+          position: "fixed",
+          left: `${rect.left}px`,
+          top: `${rect.bottom + 4}px`,
+          zIndex: "30",
+        })}
       >
         <sp-textfield
           placeholder="https://..."
@@ -279,14 +281,11 @@ function showLinkPopover(anchorBtn) {
           : nothing}
       </sp-popover>
     `,
-    view.linkPopoverHost,
+    host,
   );
 
   requestAnimationFrame(
-    () =>
-      /** @type {HTMLElement | null} */ (
-        view.linkPopoverHost?.querySelector("sp-textfield")
-      )?.focus(),
+    () => /** @type {HTMLElement | null} */ (host.querySelector("sp-textfield"))?.focus(),
   );
 }
 
@@ -320,7 +319,7 @@ function moveSelectionDown() {
 export function renderBlockActionBar() {
   if (!_ctx) return;
   if (!view.blockActionBarEl) {
-    view.blockActionBarEl = _ctx.createFloatingContainer();
+    view.blockActionBarEl = getLayerSlot("popover", "block-action-bar");
   }
 
   if (view.selDragCleanup) {
@@ -365,7 +364,7 @@ export function renderBlockActionBar() {
     html`
       <div
         class="block-action-bar"
-        style="left:${elRect.left}px; top:${topPos}px"
+        style=${styleMap({ left: `${elRect.left}px`, top: `${topPos}px` })}
         @mousedown=${onBarMousedown}
       >
         ${selection.length >= 2 ? renderParentSelector() : nothing}
@@ -373,7 +372,7 @@ export function renderBlockActionBar() {
         <span class="bar-tag">${node.$id || (node.tagName ?? "div")}</span>
 
         ${selection.length >= 2
-          ? html`<span class="bar-drag-handle" title="Drag to reorder">⡇</span>`
+          ? html`<span class="bar-drag-handle" title="Drag to reorder">⠿</span>`
           : nothing}
         ${selection.length >= 2 ? renderMoveArrows() : nothing}
         ${selection.length >= 2 && node.tagName
@@ -424,7 +423,7 @@ export function renderBlockActionBar() {
                       @mousedown=${captureSelectionRange}
                       @click=${(/** @type {MouseEvent} */ e) => onFormatClick(e, action)}
                     >
-                      ${formatIconMap[action.icon] ?? nothing}
+                      ${action.icon ? (formatIconMap[action.icon] ?? nothing) : nothing}
                     </sp-action-button>
                   `,
                 )}
@@ -438,7 +437,7 @@ export function renderBlockActionBar() {
 
   // Post-render side effects
   requestAnimationFrame(() => {
-    const bar = view.blockActionBarEl?.firstElementChild;
+    const bar = /** @type {HTMLElement | null} */ (view.blockActionBarEl?.firstElementChild);
     if (!bar) return;
     // Clamp to window
     const barRect = bar.getBoundingClientRect();
@@ -448,7 +447,7 @@ export function renderBlockActionBar() {
     // Attach drag handle
     const currentTab = activeTab.value;
     if (currentTab?.session.selection && currentTab.session.selection.length >= 2) {
-      const handle = bar.querySelector(".bar-drag-handle");
+      const handle = /** @type {HTMLElement | null} */ (bar.querySelector(".bar-drag-handle"));
       if (handle) {
         if (view.selDragCleanup) {
           view.selDragCleanup();

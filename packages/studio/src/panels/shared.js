@@ -6,7 +6,7 @@
 /**
  * Convert a $media key like "--tablet" to a friendly display name "Tablet". "--" returns "Base".
  *
- * @param {any} name
+ * @param {string} name
  */
 export function mediaDisplayName(name) {
   if (name === "--") return "Base";
@@ -14,7 +14,7 @@ export function mediaDisplayName(name) {
     name
       .replace(/^--/, "")
       .replace(/-/g, " ")
-      .replace(/\b\w/g, (/** @type {any} */ c) => c.toUpperCase()) || name
+      .replace(/\b\w/g, (/** @type {string} */ c) => c.toUpperCase()) || name
   );
 }
 
@@ -23,10 +23,10 @@ export const unsafeTags = new Set(["script", "style", "link", "iframe", "object"
 /**
  * Generate a sensible default Jx node for a given tag name.
  *
- * @param {any} tag
+ * @param {string} tag
  */
 export function defaultDef(tag) {
-  /** @type {any} */
+  /** @type {JxMutableNode} */
   const def = { tagName: tag };
   if (/^h[1-6]$/.test(tag)) def.textContent = "Heading";
   else if (tag === "p") def.textContent = "Paragraph text";

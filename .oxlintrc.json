@@ -7,7 +7,9 @@
     "builtin": true
   },
   "plugins": ["jsdoc", "oxc", "typescript", "unicorn"],
-  "rules": {},
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "error"
+  },
   "settings": {
     "jsdoc": {
       "check-access": true,

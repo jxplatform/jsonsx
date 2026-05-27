@@ -27,7 +27,7 @@ describe("isClassJsonSrc", () => {
 // ─── isDynamic — Five-Shape state Grammar ────────────────────────────────────
 
 describe("isDynamic", () => {
-  test("null → false", () => expect(isDynamic(null)).toBe(false));
+  test("null → false", () => expect(isDynamic(/** @type {any} */ (null))).toBe(false));
   test("non-object → false", () => expect(isDynamic("string")).toBe(false));
   test("fully static node → false", () => {
     expect(isDynamic({ tagName: "div", textContent: "hello" })).toBe(false);
@@ -47,7 +47,7 @@ describe("isDynamic", () => {
     expect(isDynamic({ state: { $x: null } })).toBe(true);
   });
   test("naked array in state → true", () => {
-    expect(isDynamic({ state: { $items: [1, 2] } })).toBe(true);
+    expect(isDynamic(/** @type {any} */ ({ state: { $items: [1, 2] } }))).toBe(true);
   });
 
   // Shape 2: Expanded signal with default → dynamic
@@ -83,10 +83,12 @@ describe("isDynamic", () => {
     expect(isDynamic({ $switch: { $ref: "#/state/$x" } })).toBe(true);
   });
   test("children.$prototype Array → true", () => {
-    expect(isDynamic({ children: { $prototype: "Array" } })).toBe(true);
+    expect(isDynamic(/** @type {any} */ ({ children: { $prototype: "Array" } }))).toBe(true);
   });
   test("$ref in non-reserved property → true", () => {
-    expect(isDynamic({ tagName: "span", textContent: { $ref: "#/state/$x" } })).toBe(true);
+    expect(
+      isDynamic(/** @type {any} */ ({ tagName: "span", textContent: { $ref: "#/state/$x" } })),
+    ).toBe(true);
   });
 
   // Template strings in properties → dynamic
@@ -103,10 +105,12 @@ describe("isDynamic", () => {
   });
   test("dynamic child in children array → true", () => {
     expect(
-      isDynamic({
-        tagName: "div",
-        children: [{ tagName: "span" }, { tagName: "p", textContent: { $ref: "#/state/$x" } }],
-      }),
+      isDynamic(
+        /** @type {any} */ ({
+          tagName: "div",
+          children: [{ tagName: "span" }, { tagName: "p", textContent: { $ref: "#/state/$x" } }],
+        }),
+      ),
     ).toBe(true);
   });
   test("all-static children array → false", () => {

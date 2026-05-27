@@ -161,16 +161,12 @@ The `project.json` file at the project root defines site-wide settings. It is th
   },
 
   "style": {
-    ":root": {
-      "--color-primary": "#3b82f6",
-      "--color-surface": "#ffffff",
-      "--font-sans": "Inter, system-ui, sans-serif",
-      "--font-mono": "JetBrains Mono, monospace"
-    },
+    "--color-primary": "#3b82f6",
+    "--color-surface": "#ffffff",
+    "--font-sans": "Inter, system-ui, sans-serif",
+    "--font-mono": "JetBrains Mono, monospace",
     "@--dark": {
-      ":root": {
-        "--color-surface": "#0f172a"
-      }
+      "--color-surface": "#0f172a"
     }
   },
 
@@ -194,9 +190,8 @@ The `project.json` file at the project root defines site-wide settings. It is th
 
   "build": {
     "outDir": "./dist",
-    "format": "directory",
     "trailingSlash": "always",
-    "adapter": "cloudflare"
+    "adapter": "cloudflare-pages"
   }
 }
 ```
@@ -225,7 +220,7 @@ Site-level declarations cascade to all pages:
 
 - `$head` entries are prepended to every page's `<head>`
 - `$media` breakpoints are available in every component's style objects
-- `style` rules on the root (`:root` selectors) produce global CSS custom properties
+- `style` properties prefixed with `--` are compiled to `:root {}` automatically; element selectors use nested objects
 - `state` entries are available to every page (read-only from the page's perspective)
 - `imports` entries cascade to all pages; page-level entries take precedence on collision
 
@@ -1085,7 +1080,7 @@ project.json
 
 These cascade without explicit import:
 
-1. **CSS Custom Properties** — Defined in `project.json` `style[":root"]`, they cascade through the DOM naturally. Every component can reference `var(--color-primary)` without importing anything.
+1. **CSS Custom Properties** — Defined as `--`-prefixed keys in `project.json` `style`, they are compiled to `:root {}` and cascade through the DOM naturally. Every component can reference `var(--color-primary)` without importing anything.
 
 2. **Named media breakpoints** — `$media` from `project.json` is available in every component's style objects. A component can use `"@--md": { ... }` without knowing where `--md` was defined.
 
@@ -1093,7 +1088,7 @@ These cascade without explicit import:
 
 4. **Language** — `defaults.lang` from `project.json` sets `<html lang>` on every page.
 
-5. **Global stylesheet rules** — Root-level `style` rules from `project.json` (not just `:root` custom properties, but any global selectors) are applied to all pages and cascaded into all rendered contexts including Studio's canvas and stylebook.
+5. **Global stylesheet rules** — Root-level `style` rules from `project.json` (custom properties compiled to `:root`, element selectors as nested objects) are applied to all pages and cascaded into all rendered contexts including Studio's canvas and stylebook.
 
 ### 10.3 Component Scoping
 
@@ -1142,7 +1137,7 @@ Individual file `$media`, `$style`, and `$elements` merge on top of site-level d
 
 The global stylesheet is emitted in this order:
 
-1. Site-level `:root` custom properties
+1. Site-level `:root` custom properties (from `--`-prefixed keys in `style`)
 2. Site-level responsive (`@--dark`, etc.) overrides
 3. Layout-level styles
 4. Page-level styles
@@ -1421,6 +1416,39 @@ dist/
 ```
 
 ---
+
+## Appendix: Element Annotations
+
+Jx elements support `$title` and `$description` as developer-facing annotation metadata. These are inspired by JSON Schema's annotation keywords and are never compiled to HTML output.
+
+| Property       | Type     | Purpose                                                   |
+| -------------- | -------- | --------------------------------------------------------- |
+| `$title`       | `string` | Human-friendly label. Displayed in studio layers panel.   |
+| `$description` | `string` | Extended description. Reserved for future studio tooltip. |
+
+**Behavior:**
+
+- Both are `$`-prefixed, signaling they are JX-specific metadata (not DOM properties)
+- Neither appears in compiled HTML or is applied to the DOM at runtime
+- `$title` takes priority over `$id` and `textContent` as the layer label in Jx Studio
+- In the studio layers panel, double-click a layer item to edit `$title` inline
+- The context menu provides a "Set Title" action for the same purpose
+
+**Markdown remark directive mapping:**
+
+- `$title` → `--title` attribute on the directive
+- `$description` → `--description` attribute on the directive
+
+**Example:**
+
+```json
+{
+  "tagName": "section",
+  "$title": "Hero Section",
+  "$description": "Main landing page hero with CTA button",
+  "children": [...]
+}
+```
 
 ## Appendix A: New Keywords Summary
 

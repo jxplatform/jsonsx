@@ -6,7 +6,9 @@
   },
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
-    ".": "./src/schema.js"
+    ".": "./src/schema.js",
+    "./schema.json": "./schema.json",
+    "./project-schema.json": "./project-schema.json"
   },
   "files": [
     "src/",
@@ -29,5 +31,5 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",
-  "version": "0.17.0"
+  "version": "0.19.0"
 }

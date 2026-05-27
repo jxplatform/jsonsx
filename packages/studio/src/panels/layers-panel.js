@@ -4,6 +4,8 @@
  */
 
 import { html, nothing } from "lit-html";
+import { classMap } from "lit-html/directives/class-map.js";
+import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
   flattenTree,
   getNodeAtPath,
@@ -15,13 +17,77 @@ import {
   VOID_ELEMENTS,
 } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
-import { transactDoc, mutateMoveNode, mutateRemoveNode } from "../tabs/transact.js";
+import {
+  transactDoc,
+  mutateMoveNode,
+  mutateRemoveNode,
+  mutateUpdateProperty,
+} from "../tabs/transact.js";
 import { view } from "../view.js";
 import { isInlineElement } from "../editor/inline-edit.js";
 import { showContextMenu } from "../editor/context-menu.js";
+import { panToElement } from "../canvas/canvas-utils.js";
 
 /**
- * @param {{ navigateToComponent: any; rerender: () => void }} ctx
+ * Start inline title editing on a layer row.
+ *
+ * @param {JxPath} path
+ * @param {() => void} rerender
+ */
+export function startLayerTitleEdit(path, rerender) {
+  const key = pathKey(path);
+  const row = document.querySelector(`.layer-row[data-path="${key}"]`);
+  if (!row) return;
+  const label = /** @type {HTMLElement | null} */ (row.querySelector(".layer-label"));
+  if (!label) return;
+
+  const tab = activeTab.value;
+  const node = getNodeAtPath(tab?.doc.document, path);
+  if (!node) return;
+
+  label.style.display = "none";
+  const input = document.createElement("input");
+  input.className = "layer-title-input";
+  input.value = node.$title || "";
+  input.placeholder = nodeLabel({ ...node, $title: undefined });
+  label.after(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const cleanup = () => {
+    input.remove();
+    label.style.display = "";
+  };
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    cleanup();
+    const val = input.value.trim();
+    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$title", val || undefined));
+    rerender();
+  };
+  const cancel = () => {
+    if (committed) return;
+    committed = true;
+    cleanup();
+    rerender();
+  };
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (/** @type {KeyboardEvent} */ e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancel();
+    }
+  });
+}
+
+/**
+ * @param {{ navigateToComponent: (path: string) => void; rerender: () => void }} ctx
  * @returns {import("lit-html").TemplateResult}
  */
 export function renderLayersTemplate(ctx) {
@@ -33,7 +99,7 @@ export function renderLayersTemplate(ctx) {
   const rows = flattenTree(tab?.doc.document);
   const collapsed = view._layersCollapsed || (view._layersCollapsed = new Set());
 
-  /** @type {any[]} */
+  /** @type {import("lit-html").TemplateResult[]} */
   const layerRows = [];
   for (const { node, path, depth, nodeType } of rows) {
     let hidden = false;
@@ -62,28 +128,40 @@ export function renderLayersTemplate(ctx) {
       continue;
     }
 
+    // After text-node skip, node is guaranteed to be JxMutableNode (not a primitive)
+    if (typeof node !== "object" || node === null) continue;
+    /** @type {JxMutableNode} */
+    const jxNode = /** @type {JxMutableNode} */ (node);
+
     if (path.length >= 2 && nodeType === "element") {
       const pPath = parentElementPath(path);
       const parentNode = pPath ? getNodeAtPath(tab?.doc.document, pPath) : null;
-      if (parentNode && isInlineElement(node, parentNode)) continue;
+      if (parentNode && isInlineElement(jxNode, parentNode)) continue;
     }
 
     const key = pathKey(path);
     const isSelected = pathsEqual(path, tab?.session.selection);
-    const hasChildren = Array.isArray(node.children) && node.children.length > 0;
+    const hasChildren = Array.isArray(jxNode.children) && jxNode.children.length > 0;
     const hasMapChildren =
-      node.children && typeof node.children === "object" && node.children.$prototype === "Array";
+      jxNode.children &&
+      typeof jxNode.children === "object" &&
+      /** @type {{ $prototype?: string }} */ (/** @type {unknown} */ (jxNode.children))
+        .$prototype === "Array";
     const hasCases =
-      node.$switch &&
-      node.cases &&
-      typeof node.cases === "object" &&
-      Object.keys(node.cases).length > 0;
+      jxNode.$switch &&
+      jxNode.cases &&
+      typeof jxNode.cases === "object" &&
+      Object.keys(jxNode.cases).length > 0;
     const isExpandable =
-      hasChildren || hasMapChildren || hasCases || (nodeType === "map" && node.map);
-    const isVoidEl = VOID_ELEMENTS.has((node.tagName || "div").toLowerCase());
+      hasChildren || hasMapChildren || hasCases || (nodeType === "map" && jxNode.map);
+    const isVoidEl = VOID_ELEMENTS.has((jxNode.tagName || "div").toLowerCase());
 
-    /** @type {any} */
-    let badgeClass, badgeText, badgeTitle;
+    /** @type {string} */
+    let badgeClass;
+    /** @type {string | number} */
+    let badgeText;
+    /** @type {string | undefined} */
+    let badgeTitle;
     if (nodeType === "map") {
       badgeClass = "layer-tag map-tag";
       badgeText = "↻";
@@ -92,59 +170,84 @@ export function renderLayersTemplate(ctx) {
       badgeClass = "layer-tag case-tag";
       badgeText = path[path.length - 1];
       badgeTitle = `$switch case: ${path[path.length - 1]}`;
-    } else if (node.$switch) {
+    } else if (jxNode.$switch) {
       badgeClass = "layer-tag switch-tag";
       badgeText = "⇄";
       badgeTitle = "$switch";
     } else {
       badgeClass = "layer-tag";
-      badgeText = node.tagName || "div";
+      badgeText = jxNode.tagName || "div";
       badgeTitle = undefined;
     }
 
-    /** @type {any} */
-    let labelText, labelItalic;
+    /** @type {string} */
+    let labelText;
+    /** @type {boolean} */
+    let labelItalic;
     if (nodeType === "case-ref") {
-      labelText = node.$ref || "external";
+      labelText = jxNode.$ref || "external";
       labelItalic = true;
     } else {
-      labelText = nodeLabel(node);
+      labelText = nodeLabel(jxNode);
       labelItalic = false;
     }
 
     const isElement = nodeType === "element";
     const isRoot = tab?.doc.mode === "content" ? path.length === 0 : path.length < 2;
     const idx = isElement ? /** @type {number} */ (childIndex(path)) : 0;
-    const parentPath = isElement && !isRoot ? /** @type {any} */ (parentElementPath(path)) : null;
+    const parentPath =
+      isElement && !isRoot ? /** @type {JxPath} */ (parentElementPath(path)) : null;
     const parentNode = parentPath ? getNodeAtPath(tab?.doc.document, parentPath) : null;
     const siblingCount = parentNode?.children?.length || 0;
     const canMoveUp = isElement && !isRoot && idx > 0;
     const canMoveDown = isElement && !isRoot && idx < siblingCount - 1;
-    const prevSibling = canMoveUp && parentNode ? parentNode.children[idx - 1] : null;
-    const canMoveIn =
-      isElement &&
-      !isRoot &&
-      prevSibling &&
-      !VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase());
+    const prevSibling = canMoveUp && parentNode ? parentNode.children?.[idx - 1] : null;
+    const prevIsContainer = (() => {
+      if (!prevSibling || typeof prevSibling !== "object") return false;
+      if (VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase())) return false;
+      const ch = prevSibling.children;
+      if (!ch) return false;
+      if (
+        typeof ch === "object" &&
+        /** @type {{ $prototype?: string }} */ (/** @type {unknown} */ (ch)).$prototype === "Array"
+      )
+        return true;
+      if (!Array.isArray(ch)) return false;
+      if (ch.length === 0) return true;
+      return ch.some(
+        (c) => typeof c === "object" && c !== null && !isInlineElement(c, prevSibling),
+      );
+    })();
+    const canMoveIn = isElement && !isRoot && prevIsContainer;
     const grandparentPath =
       isElement && parentPath && parentPath.length >= 2
-        ? /** @type {any} */ (parentElementPath(parentPath))
+        ? /** @type {JxPath} */ (parentElementPath(parentPath))
         : null;
     const canMoveOut = isElement && !isRoot && !!grandparentPath;
 
     layerRows.push(html`
       <div
-        class="layer-row${isSelected ? " selected" : ""}"
+        class=${classMap({ "layer-row": true, selected: isSelected })}
         data-path=${key}
         data-dnd-row=${isElement ? key : nothing}
         data-dnd-depth=${isElement ? depth : nothing}
         data-dnd-void=${isElement && isVoidEl ? "" : nothing}
         data-dnd-expanded=${isElement && isExpandable && !collapsed.has(key) ? "" : nothing}
-        @click=${() => (activeTab.value.session.selection = path)}
+        @click=${() => {
+          activeTab.value.session.selection = path;
+          panToElement(path);
+        }}
+        @dblclick=${isElement
+          ? (/** @type {MouseEvent} */ e) => {
+              e.stopPropagation();
+              startLayerTitleEdit(path, ctx.rerender);
+            }
+          : nothing}
         @contextmenu=${isElement
-          ? (/** @type {any} */ e) =>
+          ? (/** @type {MouseEvent} */ e) =>
               showContextMenu(e, path, {
                 onEditComponent: ctx.navigateToComponent,
+                rerender: ctx.rerender,
               })
           : nothing}
       >
@@ -158,24 +261,24 @@ export function renderLayersTemplate(ctx) {
               `
             : nothing}</span
         >
-        <span class=${badgeClass} title=${badgeTitle ?? nothing}>${badgeText}</span>
+        <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
         <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
           >${labelText}</span
         >
         ${isElement && !isRoot
           ? html`
               <span class="layer-actions">
+                <span class="layer-drag-handle" title="Drag to reorder">⠿</span>
                 ${canMoveUp
                   ? html`<sp-action-button
                       quiet
                       size="xs"
                       title="Move up"
-                      @click=${(/** @type {any} */ e) => {
+                      @click=${(/** @type {MouseEvent} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        transactDoc(activeTab.value, (t) =>
-                          mutateMoveNode(t, path, parentPath, idx - 1),
-                        );
+                        const pp = /** @type {JxPath} */ (parentPath);
+                        transactDoc(activeTab.value, (t) => mutateMoveNode(t, path, pp, idx - 1));
                       }}
                     >
                       <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
@@ -186,12 +289,11 @@ export function renderLayersTemplate(ctx) {
                       quiet
                       size="xs"
                       title="Move down"
-                      @click=${(/** @type {any} */ e) => {
+                      @click=${(/** @type {MouseEvent} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        transactDoc(activeTab.value, (t) =>
-                          mutateMoveNode(t, path, parentPath, idx + 2),
-                        );
+                        const pp = /** @type {JxPath} */ (parentPath);
+                        transactDoc(activeTab.value, (t) => mutateMoveNode(t, path, pp, idx + 2));
                       }}
                     >
                       <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
@@ -202,10 +304,11 @@ export function renderLayersTemplate(ctx) {
                       quiet
                       size="xs"
                       title="Move into previous sibling"
-                      @click=${(/** @type {any} */ e) => {
+                      @click=${(/** @type {MouseEvent} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        const prevPath = [...parentPath, idx - 1];
+                        const pp = /** @type {JxPath} */ (parentPath);
+                        const prevPath = [...pp, idx - 1];
                         const prev = getNodeAtPath(activeTab.value?.doc.document, prevPath);
                         const len = prev?.children?.length || 0;
                         transactDoc(activeTab.value, (t) => mutateMoveNode(t, path, prevPath, len));
@@ -219,12 +322,15 @@ export function renderLayersTemplate(ctx) {
                       quiet
                       size="xs"
                       title="Move out of parent"
-                      @click=${(/** @type {any} */ e) => {
+                      @click=${(/** @type {MouseEvent} */ e) => {
                         e.stopPropagation();
                         /** @type {HTMLElement} */ (e.currentTarget).blur();
-                        const parentIdx = /** @type {number} */ (childIndex(parentPath));
+                        const gp = /** @type {JxPath} */ (grandparentPath);
+                        const parentIdx = /** @type {number} */ (
+                          childIndex(/** @type {JxPath} */ (parentPath))
+                        );
                         transactDoc(activeTab.value, (t) =>
-                          mutateMoveNode(t, path, grandparentPath, parentIdx + 1),
+                          mutateMoveNode(t, path, gp, parentIdx + 1),
                         );
                       }}
                     >
@@ -236,7 +342,7 @@ export function renderLayersTemplate(ctx) {
                   size="xs"
                   class="layer-delete"
                   title="Delete"
-                  @click=${(/** @type {any} */ e) => {
+                  @click=${(/** @type {MouseEvent} */ e) => {
                     e.stopPropagation();
                     transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path));
                   }}
@@ -254,13 +360,13 @@ export function renderLayersTemplate(ctx) {
     <div class="layers-container" style="position:relative">
       <div
         class="layers-tree"
-        @click=${(/** @type {any} */ e) => {
-          const toggle = e.target.closest(".layer-toggle");
+        @click=${(/** @type {MouseEvent} */ e) => {
+          const toggle = /** @type {HTMLElement} */ (e.target).closest(".layer-toggle");
           if (!toggle) return;
           e.stopPropagation();
           const row = toggle.closest(".layer-row");
           if (!row) return;
-          const key = row.dataset.path;
+          const key = /** @type {HTMLElement} */ (row).dataset.path;
           if (!key) return;
           if (collapsed.has(key)) collapsed.delete(key);
           else collapsed.add(key);

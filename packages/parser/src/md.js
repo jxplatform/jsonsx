@@ -27,7 +27,7 @@ import { mdastNodeToJx } from "./transpile.js";
 /**
  * Walk an AST tree, calling visitor for nodes matching the given type.
  *
- * @param {any} tree
+ * @param {object} tree
  * @param {string | function} typeOrVisitor
  * @param {function} [maybeVisitor]
  */
@@ -35,20 +35,20 @@ function visit(tree, typeOrVisitor, maybeVisitor) {
   const type = typeof typeOrVisitor === "string" ? typeOrVisitor : null;
   const visitor = type ? maybeVisitor : typeOrVisitor;
 
-  function walk(/** @type {any} */ node) {
+  function walk(/** @type {MdastNode} */ node) {
     if (!node || typeof node !== "object") return;
     if (!type || node.type === type) /** @type {Function} */ (visitor)(node);
     if (Array.isArray(node.children)) {
       for (const child of node.children) walk(child);
     }
   }
-  walk(tree);
+  walk(/** @type {MdastNode} */ (tree));
 }
 
 /**
  * Serialize an mdast tree to plain text.
  *
- * @param {any} node
+ * @param {MdastNode} node
  * @returns {string}
  */
 function mdastToString(node) {
@@ -81,7 +81,7 @@ function readingTime(text) {
 function extractToc(tree) {
   /** @type {{ depth: number; text: string; id: string }[]} */
   const entries = [];
-  visit(tree, "heading", (/** @type {any} */ node) => {
+  visit(tree, "heading", (/** @type {MdastNode} */ node) => {
     const text = mdastToString(node);
     const id = text
       .toLowerCase()
@@ -89,7 +89,7 @@ function extractToc(tree) {
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
-    entries.push({ depth: node.depth, text, id });
+    entries.push({ depth: /** @type {number} */ (node.depth), text, id });
   });
   return entries;
 }
@@ -101,9 +101,9 @@ function extractToc(tree) {
  * @returns {string} Plain text of first paragraph, or empty string
  */
 function extractExcerpt(tree) {
-  /** @type {any} */
+  /** @type {MdastNode | null} */
   let firstParagraph = null;
-  visit(tree, "paragraph", (/** @type {any} */ node) => {
+  visit(tree, "paragraph", (/** @type {MdastNode} */ node) => {
     if (!firstParagraph) firstParagraph = node;
   });
   if (!firstParagraph) return "";
@@ -117,8 +117,10 @@ function extractExcerpt(tree) {
  *
  * @param {string} source - Raw markdown string
  * @param {string} filePath - File path (for slug derivation)
- * @param {any} config - Processing options
- * @returns {object} MarkdownFileResult
+ * @param {object} config - Processing options
+ * @param {boolean} [config.directives] - Enable directive support
+ * @param {unknown} [config.directiveOptions] - Directive plugin options
+ * @returns {MarkdownFileResult}
  */
 function processMarkdown(source, filePath, config = {}) {
   let processor = unified()
@@ -133,18 +135,25 @@ function processMarkdown(source, filePath, config = {}) {
 
   const tree = processor.parse(source);
   const vfile = { data: {} };
-  processor.runSync(tree, /** @type {any} */ (vfile));
+  // @ts-ignore - vfile shape satisfies unified's internal contract
+  processor.runSync(tree, vfile);
 
-  const frontmatter = /** @type {any} */ (vfile.data).frontmatter ?? {};
-  const plainText = mdastToString(tree);
+  const vfileData = /** @type {Record<string, unknown>} */ (vfile.data);
+  const frontmatter = /** @type {Record<string, unknown>} */ (vfileData.frontmatter ?? {});
+  const mdTree = /** @type {MdastNode} */ (/** @type {unknown} */ (tree));
+  const plainText = mdastToString(mdTree);
   const toc = extractToc(tree);
   const excerpt = extractExcerpt(tree);
   const slug = basename(filePath, extname(filePath));
 
-  const bodyNodes = tree.children.filter(
-    (/** @type {any} */ n) => n.type !== "yaml" && n.type !== "toml",
+  const bodyNodes = /** @type {MdastNode[]} */ (
+    tree.children.filter(
+      (/** @type {{ type: string }} */ n) => n.type !== "yaml" && n.type !== "toml",
+    )
   );
-  const $children = bodyNodes.map(mdastNodeToJx).filter(Boolean);
+  const $children = /** @type {(JxElement | string)[]} */ (
+    bodyNodes.map(/** @type {(n: MdastNode) => any} */ (mdastNodeToJx)).filter(Boolean)
+  );
 
   return {
     slug,
@@ -161,12 +170,17 @@ function processMarkdown(source, filePath, config = {}) {
 /**
  * Resolve a dot-notation path within an object.
  *
- * @param {any} obj
+ * @param {Record<string, unknown> | MarkdownFileResult} obj
  * @param {string} path
- * @returns {any}
+ * @returns {unknown}
  */
 function getNestedValue(obj, path) {
-  return path.split(".").reduce((/** @type {any} */ o, k) => o?.[k], obj);
+  return path
+    .split(".")
+    .reduce(
+      (/** @type {unknown} */ o, k) => /** @type {Record<string, unknown> | undefined} */ (o)?.[k],
+      /** @type {unknown} */ (obj),
+    );
 }
 
 // ─── MarkdownFile ─────────────────────────────────────────────────────────────
@@ -181,8 +195,8 @@ export class MarkdownFile {
   /**
    * @param {object} config
    * @param {string} config.src - File path to markdown file
-   * @param {any[]} [config.remarkPlugins] Default is `[]`
-   * @param {any[]} [config.rehypePlugins] Default is `[]`
+   * @param {unknown[]} [config.remarkPlugins] Default is `[]`
+   * @param {unknown[]} [config.rehypePlugins] Default is `[]`
    * @param {string} [config.basePath] - Base path for resolving src
    * @param {boolean} [config.directives] - Enable directive support
    */
@@ -193,7 +207,7 @@ export class MarkdownFile {
   /**
    * Parse and resolve the markdown file.
    *
-   * @returns {object} MarkdownFileResult
+   * @returns {MarkdownFileResult}
    */
   resolve() {
     const { src, basePath, ...processorConfig } = this.config;
@@ -220,8 +234,8 @@ export class MarkdownCollection {
    * @param {string} [config.sortOrder] Default is `'desc'`
    * @param {number} [config.limit]
    * @param {Function} [config.filter] - Filter function
-   * @param {any[]} [config.remarkPlugins] Default is `[]`
-   * @param {any[]} [config.rehypePlugins] Default is `[]`
+   * @param {unknown[]} [config.remarkPlugins] Default is `[]`
+   * @param {unknown[]} [config.rehypePlugins] Default is `[]`
    * @param {string} [config.basePath] - Base path for resolving glob
    * @param {boolean} [config.directives] - Enable directive support
    */
@@ -232,7 +246,7 @@ export class MarkdownCollection {
   /**
    * Glob files, parse each, sort, filter, and limit.
    *
-   * @returns {Promise<object[]>} Array of MarkdownFileResult
+   * @returns {Promise<MarkdownFileResult[]>} Array of MarkdownFileResult
    */
   async resolve() {
     const {
@@ -258,13 +272,13 @@ export class MarkdownCollection {
     // Filter
     let filtered = results;
     if (typeof filter === "function") {
-      filtered = results.filter(/** @type {any} */ (filter));
+      filtered = results.filter(/** @type {(r: MarkdownFileResult) => boolean} */ (filter));
     }
 
     // Sort
     filtered.sort((a, b) => {
-      const aVal = getNestedValue(a, sortBy) ?? "";
-      const bVal = getNestedValue(b, sortBy) ?? "";
+      const aVal = /** @type {string | number} */ (getNestedValue(a, sortBy) ?? "");
+      const bVal = /** @type {string | number} */ (getNestedValue(b, sortBy) ?? "");
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
       if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
       return 0;

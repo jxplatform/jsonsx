@@ -47,21 +47,27 @@ export class JxValueSelector extends LitElement {
   get _isPicker() {
     return (
       !!this.value &&
-      this.options.some((/** @type {any} */ o) => !o.divider && o.value === this.value)
+      this.options.some(
+        (/** @type {ComboOption} */ o) => !("divider" in o) && o.value === this.value,
+      )
     );
   }
 
   /** Get the selected option's style string for the picker button preview */
   get _selectedStyle() {
     if (!this._isPicker) return "";
-    const opt = this.options.find((/** @type {any} */ o) => !o.divider && o.value === this.value);
-    return /** @type {any} */ (opt)?.style || "";
+    const opt = this.options.find(
+      (/** @type {ComboOption} */ o) => !("divider" in o) && o.value === this.value,
+    );
+    return (
+      /** @type {{ value: string; label: string; style?: string } | undefined} */ (opt)?.style || ""
+    );
   }
 
   /** Render menu items from options array */
   _renderMenuItems() {
-    return this.options.map((/** @type {any} */ opt) =>
-      opt.divider
+    return this.options.map((/** @type {ComboOption} */ opt) =>
+      "divider" in opt
         ? html`<sp-menu-divider></sp-menu-divider>`
         : html`<sp-menu-item value=${opt.value} style=${opt.style || ""}
             >${opt.label}</sp-menu-item
@@ -70,33 +76,33 @@ export class JxValueSelector extends LitElement {
   }
 
   /** Picker mode: sp-picker @change handler */
-  _handlePickerChange(/** @type {any} */ e) {
+  _handlePickerChange(/** @type {Event} */ e) {
     e.stopPropagation();
-    this.value = e.target.value;
+    this.value = /** @type {HTMLInputElement} */ (e.target).value;
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
   /** Combobox mode: sp-menu @change handler */
-  _handleMenuChange(/** @type {any} */ e) {
+  _handleMenuChange(/** @type {Event} */ e) {
     e.stopPropagation();
-    if (!e.target.value) return;
-    this.value = e.target.value;
+    if (!(/** @type {HTMLInputElement} */ (e.target).value)) return;
+    this.value = /** @type {HTMLInputElement} */ (e.target).value;
     this.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
 
   /** Combobox mode: textfield @input handler */
-  _handleInput(/** @type {any} */ e) {
+  _handleInput(/** @type {Event} */ e) {
     e.stopPropagation();
-    this.value = e.target.value;
+    this.value = /** @type {HTMLInputElement} */ (e.target).value;
     this.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
   }
 
   /** Set popover min-width to match trigger width (replicates sp-picker behavior) */
-  _setPopoverWidth(/** @type {any} */ e) {
+  _setPopoverWidth(/** @type {Event} */ e) {
     const group = this.querySelector(".jx-combobox-group");
     const w = group ? /** @type {HTMLElement} */ (group).offsetWidth : 0;
-    const popover = e.target.querySelector("sp-popover");
-    if (popover && w) popover.style.minWidth = `${w}px`;
+    const popover = /** @type {HTMLElement} */ (e.target).querySelector("sp-popover");
+    if (popover && w) /** @type {HTMLElement} */ (popover).style.minWidth = `${w}px`;
   }
 
   render() {

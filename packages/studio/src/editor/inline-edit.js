@@ -5,6 +5,16 @@
  * text formatting, Enter for new paragraphs, and slash commands for inserting elements.
  */
 
+/**
+ * @typedef {{ tag: string; label: string; icon?: string; command?: string; shortcut?: string }} InlineAction
+ *
+ * @typedef {{ $inlineChildren?: string[]; $inlineActions?: InlineAction[] | string }} ElementDef
+ *
+ * @typedef {{ label: string; tag: string; description: string }} SlashCommand
+ *
+ * @typedef {{ textContent?: string | null; children?: (JxMutableNode | string)[] }} JxContentResult
+ */
+
 import elementsMeta from "../../data/elements-meta.json";
 import { toggleInlineFormat, normalizeInlineContent } from "./inline-format.js";
 import {
@@ -60,7 +70,7 @@ const EDITABLE_BLOCKS = new Set([
  */
 export function isInlineInContext(childTag, parentTag) {
   if (!parentTag) return INLINE_TAGS.has(childTag);
-  const parentDef = /** @type {Record<string, any>} */ (elementsMeta.$defs)[parentTag];
+  const parentDef = /** @type {Record<string, ElementDef>} */ (elementsMeta.$defs)[parentTag];
   if (!parentDef || !parentDef.$inlineChildren) return false;
   return parentDef.$inlineChildren.includes(childTag);
 }
@@ -70,15 +80,15 @@ export function isInlineInContext(childTag, parentTag) {
  * look up h1's actions).
  *
  * @param {string} tag
- * @returns {any[] | null}
+ * @returns {InlineAction[] | null}
  */
 export function getInlineActions(tag) {
-  const def = /** @type {Record<string, any>} */ (elementsMeta.$defs)[tag];
+  const def = /** @type {Record<string, ElementDef>} */ (elementsMeta.$defs)[tag];
   if (!def) return null;
   let actions = def.$inlineActions;
   if (typeof actions === "string") {
-    const refDef = /** @type {Record<string, any>} */ (elementsMeta.$defs)[actions];
-    actions = refDef?.$inlineActions ?? null;
+    const refDef = /** @type {Record<string, ElementDef>} */ (elementsMeta.$defs)[actions];
+    actions = refDef?.$inlineActions ?? undefined;
   }
   if (!Array.isArray(actions)) return null;
   return actions;
@@ -88,13 +98,26 @@ export function getInlineActions(tag) {
 
 /** @type {HTMLElement | null} */
 let activeEl = null; // currently contenteditable element
-/** @type {any[] | null} */
+/** @type {JxPath | null} */
 let activePath = null; // JSON path to the active element
-/** @type {((path: any[], children: any, textContent: any) => void) | null} */
+/**
+ * @type {((
+ *       path: JxPath,
+ *       children: (JxMutableNode | string)[] | null,
+ *       textContent: string | null,
+ *     ) => void)
+ *   | null}
+ */
 let commitFn = null; // function(path, newChildren, newTextContent) to commit changes
-/** @type {((path: any[], beforeChildren: any, afterChildren: any) => void) | null} */
+/**
+ * @type {((path: JxPath, beforeChildren: JxContentResult, afterChildren: JxContentResult) => void)
+ *   | null}
+ */
 let splitFn = null; // function(path, beforeChildren, afterChildren) to split paragraph
-/** @type {((path: any[], elementDef: any, commitData?: any) => void) | null} */
+/**
+ * @type {((path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void)
+ *   | null}
+ */
 let insertFn = null; // function(path, elementDef, commitData?) to insert after current block
 /** @type {(() => void) | null} */
 let endFn = null; // function() called when editing stops
@@ -113,8 +136,8 @@ export function isEditableBlock(el) {
  * Check if a node is an inline child. When parentNode is provided, uses context-aware scoping from
  * metadata. Without parent, uses the fallback INLINE_TAGS set.
  *
- * @param {any} node
- * @param {any} [parentNode]
+ * @param {JxMutableNode} node
+ * @param {JxMutableNode} [parentNode]
  * @returns {boolean}
  */
 export function isInlineElement(node, parentNode) {
@@ -131,11 +154,21 @@ export function isInlineElement(node, parentNode) {
  * Start inline editing on a canvas element.
  *
  * @param {HTMLElement} el - The canvas DOM element to edit
- * @param {any[]} path - JSON path to the element
- * @param {Record<string, any>} callbacks - { onCommit, onSplit, onInsert, onEnd } onCommit(path,
- *   children|null, textContent|null) — save inline content onSplit(path, beforeChildren,
- *   afterChildren) — Enter key: split block onInsert(path, elementDef) — slash command: insert
- *   after onEnd() — called when editing stops (for overlay restoration)
+ * @param {JxPath} path - JSON path to the element
+ * @param {{
+ *   onCommit: (
+ *     path: JxPath,
+ *     children: (JxMutableNode | string)[] | null,
+ *     textContent: string | null,
+ *   ) => void;
+ *   onSplit: (
+ *     path: JxPath,
+ *     beforeChildren: JxContentResult,
+ *     afterChildren: JxContentResult,
+ *   ) => void;
+ *   onInsert: (path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void;
+ *   onEnd: () => void;
+ * }} callbacks
  */
 export function startEditing(el, path, callbacks) {
   if (activeEl) stopEditing();
@@ -373,8 +406,8 @@ function commitChanges() {
  * Normalize a node's children array: merge adjacent text nodes and fold all-text children into
  * textContent. Returns `{ textContent }` or `{ children }`.
  *
- * @param {{ children?: any[] }} node
- * @returns {{ textContent?: string | null; children?: any[] }}
+ * @param {{ children?: (JxMutableNode | string)[] }} node
+ * @returns {JxContentResult}
  */
 export function normalizeChildren(node) {
   if (!Array.isArray(node.children) || node.children.length === 0) return { textContent: "" };
@@ -394,7 +427,7 @@ export function normalizeChildren(node) {
   }
 
   // Step 2: If all children are text, fold into textContent
-  if (merged.every((/** @type {any} */ c) => typeof c === "string")) {
+  if (merged.every((/** @type {JxMutableNode | string} */ c) => typeof c === "string")) {
     return { textContent: merged.join("") };
   }
 
@@ -406,7 +439,7 @@ export function normalizeChildren(node) {
  * for plain text or { children } for rich content.
  *
  * @param {HTMLElement} el
- * @returns {{ textContent?: string | null; children?: any[] }}
+ * @returns {JxContentResult}
  */
 function elementToJx(el) {
   const nodes = el.childNodes;
@@ -418,7 +451,7 @@ function elementToJx(el) {
   }
 
   // Mixed content → children array
-  /** @type {any[]} */
+  /** @type {(JxMutableNode | string)[]} */
   const children = [];
   for (const child of nodes) {
     const jsx = domNodeToJx(child);
@@ -433,7 +466,7 @@ function elementToJx(el) {
  * Convert a DOM node to a Jx element definition.
  *
  * @param {Node} node
- * @returns {any}
+ * @returns {JxMutableNode | string | null}
  */
 function domNodeToJx(node) {
   if (node.nodeType === Node.TEXT_NODE) {
@@ -446,7 +479,7 @@ function domNodeToJx(node) {
 
   const el = /** @type {HTMLElement} */ (node);
   const tag = el.tagName.toLowerCase();
-  /** @type {Record<string, any>} */
+  /** @type {JxMutableNode} */
   const result = { tagName: tag };
 
   // Map browser execCommand output to our tag conventions
@@ -475,7 +508,7 @@ function domNodeToJx(node) {
     result.children = [];
     for (const child of childNodes) {
       const jsx = domNodeToJx(child);
-      if (jsx) result.children.push(jsx);
+      if (jsx) result.children.push(/** @type {JxMutableNode} */ (jsx));
     }
   }
 
@@ -486,7 +519,7 @@ function domNodeToJx(node) {
  * Convert a DocumentFragment to a Jx-compatible structure. Returns { textContent } or { children }.
  *
  * @param {DocumentFragment} frag
- * @returns {{ textContent?: string | null; children?: any[] }}
+ * @returns {JxContentResult}
  */
 function fragmentToJx(frag) {
   const nodes = frag.childNodes;
@@ -495,14 +528,19 @@ function fragmentToJx(frag) {
     return { textContent: nodes[0].textContent };
   }
 
-  /** @type {any[]} */
+  /** @type {(JxMutableNode | string)[]} */
   const children = [];
   for (const child of nodes) {
     const jsx = domNodeToJx(child);
     if (jsx) children.push(jsx);
   }
 
-  if (children.length === 1 && children[0].tagName === "span" && children[0].textContent != null) {
+  if (
+    children.length === 1 &&
+    typeof children[0] !== "string" &&
+    children[0].tagName === "span" &&
+    children[0].textContent != null
+  ) {
     return { textContent: children[0].textContent };
   }
 
@@ -560,7 +598,7 @@ function updateSlashMenu() {
   sharedShowSlashMenu(activeEl, filter, { onSelect: handleSlashSelect });
 }
 
-/** @param {any} cmd */
+/** @param {SlashCommand} cmd */
 function handleSlashSelect(cmd) {
   if (!activeEl || !insertFn || !activePath) return;
 

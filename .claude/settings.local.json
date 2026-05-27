@@ -5,7 +5,11 @@
       "Bash(bun test:*)",
       "Bash(bun add:*)",
       "Bash(grep -E \"^\\(tests\\\\\\\\\\\\\\\\|✓|✗|fail|pass|error:|All tests|[0-9]+ tests\\)\")",
-      "Bash(xargs cat:*)"
+      "Bash(xargs cat:*)",
+      "Bash(bun run *)",
+      "Bash(oxlint packages/runtime/src/runtime.js)",
+      "Bash(oxlint .)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

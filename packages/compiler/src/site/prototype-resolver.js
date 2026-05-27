@@ -65,7 +65,7 @@ const RESERVED_KEYS = new Set([
  * - Instantiates the class with the config - Calls .resolve() and replaces the state entry with the
  * result
  *
- * @param {any} doc - The page document (mutated in place)
+ * @param {JxMutableNode | JxDocument} doc - The page document (mutated in place)
  * @param {{ sourcePath?: string }} route - Route info (sourcePath = absolute path to page .json)
  * @param {string} projectRoot - Absolute path to the project root
  */

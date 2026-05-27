@@ -17,7 +17,7 @@ import { jxKey, mdKey } from "../src/transpile.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const EXAMPLES_DIR = join(__dirname, "..", "..", "..", "examples", "markdown-todo");
+const EXAMPLES_DIR = join(__dirname, "..", "..", "..", "examples");
 
 // ─── jxKey / mdKey ──────────────────────────────────────────────────────────
 
@@ -547,7 +547,7 @@ state:
   });
 
   test("transpiles the todo-app example", () => {
-    const source = readFileSync(join(EXAMPLES_DIR, "todo-app.md"), "utf8");
+    const source = readFileSync(join(EXAMPLES_DIR, "components", "todo-app.md"), "utf8");
     const doc = /** @type {any} */ (transpileJxMarkdown(source));
 
     expect(doc.$schema).toBe("https://jxsuite.com/schema/v1");

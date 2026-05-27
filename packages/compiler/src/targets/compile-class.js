@@ -8,8 +8,8 @@
 /**
  * Compile a .class.json schema to a JavaScript ES module string.
  *
- * @param {any} classDef - Parsed .class.json content (must have $prototype: "Class")
- * @param {any} [_opts]
+ * @param {JxMutableNode} classDef - Parsed .class.json content (must have $prototype: "Class")
+ * @param {Record<string, unknown>} [_opts]
  * @returns {string} JavaScript module source code
  */
 export function compileClassJson(classDef, _opts = {}) {
@@ -17,9 +17,10 @@ export function compileClassJson(classDef, _opts = {}) {
   if (!className) throw new Error("compileClassJson: missing title (class name)");
 
   const baseClass = resolveBaseClass(classDef.extends);
-  const fields = classDef.$defs?.fields ?? {};
-  const ctor = classDef.$defs?.constructor;
-  const methods = classDef.$defs?.methods ?? {};
+  const defs = /** @type {Record<string, unknown> | undefined} */ (classDef.$defs);
+  const fields = /** @type {Record<string, JxMutableNode>} */ (defs?.fields ?? {});
+  const ctor = /** @type {JxMutableNode | undefined} */ (defs?.constructor);
+  const methods = /** @type {Record<string, JxMutableNode>} */ (defs?.methods ?? {});
 
   /** @type {string[]} */
   const lines = [];
@@ -33,7 +34,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Static fields
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope !== "static") continue;
     const name = f.identifier ?? key;
     const prefix = f.access === "private" ? "#" : "";
@@ -48,7 +49,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Instance field declarations (private)
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope === "static") continue;
     if (f.access !== "private") continue;
     const name = f.identifier ?? key;
@@ -66,7 +67,7 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Initialize instance fields from config or defaults
   for (const [key, field] of Object.entries(fields)) {
-    const f = /** @type {any} */ (field);
+    const f = /** @type {JxMutableNode} */ (field);
     if (f.scope === "static") continue;
     const name = f.identifier ?? key;
     const prefix = f.access === "private" ? "#" : "";
@@ -92,13 +93,17 @@ export function compileClassJson(classDef, _opts = {}) {
 
   // Methods
   for (const [key, method] of Object.entries(methods)) {
-    const m = /** @type {any} */ (method);
+    const m = /** @type {JxMutableNode} */ (method);
     const name = m.identifier ?? key;
     const isStatic = m.scope === "static";
     const isPrivate = m.access === "private";
     const prefix = isPrivate ? "#" : "";
     const staticPrefix = isStatic ? "static " : "";
-    const asyncPrefix = m.returnType?.$ref?.includes("Promise") || isMethodAsync(m) ? "async " : "";
+    const asyncPrefix =
+      m.returnType?.$ref?.includes("Promise") ||
+      isMethodAsync(/** @type {{ body?: string | string[] }} */ (/** @type {unknown} */ (m)))
+        ? "async "
+        : "";
 
     const params = resolveParams(m.parameters ?? []);
     const bodyStr = resolveBody(m.body);
@@ -140,15 +145,15 @@ export function compileClassJson(classDef, _opts = {}) {
 /**
  * Resolve the base class name from an extends value.
  *
- * @param {any} ext
+ * @param {unknown} ext
  * @returns {string}
  */
 function resolveBaseClass(ext) {
   if (!ext) return "Object";
   if (typeof ext === "string") return ext;
-  // { $ref: "./Parent.class.json" } — extract title from filename as best guess
-  if (ext.$ref) {
-    const ref = ext.$ref;
+  const e = /** @type {JxMutableNode} */ (ext);
+  if (e.$ref) {
+    const ref = e.$ref;
     const match = ref.match(/([A-Za-z0-9_]+)\.class\.json/);
     return match ? match[1] : "Object";
   }
@@ -158,14 +163,15 @@ function resolveBaseClass(ext) {
 /**
  * Resolve parameter names from $ref or inline definitions.
  *
- * @param {any[]} params
+ * @param {unknown[]} params
  * @returns {string}
  */
 function resolveParams(params) {
   return params
-    .map((/** @type {any} */ p) => {
-      if (p.$ref) return p.$ref.split("/").pop();
-      return p.identifier ?? p.name ?? "arg";
+    .map((p) => {
+      const param = /** @type {JxMutableNode} */ (p);
+      if (param.$ref) return param.$ref.split("/").pop();
+      return param.identifier ?? param.name ?? "arg";
     })
     .join(", ");
 }
@@ -173,19 +179,19 @@ function resolveParams(params) {
 /**
  * Resolve body from string or array of strings.
  *
- * @param {any} body
+ * @param {unknown} body
  * @returns {string[]}
  */
 function resolveBody(body) {
   if (!body) return [""];
   if (Array.isArray(body)) return body;
-  return [body];
+  return [/** @type {string} */ (body)];
 }
 
 /**
  * Simple heuristic: does the method body contain await?
  *
- * @param {any} method
+ * @param {{ body?: string | string[] }} method
  * @returns {boolean}
  */
 function isMethodAsync(method) {

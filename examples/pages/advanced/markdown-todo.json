@@ -1,0 +1,5 @@
+{
+  "title": "Markdown Todo — Jx Examples",
+  "$layout": "../../layouts/example.json",
+  "children": [{ "$ref": "../../components/todo-app.md" }]
+}

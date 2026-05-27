@@ -1,0 +1,197 @@
+{
+  "$layout": "./base.json",
+  "tagName": "div",
+  "style": {
+    "display": "flex",
+    "maxWidth": "1200px",
+    "margin": "0 auto",
+    "padding": "1.5rem",
+    "gap": "2rem",
+    "width": "100%"
+  },
+  "children": [
+    {
+      "tagName": "aside",
+      "style": {
+        "width": "180px",
+        "flexShrink": "0"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontSize": "0.75rem",
+            "textTransform": "uppercase",
+            "color": "#666",
+            "marginBottom": "0.5rem"
+          },
+          "children": ["Basics"]
+        },
+        {
+          "tagName": "nav",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "0.25rem",
+            "marginBottom": "1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/counter" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Counter"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/computed" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Computed"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/list" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["List"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/fetch" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Fetch"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/switch" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Switch"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/form" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Form"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/responsive" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Responsive"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/todo" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Todo"]
+            }
+          ]
+        },
+        {
+          "tagName": "h3",
+          "style": {
+            "fontSize": "0.75rem",
+            "textTransform": "uppercase",
+            "color": "#666",
+            "marginBottom": "0.5rem"
+          },
+          "children": ["Advanced"]
+        },
+        {
+          "tagName": "nav",
+          "style": { "display": "flex", "flexDirection": "column", "gap": "0.25rem" },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/custom-elements" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Custom Elements"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/markdown-blog" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Markdown Blog"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/markdown-todo" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Markdown Todo"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/shoelace" },
+              "style": {
+                "color": "#333",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "padding": "0.25rem 0"
+              },
+              "children": ["Shoelace"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "flex": "1", "minWidth": "0" },
+      "children": [{ "tagName": "slot" }]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ import { handleCodeApi } from "../src/code-api.js";
 
 /**
  * @param {string} action
- * @param {any} body
+ * @param {unknown} body
  */
 function codeRequest(action, body) {
   const url = new URL(`http://localhost/__studio/code/${action}`);

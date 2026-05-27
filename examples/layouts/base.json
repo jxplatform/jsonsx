@@ -1,0 +1,65 @@
+{
+  "tagName": "div",
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "minHeight": "100vh"
+  },
+  "children": [
+    {
+      "tagName": "header",
+      "style": {
+        "backgroundColor": "#1a1a2e",
+        "color": "white",
+        "padding": "0.75rem 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "nav",
+          "style": { "display": "flex", "gap": "1.5rem", "alignItems": "center" },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/" },
+              "style": {
+                "color": "white",
+                "textDecoration": "none",
+                "fontWeight": "bold",
+                "fontSize": "1.125rem"
+              },
+              "children": ["Jx Examples"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/basics/counter" },
+              "style": { "color": "#ccc", "textDecoration": "none", "fontSize": "0.875rem" },
+              "children": ["Basics"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/advanced/custom-elements" },
+              "style": { "color": "#ccc", "textDecoration": "none", "fontSize": "0.875rem" },
+              "children": ["Advanced"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    {
+      "tagName": "footer",
+      "style": {
+        "backgroundColor": "#f5f5f5",
+        "padding": "1rem 1.5rem",
+        "textAlign": "center",
+        "color": "#666",
+        "fontSize": "0.8125rem"
+      },
+      "children": [{ "tagName": "p", "children": ["Built with Jx"] }]
+    }
+  ]
+}
