@@ -1,14 +1,14 @@
 /**
  * Ai-panel.js — Claude AI Assistant tab for the right panel
  *
- * Renders as a tab in the right panel alongside Properties/Events/Style. Uses the Claude Agent SDK
- * via server endpoints for streaming agentic responses.
+ * Uses QuikChat for the chat UI with Claude Agent SDK streaming via SSE.
  */
 
 import { html, nothing } from "lit-html";
+import quikchat from "quikchat/md";
 import { getPlatform } from "../platform.js";
 import { rightPanel } from "../store.js";
-import { userMessage, assistantMessage, toolUseBlock } from "./ai-message.js";
+import { reloadFileInTab } from "../files/files.js";
 
 // ─── State (module-level, persists across tab switches) ─────────────────────
 
@@ -22,7 +22,6 @@ import { userMessage, assistantMessage, toolUseBlock } from "./ai-message.js";
 let messages = [];
 let streaming = false;
 let sessionId = /** @type {string | null} */ (null);
-let inputText = "";
 let authStatus = /** @type {"authenticated" | "unauthenticated" | "checking" | "unknown"} */ (
   "unknown"
 );
@@ -30,6 +29,15 @@ let authError = "";
 let currentAssistantText = "";
 let eventSource = /** @type {EventSource | null} */ (null);
 let mounted = false;
+
+/** @type {any} */
+let chatInstance = null;
+/** @type {Element | null} */
+let chatContainerEl = null;
+let currentStreamMsgId = /** @type {number | null} */ (null);
+let streamStarted = false;
+/** @type {Set<string>} */
+let pendingFileReloads = new Set();
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -39,22 +47,72 @@ export function mountAiPanel() {
   checkAuth();
 }
 
-/** Force a re-render of ONLY the right panel (when AI state changes). */
 function rerenderPanel() {
   const { render } = /** @type {any} */ (/** @type {any} */ (globalThis).__jxRightPanelRender) ||
   {};
   if (render) render();
+  requestAnimationFrame(() => mountQuikChat());
 }
 
-/** Register the right panel's render fn so we can call it on AI state changes */
 export function registerRightPanelRender(/** @type {Function} */ fn) {
   /** @type {any} */ (globalThis).__jxRightPanelRender = { render: fn };
+}
+
+// ─── QuikChat Mount ────────────────────────────────────────────────────────
+
+export function mountQuikChat() {
+  const container = rightPanel.querySelector("#ai-quikchat");
+  if (!container) return;
+  if (chatInstance && chatContainerEl === container) return;
+
+  chatInstance = new quikchat(
+    container,
+    (/** @type {any} */ _chat, /** @type {string} */ msg) => {
+      handleUserSend(msg);
+    },
+    {
+      theme: "quikchat-theme-dark",
+      titleArea: { show: false },
+      showTimestamps: false,
+      messagesArea: { alternating: false },
+    },
+  );
+  chatContainerEl = container;
+
+  replayMessages();
+
+  if (streaming) {
+    chatInstance.inputAreaSetEnabled(false);
+  }
+}
+
+function replayMessages() {
+  if (!chatInstance || !messages.length) return;
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      chatInstance.messageAddNew(msg.content, "You", "right", "user");
+    } else if (msg.role === "tool" && msg.toolUse) {
+      chatInstance.messageAddNew(
+        formatToolLabel(msg.toolUse.tool, msg.toolUse.input),
+        "",
+        "left",
+        "tool",
+      );
+    } else {
+      chatInstance.messageAddNew(msg.content, "", "left", "assistant");
+    }
+  }
+  if (streaming && currentAssistantText) {
+    currentStreamMsgId = chatInstance.messageAddNew(currentAssistantText, "", "left", "assistant");
+    streamStarted = true;
+  }
 }
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
 
 async function checkAuth() {
   authStatus = "checking";
+  rerenderPanel();
   try {
     const plat = getPlatform();
     const result = await plat.aiAuthStatus();
@@ -64,21 +122,24 @@ async function checkAuth() {
     authStatus = "unauthenticated";
     authError = String(err);
   }
+  rerenderPanel();
 }
 
 // ─── Messaging ──────────────────────────────────────────────────────────────
 
-async function send() {
-  const text = inputText.trim();
-  if (!text || streaming) return;
+/** @param {string} text */
+async function handleUserSend(text) {
+  if (!text.trim() || streaming) return;
 
   messages.push({ role: "user", content: text });
-  inputText = "";
   streaming = true;
   currentAssistantText = "";
+  streamStarted = false;
 
-  const ta = rightPanel.querySelector(".ai-input-area textarea");
-  if (ta) /** @type {HTMLTextAreaElement} */ (ta).value = "";
+  if (chatInstance) {
+    currentStreamMsgId = chatInstance.messageAddTypingIndicator("");
+    chatInstance.inputAreaSetEnabled(false);
+  }
 
   rerenderPanel();
 
@@ -88,13 +149,17 @@ async function send() {
     if (!sessionId) {
       const result = await plat.aiCreateSession({ message: text });
       sessionId = result.id;
-      connectStream(/** @type {string} */ (sessionId));
+      await connectStream(/** @type {string} */ (sessionId));
     } else {
       await plat.aiSendMessage(sessionId, text);
     }
   } catch (err) {
+    if (chatInstance && currentStreamMsgId != null) {
+      chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${err}`);
+    }
     messages.push({ role: "assistant", content: `Error: ${err}` });
     streaming = false;
+    if (chatInstance) chatInstance.inputAreaSetEnabled(true);
     rerenderPanel();
   }
 }
@@ -103,13 +168,7 @@ function stop() {
   if (!sessionId) return;
   const plat = getPlatform();
   plat.aiStopSession(sessionId);
-  streaming = false;
-  if (currentAssistantText) {
-    messages.push({ role: "assistant", content: currentAssistantText });
-    currentAssistantText = "";
-  }
-  disconnectStream();
-  rerenderPanel();
+  finishStream();
 }
 
 function newChat() {
@@ -122,16 +181,42 @@ function newChat() {
   sessionId = null;
   streaming = false;
   currentAssistantText = "";
+  currentStreamMsgId = null;
+  streamStarted = false;
+  pendingFileReloads.clear();
+  if (chatInstance) {
+    chatInstance.historyImport([]);
+    chatInstance.inputAreaSetEnabled(true);
+  }
   rerenderPanel();
 }
 
 // ─── SSE Stream ─────────────────────────────────────────────────────────────
 
-function connectStream(/** @type {string} */ id) {
+async function connectStream(/** @type {string} */ id) {
   disconnectStream();
   const plat = getPlatform();
-  const url = plat.aiStreamUrl(id);
+  const url = await Promise.resolve(plat.aiStreamUrl(id));
   eventSource = new EventSource(url);
+
+  eventSource.addEventListener("stream_event", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      const evt = data.event;
+      if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+        const token = evt.delta.text;
+        currentAssistantText += token;
+        if (chatInstance && currentStreamMsgId != null) {
+          if (!streamStarted) {
+            chatInstance.messageReplaceContent(currentStreamMsgId, currentAssistantText);
+            streamStarted = true;
+          } else {
+            chatInstance.messageAppendContent(currentStreamMsgId, token);
+          }
+        }
+      }
+    } catch {}
+  });
 
   eventSource.addEventListener("assistant", (e) => {
     try {
@@ -142,7 +227,12 @@ function connectStream(/** @type {string} */ id) {
   eventSource.addEventListener("result", (e) => {
     try {
       const data = JSON.parse(e.data);
-      handleAssistantMessage(data);
+      if (data.result && data.is_error) {
+        if (chatInstance && currentStreamMsgId != null) {
+          chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.result}`);
+        }
+        currentAssistantText = `Error: ${data.result}`;
+      }
     } catch {}
     finishStream();
   });
@@ -151,14 +241,21 @@ function connectStream(/** @type {string} */ id) {
     finishStream();
   });
 
-  eventSource.addEventListener("error", () => {
-    streaming = false;
-    rerenderPanel();
+  eventSource.addEventListener("error", (e) => {
+    try {
+      const data = JSON.parse(/** @type {MessageEvent} */ (e).data);
+      if (data.error) {
+        if (chatInstance && currentStreamMsgId != null) {
+          chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.error}`);
+        }
+        currentAssistantText = `Error: ${data.error}`;
+      }
+    } catch {}
+    finishStream();
   });
 
   eventSource.onerror = () => {
-    streaming = false;
-    rerenderPanel();
+    finishStream();
   };
 }
 
@@ -169,6 +266,15 @@ function finishStream() {
     currentAssistantText = "";
   }
   streaming = false;
+  currentStreamMsgId = null;
+  streamStarted = false;
+  if (chatInstance) chatInstance.inputAreaSetEnabled(true);
+
+  if (pendingFileReloads.size) {
+    for (const fp of pendingFileReloads) reloadFileInTab(fp);
+    pendingFileReloads.clear();
+  }
+
   rerenderPanel();
 }
 
@@ -192,136 +298,102 @@ function handleAssistantMessage(data) {
       text += block.text;
     } else if (block.type === "tool_use") {
       toolBlocks.push({ tool: block.name, input: block.input });
+      if ((block.name === "Edit" || block.name === "Write") && block.input) {
+        const fp = block.input.file_path || block.input.path;
+        if (fp) pendingFileReloads.add(String(fp));
+      }
     }
   }
 
   if (toolBlocks.length) {
     if (currentAssistantText) {
       messages.push({ role: "assistant", content: currentAssistantText });
-      currentAssistantText = "";
     }
     for (const t of toolBlocks) {
       messages.push({ role: "tool", content: "", toolUse: t });
+      if (chatInstance) {
+        chatInstance.messageAddNew(formatToolLabel(t.tool, t.input), "", "left", "tool");
+      }
     }
   }
 
   currentAssistantText = text;
-  rerenderPanel();
-  scrollToBottom();
-}
-
-// ─── UI Helpers ─────────────────────────────────────────────────────────────
-
-function scrollToBottom() {
-  requestAnimationFrame(() => {
-    const el = rightPanel.querySelector(".ai-messages");
-    if (el) el.scrollTop = el.scrollHeight;
-  });
-}
-
-/** @param {KeyboardEvent} e */
-function handleKeydown(e) {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    send();
+  if (chatInstance) {
+    currentStreamMsgId = chatInstance.messageAddNew(text || "", "", "left", "assistant");
+    streamStarted = !!text;
   }
 }
 
-/** @param {Event} e */
-function handleInput(e) {
-  inputText = /** @type {HTMLTextAreaElement} */ (e.target).value;
-  const btn = rightPanel.querySelector(".ai-send-btn");
-  if (btn) /** @type {HTMLButtonElement} */ (btn).disabled = streaming || !inputText.trim();
+// ─── Tool Label Formatting ─────────────────────────────────────────────────
+
+/**
+ * @param {string} tool
+ * @param {Record<string, unknown>} [input]
+ */
+function formatToolLabel(tool, input) {
+  switch (tool) {
+    case "Edit":
+    case "Write":
+      return `📝 ${tool}: ${input?.file_path || input?.path || "file"}`;
+    case "Read":
+      return `📖 Read: ${input?.file_path || input?.path || "file"}`;
+    case "Bash":
+      return `⚡ Run: ${truncate(String(input?.command || ""), 50)}`;
+    case "Glob":
+      return `🔍 Glob: ${input?.pattern || ""}`;
+    case "Grep":
+      return `🔍 Grep: ${truncate(String(input?.pattern || ""), 40)}`;
+    default:
+      return `🔧 ${tool}`;
+  }
+}
+
+/** @param {string} s @param {number} max */
+function truncate(s, max) {
+  return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
 // ─── Template ───────────────────────────────────────────────────────────────
 
-/**
- * Returns the lit-html template for the AI assistant tab body.
- *
- * @returns {import("lit-html").TemplateResult}
- */
+/** @returns {import("lit-html").TemplateResult} */
 export function renderAiPanelTemplate() {
   if (authStatus === "checking" || authStatus === "unknown") {
-    return html`<div class="ai-auth-prompt">Checking authentication...</div>`;
+    return html`<div class="ai-tab-body">
+      <div class="ai-status-center">Checking authentication...</div>
+    </div>`;
   }
 
   if (authStatus === "unauthenticated") {
     return html`
-      <div class="ai-auth-prompt">
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        >
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-        </svg>
-        <div>Claude authentication required</div>
-        <div style="font-size:11px">Run the following in your terminal:</div>
-        <code>npx @anthropic-ai/claude-code login</code>
-        ${authError
-          ? html`<div style="color:var(--danger);font-size:11px">${authError}</div>`
-          : nothing}
-        <button class="ai-send-btn" style="margin-top:8px" @click=${checkAuth}>Retry</button>
+      <div class="ai-tab-body">
+        <div class="ai-status-center">
+          <sp-icon-artboard style="font-size:32px"></sp-icon-artboard>
+          <div>Claude authentication required</div>
+          <div style="font-size:11px;color:var(--spectrum-global-color-gray-600)">
+            Run the following in your terminal:
+          </div>
+          <code class="ai-code-snippet">npx @anthropic-ai/claude-code login</code>
+          ${authError
+            ? html`<sp-help-text variant="negative">${authError}</sp-help-text>`
+            : nothing}
+          <sp-button size="s" variant="primary" @click=${checkAuth}>Retry</sp-button>
+        </div>
       </div>
     `;
   }
 
   return html`
     <div class="ai-tab-body">
-      <div class="ai-header">
-        <span class="ai-header-title">Assistant</span>
-        <sp-action-button size="xs" quiet @click=${newChat} title="New Chat">
-          <svg
-            slot="icon"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
+      <div class="ai-toolbar">
+        ${streaming
+          ? html`<sp-action-button size="xs" @click=${stop}>Stop</sp-action-button>`
+          : nothing}
+        <sp-action-button size="xs" quiet @click=${newChat}>
+          <sp-icon-add slot="icon"></sp-icon-add>
+          New Chat
         </sp-action-button>
       </div>
-      <div class="ai-messages">
-        ${messages.length === 0 && !streaming
-          ? html`<div style="color:var(--fg-dim);text-align:center;padding:24px;font-size:11px">
-              Ask Claude to help with your project.
-            </div>`
-          : nothing}
-        ${messages.map((msg) => {
-          if (msg.role === "user") return userMessage(msg.content);
-          if (msg.role === "tool" && msg.toolUse) return toolUseBlock(msg.toolUse);
-          return assistantMessage(msg.content);
-        })}
-        ${streaming && currentAssistantText
-          ? assistantMessage(currentAssistantText, true)
-          : nothing}
-      </div>
-      ${streaming
-        ? html`<div style="padding:4px 8px">
-            <button class="ai-stop-btn" @click=${stop}>Stop</button>
-          </div>`
-        : nothing}
-      <div class="ai-input-area">
-        <textarea
-          rows="1"
-          placeholder="Ask Claude..."
-          .value=${inputText}
-          @input=${handleInput}
-          @keydown=${handleKeydown}
-          ?disabled=${streaming}
-        ></textarea>
-        <button class="ai-send-btn" @click=${send} ?disabled=${streaming || !inputText.trim()}>
-          Send
-        </button>
-      </div>
+      <div id="ai-quikchat"></div>
     </div>
   `;
 }

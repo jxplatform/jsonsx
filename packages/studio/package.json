@@ -72,6 +72,7 @@
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",
+    "quikchat": "^1.2.7",
     "remark-directive": "^4.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
@@ -82,6 +83,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.9.0",
+    "@types/mdast": "^4.0.4",
     "@webref/css": "^8.5.7",
     "@webref/elements": "^2.7.1",
     "@webref/idl": "^3.79.0"

@@ -197,5 +197,35 @@ export function createDesktopPlatform(): StudioPlatform {
     }) {
       return request("createProject", opts) as Promise<{ root: string; config: ProjectConfig }>;
     },
+
+    // AI Assistant
+    async aiAuthStatus() {
+      const res = await fetch("/studio/ai/auth-status");
+      return res.json() as Promise<{ authenticated: boolean; error?: string }>;
+    },
+    async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
+      const res = await fetch("/studio/ai/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      return res.json() as Promise<{ id: string }>;
+    },
+    async aiSendMessage(id: string, message: string) {
+      await fetch(`/studio/ai/session/${id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+    },
+    aiStreamUrl(id: string) {
+      return `/studio/ai/session/${id}/stream`;
+    },
+    async aiStopSession(id: string) {
+      await fetch(`/studio/ai/session/${id}/stop`, { method: "POST" });
+    },
+    async aiDeleteSession(id: string) {
+      await fetch(`/studio/ai/session/${id}`, { method: "DELETE" });
+    },
   };
 }

@@ -12,6 +12,23 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 /** @typedef {import("@anthropic-ai/claude-agent-sdk").Options} AgentOptions */
 
 /**
+ * Build a clean env for SDK child processes. Strips session-specific vars from a parent Claude Code
+ * instance that would override the SDK's own credential resolution (OAuth from ~/.claude/).
+ */
+function buildSdkEnv() {
+  const env = { ...process.env };
+  delete env.ANTHROPIC_AUTH_TOKEN;
+  delete env.ANTHROPIC_BASE_URL;
+  delete env.CLAUDE_CODE_ENTRYPOINT;
+  delete env.CLAUDE_CODE_EXECPATH;
+  delete env.CLAUDE_AGENT_SDK_VERSION;
+  delete env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC;
+  delete env.CLAUDECODE;
+  env.CLAUDE_AGENT_SDK_CLIENT_APP = "jx-studio/0.17.0";
+  return env;
+}
+
+/**
  * @typedef {{
  *   id: string;
  *   sessionId: string | null;
@@ -58,6 +75,9 @@ async function processStream(session, stream) {
   try {
     for await (const message of stream) {
       if (/** @type {string} */ (session.status) === "stopped") break;
+      if (message.session_id && !session.sessionId) {
+        session.sessionId = message.session_id;
+      }
       broadcast(session, message.type, message);
     }
   } catch (err) {
@@ -107,14 +127,11 @@ export function createSession(projectRoot, message, opts = {}) {
     maxTurns: 30,
     includePartialMessages: true,
     persistSession: true,
-    env: {
-      ...process.env,
-      CLAUDE_AGENT_SDK_CLIENT_APP: "jx-studio/0.17.0",
-    },
+    env: buildSdkEnv(),
   };
 
   if (opts.systemPrompt) {
-    queryOpts.extraArgs = { "system-prompt": opts.systemPrompt };
+    queryOpts.systemPrompt = opts.systemPrompt;
   }
 
   const stream = query({ prompt: message, options: queryOpts });
@@ -147,10 +164,7 @@ export function sendMessage(id, message) {
     maxTurns: 30,
     includePartialMessages: true,
     continue: true,
-    env: {
-      ...process.env,
-      CLAUDE_AGENT_SDK_CLIENT_APP: "jx-studio/0.17.0",
-    },
+    env: buildSdkEnv(),
   };
 
   if (session.sessionId) {
@@ -249,29 +263,46 @@ export function streamSession(id) {
  */
 export async function getAuthStatus() {
   try {
-    // Spawn a minimal query that will immediately fail or succeed auth
     const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15000);
     const testStream = query({
       prompt: "Say OK",
       options: {
         abortController: ctrl,
         maxTurns: 1,
         persistSession: false,
-        includePartialMessages: false,
+        includePartialMessages: true,
+        env: buildSdkEnv(),
       },
     });
 
-    // Read just the first message to check for auth errors
-    const first = await testStream.next();
-    ctrl.abort();
-
-    if (first.value?.type === "auth_status") {
-      const authMsg = /** @type {any} */ (first.value);
-      if (authMsg.error) {
-        return { authenticated: false, error: authMsg.error };
+    for await (const msg of testStream) {
+      if (msg.type === "assistant") {
+        const content = /** @type {any} */ (msg).message?.content;
+        if (Array.isArray(content)) {
+          const text = content.find((b) => b.type === "text");
+          if (text?.text?.toLowerCase().includes("error")) {
+            clearTimeout(timeout);
+            ctrl.abort();
+            return { authenticated: false, error: text.text };
+          }
+        }
+        clearTimeout(timeout);
+        ctrl.abort();
+        return { authenticated: true };
+      }
+      if (msg.type === "result") {
+        const result = /** @type {any} */ (msg);
+        clearTimeout(timeout);
+        ctrl.abort();
+        if (result.is_error) {
+          return { authenticated: false, error: result.result || "API error" };
+        }
+        return { authenticated: true };
       }
     }
 
+    clearTimeout(timeout);
     return { authenticated: true };
   } catch (err) {
     return { authenticated: false, error: String(err) };

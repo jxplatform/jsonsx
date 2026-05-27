@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jx Studio</title>
     <link rel="stylesheet" href="./dist/studio.css" />
+    <link rel="stylesheet" href="./node_modules/quikchat/dist/quikchat.css" />
     <style>
       *,
       *::before,
@@ -147,6 +148,18 @@
         background: var(--bg-panel);
         border-left: 1px solid var(--border);
       }
+      #right-panel:has(.ai-tab-body) {
+        display: flex;
+        flex-direction: column;
+        overflow-y: hidden;
+      }
+      #right-panel:has(.ai-tab-body) .panel-body {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
 
       /* ─── Collapsed sidebars ──────────────────────── */
       #app.left-collapsed {
@@ -168,123 +181,105 @@
       .ai-tab-body {
         display: flex;
         flex-direction: column;
-        height: 100%;
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
       }
-      .ai-header {
+      .ai-toolbar {
         display: flex;
-        align-items: center;
         gap: 6px;
-        padding: 8px 12px;
-        border-bottom: 1px solid var(--border);
+        padding: 4px 8px;
+        justify-content: flex-end;
         flex-shrink: 0;
       }
-      .ai-header-title {
-        font-weight: 600;
+      #ai-quikchat {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+      }
+      #ai-quikchat .quikchat-base {
+        height: 100%;
+        background: transparent;
+        border: none;
+        border-radius: 0;
         font-size: 12px;
-        flex: 1;
+        font-family: inherit;
       }
-      .ai-messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+      #ai-quikchat .quikchat-messages-area {
+        background: transparent;
+        color: var(--fg);
       }
-      .ai-msg {
-        padding: 8px 12px;
-        border-radius: 6px;
+      #ai-quikchat .quikchat-message-content {
         font-size: 12px;
         line-height: 1.5;
-        white-space: pre-wrap;
-        word-break: break-word;
       }
-      .ai-msg--user {
+      #ai-quikchat .quikchat-message[data-role="user"] .quikchat-message-content {
         background: var(--accent-15);
-        align-self: flex-end;
-        max-width: 85%;
+        border-radius: 6px;
+        padding: 6px 10px;
       }
-      .ai-msg--assistant {
+      #ai-quikchat .quikchat-message[data-role="assistant"] .quikchat-message-content {
         background: var(--bg-input);
-        align-self: flex-start;
-        max-width: 95%;
+        border-radius: 6px;
+        padding: 6px 10px;
       }
-      .ai-msg--assistant code {
+      #ai-quikchat .quikchat-message[data-role="tool"] .quikchat-message-content {
+        font-size: 11px;
+        background: var(--hover-bg);
+        border-left: 2px solid var(--accent);
+        border-radius: 4px;
+        padding: 4px 8px;
+        color: var(--fg-dim);
+      }
+      #ai-quikchat .quikchat-message-content code {
         background: rgba(0, 0, 0, 0.3);
         padding: 1px 4px;
         border-radius: 3px;
         font-size: 11px;
       }
-      .ai-msg--assistant pre {
+      #ai-quikchat .quikchat-message-content pre {
         background: rgba(0, 0, 0, 0.3);
         padding: 8px;
         border-radius: 4px;
         overflow-x: auto;
         margin: 6px 0;
       }
-      .ai-msg--assistant pre code {
+      #ai-quikchat .quikchat-message-content pre code {
         background: none;
         padding: 0;
       }
-      .ai-tool-block {
-        font-size: 11px;
-        padding: 4px 8px;
-        background: var(--hover-bg);
-        border-radius: 4px;
-        border-left: 2px solid var(--accent);
-        color: var(--fg-dim);
-      }
-      .ai-tool-block summary {
-        cursor: pointer;
-        user-select: none;
-      }
-      .ai-input-area {
-        display: flex;
-        gap: 6px;
-        padding: 8px 12px;
+      #ai-quikchat .quikchat-input-area {
         border-top: 1px solid var(--border);
-        flex-shrink: 0;
+        background: transparent;
+        padding: 8px;
       }
-      .ai-input-area textarea {
-        flex: 1;
-        resize: none;
-        border: 1px solid var(--border);
-        border-radius: 4px;
+      #ai-quikchat .quikchat-input-textbox {
         background: var(--bg-input);
         color: var(--fg);
-        padding: 6px 8px;
-        font: inherit;
+        border: 1px solid var(--border);
+        border-radius: 4px;
         font-size: 12px;
-        min-height: 36px;
-        max-height: 120px;
+        font-family: inherit;
+      }
+      #ai-quikchat .quikchat-input-textbox:focus {
+        border-color: var(--accent);
         outline: none;
       }
-      .ai-input-area textarea:focus {
-        border-color: var(--accent);
-      }
-      .ai-send-btn,
-      .ai-stop-btn {
+      #ai-quikchat .quikchat-input-send-btn {
+        background: var(--accent);
+        color: #fff;
         border: none;
         border-radius: 4px;
-        padding: 6px 10px;
+        font-size: 12px;
         cursor: pointer;
-        font-size: 11px;
-        font-weight: 500;
       }
-      .ai-send-btn {
-        background: var(--accent);
-        color: var(--accent-fg);
+      #ai-quikchat .quikchat-input-send-btn:hover {
+        opacity: 0.9;
       }
-      .ai-send-btn:disabled {
-        opacity: 0.5;
-        cursor: default;
+      #ai-quikchat .quikchat-message-user-string {
+        display: none;
       }
-      .ai-stop-btn {
-        background: var(--danger);
-        color: white;
-      }
-      .ai-auth-prompt {
+      .ai-status-center {
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -296,10 +291,11 @@
         color: var(--fg-dim);
         font-size: 12px;
       }
-      .ai-auth-prompt code {
+      .ai-code-snippet {
         background: var(--bg-input);
         padding: 4px 8px;
         border-radius: 4px;
+        font-size: 11px;
       }
       #statusbar {
         grid-row: 4;

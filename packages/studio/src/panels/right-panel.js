@@ -15,7 +15,12 @@ import { isCustomElementDoc } from "./signals-panel.js";
 import { isColorPopoverOpen } from "../ui/color-selector.js";
 import { renderStylePanelTemplate } from "./style-panel.js";
 import { renderPropertiesPanelTemplate } from "./properties-panel.js";
-import { renderAiPanelTemplate, mountAiPanel, registerRightPanelRender } from "./ai-panel.js";
+import {
+  renderAiPanelTemplate,
+  mountAiPanel,
+  mountQuikChat,
+  registerRightPanelRender,
+} from "./ai-panel.js";
 
 /**
  * @typedef {{
@@ -116,6 +121,7 @@ function _flush() {
   } finally {
     _rendering = false;
   }
+  requestAnimationFrame(() => mountQuikChat());
   _ctx.updateForcedPseudoPreview();
 }
 
@@ -142,7 +148,7 @@ function rightPanelTemplate() {
     { value: "properties", icon: "sp-icon-properties", label: "Properties" },
     { value: "events", icon: "sp-icon-event", label: "Events" },
     { value: "style", icon: "sp-icon-brush", label: "Style" },
-    { value: "assistant", icon: "sp-icon-artboard", label: "Assistant" },
+    { value: "assistant", icon: "sp-icon-chat", label: "Assistant" },
   ];
 
   const tabsT = html`
