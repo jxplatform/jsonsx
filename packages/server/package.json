@@ -23,6 +23,10 @@
   },
   "dependencies": {
     "@jxsuite/create": "workspace:^",
-    "chokidar": "^5.0.0"
+    "@anthropic-ai/claude-agent-sdk": "^0.3.149",
+    "@anthropic-ai/sdk": "^0.98.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "chokidar": "^5.0.0",
+    "zod": "^4.4.3"
   }
 }

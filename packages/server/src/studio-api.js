@@ -11,6 +11,7 @@ import { resolve, relative, basename, dirname, isAbsolute } from "node:path";
 import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
+import * as claude from "./claude-session.js";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (/** @type {string} */ p) => p.replaceAll("\\", "/");
@@ -992,6 +993,69 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         { status: 500 },
       );
     }
+  }
+
+  // ─── AI Assistant ─────────────────────────────────────────────────────────
+
+  if (path === "/__studio/ai/auth-status" && req.method === "GET") {
+    const status = await claude.getAuthStatus();
+    return Response.json(status);
+  }
+
+  if (path === "/__studio/ai/session" && req.method === "POST") {
+    try {
+      const body = await req.json();
+      const projectDir = activeProjectRoot || root;
+      const result = claude.createSession(projectDir, body.message, {
+        systemPrompt: body.systemPrompt,
+      });
+      return Response.json(result);
+    } catch (/** @type {any} */ e) {
+      return Response.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  if (
+    path.startsWith("/__studio/ai/session/") &&
+    path.endsWith("/stream") &&
+    req.method === "GET"
+  ) {
+    const id = path.split("/")[4];
+    return claude.streamSession(id);
+  }
+
+  if (
+    path.startsWith("/__studio/ai/session/") &&
+    path.endsWith("/message") &&
+    req.method === "POST"
+  ) {
+    try {
+      const id = path.split("/")[4];
+      const body = await req.json();
+      claude.sendMessage(id, body.message);
+      return Response.json({ ok: true });
+    } catch (/** @type {any} */ e) {
+      return Response.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
+    const id = path.split("/")[4];
+    claude.stopSession(id);
+    return Response.json({ ok: true });
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && req.method === "DELETE") {
+    const id = path.split("/")[4];
+    claude.deleteSession(id);
+    return Response.json({ ok: true });
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
+    const id = path.split("/")[4];
+    const info = claude.getSession(id);
+    if (!info) return Response.json({ error: "Not found" }, { status: 404 });
+    return Response.json(info);
   }
 
   return null;
