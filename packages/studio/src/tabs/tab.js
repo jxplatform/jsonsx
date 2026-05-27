@@ -41,6 +41,7 @@ import { reactive, effectScope } from "../reactivity.js";
  *   id: string;
  *   documentPath: string | null;
  *   fileHandle: FileSystemFileHandle | null;
+ *   capabilities: { modes: string[] };
  *   scope: { stop(): void; run<T>(fn: () => T): T | undefined; [k: string]: unknown };
  *   doc: {
  *     document: JxMutableNode;
@@ -100,6 +101,8 @@ function createDefaultUi() {
   };
 }
 
+const ALL_MODES = ["edit", "design", "preview", "source", "stylebook"];
+
 /**
  * Create a new tab with reactive doc/session/history trees, owned by an effectScope.
  *
@@ -110,6 +113,7 @@ function createDefaultUi() {
  *   document: Record<string, unknown>;
  *   frontmatter?: Record<string, unknown>;
  *   sourceFormat?: string | null;
+ *   capabilities?: { modes?: string[] };
  * }} opts
  * @returns {Tab}
  */
@@ -120,8 +124,11 @@ export function createTab({
   document,
   frontmatter,
   sourceFormat = null,
+  capabilities,
 }) {
   const scope = effectScope();
+
+  const resolvedModes = capabilities?.modes ?? inferModes(documentPath, sourceFormat);
 
   const tab = /** @type {Tab} */ (
     /** @type {unknown} */ (
@@ -129,6 +136,7 @@ export function createTab({
         id,
         documentPath,
         fileHandle,
+        capabilities: { modes: resolvedModes },
         scope,
         doc: reactive({
           document,
@@ -160,6 +168,18 @@ export function createTab({
   );
 
   return tab;
+}
+
+/**
+ * @param {string | null | undefined} documentPath
+ * @param {string | null} sourceFormat
+ * @returns {string[]}
+ */
+function inferModes(documentPath, sourceFormat) {
+  if (documentPath === "project.json") return ["stylebook", "source"];
+  if (sourceFormat === "md" || documentPath?.endsWith(".md"))
+    return ["edit", "design", "preview", "source"];
+  return ALL_MODES;
 }
 
 /**

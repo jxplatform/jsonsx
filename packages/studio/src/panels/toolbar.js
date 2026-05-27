@@ -100,17 +100,20 @@ export function mount(rootEl, ctx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
-      // Read reactive properties to establish tracking
-      void tab.doc.document;
-      void tab.doc.dirty;
-      void tab.doc.mode;
-      void tab.session.selection;
-      void tab.session.ui.canvasMode;
-      void tab.session.ui.editingFunction;
-      void tab.session.ui.featureToggles;
-      void tab.session.ui.rightTab;
-      void tab.session.ui.gitStatus;
+      if (tab) {
+        // Read reactive properties to establish tracking
+        void tab.doc.document;
+        void tab.doc.dirty;
+        void tab.doc.mode;
+        void tab.session.selection;
+        void tab.session.ui.canvasMode;
+        void tab.session.ui.editingFunction;
+        void tab.session.ui.featureToggles;
+        void tab.session.ui.rightTab;
+        void tab.session.ui.gitStatus;
+        void tab.history.index;
+        void tab.history.snapshots.length;
+      }
       render();
     });
   });
@@ -139,10 +142,147 @@ async function handleNewProject() {
   }
 }
 
+/** @param {ToolbarCtx} ctx */
+function minimalToolbarTemplate(ctx) {
+  const recentProjects = getRecentProjects();
+  const recentProjectsTpl = html`
+    <overlay-trigger placement="bottom-start" triggered-by="click">
+      <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
+        <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
+      </sp-action-button>
+      <sp-popover slot="click-content" tip>
+        <sp-menu
+          @change=${(/** @type {Event} */ e) => {
+            const val = /** @type {HTMLInputElement} */ (/** @type {unknown} */ (e.target)).value;
+            if (val === "__new__") {
+              handleNewProject();
+            } else {
+              ctx.openRecentProject(val);
+            }
+          }}
+        >
+          <sp-menu-item value="__new__">New Project…</sp-menu-item>
+          ${recentProjects.length
+            ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
+                  (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
+                )}`
+            : nothing}
+        </sp-menu>
+      </sp-popover>
+    </overlay-trigger>
+  `;
+
+  const windowControls = /**
+   * @type {{
+   *   __jxPlatform?: {
+   *     windowControls?: { minimize: () => void; maximize: () => void; close: () => void };
+   *   };
+   * }}
+   */ (/** @type {unknown} */ (globalThis)).__jxPlatform?.windowControls;
+  const csdTpl = windowControls
+    ? html`
+        <sp-action-group class="window-controls" size="s">
+          <sp-action-button
+            quiet
+            size="s"
+            title="Minimize"
+            @click=${() => windowControls.minimize()}
+          >
+            <sp-icon-remove slot="icon"></sp-icon-remove>
+          </sp-action-button>
+          <sp-action-button
+            quiet
+            size="s"
+            title="Maximize"
+            @click=${() => windowControls.maximize()}
+          >
+            <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
+          </sp-action-button>
+          <sp-action-button
+            quiet
+            size="s"
+            title="Close"
+            class="csd-close"
+            @click=${() => windowControls.close()}
+          >
+            <sp-icon-close slot="icon"></sp-icon-close>
+          </sp-action-button>
+        </sp-action-group>
+      `
+    : nothing;
+
+  return html`
+    <div class="tb-split-btn">
+      <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
+        ${toolbarIconMap["sp-icon-folder-open"]} Open Project
+      </sp-action-button>
+      ${recentProjectsTpl}
+    </div>
+    ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
+    <sp-action-button size="s" disabled>
+      ${toolbarIconMap["sp-icon-save-floppy"]} Save
+    </sp-action-button>
+    <sp-action-group compact size="s">
+      <sp-action-button size="s" disabled>
+        ${toolbarIconMap["sp-icon-undo"]} Undo
+      </sp-action-button>
+      <sp-action-button size="s" disabled>
+        ${toolbarIconMap["sp-icon-redo"]} Redo
+      </sp-action-button>
+    </sp-action-group>
+    <div class="tb-spacer"></div>
+    <sp-action-button class="tb-search-trigger" size="s" quiet @click=${openQuickSearch}>
+      <sp-icon-search slot="icon"></sp-icon-search>
+      <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
+    </sp-action-button>
+    <div class="tb-spacer"></div>
+    <sp-action-group selects="single" size="s" compact>
+      ${modes.map(
+        (m) => html`
+          <sp-action-button size="s" disabled ?selected=${m.key === "design"}>
+            ${toolbarIconMap[m.iconTag]}${m.label}
+          </sp-action-button>
+        `,
+      )}
+    </sp-action-group>
+    <sp-action-button
+      quiet
+      size="s"
+      title="Toggle Right Panel"
+      @click=${() => {
+        view.rightPanelCollapsed = !view.rightPanelCollapsed;
+        applyPanelCollapse();
+        render();
+      }}
+    >
+      ${view.rightPanelCollapsed
+        ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
+        : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
+    </sp-action-button>
+    ${csdTpl}
+  `;
+}
+
+const modes = [
+  { key: "edit", label: "Edit", iconTag: "sp-icon-edit" },
+  { key: "design", label: "Design", iconTag: "sp-icon-artboard" },
+  { key: "preview", label: "Preview", iconTag: "sp-icon-preview" },
+  { key: "source", label: "Code", iconTag: "sp-icon-code" },
+  { key: "stylebook", label: "Stylebook", iconTag: "sp-icon-brush" },
+];
+
 function toolbarTemplate() {
   const tab = activeTab.value;
-  if (!tab || !_ctx) return html``;
+  if (!_ctx) return html``;
   const ctx = _ctx;
+
+  if (!tab) return minimalToolbarTemplate(ctx);
+
+  const allowedModes = new Set(tab.capabilities.modes);
+  const canUndo = tab.history.index > 0;
+  const canRedo = tab.history.index < tab.history.snapshots.length - 1;
+  const canSave = tab.doc.dirty;
+
   const S = {
     document: tab.doc.document,
     ui: tab.session.ui,
@@ -205,17 +345,6 @@ function toolbarTemplate() {
         `
       : nothing;
 
-  const modes = [
-    { key: "edit", label: "Edit", iconTag: "sp-icon-edit" },
-    { key: "design", label: "Design", iconTag: "sp-icon-artboard" },
-    { key: "preview", label: "Preview", iconTag: "sp-icon-preview" },
-    { key: "source", label: "Code", iconTag: "sp-icon-code" },
-    { key: "stylebook", label: "Stylebook", iconTag: "sp-icon-brush" },
-  ];
-
-  const isProjectFile = S.documentPath === "project.json";
-  const allowedModes = isProjectFile ? new Set(["stylebook", "source"]) : null;
-
   const modeSwitcherTpl = html`
     <sp-action-group selects="single" size="s" compact>
       ${modes.map(
@@ -223,10 +352,10 @@ function toolbarTemplate() {
           <sp-action-button
             size="s"
             ?selected=${canvasMode === m.key}
-            ?disabled=${allowedModes && !allowedModes.has(m.key)}
+            ?disabled=${!allowedModes.has(m.key)}
             @click=${() => {
               if (canvasMode === m.key) return;
-              if (allowedModes && !allowedModes.has(m.key)) return;
+              if (!allowedModes.has(m.key)) return;
               if (S.ui.editingFunction) {
                 if (view.functionEditor) {
                   view.functionEditor.dispose();
@@ -326,10 +455,16 @@ function toolbarTemplate() {
       ${recentProjectsTpl}
     </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    ${tbBtnTpl("Save", ctx.saveFile, "sp-icon-save-floppy")}
+    <sp-action-button size="s" ?disabled=${!canSave} @click=${ctx.saveFile}>
+      ${toolbarIconMap["sp-icon-save-floppy"]} Save
+    </sp-action-button>
     <sp-action-group compact size="s">
-      ${tbBtnTpl("Undo", () => tabUndo(activeTab.value), "sp-icon-undo")}
-      ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}
+      <sp-action-button size="s" ?disabled=${!canUndo} @click=${() => tabUndo(activeTab.value)}>
+        ${toolbarIconMap["sp-icon-undo"]} Undo
+      </sp-action-button>
+      <sp-action-button size="s" ?disabled=${!canRedo} @click=${() => tabRedo(activeTab.value)}>
+        ${toolbarIconMap["sp-icon-redo"]} Redo
+      </sp-action-button>
     </sp-action-group>
     <div class="tb-spacer"></div>
     <sp-action-button class="tb-search-trigger" size="s" quiet @click=${openQuickSearch}>

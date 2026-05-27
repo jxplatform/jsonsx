@@ -19,6 +19,15 @@ async function git(...args: string[]): Promise<string> {
 }
 
 export async function gitStatus(): Promise<GitStatusResult> {
+  const root = getProjectRoot();
+  if (!root) throw new Error("No project open");
+
+  try {
+    await git("rev-parse", "--is-inside-work-tree");
+  } catch {
+    return { branch: "", files: [], ahead: 0, behind: 0, isRepo: false, remotes: [] };
+  }
+
   const branch = (await git("branch", "--show-current")).trim();
   const porcelain = await git("status", "--porcelain=v1");
   const files = porcelain
@@ -39,7 +48,15 @@ export async function gitStatus(): Promise<GitStatusResult> {
     // no upstream configured
   }
 
-  return { branch, files, ahead, behind };
+  let remotes: string[] = [];
+  try {
+    const remotesOut = await git("remote");
+    remotes = remotesOut.trim().split("\n").filter(Boolean);
+  } catch {
+    // no remotes
+  }
+
+  return { branch, files, ahead, behind, isRepo: true, remotes };
 }
 
 export async function gitBranches(): Promise<GitBranchesResult> {
@@ -75,8 +92,13 @@ export async function gitCommit(params: { message: string }): Promise<void> {
   await git("commit", "-m", params.message);
 }
 
-export async function gitPush(): Promise<void> {
-  await git("push");
+export async function gitPush(params?: { setUpstream?: boolean }): Promise<void> {
+  if (params?.setUpstream) {
+    const branch = (await git("rev-parse", "--abbrev-ref", "HEAD")).trim();
+    await git("push", "-u", "origin", branch);
+  } else {
+    await git("push");
+  }
 }
 
 export async function gitPull(): Promise<void> {
@@ -109,4 +131,12 @@ export async function gitShow(params: { path: string; ref?: string }): Promise<s
 
 export async function gitDiscard(params: { files: string[] }): Promise<void> {
   await git("checkout", "--", ...params.files);
+}
+
+export async function gitInit(): Promise<void> {
+  await git("init");
+}
+
+export async function gitAddRemote(params: { name: string; url: string }): Promise<void> {
+  await git("remote", "add", params.name, params.url);
 }

@@ -3031,6 +3031,63 @@
         font-size: 12px;
       }
 
+      .git-panel-empty {
+        justify-content: center;
+        align-items: center;
+      }
+      .git-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 24px 16px;
+        text-align: center;
+        color: var(--fg-dim);
+      }
+      .git-empty-state p {
+        margin: 0;
+        font-size: 12px;
+      }
+      .git-sync-bar--no-remote {
+        gap: 8px;
+      }
+
+      /* GitHub auth dialog */
+      .github-auth-dialog {
+        text-align: center;
+        padding: 16px 0;
+      }
+      .github-auth-dialog p {
+        margin: 8px 0;
+        font-size: 13px;
+      }
+      .github-auth-code {
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        font-family: var(--mono-font, monospace);
+        padding: 12px 16px;
+        background: var(--hover-bg);
+        border-radius: var(--radius);
+        display: inline-block;
+        margin: 8px 0;
+      }
+      .github-auth-waiting {
+        color: var(--fg-dim);
+        font-style: italic;
+      }
+
+      /* GitHub publish dialog */
+      .github-publish-dialog {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 8px 0;
+      }
+      .github-publish-dialog sp-textfield {
+        width: 100%;
+      }
+
       /* ─── Feature toggle (stylebook) ─────────────── */
       .tb-toggle {
         padding: 3px 8px;
@@ -3295,6 +3352,102 @@
       .canvas-panel-canvas [contenteditable="true"]:focus {
         outline-color: var(--accent);
         box-shadow: 0 0 0 3px var(--accent-15);
+      }
+
+      /* ─── Welcome screen ─────────────────────────── */
+      .welcome-screen {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 10vh;
+        overflow-y: auto;
+      }
+      .welcome-content {
+        max-width: 500px;
+        width: 100%;
+        padding: 0 24px;
+      }
+      .welcome-title {
+        font-size: 28px;
+        font-weight: 300;
+        color: var(--fg);
+        margin: 0;
+        letter-spacing: -0.5px;
+      }
+      .welcome-subtitle {
+        font-size: 14px;
+        color: var(--fg-dim);
+        margin: 2px 0 0;
+      }
+      .welcome-section {
+        margin-top: 28px;
+      }
+      .welcome-section-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg);
+        margin: 0 0 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      .welcome-action {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        padding: 5px 8px;
+        margin: 0;
+        background: none;
+        border: none;
+        border-radius: var(--radius);
+        font: inherit;
+        font-size: 13px;
+        color: var(--accent);
+        cursor: pointer;
+        text-align: left;
+      }
+      .welcome-action:hover {
+        background: var(--hover-bg);
+        text-decoration: underline;
+      }
+      .welcome-action-icon {
+        flex-shrink: 0;
+        opacity: 0.8;
+      }
+      .welcome-recent {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        width: 100%;
+        padding: 4px 8px;
+        margin: 0;
+        background: none;
+        border: none;
+        border-radius: var(--radius);
+        font: inherit;
+        font-size: 13px;
+        color: var(--fg);
+        cursor: pointer;
+        text-align: left;
+      }
+      .welcome-recent:hover {
+        background: var(--hover-bg);
+      }
+      .welcome-recent-name {
+        color: var(--accent);
+        flex-shrink: 0;
+      }
+      .welcome-recent-name:hover {
+        text-decoration: underline;
+      }
+      .welcome-recent-path {
+        color: var(--fg-dim);
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
     </style>
   </head>

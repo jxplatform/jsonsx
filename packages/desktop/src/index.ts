@@ -33,6 +33,8 @@ import {
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitInit,
+  gitAddRemote,
 } from "./git";
 import { addPackage, removePackage, listPackages } from "./packages";
 import {
@@ -93,13 +95,15 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       gitStage: (params) => gitStage(params),
       gitUnstage: (params) => gitUnstage(params),
       gitCommit: (params) => gitCommit(params),
-      gitPush: () => gitPush(),
+      gitPush: (params) => gitPush(params),
       gitPull: () => gitPull(),
       gitFetch: () => gitFetch(),
       gitCheckout: (params) => gitCheckout(params),
       gitCreateBranch: (params) => gitCreateBranch(params),
       gitDiff: (params) => gitDiff(params),
       gitDiscard: (params) => gitDiscard(params),
+      gitInit: () => gitInit(),
+      gitAddRemote: (params) => gitAddRemote(params),
       addPackage: (params) => addPackage(params),
       removePackage: (params) => removePackage(params),
       listPackages: () => listPackages(),
