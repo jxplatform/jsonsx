@@ -130,9 +130,16 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       windowClose: () => {
         win.close();
       },
+      windowGetFrame: () => {
+        return win.getFrame();
+      },
+      windowSetFrame: (params) => {
+        win.setFrame(params.x, params.y, params.width, params.height);
+      },
       aiAuthStatus: () => getAuthStatus(),
       aiCreateSession: (params) =>
         createSession(projectRoot, params.message, { systemPrompt: params.systemPrompt }),
+      },
       aiSendMessage: (params) => {
         sendMessage(params.id, params.message);
       },

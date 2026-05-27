@@ -280,6 +280,14 @@ export type StudioRPC = {
         params: void;
         response: void;
       };
+      windowGetFrame: {
+        params: void;
+        response: { x: number; y: number; width: number; height: number };
+      };
+      windowSetFrame: {
+        params: { x: number; y: number; width: number; height: number };
+        response: void;
+      };
       // AI Assistant
       aiAuthStatus: {
         params: void;
@@ -303,7 +311,6 @@ export type StudioRPC = {
       };
       aiDeleteSession: {
         params: { id: string };
-        response: void;
       };
     };
     messages: {};

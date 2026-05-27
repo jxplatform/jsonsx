@@ -55,6 +55,7 @@ import { exportCemManifest as _exportCemManifest } from "./services/cem-export.j
 import { registerPlatform, getPlatform, hasPlatform } from "./platform.js";
 import { parseMediaEntries } from "./utils/canvas-media.js";
 import { createDevServerPlatform } from "./platforms/devserver.js";
+import { mountResizeEdges } from "./resize-edges.js";
 import { codeService } from "./services/code-services.js";
 import { defCategory, defBadgeLabel, renderSignalsTemplate } from "./panels/signals-panel.js";
 import { loadComponentRegistry } from "./files/components.js";
@@ -281,7 +282,18 @@ if (!hasPlatform()) {
   registerPlatform(createDevServerPlatform());
 }
 
-// Create the Welcome tab — shown on startup when no project is loaded.
+mountResizeEdges();
+
+const EMPTY_DOC = {
+  tagName: "div",
+  style: { padding: "2rem", fontFamily: "system-ui, sans-serif" },
+  children: [
+    { tagName: "h1", textContent: "New Component" },
+    { tagName: "p", textContent: "Open a Jx file or start editing." },
+  ],
+};
+
+// Create the initial reactive tab — the canonical state container.
 openTab({ id: "welcome", document: { tagName: "div", children: [] }, capabilities: { modes: [] } });
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
