@@ -106,7 +106,6 @@ function render() {
  * @returns {string}
  */
 function tabLabel(tab) {
-  if (tab.id === "welcome") return "Welcome";
   const path = tab.documentPath;
   if (!path) return "Untitled";
   const parts = path.split("/");

@@ -284,18 +284,6 @@ if (!hasPlatform()) {
 
 mountResizeEdges();
 
-const EMPTY_DOC = {
-  tagName: "div",
-  style: { padding: "2rem", fontFamily: "system-ui, sans-serif" },
-  children: [
-    { tagName: "h1", textContent: "New Component" },
-    { tagName: "p", textContent: "Open a Jx file or start editing." },
-  ],
-};
-
-// Create the initial reactive tab — the canonical state container.
-openTab({ id: "welcome", document: { tagName: "div", children: [] }, capabilities: { modes: [] } });
-
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
 // Mount extracted panel modules
@@ -557,9 +545,7 @@ if (_openParam) {
             parsedDoc = JSON.parse(content);
           }
 
-          // Open in a tab (close welcome tab first)
-          const { closeTab } = await import("./workspace/workspace.js");
-          closeTab("welcome");
+          // Open in a tab
           openTab({
             id: fileRelPath,
             documentPath: fileRelPath,
