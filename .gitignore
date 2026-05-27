@@ -9,6 +9,9 @@ node_modules/
 result
 .jx-cache/
 
+# Windows reserved device names (confuse git's directory walker)
+nul
+
 # Chromium profile (desktop chromium mode)
 .jx/
 packages/desktop/.jx/
