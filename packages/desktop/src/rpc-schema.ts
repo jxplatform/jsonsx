@@ -311,6 +311,7 @@ export type StudioRPC = {
       };
       aiDeleteSession: {
         params: { id: string };
+        response: void;
       };
     };
     messages: {};

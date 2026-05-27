@@ -69,6 +69,8 @@ setFileDialog(openFileDialog);
 let _maximized = false;
 let _restoreFrame = { x: 0, y: 0, width: 1400, height: 900 };
 
+let win: InstanceType<typeof BrowserWindow>;
+
 // ─── Register RPC handlers ────────────────────────────────────────────────────
 
 const rpc = BrowserView.defineRPC<StudioRPC>({
@@ -130,7 +132,7 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       windowClose: () => {
         win.close();
       },
-      windowGetFrame: () => {
+      windowGetFrame: (): { x: number; y: number; width: number; height: number } => {
         return win.getFrame();
       },
       windowSetFrame: (params) => {
@@ -139,7 +141,6 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       aiAuthStatus: () => getAuthStatus(),
       aiCreateSession: (params) =>
         createSession(projectRoot, params.message, { systemPrompt: params.systemPrompt }),
-      },
       aiSendMessage: (params) => {
         sendMessage(params.id, params.message);
       },
@@ -172,7 +173,7 @@ const aiServerUrl = `http://localhost:${aiServer.port}`;
 
 // ─── Open the main window ─────────────────────────────────────────────────────
 
-const win = new BrowserWindow({
+win = new BrowserWindow({
   title: "Jx Studio",
   url: "views://studio/index.html",
   frame: { x: 0, y: 0, width: 1400, height: 900 },
