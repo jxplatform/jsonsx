@@ -281,9 +281,6 @@ if (!hasPlatform()) {
   registerPlatform(createDevServerPlatform());
 }
 
-// Create the Welcome tab — shown on startup when no project is loaded.
-openTab({ id: "welcome", document: { tagName: "div", children: [] }, capabilities: { modes: [] } });
-
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
 // Mount extracted panel modules
@@ -545,9 +542,7 @@ if (_openParam) {
             parsedDoc = JSON.parse(content);
           }
 
-          // Open in a tab (close welcome tab first)
-          const { closeTab } = await import("./workspace/workspace.js");
-          closeTab("welcome");
+          // Open in a tab
           openTab({
             id: fileRelPath,
             documentPath: fileRelPath,

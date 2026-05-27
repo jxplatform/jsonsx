@@ -90,12 +90,6 @@ export function initCanvasRender(ctx) {
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) {
-    canvasWrap.textContent = "";
-    return;
-  }
-
-  // Welcome tab: render the welcome screen instead of normal canvas
-  if (tab.id === "welcome") {
     renderWelcome(canvasWrap);
     return;
   }
