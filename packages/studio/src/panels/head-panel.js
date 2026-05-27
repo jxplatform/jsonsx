@@ -53,6 +53,9 @@ const OG_FIELDS = [
 /** Set of `name`/`property` values managed by the structured forms. */
 const MANAGED_META_KEYS = new Set([...PAGE_FIELDS, ...OG_FIELDS].map((f) => f.key));
 
+/** Frontmatter keys managed by the PAGE dedicated controls (others live inside $head). */
+const RESERVED_FM_KEYS = new Set(["title"]);
+
 // ─── Helpers ─────────────────────────────────────────────────────────────
 
 /**
@@ -451,10 +454,11 @@ function renderFrontmatterSection() {
     for (const [field, fieldSchema] of Object.entries(
       /** @type {Record<string, FmSchemaEntry>} */ (schemaProps),
     )) {
+      if (RESERVED_FM_KEYS.has(field)) continue;
       fields.push({ field, entry: fieldSchema, value: /** @type {JsonValue} */ (fm[field]) });
     }
     for (const [field, value] of Object.entries(fm)) {
-      if (schemaProps[field] || field.startsWith("$")) continue;
+      if (schemaProps[field] || field.startsWith("$") || RESERVED_FM_KEYS.has(field)) continue;
       fields.push({
         field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
@@ -463,7 +467,7 @@ function renderFrontmatterSection() {
     }
   } else {
     for (const [field, value] of Object.entries(fm)) {
-      if (field.startsWith("$")) continue;
+      if (field.startsWith("$") || RESERVED_FM_KEYS.has(field)) continue;
       fields.push({
         field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
