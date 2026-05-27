@@ -264,7 +264,7 @@ export class MarkdownCollection {
     const pattern = resolved.split("\\").join("/");
     const files = globSync(pattern, { absolute: true });
 
-    const results = files.map((filePath) => {
+    const results = files.map((/** @type {string} */ filePath) => {
       const source = readFileSync(filePath, "utf-8");
       return processMarkdown(source, filePath, processorConfig);
     });
@@ -276,7 +276,7 @@ export class MarkdownCollection {
     }
 
     // Sort
-    filtered.sort((a, b) => {
+    filtered.sort((/** @type {MarkdownFileResult} */ a, /** @type {MarkdownFileResult} */ b) => {
       const aVal = /** @type {string | number} */ (getNestedValue(a, sortBy) ?? "");
       const bVal = /** @type {string | number} */ (getNestedValue(b, sortBy) ?? "");
       if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;

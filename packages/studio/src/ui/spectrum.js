@@ -123,6 +123,7 @@ import { IconBox } from "@spectrum-web-components/icons-workflow/src/elements/Ic
 import { IconVisibility } from "@spectrum-web-components/icons-workflow/src/elements/IconVisibility.js";
 import { IconVisibilityOff } from "@spectrum-web-components/icons-workflow/src/elements/IconVisibilityOff.js";
 import { IconArtboard } from "@spectrum-web-components/icons-workflow/src/elements/IconArtboard.js";
+import { IconChat } from "@spectrum-web-components/icons-workflow/src/elements/IconChat.js";
 import { IconViewList } from "@spectrum-web-components/icons-workflow/src/elements/IconViewList.js";
 import { IconRailRightClose } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightClose.js";
 import { IconRailRightOpen } from "@spectrum-web-components/icons-workflow/src/elements/IconRailRightOpen.js";
@@ -265,6 +266,7 @@ const components = [
   ["sp-icon-visibility", IconVisibility],
   ["sp-icon-visibility-off", IconVisibilityOff],
   ["sp-icon-artboard", IconArtboard],
+  ["sp-icon-chat", IconChat],
   ["sp-icon-view-list", IconViewList],
   ["sp-icon-text-bold", IconTextBold],
   ["sp-icon-text-italic", IconTextItalic],

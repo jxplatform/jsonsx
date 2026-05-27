@@ -37,6 +37,7 @@ import {
 } from "../git";
 import { addPackage, removePackage, listPackages } from "../packages";
 import { openFileDialog } from "./utils";
+import { handleAiRoute } from "../ai";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
@@ -92,6 +93,12 @@ const server = Bun.serve({
 
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/{2,}/, "/");
+
+    // AI routes (SSE streaming + REST)
+    if (path.startsWith("/studio/ai/")) {
+      const aiResponse = await handleAiRoute(req, path, projectRoot);
+      if (aiResponse) return aiResponse;
+    }
 
     if (path.startsWith("/studio/")) {
       const assetPath = resolve(studioDir, "." + path.replace("/studio/", "/"));

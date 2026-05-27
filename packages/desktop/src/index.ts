@@ -47,6 +47,14 @@ import {
   setNotifyWebview,
 } from "./updater";
 import { init as initUtils, openFileDialog } from "./utils";
+import { handleAiRoute } from "./ai";
+import {
+  createSession,
+  sendMessage,
+  stopSession,
+  deleteSession,
+  getAuthStatus,
+} from "@jxsuite/server/claude-session";
 
 // ─── Determine project root ───────────────────────────────────────────────────
 
@@ -122,10 +130,38 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       windowClose: () => {
         win.close();
       },
+      aiAuthStatus: () => getAuthStatus(),
+      aiCreateSession: (params) =>
+        createSession(projectRoot, params.message, { systemPrompt: params.systemPrompt }),
+      aiSendMessage: (params) => {
+        sendMessage(params.id, params.message);
+      },
+      aiStreamUrl: (params) => `${aiServerUrl}/studio/ai/session/${params.id}/stream`,
+      aiStopSession: (params) => {
+        stopSession(params.id);
+      },
+      aiDeleteSession: (params) => {
+        deleteSession(params.id);
+      },
     },
     messages: {},
   },
 });
+
+// ─── AI HTTP server (SSE streaming requires HTTP) ────────────────────────────
+
+const aiServer = Bun.serve({
+  port: 0,
+  async fetch(req) {
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/{2,}/, "/");
+    const aiResponse = await handleAiRoute(req, path, projectRoot);
+    if (aiResponse) return aiResponse;
+    return new Response("Not Found", { status: 404 });
+  },
+});
+
+const aiServerUrl = `http://localhost:${aiServer.port}`;
 
 // ─── Open the main window ─────────────────────────────────────────────────────
 

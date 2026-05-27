@@ -13,6 +13,7 @@
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
+import remarkGfm from "remark-gfm";
 import { MD_ALL } from "./md-allowlist.js";
 import { htmlToJx } from "@jxsuite/parser/transpile";
 
@@ -728,6 +729,7 @@ export function jxDocToMd(doc) {
 
     const mdast = { type: "root", children: mdastChildren };
     const md = unified()
+      .use(remarkGfm)
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
       .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));

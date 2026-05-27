@@ -15,6 +15,12 @@ import { isCustomElementDoc } from "./signals-panel.js";
 import { isColorPopoverOpen } from "../ui/color-selector.js";
 import { renderStylePanelTemplate } from "./style-panel.js";
 import { renderPropertiesPanelTemplate } from "./properties-panel.js";
+import {
+  renderAiPanelTemplate,
+  mountAiPanel,
+  mountQuikChat,
+  registerRightPanelRender,
+} from "./ai-panel.js";
 
 /**
  * @typedef {{
@@ -41,6 +47,8 @@ let _scheduled = false;
  */
 export function mount(ctx) {
   _ctx = ctx;
+  mountAiPanel();
+  registerRightPanelRender(render);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -113,6 +121,7 @@ function _flush() {
   } finally {
     _rendering = false;
   }
+  requestAnimationFrame(() => mountQuikChat());
   _ctx.updateForcedPseudoPreview();
 }
 
@@ -139,6 +148,7 @@ function rightPanelTemplate() {
     { value: "properties", icon: "sp-icon-properties", label: "Properties" },
     { value: "events", icon: "sp-icon-event", label: "Events" },
     { value: "style", icon: "sp-icon-brush", label: "Style" },
+    { value: "assistant", icon: "sp-icon-chat", label: "Assistant" },
   ];
 
   const tabsT = html`
@@ -178,10 +188,17 @@ function rightPanelTemplate() {
     } catch (/** @type {unknown} */ e) {
       console.error("[renderStylePanelTemplate]", e);
     }
+  } else if (tab === "assistant") {
+    bodyT = renderAiPanelTemplate();
   }
 
   return html`
     ${tabsT}
-    <div class="panel-body">${bodyT}</div>
+    <div
+      class="panel-body"
+      style=${tab === "assistant" ? "display:flex;flex-direction:column;overflow:hidden" : ""}
+    >
+      ${bodyT}
+    </div>
   `;
 }

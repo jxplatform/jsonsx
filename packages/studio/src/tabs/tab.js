@@ -75,7 +75,7 @@ import { reactive, effectScope } from "../reactivity.js";
 function createDefaultUi() {
   return {
     rightTab: "properties",
-    canvasMode: "design",
+    canvasMode: "edit",
     zoom: 1,
     activeMedia: null,
     activeSelector: null,

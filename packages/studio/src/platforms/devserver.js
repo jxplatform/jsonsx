@@ -372,6 +372,7 @@ export function createDevServerPlatform() {
       return schema;
     },
 
+
     // ─── Git operations ──────────────────────────────────────────────────
 
     async gitStatus() {
@@ -527,6 +528,50 @@ export function createDevServerPlatform() {
         body: JSON.stringify({ name, url }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
+    },
+
+    // ─── AI Assistant ───────────────────────────────────
+
+    async aiAuthStatus() {
+      const res = await fetch("/__studio/ai/auth-status");
+      return await res.json();
+    },
+
+    /** @param {{ message: string; systemPrompt?: string }} opts */
+    async aiCreateSession(opts) {
+      const res = await fetch("/__studio/ai/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
+
+    /** @param {string} id @param {string} message */
+    async aiSendMessage(id, message) {
+      const res = await fetch(`/__studio/ai/session/${id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
+
+    /** @param {string} id */
+    aiStreamUrl(id) {
+      return `/__studio/ai/session/${id}/stream`;
+    },
+
+    /** @param {string} id */
+    async aiStopSession(id) {
+      await fetch(`/__studio/ai/session/${id}/stop`, { method: "POST" });
+    },
+
+    /** @param {string} id */
+    async aiDeleteSession(id) {
+      await fetch(`/__studio/ai/session/${id}`, { method: "DELETE" });
     },
   };
 }

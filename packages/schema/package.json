@@ -1,8 +1,8 @@
 {
   "dependencies": {
-    "@webref/css": "^8.5.6",
+    "@webref/css": "^8.5.7",
     "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.78.0"
+    "@webref/idl": "^3.79.0"
   },
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {

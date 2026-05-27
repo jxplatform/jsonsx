@@ -15,16 +15,23 @@
     "build:stable": "bunx electrobun build --env=stable && bun run scripts/build-msi.ts",
     "chromium": "bun run scripts/pre-build-rpc.ts && bun run src/chromium/index.ts",
     "dev": "bunx electrobun dev",
+    "sign:cert": "bun run scripts/sign-cert.ts",
+    "sign:trust": "powershell -ExecutionPolicy Bypass -File scripts/trust-cert.ps1",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.152",
+    "@anthropic-ai/sdk": "^0.99.0",
+    "@jxsuite/server": "workspace:^",
     "@jxsuite/studio": "workspace:^",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "dbus-ts": "^0.0.7",
-    "electrobun": "latest"
+    "electrobun": "latest",
+    "lit-html": "^3.3.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@jxsuite/server": "workspace:^",
-    "electrobun-builder-for-windows": "^0.3.7",
-    "msw": "^2.14.6"
+    "rcedit": "^5.0.2"
   }
 }

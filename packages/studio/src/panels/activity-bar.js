@@ -80,6 +80,8 @@ export function tabIcon(tag, size) {
       html`<sp-icon-view-all-tags slot="icon" size=${s}></sp-icon-view-all-tags>`,
     "sp-icon-artboard": (/** @type {string} */ s) =>
       html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
+    "sp-icon-chat": (/** @type {string} */ s) =>
+      html`<sp-icon-chat slot="icon" size=${s}></sp-icon-chat>`,
     "sp-icon-box": (/** @type {string} */ s) =>
       html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
     "sp-icon-git-branch": gitBranchIcon,

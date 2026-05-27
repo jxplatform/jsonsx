@@ -498,7 +498,7 @@ async function createNewFile(dirPath = ".", /** @type {() => void} */ renderLeft
   const path = dirPath === "." ? name : `${dirPath}/${name}`;
   const content = name.endsWith(".md")
     ? "---\ntitle: Untitled\n---\n\n"
-    : JSON.stringify({ tagName: "div", children: [] }, null, 2);
+    : JSON.stringify({ tagName: "div", children: [{ tagName: "p", children: [] }] }, null, 2);
   try {
     const platform = getPlatform();
     await platform.writeFile(path, content);
@@ -671,5 +671,32 @@ export async function openFileInTab(path) {
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (/** @type {unknown} */ e) {
     statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
+  }
+}
+
+/**
+ * Reload an already-open tab from disk without changing the active tab. Used to refresh after AI
+ * assistant writes to a file.
+ *
+ * @param {string} path
+ */
+export async function reloadFileInTab(path) {
+  for (const [, tab] of workspace.tabs.entries()) {
+    if (tab.documentPath === path) {
+      const platform = getPlatform();
+      try {
+        const content = await platform.readFile(path);
+        if (!content) return;
+        if (path.endsWith(".md")) {
+          const { document, frontmatter } = await loadMarkdown(content);
+          tab.doc.document = document;
+          tab.doc.content.frontmatter = frontmatter;
+        } else {
+          tab.doc.document = JSON.parse(content);
+        }
+        tab.doc.dirty = false;
+      } catch {}
+      return;
+    }
   }
 }
