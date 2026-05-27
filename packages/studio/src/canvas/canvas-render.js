@@ -12,6 +12,7 @@ import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { loadMarkdown } from "../files/file-ops.js";
 import { renderWelcome } from "../panels/welcome-screen.js";
+import { projectState } from "../state.js";
 import {
   canvasPanelTemplate,
   applyTransform,
@@ -90,7 +91,11 @@ export function initCanvasRender(ctx) {
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) {
-    renderWelcome(canvasWrap);
+    if (!projectState) {
+      renderWelcome(canvasWrap);
+    } else {
+      canvasWrap.textContent = "";
+    }
     return;
   }
   const ctx = /** @type {CanvasRenderCtx} */ (_ctx);
