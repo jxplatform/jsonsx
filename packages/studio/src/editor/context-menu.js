@@ -12,6 +12,7 @@ import {
 } from "../tabs/transact.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { convertToComponent } from "./convert-to-component.js";
+import { convertToRepeater } from "./convert-to-repeater.js";
 import { componentRegistry } from "../files/components.js";
 import { renderPopover } from "../ui/layers.js";
 import { startLayerTitleEdit } from "../panels/layers-panel.js";
@@ -169,6 +170,15 @@ export function showContextMenu(e, path, opts = {}) {
       label: "Wrap in Div",
       action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
     });
+    // Don't show Repeat if already inside a repeater (path ends with "children", "map")
+    if (
+      !(path.length >= 2 && path[path.length - 2] === "children" && path[path.length - 1] === "map")
+    ) {
+      items.push({
+        label: "Repeat...",
+        action: () => convertToRepeater(),
+      });
+    }
     items.push({
       label: "Set Title",
       action: () => {
