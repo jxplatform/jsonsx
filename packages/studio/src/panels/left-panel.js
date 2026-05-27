@@ -124,20 +124,46 @@ function _flush() {
 
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
-  const aTab = activeTab.value;
   const tab = view.leftTab;
 
-  if ((!aTab || aTab.id === "welcome") && tab === "git") {
-    const S = { ui: aTab?.session?.ui || {} };
-    const content = ctx.renderGitPanel(S, ctx);
-    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+  // ── Project-level panels: render based on projectState, independent of active tab ──
+
+  if (tab === "files") {
+    litRender(html`<div class="panel-body">${ctx.renderFilesTemplate()}</div>`, leftPanel);
+    const tree = /** @type {HTMLElement | null} */ (leftPanel.querySelector(".file-tree"));
+    if (tree) ctx.setupTreeKeyboard(tree);
     return;
   }
 
-  if (!aTab || aTab.id === "welcome") {
+  if (tab === "git") {
+    const aTab = activeTab.value;
+    const S = aTab ? { ui: aTab.session.ui } : { ui: {} };
+    litRender(html`<div class="panel-body">${ctx.renderGitPanel(S, ctx)}</div>`, leftPanel);
+    return;
+  }
+
+  if (tab === "blocks") {
+    const content = renderElementsTemplate(
+      /** @type {Parameters<typeof renderElementsTemplate>[0]} */ ({
+        webdata: ctx.webdata,
+        defaultDef: ctx.defaultDef,
+        rerender: render,
+      }),
+    );
+    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+    ctx.registerElementsDnD();
+    ctx.registerComponentsDnD();
+    return;
+  }
+
+  // ── Document-level panels: require an active tab ──
+
+  const aTab = activeTab.value;
+  if (!aTab) {
     litRender(html`<div class="panel-body"></div>`, leftPanel);
     return;
   }
+
   const S = /**
    * @type {{
    *   ui: unknown;
@@ -154,6 +180,8 @@ function _render() {
     mode: aTab.doc.mode,
     selection: aTab.session.selection,
     canvas: aTab.session.canvas,
+    content: aTab.doc.content,
+    documentPath: aTab.documentPath,
   });
 
   /** @type {TemplateResult | typeof nothing} */
@@ -180,15 +208,6 @@ function _render() {
         transact(activeTab.value, fn);
       },
     });
-  else if (tab === "files") content = ctx.renderFilesTemplate();
-  else if (tab === "blocks")
-    content = renderElementsTemplate(
-      /** @type {Parameters<typeof renderElementsTemplate>[0]} */ ({
-        webdata: ctx.webdata,
-        defaultDef: ctx.defaultDef,
-        rerender: render,
-      }),
-    );
   else if (tab === "state")
     content = ctx.renderSignalsTemplate(S, {
       renderLeftPanel: render,
@@ -219,26 +238,17 @@ function _render() {
               mutateUpdateFrontmatter(tab, "title", /** @type {JsonValue} */ (tmp.title));
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
             mutateUpdateFrontmatter(tab, "$head", /** @type {JsonValue} */ (newHead));
+            render();
           }
         : (/** @type {(doc: object) => void} */ fn) => {
             transact(activeTab.value, fn);
           },
       renderLeftPanel: render,
     });
-  } else if (tab === "git") content = ctx.renderGitPanel(S, ctx);
-  else content = nothing;
+  } else content = nothing;
 
   litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
 
   // Post-render side effects
   if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") ctx.registerLayersDnD();
-  else if (tab === "imports") {
-    /* no post-render DnD needed */
-  } else if (tab === "blocks") {
-    ctx.registerElementsDnD();
-    ctx.registerComponentsDnD();
-  } else if (tab === "files") {
-    const tree = /** @type {HTMLElement | null} */ (leftPanel.querySelector(".file-tree"));
-    if (tree) ctx.setupTreeKeyboard(tree);
-  }
 }
