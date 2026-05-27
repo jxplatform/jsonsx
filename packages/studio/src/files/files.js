@@ -659,7 +659,6 @@ export async function openFileInTab(path) {
     });
     requireProjectState().selectedPath = path;
     trackRecentFile({ path, name: path.split("/").pop() || path });
-    view.leftTab = "layers";
 
     if (path === "project.json") {
       const tab = activeTab.value;
