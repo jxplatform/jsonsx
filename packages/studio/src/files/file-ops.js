@@ -92,7 +92,9 @@ export async function loadMarkdown(source) {
   }
 
   // Content markdown — children form the root-level document body
-  const contentDoc = { children: doc.children ?? [] };
+  const children = doc.children ?? [];
+  if (children.length === 0) children.push({ tagName: "p", children: [] });
+  const contentDoc = { children };
 
   /** @type {Record<string, unknown>} */
   const frontmatter = {};

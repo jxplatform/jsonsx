@@ -497,7 +497,7 @@ async function createNewFile(dirPath = ".", /** @type {() => void} */ renderLeft
   const path = dirPath === "." ? name : `${dirPath}/${name}`;
   const content = name.endsWith(".md")
     ? "---\ntitle: Untitled\n---\n\n"
-    : JSON.stringify({ tagName: "div", children: [] }, null, 2);
+    : JSON.stringify({ tagName: "div", children: [{ tagName: "p", children: [] }] }, null, 2);
   try {
     const platform = getPlatform();
     await platform.writeFile(path, content);
