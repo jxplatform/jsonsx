@@ -7,6 +7,7 @@
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
+import remarkGfm from "remark-gfm";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd, jxDocToMd } from "../markdown/md-convert.js";
 import { locateDocument } from "../services/code-services.js";
@@ -202,6 +203,7 @@ export function serializeDocument(tab) {
   if (tab.doc.mode === "content") {
     const mdast = jxToMd(/** @type {JxElement} */ (tab.doc.document));
     const md = unified()
+      .use(remarkGfm)
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
       .stringify(/** @type {import("mdast").Root} */ (/** @type {unknown} */ (mdast)));
