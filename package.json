@@ -39,7 +39,9 @@
     "typecheck:legacy": "tsc",
     "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces upgrade"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@jxsuite/server": "workspace:^"
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",
