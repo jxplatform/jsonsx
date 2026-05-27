@@ -44,6 +44,7 @@
         "@apidevtools/json-schema-ref-parser": "^15.3.5",
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
+        "glob": "^13.0.6",
         "remark-gfm": "^4.0.1",
         "remark-stringify": "^11.0.0",
         "sharp": "^0.34.5",
@@ -51,6 +52,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.9.0",
+        "@types/mdast": "^4.0.4",
       },
     },
     "packages/create": {
@@ -70,6 +72,7 @@
         "@modelcontextprotocol/sdk": "^1.29.0",
         "dbus-ts": "^0.0.7",
         "electrobun": "latest",
+        "lit-html": "^3.3.3",
         "zod": "^4.4.3",
       },
       "devDependencies": {
@@ -183,6 +186,7 @@
         "lit": "^3.3.3",
         "lit-html": "^3.3.3",
         "monaco-editor": "^0.55.1",
+        "quikchat": "^1.2.7",
         "remark-directive": "^4.0.0",
         "remark-frontmatter": "^5.0.0",
         "remark-gfm": "^4.0.1",
@@ -193,6 +197,7 @@
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.9.0",
+        "@types/mdast": "^4.0.4",
         "@webref/css": "^8.5.7",
         "@webref/elements": "^2.7.1",
         "@webref/idl": "^3.79.0",
@@ -1426,6 +1431,8 @@
     "queue-microtask": ["queue-microtask@1.2.3", "", {}, "sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A=="],
 
     "quickjs-wasi": ["quickjs-wasi@0.0.1", "", {}, "sha512-fBWNLTBkxkLAhe1AzF1hyXEvuA+N+vV1WMP2D6iiMUblvmOt8Pp5t8zUcgvz7aYA1ldUdxDlgUse15dmcKjkNg=="],
+
+    "quikchat": ["quikchat@1.2.7", "", {}, "sha512-o5zD1eqFyHfHegFxGT380KkmRMLX1j9qfAQT1NoGeO8BB3dstYUgnqIV8dIJhbrqgRxkJyAsvTkSuPl2jfCL8A=="],
 
     "raf-schd": ["raf-schd@4.0.3", "", {}, "sha512-tQkJl2GRWh83ui2DiPTJz9wEiMN20syf+5oKfB03yYP7ioZcJwsIK8FjrtLwH1m7C7e+Tt2yYBlrOpdT+dyeIQ=="],
 

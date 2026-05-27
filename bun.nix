@@ -2639,6 +2639,10 @@
     url = "https://registry.npmjs.org/quickjs-wasi/-/quickjs-wasi-0.0.1.tgz";
     hash = "sha512-fBWNLTBkxkLAhe1AzF1hyXEvuA+N+vV1WMP2D6iiMUblvmOt8Pp5t8zUcgvz7aYA1ldUdxDlgUse15dmcKjkNg==";
   };
+  "quikchat@1.2.7" = fetchurl {
+    url = "https://registry.npmjs.org/quikchat/-/quikchat-1.2.7.tgz";
+    hash = "sha512-o5zD1eqFyHfHegFxGT380KkmRMLX1j9qfAQT1NoGeO8BB3dstYUgnqIV8dIJhbrqgRxkJyAsvTkSuPl2jfCL8A==";
+  };
   "raf-schd@4.0.3" = fetchurl {
     url = "https://registry.npmjs.org/raf-schd/-/raf-schd-4.0.3.tgz";
     hash = "sha512-tQkJl2GRWh83ui2DiPTJz9wEiMN20syf+5oKfB03yYP7ioZcJwsIK8FjrtLwH1m7C7e+Tt2yYBlrOpdT+dyeIQ==";

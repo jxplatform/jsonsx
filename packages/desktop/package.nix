@@ -46,21 +46,14 @@ stdenv.mkDerivation {
 
     mkdir -p $out/lib/jx-studio $out/bin
 
-    cp -r packages/desktop/assets $out/lib/jx-studio/
-    cp -r packages/desktop/src $out/lib/jx-studio/
-
-    # Copy root node_modules (hoisted deps), dereferencing workspace symlinks
-    cp -rL node_modules $out/lib/jx-studio/
-
-    # Merge workspace-scoped deps (e.g. dbus-ts) into node_modules
-    if [ -d packages/desktop/node_modules ]; then
-      cp -rLn packages/desktop/node_modules/. $out/lib/jx-studio/node_modules/ || true
-    fi
+    # Preserve workspace structure so Bun's symlink-based resolution works
+    cp -r node_modules $out/lib/jx-studio/
+    cp -r packages $out/lib/jx-studio/packages
 
     makeWrapper ${bun}/bin/bun $out/bin/jx-studio \
-      --add-flags "run $out/lib/jx-studio/src/chromium/index.ts" \
+      --add-flags "run $out/lib/jx-studio/packages/desktop/src/chromium/index.ts" \
       --set CHROMIUM_BIN "${chromium}/bin/chromium" \
-      --set JX_STUDIO_ASSETS "$out/lib/jx-studio/assets/studio"
+      --set JX_STUDIO_ASSETS "$out/lib/jx-studio/packages/desktop/assets/studio"
 
     install -Dm644 packages/desktop/icon.png $out/share/icons/hicolor/512x512/apps/jx-studio.png
     install -Dm644 branding/jx_flattened.svg $out/share/icons/hicolor/scalable/apps/jx-studio.svg
