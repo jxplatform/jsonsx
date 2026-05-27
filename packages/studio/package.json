@@ -22,7 +22,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/studio.js --outdir dist --target browser --sourcemap=linked && bun build ../../node_modules/monaco-editor/esm/vs/editor/editor.worker.js --outdir dist/workers --target browser --entry-naming editor.worker.js && bun build ../../node_modules/monaco-editor/esm/vs/language/json/json.worker.js --outdir dist/workers --target browser --entry-naming json.worker.js && bun build ../../node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js --outdir dist/workers --target browser --entry-naming ts.worker.js",
+    "build": "bun build ./src/studio.js --outdir dist --target browser --sourcemap=linked && bun build ./node_modules/monaco-editor/esm/vs/editor/editor.worker.js --outdir dist/workers --target browser --entry-naming editor.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/json/json.worker.js --outdir dist/workers --target browser --entry-naming json.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js --outdir dist/workers --target browser --entry-naming ts.worker.js",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "test": "bun test",
     "upgrade": "bunx npm-check-updates -u && bun install"
@@ -30,11 +30,15 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
+    "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
+    "@jxsuite/schema": "workspace:^",
     "@spectrum-web-components/accordion": "^1.12.1",
     "@spectrum-web-components/action-bar": "1.12.1",
     "@spectrum-web-components/action-button": "^1.12.1",
     "@spectrum-web-components/action-group": "^1.12.1",
+    "@spectrum-web-components/base": "^1.12.1",
+    "@spectrum-web-components/button": "^1.12.1",
     "@spectrum-web-components/checkbox": "^1.12.1",
     "@spectrum-web-components/color-area": "^1.12.1",
     "@spectrum-web-components/color-handle": "^1.12.1",
@@ -42,7 +46,10 @@
     "@spectrum-web-components/combobox": "^1.12.1",
     "@spectrum-web-components/dialog": "^1.12.1",
     "@spectrum-web-components/divider": "^1.12.1",
+    "@spectrum-web-components/field-label": "^1.12.1",
+    "@spectrum-web-components/help-text": "^1.12.1",
     "@spectrum-web-components/icon": "^1.12.1",
+    "@spectrum-web-components/icons-ui": "^1.12.1",
     "@spectrum-web-components/icons-workflow": "^1.12.1",
     "@spectrum-web-components/menu": "^1.12.1",
     "@spectrum-web-components/number-field": "^1.12.1",
@@ -60,9 +67,12 @@
     "@spectrum-web-components/theme": "^1.12.1",
     "@spectrum-web-components/toast": "^1.12.1",
     "@spectrum-web-components/tooltip": "^1.12.1",
+    "@spectrum-web-components/underlay": "^1.12.1",
     "@vue/reactivity": "3.5.35",
+    "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",
+    "quikchat": "^1.2.7",
     "remark-directive": "^4.0.0",
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
@@ -73,6 +83,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.9.0",
+    "@types/mdast": "^4.0.4",
     "@webref/css": "^8.5.7",
     "@webref/elements": "^2.7.1",
     "@webref/idl": "^3.79.0"
