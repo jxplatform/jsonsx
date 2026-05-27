@@ -2,6 +2,8 @@ import { fromHtml } from "hast-util-from-html";
 import { whitespace } from "hast-util-whitespace";
 import { find, html as htmlInfo } from "property-information";
 
+/** @typedef {import("hast").Nodes} HastNode */
+
 /**
  * Convert an HTML string into an array of Jx tree nodes.
  *
@@ -33,8 +35,7 @@ function convertHastChildren(children) {
  */
 function convertHastNode(node) {
   if (node.type === "text") {
-    if (whitespace(/** @type {import("hast").Nodes} */ (/** @type {unknown} */ (node))))
-      return null;
+    if (whitespace(/** @type {HastNode} */ (/** @type {unknown} */ (node)))) return null;
     return node.value ?? null;
   }
 
