@@ -558,7 +558,6 @@ if (_openParam) {
           if (fileRelPath === "project.json" && activeTab.value) {
             activeTab.value.session.ui.canvasMode = "stylebook";
           }
-          view.leftTab = "layers";
 
           render();
           statusMessage(`Opened ${_openParam}`);
