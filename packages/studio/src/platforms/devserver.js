@@ -372,7 +372,6 @@ export function createDevServerPlatform() {
       return schema;
     },
 
-
     // ─── Git operations ──────────────────────────────────────────────────
 
     async gitStatus() {
