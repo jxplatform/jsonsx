@@ -494,5 +494,16 @@ export function createDevServerPlatform() {
       if (!res.ok) throw new Error((await res.json()).error);
       return await res.json();
     },
+
+    /** @param {string} url */
+    async gitClone(url) {
+      const res = await fetch("/__studio/git/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
   };
 }

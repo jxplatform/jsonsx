@@ -95,6 +95,7 @@ interface StudioPlatform {
   gitDiff(path?: string): Promise<string>;
   gitShow(opts: { path: string; ref?: string }): Promise<string>;
   gitDiscard(files: string[]): Promise<void>;
+  gitClone?(url: string): Promise<{ ok: boolean; root: string }>;
   createProject(opts: {
     name: string;
     description?: string;

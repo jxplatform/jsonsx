@@ -21,6 +21,7 @@ import {
   workspace,
   openTab,
   activateTab,
+  closeTab,
   replaceAllTabs,
   activeTab,
 } from "../workspace/workspace.js";
@@ -650,6 +651,7 @@ export async function openFileInTab(path) {
     }
 
     const id = path;
+    if (workspace.tabs.has("welcome")) closeTab("welcome");
     openTab({
       id,
       documentPath: path,

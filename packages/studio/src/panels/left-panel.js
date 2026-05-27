@@ -64,15 +64,16 @@ export function mount(ctx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
-      // Track properties the left panel reads
-      void tab.doc.document;
-      void tab.doc.mode;
-      void tab.session.selection;
-      void tab.session.ui.settingsTab;
-      void tab.session.ui.gitStatus;
-      void tab.session.ui.gitLoading;
-      void tab.session.ui.gitError;
+      if (tab) {
+        // Track properties the left panel reads
+        void tab.doc.document;
+        void tab.doc.mode;
+        void tab.session.selection;
+        void tab.session.ui.settingsTab;
+        void tab.session.ui.gitStatus;
+        void tab.session.ui.gitLoading;
+        void tab.session.ui.gitError;
+      }
       render();
     });
   });
@@ -123,7 +124,10 @@ function _flush() {
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
   const aTab = activeTab.value;
-  if (!aTab) return;
+  if (!aTab || aTab.id === "welcome") {
+    litRender(html`<div class="panel-body"></div>`, leftPanel);
+    return;
+  }
   const S = /**
    * @type {{
    *   ui: unknown;

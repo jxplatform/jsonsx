@@ -986,6 +986,23 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         await runGit(["checkout", "--", ...files]);
         return Response.json({ ok: true });
       }
+
+      if (gitCmd === "clone" && req.method === "POST") {
+        const { url } = await req.json();
+        if (!url || typeof url !== "string")
+          return Response.json({ error: "Missing url" }, { status: 400 });
+        const repoName = basename(url.replace(/\.git$/, ""));
+        const dest = resolve(cwd, repoName);
+        const proc = Bun.spawn(["git", "clone", url, dest], {
+          cwd,
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const exitCode = await proc.exited;
+        const stderr = await new Response(proc.stderr).text();
+        if (exitCode !== 0) throw new Error(stderr || `git clone exited with ${exitCode}`);
+        return Response.json({ ok: true, root: dest });
+      }
     } catch (/** @type {unknown} */ e) {
       return Response.json(
         { error: /** @type {{ message?: string }} */ (e).message },

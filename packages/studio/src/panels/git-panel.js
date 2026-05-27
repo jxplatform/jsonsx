@@ -7,11 +7,14 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform.js";
-import { updateUi, renderOnly } from "../store.js";
+import { updateUi, renderOnly, projectState } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { showDialog } from "../ui/layers.js";
+import { statusMessage } from "./statusbar.js";
 
 export async function refreshGitStatus() {
+  if (!projectState) return;
   const plat = getPlatform();
   updateUi("gitLoading", true);
   updateUi("gitError", null);
@@ -26,6 +29,66 @@ export async function refreshGitStatus() {
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
   }
+}
+
+/**
+ * Show a dialog to clone a git repository. Returns the cloned project root on success, or null.
+ *
+ * @param {{ openRecentProject: (root: string) => Promise<void> }} ctx
+ */
+export async function cloneRepository(ctx) {
+  const platform = getPlatform();
+  if (!platform.gitClone) {
+    statusMessage("Clone not supported on this platform");
+    return;
+  }
+
+  const url = await showDialog(
+    (done) => html`
+      <sp-underlay open @close=${() => done(null)}></sp-underlay>
+      <sp-dialog-wrapper
+        headline="Clone Git Repository"
+        confirmLabel="Clone"
+        cancelLabel="Cancel"
+        open
+        @confirm=${(/** @type {Event} */ e) => {
+          const input = /** @type {HTMLInputElement | null} */ (
+            /** @type {HTMLElement} */ (
+              /** @type {HTMLElement} */ (e.target).parentElement
+            ).querySelector("sp-textfield")
+          );
+          done(input?.value?.trim() || null);
+        }}
+        @cancel=${() => done(null)}
+        @close=${() => done(null)}
+      >
+        <sp-textfield
+          label="Repository URL"
+          placeholder="https://github.com/user/repo.git"
+          style="width: 100%"
+          autofocus
+        ></sp-textfield>
+      </sp-dialog-wrapper>
+    `,
+  );
+
+  if (!url) return;
+
+  try {
+    statusMessage("Cloning repository...");
+    const result = await platform.gitClone(url);
+    if (result?.root) {
+      statusMessage("Clone complete");
+      await ctx.openRecentProject(result.root);
+    }
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Clone failed: ${/** @type {Error} */ (e).message}`);
+  }
+}
+
+/** @returns {boolean} */
+export function platformSupportsClone() {
+  return !!getPlatform().gitClone;
 }
 
 /**
@@ -90,6 +153,11 @@ async function fetchGitLog() {
  * }} ctx
  */
 export function renderGitPanel(S, ctx) {
+  if (!projectState) {
+    return html`<div class="git-panel">
+      <div class="git-empty">Open a project to use source control.</div>
+    </div>`;
+  }
   const status = S.ui.gitStatus;
   const branches = S.ui.gitBranches;
   const loading = S.ui.gitLoading;
