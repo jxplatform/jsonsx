@@ -52,7 +52,7 @@ The freedom of hand-coded HTML. The speed of a visual builder. The power of a fr
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="3rem"}
 ::cta-button{props.href="/docs/getting-started" props.label="Get Started" props.variant="primary"}
 
-::cta-button{props.href="https://github.com/nickshanks347/jx" props.label="View on GitHub" props.variant="secondary"}
+::cta-button{props.href="https://github.com/jxsuite/jx" props.label="View on GitHub" props.variant="secondary"}
 :::
 
 ::::div{style.backgroundColor="var(--color-bg-surface)" style.border="1px solid var(--color-border)" style.borderRadius="var(--radius)" style.padding="0.75rem 1.25rem" style.fontFamily="var(--font-mono)" style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.display="inline-flex" style.alignItems="center" style.gap="0.75rem"}
