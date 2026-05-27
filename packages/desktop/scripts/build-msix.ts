@@ -1,113 +1,153 @@
-import { cp, mkdir, rm, rename, writeFile } from "fs/promises";
-import { existsSync, cpSync, mkdirSync } from "fs";
+import { $ } from "bun";
+import { cp, mkdir, readFile, writeFile, rm, copyFile } from "fs/promises";
 import { join, resolve } from "path";
-import { execSync } from "child_process";
-import { generateUpdateMetadata } from "electrobun-builder-for-windows/dist/update.js";
-import { loadConfig } from "electrobun-builder-for-windows/dist/config.js";
-import { checkDependencies } from "electrobun-builder-for-windows/dist/utils/deps.js";
-import sharp from "sharp";
+import { existsSync, readdirSync, unlinkSync } from "fs";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
   process.exit(0);
 }
 
-const projectRoot = join(import.meta.dir, "..");
-const config = await loadConfig(projectRoot);
+const desktopDir = resolve(import.meta.dir, "..");
+const certPath = join(desktopDir, "certs", "jx-studio-dev.pfx");
+const certPassword = "dev-cert-password";
 
-await checkDependencies("msix", false);
+const distDir = join(desktopDir, "dist");
+const artifactsDir = join(desktopDir, "artifacts");
+await mkdir(distDir, { recursive: true });
+await mkdir(artifactsDir, { recursive: true });
 
-const distDir = join(projectRoot, "dist");
-const stageDir = join(distDir, "msix-stage");
-
-if (existsSync(stageDir)) await rm(stageDir, { recursive: true });
-mkdirSync(stageDir, { recursive: true });
-
-const appName = config.name || "ElectrobunApp";
-const version = config.version || "1.0.0";
-const quadVersion = version.split(".").length === 3 ? `${version}.0` : version;
-const winConfig = config.windows;
-const msixConfig = winConfig?.msix;
-const identifier =
-  config.id ||
-  msixConfig?.identityName ||
-  `com.example.${appName.toLowerCase().replace(/\s/g, "")}`;
-const publisher = msixConfig?.publisher || "CN=Electrobun";
-const publisherDisplayName =
-  msixConfig?.publisherDisplayName || config.author || "Electrobun Developer";
-
-// 1. Copy app files into staging directory
-const appFolderName = winConfig?.installDir || appName;
-const buildRootDir = join(projectRoot, "build", "stable-win-x64");
-const appSourceDir = join(buildRootDir, appFolderName);
-const sourceDir = existsSync(appSourceDir) ? appSourceDir : buildRootDir;
-
-console.log(`[build-msix] Copying app files from ${sourceDir}`);
-cpSync(sourceDir, stageDir, { recursive: true });
-
-// 2. Ensure launcher is renamed to <AppName>.exe at staging root
-const launcherInBin = join(stageDir, "bin", "launcher");
-const launcherExe = join(stageDir, "bin", "launcher.exe");
-const targetExe = join(stageDir, `${appName}.exe`);
-
-if (existsSync(launcherInBin)) {
-  await rename(launcherInBin, targetExe);
-  console.log(`[build-msix] Moved bin/launcher → ${appName}.exe`);
-} else if (existsSync(launcherExe)) {
-  await rename(launcherExe, targetExe);
-  console.log(`[build-msix] Moved bin/launcher.exe → ${appName}.exe`);
+const buildDir = join(desktopDir, "build", "stable-win-x64", "JxStudio");
+if (!existsSync(buildDir)) {
+  console.error(
+    "[build-msix] Build dir not found. Run 'bunx electrobun build --env=stable' first.",
+  );
+  process.exit(1);
 }
 
-// 3. Generate MSIX assets from icon
-const assetsDir = join(stageDir, "Assets");
-mkdirSync(assetsDir, { recursive: true });
+// Resolve electrobun dist (may be hoisted to workspace root in monorepos)
+const localDist = join(desktopDir, "node_modules", "electrobun", "dist-win-x64");
+const rootDist = join(desktopDir, "..", "..", "node_modules", "electrobun", "dist-win-x64");
+const electrobunDist = existsSync(localDist) ? localDist : rootDist;
+if (!existsSync(electrobunDist)) {
+  console.error("[build-msix] Cannot find electrobun/dist-win-x64.");
+  process.exit(1);
+}
 
-const iconPath = winConfig?.icon ? resolve(projectRoot, winConfig.icon) : null;
-const assets = [
-  { name: "StoreLogo.png", size: 50 },
-  { name: "Square150x150Logo.png", size: 150 },
-  { name: "Square44x44Logo.png", size: 44 },
-  { name: "Wide310x150Logo.png", size: [310, 150] as [number, number] },
-  { name: "SplashScreen.png", size: [620, 300] as [number, number] },
-];
-
-for (const asset of assets) {
-  const assetPath = join(assetsDir, asset.name);
-  if (iconPath && existsSync(iconPath)) {
-    const s = sharp(iconPath);
-    if (Array.isArray(asset.size)) {
-      await s
-        .resize(asset.size[0], asset.size[1], {
-          fit: "contain",
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        })
-        .toFile(assetPath);
-    } else {
-      await s.resize(asset.size, asset.size).toFile(assetPath);
-    }
+// --- Step 1: Decompress tar.zst archive if needed ---
+const resourcesDir = join(buildDir, "Resources");
+if (existsSync(resourcesDir) && !existsSync(join(resourcesDir, "app"))) {
+  const files = readdirSync(resourcesDir);
+  const tarZstFile = files.find((f) => f.endsWith(".tar.zst"));
+  if (tarZstFile) {
+    const zstdPath = join(electrobunDist, "zig-zstd.exe");
+    const tarZstPath = join(resourcesDir, tarZstFile);
+    const tarPath = tarZstPath.replace(".zst", "");
+    console.log(`[build-msix] Decompressing: ${tarZstFile}`);
+    await $`${zstdPath} decompress -i ${tarZstPath} -o ${tarPath}`;
+    await $`C:\\Windows\\System32\\tar.exe -xf ${tarPath} -C ${join(buildDir, "..")}`;
+    unlinkSync(tarPath);
+    unlinkSync(tarZstPath);
   }
 }
 
-// 4. Generate AppxManifest.xml
-const capabilities = msixConfig?.capabilities
-  ? msixConfig.capabilities.map((c: string) => `    <Capability Name="${c}" />`).join("\n")
-  : "";
+// --- Step 2: Place runtime files from electrobun dist ---
+const binDir = join(buildDir, "bin");
+const runtimeFiles = [
+  "launcher.exe",
+  "libNativeWrapper.dll",
+  "WebView2Loader.dll",
+  "d3dcompiler_47.dll",
+  "webgpu_dawn.dll",
+  "process_helper.exe",
+];
+for (const file of runtimeFiles) {
+  const src = join(electrobunDist, file);
+  if (existsSync(src)) await copyFile(src, join(binDir, file));
+}
+
+// Copy CEF files if present (bundleCEF: true)
+const cefSrcDir = join(electrobunDist, "cef");
+if (existsSync(cefSrcDir)) {
+  console.log("[build-msix] Copying CEF runtime files...");
+  await cp(cefSrcDir, join(binDir, "cef"), { recursive: true });
+}
+
+// --- Step 3: Patch main.js and compile into standalone exe ---
+// MSIX Workers get EPERM reading files from C:\Program Files\WindowsApps.
+// We patch the flat-files branch to copy the app entrypoint to %TEMP% before
+// spawning the Worker, then compile the patched main.js into bun.exe.
+const mainJsPath = join(buildDir, "Resources", "main.js");
+let mainJsSrc = await readFile(mainJsPath, "utf8");
+
+const flatFilesOriginal = `} else {
+    console.log(\`[LAUNCHER] Loading app code from flat files\`);
+    appEntrypointPath = join(appFolderPath, "bun", "index.js");
+  }`;
+
+const flatFilesPatched = `} else {
+    console.log(\`[LAUNCHER] Loading app code from flat files\`);
+    const __flatEntry = join(appFolderPath, "bun", "index.js");
+    const __appData = __require("fs").readFileSync(__flatEntry, "utf8");
+    const __tmpName = \`electrobun-\${Date.now()}-\${Math.random().toString(36).substring(7)}.js\`;
+    appEntrypointPath = join(tmpdir(), __tmpName);
+    writeFileSync(appEntrypointPath, __appData);
+    console.log(\`[LAUNCHER] Copied app entrypoint to: \${appEntrypointPath}\`);
+  }`;
+
+if (mainJsSrc.includes("Loading app code from flat files")) {
+  mainJsSrc = mainJsSrc.replace(flatFilesOriginal, flatFilesPatched);
+  await writeFile(mainJsPath, mainJsSrc, "utf8");
+  console.log("[build-msix] Patched main.js (flat-files → temp copy for MSIX Worker EPERM fix)");
+} else {
+  console.log("[build-msix] Warning: Could not find flat-files pattern in main.js, skipping patch");
+}
+
+const compiledExe = join(binDir, "bun.exe");
+await $`bun build ${mainJsPath} --compile --outfile ${compiledExe}`;
+console.log("[build-msix] Compiled main.js → bun.exe (standalone)");
+
+// --- Step 4: Stage flat directory for MSIX ---
+const msixStageDir = join(distDir, "msix-stage");
+if (existsSync(msixStageDir)) await rm(msixStageDir, { recursive: true });
+await cp(buildDir, msixStageDir, { recursive: true });
+
+// Remove build tools, cross-platform artifacts, and unused libs
+const junkFiles = ["zig-zstd.exe", "bspatch.exe", "Info.plist", "libasar.dll", "libasar-arm64.dll"];
+for (const name of junkFiles) {
+  for (const dir of [join(msixStageDir, "bin"), msixStageDir]) {
+    const p = join(dir, name);
+    if (existsSync(p)) unlinkSync(p);
+  }
+}
+const extensionlessLauncher = join(msixStageDir, "bin", "launcher");
+if (existsSync(extensionlessLauncher)) unlinkSync(extensionlessLauncher);
+
+// --- Step 5: Copy pre-generated asset PNGs ---
+const assetsDir = join(msixStageDir, "Assets");
+await mkdir(assetsDir, { recursive: true });
+for (const file of readdirSync(join(desktopDir, "msix-assets"))) {
+  await copyFile(join(desktopDir, "msix-assets", file), join(assetsDir, file));
+}
+
+// --- Step 6: Generate AppxManifest.xml ---
+const pkg = JSON.parse(await readFile(join(desktopDir, "package.json"), "utf8"));
+const version = pkg.version;
+const quadVersion = version.split(".").length === 3 ? `${version}.0` : version;
 
 const manifest = `<?xml version="1.0" encoding="utf-8"?>
-<Package
-  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
 
-  <Identity
-    Name="${identifier}"
-    Publisher="${publisher}"
-    Version="${quadVersion}"
-    ProcessorArchitecture="x64" />
+  <Identity Name="AvunuLLC.JxStudio"
+            Publisher="CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4"
+            Version="${quadVersion}"
+            ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>${appName}</DisplayName>
-    <PublisherDisplayName>${publisherDisplayName}</PublisherDisplayName>
+    <DisplayName>Jx Studio</DisplayName>
+    <PublisherDisplayName>Avunu LLC</PublisherDisplayName>
     <Logo>Assets\\StoreLogo.png</Logo>
   </Properties>
 
@@ -120,13 +160,12 @@ const manifest = `<?xml version="1.0" encoding="utf-8"?>
   </Resources>
 
   <Applications>
-    <Application Id="App" Executable="${appName}.exe" EntryPoint="Windows.FullTrustApplication">
-      <uap:VisualElements
-        DisplayName="${appName}"
-        Description="${appName}"
-        BackgroundColor="#000000"
-        Square150x150Logo="Assets\\Square150x150Logo.png"
-        Square44x44Logo="Assets\\Square44x44Logo.png">
+    <Application Id="App" Executable="bin\\launcher.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Jx Studio"
+                          Description="Jx Studio"
+                          BackgroundColor="transparent"
+                          Square150x150Logo="Assets\\Square150x150Logo.png"
+                          Square44x44Logo="Assets\\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\\SplashScreen.png" />
       </uap:VisualElements>
@@ -134,31 +173,50 @@ const manifest = `<?xml version="1.0" encoding="utf-8"?>
   </Applications>
 
   <Capabilities>
+    <Capability Name="internetClient" />
     <rescap:Capability Name="runFullTrust" />
-    ${capabilities}
   </Capabilities>
-</Package>`;
+</Package>
+`;
 
-await writeFile(join(stageDir, "AppxManifest.xml"), manifest);
+await writeFile(join(msixStageDir, "AppxManifest.xml"), manifest, "utf8");
+console.log("[build-msix] Generated AppxManifest.xml");
 
-// 5. Run makeappx
-const outputFilename = `${appName}_${quadVersion}_x64.msix`;
-const outputPath = join(distDir, outputFilename);
-
-console.log(`[build-msix] Creating MSIX: ${outputPath}`);
-execSync(`makeappx pack /d "${stageDir}" /p "${outputPath}" /o`, { stdio: "inherit" });
-console.log(`[build-msix] MSIX created successfully`);
-
-// 6. Generate update metadata
-const baseUrl = "https://github.com/jxsuite/jx/releases/latest/download/";
-await generateUpdateMetadata(outputPath, version, baseUrl, distDir);
-
-// 7. Copy artifacts
-const artifactsDir = join(projectRoot, "artifacts");
-await mkdir(artifactsDir, { recursive: true });
-
-const distFiles = new Bun.Glob("*.{msix,json}");
-for await (const file of distFiles.scan(distDir)) {
-  await cp(join(distDir, file), join(artifactsDir, file));
-  console.log(`[build-msix] Copied ${file} → artifacts/`);
+// --- Step 7: Run makeappx ---
+function findSdkTool(name: string): string {
+  const kitsDir = "C:\\Program Files (x86)\\Windows Kits\\10\\bin";
+  if (existsSync(kitsDir)) {
+    const versions = readdirSync(kitsDir)
+      .filter((d) => d.startsWith("10."))
+      .sort()
+      .reverse();
+    for (const ver of versions) {
+      const p = join(kitsDir, ver, "x64", `${name}.exe`);
+      if (existsSync(p)) return p;
+    }
+  }
+  return name;
 }
+
+const makeappx = findSdkTool("makeappx");
+const outputMsix = join(distDir, `JxStudio_${quadVersion}_x64.msix`);
+await $`${makeappx} pack /d ${msixStageDir} /p ${outputMsix} /o`;
+console.log(`[build-msix] Created: ${outputMsix}`);
+
+// --- Step 8: Sign if certificate exists ---
+if (existsSync(certPath)) {
+  const signtool = findSdkTool("signtool");
+  try {
+    await $`${signtool} sign /f ${certPath} /p ${certPassword} /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 ${outputMsix}`;
+    console.log("[build-msix] Signed MSIX");
+  } catch {
+    console.error("[build-msix] Signing failed. Continuing without signature.");
+  }
+} else {
+  console.log("[build-msix] No certificate found, skipping signing.");
+}
+
+// --- Step 9: Copy artifacts ---
+const msixName = `JxStudio_${quadVersion}_x64.msix`;
+await cp(outputMsix, join(artifactsDir, msixName));
+console.log(`[build-msix] Done → artifacts/${msixName}`);

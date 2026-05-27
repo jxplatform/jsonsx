@@ -54,8 +54,8 @@ export default {
       },
     },
     win: {
-      bundleCEF: false,
-      defaultRenderer: "native",
+      bundleCEF: true,
+      defaultRenderer: "cef",
       icon: "icon.ico",
     },
 
@@ -76,22 +76,4 @@ export default {
   release: {
     baseUrl: "https://github.com/jxsuite/jx/releases/latest/download/",
   },
-
-  // electrobun-builder-for-windows configuration
-  // @ts-expect-error
-  id: "AvunuLLC.JxStudio",
-  name: "Jx Studio",
-  version: pkg.version,
-  author: "Avunu LLC",
-  windows: {
-    icon: "icon.png",
-    productId: "com.jxsuite.jx-studio",
-    installDir: "JxStudio",
-    msix: {
-      publisher: "CN=118A192A-BE3D-4B35-A22B-EA889CD1D0B4",
-      publisherDisplayName: "Avunu LLC",
-      identityName: "AvunuLLC.JxStudio",
-      capabilities: ["internetClient"],
-    },
-  },
-} satisfies ElectrobunConfig as ElectrobunConfig & Record<string, unknown>;
+} satisfies ElectrobunConfig;

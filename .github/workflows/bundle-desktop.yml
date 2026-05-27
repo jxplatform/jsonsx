@@ -50,9 +50,8 @@ jobs:
       - name: Install WiX Toolset (Windows)
         if: runner.os == 'Windows'
         run: |
-          Invoke-WebRequest -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314.exe" -OutFile wix314.exe
-          Start-Process -Wait -FilePath .\wix314.exe -ArgumentList '/install','/quiet','/norestart'
-          echo "C:\Program Files (x86)\WiX Toolset v3.14\bin" >> $env:GITHUB_PATH
+          dotnet tool install --global wix
+          wix eula accept wix7
 
       - name: Free disk space (macOS x64)
         if: matrix.platform == 'macos-x64'

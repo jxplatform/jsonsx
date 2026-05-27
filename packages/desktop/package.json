@@ -15,6 +15,8 @@
     "build:stable": "bunx electrobun build --env=stable && bun run scripts/build-msi.ts",
     "chromium": "bun run scripts/pre-build-rpc.ts && bun run src/chromium/index.ts",
     "dev": "bunx electrobun dev",
+    "sign:cert": "bun run scripts/sign-cert.ts",
+    "sign:trust": "powershell -ExecutionPolicy Bypass -File scripts/trust-cert.ps1",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
@@ -24,6 +26,6 @@
   },
   "devDependencies": {
     "@jxsuite/server": "workspace:^",
-    "electrobun-builder-for-windows": "^0.3.7"
+    "rcedit": "^5.0.2"
   }
 }
