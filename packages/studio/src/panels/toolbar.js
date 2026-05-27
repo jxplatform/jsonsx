@@ -258,36 +258,71 @@ function toolbarTemplate() {
    *   };
    * }}
    */ (/** @type {unknown} */ (globalThis)).__jxPlatform?.windowControls;
+  const isMac = navigator.platform.startsWith("Mac");
   const csdTpl = windowControls
-    ? html`
-        <sp-action-group class="window-controls" size="s">
-          <sp-action-button
-            quiet
-            size="s"
-            title="Minimize"
-            @click=${() => windowControls.minimize()}
-          >
-            <sp-icon-remove slot="icon"></sp-icon-remove>
-          </sp-action-button>
-          <sp-action-button
-            quiet
-            size="s"
-            title="Maximize"
-            @click=${() => windowControls.maximize()}
-          >
-            <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
-          </sp-action-button>
-          <sp-action-button
-            quiet
-            size="s"
-            title="Close"
-            class="csd-close"
-            @click=${() => windowControls.close()}
-          >
-            <sp-icon-close slot="icon"></sp-icon-close>
-          </sp-action-button>
-        </sp-action-group>
-      `
+    ? isMac
+      ? html`
+          <sp-action-group class="window-controls mac" size="s">
+            <sp-action-button
+              quiet
+              size="s"
+              title="Close"
+              class="csd-close"
+              @click=${() => windowControls.close()}
+            >
+              <sp-icon-close slot="icon"></sp-icon-close>
+            </sp-action-button>
+            <sp-action-button
+              quiet
+              size="s"
+              title="Minimize"
+              class="csd-minimize"
+              @click=${() => windowControls.minimize()}
+            >
+              <sp-icon-remove slot="icon"></sp-icon-remove>
+            </sp-action-button>
+            <sp-action-button
+              quiet
+              size="s"
+              title="Maximize"
+              class="csd-maximize"
+              @click=${() => windowControls.maximize()}
+            >
+              <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
+            </sp-action-button>
+          </sp-action-group>
+        `
+      : html`
+          <sp-action-group class="window-controls" size="s">
+            <sp-action-button
+              quiet
+              size="s"
+              title="Minimize"
+              class="csd-minimize"
+              @click=${() => windowControls.minimize()}
+            >
+              <sp-icon-remove slot="icon"></sp-icon-remove>
+            </sp-action-button>
+            <sp-action-button
+              quiet
+              size="s"
+              title="Maximize"
+              class="csd-maximize"
+              @click=${() => windowControls.maximize()}
+            >
+              <sp-icon-rectangle slot="icon"></sp-icon-rectangle>
+            </sp-action-button>
+            <sp-action-button
+              quiet
+              size="s"
+              title="Close"
+              class="csd-close"
+              @click=${() => windowControls.close()}
+            >
+              <sp-icon-close slot="icon"></sp-icon-close>
+            </sp-action-button>
+          </sp-action-group>
+        `
     : nothing;
 
   const recentProjects = getRecentProjects();
@@ -319,6 +354,7 @@ function toolbarTemplate() {
   `;
 
   return html`
+    ${isMac ? csdTpl : nothing}
     <div class="tb-split-btn">
       <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
         ${toolbarIconMap["sp-icon-folder-open"]} Open Project
@@ -364,6 +400,6 @@ function toolbarTemplate() {
         ? html`<sp-icon-rail-right-open slot="icon"></sp-icon-rail-right-open>`
         : html`<sp-icon-rail-right-close slot="icon"></sp-icon-rail-right-close>`}
     </sp-action-button>
-    ${csdTpl}
+    ${isMac ? nothing : csdTpl}
   `;
 }

@@ -329,6 +329,9 @@ export function createDesktopPlatform() {
       minimize: () => rpc.request.windowMinimize(),
       maximize: () => rpc.request.windowMaximize(),
       close: () => rpc.request.windowClose(),
+      getFrame: () => rpc.request.windowGetFrame(),
+      setFrame: (x: number, y: number, w: number, h: number) =>
+        rpc.request.windowSetFrame({ x, y, width: w, height: h }),
     },
   };
 }

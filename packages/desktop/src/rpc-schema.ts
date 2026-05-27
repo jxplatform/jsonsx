@@ -270,6 +270,14 @@ export type StudioRPC = {
         params: void;
         response: void;
       };
+      windowGetFrame: {
+        params: void;
+        response: { x: number; y: number; width: number; height: number };
+      };
+      windowSetFrame: {
+        params: { x: number; y: number; width: number; height: number };
+        response: void;
+      };
     };
     messages: {};
   }>;
