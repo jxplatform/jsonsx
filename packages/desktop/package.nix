@@ -49,8 +49,13 @@ stdenv.mkDerivation {
     cp -r packages/desktop/assets $out/lib/jx-studio/
     cp -r packages/desktop/src $out/lib/jx-studio/
 
-    # Copy node_modules, dereferencing workspace symlinks
+    # Copy root node_modules (hoisted deps), dereferencing workspace symlinks
     cp -rL node_modules $out/lib/jx-studio/
+
+    # Merge workspace-scoped deps (e.g. dbus-ts) into node_modules
+    if [ -d packages/desktop/node_modules ]; then
+      cp -rLn packages/desktop/node_modules/. $out/lib/jx-studio/node_modules/ || true
+    fi
 
     makeWrapper ${bun}/bin/bun $out/bin/jx-studio \
       --add-flags "run $out/lib/jx-studio/src/chromium/index.ts" \
