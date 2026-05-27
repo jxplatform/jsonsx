@@ -137,11 +137,15 @@
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
+        "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
+        "@jxsuite/schema": "workspace:^",
         "@spectrum-web-components/accordion": "^1.12.1",
         "@spectrum-web-components/action-bar": "1.12.1",
         "@spectrum-web-components/action-button": "^1.12.1",
         "@spectrum-web-components/action-group": "^1.12.1",
+        "@spectrum-web-components/base": "^1.12.1",
+        "@spectrum-web-components/button": "^1.12.1",
         "@spectrum-web-components/checkbox": "^1.12.1",
         "@spectrum-web-components/color-area": "^1.12.1",
         "@spectrum-web-components/color-handle": "^1.12.1",
@@ -149,7 +153,10 @@
         "@spectrum-web-components/combobox": "^1.12.1",
         "@spectrum-web-components/dialog": "^1.12.1",
         "@spectrum-web-components/divider": "^1.12.1",
+        "@spectrum-web-components/field-label": "^1.12.1",
+        "@spectrum-web-components/help-text": "^1.12.1",
         "@spectrum-web-components/icon": "^1.12.1",
+        "@spectrum-web-components/icons-ui": "^1.12.1",
         "@spectrum-web-components/icons-workflow": "^1.12.1",
         "@spectrum-web-components/menu": "^1.12.1",
         "@spectrum-web-components/number-field": "^1.12.1",
@@ -167,7 +174,9 @@
         "@spectrum-web-components/theme": "^1.12.1",
         "@spectrum-web-components/toast": "^1.12.1",
         "@spectrum-web-components/tooltip": "^1.12.1",
+        "@spectrum-web-components/underlay": "^1.12.1",
         "@vue/reactivity": "3.5.35",
+        "lit": "^3.3.3",
         "lit-html": "^3.3.3",
         "monaco-editor": "^0.55.1",
         "remark-directive": "^4.0.0",
@@ -1478,7 +1487,7 @@
 
     "sax": ["sax@1.6.0", "", {}, "sha512-6R3J5M4AcbtLUdZmRv2SygeVaM7IhrLXu9BmnOGmmACak8fiUtOsYNWUS4uK7upbmHIBbLBeFeI//477BKLBzA=="],
 
-    "semver": ["semver@7.8.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg=="],
+    "semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
 
     "send": ["send@1.2.1", "", { "dependencies": { "debug": "^4.4.3", "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "etag": "^1.8.1", "fresh": "^2.0.0", "http-errors": "^2.0.1", "mime-types": "^3.0.2", "ms": "^2.1.3", "on-finished": "^2.4.1", "range-parser": "^1.2.1", "statuses": "^2.0.2" } }, "sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ=="],
 
@@ -1739,8 +1748,6 @@
     "path-scurry/lru-cache": ["lru-cache@11.5.0", "", {}, "sha512-5YgH9UJd7wVb9hIouI2adWpgqrrICkt070Dnj8EUY1+B4B2P9eRLPAkAAo6NICA7CEhOIeBHl46u9zSNpNu7zA=="],
 
     "png-to-ico/@types/node": ["@types/node@17.0.45", "", {}, "sha512-w+tIMs3rq2afQdsPJlODhoUEKzFP1ayaoyl1CcnwtIlsVe7K7bA1NGm4s3PraqTLlXnbIN84zuBlxBWo1u9BLw=="],
-
-    "release-it/semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
 
     "remark-parse-frontmatter/yaml": ["yaml@1.10.3", "", {}, "sha512-vIYeF1u3CjlhAFekPPAk2h/Kv4T3mAkMox5OymRiJQB0spDP10LHvt+K7G9Ny6NuuMAb25/6n1qyUjAcGNf/AA=="],
 
