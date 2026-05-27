@@ -42,19 +42,20 @@ function varToLabel(/** @type {string} */ name) {
 }
 
 /** Resolve a color value for display — if it's a var() reference, look up the actual color. */
-function resolveColorForDisplay(/** @type {any} */ val) {
+function resolveColorForDisplay(/** @type {string | number | undefined} */ val) {
   if (!val) return "transparent";
-  const m = val.match(/^var\((--[^)]+)\)$/);
+  const s = String(val);
+  const m = s.match(/^var\((--[^)]+)\)$/);
   if (m) {
     const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
     const resolved = style?.[m[1]];
     if (typeof resolved === "string") return resolved;
     return "transparent";
   }
-  return val;
+  return s;
 }
 
-function safeColor(/** @type {any} */ val) {
+function safeColor(/** @type {string | number | undefined} */ val) {
   if (!val) return "transparent";
   return resolveColorForDisplay(val);
 }
@@ -69,7 +70,7 @@ function normalizeHex(/** @type {string} */ c) {
 /**
  * Check if a value is a var() reference that matches a defined color variable.
  *
- * @param {any} value
+ * @param {string | number | undefined} value
  * @param {{ name: string; value: string }[]} colorVars
  */
 function matchesColorVar(value, colorVars) {
@@ -102,7 +103,7 @@ export class JxColorPopover extends LitElement {
     return this;
   }
 
-  /** @param {Map<string, any>} changed */
+  /** @param {Map<string, unknown>} changed */
   willUpdate(changed) {
     if (changed.has("color")) {
       const raw = resolveColorForDisplay(this.color);
@@ -116,29 +117,33 @@ export class JxColorPopover extends LitElement {
     }
   }
 
-  _handleArea(/** @type {any} */ e) {
-    const color = normalizeHex(String(e.target.color));
+  _handleArea(/** @type {Event} */ e) {
+    const color = normalizeHex(
+      String(/** @type {HTMLElement & { color: string }} */ (e.target).color),
+    );
     this.displayColor = color;
     this.color = color;
     this.dispatchEvent(new CustomEvent("color-change", { detail: color, bubbles: true }));
   }
 
-  _handleSlider(/** @type {any} */ e) {
-    const color = normalizeHex(String(e.target.color));
+  _handleSlider(/** @type {Event} */ e) {
+    const color = normalizeHex(
+      String(/** @type {HTMLElement & { color: string }} */ (e.target).color),
+    );
     this.displayColor = color;
     this.color = color;
     this.dispatchEvent(new CustomEvent("color-change", { detail: color, bubbles: true }));
   }
 
-  _handleText(/** @type {any} */ e) {
-    const val = e.target.value.trim();
+  _handleText(/** @type {Event} */ e) {
+    const val = /** @type {HTMLInputElement} */ (e.target).value.trim();
     if (!val) return;
     this.displayColor = val;
     this.color = val;
     this.dispatchEvent(new CustomEvent("color-change", { detail: val, bubbles: true }));
   }
 
-  _handleSwatch(/** @type {any} */ e, /** @type {string} */ varName) {
+  _handleSwatch(/** @type {Event} */ e, /** @type {string} */ varName) {
     e.stopPropagation();
     const varRef = `var(${varName})`;
     this.color = varRef;
@@ -176,7 +181,7 @@ export class JxColorPopover extends LitElement {
                       color=${cv.value}
                       .value=${cv.name}
                       title=${cv.name}
-                      @click=${(/** @type {any} */ e) => this._handleSwatch(e, cv.name)}
+                      @click=${(/** @type {Event} */ e) => this._handleSwatch(e, cv.name)}
                     ></sp-swatch>
                   `,
                 )}
@@ -198,14 +203,14 @@ export class JxColorPopover extends LitElement {
  * title-cased label with swatch (e.g. "Primary Blue").
  *
  * @param {string} prop — property key (for debounce namespace)
- * @param {any} value — current color value
+ * @param {string | number | undefined} value — current color value
  * @param {(color: string) => void} onChange — commit callback
- * @returns {any}
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderColorSelector(
-  /** @type {any} */ prop,
-  /** @type {any} */ value,
-  /** @type {any} */ onChange,
+  /** @type {string} */ prop,
+  /** @type {string | number | undefined} */ value,
+  /** @type {(color: string) => void} */ onChange,
 ) {
   const colorVars = getColorVars();
   const matchedVar = matchesColorVar(value, colorVars);
@@ -237,9 +242,9 @@ export function renderColorSelector(
           size="s"
           style="flex:1; min-width:0"
           .value=${`var(${matchedVar.name})`}
-          @change=${(/** @type {any} */ e) => {
+          @change=${(/** @type {Event} */ e) => {
             e.stopPropagation();
-            onChange(e.target.value);
+            onChange(/** @type {HTMLInputElement} */ (e.target).value);
           }}
         >
           ${colorVars.map(
@@ -275,8 +280,8 @@ export function renderColorSelector(
         style="flex:1; min-width:0"
         .value=${live(value || "")}
         @click=${(/** @type {Event} */ e) => e.stopPropagation()}
-        @input=${debouncedStyleCommit(`color:${prop}`, 400, (/** @type {any} */ e) => {
-          onChange(e.target.value.trim());
+        @input=${debouncedStyleCommit(`color:${prop}`, 400, (/** @type {Event} */ e) => {
+          onChange(/** @type {HTMLInputElement} */ (e.target).value.trim());
         })}
       ></sp-textfield>
       <sp-overlay trigger="${triggerId}@click" placement="bottom-start" type="auto">

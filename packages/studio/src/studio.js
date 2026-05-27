@@ -15,6 +15,7 @@ import {
   render,
   projectState,
   setProjectState,
+  requireProjectState,
   updateUi,
 } from "./store.js";
 
@@ -105,12 +106,12 @@ function setCanvasMode(mode) {
   if (tab) tab.session.ui.canvasMode = mode;
 }
 
-/** @type {any} */
+/** @type {import("./canvas/canvas-render.js").GitDiffState | null} */
 let gitDiffState = null;
 
 // ─── Component registry ───────────────────────────────────────────────────────
 
-/** @param {any} componentPath */
+/** @param {string} componentPath */
 async function navigateToComponent(componentPath) {
   try {
     const platform = getPlatform();
@@ -135,7 +136,7 @@ async function navigateToComponent(componentPath) {
     // Load the component
     tab.doc.document = parsed;
     tab.doc.dirty = false;
-    tab.doc.mode = /** @type {any} */ (null);
+    tab.doc.mode = /** @type {string} */ (/** @type {unknown} */ (null));
     tab.doc.sourceFormat = null;
     tab.documentPath = componentPath;
     tab.session.selection = null;
@@ -145,8 +146,8 @@ async function navigateToComponent(componentPath) {
 
     render();
     statusMessage(`Editing component: ${parsed.tagName || componentPath}`);
-  } catch (/** @type {any} */ e) {
-    const err = /** @type {any} */ (e);
+  } catch (/** @type {unknown} */ e) {
+    const err = /** @type {Error} */ (e);
     statusMessage(`Error: ${err.message}`);
   }
 }
@@ -158,21 +159,23 @@ async function navigateBack() {
     try {
       const platform = getPlatform();
       await platform.writeFile(tab.documentPath, serializeDocument(tab));
-    } catch (/** @type {any} */ e) {
-      const err = /** @type {any} */ (e);
+    } catch (/** @type {unknown} */ e) {
+      const err = /** @type {Error} */ (e);
       statusMessage(`Save error: ${err.message}`);
     }
   }
 
   // Pop the stack
-  const frame = /** @type {any} */ (tab.session.documentStack.pop());
+  const frame = /** @type {Record<string, unknown> | undefined} */ (
+    tab.session.documentStack.pop()
+  );
   if (!frame) return;
-  tab.doc.document = frame.document;
-  tab.doc.dirty = frame.dirty;
-  tab.doc.mode = frame.mode;
-  tab.doc.sourceFormat = frame.sourceFormat;
-  tab.documentPath = frame.documentPath;
-  tab.session.selection = frame.selection;
+  tab.doc.document = /** @type {JxMutableNode} */ (frame.document);
+  tab.doc.dirty = /** @type {boolean} */ (frame.dirty);
+  tab.doc.mode = /** @type {string} */ (frame.mode);
+  tab.doc.sourceFormat = /** @type {string | null} */ (frame.sourceFormat);
+  tab.documentPath = /** @type {string | null} */ (frame.documentPath);
+  tab.session.selection = /** @type {JxPath | null} */ (frame.selection);
   view.leftTab = "layers";
 
   render();
@@ -188,20 +191,20 @@ async function navigateToLevel(targetIndex) {
     try {
       const platform = getPlatform();
       await platform.writeFile(tab.documentPath, serializeDocument(tab));
-    } catch (/** @type {any} */ e) {
-      const err = /** @type {any} */ (e);
+    } catch (/** @type {unknown} */ e) {
+      const err = /** @type {Error} */ (e);
       statusMessage(`Save error: ${err.message}`);
     }
   }
 
-  const frame = /** @type {any} */ (stack[targetIndex]);
+  const frame = /** @type {DocumentStackEntry} */ (stack[targetIndex]);
   tab.session.documentStack = stack.slice(0, targetIndex);
-  tab.doc.document = frame.document;
-  tab.doc.dirty = frame.dirty;
-  tab.doc.mode = frame.mode;
-  tab.doc.sourceFormat = frame.sourceFormat;
-  tab.documentPath = frame.documentPath;
-  tab.session.selection = frame.selection;
+  tab.doc.document = /** @type {JxMutableNode} */ (frame.document);
+  tab.doc.dirty = /** @type {boolean} */ (frame.dirty);
+  tab.doc.mode = /** @type {string} */ (frame.mode);
+  tab.doc.sourceFormat = /** @type {string | null} */ (frame.sourceFormat);
+  tab.documentPath = /** @type {string | null} */ (frame.documentPath);
+  tab.session.selection = /** @type {JxPath | null} */ (frame.selection);
   view.leftTab = "layers";
 
   render();
@@ -210,23 +213,33 @@ async function navigateToLevel(targetIndex) {
 
 async function closeFunctionEditor() {
   const tab = activeTab.value;
-  const editing = /** @type {any} */ (tab?.session.ui.editingFunction);
-  if (!editing) return;
+  const editing =
+    /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ (
+      tab?.session.ui.editingFunction
+    );
+  if (!editing || !tab) return;
   if (view.functionEditor) {
     const currentCode = view.functionEditor.getValue();
     const minResult = await codeService("minify", { code: currentCode });
     const bodyToStore = minResult?.code ?? currentCode;
     if (editing.type === "def") {
-      transactDoc(tab, (t) => mutateUpdateDef(t, editing.defName, { body: bodyToStore }));
-    } else if (editing.type === "event") {
-      const node = getNodeAtPath(tab.doc.document, editing.path);
-      const current = node?.[editing.eventKey] || {};
       transactDoc(tab, (t) =>
-        mutateUpdateProperty(t, editing.path, editing.eventKey, {
-          ...current,
-          $prototype: "Function",
-          body: bodyToStore,
-        }),
+        mutateUpdateDef(t, /** @type {string} */ (editing.defName), { body: bodyToStore }),
+      );
+    } else if (editing.type === "event") {
+      const node = getNodeAtPath(tab.doc.document, /** @type {JxPath} */ (editing.path));
+      const current = node?.[/** @type {string} */ (editing.eventKey)] || {};
+      transactDoc(tab, (t) =>
+        mutateUpdateProperty(
+          t,
+          /** @type {JxPath} */ (editing.path),
+          /** @type {string} */ (editing.eventKey),
+          {
+            .../** @type {object} */ (current),
+            $prototype: "Function",
+            body: bodyToStore,
+          },
+        ),
       );
     }
     view.functionEditor.dispose();
@@ -243,10 +256,12 @@ document.body.appendChild(datalistHost);
 litRender(
   html`
     <datalist id="tag-names">
-      ${webdata.allTags.map((/** @type {any} */ tag) => html`<option value=${tag}></option>`)}
+      ${webdata.allTags.map((/** @type {string} */ tag) => html`<option value=${tag}></option>`)}
     </datalist>
     <datalist id="css-props">
-      ${webdata.cssProps.map((/** @type {any} */ [name]) => html`<option value=${name}></option>`)}
+      ${webdata.cssProps.map(
+        (/** @type {string[]} */ [name]) => html`<option value=${name}></option>`,
+      )}
     </datalist>
   `,
   datalistHost,
@@ -338,7 +353,9 @@ initCanvasRender({
   get gitDiffState() {
     return gitDiffState;
   },
-  setGitDiffState: (/** @type {any} */ state) => {
+  setGitDiffState: (
+    /** @type {import("./canvas/canvas-render.js").GitDiffState | null} */ state,
+  ) => {
     gitDiffState = state;
   },
 });
@@ -396,7 +413,9 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
-  setGitDiffState: (/** @type {any} */ state) => {
+  setGitDiffState: (
+    /** @type {import("./canvas/canvas-render.js").GitDiffState | null} */ state,
+  ) => {
     gitDiffState = state;
   },
 });
@@ -412,7 +431,7 @@ mountStatusbar();
 mountActivityBar();
 
 // Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
-canvasWrap.addEventListener("click", (/** @type {any} */ e) => {
+canvasWrap.addEventListener("click", (/** @type {MouseEvent} */ e) => {
   if (e.target !== canvasWrap && e.target !== view.panzoomWrap) return;
   if (!activeTab.value?.session.selection) return;
   activeTab.value.session.selection = null;
@@ -456,7 +475,7 @@ if (_openParam) {
             name: siteCtx.projectConfig?.name || "Project",
             projectRoot: siteCtx.sitePath,
             isSiteProject: true,
-            projectConfig: siteCtx.projectConfig,
+            projectConfig: siteCtx.projectConfig || null,
             projectDirs: [],
             dirs: new Map(),
             expanded: new Set(),
@@ -477,17 +496,17 @@ if (_openParam) {
             "styles",
           ];
           const dirEntries = await platform.listDirectory(".");
-          projectState.dirs.set(".", dirEntries);
+          requireProjectState().dirs.set(".", dirEntries);
           const foundDirs = [];
           for (const e of dirEntries) {
             if (e.type === "directory" && conventionalDirs.includes(e.name)) {
               foundDirs.push(e.name);
-              projectState.expanded.add(e.path || e.name);
+              requireProjectState().expanded.add(e.path || e.name);
               const sub = await platform.listDirectory(e.path || e.name);
-              projectState.dirs.set(e.path || e.name, sub);
+              requireProjectState().dirs.set(e.path || e.name, sub);
             }
           }
-          projectState.projectDirs = foundDirs;
+          requireProjectState().projectDirs = foundDirs;
         }
 
         // Read and open the file
@@ -540,8 +559,8 @@ if (_openParam) {
           render();
           statusMessage(`Opened ${_openParam}`);
         }
-      } catch (/** @type {any} */ e) {
-        statusMessage(`Error: ${e.message}`);
+      } catch (/** @type {unknown} */ e) {
+        statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
       }
     })();
   }
@@ -620,29 +639,29 @@ async function openRecentProject(/** @type {string} */ root) {
       "public",
       "styles",
     ];
-    const entries = projectState.dirs.get(".") || [];
+    const entries = requireProjectState().dirs.get(".") || [];
     for (const e of entries) {
       if (e.type === "directory" && conventionalDirs.includes(e.name)) {
-        projectState.expanded.add(e.path || e.name);
+        requireProjectState().expanded.add(e.path || e.name);
         await loadDirectory(e.path || e.name);
       }
     }
 
-    addRecentProject(projectState.name, root);
+    addRecentProject(requireProjectState().name, root);
     view.leftTab = "files";
     renderActivityBar();
     renderLeftPanel();
-    statusMessage(`Opened project: ${projectState.name}`);
+    statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
-  } catch (/** @type {any} */ e) {
-    statusMessage(`Error: ${e.message}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
   }
 }
 function renderFilesTemplate() {
   return _renderFilesTemplate({ openProject, openFileFromTree, renderLeftPanel });
 }
-function openFileFromTree(/** @type {any} */ path) {
+function openFileFromTree(/** @type {string} */ path) {
   return openFileInTab(path);
 }
 
@@ -676,13 +695,13 @@ initShortcuts(() => ({
 
 // ─── Autosave (registered as update middleware) ──────────────────────────────
 
-/** @type {any} */
+/** @type {number} */
 const AUTO_SAVE_DELAY = 2000;
 
 function scheduleAutosave() {
   const tab = activeTab.value;
   if (!tab?.fileHandle || !tab.doc.dirty) return;
-  clearTimeout(view.autosaveTimer);
+  if (view.autosaveTimer) clearTimeout(view.autosaveTimer);
   view.autosaveTimer = setTimeout(async () => {
     const t = activeTab.value;
     if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {

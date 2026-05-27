@@ -1,0 +1,17 @@
+{
+  "tagName": "section-label",
+  "state": {
+    "text": "Label"
+  },
+  "style": {
+    "display": "block",
+    "fontFamily": "var(--font-mono)",
+    "fontSize": "0.75rem",
+    "fontWeight": "600",
+    "color": "var(--color-accent)",
+    "textTransform": "uppercase",
+    "letterSpacing": "0.08em",
+    "marginBottom": "1rem"
+  },
+  "textContent": "${state.text}"
+}

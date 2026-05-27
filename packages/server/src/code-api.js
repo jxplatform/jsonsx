@@ -10,6 +10,15 @@ import { join, resolve } from "node:path";
 import { unlink } from "node:fs/promises";
 import { format } from "oxfmt";
 
+/**
+ * @typedef {{
+ *   span: { offset: number; line: number; [key: string]: unknown };
+ *   [key: string]: unknown;
+ * }} OxcLabel
+ *
+ * @typedef {{ labels?: OxcLabel[]; [key: string]: unknown }} OxcDiagnostic
+ */
+
 const OXLINT_BIN = resolve(
   import.meta.dir,
   "../../node_modules/.bin",
@@ -40,7 +49,7 @@ function unwrapFormatted(formatted) {
 }
 
 /**
- * @param {any[]} diagnostics
+ * @param {OxcDiagnostic[]} diagnostics
  * @param {number} headerLen
  */
 function adjustDiagnostics(diagnostics, headerLen) {
@@ -51,7 +60,7 @@ function adjustDiagnostics(diagnostics, headerLen) {
     })
     .map((d) => ({
       ...d,
-      labels: d.labels.map((/** @type {any} */ label) => ({
+      labels: d.labels?.map((label) => ({
         ...label,
         span: {
           ...label.span,
@@ -98,8 +107,11 @@ export async function handleCodeApi(req, url) {
         code: unwrapFormatted(result.code),
         errors: result.errors,
       });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ code, errors: [{ message: e.message }] });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json({
+        code,
+        errors: [{ message: /** @type {{ message?: string }} */ (e).message }],
+      });
     }
   }
 
@@ -112,8 +124,8 @@ export async function handleCodeApi(req, url) {
     try {
       const minified = minifier.transformSync(code).trim();
       return Response.json({ code: minified });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ code, error: e.message });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json({ code, error: /** @type {{ message?: string }} */ (e).message });
     }
   }
 
@@ -142,8 +154,11 @@ export async function handleCodeApi(req, url) {
       const parsed = JSON.parse(output);
       const adjusted = adjustDiagnostics(parsed.diagnostics || [], headerLen);
       return Response.json({ diagnostics: adjusted });
-    } catch (/** @type {any} */ e) {
-      return Response.json({ diagnostics: [], error: e.message });
+    } catch (/** @type {unknown} */ e) {
+      return Response.json({
+        diagnostics: [],
+        error: /** @type {{ message?: string }} */ (e).message,
+      });
     } finally {
       try {
         await unlink(tmpFile);

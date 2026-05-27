@@ -79,10 +79,13 @@ export function createDevServerPlatform() {
 
       let dirHandle;
       try {
-        dirHandle = await /** @type {any} */ (window).showDirectoryPicker({ mode: "readwrite" });
-      } catch (/** @type {any} */ e) {
+        dirHandle =
+          await /** @type {{ showDirectoryPicker(opts: { mode: string }): Promise<FileSystemDirectoryHandle> }} */ (
+            window
+          ).showDirectoryPicker({ mode: "readwrite" });
+      } catch (/** @type {unknown} */ e) {
         // User cancelled the picker
-        if (e.name === "AbortError") return null;
+        if (/** @type {Error} */ (e).name === "AbortError") return null;
         throw e;
       }
 
@@ -102,7 +105,8 @@ export function createDevServerPlatform() {
       if (!sitesRes.ok) throw new Error("Failed to fetch site list from server");
       const sites = await sitesRes.json();
       const match = sites.find(
-        /** @param {any} s */ (s) => JSON.stringify(s.config) === JSON.stringify(config),
+        /** @param {{ config: unknown; path: string }} s */ (s) =>
+          JSON.stringify(s.config) === JSON.stringify(config),
       );
 
       if (!match) {
@@ -147,6 +151,30 @@ export function createDevServerPlatform() {
       } catch {
         return null;
       }
+    },
+
+    // ─── Project creation ─────────────────────────────────────────────────
+
+    /**
+     * @param {{
+     *   name: string;
+     *   description?: string;
+     *   url?: string;
+     *   adapter?: string;
+     *   directory: string;
+     * }} opts
+     */
+    async createProject(opts) {
+      const res = await fetch("/__studio/create-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create project");
+      }
+      return await res.json();
     },
 
     // ─── File operations ──────────────────────────────────────────────────
@@ -270,7 +298,7 @@ export function createDevServerPlatform() {
 
     /**
      * @param {string} action
-     * @param {any} payload
+     * @param {unknown} payload
      */
     async codeService(action, payload) {
       try {

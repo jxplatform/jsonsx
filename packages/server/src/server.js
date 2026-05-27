@@ -270,7 +270,7 @@ export async function createDevServer(options) {
               if (result.success && result.outputs.length > 0) {
                 bundleCache.set(cacheKey, await result.outputs[0].text());
               }
-            } catch (/** @type {any} */ e) {
+            } catch (/** @type {unknown} */ e) {
               console.error("Bundle failed for", resolved, e);
             }
           }

@@ -8,7 +8,7 @@
  * Convert a template string to a displayable expression for edit mode. Replaces ${expr} with ❮ expr
  * ❯ so the runtime renders it as literal text.
  *
- * @param {any} str
+ * @param {string} str
  */
 export function templateToEditDisplay(str) {
   return str.replace(/\$\{([^}]+)\}/g, "\u276A $1 \u276B");
@@ -18,14 +18,14 @@ export function templateToEditDisplay(str) {
  * Reverse templateToEditDisplay: walk all text nodes in `el` and replace ❪ expr ❫ back to ${expr}
  * so the user edits raw template syntax.
  *
- * @param {any} el
+ * @param {HTMLElement} el
  */
 export function restoreTemplateExpressions(el) {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   while (walker.nextNode()) {
-    const node = /** @type {any} */ (walker.currentNode);
-    if (node.textContent.includes("\u276A")) {
-      node.textContent = node.textContent.replace(/\u276A\s*(.*?)\s*\u276B/g, "${$1}");
+    const node = /** @type {Text} */ (walker.currentNode);
+    if (node.data.includes("\u276A")) {
+      node.data = node.data.replace(/\u276A\s*(.*?)\s*\u276B/g, "${$1}");
     }
   }
 }
@@ -35,24 +35,31 @@ export function restoreTemplateExpressions(el) {
  * $prototype:Array with placeholders, and $ref bindings with display labels. Preserves state so the
  * runtime can still initialise scope.
  *
- * @param {any} node
- * @returns {any}
+ * @param {JxMutableNode} node
+ * @returns {JxMutableNode}
  */
 export function prepareForEditMode(node) {
   if (!node || typeof node !== "object") return node;
   if (Array.isArray(node)) return node.map(prepareForEditMode);
 
-  /** @type {Record<string, any>} */
+  const /** @type {Record<string, unknown>} */ obj = /** @type {Record<string, unknown>} */ (node);
+
+  /** @type {Record<string, unknown>} */
   const out = {};
-  for (const [k, v] of Object.entries(node)) {
+  for (const [k, v] of Object.entries(obj)) {
     if (k === "state" || k === "$media" || k === "$props" || k === "$elements") {
       out[k] = v; // preserve as-is for runtime resolution
     } else if (k === "children") {
       if (Array.isArray(v)) {
         out.children = v.map(prepareForEditMode);
-      } else if (v && typeof v === "object" && v.$prototype === "Array") {
+      } else if (
+        v &&
+        typeof v === "object" &&
+        /** @type {Record<string, unknown>} */ (v).$prototype === "Array"
+      ) {
         // Wrap the map template in a visual repeater perimeter
-        const template = v.map;
+        const vObj = /** @type {Record<string, unknown>} */ (v);
+        const template = vObj.map;
         if (template && typeof template === "object") {
           out.children = [
             {
@@ -70,14 +77,18 @@ export function prepareForEditMode(node) {
           out.children = [];
         }
       } else {
-        out.children = prepareForEditMode(v);
+        out.children = prepareForEditMode(/** @type {JxMutableNode} */ (v));
       }
-    } else if (k === "cases" && node.$switch && v && typeof v === "object") {
+    } else if (k === "cases" && obj.$switch && v && typeof v === "object") {
       // Replace $switch cases with a placeholder showing the first case or a label
       const caseKeys = Object.keys(v);
       if (caseKeys.length > 0) {
-        const firstCase = v[caseKeys[0]];
-        if (firstCase && typeof firstCase === "object" && !firstCase.$ref) {
+        const firstCase = /** @type {Record<string, unknown>} */ (v)[caseKeys[0]];
+        if (
+          firstCase &&
+          typeof firstCase === "object" &&
+          !(/** @type {Record<string, unknown>} */ (firstCase).$ref)
+        ) {
           out.children = [prepareForEditMode(firstCase)];
         } else {
           out.children = [
@@ -101,7 +112,7 @@ export function prepareForEditMode(node) {
     } else if (k === "style") {
       // Replace template strings in style values with empty strings
       if (v && typeof v === "object") {
-        /** @type {Record<string, any>} */
+        /** @type {Record<string, unknown>} */
         const s = {};
         for (const [sk, sv] of Object.entries(v)) {
           s[sk] = typeof sv === "string" && sv.includes("${") ? "" : sv;
@@ -113,13 +124,13 @@ export function prepareForEditMode(node) {
     } else if (typeof v === "string" && v.includes("${")) {
       // Template string in a display property → show raw expression
       out[k] = templateToEditDisplay(v);
-    } else if (v && typeof v === "object" && v.$ref) {
+    } else if (v && typeof v === "object" && /** @type {Record<string, unknown>} */ (v).$ref) {
       // $ref binding → show ref path as literal text
-      const ref = v.$ref;
+      const ref = /** @type {string} */ (/** @type {Record<string, unknown>} */ (v).$ref);
       const label = ref.startsWith("#/state/") ? ref.slice(8) : ref;
       out[k] = `{${label}}`;
     } else {
-      out[k] = prepareForEditMode(v);
+      out[k] = prepareForEditMode(/** @type {JxMutableNode} */ (v));
     }
   }
 
@@ -127,7 +138,7 @@ export function prepareForEditMode(node) {
   if (out.tagName && !out.textContent && !out.innerHTML) {
     const hasChildren = Array.isArray(out.children) && out.children.length > 0;
     if (!hasChildren) {
-      const tag = out.tagName;
+      const tag = /** @type {string} */ (out.tagName);
       const textTags = new Set([
         "p",
         "h1",

@@ -49,7 +49,7 @@ if (command === "build") {
 
     console.log(`\nDone: ${result.routes} routes → ${result.files} files`);
   } catch (e) {
-    const err = /** @type {any} */ (e);
+    const err = /** @type {Error} */ (e);
     console.error(`Build failed: ${err.message}`);
     process.exit(1);
   }

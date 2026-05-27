@@ -16,17 +16,39 @@ import { openQuickSearch } from "./quick-search.js";
 import { getPlatform } from "../platform.js";
 import { refreshGitStatus } from "./git-panel.js";
 import { openBrowseModal } from "../browse/browse-modal.js";
+import { openNewProjectModal } from "../new-project/new-project-modal.js";
 
 /** @type {HTMLElement | null} */
 let _rootEl = null;
 
-/** @type {any} */
+/**
+ * @typedef {{
+ *   navigateBack: () => void;
+ *   navigateToLevel: (level: number) => void;
+ *   openProject: () => void;
+ *   openFile?: (path: string) => void;
+ *   saveFile: () => void;
+ *   parseMediaEntries: (media: Record<string, string> | null | undefined) => {
+ *     sizeBreakpoints: { name: string; query: string; width: number; type: string }[];
+ *     featureQueries: { name: string; query: string }[];
+ *     baseWidth: number;
+ *   };
+ *   getCanvasMode: () => string;
+ *   setCanvasMode: (mode: string) => void;
+ *   renderCanvas: () => void;
+ *   safeRenderRightPanel: () => void;
+ *   openRecentProject: (root: string) => Promise<void>;
+ *   closeFunctionEditor: () => void;
+ * }} ToolbarCtx
+ */
+
+/** @type {ToolbarCtx | null} */
 let _ctx = null;
 
 /** @type {import("@vue/reactivity").EffectScope | null} */
 let _scope = null;
 
-const toolbarIconMap = /** @type {Record<string, any>} */ ({
+const toolbarIconMap = /** @type {Record<string, import("lit-html").TemplateResult>} */ ({
   "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
   "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
   "sp-icon-back": html`<sp-icon-back slot="icon"></sp-icon-back>`,
@@ -45,9 +67,9 @@ const toolbarIconMap = /** @type {Record<string, any>} */ ({
 });
 
 /**
- * @param {any} label
- * @param {any} onClick
- * @param {any} iconTag
+ * @param {string} label
+ * @param {Function} onClick
+ * @param {string} [iconTag]
  */
 function tbBtnTpl(label, onClick, iconTag) {
   return html`
@@ -61,13 +83,17 @@ function tbBtnTpl(label, onClick, iconTag) {
  * Mount the toolbar panel.
  *
  * @param {HTMLElement} rootEl
- * @param {any} ctx — { navigateBack, closeFunctionEditor, openProject, openFile, saveFile,
+ * @param {ToolbarCtx} ctx — { navigateBack, closeFunctionEditor, openProject, openFile, saveFile,
  *   parseMediaEntries, getCanvasMode, setCanvasMode, renderCanvas, safeRenderRightPanel }
  */
 export function mount(rootEl, ctx) {
   _rootEl = rootEl;
   _ctx = ctx;
-  if (/** @type {any} */ (globalThis).__jxPlatform?.windowControls) {
+  if (
+    /** @type {{ __jxPlatform?: { windowControls?: unknown } }} */ (
+      /** @type {unknown} */ (globalThis)
+    ).__jxPlatform?.windowControls
+  ) {
     rootEl.classList.add("electrobun-webkit-app-region-drag");
   }
   _scope = effectScope();
@@ -106,10 +132,18 @@ export function render() {
   }
 }
 
+async function handleNewProject() {
+  const result = await openNewProjectModal();
+  if (result && _ctx) {
+    await _ctx.openRecentProject(result.root);
+  }
+}
+
 function toolbarTemplate() {
   const tab = activeTab.value;
-  if (!tab) return html``;
-  const S = /** @type {any} */ ({
+  if (!tab || !_ctx) return html``;
+  const ctx = _ctx;
+  const S = {
     document: tab.doc.document,
     ui: tab.session.ui,
     mode: tab.doc.mode,
@@ -118,19 +152,19 @@ function toolbarTemplate() {
     documentPath: tab.documentPath,
     fileHandle: tab.fileHandle,
     documentStack: tab.session.documentStack,
-  });
-  const canvasMode = _ctx.getCanvasMode();
+  };
+  const canvasMode = ctx.getCanvasMode();
   const hasStack = S.documentStack && S.documentStack.length > 0;
 
   const breadcrumbTpl = hasStack
     ? html`
         <div class="breadcrumb">
-          <sp-action-button size="s" title="Return to parent document" @click=${_ctx.navigateBack}>
+          <sp-action-button size="s" title="Return to parent document" @click=${ctx.navigateBack}>
             ${toolbarIconMap["sp-icon-back"]}Back
           </sp-action-button>
           ${S.documentStack.map(
-            (/** @type {any} */ frame, /** @type {number} */ i) => html`
-              <span class="breadcrumb-item clickable" @click=${() => _ctx.navigateToLevel(i)}
+            (/** @type {DocumentStackEntry} */ frame, /** @type {number} */ i) => html`
+              <span class="breadcrumb-item clickable" @click=${() => ctx.navigateToLevel(i)}
                 >${frame.documentPath?.split("/").pop() || "untitled"}</span
               >
               <span class="breadcrumb-sep"> › </span>
@@ -143,13 +177,13 @@ function toolbarTemplate() {
       `
     : nothing;
 
-  const { featureQueries } = _ctx.parseMediaEntries(getEffectiveMedia(S.document.$media));
+  const { featureQueries } = ctx.parseMediaEntries(getEffectiveMedia(S.document.$media));
   const togglesTpl =
     featureQueries.length > 0
       ? html`
           <sp-action-group compact size="s">
             ${featureQueries.map(
-              (/** @type {any} */ { name, query }) => html`
+              (/** @type {{ name: string; query: string }} */ { name, query }) => html`
                 <sp-action-button
                   toggles
                   size="s"
@@ -199,15 +233,15 @@ function toolbarTemplate() {
                   view.functionEditor = null;
                 }
               }
-              _ctx.setCanvasMode(m.key);
+              ctx.setCanvasMode(m.key);
               view.panX = 0;
               view.panY = 0;
-              /** @type {Record<string, any>} */
+              /** @type {{ editingFunction: null; rightTab?: string }} */
               const uiPatch = { editingFunction: null };
               if (m.key === "stylebook") uiPatch.rightTab = "style";
               updateSession({ ui: uiPatch });
-              _ctx.renderCanvas();
-              _ctx.safeRenderRightPanel();
+              ctx.renderCanvas();
+              ctx.safeRenderRightPanel();
             }}
           >
             ${toolbarIconMap[m.iconTag]}${m.label}
@@ -217,7 +251,13 @@ function toolbarTemplate() {
     </sp-action-group>
   `;
 
-  const windowControls = /** @type {any} */ (globalThis).__jxPlatform?.windowControls;
+  const windowControls = /**
+   * @type {{
+   *   __jxPlatform?: {
+   *     windowControls?: { minimize: () => void; maximize: () => void; close: () => void };
+   *   };
+   * }}
+   */ (/** @type {unknown} */ (globalThis)).__jxPlatform?.windowControls;
   const csdTpl = windowControls
     ? html`
         <sp-action-group class="window-controls" size="s">
@@ -251,27 +291,42 @@ function toolbarTemplate() {
     : nothing;
 
   const recentProjects = getRecentProjects();
-  const recentProjectsTpl = recentProjects.length
-    ? html`
-        <overlay-trigger placement="bottom-start" triggered-by="click">
-          <sp-action-button size="s" slot="trigger" title="Recent projects">
-            <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
-          </sp-action-button>
-          <sp-popover slot="click-content" tip>
-            <sp-menu @change=${(/** @type {any} */ e) => _ctx.openRecentProject(e.target.value)}>
-              ${recentProjects.map(
-                (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
-              )}
-            </sp-menu>
-          </sp-popover>
-        </overlay-trigger>
-      `
-    : nothing;
+  const recentProjectsTpl = html`
+    <overlay-trigger placement="bottom-start" triggered-by="click">
+      <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
+        <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
+      </sp-action-button>
+      <sp-popover slot="click-content" tip>
+        <sp-menu
+          @change=${(/** @type {Event} */ e) => {
+            const val = /** @type {HTMLInputElement} */ (/** @type {unknown} */ (e.target)).value;
+            if (val === "__new__") {
+              handleNewProject();
+            } else {
+              ctx.openRecentProject(val);
+            }
+          }}
+        >
+          <sp-menu-item value="__new__">New Project…</sp-menu-item>
+          ${recentProjects.length
+            ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
+                  (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
+                )}`
+            : nothing}
+        </sp-menu>
+      </sp-popover>
+    </overlay-trigger>
+  `;
 
   return html`
-    ${tbBtnTpl("Open Project", _ctx.openProject, "sp-icon-folder-open")} ${recentProjectsTpl}
+    <div class="tb-split-btn">
+      <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
+        ${toolbarIconMap["sp-icon-folder-open"]} Open Project
+      </sp-action-button>
+      ${recentProjectsTpl}
+    </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    ${tbBtnTpl("Save", _ctx.saveFile, "sp-icon-save-floppy")}
+    ${tbBtnTpl("Save", ctx.saveFile, "sp-icon-save-floppy")}
     <sp-action-group compact size="s">
       ${tbBtnTpl("Undo", () => tabUndo(activeTab.value), "sp-icon-undo")}
       ${tbBtnTpl("Redo", () => tabRedo(activeTab.value), "sp-icon-redo")}
@@ -281,20 +336,18 @@ function toolbarTemplate() {
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
-    ${
-      /** @type {any} */ (activeTab.value?.session.ui.gitStatus)?.behind > 0
-        ? html`<sp-action-button
-            size="s"
-            @click=${async () => {
-              await getPlatform().gitPull();
-              await refreshGitStatus();
-            }}
-          >
-            <sp-icon-download slot="icon"></sp-icon-download>
-            Sync Project
-          </sp-action-button>`
-        : nothing
-    }
+    ${(activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
+      ? html`<sp-action-button
+          size="s"
+          @click=${async () => {
+            await getPlatform().gitPull();
+            await refreshGitStatus();
+          }}
+        >
+          <sp-icon-download slot="icon"></sp-icon-download>
+          Sync Project
+        </sp-action-button>`
+      : nothing}
     <div class="tb-spacer"></div>
     ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
     <sp-action-button

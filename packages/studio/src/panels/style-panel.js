@@ -43,6 +43,16 @@ import {
 import { widgetForType } from "./style-inputs.js";
 
 /**
+ * @typedef {{ name: string; entry: Record<string, unknown> }} CssLonghand
+ *
+ * @typedef {Record<string, unknown>} CssPropertyEntry
+ *
+ * @typedef {import("../tabs/tab.js").Tab} Tab
+ *
+ * @typedef {import("../state.js").JxPath} JxPath
+ */
+
+/**
  * Check if a selector is a stylebook tag path (e.g., "table" or "table th"). Tag paths don't start
  * with selector prefixes (`:`, `.`, `&`, `[`, `@`).
  *
@@ -56,31 +66,32 @@ function isTagPath(selector) {
 /**
  * Resolve a style object by traversing a nested tag path. e.g., "table th" → style["table"]["th"]
  *
- * @param {Record<string, any>} style
+ * @param {Record<string, unknown>} style
  * @param {string} tagPath
- * @returns {Record<string, any>}
+ * @returns {Record<string, unknown>}
  */
 function resolveNestedTagStyle(style, tagPath) {
   const parts = tagPath.split(" ");
+  /** @type {unknown} */
   let obj = style;
   for (const part of parts) {
     if (!obj || typeof obj !== "object") return {};
-    obj = obj[part];
+    obj = /** @type {Record<string, unknown>} */ (obj)[part];
   }
-  return obj && typeof obj === "object" ? obj : {};
+  return obj && typeof obj === "object" ? /** @type {Record<string, unknown>} */ (obj) : {};
 }
 
 // ─── Row renderers ──────────────────────────────────────────────────────────
 
 function renderStyleRow(
-  /** @type {any} */ entry,
-  /** @type {any} */ prop,
-  /** @type {any} */ value,
-  /** @type {any} */ onCommit,
-  /** @type {any} */ onDelete,
-  /** @type {any} */ isWarning,
-  /** @type {any} */ gridMode,
-  /** @type {any} */ inheritedValue,
+  /** @type {CssPropertyEntry} */ entry,
+  /** @type {string} */ prop,
+  /** @type {string} */ value,
+  /** @type {(v: string | undefined) => void} */ onCommit,
+  /** @type {() => void} */ onDelete,
+  /** @type {boolean} */ isWarning,
+  /** @type {boolean} */ gridMode,
+  /** @type {string | undefined} */ inheritedValue,
 ) {
   const type = inferInputType(entry);
   const hasVal = value !== undefined && value !== "";
@@ -91,23 +102,30 @@ function renderStyleRow(
     hasValue: hasVal,
     onClear: onDelete,
     widget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
-    span: gridMode && entry.$span === 2 ? 2 : undefined,
+    span: gridMode && /** @type {Record<string, unknown>} */ (entry).$span === 2 ? 2 : undefined,
     warning: isWarning,
   });
 }
 
 /**
- * @param {any} shortProp @param {any} entry @param {any} style @param {any} mutateFn
- * @param {any} _deleteFn @param {Record<string, any>} inherited
+ * @param {string} shortProp
+ * @param {CssPropertyEntry} entry
+ * @param {Record<string, unknown>} style
+ * @param {(t: Tab, prop: string, val: string | Record<string, unknown> | undefined) => void} mutateFn
+ * @param {() => void} _deleteFn
+ * @param {Record<string, string | number>} inherited
  */
 function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inherited = {}) {
   const tab = activeTab.value;
-  const longhands = getLonghands(shortProp);
+  const longhands = /** @type {CssLonghand[]} */ (getLonghands(shortProp));
   const shortVal = style[shortProp];
-  const hasLonghands = longhands.some((/** @type {any} */ l) => style[l.name] !== undefined);
+  const hasLonghands = longhands.some(
+    (/** @type {CssLonghand} */ l) => style[l.name] !== undefined,
+  );
   const isExpanded = tab.session.ui.styleShorthands[shortProp] ?? hasLonghands;
   const hasAnyVal =
-    shortVal !== undefined || longhands.some((/** @type {any} */ l) => style[l.name] !== undefined);
+    shortVal !== undefined ||
+    longhands.some((/** @type {CssLonghand} */ l) => style[l.name] !== undefined);
 
   return html`
     <div class="style-row" data-prop=${shortProp}>
@@ -116,7 +134,7 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
           ? html`<span
               class="set-dot"
               title="Clear ${shortProp}"
-              @click=${(/** @type {any} */ e) => {
+              @click=${(/** @type {Event} */ e) => {
                 e.stopPropagation();
                 transactDoc(activeTab.value, (t) => {
                   if (shortVal !== undefined) mutateFn(t, shortProp, undefined);
@@ -134,25 +152,27 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
           size="s"
           .value=${live(shortVal || "")}
           placeholder=${!shortVal && hasLonghands
-            ? longhands.map((/** @type {any} */ l) => style[l.name] || "0").join(" ")
+            ? longhands.map((/** @type {CssLonghand} */ l) => style[l.name] || "0").join(" ")
             : !shortVal && inherited[shortProp]
               ? inherited[shortProp]
-              : !shortVal && longhands.some((/** @type {any} */ l) => inherited[l.name])
-                ? longhands.map((/** @type {any} */ l) => inherited[l.name] || "0").join(" ")
+              : !shortVal && longhands.some((/** @type {CssLonghand} */ l) => inherited[l.name])
+                ? longhands
+                    .map((/** @type {CssLonghand} */ l) => inherited[l.name] || "0")
+                    .join(" ")
                 : ""}
-          @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (/** @type {any} */ e) => {
+          @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (/** @type {Event} */ e) => {
             transactDoc(activeTab.value, (t) => {
               for (const l of longhands) {
                 if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
               }
-              mutateFn(t, shortProp, e.target.value || undefined);
+              mutateFn(t, shortProp, /** @type {HTMLInputElement} */ (e.target).value || undefined);
             });
           })}
         ></sp-textfield>
         <sp-action-button
           size="xs"
           quiet
-          @click=${(/** @type {any} */ e) => {
+          @click=${(/** @type {Event} */ e) => {
             e.stopPropagation();
             activeTab.value.session.ui.styleShorthands = {
               ...activeTab.value.session.ui.styleShorthands,
@@ -168,16 +188,17 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
     </div>
     ${isExpanded
       ? (() => {
-          const isBorderSide = entry.$shorthandType === "border-side";
+          const isBorderSide = /** @type {Record<string, unknown>} */ (entry).$shorthandType ===
+          "border-side";
           const expanded = shortVal
             ? isBorderSide
-              ? expandBorderSide(shortVal)
-              : expandShorthand(shortVal, longhands.length)
+              ? expandBorderSide(/** @type {string} */ (shortVal))
+              : expandShorthand(/** @type {string} */ (shortVal), longhands.length)
             : null;
           const compress = isBorderSide ? compressBorderSide : compressShorthand;
           const emptyVal = isBorderSide ? "" : "0";
           return longhands.map(
-            (/** @type {any} */ { name, entry: lEntry }, /** @type {any} */ idx) => {
+            (/** @type {CssLonghand} */ { name, entry: lEntry }, /** @type {number} */ idx) => {
               const lVal = style[name] ?? (expanded ? expanded[idx] : "");
               return html`
                 <div class="style-row style-row--child" data-prop=${name}>
@@ -186,10 +207,10 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
                       ? html`<span
                           class="set-dot"
                           title="Clear ${name}"
-                          @click=${(/** @type {any} */ e) => {
+                          @click=${(/** @type {Event} */ e) => {
                             e.stopPropagation();
                             const vals = longhands.map(
-                              (/** @type {any} */ l, /** @type {any} */ i) =>
+                              (/** @type {CssLonghand} */ l, /** @type {number} */ i) =>
                                 i === idx
                                   ? emptyVal
                                   : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
@@ -198,7 +219,7 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
                               for (const l of longhands) {
                                 if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
                               }
-                              mutateFn(t, shortProp, compress(vals));
+                              mutateFn(t, shortProp, compress(/** @type {string[]} */ (vals)));
                             });
                           }}
                         ></span>`
@@ -212,17 +233,18 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
                     lEntry,
                     name,
                     lVal,
-                    (/** @type {any} */ newVal) => {
-                      const vals = longhands.map((/** @type {any} */ l, /** @type {any} */ i) =>
-                        i === idx
-                          ? newVal || emptyVal
-                          : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
+                    (/** @type {string} */ newVal) => {
+                      const vals = longhands.map(
+                        (/** @type {CssLonghand} */ l, /** @type {number} */ i) =>
+                          i === idx
+                            ? newVal || emptyVal
+                            : (style[l.name] ?? (expanded ? expanded[i] : emptyVal)),
                       );
                       transactDoc(activeTab.value, (t) => {
                         for (const l of longhands) {
                           if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
                         }
-                        mutateFn(t, shortProp, compress(vals));
+                        mutateFn(t, shortProp, compress(/** @type {string[]} */ (vals)));
                       });
                     },
                     { placeholder: !lVal && inherited[name] ? String(inherited[name]) : "" },
@@ -239,14 +261,14 @@ function renderShorthandRow(shortProp, entry, style, mutateFn, _deleteFn, inheri
 // ─── Main template ──────────────────────────────────────────────────────────
 
 /**
- * @param {any} node
- * @param {any} activeMediaTab
- * @param {any} activeSelector
- * @param {Record<string, any>} [effectiveStyle]
+ * @param {JxMutableNode} node
+ * @param {string | null} activeMediaTab
+ * @param {string | null} activeSelector
+ * @param {Record<string, unknown>} [effectiveStyle]
  */
 function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveStyle) {
   const tab = activeTab.value;
-  const sel = /** @type {import("../state.js").JxPath} */ (tab.session.selection);
+  const sel = /** @type {JxPath} */ (tab.session.selection);
   const style = effectiveStyle || node.style || {};
   const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
@@ -259,8 +281,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
           <sp-tabs
             size="s"
             selected=${mediaTab || "base"}
-            @change=${(/** @type {any} */ e) => {
-              const val = e.target.selected;
+            @change=${(/** @type {Event} */ e) => {
+              const val = /** @type {HTMLElement & { selected: string }} */ (e.target).selected;
               const newMedia = val === "base" ? null : val;
               if (newMedia !== tab.session.ui.activeMedia) {
                 tab.session.ui.activeMedia = newMedia;
@@ -276,7 +298,9 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
       : nothing;
 
   // ── Selector dropdown ──────────────────────────────────────────────────────
-  const contextStyle = mediaTab ? style[`@${mediaTab}`] || {} : style;
+  const contextStyle = mediaTab
+    ? /** @type {Record<string, unknown>} */ (style[`@${mediaTab}`]) || {}
+    : style;
   const existingSelectors = Object.keys(contextStyle).filter(isNestedSelector);
   const existingSet = new Set(existingSelectors);
   const commonSet = new Set(COMMON_SELECTORS);
@@ -292,14 +316,15 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
       class="selector-select"
       quiet
       .value=${live(_selectorVal)}
-      @change=${(/** @type {any} */ e) => {
-        const val = e.target.value;
+      @change=${(/** @type {Event} */ e) => {
+        const val = /** @type {HTMLElement & { value: string }} */ (e.target).value;
         if (val === "__add_custom__") {
           requestAnimationFrame(() => {
-            e.target.value = activeSelector || "__base__";
+            /** @type {HTMLElement & { value: string }} */ (e.target).value =
+              activeSelector || "__base__";
           });
-          const picker = e.target;
-          const bar = picker.closest(".style-toolbar");
+          const picker = /** @type {HTMLElement} */ (e.target);
+          const bar = /** @type {HTMLElement} */ (picker.closest(".style-toolbar"));
           picker.style.display = "none";
           const inp = document.createElement("input");
           inp.type = "text";
@@ -308,7 +333,7 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
           bar.appendChild(inp);
           inp.focus();
           let done = false;
-          const finish = (/** @type {any} */ accept) => {
+          const finish = (/** @type {boolean} */ accept) => {
             if (done) return;
             done = true;
             const v = inp.value.trim();
@@ -363,8 +388,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
         class="style-filter-input"
         placeholder="Filter properties…"
         .value=${live(tab.session.ui.styleFilter || "")}
-        @input=${(/** @type {any} */ e) => {
-          activeTab.value.session.ui.styleFilter = e.target.value;
+        @input=${(/** @type {Event} */ e) => {
+          activeTab.value.session.ui.styleFilter = /** @type {HTMLInputElement} */ (e.target).value;
         }}
       ></sp-textfield>
       <sp-action-button
@@ -382,61 +407,119 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
   `;
 
   // ── Determine the active style object ──────────────────────────────────────
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   let activeStyle;
-  /** @type {(prop: any, val: any) => void} */
+  /** @type {(prop: string, val: string | Record<string, unknown> | undefined) => void} */
   let commitStyle;
-  /** @type {(t: any, prop: any, val: any) => void} */
+  /** @type {(t: Tab, prop: string, val: string | Record<string, unknown> | undefined) => void} */
   let commitMutate;
   if (activeSelector && isTagPath(activeSelector) && mediaTab && mediaNames.length > 0) {
-    const mediaObj = style[`@${mediaTab}`] || {};
+    const mediaObj = /** @type {Record<string, unknown>} */ (style[`@${mediaTab}`]) || {};
     activeStyle = resolveNestedTagStyle(mediaObj, activeSelector);
     const stylePath = activeSelector.split(" ");
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateMediaNestedStylePath(t, sel, mediaTab, stylePath, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) =>
+      mutateUpdateMediaNestedStylePath(
+        t,
+        sel,
+        mediaTab,
+        stylePath,
+        prop,
+        /** @type {string | undefined} */ (val),
+      );
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && isTagPath(activeSelector)) {
     activeStyle = resolveNestedTagStyle(style, activeSelector);
     const stylePath = activeSelector.split(" ");
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateNestedStylePath(t, sel, stylePath, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) =>
+      mutateUpdateNestedStylePath(t, sel, stylePath, prop, /** @type {string | undefined} */ (val));
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && mediaTab && mediaNames.length > 0) {
-    activeStyle = (style[`@${mediaTab}`] || {})[activeSelector] || {};
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateMediaNestedStyle(t, sel, mediaTab, activeSelector, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    activeStyle = /** @type {Record<string, unknown>} */ (
+      /** @type {Record<string, unknown>} */ (style[`@${mediaTab}`] || {})[activeSelector]
+    ) || {};
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) =>
+      mutateUpdateMediaNestedStyle(
+        t,
+        sel,
+        mediaTab,
+        activeSelector,
+        prop,
+        /** @type {string | undefined} */ (val),
+      );
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector) {
-    activeStyle = style[activeSelector] || {};
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateNestedStyle(t, sel, activeSelector, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    activeStyle = /** @type {Record<string, unknown>} */ (style[activeSelector]) || {};
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) =>
+      mutateUpdateNestedStyle(
+        t,
+        sel,
+        activeSelector,
+        prop,
+        /** @type {string | undefined} */ (val),
+      );
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (mediaTab !== null && mediaNames.length > 0) {
     activeStyle = {};
-    for (const [p, v] of Object.entries(style[`@${mediaTab}`] || {})) {
+    for (const [p, v] of Object.entries(
+      /** @type {Record<string, unknown>} */ (style[`@${mediaTab}`]) || {},
+    )) {
       if (typeof v !== "object") activeStyle[p] = v;
     }
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateMediaStyle(t, sel, mediaTab, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => mutateUpdateMediaStyle(t, sel, mediaTab, prop, /** @type {string | undefined} */ (val));
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else {
     activeStyle = {};
     for (const [p, v] of Object.entries(style)) {
       if (typeof v !== "object") activeStyle[p] = v;
     }
-    commitMutate = (/** @type {any} */ t, /** @type {any} */ prop, /** @type {any} */ val) =>
-      mutateUpdateStyle(t, sel, prop, val);
-    commitStyle = (/** @type {any} */ prop, /** @type {any} */ val) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    commitMutate = (
+      /** @type {Tab} */ t,
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => mutateUpdateStyle(t, sel, prop, /** @type {string | undefined} */ (val));
+    commitStyle = (
+      /** @type {string} */ prop,
+      /** @type {string | Record<string, unknown> | undefined} */ val,
+    ) => transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   }
 
   // ── Compute inherited style from higher breakpoints ──────────────────────
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, string | number>} */
   const inheritedStyle = computeInheritedStyle(style, mediaNames, mediaTab, activeSelector);
 
   // Auto-open sections that have properties
@@ -446,23 +529,32 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
   }
 
   // Partition properties into sections
-  const sectionProps = /** @type {Record<string, any[]>} */ ({});
+  const sectionProps =
+    /** @type {Record<string, { prop: string; entry: CssPropertyEntry }[]>} */ ({});
   for (const sec of cssMeta.$sections) sectionProps[sec.key] = [];
 
-  for (const [prop, entry] of /** @type {[string, any][]} */ (Object.entries(cssMeta.$defs))) {
-    if (typeof entry.$shorthand === "string") continue;
-    const sec = entry.$section || "other";
+  for (const [prop, entry] of /** @type {[string, CssPropertyEntry][]} */ (
+    Object.entries(cssMeta.$defs)
+  )) {
+    if (typeof (/** @type {Record<string, unknown>} */ (entry).$shorthand) === "string") continue;
+    const sec = /** @type {string} */ (/** @type {Record<string, unknown>} */ (entry).$section) ||
+    "other";
     sectionProps[sec].push({ prop, entry });
   }
   for (const sec of cssMeta.$sections) {
     sectionProps[sec.key].sort(
-      (/** @type {any} */ a, /** @type {any} */ b) => a.entry.$order - b.entry.$order,
+      (
+        /** @type {{ prop: string; entry: CssPropertyEntry }} */ a,
+        /** @type {{ prop: string; entry: CssPropertyEntry }} */ b,
+      ) =>
+        /** @type {number} */ (/** @type {Record<string, unknown>} */ (a.entry).$order) -
+        /** @type {number} */ (/** @type {Record<string, unknown>} */ (b.entry).$order),
     );
   }
 
   const otherProps = [];
   for (const prop of Object.keys(activeStyle)) {
-    if (!(/** @type {Record<string, any>} */ (cssMeta.$defs)[prop])) {
+    if (!(/** @type {Record<string, unknown>} */ (cssMeta.$defs)[prop])) {
       const val = activeStyle[prop];
       if (val !== null && typeof val === "object") continue;
       otherProps.push(prop);
@@ -488,15 +580,17 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
     .map((sec) => {
       const entries = sectionProps[sec.key];
 
-      const sectionActiveProps = entries.filter((/** @type {any} */ { prop, entry }) => {
-        if (activeStyle[prop] !== undefined) return true;
-        if (inferInputType(entry) === "shorthand") {
-          return getLonghands(prop).some(
-            (/** @type {any} */ l) => activeStyle[l.name] !== undefined,
-          );
-        }
-        return false;
-      });
+      const sectionActiveProps = entries.filter(
+        (/** @type {{ prop: string; entry: CssPropertyEntry }} */ { prop, entry }) => {
+          if (activeStyle[prop] !== undefined) return true;
+          if (inferInputType(entry) === "shorthand") {
+            return /** @type {CssLonghand[]} */ (getLonghands(prop)).some(
+              (/** @type {CssLonghand} */ l) => activeStyle[l.name] !== undefined,
+            );
+          }
+          return false;
+        },
+      );
 
       const rows = [];
       for (const { prop, entry } of entries) {
@@ -512,17 +606,19 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
         }
         if (filterActive) {
           if (type === "shorthand") {
-            const longhands = getLonghands(prop);
+            const longhands = /** @type {CssLonghand[]} */ (getLonghands(prop));
             const hasAnySet =
-              hasVal || longhands.some((/** @type {any} */ l) => activeStyle[l.name] !== undefined);
+              hasVal ||
+              longhands.some((/** @type {CssLonghand} */ l) => activeStyle[l.name] !== undefined);
             if (!hasAnySet) continue;
           } else if (!hasVal) continue;
         }
 
         if (type === "shorthand") {
-          const longhands = getLonghands(prop);
+          const longhands = /** @type {CssLonghand[]} */ (getLonghands(prop));
           const hasAny =
-            hasVal || longhands.some((/** @type {any} */ l) => activeStyle[l.name] !== undefined);
+            hasVal ||
+            longhands.some((/** @type {CssLonghand} */ l) => activeStyle[l.name] !== undefined);
           if (!hasAny && !condMet) continue;
           rows.push(
             renderShorthandRow(prop, entry, activeStyle, commitMutate, () => {}, inheritedStyle),
@@ -534,12 +630,13 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
               renderStyleRow(
                 entry,
                 prop,
-                val ?? "",
-                (/** @type {any} */ newVal) => commitStyle(prop, newVal || undefined),
+                /** @type {string} */ (val) ?? "",
+                (/** @type {string | undefined} */ newVal) =>
+                  commitStyle(prop, newVal || undefined),
                 () => commitStyle(prop, undefined),
                 isWarning,
                 sec.$layout === "grid",
-                inheritedStyle[prop],
+                /** @type {string | undefined} */ (inheritedStyle[prop]),
               ),
             );
           }
@@ -553,10 +650,10 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
         <sp-accordion-item
           label=${sec.label}
           .open=${isOpen}
-          @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
+          @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
             activeTab.value.session.ui.styleSections = {
               ...activeTab.value.session.ui.styleSections,
-              [sec.key]: e.target.open,
+              [sec.key]: /** @type {HTMLElement & { open: boolean }} */ (e.target).open,
             };
           }}
         >
@@ -567,14 +664,14 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
                   <span
                     class="set-dot set-dot--section"
                     title="Clear all ${sec.label.toLowerCase()} properties"
-                    @click=${(/** @type {any} */ e) => {
+                    @click=${(/** @type {Event} */ e) => {
                       e.stopPropagation();
                       e.preventDefault();
                       transactDoc(activeTab.value, (t) => {
                         for (const { prop, entry } of sectionActiveProps) {
                           if (activeStyle[prop] !== undefined) commitMutate(t, prop, undefined);
                           if (inferInputType(entry) === "shorthand") {
-                            for (const l of getLonghands(prop)) {
+                            for (const l of /** @type {CssLonghand[]} */ (getLonghands(prop))) {
                               if (activeStyle[l.name] !== undefined)
                                 commitMutate(t, l.name, undefined);
                             }
@@ -598,10 +695,10 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
     <sp-accordion-item
       label="Custom"
       .open=${customIsOpen}
-      @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
+      @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
         activeTab.value.session.ui.styleSections = {
           ...activeTab.value.session.ui.styleSections,
-          other: e.target.open,
+          other: /** @type {HTMLElement & { open: boolean }} */ (e.target).open,
         };
       }}
     >
@@ -613,8 +710,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
                 size="s"
                 class="kv-key"
                 .value=${live(prop)}
-                @change=${(/** @type {any} */ e) => {
-                  const newProp = e.target.value.trim();
+                @change=${(/** @type {Event} */ e) => {
+                  const newProp = /** @type {HTMLInputElement} */ (e.target).value.trim();
                   if (newProp && newProp !== prop) {
                     transactDoc(activeTab.value, (t) => {
                       commitMutate(t, prop, undefined);
@@ -628,8 +725,8 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
                 class="kv-val"
                 .value=${live(String(activeStyle[prop]))}
                 placeholder=${ifDefined(cssInitialMap.get(prop))}
-                @input=${debouncedStyleCommit(`custom:${prop}`, 400, (/** @type {any} */ e) => {
-                  commitStyle(prop, e.target.value);
+                @input=${debouncedStyleCommit(`custom:${prop}`, 400, (/** @type {Event} */ e) => {
+                  commitStyle(prop, /** @type {HTMLInputElement} */ (e.target).value);
                 })}
               ></sp-textfield>
               <sp-action-button size="xs" quiet @click=${() => commitStyle(prop, undefined)}>
@@ -643,14 +740,14 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
             size="s"
             placeholder="Property name…"
             style="flex:1"
-            @keydown=${(/** @type {any} */ e) => {
+            @keydown=${(/** @type {KeyboardEvent} */ e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                const prop = e.target.value.trim();
+                const prop = /** @type {HTMLInputElement} */ (e.target).value.trim();
                 if (prop) {
                   const initial = cssInitialMap.get(prop) || "";
                   commitStyle(prop, initial || "");
-                  e.target.value = "";
+                  /** @type {HTMLInputElement} */ (e.target).value = "";
                 }
               }
             }}
@@ -668,10 +765,10 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
           <sp-accordion-item
             label="Relative Styling"
             .open=${nestedIsOpen}
-            @sp-accordion-item-toggle=${(/** @type {any} */ e) => {
+            @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
               activeTab.value.session.ui.styleSections = {
                 ...activeTab.value.session.ui.styleSections,
-                nested: e.target.open,
+                nested: /** @type {HTMLElement & { open: boolean }} */ (e.target).open,
               };
             }}
           >
@@ -755,17 +852,20 @@ export function renderStylePanelTemplate(ctx) {
 
 /** Single property input row (generic field row helper) */
 export function _fieldRow(
-  /** @type {any} */ label,
-  /** @type {any} */ type,
-  /** @type {any} */ value,
-  /** @type {any} */ onChange,
-  /** @type {any} */ _datalistId,
+  /** @type {string} */ label,
+  /** @type {string} */ type,
+  /** @type {string} */ value,
+  /** @type {(v: string | boolean) => void} */ onChange,
+  /** @type {string | undefined} */ _datalistId,
 ) {
-  /** @type {any} */
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
   let debounceTimer;
-  const onInput = (/** @type {any} */ e) => {
+  const onInput = (/** @type {Event} */ e) => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => onChange(e.target.value), 400);
+    debounceTimer = setTimeout(
+      () => onChange(/** @type {HTMLInputElement} */ (e.target).value),
+      400,
+    );
   };
   const inputTpl =
     type === "textarea"
@@ -778,7 +878,8 @@ export function _fieldRow(
       : type === "checkbox"
         ? html`<sp-checkbox
             ?checked=${!!value}
-            @change=${(/** @type {any} */ e) => onChange(e.target.checked)}
+            @change=${(/** @type {Event} */ e) =>
+              onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
           ></sp-checkbox>`
         : html`<sp-textfield size="s" value=${value ?? ""} @input=${onInput}></sp-textfield>`;
   return html`

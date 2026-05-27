@@ -29,7 +29,7 @@ let newDefName = "";
 
 async function saveProjectConfig() {
   const platform = getPlatform();
-  const config = /** @type {any} */ (projectState).projectConfig;
+  const config = /** @type {{ projectConfig: ProjectConfig }} */ (projectState).projectConfig;
   await platform.writeFile("project.json", JSON.stringify(config, null, "\t"));
 }
 
@@ -131,7 +131,7 @@ function handleRenameField(oldName, newName, rerender) {
   const def = getSelectedDef();
   if (!def?.properties || !newName || def.properties[newName]) return;
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const newProps = {};
   for (const [key, val] of Object.entries(def.properties)) {
     newProps[key === oldName ? newName : key] = val;
@@ -253,7 +253,7 @@ function handleRenameNested(parentName, oldChild, newChild, rerender) {
   const parent = def?.properties?.[parentName];
   if (!parent?.properties || !newChild || parent.properties[newChild]) return;
 
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, unknown>} */
   const newProps = {};
   for (const [key, val] of Object.entries(parent.properties)) {
     newProps[key === oldChild ? newChild : key] = val;
@@ -359,10 +359,10 @@ export function renderDefsEditor(container) {
                 size="s"
                 placeholder="TypeName"
                 .value=${newDefName}
-                @input=${(/** @type {any} */ e) => {
-                  newDefName = e.target.value;
+                @input=${(/** @type {Event} */ e) => {
+                  newDefName = /** @type {HTMLInputElement} */ (e.target).value;
                 }}
-                @keydown=${(/** @type {any} */ e) => {
+                @keydown=${(/** @type {KeyboardEvent} */ e) => {
                   if (e.key === "Enter") handleNewDef(rerender);
                   if (e.key === "Escape") {
                     showNewDef = false;
@@ -415,7 +415,12 @@ export function renderDefsEditor(container) {
     };
 
     const fieldCards = Object.entries(properties).map(([name, fieldDef]) =>
-      fieldCardTpl(name, /** @type {any} */ (fieldDef), required.includes(name), handlers),
+      fieldCardTpl(
+        name,
+        /** @type {import("./schema-field-ui.js").SchemaProperty} */ (fieldDef),
+        required.includes(name),
+        handlers,
+      ),
     );
 
     editorTpl = html`

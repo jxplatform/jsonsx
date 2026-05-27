@@ -183,7 +183,7 @@ export async function expandDynamicRoutes(routes, projectRoot, contentTypes = ne
     }
 
     // Read the page to look for $paths
-    /** @type {any} */
+    /** @type {Record<string, unknown>} */
     let raw;
     try {
       raw = JSON.parse(readFileSync(route.sourcePath, "utf8"));
@@ -245,7 +245,7 @@ function resolvePathEntries($paths, projectRoot, contentTypes) {
     }
     const param = $paths.param ?? "slug";
     const field = $paths.field ?? "id";
-    return entries.map((/** @type {any} */ entry) => ({
+    return entries.map((/** @type {ContentLoaderEntry} */ entry) => ({
       [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
     }));
   }
@@ -253,18 +253,18 @@ function resolvePathEntries($paths, projectRoot, contentTypes) {
   // Explicit values: { values: ["en", "fr"], param: "lang" }
   if (Array.isArray($paths.values)) {
     const param = $paths.param ?? "value";
-    return $paths.values.map((/** @type {any} */ v) => ({ [param]: v }));
+    return $paths.values.map((/** @type {string} */ v) => ({ [param]: v }));
   }
 
   // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" }
   if ($paths.$ref) {
     const filePath = resolve(projectRoot, $paths.$ref);
-    /** @type {any} */
+    /** @type {Record<string, unknown>[]} */
     let data;
     try {
       data = JSON.parse(readFileSync(filePath, "utf8"));
     } catch (e) {
-      const err = /** @type {any} */ (e);
+      const err = /** @type {Error} */ (e);
       console.warn(`Warning: $paths.$ref could not load "${$paths.$ref}": ${err.message}`);
       return [];
     }
@@ -274,7 +274,7 @@ function resolvePathEntries($paths, projectRoot, contentTypes) {
     }
     const param = $paths.param ?? "id";
     const field = $paths.field ?? "id";
-    return data.map((/** @type {any} */ item) => ({
+    return data.map((/** @type {Record<string, unknown>} */ item) => ({
       [param]: item[field] ?? item.id ?? String(item),
     }));
   }

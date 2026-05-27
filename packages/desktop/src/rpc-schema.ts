@@ -208,6 +208,11 @@ export type StudioRPC = {
         params: { files: string[] };
         response: void;
       };
+      // Files
+      searchFiles: {
+        params: { query: string };
+        response: DirEntry[];
+      };
       // Packages
       addPackage: {
         params: { name: string };
@@ -220,6 +225,16 @@ export type StudioRPC = {
       listPackages: {
         params: void;
         response: PackageInfo[];
+      };
+      createProject: {
+        params: {
+          name: string;
+          description?: string;
+          url?: string;
+          adapter?: string;
+          directory: string;
+        };
+        response: { root: string; config: ProjectConfig };
       };
       // Updates
       updaterGetLocalInfo: {

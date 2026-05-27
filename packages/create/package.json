@@ -1,0 +1,27 @@
+{
+  "name": "@jxsuite/create",
+  "version": "0.19.0",
+  "description": "Scaffold a new Jx project",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/create"
+  },
+  "bin": {
+    "create-jxsuite": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "generate.js",
+    "template/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./generate": "./generate.js"
+  },
+  "publishConfig": {
+    "provenance": true
+  }
+}

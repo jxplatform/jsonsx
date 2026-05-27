@@ -5,7 +5,7 @@
 import { html } from "lit";
 
 // Helper for custom filled-rect icons (alignment/justify diagrams) where no Spectrum match exists
-const _R = (/** @type {any} */ d) =>
+const _R = (/** @type {import("lit").TemplateResult} */ d) =>
   html`<svg
     xmlns="http://www.w3.org/2000/svg"
     width="16"
@@ -18,7 +18,7 @@ const _R = (/** @type {any} */ d) =>
   </svg>`;
 
 // Helper for custom stroke icons
-const _S = (/** @type {any} */ d) =>
+const _S = (/** @type {import("lit").TemplateResult} */ d) =>
   html`<svg
     xmlns="http://www.w3.org/2000/svg"
     width="16"

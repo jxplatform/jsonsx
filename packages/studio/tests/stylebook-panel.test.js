@@ -7,7 +7,7 @@ import {
 import { setProjectState } from "../src/store.js";
 
 beforeEach(() => {
-  setProjectState({ projectConfig: null, expanded: new Set() });
+  setProjectState(/** @type {any} */ ({ projectConfig: null, expanded: new Set() }));
 });
 
 // ─── buildStylebookElement ────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ describe("buildStylebookElement", () => {
     const el = buildStylebookElement(entry, rootStyle, null);
     expect(el.children.length).toBe(2);
     expect(el.children[0].textContent).toBe("Item 1");
-    expect(el.children[0].style.color).toBe("blue");
+    expect(/** @type {HTMLElement} */ (el.children[0]).style.color).toBe("blue");
   });
 });
 
@@ -117,7 +117,7 @@ describe("buildStylebookElement compound selectors", () => {
       children: [{ tag: "li", text: "Item" }],
     };
     const el = buildStylebookElement(entry, rootStyle, null);
-    expect(el.children[0].style.listStyleType).toBe("disc");
+    expect(/** @type {HTMLElement} */ (el.children[0]).style.listStyleType).toBe("disc");
   });
 
   test("differentiates ul li from ol li", () => {
@@ -135,8 +135,8 @@ describe("buildStylebookElement compound selectors", () => {
       rootStyle,
       null,
     );
-    expect(ul.children[0].style.color).toBe("blue");
-    expect(ol.children[0].style.color).toBe("red");
+    expect(/** @type {HTMLElement} */ (ul.children[0]).style.color).toBe("blue");
+    expect(/** @type {HTMLElement} */ (ol.children[0]).style.color).toBe("red");
   });
 
   test("compound selector with media breakpoint overrides", () => {
@@ -215,14 +215,16 @@ describe("renderStylebookElementsIntoCanvas CSS variables", () => {
 
 describe("renderComponentPreview", () => {
   test("npm component not registered → returns fallback div", async () => {
-    const el = await renderComponentPreview({ tagName: "sl-button", source: "npm" });
+    const el = await renderComponentPreview(
+      /** @type {any} */ ({ tagName: "sl-button", source: "npm" }),
+    );
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<sl-button>");
   });
 
   test("npm component not registered → does not throw", async () => {
     await expect(
-      renderComponentPreview({ tagName: "sl-nonexistent", source: "npm" }),
+      renderComponentPreview(/** @type {any} */ ({ tagName: "sl-nonexistent", source: "npm" })),
     ).resolves.toBeDefined();
   });
 
@@ -247,7 +249,13 @@ describe("renderComponentPreview", () => {
   });
 
   test("local component with invalid path → returns fallback (no unhandled error)", async () => {
-    setProjectState({ projectRoot: "test-project", projectConfig: null, expanded: new Set() });
+    setProjectState(
+      /** @type {any} */ ({
+        projectRoot: "test-project",
+        projectConfig: null,
+        expanded: new Set(),
+      }),
+    );
     const el = await renderComponentPreview({
       tagName: "missing-comp",
       source: "local",

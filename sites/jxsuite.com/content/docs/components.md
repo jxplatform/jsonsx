@@ -1,5 +1,5 @@
 ---
-title: "Component Model — Jx Suite"
+title: Component Model — Jx Suite
 description: "How Jx components work: self-describing JSON, state management, external sidecars, and custom elements."
 ---
 
@@ -9,7 +9,7 @@ A Jx component is a single `.json` file. All state, computed values, and functio
 
 ## Self-Describing Components
 
-```json
+```
 {
   "$id": "Counter",
   "state": {
@@ -35,7 +35,7 @@ Every entry in `state` falls into one of four shapes, determinable by inspection
 
 A JSON scalar, array, or plain object with no reserved keys:
 
-```json
+```
 { "state": { "count": 0, "name": "World", "tags": [] } }
 ```
 
@@ -43,7 +43,7 @@ A JSON scalar, array, or plain object with no reserved keys:
 
 An object with a `default` property and optional `type`:
 
-```json
+```
 {
   "state": {
     "count": {
@@ -59,7 +59,7 @@ An object with a `default` property and optional `type`:
 
 A string containing `${}` syntax:
 
-```json
+```
 {
   "state": {
     "fullName": "${state.firstName} ${state.lastName}",
@@ -72,7 +72,7 @@ A string containing `${}` syntax:
 
 An object with `$prototype` for functions and data sources:
 
-```json
+```
 {
   "state": {
     "increment": {
@@ -92,7 +92,7 @@ An object with `$prototype` for functions and data sources:
 
 When functions grow complex, extract them to a `.js` file:
 
-```json
+```
 {
   "state": {
     "increment": { "$prototype": "Function", "$src": "./counter.js" },
@@ -101,7 +101,7 @@ When functions grow complex, extract them to a `.js` file:
 }
 ```
 
-```js
+```
 export function increment(state) {
   state.count++;
 }
@@ -116,7 +116,7 @@ The first parameter is always `state` — the component's reactive scope. `this`
 
 A component whose `tagName` contains a hyphen is a custom element:
 
-```json
+```
 {
   "tagName": "user-card",
   "state": {
@@ -133,7 +133,7 @@ Custom elements render to the light DOM (no Shadow DOM). Style scoping uses `dat
 
 Props are passed via `$props` — the only mechanism for crossing component boundaries:
 
-```json
+```
 {
   "$ref": "./card.json",
   "$props": {

@@ -94,9 +94,9 @@ export function invalidateMediaCache() {
  * Render the media picker widget for src-type attributes.
  *
  * @param {string} prop — attribute name (e.g. "src")
- * @param {any} value — current attribute value
- * @param {(val: any) => void} onCommit — commit callback
- * @returns {any}
+ * @param {string} value — current attribute value
+ * @param {(val: string) => void} onCommit — commit callback
+ * @returns {import("lit-html").TemplateResult}
  */
 export function renderMediaPicker(prop, value, onCommit) {
   // Kick off async load (won't block render)
@@ -127,8 +127,8 @@ export function renderMediaPicker(prop, value, onCommit) {
         size="s"
         placeholder="/image.jpg"
         .value=${live(currentValue)}
-        @input=${debouncedStyleCommit(`media:${prop}`, 400, (/** @type {any} */ e) =>
-          onCommit(e.target.value),
+        @input=${debouncedStyleCommit(`media:${prop}`, 400, (/** @type {Event} */ e) =>
+          onCommit(/** @type {HTMLInputElement} */ (e.target).value),
         )}
         @focus=${() => loadMediaCache()}
       ></sp-textfield>
@@ -140,8 +140,8 @@ export function renderMediaPicker(prop, value, onCommit) {
               </sp-action-button>
               <sp-popover slot="click-content" class="media-picker-popover">
                 <sp-menu
-                  @change=${(/** @type {any} */ e) => {
-                    onCommit(e.target.value);
+                  @change=${(/** @type {Event} */ e) => {
+                    onCommit(/** @type {HTMLInputElement} */ (e.target).value);
                   }}
                 >
                   ${options.map(

@@ -24,7 +24,7 @@ import { collectServerEntries } from "../shared.js";
  */
 export async function compileServer(sourcePath, opts = {}) {
   const { baseUrl = "/_jx/server" } = opts;
-  const doc = await $RefParser.dereference(sourcePath);
+  const doc = /** @type {JxElement} */ (await $RefParser.dereference(sourcePath));
   const entries = collectServerEntries(doc);
   if (entries.length === 0) return null;
 

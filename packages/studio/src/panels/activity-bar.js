@@ -31,7 +31,7 @@ export function unmount() {
   _scope = null;
 }
 
-const gitBranchIcon = (/** @type {any} */ s) => html`
+const gitBranchIcon = (/** @type {string} */ s) => html`
   <svg
     slot="icon"
     xmlns="http://www.w3.org/2000/svg"
@@ -52,35 +52,35 @@ const gitBranchIcon = (/** @type {any} */ s) => html`
 `;
 
 /**
- * @param {any} tag
- * @param {any} size
+ * @param {string} tag
+ * @param {string} [size]
  */
 export function tabIcon(tag, size) {
-  /** @type {Record<string, any>} */
+  /** @type {Record<string, (s: string) => import("lit-html").TemplateResult>} */
   const m = {
-    "sp-icon-folder": (/** @type {any} */ s) =>
+    "sp-icon-folder": (/** @type {string} */ s) =>
       html`<sp-icon-folder slot="icon" size=${s}></sp-icon-folder>`,
-    "sp-icon-layers": (/** @type {any} */ s) =>
+    "sp-icon-layers": (/** @type {string} */ s) =>
       html`<sp-icon-layers slot="icon" size=${s}></sp-icon-layers>`,
-    "sp-icon-view-grid": (/** @type {any} */ s) =>
+    "sp-icon-view-grid": (/** @type {string} */ s) =>
       html`<sp-icon-view-grid slot="icon" size=${s}></sp-icon-view-grid>`,
-    "sp-icon-brackets": (/** @type {any} */ s) =>
+    "sp-icon-brackets": (/** @type {string} */ s) =>
       html`<sp-icon-brackets slot="icon" size=${s}></sp-icon-brackets>`,
-    "sp-icon-data": (/** @type {any} */ s) =>
+    "sp-icon-data": (/** @type {string} */ s) =>
       html`<sp-icon-data slot="icon" size=${s}></sp-icon-data>`,
-    "sp-icon-properties": (/** @type {any} */ s) =>
+    "sp-icon-properties": (/** @type {string} */ s) =>
       html`<sp-icon-properties slot="icon" size=${s}></sp-icon-properties>`,
-    "sp-icon-event": (/** @type {any} */ s) =>
+    "sp-icon-event": (/** @type {string} */ s) =>
       html`<sp-icon-event slot="icon" size=${s}></sp-icon-event>`,
-    "sp-icon-brush": (/** @type {any} */ s) =>
+    "sp-icon-brush": (/** @type {string} */ s) =>
       html`<sp-icon-brush slot="icon" size=${s}></sp-icon-brush>`,
-    "sp-icon-file-single-web-page": (/** @type {any} */ s) =>
+    "sp-icon-file-single-web-page": (/** @type {string} */ s) =>
       html`<sp-icon-file-single-web-page slot="icon" size=${s}></sp-icon-file-single-web-page>`,
-    "sp-icon-view-all-tags": (/** @type {any} */ s) =>
+    "sp-icon-view-all-tags": (/** @type {string} */ s) =>
       html`<sp-icon-view-all-tags slot="icon" size=${s}></sp-icon-view-all-tags>`,
-    "sp-icon-artboard": (/** @type {any} */ s) =>
+    "sp-icon-artboard": (/** @type {string} */ s) =>
       html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
-    "sp-icon-box": (/** @type {any} */ s) =>
+    "sp-icon-box": (/** @type {string} */ s) =>
       html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
     "sp-icon-git-branch": gitBranchIcon,
   };
@@ -92,7 +92,7 @@ export function renderActivityBar() {
   const tab = activeTab.value;
   if (!tab) return;
   const leftTab = view.leftTab;
-  const gitFileCount = /** @type {any} */ (tab?.session.ui.gitStatus)?.files?.length || 0;
+  const gitFileCount = tab?.session.ui.gitStatus?.files?.length || 0;
   const tabs = [
     { value: "files", icon: "sp-icon-folder", label: "Files" },
     { value: "layers", icon: "sp-icon-layers", label: "Layers" },
@@ -108,8 +108,8 @@ export function renderActivityBar() {
       selected=${view.leftPanelCollapsed ? "" : leftTab}
       direction="vertical"
       quiet
-      @change=${(/** @type {any} */ e) => {
-        const clicked = e.target.selected;
+      @change=${(/** @type {Event} */ e) => {
+        const clicked = /** @type {HTMLElement & { selected: string }} */ (e.target).selected;
         if (clicked === view.leftTab && !view.leftPanelCollapsed) {
           view.leftPanelCollapsed = true;
           applyPanelCollapse();
@@ -146,5 +146,5 @@ export function renderActivityBar() {
       </sp-action-button>
     </div>
   `;
-  litRender(tpl, /** @type {any} */ (activityBar));
+  litRender(tpl, activityBar);
 }

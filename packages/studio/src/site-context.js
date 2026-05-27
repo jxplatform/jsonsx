@@ -5,14 +5,15 @@
  * definitions merge on top (file wins on conflict).
  */
 
-import { projectState, setProjectState } from "./store.js";
+import { projectState, setProjectState, requireProjectState } from "./store.js";
 import { getPlatform } from "./platform.js";
 
 /**
  * Merge site $media with document $media. Document keys win on conflict.
  *
- * @param {any} docMedia - The current document's $media (may be undefined)
- * @returns {any}
+ * @param {Record<string, string> | undefined} docMedia - The current document's $media (may be
+ *   undefined)
+ * @returns {Record<string, string>}
  */
 export function getEffectiveMedia(docMedia) {
   const siteMedia = projectState?.projectConfig?.$media;
@@ -25,8 +26,8 @@ export function getEffectiveMedia(docMedia) {
  * Merge site style with document style. Document keys win on conflict. Nested selector objects
  * (e.g. `& li`) are shallow-merged individually.
  *
- * @param {any} docStyle - The current document's style (may be undefined)
- * @returns {any}
+ * @param {JxStyle | undefined} docStyle - The current document's style (may be undefined)
+ * @returns {JxStyle}
  */
 export function getEffectiveStyle(docStyle) {
   const siteStyle = projectState?.projectConfig?.style;
@@ -40,7 +41,7 @@ export function getEffectiveStyle(docStyle) {
       typeof merged[k] === "object" &&
       merged[k] !== null
     ) {
-      merged[k] = { ...merged[k], ...v };
+      merged[k] = { .../** @type {JxStyle} */ (merged[k]), .../** @type {JxStyle} */ (v) };
     } else {
       merged[k] = v;
     }
@@ -51,8 +52,9 @@ export function getEffectiveStyle(docStyle) {
 /**
  * Merge site imports with document imports. Document keys win on conflict.
  *
- * @param {any} docImports - The current document's imports (may be undefined)
- * @returns {any}
+ * @param {Record<string, string> | undefined} docImports - The current document's imports (may be
+ *   undefined)
+ * @returns {Record<string, string>}
  */
 export function getEffectiveImports(docImports) {
   const siteImports = projectState?.projectConfig?.imports;
@@ -64,8 +66,9 @@ export function getEffectiveImports(docImports) {
 /**
  * Merge site $elements with document $elements. Union with dedup by $ref or string value.
  *
- * @param {any[]} [docElements] - The current document's $elements (may be undefined)
- * @returns {any[]}
+ * @param {(JxElement | string)[]} [docElements] - The current document's $elements (may be
+ *   undefined)
+ * @returns {(JxElement | string)[]}
  */
 export function getEffectiveElements(docElements) {
   const siteElements = projectState?.projectConfig?.$elements;
@@ -73,7 +76,7 @@ export function getEffectiveElements(docElements) {
   if (!docElements?.length) return [...siteElements];
   /** @type {Set<string>} */
   const seen = new Set();
-  /** @type {any[]} */
+  /** @type {(JxElement | string)[]} */
   const merged = [];
   for (const entry of [...siteElements, ...docElements]) {
     const key = typeof entry === "string" ? entry : entry?.$ref;
@@ -88,8 +91,8 @@ export function getEffectiveElements(docElements) {
 /**
  * Merge site $head with document $head. Union with dedup by href/src.
  *
- * @param {any[]} [docHead] - The current document's $head (may be undefined)
- * @returns {any[]}
+ * @param {JxHeadEntry[]} [docHead] - The current document's $head (may be undefined)
+ * @returns {JxHeadEntry[]}
  */
 export function getEffectiveHead(docHead) {
   const siteHead = projectState?.projectConfig?.$head;
@@ -97,10 +100,11 @@ export function getEffectiveHead(docHead) {
   if (!docHead?.length) return [...siteHead];
   /** @type {Set<string>} */
   const seen = new Set();
-  /** @type {any[]} */
+  /** @type {JxHeadEntry[]} */
   const merged = [];
   for (const entry of [...siteHead, ...docHead]) {
-    const key = entry?.attributes?.href || entry?.attributes?.src || JSON.stringify(entry);
+    const key =
+      String(entry?.attributes?.href || entry?.attributes?.src || "") || JSON.stringify(entry);
     if (!seen.has(key)) {
       seen.add(key);
       merged.push(entry);
@@ -111,7 +115,7 @@ export function getEffectiveHead(docHead) {
 
 // ─── Layout resolution ──────────────────────────────────────────────────────
 
-/** @type {Map<string, any>} */
+/** @type {Map<string, JxMutableNode>} */
 const layoutCache = new Map();
 
 export function invalidateLayoutCache() {
@@ -121,7 +125,8 @@ export function invalidateLayoutCache() {
 /**
  * Determine the effective layout path for a document.
  *
- * @param {any} docLayout - The document's $layout value (string path, false, or undefined)
+ * @param {string | false | undefined} docLayout - The document's $layout value (string path, false,
+ *   or undefined)
  * @returns {string | null} The layout path, or null if no layout applies
  */
 export function getEffectiveLayoutPath(docLayout) {
@@ -134,11 +139,12 @@ export function getEffectiveLayoutPath(docLayout) {
  * Resolve a layout document by path. Fetches and caches the parsed JSON.
  *
  * @param {string} layoutPath - Relative path to the layout file (e.g., "./layouts/base.json")
- * @returns {Promise<any | null>} The parsed layout document, or null on failure
+ * @returns {Promise<JxMutableNode | null>} The parsed layout document, or null on failure
  */
 export async function resolveLayoutDoc(layoutPath) {
   const normalized = layoutPath.replace(/^\.\//, "");
-  if (layoutCache.has(normalized)) return structuredClone(layoutCache.get(normalized));
+  if (layoutCache.has(normalized))
+    return structuredClone(/** @type {JxMutableNode} */ (layoutCache.get(normalized)));
 
   try {
     const platform = getPlatform();
@@ -155,9 +161,9 @@ export async function resolveLayoutDoc(layoutPath) {
  * Distribute page children into a layout document's <slot> elements. Returns the merged document
  * with page content injected into slots.
  *
- * @param {any} layoutDoc - Deep-cloned layout document
- * @param {any} pageDoc - The page document
- * @returns {any} The merged document
+ * @param {JxMutableNode} layoutDoc - Deep-cloned layout document
+ * @param {JxMutableNode} pageDoc - The page document
+ * @returns {JxMutableNode} The merged document
  */
 export function distributePageIntoLayout(layoutDoc, pageDoc) {
   const pageChildren = pageDoc.children ?? [];
@@ -187,19 +193,20 @@ export function distributePageIntoLayout(layoutDoc, pageDoc) {
 }
 
 function fillSlots(
-  /** @type {any} */ node,
-  /** @type {Map<string, any[]>} */ named,
-  /** @type {any[]} */ defaults,
+  /** @type {JxMutableNode} */ node,
+  /** @type {Map<string, JxMutableNode[]>} */ named,
+  /** @type {(JxMutableNode | string)[]} */ defaults,
 ) {
   if (!node || typeof node !== "object") return;
   if (!Array.isArray(node.children)) return;
 
+  /** @type {(JxMutableNode | string)[]} */
   const newChildren = [];
   for (const child of node.children) {
     if (child && typeof child === "object" && child.tagName === "slot") {
       const slotName = child.attributes?.name;
       if (slotName && named.has(slotName)) {
-        newChildren.push(.../** @type {any[]} */ (named.get(slotName)));
+        newChildren.push(.../** @type {JxMutableNode[]} */ (named.get(slotName)));
         named.delete(slotName);
       } else if (!slotName && defaults.length > 0) {
         newChildren.push(...defaults);
@@ -207,21 +214,24 @@ function fillSlots(
         newChildren.push(...child.children);
       }
     } else {
-      fillSlots(child, named, defaults);
+      if (typeof child !== "string") fillSlots(child, named, defaults);
       newChildren.push(child);
     }
   }
-  node.children = newChildren;
+  node.children = /** @type {JxMutableNode[]} */ (newChildren);
 }
 
 /**
  * Update the project's project.json with a partial patch and persist to disk.
  *
- * @param {Record<string, any>} patch - Fields to merge into the current projectConfig
+ * @param {Partial<ProjectConfig>} patch - Fields to merge into the current projectConfig
  */
 export async function updateSiteConfig(patch) {
   const platform = getPlatform();
-  const config = { ...projectState.projectConfig, ...patch };
+  const config = /** @type {ProjectConfig} */ ({
+    ...requireProjectState().projectConfig,
+    ...patch,
+  });
   await platform.writeFile("project.json", JSON.stringify(config, null, 2));
-  setProjectState({ ...projectState, projectConfig: config });
+  setProjectState({ ...requireProjectState(), projectConfig: config });
 }

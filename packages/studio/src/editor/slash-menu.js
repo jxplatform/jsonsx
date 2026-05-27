@@ -30,12 +30,14 @@ const SLASH_COMMANDS = [
   { label: "Section", tag: "section", description: "Section container" },
 ];
 
+/** @typedef {{ label: string; tag: string; description: string }} SlashCommand */
+
 // ─── State ────────────────────────────────────────────────────────────────────
 
-/** @type {{ onSelect: (cmd: any) => void; showFilter?: boolean } | null} */
+/** @type {{ onSelect: (cmd: SlashCommand) => void; showFilter?: boolean } | null} */
 let callbacks = null;
 let activeIdx = 0;
-/** @type {any[]} */
+/** @type {SlashCommand[]} */
 let filteredItems = [];
 let open = false;
 /** @type {HTMLElement | null} */
@@ -60,7 +62,7 @@ export function isSlashMenuOpen() {
  *
  * @param {HTMLElement} anchorEl — the element being edited (for positioning)
  * @param {string} filter — current typed filter text (after the "/")
- * @param {{ onSelect: (cmd: any) => void; showFilter?: boolean }} cbs
+ * @param {{ onSelect: (cmd: SlashCommand) => void; showFilter?: boolean }} cbs
  */
 export function showSlashMenu(anchorEl, filter, cbs) {
   callbacks = cbs;
@@ -174,7 +176,7 @@ function onOutsideClick(e) {
   }
 }
 
-/** @param {any} cmd */
+/** @param {SlashCommand} cmd */
 function select(cmd) {
   const cbs = callbacks;
   dismissSlashMenu();

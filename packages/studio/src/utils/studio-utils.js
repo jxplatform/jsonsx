@@ -45,7 +45,7 @@ export function kebabToLabel(val) {
 /**
  * Get display label from metadata entry or prop name
  *
- * @param {any} entry
+ * @param {{ $label?: string; [key: string]: unknown } | null | undefined} entry
  * @param {string} prop
  * @returns {string}
  */
@@ -56,7 +56,7 @@ export function propLabel(entry, prop) {
 /**
  * Label for HTML attributes — handles kebab-case (aria-label → "Aria Label")
  *
- * @param {any} entry
+ * @param {{ $label?: string; [key: string]: unknown } | null | undefined} entry
  * @param {string} attr
  * @returns {string}
  */
@@ -106,7 +106,7 @@ export function abbreviateValue(val) {
 /**
  * Determine input widget type from a css-meta entry
  *
- * @param {any} entry
+ * @param {Record<string, unknown>} entry
  * @returns {string}
  */
 export function inferInputType(entry) {
@@ -127,13 +127,13 @@ export function inferInputType(entry) {
  * extension matching against the content type's `source` glob.
  *
  * @param {string | null} documentPath — project-relative path (e.g. "blog/hello.md")
- * @param {any} projectConfig — parsed project.json
- * @returns {{ name: string; schema: any } | null}
+ * @param {ProjectConfig | null | undefined} projectConfig — parsed project.json
+ * @returns {{ name: string; schema: ContentTypeSchema } | null}
  */
 export function findContentTypeSchema(documentPath, projectConfig) {
   if (!documentPath || !projectConfig?.contentTypes) return null;
   for (const [name, def] of Object.entries(
-    /** @type {Record<string, any>} */ (projectConfig.contentTypes),
+    /** @type {Record<string, ContentTypeDef>} */ (projectConfig.contentTypes),
   )) {
     if (!def.source || !def.schema) continue;
     const src = def.source.replace(/^\.\//, "");
@@ -186,7 +186,7 @@ export function varDisplayName(varName, prefix) {
       .replace(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "")
       .replace(/^--/, "")
       .replace(/-/g, " ")
-      .replace(/\b\w/g, (/** @type {any} */ c) => c.toUpperCase()) || varName
+      .replace(/\b\w/g, (/** @type {string} */ c) => c.toUpperCase()) || varName
   );
 }
 

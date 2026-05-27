@@ -1,6 +1,16 @@
 import { homedir } from "node:os";
 
-let Utils: any = null;
+interface ElectrobunUtils {
+  openFileDialog: (options: {
+    startingFolder?: string;
+    allowedFileTypes?: string;
+    canChooseFiles?: boolean;
+    canChooseDirectory?: boolean;
+    allowsMultipleSelection?: boolean;
+  }) => Promise<string[]>;
+}
+
+let Utils: ElectrobunUtils | null = null;
 
 export async function init() {
   try {

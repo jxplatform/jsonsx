@@ -1,4 +1,4 @@
-/** General settings section — favicon, platform adapter, and other site-wide config. */
+/** General settings section — favicon, platform adapter, breakpoints, and other site-wide config. */
 
 import { html, render as litRender, nothing } from "lit-html";
 import { projectState } from "../store.js";
@@ -9,7 +9,7 @@ import { closeSettingsModal } from "./settings-modal.js";
 
 /** @param {HTMLElement} container */
 export function renderGeneralSettings(container) {
-  const config = projectState.projectConfig || {};
+  const config = /** @type {ProjectConfig} */ (projectState?.projectConfig || {});
 
   const onFaviconUpload = async () => {
     const input = document.createElement("input");
@@ -26,13 +26,50 @@ export function renderGeneralSettings(container) {
     input.click();
   };
 
-  const onAdapterChange = (/** @type {any} */ e) => {
+  const onAdapterChange = (/** @type {Event & { target: { value: string } }} */ e) => {
     updateSiteConfig({ build: { ...config.build, adapter: e.target.value } });
   };
 
   const onEditGlobalStyles = () => {
     closeSettingsModal();
     openFileInTab("project.json");
+  };
+
+  // ─── Breakpoints ($media) ───────────────────────────────────────────────────
+
+  const media = /** @type {Record<string, string>} */ (config.$media || {});
+  const mediaEntries = Object.entries(media);
+
+  const onMediaValueChange =
+    (/** @type {string} */ key) => (/** @type {Event & { target: { value: string } }} */ e) => {
+      const updated = { ...media, [key]: e.target.value };
+      updateSiteConfig({ $media: updated });
+    };
+
+  const onMediaNameChange =
+    (/** @type {string} */ oldKey) => (/** @type {Event & { target: { value: string } }} */ e) => {
+      const rawName = e.target.value.trim();
+      const newKey = rawName.startsWith("--") ? rawName : `--${rawName}`;
+      if (newKey === oldKey) return;
+      const updated = /** @type {Record<string, string>} */ ({});
+      for (const [k, v] of Object.entries(media)) {
+        updated[k === oldKey ? newKey : k] = v;
+      }
+      updateSiteConfig({ $media: updated });
+      renderGeneralSettings(container);
+    };
+
+  const onRemoveBreakpoint = (/** @type {string} */ key) => () => {
+    const updated = { ...media };
+    delete updated[key];
+    updateSiteConfig({ $media: updated });
+    renderGeneralSettings(container);
+  };
+
+  const onAddBreakpoint = () => {
+    const updated = { ...media, "--new": "(max-width: 480px)" };
+    updateSiteConfig({ $media: updated });
+    renderGeneralSettings(container);
   };
 
   const currentFavicon = config.favicon;
@@ -78,6 +115,51 @@ export function renderGeneralSettings(container) {
           <sp-menu-item value="cloudflare-workers">Cloudflare Workers</sp-menu-item>
           <sp-menu-item value="cloudflare-pages">Cloudflare Pages</sp-menu-item>
         </sp-picker>
+      </div>
+
+      <div class="settings-field">
+        <label class="settings-field-label">Breakpoints</label>
+        <p class="settings-field-desc">
+          Responsive breakpoints for canvas panels and media query styles.
+        </p>
+        <div class="settings-media-list">
+          ${mediaEntries.map(([key, value]) => {
+            const isBase = key === "--";
+            return html`
+              <div class="settings-media-row">
+                ${isBase
+                  ? html`<span class="settings-media-name-fixed">Base</span>`
+                  : html`<sp-textfield
+                      size="s"
+                      class="settings-media-name"
+                      .value=${key.replace(/^--/, "")}
+                      placeholder="name"
+                      @change=${onMediaNameChange(key)}
+                    ></sp-textfield>`}
+                <sp-textfield
+                  size="s"
+                  class="settings-media-value"
+                  .value=${value}
+                  placeholder=${isBase ? "1280px" : "(max-width: 768px)"}
+                  @change=${onMediaValueChange(key)}
+                ></sp-textfield>
+                ${isBase
+                  ? nothing
+                  : html`<sp-action-button
+                      size="s"
+                      quiet
+                      title="Remove breakpoint"
+                      @click=${onRemoveBreakpoint(key)}
+                    >
+                      ×
+                    </sp-action-button>`}
+              </div>
+            `;
+          })}
+        </div>
+        <sp-action-button size="s" style="margin-top:8px" @click=${onAddBreakpoint}>
+          + Add Breakpoint
+        </sp-action-button>
       </div>
 
       <div class="settings-field">

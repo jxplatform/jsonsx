@@ -3,6 +3,21 @@ import { handleStudioApi } from "../src/studio-api.js";
 import { join, resolve } from "node:path";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 
+/**
+ * Test helper — calls handleStudioApi and asserts a response was returned.
+ *
+ * @param {Request} req
+ * @param {URL} url
+ * @param {string} root
+ * @param {string | null} [activeProjectRoot]
+ * @returns {Promise<Response>}
+ */
+async function callApi(req, url, root, activeProjectRoot = null) {
+  const res = await handleStudioApi(req, url, root, activeProjectRoot);
+  if (!res) throw new Error("handleStudioApi returned null");
+  return res;
+}
+
 const FIXTURES = resolve(import.meta.dir, "_studio_fixtures");
 mkdirSync(FIXTURES, { recursive: true });
 
@@ -144,9 +159,9 @@ writeFileSync(join(FIXTURES, "Parser.class.json"), JSON.stringify(siblingClassJs
 
 // Helper: create a studio API request for plugin-schema
 /**
- * @param {any} src
- * @param {any} [prototype]
- * @param {any} [base]
+ * @param {string} src
+ * @param {string} [prototype]
+ * @param {string} [base]
  */
 function schemaRequest(src, prototype, base) {
   const params = new URLSearchParams({ src });
@@ -164,9 +179,9 @@ function schemaRequest(src, prototype, base) {
 describe("plugin-schema — direct .class.json path", () => {
   test("extracts parameters as properties", async () => {
     const { req, url } = schemaRequest(`./_studio_fixtures/DataSource.class.json`, "DataSource");
-    const res = await handleStudioApi(req, url, import.meta.dir);
+    const res = await callApi(req, url, import.meta.dir);
     expect(res).not.toBeNull();
-    const { schema } = await /** @type {any} */ (res).json();
+    const { schema } = await res.json();
     expect(schema.properties.url).toEqual({
       type: "string",
       description: "API endpoint URL",
@@ -186,8 +201,8 @@ describe("plugin-schema — direct .class.json path", () => {
 
   test("includes public fields but excludes private fields", async () => {
     const { req, url } = schemaRequest(`./_studio_fixtures/DataSource.class.json`, "DataSource");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     expect(schema.properties.cache).toBeDefined();
     expect(schema.properties.cache.description).toBe("Internal cache");
     expect(schema.properties.secret).toBeUndefined();
@@ -195,8 +210,8 @@ describe("plugin-schema — direct .class.json path", () => {
 
   test("determines required from constructor parameters without defaults", async () => {
     const { req, url } = schemaRequest(`./_studio_fixtures/DataSource.class.json`, "DataSource");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     expect(schema.required).toContain("url");
     expect(schema.required).not.toContain("limit"); // has default: 10
     expect(schema.required).not.toContain("debug"); // has default: false
@@ -211,8 +226,8 @@ describe("plugin-schema — extends inheritance", () => {
       `./_studio_fixtures/PostCollection.class.json`,
       "PostCollection",
     );
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     expect(schema.description).toBe("Posts collection");
     // Parent parameters
     expect(schema.properties.src).toBeDefined();
@@ -226,8 +241,8 @@ describe("plugin-schema — extends inheritance", () => {
       `./_studio_fixtures/PostCollection.class.json`,
       "PostCollection",
     );
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     // src is required from parent (no default)
     expect(schema.required).toContain("src");
   });
@@ -241,8 +256,8 @@ describe("plugin-schema — format: json-schema", () => {
       `./_studio_fixtures/TypedCollection.class.json`,
       "TypedCollection",
     );
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     expect(schema.properties.itemSchema.format).toBe("json-schema");
     expect(schema.properties.itemSchema.description).toBe("Schema for collection items");
   });
@@ -253,8 +268,8 @@ describe("plugin-schema — format: json-schema", () => {
 describe("plugin-schema — sibling auto-discovery", () => {
   test("discovers .class.json next to .js module", async () => {
     const { req, url } = schemaRequest(`./_studio_fixtures/parser.js`, "Parser");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const { schema } = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
     expect(schema).not.toBeNull();
     expect(schema.description).toBe("Sibling auto-discovered schema");
     expect(schema.properties.input).toBeDefined();
@@ -267,14 +282,14 @@ describe("plugin-schema — errors", () => {
   test("returns 400 when src param is missing", async () => {
     const url = new URL("http://localhost/__studio/plugin-schema");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, import.meta.dir);
+    expect(res.status).toBe(400);
   });
 
   test("returns null schema for nonexistent .class.json", async () => {
     const { req, url } = schemaRequest(`./_studio_fixtures/Nonexistent.class.json`, "Nonexistent");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).toBeNull();
   });
 });
@@ -304,7 +319,7 @@ writeFileSync(
   "utf8",
 );
 
-function projectInfoRequest(/** @type {any} */ dir) {
+function projectInfoRequest(/** @type {string} */ dir) {
   const params = new URLSearchParams();
   if (dir) params.set("dir", dir);
   const url = new URL(`http://localhost/__studio/project-info?${params}`);
@@ -314,9 +329,9 @@ function projectInfoRequest(/** @type {any} */ dir) {
 describe("project-info", () => {
   test("detects a site project with project.json", async () => {
     const { req, url } = projectInfoRequest("_studio_fixtures/my-site");
-    const res = await handleStudioApi(req, url, import.meta.dir);
+    const res = await callApi(req, url, import.meta.dir);
     expect(res).not.toBeNull();
-    const data = await /** @type {any} */ (res).json();
+    const data = await res.json();
     expect(data.isSiteProject).toBe(true);
     expect(data.projectConfig.name).toBe("Test Site");
     expect(data.directories).toContain("pages");
@@ -326,23 +341,23 @@ describe("project-info", () => {
 
   test("returns isSiteProject false for plain directory", async () => {
     const { req, url } = projectInfoRequest("_studio_fixtures/plain-dir");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.isSiteProject).toBe(false);
     expect(data.projectConfig).toBeNull();
   });
 
   test("rejects directory traversal", async () => {
     const { req, url } = projectInfoRequest("../../etc");
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, import.meta.dir);
+    expect(res.status).toBe(400);
   });
 
   test("defaults to current dir when no dir param", async () => {
     const url = new URL("http://localhost/__studio/project-info");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.projectRoot).toBe(import.meta.dir.replaceAll("\\", "/"));
   });
 });
@@ -353,10 +368,12 @@ describe("sites discovery", () => {
   test("discovers site projects with project.json", async () => {
     const url = new URL("http://localhost/__studio/sites");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
+    const res = await callApi(req, url, import.meta.dir);
     expect(res).not.toBeNull();
-    const sites = await /** @type {any} */ (res).json();
-    const testSite = sites.find((/** @type {any} */ s) => s.config.name === "Test Site");
+    const sites = await res.json();
+    const testSite = sites.find(
+      (/** @type {Record<string, any>} */ s) => s.config.name === "Test Site",
+    );
     expect(testSite).toBeDefined();
     expect(testSite.path).toBe(
       resolve(import.meta.dir, "_studio_fixtures/my-site").replaceAll("\\", "/"),
@@ -367,11 +384,13 @@ describe("sites discovery", () => {
   test("does not include directories without project.json", async () => {
     const url = new URL("http://localhost/__studio/sites");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const sites = await /** @type {any} */ (res).json();
-    expect(sites.every((/** @type {any} */ s) => s.path !== "_studio_fixtures/plain-dir")).toBe(
-      true,
-    );
+    const res = await callApi(req, url, import.meta.dir);
+    const sites = await res.json();
+    expect(
+      sites.every(
+        (/** @type {Record<string, any>} */ s) => s.path !== "_studio_fixtures/plain-dir",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -381,26 +400,28 @@ describe("components — scoped scan", () => {
   test("finds components under a specific directory", async () => {
     const url = new URL("http://localhost/__studio/components?dir=_studio_fixtures/my-site");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
+    const res = await callApi(req, url, import.meta.dir);
     expect(res).not.toBeNull();
-    const components = await /** @type {any} */ (res).json();
+    const components = await res.json();
     expect(components.length).toBeGreaterThanOrEqual(1);
-    expect(components.some((/** @type {any} */ c) => c.tagName === "my-card")).toBe(true);
+    expect(components.some((/** @type {Record<string, any>} */ c) => c.tagName === "my-card")).toBe(
+      true,
+    );
   });
 
   test("returns empty for directory with no components", async () => {
     const url = new URL("http://localhost/__studio/components?dir=_studio_fixtures/plain-dir");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const components = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const components = await res.json();
     expect(components).toEqual([]);
   });
 
   test("rejects directory traversal on dir param", async () => {
     const url = new URL("http://localhost/__studio/components?dir=../../etc");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, import.meta.dir);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -411,31 +432,31 @@ describe("file — read", () => {
     writeFileSync(join(FIXTURES, "hello.txt"), "world", "utf8");
     const url = new URL(`http://localhost/__studio/file?path=${FIXTURES}/hello.txt`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(200);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(200);
+    const data = await res.json();
     expect(data.content).toBe("world");
   });
 
   test("returns 404 for nonexistent file", async () => {
     const url = new URL(`http://localhost/__studio/file?path=${FIXTURES}/nonexistent.txt`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(404);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(404);
   });
 
   test("returns 400 when path param is missing", async () => {
     const url = new URL("http://localhost/__studio/file");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 
   test("rejects path outside project root", async () => {
     const url = new URL(`http://localhost/__studio/file?path=/etc/passwd`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -443,25 +464,25 @@ describe("file — write", () => {
   test("writes a file within project root", async () => {
     const url = new URL(`http://localhost/__studio/file?path=write-test.txt`);
     const req = new Request(url, { method: "PUT", body: "new content" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(200);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(200);
+    const data = await res.json();
     expect(data.ok).toBe(true);
   });
 
   test("creates parent directories as needed", async () => {
     const url = new URL(`http://localhost/__studio/file?path=sub/deep/new.txt`);
     const req = new Request(url, { method: "PUT", body: "deep content" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.ok).toBe(true);
   });
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/file");
     const req = new Request(url, { method: "PUT", body: "x" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -470,23 +491,23 @@ describe("file — delete", () => {
     writeFileSync(join(FIXTURES, "to-delete.txt"), "bye", "utf8");
     const url = new URL(`http://localhost/__studio/file?path=to-delete.txt`);
     const req = new Request(url, { method: "DELETE" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.ok).toBe(true);
   });
 
   test("returns 404 for nonexistent file", async () => {
     const url = new URL(`http://localhost/__studio/file?path=no-such-file.txt`);
     const req = new Request(url, { method: "DELETE" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(404);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(404);
   });
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/file");
     const req = new Request(url, { method: "DELETE" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -499,8 +520,8 @@ describe("file — rename", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: "old-name.txt", to: "new-name.txt" }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.ok).toBe(true);
     expect(data.to).toBe("new-name.txt");
   });
@@ -508,8 +529,8 @@ describe("file — rename", () => {
   test("returns 400 for invalid JSON", async () => {
     const url = new URL("http://localhost/__studio/file/rename");
     const req = new Request(url, { method: "POST", body: "not json" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 
   test("returns 400 when from/to missing", async () => {
@@ -519,8 +540,8 @@ describe("file — rename", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: "only-from.txt" }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -531,26 +552,28 @@ describe("files — listing", () => {
     writeFileSync(join(FIXTURES, "listed.txt"), "x", "utf8");
     const url = new URL(`http://localhost/__studio/files?dir=${FIXTURES}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
-    expect(data.some((/** @type {any} */ f) => f.name === "listed.txt")).toBe(true);
+    expect(data.some((/** @type {Record<string, any>} */ f) => f.name === "listed.txt")).toBe(true);
   });
 
   test("lists files using glob pattern", async () => {
     const url = new URL(`http://localhost/__studio/files?dir=${FIXTURES}&glob=*.json`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
-    expect(data.every((/** @type {any} */ f) => f.name.endsWith(".json"))).toBe(true);
+    expect(data.every((/** @type {Record<string, any>} */ f) => f.name.endsWith(".json"))).toBe(
+      true,
+    );
   });
 
   test("rejects directory traversal", async () => {
     const url = new URL("http://localhost/__studio/files?dir=../../etc");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -561,8 +584,8 @@ describe("project endpoint", () => {
     writeFileSync(join(FIXTURES, "package.json"), JSON.stringify({ name: "test-pkg" }), "utf8");
     const url = new URL("http://localhost/__studio/project");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.name).toBe("test-pkg");
     expect(data.root).toBe(FIXTURES);
   });
@@ -572,8 +595,8 @@ describe("project endpoint", () => {
     mkdirSync(emptyDir, { recursive: true });
     const url = new URL("http://localhost/__studio/project");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, emptyDir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, emptyDir);
+    const data = await res.json();
     expect(data.name).toBe("empty-proj");
   });
 });
@@ -589,8 +612,8 @@ describe("locate endpoint", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "findme.txt" }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.path).toContain("findme.txt");
   });
 
@@ -601,16 +624,16 @@ describe("locate endpoint", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "nonexistent-xyz.txt" }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.path).toBeNull();
   });
 
   test("returns 400 for invalid JSON", async () => {
     const url = new URL("http://localhost/__studio/locate");
     const req = new Request(url, { method: "POST", body: "bad" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 
   test("returns 400 when name is missing", async () => {
@@ -620,8 +643,8 @@ describe("locate endpoint", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -647,8 +670,8 @@ describe("resolve-site", () => {
       `http://localhost/__studio/resolve-site?path=${encodeURIComponent(filePath)}`,
     );
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.sitePath).not.toBeNull();
     expect(data.projectConfig.name).toBe("Test Site");
   });
@@ -659,16 +682,16 @@ describe("resolve-site", () => {
       `http://localhost/__studio/resolve-site?path=${encodeURIComponent(filePath)}`,
     );
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.sitePath).toBeNull();
   });
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/resolve-site");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -678,16 +701,16 @@ describe("find-project", () => {
   test("returns 400 when name is missing", async () => {
     const url = new URL("http://localhost/__studio/find-project");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.error).toBe("Missing name");
   });
 
   test("returns null path when project not found", async () => {
     const url = new URL("http://localhost/__studio/find-project?name=nonexistent-xyz-project-404");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.path).toBeNull();
   }, 15000);
 });
@@ -714,10 +737,10 @@ describe("components — markdown discovery", () => {
   test("discovers valid Jx component from .md file", async () => {
     const url = new URL(`http://localhost/__studio/components?dir=${MD_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, MD_DIR);
-    const components = await /** @type {any} */ (res).json();
-    const widget = /** @type {any} */ (components).find(
-      (/** @type {any} */ c) => c.tagName === "my-widget",
+    const res = await callApi(req, url, MD_DIR);
+    const components = await res.json();
+    const widget = components.find(
+      (/** @type {Record<string, any>} */ c) => c.tagName === "my-widget",
     );
     expect(widget).toBeDefined();
     expect(widget.source).toBe("jx");
@@ -726,9 +749,13 @@ describe("components — markdown discovery", () => {
   test("skips .md without frontmatter", async () => {
     const url = new URL(`http://localhost/__studio/components?dir=${MD_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, MD_DIR);
-    const components = await /** @type {any} */ (res).json();
-    expect(/** @type {any[]} */ (components).every((c) => c.path !== "plain.md")).toBe(true);
+    const res = await callApi(req, url, MD_DIR);
+    const components = await res.json();
+    expect(
+      /** @type {any[]} */ (components).every(
+        (/** @type {Record<string, any>} */ c) => c.path !== "plain.md",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -786,10 +813,10 @@ describe("components — CEM npm discovery", () => {
   test("discovers CEM components from node_modules", async () => {
     const url = new URL(`http://localhost/__studio/components?dir=${CEM_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, CEM_DIR);
-    const components = await /** @type {any} */ (res).json();
-    const btn = /** @type {any} */ (components).find(
-      (/** @type {any} */ c) => c.tagName === "test-button",
+    const res = await callApi(req, url, CEM_DIR);
+    const components = await res.json();
+    const btn = components.find(
+      (/** @type {Record<string, any>} */ c) => c.tagName === "test-button",
     );
     expect(btn).toBeDefined();
     expect(btn.source).toBe("npm");
@@ -806,9 +833,11 @@ describe("packages endpoint", () => {
     const CEM_DIR = join(FIXTURES, "cem-project");
     const url = new URL(`http://localhost/__studio/packages?dir=${CEM_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, CEM_DIR);
-    const packages = await /** @type {any} */ (res).json();
-    const testEl = /** @type {any[]} */ (packages).find((p) => p.name === "test-elements");
+    const res = await callApi(req, url, CEM_DIR);
+    const packages = await res.json();
+    const testEl = /** @type {any[]} */ (packages).find(
+      (/** @type {Record<string, any>} */ p) => p.name === "test-elements",
+    );
     expect(testEl).toBeDefined();
     expect(testEl.hasCem).toBe(true);
   });
@@ -818,8 +847,8 @@ describe("packages endpoint", () => {
     mkdirSync(emptyDir, { recursive: true });
     const url = new URL(`http://localhost/__studio/packages?dir=${emptyDir}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, emptyDir);
-    const packages = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, emptyDir);
+    const packages = await res.json();
     expect(packages).toEqual([]);
   });
 });
@@ -831,8 +860,8 @@ describe("cem endpoint", () => {
     const CEM_DIR = join(FIXTURES, "cem-project");
     const url = new URL(`http://localhost/__studio/cem?pkg=test-elements&dir=${CEM_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, CEM_DIR);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, CEM_DIR);
+    const data = await res.json();
     expect(data.cem).not.toBeNull();
     expect(data.cem.modules).toHaveLength(1);
   });
@@ -841,16 +870,16 @@ describe("cem endpoint", () => {
     const CEM_DIR = join(FIXTURES, "cem-project");
     const url = new URL(`http://localhost/__studio/cem?pkg=nonexistent&dir=${CEM_DIR}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, CEM_DIR);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, CEM_DIR);
+    const data = await res.json();
     expect(data.cem).toBeNull();
   });
 
   test("returns 400 when pkg param missing", async () => {
     const url = new URL("http://localhost/__studio/cem");
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -864,8 +893,8 @@ describe("packages/add", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.error).toBe("Missing name");
   });
 
@@ -876,8 +905,8 @@ describe("packages/add", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: 123 }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.error).toBe("Missing name");
   });
 
@@ -888,8 +917,8 @@ describe("packages/add", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "@nonexistent-scope-xyz/nonexistent-pkg-404" }),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(500);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(500);
   });
 });
 
@@ -903,8 +932,8 @@ describe("packages/remove", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
     });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
     expect(data.error).toBe("Missing name");
   });
 });
@@ -916,23 +945,23 @@ describe("file — upload", () => {
     const url = new URL(`http://localhost/__studio/file/upload?path=uploaded.bin`);
     const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
     const req = new Request(url, { method: "POST", body: data });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    const result = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, FIXTURES);
+    const result = await res.json();
     expect(result.ok).toBe(true);
   });
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/file/upload");
     const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 
   test("returns 400 for path outside root", async () => {
     const url = new URL(`http://localhost/__studio/file/upload?path=/etc/evil`);
     const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
-    const res = await handleStudioApi(req, url, FIXTURES);
-    expect(/** @type {any} */ (res).status).toBe(400);
+    const res = await callApi(req, url, FIXTURES);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -960,8 +989,8 @@ describe("plugin-schema — JS module fallback", () => {
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).not.toBeNull();
     expect(data.schema.properties.x).toBeDefined();
   });
@@ -973,8 +1002,8 @@ describe("plugin-schema — JS module fallback", () => {
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).toBeNull();
     expect(data.error).toContain("not found");
   });
@@ -986,8 +1015,8 @@ describe("plugin-schema — JS module fallback", () => {
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).toBeNull();
     expect(data.error).toBeDefined();
   });
@@ -1004,8 +1033,8 @@ describe("plugin-schema — base resolution", () => {
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).not.toBeNull();
     expect(data.schema.properties.url).toBeDefined();
   });
@@ -1014,8 +1043,8 @@ describe("plugin-schema — base resolution", () => {
     const params = new URLSearchParams({ src: "./Foo.class.json", base: "not-a-url" });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, import.meta.dir);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, import.meta.dir);
+    const data = await res.json();
     expect(data.schema).toBeNull();
     expect(data.error).toBeDefined();
   });
@@ -1035,9 +1064,9 @@ describe("assertAccessible via activeProjectRoot", () => {
 
     const url = new URL(`http://localhost/__studio/file?path=${join(projectDir, "test.txt")}`);
     const req = new Request(url, { method: "GET" });
-    const res = await handleStudioApi(req, url, serverRoot, projectDir);
-    expect(/** @type {any} */ (res).status).toBe(200);
-    const data = await /** @type {any} */ (res).json();
+    const res = await callApi(req, url, serverRoot, projectDir);
+    expect(res.status).toBe(200);
+    const data = await res.json();
     expect(data.content).toBe("content");
   });
 });
