@@ -11,6 +11,7 @@ import { resolve, relative, basename, dirname, isAbsolute } from "node:path";
 import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
+import * as claude from "./claude-session.js";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (/** @type {string} */ p) => p.replaceAll("\\", "/");
@@ -40,6 +41,14 @@ const statusMap = { M: "M", T: "T", A: "A", D: "D", R: "R", C: "C", U: "U" };
  * Parse raw `git status --porcelain=v2 --branch` output into structured data.
  *
  * @param {string} out
+ * @returns {{
+ *   branch: string;
+ *   ahead: number;
+ *   behind: number;
+ *   files: { path: string; status: string; staged: boolean }[];
+ *   isRepo?: boolean;
+ *   remotes?: string[];
+ * }}
  */
 export function parseGitStatus(out) {
   let branch = "";
@@ -864,8 +873,44 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
 
     try {
       if (gitCmd === "status" && req.method === "GET") {
-        const out = await runGit(["status", "--porcelain=v2", "--branch"]);
-        return Response.json(parseGitStatus(out));
+        // Check if we're in a git repo first
+        const checkProc = Bun.spawn(["git", "rev-parse", "--is-inside-work-tree"], {
+          cwd,
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const checkExit = await checkProc.exited;
+        if (checkExit !== 0) {
+          return Response.json({
+            isRepo: false,
+            branch: "",
+            files: [],
+            ahead: 0,
+            behind: 0,
+            remotes: [],
+          });
+        }
+
+        const [out, remotesOut] = await Promise.all([
+          runGit(["status", "--porcelain=v2", "--branch"]),
+          runGit(["remote"]),
+        ]);
+        const status = parseGitStatus(out);
+        status.isRepo = true;
+        status.remotes = remotesOut.trim().split("\n").filter(Boolean);
+        return Response.json(status);
+      }
+
+      if (gitCmd === "init" && req.method === "POST") {
+        await runGit(["init"]);
+        return Response.json({ ok: true });
+      }
+
+      if (gitCmd === "add-remote" && req.method === "POST") {
+        const { name, url: remoteUrl } = await req.json();
+        if (!name || !remoteUrl) return new Response("name and url required", { status: 400 });
+        await runGit(["remote", "add", name, remoteUrl]);
+        return Response.json({ ok: true });
       }
 
       if (gitCmd === "branches" && req.method === "GET") {
@@ -929,7 +974,17 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
       }
 
       if (gitCmd === "push" && req.method === "POST") {
-        await runGit(["push"]);
+        let body = {};
+        try {
+          body = await req.json();
+        } catch {}
+        const { setUpstream } = /** @type {{ setUpstream?: boolean }} */ (body);
+        if (setUpstream) {
+          const branch = (await runGit(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+          await runGit(["push", "-u", "origin", branch]);
+        } else {
+          await runGit(["push"]);
+        }
         return Response.json({ ok: true });
       }
 
@@ -986,12 +1041,92 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         await runGit(["checkout", "--", ...files]);
         return Response.json({ ok: true });
       }
+
+      if (gitCmd === "clone" && req.method === "POST") {
+        const { url } = await req.json();
+        if (!url || typeof url !== "string")
+          return Response.json({ error: "Missing url" }, { status: 400 });
+        const repoName = basename(url.replace(/\.git$/, ""));
+        const dest = resolve(cwd, repoName);
+        const proc = Bun.spawn(["git", "clone", url, dest], {
+          cwd,
+          stdout: "pipe",
+          stderr: "pipe",
+        });
+        const exitCode = await proc.exited;
+        const stderr = await new Response(proc.stderr).text();
+        if (exitCode !== 0) throw new Error(stderr || `git clone exited with ${exitCode}`);
+        return Response.json({ ok: true, root: dest });
+      }
     } catch (/** @type {unknown} */ e) {
       return Response.json(
         { error: /** @type {{ message?: string }} */ (e).message },
         { status: 500 },
       );
     }
+  }
+
+  // ─── AI Assistant ─────────────────────────────────────────────────────────
+
+  if (path === "/__studio/ai/auth-status" && req.method === "GET") {
+    const status = await claude.getAuthStatus();
+    return Response.json(status);
+  }
+
+  if (path === "/__studio/ai/session" && req.method === "POST") {
+    try {
+      const body = await req.json();
+      const projectDir = activeProjectRoot || root;
+      const result = claude.createSession(projectDir, body.message, {
+        systemPrompt: body.systemPrompt,
+      });
+      return Response.json(result);
+    } catch (/** @type {any} */ e) {
+      return Response.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  if (
+    path.startsWith("/__studio/ai/session/") &&
+    path.endsWith("/stream") &&
+    req.method === "GET"
+  ) {
+    const id = path.split("/")[4];
+    return claude.streamSession(id);
+  }
+
+  if (
+    path.startsWith("/__studio/ai/session/") &&
+    path.endsWith("/message") &&
+    req.method === "POST"
+  ) {
+    try {
+      const id = path.split("/")[4];
+      const body = await req.json();
+      claude.sendMessage(id, body.message);
+      return Response.json({ ok: true });
+    } catch (/** @type {any} */ e) {
+      return Response.json({ error: e.message }, { status: 500 });
+    }
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
+    const id = path.split("/")[4];
+    claude.stopSession(id);
+    return Response.json({ ok: true });
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && req.method === "DELETE") {
+    const id = path.split("/")[4];
+    claude.deleteSession(id);
+    return Response.json({ ok: true });
+  }
+
+  if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
+    const id = path.split("/")[4];
+    const info = claude.getSession(id);
+    if (!info) return Response.json({ error: "Not found" }, { status: 404 });
+    return Response.json(info);
   }
 
   return null;

@@ -32,9 +32,12 @@ import {
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitInit,
+  gitAddRemote,
 } from "../git";
 import { addPackage, removePackage, listPackages } from "../packages";
 import { openFileDialog } from "./utils";
+import { handleAiRoute } from "../ai";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
@@ -65,13 +68,15 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   gitStage: (params) => gitStage(params as { files: string[] }),
   gitUnstage: (params) => gitUnstage(params as { files: string[] }),
   gitCommit: (params) => gitCommit(params as { message: string }),
-  gitPush: () => gitPush(),
+  gitPush: (params) => gitPush(params as { setUpstream?: boolean }),
   gitPull: () => gitPull(),
   gitFetch: () => gitFetch(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),
   gitDiff: (params) => gitDiff(params as { path?: string }),
   gitDiscard: (params) => gitDiscard(params as { files: string[] }),
+  gitInit: () => gitInit(),
+  gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
   addPackage: (params) => addPackage(params as { name: string }),
   removePackage: (params) => removePackage(params as { name: string }),
   listPackages: () => listPackages(),
@@ -88,6 +93,12 @@ const server = Bun.serve({
 
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/{2,}/, "/");
+
+    // AI routes (SSE streaming + REST)
+    if (path.startsWith("/studio/ai/")) {
+      const aiResponse = await handleAiRoute(req, path, projectRoot);
+      if (aiResponse) return aiResponse;
+    }
 
     if (path.startsWith("/studio/")) {
       const assetPath = resolve(studioDir, "." + path.replace("/studio/", "/"));

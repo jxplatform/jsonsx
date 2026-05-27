@@ -41,6 +41,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
  *   setGitDiffState: (state: import("../canvas/canvas-render.js").GitDiffState | null) => void;
+ *   cloneRepository?: () => void;
  * }} LeftPanelCtx
  */
 
@@ -64,15 +65,16 @@ export function mount(ctx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
-      // Track properties the left panel reads
-      void tab.doc.document;
-      void tab.doc.mode;
-      void tab.session.selection;
-      void tab.session.ui.settingsTab;
-      void tab.session.ui.gitStatus;
-      void tab.session.ui.gitLoading;
-      void tab.session.ui.gitError;
+      if (tab) {
+        // Track properties the left panel reads
+        void tab.doc.document;
+        void tab.doc.mode;
+        void tab.session.selection;
+        void tab.session.ui.settingsTab;
+        void tab.session.ui.gitStatus;
+        void tab.session.ui.gitLoading;
+        void tab.session.ui.gitError;
+      }
       render();
     });
   });
@@ -123,7 +125,19 @@ function _flush() {
 function _render() {
   const ctx = /** @type {LeftPanelCtx} */ (_ctx);
   const aTab = activeTab.value;
-  if (!aTab) return;
+  const tab = view.leftTab;
+
+  if ((!aTab || aTab.id === "welcome") && tab === "git") {
+    const S = { ui: aTab?.session?.ui || {} };
+    const content = ctx.renderGitPanel(S, ctx);
+    litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
+    return;
+  }
+
+  if (!aTab || aTab.id === "welcome") {
+    litRender(html`<div class="panel-body"></div>`, leftPanel);
+    return;
+  }
   const S = /**
    * @type {{
    *   ui: unknown;
@@ -141,7 +155,6 @@ function _render() {
     selection: aTab.session.selection,
     canvas: aTab.session.canvas,
   });
-  const tab = view.leftTab;
 
   /** @type {TemplateResult | typeof nothing} */
   let content;

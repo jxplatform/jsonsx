@@ -372,6 +372,7 @@ export function createDevServerPlatform() {
       return schema;
     },
 
+
     // ─── Git operations ──────────────────────────────────────────────────
 
     async gitStatus() {
@@ -427,8 +428,13 @@ export function createDevServerPlatform() {
       return await res.json();
     },
 
-    async gitPush() {
-      const res = await fetch("/__studio/git/push", { method: "POST" });
+    /** @param {{ setUpstream?: boolean }} [opts] */
+    async gitPush(opts) {
+      const res = await fetch("/__studio/git/push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts || {}),
+      });
       if (!res.ok) throw new Error((await res.json()).error);
       return await res.json();
     },
@@ -493,6 +499,79 @@ export function createDevServerPlatform() {
       });
       if (!res.ok) throw new Error((await res.json()).error);
       return await res.json();
+    },
+
+    /** @param {string} url */
+    async gitClone(url) {
+      const res = await fetch("/__studio/git/clone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
+
+    async gitInit() {
+      const res = await fetch("/__studio/git/init", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error);
+    },
+
+    /**
+     * @param {string} name
+     * @param {string} url
+     */
+    async gitAddRemote(name, url) {
+      const res = await fetch("/__studio/git/add-remote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, url }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+    },
+
+    // ─── AI Assistant ───────────────────────────────────
+
+    async aiAuthStatus() {
+      const res = await fetch("/__studio/ai/auth-status");
+      return await res.json();
+    },
+
+    /** @param {{ message: string; systemPrompt?: string }} opts */
+    async aiCreateSession(opts) {
+      const res = await fetch("/__studio/ai/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(opts),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
+
+    /** @param {string} id @param {string} message */
+    async aiSendMessage(id, message) {
+      const res = await fetch(`/__studio/ai/session/${id}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      return await res.json();
+    },
+
+    /** @param {string} id */
+    aiStreamUrl(id) {
+      return `/__studio/ai/session/${id}/stream`;
+    },
+
+    /** @param {string} id */
+    async aiStopSession(id) {
+      await fetch(`/__studio/ai/session/${id}/stop`, { method: "POST" });
+    },
+
+    /** @param {string} id */
+    async aiDeleteSession(id) {
+      await fetch(`/__studio/ai/session/${id}`, { method: "DELETE" });
     },
   };
 }

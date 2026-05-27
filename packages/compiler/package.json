@@ -39,12 +39,14 @@
     "@apidevtools/json-schema-ref-parser": "^15.3.5",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
+    "glob": "^13.0.6",
     "remark-gfm": "^4.0.1",
     "remark-stringify": "^11.0.0",
     "sharp": "^0.34.5",
     "unified": "^11.0.5"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.9.0"
+    "@happy-dom/global-registrator": "^20.9.0",
+    "@types/mdast": "^4.0.4"
   }
 }

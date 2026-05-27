@@ -59,6 +59,7 @@ export const activeTab = /** @type {import("@vue/reactivity").ComputedRef<Tab>} 
  *   document: Record<string, unknown>;
  *   frontmatter?: Record<string, unknown>;
  *   sourceFormat?: string | null;
+ *   capabilities?: { modes?: string[] };
  * }} opts
  * @returns {Tab}
  */

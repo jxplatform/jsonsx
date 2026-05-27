@@ -11,6 +11,7 @@ import { canvasWrap, canvasPanels, updateCanvas } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
 import { loadMarkdown } from "../files/file-ops.js";
+import { renderWelcome } from "../panels/welcome-screen.js";
 import {
   canvasPanelTemplate,
   applyTransform,
@@ -88,7 +89,16 @@ export function initCanvasRender(ctx) {
 
 export function renderCanvas() {
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    canvasWrap.textContent = "";
+    return;
+  }
+
+  // Welcome tab: render the welcome screen instead of normal canvas
+  if (tab.id === "welcome") {
+    renderWelcome(canvasWrap);
+    return;
+  }
   const ctx = /** @type {CanvasRenderCtx} */ (_ctx);
   const S = { document: tab.doc.document, ui: tab.session.ui, mode: tab.doc.mode };
   const canvasMode = ctx.getCanvasMode();

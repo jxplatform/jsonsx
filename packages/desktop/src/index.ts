@@ -33,6 +33,8 @@ import {
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitInit,
+  gitAddRemote,
 } from "./git";
 import { addPackage, removePackage, listPackages } from "./packages";
 import {
@@ -45,6 +47,14 @@ import {
   setNotifyWebview,
 } from "./updater";
 import { init as initUtils, openFileDialog } from "./utils";
+import { handleAiRoute } from "./ai";
+import {
+  createSession,
+  sendMessage,
+  stopSession,
+  deleteSession,
+  getAuthStatus,
+} from "@jxsuite/server/claude-session";
 
 // ─── Determine project root ───────────────────────────────────────────────────
 
@@ -85,13 +95,15 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       gitStage: (params) => gitStage(params),
       gitUnstage: (params) => gitUnstage(params),
       gitCommit: (params) => gitCommit(params),
-      gitPush: () => gitPush(),
+      gitPush: (params) => gitPush(params),
       gitPull: () => gitPull(),
       gitFetch: () => gitFetch(),
       gitCheckout: (params) => gitCheckout(params),
       gitCreateBranch: (params) => gitCreateBranch(params),
       gitDiff: (params) => gitDiff(params),
       gitDiscard: (params) => gitDiscard(params),
+      gitInit: () => gitInit(),
+      gitAddRemote: (params) => gitAddRemote(params),
       addPackage: (params) => addPackage(params),
       removePackage: (params) => removePackage(params),
       listPackages: () => listPackages(),
@@ -124,10 +136,39 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       windowSetFrame: (params) => {
         win.setFrame(params.x, params.y, params.width, params.height);
       },
+      aiAuthStatus: () => getAuthStatus(),
+      aiCreateSession: (params) =>
+        createSession(projectRoot, params.message, { systemPrompt: params.systemPrompt }),
+      },
+      aiSendMessage: (params) => {
+        sendMessage(params.id, params.message);
+      },
+      aiStreamUrl: (params) => `${aiServerUrl}/studio/ai/session/${params.id}/stream`,
+      aiStopSession: (params) => {
+        stopSession(params.id);
+      },
+      aiDeleteSession: (params) => {
+        deleteSession(params.id);
+      },
     },
     messages: {},
   },
 });
+
+// ─── AI HTTP server (SSE streaming requires HTTP) ────────────────────────────
+
+const aiServer = Bun.serve({
+  port: 0,
+  async fetch(req) {
+    const url = new URL(req.url);
+    const path = url.pathname.replace(/^\/{2,}/, "/");
+    const aiResponse = await handleAiRoute(req, path, projectRoot);
+    if (aiResponse) return aiResponse;
+    return new Response("Not Found", { status: 404 });
+  },
+});
+
+const aiServerUrl = `http://localhost:${aiServer.port}`;
 
 // ─── Open the main window ─────────────────────────────────────────────────────
 

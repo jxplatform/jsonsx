@@ -2,6 +2,14 @@ declare module "three";
 declare module "@webref/elements";
 declare module "@webref/css";
 declare module "@webref/idl";
+declare module "glob";
+declare module "unified";
+declare module "remark-parse";
+declare module "remark-frontmatter";
+declare module "remark-parse-frontmatter";
+declare module "remark-rehype";
+declare module "rehype-stringify";
+declare module "quikchat/md";
 
 // ─── Git & Platform Types ───────────────────────────────────────────────────
 
@@ -16,6 +24,8 @@ interface GitStatusResult {
   files: GitFileStatus[];
   ahead: number;
   behind: number;
+  isRepo: boolean;
+  remotes: string[];
 }
 
 interface GitBranchesResult {
@@ -87,7 +97,7 @@ interface StudioPlatform {
   gitStage(files: string[]): Promise<void>;
   gitUnstage(files: string[]): Promise<void>;
   gitCommit(message: string): Promise<void>;
-  gitPush(): Promise<void>;
+  gitPush(opts?: { setUpstream?: boolean }): Promise<void>;
   gitPull(): Promise<void>;
   gitFetch(): Promise<void>;
   gitCheckout(branch: string): Promise<void>;
@@ -95,6 +105,9 @@ interface StudioPlatform {
   gitDiff(path?: string): Promise<string>;
   gitShow(opts: { path: string; ref?: string }): Promise<string>;
   gitDiscard(files: string[]): Promise<void>;
+  gitClone?(url: string): Promise<{ ok: boolean; root: string }>;
+  gitInit(): Promise<void>;
+  gitAddRemote(name: string, url: string): Promise<void>;
   createProject(opts: {
     name: string;
     description?: string;
@@ -102,6 +115,14 @@ interface StudioPlatform {
     adapter?: string;
     directory: string;
   }): Promise<{ root: string; config: ProjectConfig }>;
+
+  // AI Assistant
+  aiAuthStatus(): Promise<{ authenticated: boolean; error?: string }>;
+  aiCreateSession(opts: { message: string; systemPrompt?: string }): Promise<{ id: string }>;
+  aiSendMessage(id: string, message: string): Promise<void>;
+  aiStreamUrl(id: string): string | Promise<string>;
+  aiStopSession(id: string): Promise<void>;
+  aiDeleteSession(id: string): Promise<void>;
 }
 
 // ─── Studio UI Types ────────────────────────────────────────────────────────

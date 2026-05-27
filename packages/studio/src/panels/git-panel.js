@@ -7,11 +7,15 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform.js";
-import { updateUi, renderOnly } from "../store.js";
+import { updateUi, renderOnly, projectState } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
+import { showDialog } from "../ui/layers.js";
+import { statusMessage } from "./statusbar.js";
+import { publishToGithub } from "../github/github-publish.js";
 
 export async function refreshGitStatus() {
+  if (!projectState) return;
   const plat = getPlatform();
   updateUi("gitLoading", true);
   updateUi("gitError", null);
@@ -26,6 +30,66 @@ export async function refreshGitStatus() {
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
   }
+}
+
+/**
+ * Show a dialog to clone a git repository. Returns the cloned project root on success, or null.
+ *
+ * @param {{ openRecentProject: (root: string) => Promise<void> }} ctx
+ */
+export async function cloneRepository(ctx) {
+  const platform = getPlatform();
+  if (!platform.gitClone) {
+    statusMessage("Clone not supported on this platform");
+    return;
+  }
+
+  const url = await showDialog(
+    (done) => html`
+      <sp-underlay open @close=${() => done(null)}></sp-underlay>
+      <sp-dialog-wrapper
+        headline="Clone Git Repository"
+        confirmLabel="Clone"
+        cancelLabel="Cancel"
+        open
+        @confirm=${(/** @type {Event} */ e) => {
+          const input = /** @type {HTMLInputElement | null} */ (
+            /** @type {HTMLElement} */ (
+              /** @type {HTMLElement} */ (e.target).parentElement
+            ).querySelector("sp-textfield")
+          );
+          done(input?.value?.trim() || null);
+        }}
+        @cancel=${() => done(null)}
+        @close=${() => done(null)}
+      >
+        <sp-textfield
+          label="Repository URL"
+          placeholder="https://github.com/user/repo.git"
+          style="width: 100%"
+          autofocus
+        ></sp-textfield>
+      </sp-dialog-wrapper>
+    `,
+  );
+
+  if (!url) return;
+
+  try {
+    statusMessage("Cloning repository...");
+    const result = await platform.gitClone(url);
+    if (result?.root) {
+      statusMessage("Clone complete");
+      await ctx.openRecentProject(result.root);
+    }
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Clone failed: ${/** @type {Error} */ (e).message}`);
+  }
+}
+
+/** @returns {boolean} */
+export function platformSupportsClone() {
+  return !!getPlatform().gitClone;
 }
 
 /**
@@ -60,6 +124,8 @@ let _gitSubTab = "changes";
  *     branch?: string;
  *     ahead?: number;
  *     behind?: number;
+ *     isRepo?: boolean;
+ *     remotes?: string[];
  *   } | null;
  *   gitBranches?: { current?: string; branches?: string[] } | null;
  *   gitLoading?: boolean;
@@ -87,9 +153,23 @@ async function fetchGitLog() {
  * @param {{
  *   setCanvasMode?: (mode: string) => void;
  *   setGitDiffState?: (state: unknown) => void;
+ *   cloneRepository?: () => void;
  * }} ctx
  */
 export function renderGitPanel(S, ctx) {
+  if (!projectState) {
+    return html`<div class="git-panel git-panel-empty">
+      <div class="git-empty-state">
+        <p>Open a project to use source control.</p>
+        ${platformSupportsClone()
+          ? html`<sp-action-button size="m" @click=${() => ctx.cloneRepository?.()}>
+              <sp-icon-download slot="icon"></sp-icon-download>
+              Clone Git Repository
+            </sp-action-button>`
+          : nothing}
+      </div>
+    </div>`;
+  }
   const status = S.ui.gitStatus;
   const branches = S.ui.gitBranches;
   const loading = S.ui.gitLoading;
@@ -97,6 +177,35 @@ export function renderGitPanel(S, ctx) {
   if (!status && !loading) {
     refreshGitStatus();
     return html`<div class="git-panel"><div class="git-loading">Loading...</div></div>`;
+  }
+
+  if (status && !status.isRepo) {
+    return html`<div class="git-panel git-panel-empty">
+      <div class="git-empty-state">
+        <p>This project is not yet a git repository.</p>
+        <sp-action-button
+          size="m"
+          @click=${async () => {
+            statusMessage("Initializing repository…");
+            await getPlatform().gitInit();
+            statusMessage("Repository initialized");
+            await refreshGitStatus();
+          }}
+          ?disabled=${loading}
+        >
+          <sp-icon-add slot="icon"></sp-icon-add>
+          Initialize Repository
+        </sp-action-button>
+        <sp-action-button
+          size="m"
+          @click=${() => publishToGithub({ projectName: projectState?.name || "my-project" })}
+          ?disabled=${loading}
+        >
+          <sp-icon-share slot="icon"></sp-icon-share>
+          Publish to GitHub
+        </sp-action-button>
+      </div>
+    </div>`;
   }
 
   if (!_pollTimer) {
@@ -145,45 +254,77 @@ export function renderGitPanel(S, ctx) {
     ? _lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
 
-  const syncBarT = html`
-    <div class="git-sync-bar">
-      <sp-action-button
-        size="s"
-        quiet
-        class="git-sync-icon"
-        title="Refresh"
-        @click=${() => refreshGitStatus()}
-        ?disabled=${loading}
-      >
-        <sp-icon-refresh slot="icon"></sp-icon-refresh>
-      </sp-action-button>
-      <div class="git-sync-text">
-        <span class="git-sync-label">${syncLabel}</span>
-        ${lastUpdatedStr
-          ? html`<span class="git-sync-time">Last updated ${lastUpdatedStr}</span>`
-          : nothing}
-      </div>
-      <sp-action-group size="xs" quiet class="git-sync-actions">
-        <sp-action-button title="Fetch" @click=${() => gitAction("gitFetch")} ?disabled=${loading}>
-          <sp-icon-download slot="icon" size="xs"></sp-icon-download>
-        </sp-action-button>
-        <sp-action-button
-          title="Pull${status?.behind ? ` (${status.behind} behind)` : ""}"
-          @click=${() => gitAction("gitPull")}
-          ?disabled=${loading}
-        >
-          <sp-icon-arrow-down slot="icon" size="xs"></sp-icon-arrow-down>
-        </sp-action-button>
-        <sp-action-button
-          title="Push${status?.ahead ? ` (${status.ahead} ahead)` : ""}"
-          @click=${() => gitAction("gitPush")}
-          ?disabled=${loading}
-        >
-          <sp-icon-arrow-up slot="icon" size="xs"></sp-icon-arrow-up>
-        </sp-action-button>
-      </sp-action-group>
-    </div>
-  `;
+  const hasRemotes = (status?.remotes?.length ?? 0) > 0;
+
+  const syncBarT = hasRemotes
+    ? html`
+        <div class="git-sync-bar">
+          <sp-action-button
+            size="s"
+            quiet
+            class="git-sync-icon"
+            title="Refresh"
+            @click=${() => refreshGitStatus()}
+            ?disabled=${loading}
+          >
+            <sp-icon-refresh slot="icon"></sp-icon-refresh>
+          </sp-action-button>
+          <div class="git-sync-text">
+            <span class="git-sync-label">${syncLabel}</span>
+            ${lastUpdatedStr
+              ? html`<span class="git-sync-time">Last updated ${lastUpdatedStr}</span>`
+              : nothing}
+          </div>
+          <sp-action-group size="xs" quiet class="git-sync-actions">
+            <sp-action-button
+              title="Fetch"
+              @click=${() => gitAction("gitFetch")}
+              ?disabled=${loading}
+            >
+              <sp-icon-download slot="icon" size="xs"></sp-icon-download>
+            </sp-action-button>
+            <sp-action-button
+              title="Pull${status?.behind ? ` (${status.behind} behind)` : ""}"
+              @click=${() => gitAction("gitPull")}
+              ?disabled=${loading}
+            >
+              <sp-icon-arrow-down slot="icon" size="xs"></sp-icon-arrow-down>
+            </sp-action-button>
+            <sp-action-button
+              title="Push${status?.ahead ? ` (${status.ahead} ahead)` : ""}"
+              @click=${() => gitAction("gitPush")}
+              ?disabled=${loading}
+            >
+              <sp-icon-arrow-up slot="icon" size="xs"></sp-icon-arrow-up>
+            </sp-action-button>
+          </sp-action-group>
+        </div>
+      `
+    : html`
+        <div class="git-sync-bar git-sync-bar--no-remote">
+          <sp-action-button
+            size="s"
+            quiet
+            class="git-sync-icon"
+            title="Refresh"
+            @click=${() => refreshGitStatus()}
+            ?disabled=${loading}
+          >
+            <sp-icon-refresh slot="icon"></sp-icon-refresh>
+          </sp-action-button>
+          <div class="git-sync-text">
+            <span class="git-sync-label">Local only (no remote)</span>
+          </div>
+          <sp-action-button
+            size="s"
+            @click=${() => publishToGithub({ projectName: projectState?.name || "my-project" })}
+            ?disabled=${loading}
+          >
+            <sp-icon-share slot="icon"></sp-icon-share>
+            Publish to GitHub
+          </sp-action-button>
+        </div>
+      `;
 
   // ─── 2. Branch selector ──────────────────────────────────────────────────
   const branchSelectorT = html`

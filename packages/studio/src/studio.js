@@ -19,7 +19,7 @@ import {
   updateUi,
 } from "./store.js";
 
-import { activeTab, openTab, replaceAllTabs } from "./workspace/workspace.js";
+import { activeTab, openTab, closeAllTabs } from "./workspace/workspace.js";
 import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "./tabs/transact.js";
 import { effect } from "./reactivity.js";
 
@@ -89,6 +89,9 @@ import { updateForcedPseudoPreview } from "./panels/pseudo-preview.js";
 import { initPanelEvents } from "./panels/panel-events.js";
 import { initQuickSearch } from "./panels/quick-search.js";
 import { addRecentProject } from "./recent-projects.js";
+import { initWelcome } from "./panels/welcome-screen.js";
+import { openNewProjectModal } from "./new-project/new-project-modal.js";
+import { cloneRepository } from "./panels/git-panel.js";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -291,7 +294,7 @@ const EMPTY_DOC = {
 };
 
 // Create the initial reactive tab — the canonical state container.
-openTab({ id: "initial", document: structuredClone(EMPTY_DOC) });
+openTab({ id: "welcome", document: { tagName: "div", children: [] }, capabilities: { modes: [] } });
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
 
@@ -363,20 +366,31 @@ initCanvasRender({
   },
 });
 
+initWelcome({
+  openProject: () => openProject(),
+  openRecentProject: (/** @type {string} */ root) => openRecentProject(root),
+  openNewProject: async () => {
+    const result = await openNewProjectModal();
+    if (result) openRecentProject(result.root);
+  },
+  cloneRepository: () => cloneRepository({ openRecentProject }),
+});
+
 // Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change
 let _canvasRenderScheduled = false;
 effect(() => {
   const tab = activeTab.value;
-  if (!tab) return;
-  void tab.doc.document;
-  void tab.doc.mode;
-  void tab.session.ui.canvasMode;
-  void tab.session.ui.editingFunction;
-  void tab.session.ui.featureToggles;
-  void tab.session.ui.settingsTab;
-  void tab.session.ui.stylebookTab;
-  void tab.session.ui.stylebookFilter;
-  void tab.session.ui.stylebookCustomizedOnly;
+  if (tab) {
+    void tab.doc.document;
+    void tab.doc.mode;
+    void tab.session.ui.canvasMode;
+    void tab.session.ui.editingFunction;
+    void tab.session.ui.featureToggles;
+    void tab.session.ui.settingsTab;
+    void tab.session.ui.stylebookTab;
+    void tab.session.ui.stylebookFilter;
+    void tab.session.ui.stylebookCustomizedOnly;
+  }
   if (!_canvasRenderScheduled) {
     _canvasRenderScheduled = true;
     queueMicrotask(() => {
@@ -416,6 +430,7 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
+  cloneRepository: () => cloneRepository({ openRecentProject }),
   setGitDiffState: (
     /** @type {import("./canvas/canvas-render.js").GitDiffState | null} */ state,
   ) => {
@@ -542,9 +557,9 @@ if (_openParam) {
             parsedDoc = JSON.parse(content);
           }
 
-          // Open in a tab (replaces initial tab)
+          // Open in a tab (close welcome tab first)
           const { closeTab } = await import("./workspace/workspace.js");
-          closeTab("initial");
+          closeTab("welcome");
           openTab({
             id: fileRelPath,
             documentPath: fileRelPath,
@@ -616,7 +631,7 @@ async function openRecentProject(/** @type {string} */ root) {
     const content = await platform.readFile("project.json");
     const config = JSON.parse(content);
 
-    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
+    closeAllTabs();
 
     setProjectState({
       ...projectState,

@@ -53,6 +53,8 @@ export interface GitStatusResult {
   files: GitFileStatus[];
   ahead: number;
   behind: number;
+  isRepo: boolean;
+  remotes: string[];
 }
 
 export interface GitBranchesResult {
@@ -177,7 +179,7 @@ export type StudioRPC = {
         response: void;
       };
       gitPush: {
-        params: void;
+        params: { setUpstream?: boolean };
         response: void;
       };
       gitPull: {
@@ -206,6 +208,14 @@ export type StudioRPC = {
       };
       gitDiscard: {
         params: { files: string[] };
+        response: void;
+      };
+      gitInit: {
+        params: void;
+        response: void;
+      };
+      gitAddRemote: {
+        params: { name: string; url: string };
         response: void;
       };
       // Files
@@ -277,6 +287,30 @@ export type StudioRPC = {
       windowSetFrame: {
         params: { x: number; y: number; width: number; height: number };
         response: void;
+      };
+      // AI Assistant
+      aiAuthStatus: {
+        params: void;
+        response: { authenticated: boolean; error?: string };
+      };
+      aiCreateSession: {
+        params: { message: string; systemPrompt?: string };
+        response: { id: string };
+      };
+      aiSendMessage: {
+        params: { id: string; message: string };
+        response: void;
+      };
+      aiStreamUrl: {
+        params: { id: string };
+        response: string;
+      };
+      aiStopSession: {
+        params: { id: string };
+        response: void;
+      };
+      aiDeleteSession: {
+        params: { id: string };
       };
     };
     messages: {};

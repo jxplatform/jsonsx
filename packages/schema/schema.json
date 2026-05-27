@@ -2081,6 +2081,10 @@
           "description": "Event handler for the \"tonechange\" event.",
           "$ref": "#/$defs/RefObject"
         },
+        "ontoolchange": {
+          "description": "Event handler for the \"toolchange\" event.",
+          "$ref": "#/$defs/RefObject"
+        },
         "ontouchcancel": {
           "description": "Event handler for the \"touchcancel\" event.",
           "$ref": "#/$defs/RefObject"

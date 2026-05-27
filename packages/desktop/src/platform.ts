@@ -259,8 +259,8 @@ export function createDesktopPlatform() {
       return rpc.request.gitCommit({ message });
     },
 
-    async gitPush() {
-      return rpc.request.gitPush();
+    async gitPush(opts?: { setUpstream?: boolean }) {
+      return rpc.request.gitPush(opts || {});
     },
 
     async gitPull() {
@@ -289,6 +289,14 @@ export function createDesktopPlatform() {
 
     async gitShow(opts: { path: string; ref?: string }) {
       return rpc.request.gitShow(opts);
+    },
+
+    async gitInit() {
+      await rpc.request.gitInit();
+    },
+
+    async gitAddRemote(name: string, url: string) {
+      await rpc.request.gitAddRemote({ name, url });
     },
 
     async searchFiles(query: string) {
@@ -332,6 +340,26 @@ export function createDesktopPlatform() {
       getFrame: () => rpc.request.windowGetFrame(),
       setFrame: (x: number, y: number, w: number, h: number) =>
         rpc.request.windowSetFrame({ x, y, width: w, height: h }),
+    },
+
+    // AI Assistant
+    async aiAuthStatus() {
+      return rpc.request.aiAuthStatus() as Promise<{ authenticated: boolean; error?: string }>;
+    },
+    async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
+      return rpc.request.aiCreateSession(opts) as Promise<{ id: string }>;
+    },
+    async aiSendMessage(id: string, message: string) {
+      await rpc.request.aiSendMessage({ id, message });
+    },
+    aiStreamUrl(id: string) {
+      return rpc.request.aiStreamUrl({ id }) as Promise<string>;
+    },
+    async aiStopSession(id: string) {
+      await rpc.request.aiStopSession({ id });
+    },
+    async aiDeleteSession(id: string) {
+      await rpc.request.aiDeleteSession({ id });
     },
   };
 }
