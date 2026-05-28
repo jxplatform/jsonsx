@@ -872,7 +872,7 @@ export function _fieldRow(
       ? html`<sp-textfield
           multiline
           size="s"
-          value=${value ?? ""}
+          .value=${live(value ?? "")}
           @input=${onInput}
         ></sp-textfield>`
       : type === "checkbox"
@@ -881,7 +881,11 @@ export function _fieldRow(
             @change=${(/** @type {Event} */ e) =>
               onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
           ></sp-checkbox>`
-        : html`<sp-textfield size="s" value=${value ?? ""} @input=${onInput}></sp-textfield>`;
+        : html`<sp-textfield
+            size="s"
+            .value=${live(value ?? "")}
+            @input=${onInput}
+          ></sp-textfield>`;
   return html`
     <div class="field-row">
       <sp-field-label size="s">${label}</sp-field-label>

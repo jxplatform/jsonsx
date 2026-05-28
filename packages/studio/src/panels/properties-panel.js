@@ -97,14 +97,19 @@ function bindableFieldRow(
   const staticVal = isBound ? "" : (rawValue ?? "");
   const staticTpl =
     type === "textarea"
-      ? html`<sp-textfield multiline size="s" value=${staticVal} @input=${onInput}></sp-textfield>`
+      ? html`<sp-textfield
+          multiline
+          size="s"
+          .value=${live(staticVal)}
+          @input=${onInput}
+        ></sp-textfield>`
       : type === "checkbox"
         ? html`<sp-checkbox
             ?checked=${!!staticVal}
             @change=${(/** @type {Event} */ e) =>
               onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
           ></sp-checkbox>`
-        : html`<sp-textfield size="s" value=${staticVal} @input=${onInput}></sp-textfield>`;
+        : html`<sp-textfield size="s" .value=${live(staticVal)} @input=${onInput}></sp-textfield>`;
 
   const boundTpl = html`
     <sp-picker
@@ -189,7 +194,7 @@ function kvRow(
       <sp-textfield
         size="s"
         class="kv-key"
-        value=${key}
+        .value=${live(key)}
         @input=${(/** @type {Event} */ e) => {
           currentKey = /** @type {HTMLInputElement} */ (e.target).value;
           commit();
@@ -210,7 +215,7 @@ function kvRow(
       <sp-textfield
         size="s"
         class="kv-val"
-        value=${value}
+        .value=${live(value)}
         placeholder=${placeholder}
         @input=${(/** @type {Event} */ e) => {
           currentVal = /** @type {HTMLInputElement} */ (e.target).value;
@@ -316,7 +321,7 @@ function renderSwitchFieldsTemplate(
         <div class="field-row" style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
           <input
             class="field-input"
-            value=${caseName}
+            .value=${live(caseName)}
             style="flex:1"
             @input=${(/** @type {Event} */ e) => {
               clearTimeout(debounce);
@@ -476,7 +481,7 @@ function renderComponentPropsFieldsTemplate(
           widgetTpl = html`<sp-textfield
             size="s"
             placeholder="YYYY-MM-DD"
-            value=${staticVal}
+            .value=${live(staticVal)}
             @input=${(/** @type {Event} */ e) => {
               clearTimeout(debounce);
               debounce = setTimeout(
@@ -495,7 +500,7 @@ function renderComponentPropsFieldsTemplate(
         } else if (parsed.kind === "number") {
           widgetTpl = html`<sp-number-field
             size="s"
-            value=${staticVal}
+            .value=${live(staticVal)}
             @input=${(/** @type {Event} */ e) => {
               clearTimeout(debounce);
               debounce = setTimeout(
@@ -519,7 +524,7 @@ function renderComponentPropsFieldsTemplate(
         } else {
           widgetTpl = html`<sp-textfield
             size="s"
-            value=${staticVal}
+            .value=${live(staticVal)}
             @input=${(/** @type {Event} */ e) => {
               clearTimeout(debounce);
               debounce = setTimeout(
@@ -612,7 +617,7 @@ function renderMediaFieldsTemplate(/** @type {JxMutableNode} */ node) {
         class="field-input"
         style="width:70px;flex:none"
         placeholder="320px"
-        value=${media["--"] || ""}
+        .value=${live(media["--"] || "")}
         @input=${(/** @type {Event} */ e) => {
           clearTimeout(baseDebounce);
           baseDebounce = setTimeout(() => {
@@ -716,7 +721,7 @@ function mediaBreakpointRowTemplate(/** @type {string} */ name, /** @type {strin
       <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
         <input
           class="field-input"
-          value=${mediaDisplayName(name)}
+          .value=${live(mediaDisplayName(name))}
           style="flex:1;font-weight:600;font-size:12px"
           @input=${(/** @type {Event} */ e) => {
             const newKey = friendlyNameToMedia(/** @type {HTMLInputElement} */ (e.target).value);
@@ -755,7 +760,7 @@ function mediaBreakpointRowTemplate(/** @type {string} */ name, /** @type {strin
       <div style="display:flex;gap:4px;align-items:center">
         <input
           class="field-input bp-query-input"
-          value=${query}
+          .value=${live(query)}
           style="flex:1"
           @input=${(/** @type {Event} */ e) => {
             clearTimeout(debounceTimer);

@@ -54,6 +54,16 @@ let _scope = null;
 
 let _rendering = false;
 let _scheduled = false;
+let _hasFocus = false;
+
+function _onFocusIn() {
+  _hasFocus = true;
+}
+
+function _onFocusOut() {
+  _hasFocus = false;
+  render();
+}
 
 /**
  * Mount the left panel orchestrator.
@@ -62,6 +72,8 @@ let _scheduled = false;
  */
 export function mount(ctx) {
   _ctx = ctx;
+  leftPanel.addEventListener("focusin", _onFocusIn);
+  leftPanel.addEventListener("focusout", _onFocusOut);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -76,7 +88,9 @@ export function mount(ctx) {
         void tab.session.ui.gitLoading;
         void tab.session.ui.gitError;
       }
-      render();
+      if (!_hasFocus) {
+        render();
+      }
     });
   });
 }
@@ -85,6 +99,9 @@ export function unmount() {
   _scope?.stop();
   _scope = null;
   _ctx = null;
+  leftPanel.removeEventListener("focusin", _onFocusIn);
+  leftPanel.removeEventListener("focusout", _onFocusOut);
+  _hasFocus = false;
 }
 
 export function render() {

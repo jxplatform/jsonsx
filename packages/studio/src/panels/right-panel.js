@@ -39,6 +39,16 @@ let _scope = null;
 
 let _rendering = false;
 let _scheduled = false;
+let _hasFocus = false;
+
+function _onFocusIn() {
+  _hasFocus = true;
+}
+
+function _onFocusOut() {
+  _hasFocus = false;
+  render();
+}
 
 /**
  * Mount the right panel.
@@ -49,6 +59,8 @@ export function mount(ctx) {
   _ctx = ctx;
   mountAiPanel();
   registerRightPanelRender(render);
+  rightPanel.addEventListener("focusin", _onFocusIn);
+  rightPanel.addEventListener("focusout", _onFocusOut);
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -66,20 +78,7 @@ export function mount(ctx) {
       void tab.session.ui.styleFilterActive;
       void tab.session.ui.inspectorSections;
 
-      const colorPopoverOpen = isColorPopoverOpen();
-      const activeTag = document.activeElement?.tagName;
-      const rightHasFocus =
-        !colorPopoverOpen &&
-        rightPanel.contains(document.activeElement) &&
-        (activeTag === "INPUT" ||
-          activeTag === "TEXTAREA" ||
-          activeTag === "SP-TEXTFIELD" ||
-          activeTag === "SP-NUMBER-FIELD" ||
-          activeTag === "SP-PICKER" ||
-          activeTag === "SP-COMBOBOX" ||
-          activeTag === "SP-SEARCH");
-
-      if (!rightHasFocus) {
+      if (!_hasFocus && !isColorPopoverOpen()) {
         render();
       }
     });
@@ -90,6 +89,9 @@ export function unmount() {
   _scope?.stop();
   _scope = null;
   _ctx = null;
+  rightPanel.removeEventListener("focusin", _onFocusIn);
+  rightPanel.removeEventListener("focusout", _onFocusOut);
+  _hasFocus = false;
 }
 
 export function render() {
