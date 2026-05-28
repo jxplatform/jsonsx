@@ -9,7 +9,7 @@
  * @module content-loader
  */
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, globSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
 
 // ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
@@ -292,9 +292,7 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
   let files;
 
   if (source.includes("*") || source.includes("?")) {
-    // Glob pattern — use Bun.Glob or manual directory scan
-    const glob = new Bun.Glob(source);
-    files = [...glob.scanSync({ cwd: projectRoot, absolute: true })];
+    files = globSync(source, { cwd: projectRoot }).map((f) => resolve(projectRoot, f));
   } else if (extname(source)) {
     files = existsSync(resolvedSource) ? [resolvedSource] : [];
   } else {
