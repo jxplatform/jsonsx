@@ -12,3 +12,12 @@ We're crafting a comprehensive web-based application suite that aims to encompas
 - **Spectrum Web Components**: Use stock `sp-*` components for all controls (buttons, dialogs, text fields, menus, etc.). Never build custom DOM equivalents of components that Spectrum provides. All Spectrum components used must be registered in `packages/studio/src/ui/spectrum.js`.
 - **No inline styles**: Spectrum components are styled by the design system. Do not set `style` attributes or `style.cssText` on Spectrum components. Use CSS classes in `index.html` only when Spectrum doesn't cover the layout need.
 - **Dialog pattern**: Use `sp-dialog-wrapper` with `open`, `underlay`, `headline`, `confirm-label`, `cancel-label` attributes and `@confirm`/`@cancel`/`@close` events. Do not create manual backdrops or modal overlays.
+
+## NixOS Development Environment Considerations
+
+If running on NixOS:
+
+- A development server is already running on port 3000
+- The studio interface can be accessed via: http://localhost:3000/packages/studio/index.html
+- The jxsuite.com project can be accessed via: http://localhost:3000/packages/studio/index.html?project=~/Development/jx/sites/jxsuite.com/project.json
+- Tests and validations are run at the project root level via `bun run all-the-things`
