@@ -34,7 +34,13 @@ const SLASH_COMMANDS = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-/** @type {{ onSelect: (cmd: SlashCommand) => void; showFilter?: boolean } | null} */
+/**
+ * @type {{
+ *   onSelect: (cmd: SlashCommand) => void;
+ *   showFilter?: boolean;
+ *   commands?: SlashCommand[];
+ * } | null}
+ */
 let callbacks = null;
 let activeIdx = 0;
 /** @type {SlashCommand[]} */
@@ -62,18 +68,23 @@ export function isSlashMenuOpen() {
  *
  * @param {HTMLElement} anchorEl — the element being edited (for positioning)
  * @param {string} filter — current typed filter text (after the "/")
- * @param {{ onSelect: (cmd: SlashCommand) => void; showFilter?: boolean }} cbs
+ * @param {{
+ *   onSelect: (cmd: SlashCommand) => void;
+ *   showFilter?: boolean;
+ *   commands?: SlashCommand[];
+ * }} cbs
  */
 export function showSlashMenu(anchorEl, filter, cbs) {
   callbacks = cbs;
   _anchorEl = anchorEl;
   _anchorRect = anchorEl.getBoundingClientRect();
 
+  const source = cbs.commands || SLASH_COMMANDS;
   filteredItems = filter
-    ? SLASH_COMMANDS.filter(
+    ? source.filter(
         (c) => c.label.toLowerCase().includes(filter) || c.tag.toLowerCase().includes(filter),
       )
-    : SLASH_COMMANDS;
+    : source;
 
   if (!filteredItems.length && !cbs.showFilter) {
     dismissSlashMenu();
@@ -188,11 +199,12 @@ function onFilterInput(e) {
   const input = /** @type {HTMLInputElement} */ (e.target);
   const filter = input.value.toLowerCase();
 
+  const source = callbacks?.commands || SLASH_COMMANDS;
   filteredItems = filter
-    ? SLASH_COMMANDS.filter(
+    ? source.filter(
         (c) => c.label.toLowerCase().includes(filter) || c.tag.toLowerCase().includes(filter),
       )
-    : SLASH_COMMANDS;
+    : source;
 
   activeIdx = 0;
   if (_anchorEl) render(_anchorEl, true);

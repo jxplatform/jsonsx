@@ -9,7 +9,7 @@ import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
 import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
-import { transactDoc, mutateMoveNode } from "../tabs/transact.js";
+import { transactDoc, mutateMoveNode, mutateUpdateProperty } from "../tabs/transact.js";
 import { view } from "../view.js";
 import { isEditing, getActiveElement, getInlineActions } from "../editor/inline-edit.js";
 import { toggleInlineFormat, isTagActiveInSelection } from "../editor/inline-format.js";
@@ -17,6 +17,8 @@ import { componentRegistry } from "../files/components.js";
 import { convertToComponent } from "../editor/convert-to-component.js";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers.js";
 import { getLayerSlot } from "../ui/layers.js";
+import { showSlashMenu } from "../editor/slash-menu.js";
+import { getConvertTargets } from "../editor/convert-targets.js";
 
 /**
  * @typedef {import("../state.js").StudioState} StudioState
@@ -70,7 +72,27 @@ const formatIconMap = /** @type {Record<string, import("lit-html").TemplateResul
 function onBarMousedown(e) {
   if (/** @type {HTMLElement} */ (e.target).closest("sp-textfield")) return;
   if (/** @type {HTMLElement} */ (e.target).closest(".bar-drag-handle")) return;
+  if (/** @type {HTMLElement} */ (e.target).closest(".bar-tag--interactive")) return;
   e.preventDefault();
+}
+
+/**
+ * @param {MouseEvent} e
+ * @param {import("../editor/convert-targets.js").SlashCommand[]} targets
+ * @param {JxPath} selection
+ */
+function onTagBadgeClick(e, targets, selection) {
+  e.stopPropagation();
+  const anchorEl = /** @type {HTMLElement} */ (e.currentTarget);
+  showSlashMenu(anchorEl, "", {
+    showFilter: targets.length > 6,
+    commands: targets,
+    onSelect: (cmd) => {
+      transactDoc(activeTab.value, (t) => {
+        mutateUpdateProperty(t, selection, "tagName", cmd.tag);
+      });
+    },
+  });
 }
 
 /** Saved selection range for format button mousedown→click flow */
@@ -360,6 +382,21 @@ export function renderBlockActionBar() {
     ? actions.filter((a) => isTagActiveInSelection(a.tag, el)).map((a) => a.tag)
     : [];
 
+  // Conversion targets for badge click
+  const isComponent =
+    node.tagName?.includes("-") &&
+    componentRegistry.some((/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName);
+  const isEmpty =
+    !node.textContent &&
+    (!node.children ||
+      node.children.length === 0 ||
+      (Array.isArray(node.children) &&
+        node.children.length === 1 &&
+        typeof node.children[0] === "object" &&
+        node.children[0]?.tagName === "br"));
+  const convertTargets = !isComponent ? getConvertTargets(tag, isEmpty) : [];
+  const badgeInteractive = convertTargets.length > 0;
+
   litRender(
     html`
       <div
@@ -369,7 +406,13 @@ export function renderBlockActionBar() {
       >
         ${selection.length >= 2 ? renderParentSelector() : nothing}
 
-        <span class="bar-tag">${node.$id || (node.tagName ?? "div")}</span>
+        <span
+          class="bar-tag${badgeInteractive ? " bar-tag--interactive" : ""}"
+          @click=${badgeInteractive
+            ? (/** @type {MouseEvent} */ e) => onTagBadgeClick(e, convertTargets, selection)
+            : nothing}
+          >${node.$id || (node.tagName ?? "div")}</span
+        >
 
         ${selection.length >= 2
           ? html`<span class="bar-drag-handle" title="Drag to reorder">⠿</span>`

@@ -2,8 +2,25 @@
   "$id": "elements-meta",
   "title": "HTML Element Metadata",
   "description": "Inline scoping and inline toolbar action metadata for HTML elements.",
+  "$convertGroups": {
+    "text": ["p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"],
+    "container": [
+      "div",
+      "section",
+      "article",
+      "aside",
+      "main",
+      "header",
+      "footer",
+      "nav",
+      "search"
+    ],
+    "list": ["ul", "ol"]
+  },
   "$defs": {
     "p": {
+      "$convertTo": "text",
+      "$convertToWhenEmpty": ["text", "container"],
       "$inlineChildren": [
         "em",
         "strong",
@@ -64,6 +81,7 @@
       ]
     },
     "h1": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": [
         {
@@ -85,22 +103,27 @@
       ]
     },
     "h2": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": "h1"
     },
     "h3": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": "h1"
     },
     "h4": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": "h1"
     },
     "h5": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": "h1"
     },
     "h6": {
+      "$convertTo": "text",
       "$inlineChildren": ["em", "strong", "code", "a", "span", "br", "b", "i", "u", "sub", "sup"],
       "$inlineActions": "h1"
     },
@@ -160,6 +183,7 @@
       "$inlineActions": "p"
     },
     "blockquote": {
+      "$convertTo": "text",
       "$inlineChildren": []
     },
     "a": {
@@ -199,16 +223,20 @@
       ],
       "$inlineActions": "p"
     },
-    "div": { "$inlineChildren": [] },
-    "section": { "$inlineChildren": [] },
-    "article": { "$inlineChildren": [] },
-    "nav": { "$inlineChildren": [] },
-    "main": { "$inlineChildren": [] },
-    "header": { "$inlineChildren": [] },
-    "footer": { "$inlineChildren": [] },
-    "aside": { "$inlineChildren": [] },
-    "ul": { "$inlineChildren": [] },
-    "ol": { "$inlineChildren": [] },
+    "div": {
+      "$convertTo": "container",
+      "$convertToWhenEmpty": ["container", "text"],
+      "$inlineChildren": []
+    },
+    "section": { "$convertTo": "container", "$inlineChildren": [] },
+    "article": { "$convertTo": "container", "$inlineChildren": [] },
+    "nav": { "$convertTo": "container", "$inlineChildren": [] },
+    "main": { "$convertTo": "container", "$inlineChildren": [] },
+    "header": { "$convertTo": "container", "$inlineChildren": [] },
+    "footer": { "$convertTo": "container", "$inlineChildren": [] },
+    "aside": { "$convertTo": "container", "$inlineChildren": [] },
+    "ul": { "$convertTo": "list", "$inlineChildren": [] },
+    "ol": { "$convertTo": "list", "$inlineChildren": [] },
     "pre": { "$inlineChildren": ["code"] },
     "table": { "$inlineChildren": [] },
     "thead": { "$inlineChildren": [] },
