@@ -35,8 +35,10 @@ export async function convertToRepeater() {
       doc.state[config.newDef.name] = { type: "array", default: [] };
     }
     const pp = parentElementPath(path);
+    if (!pp) return;
     const idx = /** @type {number} */ (childIndex(path));
     const parent = getNodeAtPath(doc, pp);
+    if (!parent?.children) return;
     const element = parent.children[idx];
 
     /** @type {Record<string, unknown>} */
@@ -48,7 +50,10 @@ export async function convertToRepeater() {
     if (config.filter) repeater.filter = config.filter;
     if (config.sort) repeater.sort = config.sort;
 
-    parent.children[idx] = { tagName: "div", children: repeater };
+    /** @type {(string | JxMutableNode)[]} */ (parent.children)[idx] = {
+      tagName: "div",
+      children: /** @type {any} */ (repeater),
+    };
   });
 }
 
