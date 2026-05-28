@@ -1,5 +1,6 @@
 // ─── Convert to Repeater ──────────────────────────────────────────────────────
 import { html, render as litRender, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc } from "../tabs/transact.js";
@@ -167,6 +168,10 @@ function promptRepeaterConfig(defs) {
                       @keydown=${(/** @type {KeyboardEvent} */ e) => {
                         if (e.key === "Enter") confirm();
                       }}
+                      ${ref((el) => {
+                        if (el && source === "__new__")
+                          requestAnimationFrame(() => /** @type {HTMLElement} */ (el).focus());
+                      })}
                     >
                       <sp-help-text slot="negative-help-text">${error}</sp-help-text>
                     </sp-textfield>
@@ -215,14 +220,6 @@ function promptRepeaterConfig(defs) {
         </sp-dialog-wrapper>
       `;
     }
-
-    requestAnimationFrame(() => {
-      const layer = document.getElementById("layer-dialog");
-      if (source === "__new__") {
-        const tf = /** @type {HTMLElement | null} */ (layer?.querySelector("sp-textfield"));
-        if (tf) tf.focus();
-      }
-    });
 
     return buildTpl();
   });

@@ -4,6 +4,7 @@
  */
 
 import { html } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { renderBrowse } from "./browse.js";
 import { openFileInTab } from "../files/files.js";
 import { openModal } from "../ui/layers.js";
@@ -31,23 +32,25 @@ export function openBrowseModal() {
           <sp-icon-close slot="icon"></sp-icon-close>
         </sp-action-button>
       </div>
-      <div class="browse-modal-content"></div>
+      <div
+        class="browse-modal-content"
+        ${ref((el) => {
+          if (el) {
+            requestAnimationFrame(() => {
+              renderBrowse(/** @type {HTMLElement} */ (el), {
+                openFile: (/** @type {string} */ path) => {
+                  closeBrowseModal();
+                  openFileInTab(path);
+                },
+              });
+            });
+          }
+        })}
+      ></div>
     </div>
   `;
 
   _handle = openModal(tpl);
-
-  requestAnimationFrame(() => {
-    const container = _handle?.host.querySelector(".browse-modal-content");
-    if (container) {
-      renderBrowse(/** @type {HTMLElement} */ (container), {
-        openFile: (/** @type {string} */ path) => {
-          closeBrowseModal();
-          openFileInTab(path);
-        },
-      });
-    }
-  });
 }
 
 export function closeBrowseModal() {

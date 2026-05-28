@@ -8,6 +8,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { getLayerSlot } from "../ui/layers.js";
 
 // ─── Commands ─────────────────────────────────────────────────────────────────
@@ -50,6 +51,10 @@ let open = false;
 let _anchorEl = null;
 /** @type {DOMRect | null} */
 let _anchorRect = null;
+/** @type {HTMLInputElement | null} */
+let _filterEl = null;
+/** @type {HTMLElement | null} */
+let _popoverEl = null;
 
 /** @returns {HTMLElement} */
 function getHost() {
@@ -105,10 +110,7 @@ export function showSlashMenu(anchorEl, filter, cbs) {
 
   if (cbs.showFilter) {
     requestAnimationFrame(() => {
-      const input = /** @type {HTMLInputElement | null} */ (
-        getHost().querySelector(".slash-filter")
-      );
-      if (input) input.focus();
+      if (_filterEl) _filterEl.focus();
     });
   }
 }
@@ -119,6 +121,8 @@ export function dismissSlashMenu() {
   callbacks = null;
   _anchorEl = null;
   _anchorRect = null;
+  _filterEl = null;
+  _popoverEl = null;
   filteredItems = [];
   document.removeEventListener("keydown", onKeydown, true);
   document.removeEventListener("mousedown", onOutsideClick, true);
@@ -138,6 +142,9 @@ function render(anchorEl, showFilter) {
     html`
       <sp-popover
         open
+        ${ref((el) => {
+          _popoverEl = /** @type {HTMLElement | null} */ (el || null);
+        })}
         style="position:fixed;left:${rect.left}px;top:${rect.bottom +
         4}px;z-index:9999;max-height:320px;overflow-y:auto"
       >
@@ -148,6 +155,9 @@ function render(anchorEl, showFilter) {
               placeholder="Filter…"
               autocomplete="off"
               style="display:block;width:100%;box-sizing:border-box;padding:6px 10px;border:none;border-bottom:1px solid var(--border, #444);outline:none;font-size:13px;background:transparent;color:inherit"
+              ${ref((el) => {
+                _filterEl = /** @type {HTMLInputElement | null} */ (el || null);
+              })}
               @input=${onFilterInput}
             />`
           : nothing}
@@ -180,9 +190,7 @@ function render(anchorEl, showFilter) {
 
 /** @param {MouseEvent} e */
 function onOutsideClick(e) {
-  const host = getHost();
-  const popover = host.querySelector("sp-popover");
-  if (popover && !popover.contains(/** @type {Node} */ (e.target))) {
+  if (_popoverEl && !_popoverEl.contains(/** @type {Node} */ (e.target))) {
     dismissSlashMenu();
   }
 }
@@ -211,10 +219,9 @@ function onFilterInput(e) {
 
   // Re-focus input after re-render
   requestAnimationFrame(() => {
-    const el = /** @type {HTMLInputElement | null} */ (getHost().querySelector(".slash-filter"));
-    if (el && el !== document.activeElement) {
-      el.focus();
-      el.selectionStart = el.selectionEnd = el.value.length;
+    if (_filterEl && _filterEl !== document.activeElement) {
+      _filterEl.focus();
+      _filterEl.selectionStart = _filterEl.selectionEnd = _filterEl.value.length;
     }
   });
 }

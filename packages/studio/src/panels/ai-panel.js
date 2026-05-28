@@ -5,9 +5,9 @@
  */
 
 import { html, nothing } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import quikchat from "quikchat/md";
 import { getPlatform } from "../platform.js";
-import { rightPanel } from "../store.js";
 import { reloadFileInTab } from "../files/files.js";
 
 // ─── State (module-level, persists across tab switches) ─────────────────────
@@ -34,6 +34,8 @@ let mounted = false;
 let chatInstance = null;
 /** @type {Element | null} */
 let chatContainerEl = null;
+/** @type {HTMLElement | null} */
+let _quikChatEl = null;
 let currentStreamMsgId = /** @type {number | null} */ (null);
 let streamStarted = false;
 /** @type {Set<string>} */
@@ -61,7 +63,7 @@ export function registerRightPanelRender(/** @type {Function} */ fn) {
 // ─── QuikChat Mount ────────────────────────────────────────────────────────
 
 export function mountQuikChat() {
-  const container = rightPanel.querySelector("#ai-quikchat");
+  const container = _quikChatEl;
   if (!container) return;
   if (chatInstance && chatContainerEl === container) return;
 
@@ -393,7 +395,12 @@ export function renderAiPanelTemplate() {
           New Chat
         </sp-action-button>
       </div>
-      <div id="ai-quikchat"></div>
+      <div
+        id="ai-quikchat"
+        ${ref((el) => {
+          _quikChatEl = /** @type {HTMLElement | null} */ (el || null);
+        })}
+      ></div>
     </div>
   `;
 }

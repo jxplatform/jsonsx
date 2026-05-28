@@ -1,5 +1,6 @@
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transact } from "../tabs/transact.js";
@@ -172,22 +173,20 @@ function promptComponentName(defaultName) {
             ?negative=${!!error}
             @input=${onInput}
             @keydown=${onKeydown}
+            ${ref((el) => {
+              if (el)
+                requestAnimationFrame(() => {
+                  /** @type {HTMLElement} */ (el).focus();
+                  const input = /** @type {HTMLElement} */ (el).shadowRoot?.querySelector("input");
+                  if (input) input.select();
+                });
+            })}
           >
             <sp-help-text slot="negative-help-text">${error}</sp-help-text>
           </sp-textfield>
         </sp-dialog-wrapper>
       `;
     }
-
-    requestAnimationFrame(() => {
-      const layer = document.getElementById("layer-dialog");
-      const tf = /** @type {HTMLElement | null} */ (layer?.querySelector("sp-textfield"));
-      if (tf) {
-        tf.focus();
-        const input = tf.shadowRoot?.querySelector("input");
-        if (input) input.select();
-      }
-    });
 
     return buildTpl();
   });

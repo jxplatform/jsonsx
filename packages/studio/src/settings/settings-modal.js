@@ -20,6 +20,9 @@ let _handle = null;
 /** @type {string} */
 let _activeSection = "general";
 
+/** @type {HTMLElement | null} */
+let _contentEl = null;
+
 const sections = [
   { key: "general", label: "General", icon: "sp-icon-properties" },
   { key: "head", label: "Head", icon: "sp-icon-file-single-web-page" },
@@ -38,6 +41,7 @@ export function closeSettingsModal() {
   if (!_handle) return;
   _handle.close();
   _handle = null;
+  _contentEl = null;
 }
 
 function renderModal() {
@@ -77,7 +81,8 @@ function renderModal() {
         <div
           class="settings-modal-content"
           ${ref((el) => {
-            if (el) requestAnimationFrame(() => renderActiveSection());
+            _contentEl = /** @type {HTMLElement | null} */ (el || null);
+            if (_contentEl) requestAnimationFrame(() => renderActiveSection());
           })}
         ></div>
       </div>
@@ -92,25 +97,23 @@ function renderModal() {
 }
 
 function renderActiveSection() {
-  if (!_handle) return;
-  const container = _handle.host.querySelector(".settings-modal-content");
-  if (!container) return;
+  if (!_handle || !_contentEl) return;
 
   switch (_activeSection) {
     case "general":
-      renderGeneralSettings(/** @type {HTMLElement} */ (container));
+      renderGeneralSettings(_contentEl);
       break;
     case "head":
-      renderHeadEditor(/** @type {HTMLElement} */ (container));
+      renderHeadEditor(_contentEl);
       break;
     case "cssVars":
-      renderCssVarsEditor(/** @type {HTMLElement} */ (container));
+      renderCssVarsEditor(_contentEl);
       break;
     case "definitions":
-      renderDefsEditor(/** @type {HTMLElement} */ (container));
+      renderDefsEditor(_contentEl);
       break;
     case "contentTypes":
-      renderContentTypesEditor(/** @type {HTMLElement} */ (container));
+      renderContentTypesEditor(_contentEl);
       break;
   }
 }

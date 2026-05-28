@@ -26,17 +26,23 @@ export {
   updateFrontmatter,
 } from "./state.js";
 
-// ─── DOM shortcuts & element refs ────────────────────────────────────────────
+// ─── Shell element refs (populated by initShellRefs) ─────────────────────────
 
-export const $ = (/** @type {string} */ sel) => document.querySelector(sel);
-export const _$$ = (/** @type {string} */ sel) => document.querySelectorAll(sel);
+export let canvasWrap = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
+export let activityBar = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
+export let leftPanel = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
+export let rightPanel = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
+export let toolbarEl = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
+export let statusbarEl = /** @type {HTMLElement} */ (/** @type {unknown} */ (null));
 
-export const canvasWrap = /** @type {HTMLElement} */ (document.querySelector("#canvas-wrap"));
-export const activityBar = /** @type {HTMLElement} */ (document.querySelector("#activity-bar"));
-export const leftPanel = /** @type {HTMLElement} */ (document.querySelector("#left-panel"));
-export const rightPanel = /** @type {HTMLElement} */ (document.querySelector("#right-panel"));
-export const toolbarEl = /** @type {HTMLElement} */ (document.querySelector("#toolbar"));
-export const statusbarEl = /** @type {HTMLElement} */ (document.querySelector("#statusbar"));
+export function initShellRefs() {
+  canvasWrap = /** @type {HTMLElement} */ (document.querySelector("#canvas-wrap"));
+  activityBar = /** @type {HTMLElement} */ (document.querySelector("#activity-bar"));
+  leftPanel = /** @type {HTMLElement} */ (document.querySelector("#left-panel"));
+  rightPanel = /** @type {HTMLElement} */ (document.querySelector("#right-panel"));
+  toolbarEl = /** @type {HTMLElement} */ (document.querySelector("#toolbar"));
+  statusbarEl = /** @type {HTMLElement} */ (document.querySelector("#statusbar"));
+}
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────
 

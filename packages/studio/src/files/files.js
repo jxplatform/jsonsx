@@ -7,6 +7,7 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import { ref } from "lit-html/directives/ref.js";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import { renderPopover, showDialog, showConfirmDialog } from "../ui/layers.js";
@@ -623,7 +624,22 @@ function showFileContextMenu(
     y = e.clientY;
 
   _fileCtxHandle = renderPopover(
-    html`<sp-popover open style="position:fixed;z-index:10000;left:${x}px;top:${y}px">
+    html`<sp-popover
+      open
+      style="position:fixed;z-index:10000;left:${x}px;top:${y}px"
+      ${ref((el) => {
+        if (!el) return;
+        requestAnimationFrame(() => {
+          const popover = /** @type {HTMLElement} */ (el);
+          const menuRect = popover.getBoundingClientRect();
+          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+          if (y + menuRect.height > window.innerHeight)
+            y = window.innerHeight - menuRect.height - 4;
+          popover.style.left = `${x}px`;
+          popover.style.top = `${y}px`;
+        });
+      })}
+    >
       <sp-menu>
         ${items.map((item) =>
           item.label === "\u2014"
@@ -646,18 +662,6 @@ function showFileContextMenu(
       },
     },
   );
-
-  requestAnimationFrame(() => {
-    const popover = /** @type {HTMLElement | null} */ (
-      _fileCtxHandle?.host.querySelector("sp-popover")
-    );
-    if (!popover) return;
-    const menuRect = popover.getBoundingClientRect();
-    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
-    popover.style.left = `${x}px`;
-    popover.style.top = `${y}px`;
-  });
 }
 
 // ─── File CRUD ────────────────────────────────────────────────────────────────

@@ -25,6 +25,9 @@ import { getActivePanel, findCanvasElement } from "./canvas-helpers.js";
  */
 let _ctx;
 
+/** @type {HTMLElement | null} */
+let _zoomIndicatorEl = null;
+
 /**
  * Initialize the canvas utils module.
  *
@@ -288,7 +291,12 @@ export function renderZoomIndicator() {
   const host = getLayerSlot("popover", "zoom-indicator");
   litRender(
     html`
-      <div class="zoom-indicator">
+      <div
+        class="zoom-indicator"
+        ${ref((el) => {
+          _zoomIndicatorEl = /** @type {HTMLElement | null} */ (el || null);
+        })}
+      >
         <span class="zoom-indicator-action" title="Reset to 100%" @click=${resetZoom}>
           <svg
             width="14"
@@ -325,12 +333,11 @@ export function renderZoomIndicator() {
 
 /** Position the zoom indicator relative to canvas-wrap bounds. */
 export function positionZoomIndicator() {
-  const indicator = /** @type {HTMLElement | null} */ (document.querySelector(".zoom-indicator"));
-  if (!indicator) return;
+  if (!_zoomIndicatorEl) return;
   const rect = canvasWrap.getBoundingClientRect();
-  indicator.style.left = `${rect.left + rect.width / 2}px`;
-  indicator.style.top = `${rect.bottom - 32}px`;
-  indicator.style.transform = "translateX(-50%)";
+  _zoomIndicatorEl.style.left = `${rect.left + rect.width / 2}px`;
+  _zoomIndicatorEl.style.top = `${rect.bottom - 32}px`;
+  _zoomIndicatorEl.style.transform = "translateX(-50%)";
 }
 
 /** Toggle "active" class on canvas panel headers based on activeMedia. */

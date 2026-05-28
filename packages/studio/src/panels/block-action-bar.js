@@ -5,6 +5,7 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { styleMap } from "lit-html/directives/style-map.js";
+import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
 import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store.js";
@@ -248,9 +249,11 @@ function showLinkPopover(anchorBtn) {
 
   const rect = anchorBtn.getBoundingClientRect();
 
+  /** @type {HTMLInputElement | null} */
+  let _linkField = null;
+
   const onApply = () => {
-    const field = /** @type {HTMLInputElement | null} */ (host.querySelector("sp-textfield"));
-    const url = field?.value || "";
+    const url = _linkField?.value || "";
     if (existingLink) {
       existingLink.setAttribute("href", url);
     } else if (url) {
@@ -294,6 +297,10 @@ function showLinkPopover(anchorBtn) {
           style="width:200px"
           value=${existingLink?.getAttribute("href") || ""}
           @keydown=${onKeydown}
+          ${ref((el) => {
+            _linkField = /** @type {HTMLInputElement | null} */ (el || null);
+            if (el) requestAnimationFrame(() => /** @type {HTMLElement} */ (el).focus());
+          })}
         ></sp-textfield>
         <sp-action-button size="xs" @click=${onApply}>
           ${existingLink ? "Update" : "Apply"}
@@ -304,10 +311,6 @@ function showLinkPopover(anchorBtn) {
       </sp-popover>
     `,
     host,
-  );
-
-  requestAnimationFrame(
-    () => /** @type {HTMLElement | null} */ (host.querySelector("sp-textfield"))?.focus(),
   );
 }
 
@@ -415,7 +418,25 @@ export function renderBlockActionBar() {
         >
 
         ${selection.length >= 2
-          ? html`<span class="bar-drag-handle" title="Drag to reorder">⠿</span>`
+          ? html`<span
+              class="bar-drag-handle"
+              title="Drag to reorder"
+              ${ref((el) => {
+                if (!el) return;
+                if (view.selDragCleanup) {
+                  view.selDragCleanup();
+                  view.selDragCleanup = null;
+                }
+                view.selDragCleanup = draggable({
+                  element: /** @type {HTMLElement} */ (el),
+                  getInitialData: () => ({
+                    type: "tree-node",
+                    path: activeTab.value?.session.selection,
+                  }),
+                });
+              })}
+              >⠿</span
+            >`
           : nothing}
         ${selection.length >= 2 ? renderMoveArrows() : nothing}
         ${selection.length >= 2 && node.tagName
@@ -486,21 +507,6 @@ export function renderBlockActionBar() {
     const barRect = bar.getBoundingClientRect();
     if (barRect.right > window.innerWidth) {
       bar.style.left = `${Math.max(0, window.innerWidth - barRect.width)}px`;
-    }
-    // Attach drag handle
-    const currentTab = activeTab.value;
-    if (currentTab?.session.selection && currentTab.session.selection.length >= 2) {
-      const handle = /** @type {HTMLElement | null} */ (bar.querySelector(".bar-drag-handle"));
-      if (handle) {
-        if (view.selDragCleanup) {
-          view.selDragCleanup();
-          view.selDragCleanup = null;
-        }
-        view.selDragCleanup = draggable({
-          element: handle,
-          getInitialData: () => ({ type: "tree-node", path: activeTab.value?.session.selection }),
-        });
-      }
     }
   });
 }

@@ -1,5 +1,6 @@
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
 import { html } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { getNodeAtPath, parentElementPath, childIndex } from "../store.js";
 import { activeTab, workspace } from "../workspace/workspace.js";
 import {
@@ -241,7 +242,22 @@ export function showContextMenu(e, path, opts = {}) {
     y = e.clientY;
 
   _ctxHandle = renderPopover(
-    html`<sp-popover open style="position:fixed;z-index:10000;left:${x}px;top:${y}px">
+    html`<sp-popover
+      open
+      style="position:fixed;z-index:10000;left:${x}px;top:${y}px"
+      ${ref((el) => {
+        if (!el) return;
+        requestAnimationFrame(() => {
+          const popover = /** @type {HTMLElement} */ (el);
+          const menuRect = popover.getBoundingClientRect();
+          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+          if (y + menuRect.height > window.innerHeight)
+            y = window.innerHeight - menuRect.height - 4;
+          popover.style.left = `${x}px`;
+          popover.style.top = `${y}px`;
+        });
+      })}
+    >
       <sp-menu>
         ${items.map((item) =>
           item.label === "—"
@@ -264,16 +280,4 @@ export function showContextMenu(e, path, opts = {}) {
       },
     },
   );
-
-  requestAnimationFrame(() => {
-    const popover = /** @type {HTMLElement | null} */ (
-      _ctxHandle?.host.querySelector("sp-popover")
-    );
-    if (!popover) return;
-    const menuRect = popover.getBoundingClientRect();
-    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
-    popover.style.left = `${x}px`;
-    popover.style.top = `${y}px`;
-  });
 }

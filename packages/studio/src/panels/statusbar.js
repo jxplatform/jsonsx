@@ -38,11 +38,14 @@ export function mountStatusbar() {
       renderStatusbar();
     });
   });
+
+  statusbarEl?.addEventListener("click", _onStatusbarClick);
 }
 
 export function unmountStatusbar() {
   _scope?.stop();
   _scope = null;
+  statusbarEl?.removeEventListener("click", _onStatusbarClick);
 }
 
 // ─── Statusbar ───────────────────────────────────────────────────────────────
@@ -81,7 +84,8 @@ export function renderStatusbar() {
   statusbarEl.innerHTML = parts.join("  |  ") || "Jx Studio";
 }
 
-statusbarEl?.addEventListener("click", (e) => {
+/** @param {Event} e */
+function _onStatusbarClick(e) {
   const target = /** @type {HTMLElement} */ (e.target);
   if (!target.classList.contains("sb-path-seg")) return;
   const pathStr = target.dataset.path;
@@ -93,7 +97,7 @@ statusbarEl?.addEventListener("click", (e) => {
   } catch {
     // ignore
   }
-});
+}
 
 /**
  * Show a temporary status message.

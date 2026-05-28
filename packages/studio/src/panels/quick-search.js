@@ -1,6 +1,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
+import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform.js";
 import { openFileInTab } from "../files/files.js";
 import { getRecentFiles, trackRecentFile } from "../recent-projects.js";
@@ -28,10 +29,6 @@ export function openQuickSearch() {
   _results = [];
   _selectedIndex = 0;
   renderOverlay();
-  requestAnimationFrame(() => {
-    const input = getContainer().querySelector(".quick-search-input");
-    if (input) /** @type {HTMLInputElement} */ (input).focus();
-  });
 }
 
 export function closeQuickSearch() {
@@ -136,6 +133,9 @@ function renderOverlay() {
           .value=${live(_query)}
           @input=${onInput}
           @keydown=${onKeydown}
+          ${ref((el) => {
+            if (el) requestAnimationFrame(() => /** @type {HTMLInputElement} */ (el).focus());
+          })}
         />
         <div class="quick-search-results">
           ${items.length === 0 && _query.trim()

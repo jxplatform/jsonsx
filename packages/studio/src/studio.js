@@ -17,6 +17,7 @@ import {
   setProjectState,
   requireProjectState,
   updateUi,
+  initShellRefs,
 } from "./store.js";
 
 import { activeTab, openTab, closeAllTabs } from "./workspace/workspace.js";
@@ -286,6 +287,8 @@ if (!hasPlatform()) {
 mountResizeEdges();
 
 // ─── Render loop ──────────────────────────────────────────────────────────────
+
+initShellRefs();
 
 // Mount extracted panel modules
 toolbarPanel.mount(toolbarEl, {

@@ -362,7 +362,22 @@ function showBrowseContextMenu(e, file, container, ctx) {
     y = e.clientY;
 
   _browseCtxHandle = renderPopover(
-    html`<sp-popover open style="position:fixed;left:${x}px;top:${y}px">
+    html`<sp-popover
+      open
+      style="position:fixed;left:${x}px;top:${y}px"
+      ${ref((el) => {
+        if (!el) return;
+        requestAnimationFrame(() => {
+          const popover = /** @type {HTMLElement} */ (el);
+          const menuRect = popover.getBoundingClientRect();
+          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
+          if (y + menuRect.height > window.innerHeight)
+            y = window.innerHeight - menuRect.height - 4;
+          popover.style.left = `${x}px`;
+          popover.style.top = `${y}px`;
+        });
+      })}
+    >
       <sp-menu>
         ${items.map((item) =>
           item.label === "\u2014"
@@ -386,18 +401,6 @@ function showBrowseContextMenu(e, file, container, ctx) {
       layer: "dialog",
     },
   );
-
-  requestAnimationFrame(() => {
-    const popover = /** @type {HTMLElement | null} */ (
-      _browseCtxHandle?.host.querySelector("sp-popover")
-    );
-    if (!popover) return;
-    const menuRect = popover.getBoundingClientRect();
-    if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-    if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4;
-    popover.style.left = `${x}px`;
-    popover.style.top = `${y}px`;
-  });
 }
 
 /**
