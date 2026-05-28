@@ -31,6 +31,11 @@ import { buildNestedSiteCSS } from "./nested-site-style.js";
 
 export { buildNestedSiteCSS } from "./nested-site-style.js";
 
+/** @param {Event} e */
+function _preventNav(e) {
+  e.preventDefault();
+}
+
 /** @type {{ getCanvasMode: () => string } | null} */
 let _ctx = null;
 
@@ -449,6 +454,11 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       el.style.pointerEvents = "none";
       for (const child of el.querySelectorAll("*")) {
         /** @type {HTMLElement} */ (child).style.pointerEvents = "none";
+      }
+      // Prevent link navigation on all <a> elements (pointer events get
+      // re-enabled during inline editing, which would allow navigation)
+      for (const a of el.querySelectorAll("a[href]")) {
+        a.addEventListener("click", _preventNav);
       }
     }
     // Clear and append atomically — ensures the canvas is never left empty if a
