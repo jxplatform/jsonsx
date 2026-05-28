@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach } from "bun:test";
 import {
   buildStylebookElement,

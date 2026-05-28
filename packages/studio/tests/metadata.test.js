@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";

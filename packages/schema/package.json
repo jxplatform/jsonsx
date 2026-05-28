@@ -28,6 +28,7 @@
   "scripts": {
     "schema": "bun run src/schema.js",
     "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",

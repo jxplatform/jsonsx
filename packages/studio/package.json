@@ -24,7 +24,8 @@
   "scripts": {
     "build": "bun build ./src/studio.js --outdir dist --target browser --sourcemap=linked && bun build ./node_modules/monaco-editor/esm/vs/editor/editor.worker.js --outdir dist/workers --target browser --entry-naming editor.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/json/json.worker.js --outdir dist/workers --target browser --entry-naming json.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js --outdir dist/workers --target browser --entry-naming ts.worker.js",
     "gen:webdata": "bun run scripts/gen-webdata.js",
-    "test": "bun test",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {

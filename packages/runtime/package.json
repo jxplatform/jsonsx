@@ -22,6 +22,7 @@
   "scripts": {
     "build": "bun build ./src/runtime.js --outdir dist --target browser --sourcemap=linked",
     "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {

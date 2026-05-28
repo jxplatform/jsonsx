@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { reactive, effect, effectScope, computed } from "../src/reactivity.js";
 import { test, expect } from "bun:test";
 

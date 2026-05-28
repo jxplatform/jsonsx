@@ -5,7 +5,9 @@
   "license": "MIT",
   "scripts": {
     "build": "jx build",
-    "upgrade": "bunx npm-check-updates -u && bun install"
+    "upgrade": "bunx npm-check-updates -u && bun install",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage"
   },
   "dependencies": {
     "@jxsuite/compiler": "workspace:^",

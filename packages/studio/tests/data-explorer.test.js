@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 import { render } from "lit-html";
 import { renderDataExplorerTemplate } from "../src/panels/data-explorer.js";

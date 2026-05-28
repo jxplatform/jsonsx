@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { effect } from "../src/reactivity.js";
 import {
   workspace,
@@ -5,6 +6,7 @@ import {
   openTab,
   closeTab,
   activateTab,
+  renameTab,
 } from "../src/workspace/workspace.js";
 import { test, expect, describe, beforeEach } from "bun:test";
 
@@ -130,5 +132,88 @@ describe("Workspace primitive", () => {
     closeTab("t1");
     tab.doc.dirty = false;
     expect(runs).toBe(2);
+  });
+});
+
+describe("renameTab", () => {
+  beforeEach(() => {
+    for (const id of workspace.tabs.keys()) closeTab(id);
+  });
+
+  test("re-keys tab in the tabs map", () => {
+    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
+
+    renameTab("pages/old.md", "pages/new.md", "pages/new.md");
+
+    expect(workspace.tabs.has("pages/old.md")).toBe(false);
+    expect(workspace.tabs.has("pages/new.md")).toBe(true);
+    const tab = /** @type {any} */ (workspace.tabs.get("pages/new.md"));
+    expect(tab.id).toBe("pages/new.md");
+    expect(tab.documentPath).toBe("pages/new.md");
+  });
+
+  test("preserves document content and dirty state", () => {
+    const tab = openTab({
+      id: "pages/old.md",
+      document: { tagName: "div", children: [{ tagName: "p" }] },
+      documentPath: "pages/old.md",
+    });
+    tab.doc.dirty = true;
+
+    renameTab("pages/old.md", "pages/new.md", "pages/new.md");
+
+    const renamed = /** @type {any} */ (workspace.tabs.get("pages/new.md"));
+    expect(renamed.doc.document.children).toEqual([{ tagName: "p" }]);
+    expect(renamed.doc.dirty).toBe(true);
+  });
+
+  test("updates tabOrder preserving position", () => {
+    openTab({ id: "a.json", document: { tagName: "div" }, documentPath: "a.json" });
+    openTab({ id: "pages/old.md", document: { tagName: "p" }, documentPath: "pages/old.md" });
+    openTab({ id: "c.json", document: { tagName: "span" }, documentPath: "c.json" });
+
+    renameTab("pages/old.md", "pages/new.md", "pages/new.md");
+
+    expect(workspace.tabOrder).toEqual(["a.json", "pages/new.md", "c.json"]);
+  });
+
+  test("updates activeTabId when renaming the active tab", () => {
+    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
+    expect(workspace.activeTabId).toBe("pages/old.md");
+
+    renameTab("pages/old.md", "pages/new.md", "pages/new.md");
+
+    expect(workspace.activeTabId).toBe("pages/new.md");
+    expect(activeTab.value?.id).toBe("pages/new.md");
+  });
+
+  test("does not change activeTabId when renaming a non-active tab", () => {
+    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
+    openTab({ id: "active.json", document: { tagName: "span" }, documentPath: "active.json" });
+
+    renameTab("pages/old.md", "pages/new.md", "pages/new.md");
+
+    expect(workspace.activeTabId).toBe("active.json");
+  });
+
+  test("no-op for nonexistent tab id", () => {
+    openTab({ id: "a.json", document: { tagName: "div" }, documentPath: "a.json" });
+
+    renameTab("nonexistent", "new-id", "new-path");
+
+    expect(workspace.tabs.size).toBe(1);
+    expect(workspace.tabs.has("a.json")).toBe(true);
+  });
+
+  test("handles moving into a subdirectory", () => {
+    openTab({ id: "index.md", document: { tagName: "div" }, documentPath: "index.md" });
+
+    renameTab("index.md", "pages/index.md", "pages/index.md");
+
+    expect(workspace.tabs.has("index.md")).toBe(false);
+    expect(workspace.tabs.has("pages/index.md")).toBe(true);
+    expect(/** @type {any} */ (workspace.tabs.get("pages/index.md")).documentPath).toBe(
+      "pages/index.md",
+    );
   });
 });

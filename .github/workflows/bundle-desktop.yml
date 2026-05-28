@@ -65,8 +65,27 @@ jobs:
       - name: Build workspace packages
         run: bun run build
 
+      - name: Write Apple API Key File
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p ~/.apple/keys
+          echo "${{ secrets.APPLE_API_KEY_BASE64 }}" | base64 --decode > ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+
       - name: Build desktop installer
+        env:
+          # Electrobun signing variables mapped only on macOS runners
+          ELECTROBUN_APPLEAPIKEYPATH: /Users/runner/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          ELECTROBUN_APPLEAPIKEY: ${{ secrets.APPLE_API_KEY_ID }}
+          ELECTROBUN_APPLEAPIISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
+          ELECTROBUN_TEAMID: ${{ secrets.APPLE_TEAM_ID }}
+          ELECTROBUN_DEVELOPER_ID: "Developer ID Application: Avunu LLC (${{ secrets.APPLE_TEAM_ID }})"
         run: bun run desktop:stable
+
+      # New Step: Shreds the sensitive API key from the system even if previous steps fail
+      - name: Shred Apple Private Key
+        if: always() && runner.os == 'macOS'
+        run: |
+          rm -f ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

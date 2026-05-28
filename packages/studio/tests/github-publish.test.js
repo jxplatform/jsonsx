@@ -1,4 +1,15 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+
+if (typeof globalThis.localStorage === "undefined") {
+  const store = new Map();
+  globalThis.localStorage = /** @type {any} */ ({
+    getItem: (/** @type {string} */ k) => store.get(k) ?? null,
+    setItem: (/** @type {string} */ k, /** @type {string} */ v) => store.set(k, v),
+    removeItem: (/** @type {string} */ k) => store.delete(k),
+    clear: () => store.clear(),
+  });
+}
 
 const STORAGE_KEY = "jx_github_token";
 
@@ -34,6 +45,7 @@ let showDialogResult = null;
 
 mock.module("../src/ui/layers.js", () => ({
   showDialog: async () => showDialogResult,
+  showConfirmDialog: async () => true,
 }));
 
 mock.module("../src/github/github-auth.js", () => ({
@@ -49,6 +61,8 @@ mock.module("../src/platform.js", () => ({
 
 mock.module("../src/panels/git-panel.js", () => ({
   refreshGitStatus: async () => {},
+  renderGitPanel: () => null,
+  platformSupportsClone: () => false,
 }));
 
 mock.module("../src/panels/statusbar.js", () => ({

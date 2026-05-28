@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 
 // ─── Unit tests for jx-value-selector logic ─────────────────────────────────

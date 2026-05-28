@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 import { mdToJx, jxToMd, jxDocToMd } from "../src/markdown/md-convert.js";
 

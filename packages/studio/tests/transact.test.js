@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { effect } from "../src/reactivity.js";
 import { createTab, disposeTab } from "../src/tabs/tab.js";
 import {

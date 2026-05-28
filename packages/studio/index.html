@@ -773,6 +773,13 @@
         overflow: hidden;
         text-overflow: ellipsis;
       }
+      .block-action-bar .bar-tag--interactive {
+        cursor: pointer;
+      }
+      .block-action-bar .bar-tag--interactive:hover {
+        background: var(--accent);
+        color: var(--bg);
+      }
       .block-action-bar .bar-drag-handle {
         cursor: grab;
         font-size: 14px;
@@ -910,6 +917,17 @@
       }
       .file-tree-item.selected {
         background: var(--accent-20);
+      }
+      .file-tree-item.dragging {
+        opacity: 0.4;
+      }
+      .file-tree-item.drag-over {
+        background: var(--accent-20);
+        outline: 1px solid var(--accent);
+        outline-offset: -1px;
+      }
+      .file-tree.drag-over-root {
+        background: var(--hover-bg);
       }
       .file-tree-toggle {
         width: 14px;

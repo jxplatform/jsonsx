@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach, mock } from "bun:test";
 import { render as litRender } from "lit-html";
 
@@ -13,6 +14,7 @@ mock.module("../src/workspace/workspace.js", () => ({
   activeTab: { value: null },
   openTab: () => {},
   closeTab: () => {},
+  renameTab: () => {},
 }));
 
 mock.module("../src/view.js", () => ({
@@ -21,6 +23,7 @@ mock.module("../src/view.js", () => ({
 
 mock.module("../src/ui/layers.js", () => ({
   showDialog: async () => null,
+  showConfirmDialog: async () => true,
 }));
 
 mock.module("../src/panels/statusbar.js", () => ({

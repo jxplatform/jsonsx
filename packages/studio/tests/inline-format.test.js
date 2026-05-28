@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { expect, test, describe } from "bun:test";
 import {
   findTemplateExpressions,

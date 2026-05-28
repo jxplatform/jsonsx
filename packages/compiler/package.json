@@ -33,6 +33,7 @@
     "build": "bun build src/compiler.js --outdir=dist --format=esm --minify",
     "build:site": "bun src/cli.js build",
     "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {

@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform.js";
 import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-ops.js";

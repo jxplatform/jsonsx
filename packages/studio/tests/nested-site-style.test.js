@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 import { buildNestedSiteCSS } from "../src/canvas/nested-site-style.js";
 

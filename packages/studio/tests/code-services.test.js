@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform.js";
 

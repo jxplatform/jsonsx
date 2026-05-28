@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import {
   isEditableBlock,

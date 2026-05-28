@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 
 import { showSlashMenu, dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu.js";
@@ -201,6 +202,61 @@ describe("Slash Menu", () => {
       // The key test: after Enter, the menu is closed and item selected.
       expect(isSlashMenuOpen()).toBe(false);
       document.removeEventListener("keydown", handler);
+    });
+  });
+
+  // ─── Custom commands ────────────────────────────────────────────────────
+
+  describe("custom commands", () => {
+    const customCommands = [
+      { label: "Paragraph", tag: "p", description: "Plain text" },
+      { label: "Heading 2", tag: "h2", description: "Medium heading" },
+      { label: "Heading 3", tag: "h3", description: "Small heading" },
+    ];
+
+    test("shows only custom commands when provided", () => {
+      showSlashMenu(anchor, "", { onSelect: () => {}, commands: customCommands });
+      const items = getMenuItems();
+      expect(items.length).toBe(3);
+    });
+
+    test("filters within custom commands", () => {
+      showSlashMenu(anchor, "head", { onSelect: () => {}, commands: customCommands });
+      const items = getMenuItems();
+      expect(items.length).toBe(2);
+    });
+
+    test("Enter selects from custom commands", () => {
+      /** @type {any} */
+      let selected = null;
+      showSlashMenu(anchor, "", {
+        onSelect: (cmd) => (selected = cmd),
+        commands: customCommands,
+      });
+      pressKey("Enter");
+      expect(selected.tag).toBe("p");
+      expect(selected.label).toBe("Paragraph");
+    });
+
+    test("no matches in custom commands auto-dismisses", () => {
+      showSlashMenu(anchor, "xyz", { onSelect: () => {}, commands: customCommands });
+      expect(isSlashMenuOpen()).toBe(false);
+    });
+
+    test("keyboard navigation works with custom commands", () => {
+      showSlashMenu(anchor, "", { onSelect: () => {}, commands: customCommands });
+      const items = getMenuItems();
+      expect(items[0].hasAttribute("focused")).toBe(true);
+
+      pressKey("ArrowDown");
+      expect(items[1].hasAttribute("focused")).toBe(true);
+
+      pressKey("ArrowDown");
+      expect(items[2].hasAttribute("focused")).toBe(true);
+
+      // Wraps
+      pressKey("ArrowDown");
+      expect(items[0].hasAttribute("focused")).toBe(true);
     });
   });
 });

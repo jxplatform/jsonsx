@@ -1,3 +1,4 @@
+import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
 import { computeRelativePath } from "../src/files/components.js";
 
