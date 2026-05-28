@@ -65,6 +65,26 @@ jobs:
       - name: Build workspace packages
         run: bun run build
 
+      # - name: Import code signing certificate
+      #   if: runner.os == 'macOS'
+      #   env:
+      #     CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+      #     CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      #   run: |
+      #     KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+      #     KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+      #     security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+      #     security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+      #     security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      #     echo "$CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/certificate.p12
+      #     security import $RUNNER_TEMP/certificate.p12 -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+      #     rm $RUNNER_TEMP/certificate.p12
+
+      #     security list-keychain -d user -s "$KEYCHAIN_PATH" login.keychain-db
+      #     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
       - name: Write Apple API Key File
         if: runner.os == 'macOS'
         run: |
@@ -73,18 +93,17 @@ jobs:
 
       - name: Build desktop installer
         env:
-          # Electrobun signing variables mapped only on macOS runners
+          ELECTROBUN_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          ELECTROBUN_TEAMID: ${{ secrets.APPLE_TEAM_ID }}
           ELECTROBUN_APPLEAPIKEYPATH: /Users/runner/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.APPLE_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
-          # ELECTROBUN_TEAMID: ${{ secrets.APPLE_TEAM_ID }}
-          # ELECTROBUN_DEVELOPER_ID: "Developer ID Application: Avunu LLC (${{ secrets.APPLE_TEAM_ID }})"
         run: bun run desktop:stable
 
-      # New Step: Shreds the sensitive API key from the system even if previous steps fail
-      - name: Shred Apple Private Key
+      - name: Clean up signing materials
         if: always() && runner.os == 'macOS'
         run: |
+          # security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
           rm -f ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
 
       - name: Upload artifacts

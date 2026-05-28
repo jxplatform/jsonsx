@@ -40,8 +40,8 @@ export default {
     mac: {
       bundleCEF: true,
       defaultRenderer: "cef",
-      codesign: true,
-      notarize: true,
+      codesign: false,
+      notarize: false,
     },
     linux: {
       bundleCEF: true,
