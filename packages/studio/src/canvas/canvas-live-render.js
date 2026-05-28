@@ -168,8 +168,8 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     }
   }
 
-  // In edit mode, collect paths where children use $prototype:"Array"
-  // so we can remap runtime paths (children,map,N,...) → (children,map,...)
+  // In edit mode, collect paths where $map templates were inlined as children[0]
+  // so we can remap runtime paths (children,0,...) → (children,map,...)
   const mapParentPaths = new Set();
   if (canvasMode === "design" || canvasMode === "edit") {
     (function findMapParents(
@@ -412,17 +412,27 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
             }
           }
 
-          // Remap $map paths: renderMappedArray produces paths like
-          // [..., "children", "map", N, ...] for each rendered item. Map them
-          // back to [..., "children", "map", ...] (the template definition path).
+          // Remap $map paths: wrapper and template children → real document paths
+          // prepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
+          // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
           if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
             for (let i = 0; i < mappedPath.length - 1; i++) {
-              if (mappedPath[i] === "children" && mappedPath[i + 1] === "map") {
+              if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
                 const parentKey = mappedPath.slice(0, i).join("/");
                 if (mapParentPaths.has(parentKey)) {
-                  if (mappedPath.length > i + 2 && typeof mappedPath[i + 2] === "number") {
-                    // Strip the item index: [..., "children", "map", N, rest] → [..., "children", "map", rest]
-                    mappedPath = [...mappedPath.slice(0, i + 2), ...mappedPath.slice(i + 3)];
+                  if (mappedPath.length === i + 2) {
+                    mappedPath = mappedPath.slice(0, i + 1);
+                  } else if (
+                    mappedPath.length >= i + 4 &&
+                    mappedPath[i + 2] === "children" &&
+                    mappedPath[i + 3] === 0
+                  ) {
+                    mappedPath = [
+                      ...mappedPath.slice(0, i),
+                      "children",
+                      "map",
+                      ...mappedPath.slice(i + 4),
+                    ];
                   }
                   break;
                 }
