@@ -16,14 +16,29 @@ import {
 
 describe("isEditableBlock", () => {
   test("returns true for text-bearing block elements", () => {
-    for (const tag of ["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "td", "th", "blockquote"]) {
+    for (const tag of [
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "p",
+      "li",
+      "td",
+      "th",
+      "blockquote",
+      "span",
+      "a",
+      "label",
+    ]) {
       const el = document.createElement(tag);
       expect(isEditableBlock(el)).toBe(true);
     }
   });
 
   test("returns false for non-editable elements", () => {
-    for (const tag of ["div", "span", "img", "section", "ul", "ol", "table", "tr"]) {
+    for (const tag of ["div", "img", "section", "ul", "ol", "table", "tr"]) {
       const el = document.createElement(tag);
       expect(isEditableBlock(el)).toBe(false);
     }

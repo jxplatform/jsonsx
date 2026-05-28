@@ -56,6 +56,9 @@ const EDITABLE_BLOCKS = new Set([
   "td",
   "th",
   "blockquote",
+  "span",
+  "a",
+  "label",
 ]);
 
 // ─── Context-aware inline scoping ─────────────────────────────────────────
