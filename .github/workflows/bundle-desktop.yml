@@ -77,8 +77,8 @@ jobs:
           ELECTROBUN_APPLEAPIKEYPATH: /Users/runner/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
           ELECTROBUN_APPLEAPIKEY: ${{ secrets.APPLE_API_KEY_ID }}
           ELECTROBUN_APPLEAPIISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}
-          ELECTROBUN_TEAMID: ${{ secrets.APPLE_TEAM_ID }}
-          ELECTROBUN_DEVELOPER_ID: "Developer ID Application: Avunu LLC (${{ secrets.APPLE_TEAM_ID }})"
+          # ELECTROBUN_TEAMID: ${{ secrets.APPLE_TEAM_ID }}
+          # ELECTROBUN_DEVELOPER_ID: "Developer ID Application: Avunu LLC (${{ secrets.APPLE_TEAM_ID }})"
         run: bun run desktop:stable
 
       # New Step: Shreds the sensitive API key from the system even if previous steps fail
