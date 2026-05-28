@@ -79,7 +79,7 @@
       "release": true
     },
     "hooks": {
-      "before:init": "bun test && bun run lint"
+      "before:init": "bun test --isolate && bun run lint"
     },
     "npm": {
       "publish": false
