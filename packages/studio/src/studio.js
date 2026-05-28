@@ -46,6 +46,7 @@ import {
   openFileInTab,
   openHomePage,
   setupTreeKeyboard,
+  registerFileTreeDnD,
   loadDirectory,
 } from "./files/files.js";
 import { renderImportsTemplate } from "./panels/imports-panel.js";
@@ -418,6 +419,7 @@ leftPanelMod.mount({
   registerElementsDnD,
   registerComponentsDnD,
   setupTreeKeyboard,
+  registerFileTreeDnD,
   cloneRepository: () => cloneRepository({ openRecentProject }),
   setGitDiffState: (
     /** @type {import("./canvas/canvas-render.js").GitDiffState | null} */ state,

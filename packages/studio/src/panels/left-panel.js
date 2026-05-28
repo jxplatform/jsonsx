@@ -40,6 +40,7 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel.js";
  *   registerElementsDnD: () => void;
  *   registerComponentsDnD: () => void;
  *   setupTreeKeyboard: (tree: HTMLElement) => void;
+ *   registerFileTreeDnD: (ctx: { renderLeftPanel: () => void }) => void;
  *   setGitDiffState: (state: import("../canvas/canvas-render.js").GitDiffState | null) => void;
  *   cloneRepository?: () => void;
  * }} LeftPanelCtx
@@ -132,6 +133,7 @@ function _render() {
     litRender(html`<div class="panel-body">${ctx.renderFilesTemplate()}</div>`, leftPanel);
     const tree = /** @type {HTMLElement | null} */ (leftPanel.querySelector(".file-tree"));
     if (tree) ctx.setupTreeKeyboard(tree);
+    ctx.registerFileTreeDnD({ renderLeftPanel: render });
     return;
   }
 
