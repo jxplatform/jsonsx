@@ -12,6 +12,7 @@ import { componentRegistry, computeRelativePath } from "../files/components.js";
 import { projectState } from "../store.js";
 import { updateSiteConfig } from "../site-context.js";
 import { getPlatform } from "../platform.js";
+import { showConfirmDialog } from "../ui/layers.js";
 
 /** @typedef {import("../files/components.js").ComponentEntry} ComponentEntry */
 
@@ -185,7 +186,11 @@ function renderSiteLevelImports(renderLeftPanel) {
                 size="xs"
                 title="Remove package"
                 @click=${async () => {
-                  if (!confirm("Remove " + pkg + "?")) return;
+                  const confirmed = await showConfirmDialog("Remove Package", `Remove ${pkg}?`, {
+                    confirmLabel: "Remove",
+                    destructive: true,
+                  });
+                  if (!confirmed) return;
                   try {
                     const platform = getPlatform();
                     await platform.removePackage(pkg);

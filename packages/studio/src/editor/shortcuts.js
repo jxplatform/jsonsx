@@ -18,6 +18,7 @@ import {
 import { isEditing, stopEditing } from "./inline-edit.js";
 import { copyNode, cutNode, pasteNode } from "./context-menu.js";
 import { openQuickSearch } from "../panels/quick-search.js";
+import { showConfirmDialog } from "../ui/layers.js";
 
 /** @typedef {import("../state.js").JxPath} JxPath */
 
@@ -160,9 +161,16 @@ export function initShortcuts(getContext) {
             const tab = workspace.tabs.get(workspace.activeTabId);
             if (tab?.doc.dirty) {
               const name = tab.documentPath?.split("/").pop() || "Untitled";
-              if (!window.confirm(`"${name}" has unsaved changes. Close without saving?`)) break;
+              showConfirmDialog(
+                "Unsaved Changes",
+                `"${name}" has unsaved changes. Close without saving?`,
+                { confirmLabel: "Close", destructive: true },
+              ).then((confirmed) => {
+                if (confirmed && workspace.activeTabId) closeTab(workspace.activeTabId);
+              });
+            } else {
+              closeTab(workspace.activeTabId);
             }
-            closeTab(workspace.activeTabId);
           }
           break;
         case "o":

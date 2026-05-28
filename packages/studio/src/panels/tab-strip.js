@@ -10,6 +10,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { effect, effectScope } from "../reactivity.js";
 import { workspace, activateTab, closeTab } from "../workspace/workspace.js";
+import { showConfirmDialog } from "../ui/layers.js";
 
 /** @typedef {import("../tabs/tab.js").Tab} Tab */
 
@@ -117,12 +118,14 @@ function tabLabel(tab) {
  *
  * @param {string} id
  */
-function requestClose(id) {
+async function requestClose(id) {
   const tab = workspace.tabs.get(id);
   if (!tab) return;
   if (tab.doc.dirty) {
-    const confirmed = window.confirm(
+    const confirmed = await showConfirmDialog(
+      "Unsaved Changes",
       `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,
+      { confirmLabel: "Close", destructive: true },
     );
     if (!confirmed) return;
   }

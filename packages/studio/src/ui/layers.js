@@ -1,4 +1,4 @@
-import { render as litRender, nothing } from "lit-html";
+import { render as litRender, nothing, html } from "lit-html";
 
 /** @type {HTMLElement} */
 let _popoverLayer;
@@ -35,6 +35,36 @@ export function showDialog(templateFn) {
     };
     litRender(templateFn(done), slot);
   });
+}
+
+/**
+ * Show a confirm/cancel dialog. Returns true if confirmed, false otherwise.
+ *
+ * @param {string} headline
+ * @param {string | import("lit-html").TemplateResult} message
+ * @param {{ confirmLabel?: string; cancelLabel?: string; destructive?: boolean }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export function showConfirmDialog(headline, message, opts = {}) {
+  const { confirmLabel = "Confirm", cancelLabel = "Cancel", destructive = false } = opts;
+  return showDialog(
+    (done) => html`
+      <sp-dialog-wrapper
+        open
+        underlay
+        headline=${headline}
+        confirm-label=${confirmLabel}
+        cancel-label=${cancelLabel}
+        size="s"
+        @confirm=${() => done(true)}
+        @cancel=${() => done(false)}
+        @close=${() => done(false)}
+        class=${destructive ? "dialog-destructive" : ""}
+      >
+        <p>${message}</p>
+      </sp-dialog-wrapper>
+    `,
+  );
 }
 
 /**

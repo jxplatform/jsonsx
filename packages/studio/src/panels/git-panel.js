@@ -10,7 +10,7 @@ import { getPlatform } from "../platform.js";
 import { updateUi, renderOnly, projectState } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { view } from "../view.js";
-import { showDialog } from "../ui/layers.js";
+import { showDialog, showConfirmDialog } from "../ui/layers.js";
 import { statusMessage } from "./statusbar.js";
 import { publishToGithub } from "../github/github-publish.js";
 
@@ -531,7 +531,12 @@ export function renderGitPanel(S, ctx) {
                   title="Discard changes"
                   @click=${async () => {
                     if (file.status === "U") return;
-                    if (!confirm(`Discard changes to ${file.path}?`)) return;
+                    const confirmed = await showConfirmDialog(
+                      "Discard Changes",
+                      `Discard changes to ${file.path}?`,
+                      { confirmLabel: "Discard", destructive: true },
+                    );
+                    if (!confirmed) return;
                     await gitAction("gitDiscard", [file.path]);
                   }}
                   ?disabled=${file.status === "U"}
