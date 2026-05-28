@@ -13,6 +13,7 @@ import {
   buildScope,
   defineElement,
   setSkipServerFunctions,
+  setSkipContentResolution,
 } from "@jxsuite/runtime";
 import {
   getEffectiveElements,
@@ -128,6 +129,7 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   // failed proxy calls and infinite reactive retries (also covers
   // async custom element connectedCallbacks that run after this function returns)
   setSkipServerFunctions(canvasMode !== "preview");
+  setSkipContentResolution(canvasMode !== "preview");
 
   let renderDoc =
     canvasMode === "preview"
