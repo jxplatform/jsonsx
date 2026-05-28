@@ -16,10 +16,11 @@ export function mount() {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
-      const gs = tab.session.ui.gitStatus;
-      if (!gs && !tab.session.ui.gitLoading) {
-        refreshGitStatus();
+      if (tab) {
+        const gs = tab.session.ui.gitStatus;
+        if (!gs && !tab.session.ui.gitLoading) {
+          refreshGitStatus();
+        }
       }
       renderActivityBar();
     });
@@ -92,7 +93,6 @@ export function tabIcon(tag, size) {
 
 export function renderActivityBar() {
   const tab = activeTab.value;
-  if (!tab) return;
   const leftTab = view.leftTab;
   const gitFileCount = tab?.session.ui.gitStatus?.files?.length || 0;
   const tabs = [
