@@ -47,7 +47,7 @@ beforeAll(() => {
     build: { outDir: "./dist" },
     contentTypes: {
       blog: {
-        source: "./content/blog/**/*.md",
+        source: "./content/blog/",
         schema: {
           type: "object",
           properties: {
@@ -61,7 +61,8 @@ beforeAll(() => {
         },
       },
       authors: {
-        source: "./content/authors/*.json",
+        source: "./content/authors/",
+        format: "json",
         schema: {
           type: "object",
           properties: {
@@ -593,7 +594,7 @@ describe("content-loader edge cases", () => {
     const projectConfig = {
       contentTypes: {
         blog: {
-          source: "./content/blog/*.md",
+          source: "./content/blog/",
           $elements: ["my-component", { $ref: "./card.json" }],
         },
       },
@@ -618,7 +619,8 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           items: {
-            source: "./content/items/*.json",
+            source: "./content/items/",
+            format: "json",
             schema: {
               properties: {
                 name: { type: "string" },
@@ -680,7 +682,7 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           docs: {
-            source: "./content/docs/*.md",
+            source: "./content/docs/",
             $elements: ["my-widget", { $ref: "./card.json" }],
             schema: { properties: { title: { type: "string" } } },
           },
@@ -712,7 +714,8 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           items: {
-            source: "./content/items/*.json",
+            source: "./content/items/",
+            format: "json",
             schema: {
               required: ["name", "price"],
               properties: { name: { type: "string" }, price: { type: "number" } },

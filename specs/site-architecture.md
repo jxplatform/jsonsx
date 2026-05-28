@@ -500,7 +500,7 @@ Collections are defined in `the `collections` key in project.json`:
   "$schema": "https://jxsuite.com/schema/project/v1",
   "contentTypes": {
     "blog": {
-      "source": "./blog/**/*.md",
+      "source": "./blog/",
       "schema": {
         "type": "object",
         "properties": {
@@ -521,7 +521,8 @@ Collections are defined in `the `collections` key in project.json`:
     },
 
     "authors": {
-      "source": "./authors/*.json",
+      "source": "./authors/",
+      "format": "json",
       "schema": {
         "type": "object",
         "properties": {
@@ -562,12 +563,12 @@ Collections are defined in `the `collections` key in project.json`:
 
 ### 6.2 Collection Shapes
 
-| Source Pattern | File Type                 | Entry ID               | Notes                                |
-| -------------- | ------------------------- | ---------------------- | ------------------------------------ |
-| `**/*.md`      | Markdown with frontmatter | Filename (slugified)   | Body parsed to Jx tree (`$children`) |
-| `**/*.json`    | JSON objects              | `id` field or filename | Direct data access                   |
-| `*.csv`        | CSV rows                  | Row index or ID column | Parsed via built-in CSV parser       |
-| `**/*.yaml`    | YAML documents            | `id` field or filename | Parsed via built-in YAML parser      |
+| Format | File Type                 | Entry ID               | Notes                                |
+| ------ | ------------------------- | ---------------------- | ------------------------------------ |
+| `md`   | Markdown with frontmatter | Filename (slugified)   | Body parsed to Jx tree (`$children`) |
+| `json` | JSON objects              | `id` field or filename | Direct data access                   |
+| `csv`  | CSV rows                  | Row index or ID column | Parsed via built-in CSV parser       |
+| `yaml` | YAML documents            | `id` field or filename | Parsed via built-in YAML parser      |
 
 ### 6.3 Schema Validation
 
@@ -697,8 +698,8 @@ content/
 **Key rules:**
 
 - One directory per collection (named after the collection)
-- For glob-based collections (`**/*.md`), each file is one entry
-- For file-based collections (`*.json`, `*.csv`), one file contains many entries
+- For directory-based collections (`format: "md"`), each file is one entry
+- For file-based collections (single CSV or JSON file as `source`), one file contains many entries
 - Media can be co-located next to content entries
 - The collection directory name matches the key in `project.json `collections``
 
@@ -1332,7 +1333,7 @@ The collection config can specify locale awareness:
 ```json
 {
   "blog": {
-    "source": "./blog/{locale}/**/*.md",
+    "source": "./blog/{locale}/",
     "schema": { "...": "..." }
   }
 }

@@ -136,17 +136,17 @@ export function findContentTypeSchema(documentPath, projectConfig) {
     /** @type {Record<string, ContentTypeDef>} */ (projectConfig.contentTypes),
   )) {
     if (!def.source || !def.schema) continue;
-    const src = def.source.replace(/^\.\//, "");
-    const dir = src.split("/")[0];
-    const ext = src.includes("*.md")
-      ? ".md"
-      : src.includes("*.json")
-        ? ".json"
-        : src.includes("*.csv")
-          ? ".csv"
-          : null;
-    if (documentPath.startsWith(dir + "/") && (!ext || documentPath.endsWith(ext))) {
-      return { name, schema: def.schema };
+    const src = def.source.replace(/^\.\//, "").replace(/\/$/, "");
+    const hasExt = src.includes(".") && !src.endsWith("/");
+    if (hasExt) {
+      if (documentPath === src || documentPath.endsWith("/" + src)) {
+        return { name, schema: def.schema };
+      }
+    } else {
+      const ext = `.${def.format || "md"}`;
+      if (documentPath.startsWith(src + "/") && documentPath.endsWith(ext)) {
+        return { name, schema: def.schema };
+      }
     }
   }
   return null;

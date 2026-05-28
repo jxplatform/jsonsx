@@ -88,6 +88,13 @@ export function setSkipServerFunctions(/** @type {boolean} */ v) {
   _serverFnConfig.skip = v;
 }
 
+/** @type {{ skip: boolean }} */
+const _contentConfig = { skip: false };
+/** Set to true to suppress ContentCollection/ContentEntry resolution (used by Studio edit mode). */
+export function setSkipContentResolution(/** @type {boolean} */ v) {
+  _contentConfig.skip = v;
+}
+
 /**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
  *
@@ -235,8 +242,9 @@ export { hasSchemaKeywords };
  * @returns {string}
  */
 function evaluateTemplate(str, state) {
-  const fn = new Function("state", "$map", `return \`${str}\``);
-  return fn(state, state?.$map);
+  const $map = state?.$map;
+  const fn = new Function("state", "$map", "item", "index", `return \`${str}\``);
+  return fn(state, $map, $map?.item, $map?.index);
 }
 
 // ─── Step 2b: Function resolution (Shape 4) ─────────────────────────────────
@@ -950,6 +958,42 @@ export async function resolvePrototype(def, state, key, base) {
 
     case "ReadableStream":
       return null;
+
+    case "ContentCollection":
+    case "ContentEntry": {
+      if (_contentConfig.skip) {
+        return ref(def.$prototype === "ContentCollection" ? [{ id: "", data: {} }] : null);
+      }
+      const s = ref(def.$prototype === "ContentCollection" ? [] : null);
+      effect(() => {
+        let id = def.id;
+        if (id && typeof id === "object" && id.$ref?.startsWith("#/$params/")) {
+          const paramName = id.$ref.replace("#/$params/", "");
+          id = state?.$params?.[paramName];
+        } else if (typeof id === "string" && id.includes("${")) {
+          id = evaluateTemplate(id, state);
+        }
+        if (def.$prototype === "ContentEntry" && !id) return;
+        fetch("/__studio/content", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            $prototype: def.$prototype,
+            contentType: def.contentType,
+            id,
+            filter: def.filter,
+            sort: def.sort,
+            limit: def.limit,
+          }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            s.value = d;
+          })
+          .catch(() => {});
+      });
+      return s;
+    }
 
     default:
       console.warn(

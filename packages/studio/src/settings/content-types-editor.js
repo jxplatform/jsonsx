@@ -57,7 +57,7 @@ function handleNewContentType(rerender) {
   if (config.contentTypes[slug]) return; // already exists
 
   config.contentTypes[slug] = {
-    source: `./content/${slug}/**/*.md`,
+    source: `./content/${slug}/`,
     schema: { type: "object", properties: {}, required: [] },
   };
 

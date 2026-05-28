@@ -9,9 +9,8 @@
  * @module content-loader
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
-import { globSync } from "glob";
 
 // ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
 
@@ -287,9 +286,29 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
       }
     : undefined;
 
-  // Resolve the glob pattern relative to project root
-  const pattern = resolve(projectRoot, source).split("\\").join("/");
-  const files = globSync(pattern, { absolute: true });
+  // Resolve source path and discover files
+  const resolvedSource = resolve(projectRoot, source).split("\\").join("/");
+  /** @type {string[]} */
+  let files;
+
+  if (source.includes("*") || source.includes("?")) {
+    // Glob pattern — use Bun.Glob or manual directory scan
+    const glob = new Bun.Glob(source);
+    files = [...glob.scanSync({ cwd: projectRoot, absolute: true })];
+  } else if (extname(source)) {
+    files = existsSync(resolvedSource) ? [resolvedSource] : [];
+  } else {
+    const format = contentTypeDef.format || "md";
+    const ext = `.${format}`;
+    const dir = resolvedSource.endsWith("/") ? resolvedSource : resolvedSource + "/";
+    try {
+      files = readdirSync(dir, { recursive: true })
+        .filter((f) => String(f).endsWith(ext))
+        .map((f) => resolve(dir, String(f)));
+    } catch {
+      files = [];
+    }
+  }
 
   /** @type {ContentLoaderEntry[]} */
   const entries = [];

@@ -154,7 +154,7 @@ function contentTypeFor(filePath) {
   for (const [name, def] of Object.entries(config.contentTypes)) {
     const d = /** @type {ContentTypeDef} */ (def);
     if (!d.source) continue;
-    const prefix = d.source.replace(/^\.\//, "").split("/**")[0].split("/*")[0];
+    const prefix = d.source.replace(/^\.\//, "").replace(/\/$/, "");
     if (filePath.startsWith(prefix + "/") || filePath === prefix) {
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
@@ -233,12 +233,12 @@ function getContentTypeTypes() {
   if (!config?.contentTypes) return [];
   return Object.entries(config.contentTypes).map(([name, def]) => {
     const d = /** @type {ContentTypeDef} */ (def);
-    const dir = d.source ? d.source.replace(/^\.\//, "").split("/")[0] : name;
+    const dir = d.source ? d.source.replace(/^\.\//, "").replace(/\/$/, "") : name;
     return {
       key: `contentType:${name}`,
       label: name.charAt(0).toUpperCase() + name.slice(1),
       dir,
-      ext: ".md",
+      ext: `.${d.format || "md"}`,
       contentTypeName: name,
     };
   });

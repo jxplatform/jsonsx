@@ -65,12 +65,7 @@ export function prepareForEditMode(node) {
             {
               tagName: "div",
               className: "repeater-perimeter",
-              state: {
-                $map: { item: {}, index: 0 },
-                "$map/item": {},
-                "$map/index": 0,
-              },
-              children: [prepareForEditMode(template)],
+              children: [prepareForEditMode(/** @type {JxMutableNode} */ (template))],
             },
           ];
         } else {

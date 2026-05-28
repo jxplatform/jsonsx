@@ -9,7 +9,7 @@ import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
-import { renderPopover, showDialog } from "../ui/layers.js";
+import { renderPopover, showDialog, showConfirmDialog } from "../ui/layers.js";
 import remarkDirective from "remark-directive";
 import { stringify as stringifyYaml } from "yaml";
 import { jxToMd } from "../markdown/md-convert.js";
@@ -17,6 +17,12 @@ import { createState, projectState, setProjectState, requireProjectState } from 
 import { getPlatform } from "../platform.js";
 import { statusMessage } from "../panels/statusbar.js";
 import { loadComponentRegistry } from "./components.js";
+import {
+  draggable,
+  dropTargetForElements,
+  monitorForElements,
+} from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import {
   workspace,
   openTab,
@@ -408,6 +414,170 @@ export function setupTreeKeyboard(/** @type {HTMLElement} */ tree) {
   if (first) first.setAttribute("tabindex", "0");
 }
 
+/** @type {(() => void)[]} */
+let _fileTreeDndCleanups = [];
+
+/**
+ * Register drag-and-drop on file tree items. Called after each file tree render.
+ *
+ * @param {{ renderLeftPanel: () => void }} ctx
+ */
+export function registerFileTreeDnD({ renderLeftPanel }) {
+  // Clean up previous registrations
+  for (const fn of _fileTreeDndCleanups) fn();
+  _fileTreeDndCleanups = [];
+
+  requestAnimationFrame(() => {
+    const tree = /** @type {HTMLElement | null} */ (document.querySelector(".file-tree"));
+    if (!tree) return;
+
+    const items = /** @type {NodeListOf<HTMLElement>} */ (tree.querySelectorAll(".file-tree-item"));
+
+    items.forEach((row) => {
+      const path = row.dataset.path;
+      const type = row.dataset.type;
+      if (!path) return;
+
+      const cleanups = [
+        draggable({
+          element: row,
+          getInitialData() {
+            return { type: "file-tree", path, entryType: type };
+          },
+          onDragStart() {
+            row.classList.add("dragging");
+          },
+          onDrop() {
+            row.classList.remove("dragging");
+          },
+        }),
+      ];
+
+      if (type === "directory") {
+        cleanups.push(
+          dropTargetForElements({
+            element: row,
+            canDrop({ source }) {
+              if (source.data.type !== "file-tree") return false;
+              const srcPath = /** @type {string} */ (source.data.path);
+              if (srcPath === path) return false;
+              if (srcPath.startsWith(path + "/")) return false;
+              const srcParent = parentDir(srcPath);
+              if (srcParent === path) return false;
+              return true;
+            },
+            onDragEnter() {
+              row.classList.add("drag-over");
+            },
+            onDrag() {
+              if (!row.classList.contains("drag-over")) row.classList.add("drag-over");
+            },
+            onDragLeave() {
+              row.classList.remove("drag-over");
+            },
+            onDrop() {
+              row.classList.remove("drag-over");
+            },
+            getData() {
+              return { type: "file-tree-target", targetDir: path };
+            },
+          }),
+        );
+      }
+
+      _fileTreeDndCleanups.push(combine(...cleanups));
+    });
+
+    // Root-level drop target (move to project root)
+    const rootCleanup = dropTargetForElements({
+      element: tree,
+      canDrop({ source }) {
+        if (source.data.type !== "file-tree") return false;
+        const srcPath = /** @type {string} */ (source.data.path);
+        return parentDir(srcPath) !== ".";
+      },
+      onDragEnter() {
+        tree.classList.add("drag-over-root");
+      },
+      onDragLeave() {
+        tree.classList.remove("drag-over-root");
+      },
+      onDrop() {
+        tree.classList.remove("drag-over-root");
+      },
+      getData() {
+        return { type: "file-tree-target", targetDir: "." };
+      },
+    });
+    _fileTreeDndCleanups.push(rootCleanup);
+
+    // Monitor for drop events
+    const monitorCleanup = monitorForElements({
+      onDrop({ source, location }) {
+        const target = location.current.dropTargets[0];
+        if (!target) return;
+        if (source.data.type !== "file-tree") return;
+        if (target.data.type !== "file-tree-target") return;
+
+        const srcPath = /** @type {string} */ (source.data.path);
+        const targetDirPath = /** @type {string} */ (target.data.targetDir);
+        const fileName = srcPath.split("/").pop();
+        const newPath = targetDirPath === "." ? fileName : `${targetDirPath}/${fileName}`;
+
+        if (newPath === srcPath) return;
+
+        moveFileEntry(srcPath, /** @type {string} */ (newPath), renderLeftPanel);
+      },
+    });
+    _fileTreeDndCleanups.push(monitorCleanup);
+  });
+}
+
+/**
+ * Move a file/directory and update all affected state.
+ *
+ * @param {string} oldPath
+ * @param {string} newPath
+ * @param {() => void} renderLeftPanel
+ */
+async function moveFileEntry(oldPath, newPath, renderLeftPanel) {
+  const platform = getPlatform();
+  try {
+    await platform.renameFile(oldPath, newPath);
+
+    // Update open tabs referencing the moved path
+    for (const [id] of workspace.tabs.entries()) {
+      if (id === oldPath) {
+        renameTab(oldPath, newPath, newPath);
+      } else if (id.startsWith(oldPath + "/")) {
+        const newTabPath = newPath + id.slice(oldPath.length);
+        renameTab(id, newTabPath, newTabPath);
+      }
+    }
+
+    // Refresh affected directories
+    const oldParent = parentDir(oldPath);
+    const newParent = parentDir(newPath);
+    await loadDirectory(oldParent);
+    if (newParent !== oldParent) await loadDirectory(newParent);
+
+    // Auto-expand target directory
+    if (newParent !== ".") requireProjectState().expanded.add(newParent);
+
+    renderLeftPanel();
+    statusMessage(`Moved to ${newPath}`);
+  } catch (/** @type {unknown} */ e) {
+    statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
+  }
+}
+
+/** @param {string} path @returns {string} */
+function parentDir(path) {
+  const normalized = path.replaceAll("\\", "/");
+  const lastSlash = normalized.lastIndexOf("/");
+  return lastSlash === -1 ? "." : normalized.substring(0, lastSlash);
+}
+
 // ─── Context menu ─────────────────────────────────────────────────────────────
 
 /** @type {ReturnType<typeof renderPopover> | null} */
@@ -588,7 +758,11 @@ async function deleteFile(
   /** @type {{ name: string; path: string; type: string }} */ entry,
   /** @type {() => void} */ renderLeftPanel,
 ) {
-  if (!confirm(`Delete "${entry.name}"?`)) return;
+  const confirmed = await showConfirmDialog("Delete File", `Delete "${entry.name}"?`, {
+    confirmLabel: "Delete",
+    destructive: true,
+  });
+  if (!confirmed) return;
   try {
     const platform = getPlatform();
     await platform.deleteFile(entry.path);

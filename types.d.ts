@@ -379,6 +379,7 @@ interface ContentLoaderEntry {
 
 interface ContentTypeDef {
   source: string;
+  format?: "md" | "json" | "csv" | "yaml";
   schema?: ContentTypeSchema;
   $elements?: (string | { $ref: string })[];
   [key: string]: unknown;

@@ -12,7 +12,7 @@
   },
   "contentTypes": {
     "posts": {
-      "source": "./content/posts/**/*.md",
+      "source": "./content/posts/",
       "schema": {
         "type": "object",
         "properties": {

@@ -8,6 +8,7 @@ import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import { styleMap } from "lit-html/directives/style-map.js";
+import { projectState } from "../state.js";
 import { activeTab } from "../workspace/workspace.js";
 import {
   transactDoc,
@@ -59,6 +60,11 @@ import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.
  *   parameters?: Record<string, unknown>[];
  *   emits?: Record<string, unknown>[];
  *   fields?: unknown;
+ *   contentType?: string;
+ *   id?: unknown;
+ *   filter?: Record<string, unknown>;
+ *   sort?: { field?: string; order?: string };
+ *   limit?: number;
  * }} SignalDef
  *
  * @typedef {{ name: string; type?: { text?: string }; description?: string; optional?: boolean }} CemParameter
@@ -730,6 +736,9 @@ function renderDataSourceFields(
       )}
     `;
   }
+  if (proto === "ContentEntry" || proto === "ContentCollection") {
+    return renderContentPrototypeFields(name, def, proto);
+  }
   if (proto === "Set" || proto === "Map" || proto === "FormData") {
     const fieldName = proto === "FormData" ? "fields" : "default";
     const fieldLabel = proto === "FormData" ? "Fields" : "Default";
@@ -749,6 +758,117 @@ function renderDataSourceFields(
   }
   // Schema-driven fallback
   return renderExternalPrototypeEditorTemplate(S, name, def, ctx);
+}
+
+/** ContentEntry/ContentCollection fields for signal editor */
+function renderContentPrototypeFields(
+  /** @type {string} */ name,
+  /** @type {SignalDef} */ def,
+  /** @type {string} */ proto,
+) {
+  const contentTypes = projectState?.projectConfig?.contentTypes;
+  const typeNames = contentTypes ? Object.keys(contentTypes) : [];
+  const currentType = def.contentType || "";
+  const schema = /** @type {ContentTypeSchema | undefined} */ (
+    currentType && contentTypes?.[currentType]?.schema
+  ) ||
+  undefined;
+
+  const contentTypeField = typeNames.length
+    ? html`
+        <div class="signal-field-row">
+          <label class="signal-field-label">Content Type</label>
+          <sp-picker
+            size="s"
+            value=${currentType}
+            style="width:100%"
+            @change=${(/** @type {Event} */ e) => {
+              const v = /** @type {HTMLSelectElement} */ (e.target).value;
+              transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { contentType: v }));
+            }}
+          >
+            ${typeNames.map((t) => html`<sp-menu-item value=${t}>${t}</sp-menu-item>`)}
+          </sp-picker>
+        </div>
+      `
+    : signalFieldRow("Content Type", currentType, (/** @type {string} */ v) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { contentType: v })),
+      );
+
+  /** @type {import("lit-html").TemplateResult | symbol} */
+  let entryFields = nothing;
+  if (proto === "ContentEntry") {
+    const idVal = def.id;
+    const idStr =
+      idVal && typeof idVal === "object" && /** @type {Record<string, unknown>} */ (idVal).$ref
+        ? /** @type {string} */ (/** @type {Record<string, unknown>} */ (idVal).$ref)
+        : typeof idVal === "string"
+          ? idVal
+          : "";
+    entryFields = signalFieldRow("ID", idStr, (/** @type {string} */ v) => {
+      const val = v.startsWith("#/") ? { $ref: v } : v;
+      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { id: val }));
+    });
+  } else {
+    const filterStr = def.filter ? JSON.stringify(def.filter) : "";
+    const sortStr = def.sort ? `${def.sort.field || ""} ${def.sort.order || ""}`.trim() : "";
+    const limitStr = def.limit != null ? String(def.limit) : "";
+    entryFields = html`
+      ${signalFieldRow("Filter", filterStr, (/** @type {string} */ v) => {
+        try {
+          const parsed = v ? JSON.parse(v) : undefined;
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { filter: parsed }));
+        } catch {}
+      })}
+      ${signalFieldRow("Sort", sortStr, (/** @type {string} */ v) => {
+        if (!v) {
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { sort: undefined }));
+          return;
+        }
+        const [field, order] = v.split(" ");
+        transactDoc(activeTab.value, (t) =>
+          mutateUpdateDef(t, name, { sort: { field, order: order || "asc" } }),
+        );
+      })}
+      ${signalFieldRow("Limit", limitStr, (/** @type {string} */ v) => {
+        const num = v ? parseInt(v, 10) : undefined;
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { limit: num }));
+      })}
+    `;
+  }
+
+  /** @type {import("lit-html").TemplateResult | symbol} */
+  let schemaFields = nothing;
+  if (schema?.properties) {
+    const fields = Object.entries(schema.properties);
+    const required = new Set(schema.required || []);
+    schemaFields = html`
+      <div style="margin-top:8px;padding:6px 0;border-top:1px solid var(--border-dim)">
+        <div style="font-size:11px;color:var(--fg-dim);margin-bottom:4px;font-weight:500">
+          Fields (${currentType})
+        </div>
+        ${fields.map(
+          ([field, fieldDef]) => html`
+            <div style="font-size:11px;padding:2px 0;display:flex;gap:4px;align-items:center">
+              <code style="color:var(--fg-default)">${field}</code>
+              <span style="color:var(--fg-dim)">${/** @type {any} */ (fieldDef).type || ""}</span>
+              ${required.has(field)
+                ? html`<span style="color:var(--color-accent,#f36f32);font-size:9px">req</span>`
+                : nothing}
+            </div>
+          `,
+        )}
+      </div>
+    `;
+  }
+
+  return html`
+    ${contentTypeField}
+    ${signalFieldRow("Prototype", proto, (/** @type {string} */ v) =>
+      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $prototype: v })),
+    )}
+    ${entryFields} ${schemaFields}
+  `;
 }
 
 /** Function fields for signal editor */

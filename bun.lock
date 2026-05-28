@@ -36,7 +36,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "bin": {
         "jx": "./src/cli.js",
       },
@@ -44,7 +44,6 @@
         "@apidevtools/json-schema-ref-parser": "^15.3.5",
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
-        "glob": "^13.0.6",
         "remark-gfm": "^4.0.1",
         "remark-stringify": "^11.0.0",
         "sharp": "^0.34.5",
@@ -64,7 +63,7 @@
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.152",
         "@anthropic-ai/sdk": "^0.99.0",
@@ -83,7 +82,7 @@
     },
     "packages/parser": {
       "name": "@jxsuite/parser",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "glob": "^13.0.6",
         "hast-util-from-html": "^2.0.3",
@@ -108,7 +107,7 @@
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "@vue/reactivity": "^3.5.35",
       },
@@ -118,7 +117,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "@webref/css": "^8.5.7",
         "@webref/elements": "^2.7.1",
@@ -127,10 +126,11 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.152",
         "@anthropic-ai/sdk": "^0.99.0",
+        "@jxsuite/compiler": "workspace:^",
         "@jxsuite/create": "workspace:^",
         "@jxsuite/parser": "workspace:^",
         "@modelcontextprotocol/sdk": "^1.29.0",
@@ -140,7 +140,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "0.19.0",
+      "version": "0.20.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.1.0",
