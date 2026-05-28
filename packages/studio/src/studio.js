@@ -452,14 +452,17 @@ function safeRenderRightPanel() {
 // Now that renderers are registered, bootstrap
 registerFunctionCompletions();
 
-const _openParam = new URLSearchParams(location.search).get("open");
+const _urlParams = new URLSearchParams(location.search);
+const _projectParam = _urlParams.get("project") || _urlParams.get("open");
 
-if (_openParam) {
-  // ?open= mode: skip normal loadProject, set up site context from the path
+if (_projectParam) {
+  // ?project= mode: skip normal loadProject, set up site context from the path
   const isAbsPath =
-    _openParam.startsWith("/") || _openParam.startsWith("~") || /^[A-Za-z]:[/\\]/.test(_openParam);
+    _projectParam.startsWith("/") ||
+    _projectParam.startsWith("~") ||
+    /^[A-Za-z]:[/\\]/.test(_projectParam);
   if (!isAbsPath) {
-    statusMessage(`Error: ?open= requires an absolute path (got "${_openParam}")`);
+    statusMessage(`Error: ?project= requires an absolute path (got "${_projectParam}")`);
     render();
   } else {
     render();
@@ -467,7 +470,7 @@ if (_openParam) {
     (async () => {
       try {
         const siteCtx = platform.resolveSiteContext
-          ? await platform.resolveSiteContext(_openParam)
+          ? await platform.resolveSiteContext(_projectParam)
           : { sitePath: null };
 
         if (siteCtx.sitePath) {
@@ -518,8 +521,8 @@ if (_openParam) {
         }
 
         // Read and open the file
-        const _fileParam = new URLSearchParams(location.search).get("file");
-        let fileRelPath = _fileParam || siteCtx.fileRelPath || _openParam;
+        const _fileParam = _urlParams.get("file");
+        let fileRelPath = _fileParam || siteCtx.fileRelPath || _projectParam;
 
         // When opening project.json, default to home page instead
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
@@ -562,7 +565,7 @@ if (_openParam) {
           }
 
           render();
-          statusMessage(`Opened ${_openParam}`);
+          statusMessage(`Opened ${fileRelPath}`);
         }
       } catch (/** @type {unknown} */ e) {
         statusMessage(`Error: ${/** @type {Error} */ (e).message}`);
