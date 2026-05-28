@@ -75,25 +75,6 @@
             #   config.process-compose.default.processes.devShell
             # ];
             nativeBuildInputs = [
-              (pkgs.writeShellScriptBin "update-nix-hashes" ''
-                set -e
-                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
-
-                echo "Regenerating bun.nix..."
-                bun2nix
-
-                echo "Computing node_modules hash..."
-                # Build with fakeHash to get the real hash
-                sed -i 's|outputHash = "sha256-.*"|outputHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="|' packages/desktop/package.nix
-                hash=$(nix build .#packages.x86_64-linux.default 2>&1 | grep -oP 'got:\s+\Ksha256-[A-Za-z0-9+/=]+' || true)
-                if [ -n "$hash" ]; then
-                  sed -i "s|outputHash = \"sha256-.*\"|outputHash = \"$hash\"|" packages/desktop/package.nix
-                  echo "Updated hash: $hash"
-                else
-                  echo "ERROR: Could not determine hash. Check nix build output."
-                  exit 1
-                fi
-              '')
               (pkgs.writeShellScriptBin "build-desktop" ''
                 nix build
               '')
@@ -118,6 +99,30 @@
                 magick "$ICONSET/icon_16x16.png" "$ICONSET/icon_32x32.png" "$ICONSET/icon_48x48.png" "$ICONSET/icon_256x256.png" "packages/desktop/icon.ico"
 
                 echo "Generated icons in $ICONSET/, packages/desktop/icon.png, and packages/desktop/icon.ico"
+              '')
+              (pkgs.writeShellScriptBin "update-deps" ''
+                nix flake update
+                bun run upgrade
+                update-nix-hashes
+              '')
+              (pkgs.writeShellScriptBin "update-nix-hashes" ''
+                set -e
+                cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+
+                echo "Regenerating bun.nix..."
+                bun2nix
+
+                echo "Computing node_modules hash..."
+                # Build with fakeHash to get the real hash
+                sed -i 's|outputHash = "sha256-.*"|outputHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="|' packages/desktop/package.nix
+                hash=$(nix build .#packages.x86_64-linux.default 2>&1 | grep -oP 'got:\s+\Ksha256-[A-Za-z0-9+/=]+' || true)
+                if [ -n "$hash" ]; then
+                  sed -i "s|outputHash = \"sha256-.*\"|outputHash = \"$hash\"|" packages/desktop/package.nix
+                  echo "Updated hash: $hash"
+                else
+                  echo "ERROR: Could not determine hash. Check nix build output."
+                  exit 1
+                fi
               '')
             ];
 
