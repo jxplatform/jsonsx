@@ -33,8 +33,13 @@ export { buildNestedSiteCSS } from "./nested-site-style.js";
 
 /** @param {Event} e */
 function _preventNav(e) {
-  e.preventDefault();
+  if (/** @type {HTMLElement} */ (e.target).closest("a[href]")) {
+    e.preventDefault();
+  }
 }
+
+/** Canvas elements that already have the delegated nav guard listener. */
+const _navGuarded = new WeakSet();
 
 /** @type {{ getCanvasMode: () => string } | null} */
 let _ctx = null;
@@ -455,11 +460,6 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       for (const child of el.querySelectorAll("*")) {
         /** @type {HTMLElement} */ (child).style.pointerEvents = "none";
       }
-      // Prevent link navigation on all <a> elements (pointer events get
-      // re-enabled during inline editing, which would allow navigation)
-      for (const a of el.querySelectorAll("a[href]")) {
-        a.addEventListener("click", _preventNav);
-      }
     }
     // Clear and append atomically — ensures the canvas is never left empty if a
     // newer render starts and this one would have bailed after clearing.
@@ -471,6 +471,13 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
     }
 
     canvasEl.appendChild(el);
+
+    // Delegated click handler prevents link navigation in all canvas modes.
+    // Attached once per canvasEl (survives reactive re-renders that replace children).
+    if (!_navGuarded.has(canvasEl)) {
+      canvasEl.addEventListener("click", _preventNav);
+      _navGuarded.add(canvasEl);
+    }
 
     if (canvasMode === "design" || canvasMode === "edit") {
       requestAnimationFrame(() => {
