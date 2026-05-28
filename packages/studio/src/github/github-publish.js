@@ -1,6 +1,7 @@
 /** Publish a local project to GitHub — creates a new repo and pushes. */
 
 import { html } from "lit-html";
+import { ref } from "lit-html/directives/ref.js";
 import { showDialog } from "../ui/layers.js";
 import { authenticateGithub } from "./github-auth.js";
 import { getPlatform } from "../platform.js";
@@ -19,27 +20,24 @@ export async function publishToGithub({ projectName }) {
   if (!token) return false;
 
   const repoOpts = await showDialog((done) => {
+    /** @type {HTMLInputElement | null} */
+    let _nameInput = null;
+    /** @type {HTMLInputElement | null} */
+    let _descInput = null;
+    /** @type {HTMLInputElement | null} */
+    let _privateToggle = null;
+
     return html`
       <sp-dialog-wrapper
         open
         headline="Publish to GitHub"
         confirm-label="Create Repository"
         cancel-label="Cancel"
-        @confirm=${(/** @type {Event} */ e) => {
-          const dialog = /** @type {HTMLElement} */ (e.target);
-          const nameInput = /** @type {HTMLInputElement | null} */ (
-            dialog.querySelector('[name="repo-name"]')
-          );
-          const descInput = /** @type {HTMLInputElement | null} */ (
-            dialog.querySelector('[name="repo-desc"]')
-          );
-          const privateToggle = /** @type {HTMLInputElement | null} */ (
-            dialog.querySelector('[name="repo-private"]')
-          );
+        @confirm=${() => {
           done({
-            name: nameInput?.value || projectName,
-            description: descInput?.value || "",
-            isPrivate: privateToggle?.checked ?? true,
+            name: _nameInput?.value || projectName,
+            description: _descInput?.value || "",
+            isPrivate: _privateToggle?.checked ?? true,
           });
         }}
         @cancel=${() => done(null)}
@@ -52,6 +50,9 @@ export async function publishToGithub({ projectName }) {
             name="repo-name"
             value="${projectName}"
             placeholder="my-project"
+            ${ref((el) => {
+              _nameInput = /** @type {HTMLInputElement | null} */ (el || null);
+            })}
           ></sp-textfield>
 
           <sp-field-label for="repo-desc">Description (optional)</sp-field-label>
@@ -59,10 +60,20 @@ export async function publishToGithub({ projectName }) {
             id="repo-desc"
             name="repo-desc"
             placeholder="A brief description"
+            ${ref((el) => {
+              _descInput = /** @type {HTMLInputElement | null} */ (el || null);
+            })}
           ></sp-textfield>
 
           <sp-field-label>Visibility</sp-field-label>
-          <sp-switch name="repo-private" checked>Private repository</sp-switch>
+          <sp-switch
+            name="repo-private"
+            checked
+            ${ref((el) => {
+              _privateToggle = /** @type {HTMLInputElement | null} */ (el || null);
+            })}
+            >Private repository</sp-switch
+          >
         </div>
       </sp-dialog-wrapper>
     `;
