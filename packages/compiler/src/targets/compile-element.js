@@ -16,7 +16,7 @@ import { escapeHtml, tagNameToClassName, isSchemaOnly, collectStyles } from "../
  * @returns {Promise<{ files: { path: string; content: string; tagName: string }[] }>}
  */
 export async function compileElement(sourcePath, opts = {}) {
-  const { resolveElementPath } = /** @type {JxMutableNode} */ (opts);
+  const { resolveElementPath, $media: optsMedia } = /** @type {JxMutableNode} */ (opts);
   /** @type {{ path: string; content: string; tagName: string }[]} */
   const files = [];
   /** @type {Set<string>} */
@@ -82,6 +82,9 @@ export async function compileElement(sourcePath, opts = {}) {
     }
 
     const className = tagNameToClassName(tagName);
+    if (optsMedia) {
+      doc.$media = { ...optsMedia, ...doc.$media };
+    }
     const jsContent = emitElementModule(doc, className, elementImports);
     const outputPath = filePath ? filePath.replace(/\.json$/, ".js") : `${tagName}.js`;
     files.push({ path: outputPath, content: jsContent, tagName });

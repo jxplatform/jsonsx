@@ -134,7 +134,7 @@ export async function buildSite(projectRoot, options = {}) {
     for (const file of componentFiles) {
       try {
         const componentPath = resolve(componentsDir, file);
-        const result = await compileElement(componentPath);
+        const result = await compileElement(componentPath, { $media: projectConfig.$media });
         for (const f of result.files) {
           const outName = f.path.includes("/")
             ? /** @type {string} */ (f.path.split("/").pop())

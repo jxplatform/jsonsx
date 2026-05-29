@@ -43,6 +43,10 @@ export async function Jx(source, target = document.body, options) {
     injectHead(doc.$head, base);
   }
 
+  if (doc.$media) {
+    _rootMedia = doc.$media;
+  }
+
   const state = await buildScope(doc, {}, base);
   target.appendChild(renderNode(doc, state, options));
   if (typeof state.onMount === "function") state.onMount(state);
@@ -209,6 +213,8 @@ export async function buildScope(doc, parentScope = {}, base = location.href) {
 
   if (doc.$media) {
     state["$media"] = doc.$media;
+  } else if (!state["$media"] && Object.keys(_rootMedia).length > 0) {
+    state["$media"] = _rootMedia;
   }
 
   return state;
@@ -1562,6 +1568,7 @@ export function toCSSText(rules) {
 
 // ─── Custom Element Registration ──────────────────────────────────────────────
 
+let _rootMedia = {};
 const _elementDefs = new Map();
 
 /**
