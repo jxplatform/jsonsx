@@ -23,24 +23,7 @@ import { createRequire } from "node:module";
  * Prototype names handled elsewhere (builtins + legacy content system). These are skipped by the
  * generic resolver.
  */
-const SKIP_PROTOTYPES = new Set([
-  "Function",
-  "LocalStorage",
-  "SessionStorage",
-  "Array",
-  "ContentCollection",
-  "ContentEntry",
-]);
-
-/**
- * Built-in $prototype → .class.json mappings. These resolve automatically without requiring an
- * explicit `imports` entry in project.json. Project-level imports take precedence on collision.
- */
-/** @type {Record<string, string>} */
-const BUILTIN_CLASS_MAPPINGS = {
-  MarkdownFile: "@jxsuite/parser/MarkdownFile.class.json",
-  MarkdownCollection: "@jxsuite/parser/MarkdownCollection.class.json",
-};
+const SKIP_PROTOTYPES = new Set(["Function", "LocalStorage", "SessionStorage", "Array"]);
 
 /**
  * Keys reserved by the Jx prototype system — stripped before passing config to the external class
@@ -66,10 +49,12 @@ const RESERVED_KEYS = new Set([
  * result
  *
  * @param {JxMutableNode | JxDocument} doc - The page document (mutated in place)
- * @param {{ sourcePath?: string }} route - Route info (sourcePath = absolute path to page .json)
+ * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route - Route info
  * @param {string} projectRoot - Absolute path to the project root
+ * @param {{ config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> }} [projectContext] -
+ *   Project-level context injected into all classes
  */
-export async function resolvePrototypes(doc, route, projectRoot) {
+export async function resolvePrototypes(doc, route, projectRoot, projectContext = {}) {
   const imports = doc.imports ?? {};
   const state = doc.state;
   if (!state) return;
@@ -83,13 +68,13 @@ export async function resolvePrototypes(doc, route, projectRoot) {
 
     // Look up in imports if no $src already set
     if (!def.$src) {
-      const mapped = imports[def.$prototype] ?? BUILTIN_CLASS_MAPPINGS[def.$prototype];
+      const mapped = imports[def.$prototype];
       if (!mapped) continue;
       def.$src = mapped;
     }
 
     try {
-      const resolved = await resolveClassPrototype(def, route, projectRoot);
+      const resolved = await resolveClassPrototype(def, route, projectRoot, state, projectContext);
       // Preserve timing metadata on the resolved value so compilePage() can strip it
       if (def.timing && resolved && typeof resolved === "object" && !Array.isArray(resolved)) {
         resolved.timing = def.timing;
@@ -108,11 +93,13 @@ export async function resolvePrototypes(doc, route, projectRoot) {
  * Resolve a single $prototype entry via its .class.json.
  *
  * @param {Record<string, any>} def - The state entry definition
- * @param {{ sourcePath?: string }} route
+ * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route
  * @param {string} projectRoot
+ * @param {Record<string, unknown>} state - The full page state object
+ * @param {{ config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> }} projectContext
  * @returns {Promise<any>} The resolved value
  */
-async function resolveClassPrototype(def, route, projectRoot) {
+async function resolveClassPrototype(def, route, projectRoot, state, projectContext) {
   const src = def.$src;
 
   // 1. Resolve .class.json path — handles both npm specifiers and relative paths
@@ -161,6 +148,14 @@ async function resolveClassPrototype(def, route, projectRoot) {
   if (config.src && !config.basePath && route.sourcePath) {
     config.basePath = dirname(route.sourcePath);
   }
+
+  // Inject universal context — available to all classes
+  config._project = {
+    config: projectContext.config ?? null,
+    contentTypes: projectContext.contentTypes ?? null,
+    root: projectRoot,
+  };
+  config._document = { route, state };
 
   // 7. Instantiate and resolve
   const instance = new ExportedClass(config);

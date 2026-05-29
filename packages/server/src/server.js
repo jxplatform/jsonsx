@@ -196,7 +196,7 @@ export async function createDevServer(options) {
 
       // $prototype + $src proxy
       if (path === "/__jx_resolve__" && req.method === "POST") {
-        return handleResolve(req, absRoot);
+        return handleResolve(req, absRoot, activeProjectRoot);
       }
 
       // timing: "server" function proxy

@@ -11,7 +11,6 @@ import { resolve, relative, basename, dirname, isAbsolute } from "node:path";
 import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
-import { loadContentTypes, queryContentType, findEntry } from "@jxsuite/compiler/content-loader";
 import * as claude from "./claude-session.js";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
@@ -800,12 +799,29 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
 
     let moduleAbsPath;
     try {
-      if (base) {
-        const docUrlPath = new URL(base).pathname;
-        const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-        moduleAbsPath = resolve(resolve(root, "." + docDir), src);
+      if (src.startsWith("./") || src.startsWith("../")) {
+        // Relative path
+        if (base) {
+          const docUrlPath = new URL(base).pathname;
+          const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
+          moduleAbsPath = resolve(resolve(root, "." + docDir), src);
+        } else {
+          moduleAbsPath = resolve(activeProjectRoot || root, src);
+          if (!existsSync(moduleAbsPath) && activeProjectRoot) {
+            moduleAbsPath = resolve(root, src);
+          }
+        }
       } else {
-        moduleAbsPath = resolve(root, src);
+        // npm/bare specifier — use createRequire from project root, fall back to server package
+        const projectRoot = activeProjectRoot || root;
+        const { createRequire } = await import("node:module");
+        const projRequire = createRequire(resolve(projectRoot, "package.json"));
+        try {
+          moduleAbsPath = projRequire.resolve(src);
+        } catch {
+          const serverRequire = createRequire(import.meta.url);
+          moduleAbsPath = serverRequire.resolve(src);
+        }
       }
     } catch (/** @type {unknown} */ e) {
       return Response.json({
@@ -1059,50 +1075,6 @@ export async function handleStudioApi(req, url, root, activeProjectRoot = null) 
         if (exitCode !== 0) throw new Error(stderr || `git clone exited with ${exitCode}`);
         return Response.json({ ok: true, root: dest });
       }
-    } catch (/** @type {unknown} */ e) {
-      return Response.json(
-        { error: /** @type {{ message?: string }} */ (e).message },
-        { status: 500 },
-      );
-    }
-  }
-
-  // ─── Content Type Resolution ──────────────────────────────────────────────
-
-  if (path === "/__studio/content" && req.method === "POST") {
-    try {
-      const body = await req.json();
-      const { $prototype, contentType, id, filter, sort, limit } = body;
-      const projectRoot = activeProjectRoot || root;
-
-      let projectConfig;
-      try {
-        projectConfig = JSON.parse(readFileSync(resolve(projectRoot, "project.json"), "utf8"));
-      } catch {
-        return Response.json({ error: "No project.json found" }, { status: 404 });
-      }
-
-      if (!projectConfig.contentTypes?.[contentType]) {
-        return Response.json({ error: `Content type "${contentType}" not found` }, { status: 404 });
-      }
-
-      const contentTypes = await loadContentTypes(projectRoot, projectConfig);
-      const entries = contentTypes.get(contentType);
-      if (!entries || entries.length === 0) {
-        return Response.json($prototype === "ContentCollection" ? [] : null);
-      }
-
-      if ($prototype === "ContentCollection") {
-        const result = queryContentType(entries, { filter, sort, limit });
-        return Response.json(result);
-      }
-
-      if ($prototype === "ContentEntry") {
-        const entry = findEntry(entries, id);
-        return Response.json(entry ?? null);
-      }
-
-      return Response.json({ error: "Invalid $prototype" }, { status: 400 });
     } catch (/** @type {unknown} */ e) {
       return Response.json(
         { error: /** @type {{ message?: string }} */ (e).message },

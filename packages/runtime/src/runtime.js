@@ -88,12 +88,8 @@ export function setSkipServerFunctions(/** @type {boolean} */ v) {
   _serverFnConfig.skip = v;
 }
 
-/** @type {{ skip: boolean }} */
-const _contentConfig = { skip: false };
-/** Set to true to suppress ContentCollection/ContentEntry resolution (used by Studio edit mode). */
-export function setSkipContentResolution(/** @type {boolean} */ v) {
-  _contentConfig.skip = v;
-}
+/** @deprecated No longer needed — ContentCollection/ContentEntry resolve via generic class path */
+export function setSkipContentResolution(/** @type {boolean} */ _v) {}
 
 /**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
@@ -671,7 +667,8 @@ function renderMappedArray(def, state, options) {
   applyProperties(container, def, state);
   applyStyle(container, def.style ?? {}, state["$media"] ?? {}, state);
   applyAttributes(container, def.attributes ?? {}, state);
-  const { items: itemsSrc, map: mapDef, filter: filterRef, sort: sortRef } = def.children;
+  const { items: _items, of: _of, map: mapDef, filter: filterRef, sort: sortRef } = def.children;
+  const itemsSrc = _items ?? _of;
 
   effect(() => {
     container.innerHTML = "";
@@ -959,42 +956,6 @@ export async function resolvePrototype(def, state, key, base) {
     case "ReadableStream":
       return null;
 
-    case "ContentCollection":
-    case "ContentEntry": {
-      if (_contentConfig.skip) {
-        return ref(def.$prototype === "ContentCollection" ? [{ id: "", data: {} }] : null);
-      }
-      const s = ref(def.$prototype === "ContentCollection" ? [] : null);
-      effect(() => {
-        let id = def.id;
-        if (id && typeof id === "object" && id.$ref?.startsWith("#/$params/")) {
-          const paramName = id.$ref.replace("#/$params/", "");
-          id = state?.$params?.[paramName];
-        } else if (typeof id === "string" && id.includes("${")) {
-          id = evaluateTemplate(id, state);
-        }
-        if (def.$prototype === "ContentEntry" && !id) return;
-        fetch("/__studio/content", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            $prototype: def.$prototype,
-            contentType: def.contentType,
-            id,
-            filter: def.filter,
-            sort: def.sort,
-            limit: def.limit,
-          }),
-        })
-          .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
-            s.value = d;
-          })
-          .catch(() => {});
-      });
-      return s;
-    }
-
     default:
       console.warn(
         `Jx: unknown $prototype "${def.$prototype}" for "${key}". Did you mean to add '$src'?`,
@@ -1133,13 +1094,18 @@ async function resolveClassJson(def, state, key, base) {
 
   // Hybrid mode: $implementation points to the real JS module
   if (classDef.$implementation) {
+    // If the schema references $context (e.g. content types), the browser cannot provide
+    // the required server-side context — go directly to dev proxy.
+    const schemaStr = JSON.stringify(classDef);
+    if (schemaStr.includes('"#/$context/')) {
+      return resolveViaDevProxy(def, state, key, base);
+    }
     const schemaUrl = base ? new URL(src, base).href : new URL(src, location.href).href;
     const implSrc = new URL(classDef.$implementation, schemaUrl).href;
     const exportName = def.$export ?? classDef.title ?? def.$prototype;
     try {
       return await importAndInstantiate(def, implSrc, exportName, base);
     } catch {
-      // Browser can't import the JS module — fall back to dev proxy with original .class.json def
       return resolveViaDevProxy(def, state, key, base);
     }
   }

@@ -1,6 +1,7 @@
 /** OXC code services (server-backed) */
 
 import { getPlatform } from "../platform.js";
+import { projectState } from "../state.js";
 import { getNodeAtPath } from "../store.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
@@ -29,14 +30,19 @@ export async function locateDocument(name) {
 export const pluginSchemaCache = new Map();
 
 /**
- * Fetch and cache the schema for an external $prototype + $src module via the server.
+ * Fetch and cache the schema for a $prototype module via the server. Works for both external
+ * prototypes (with $src) and prototypes resolved from project.json imports.
  *
  * @param {{ $src?: string; $prototype?: string }} def
  * @param {{ documentPath?: string }} state
  */
 export async function fetchPluginSchema(def, state) {
-  if (!def.$src || !def.$prototype) return null;
-  const cacheKey = `${def.$src}::${def.$prototype}`;
+  const importedPath = def.$prototype
+    ? projectState?.projectConfig?.imports?.[def.$prototype]
+    : null;
+  const src = def.$src || importedPath;
+  if (!src || !def.$prototype) return null;
+  const cacheKey = `${src}::${def.$prototype}`;
   if (pluginSchemaCache.has(cacheKey)) return pluginSchemaCache.get(cacheKey);
 
   try {
@@ -45,8 +51,9 @@ export async function fetchPluginSchema(def, state) {
       pluginSchemaCache.set(cacheKey, null);
       return null;
     }
-    const base = state.documentPath ? `${location.origin}/${state.documentPath}` : undefined;
-    const schema = await platform.fetchPluginSchema(def.$src, def.$prototype, base);
+    const base =
+      !importedPath && state.documentPath ? `${location.origin}/${state.documentPath}` : undefined;
+    const schema = await platform.fetchPluginSchema(src, def.$prototype, base);
     pluginSchemaCache.set(cacheKey, schema);
     return schema;
   } catch {

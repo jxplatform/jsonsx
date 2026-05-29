@@ -12,7 +12,6 @@
  * title $page.params — dynamic route parameters (if any)
  */
 
-import { queryContentType, findEntry } from "./content-loader.js";
 import { resolve, dirname, relative } from "node:path";
 
 /**
@@ -47,11 +46,6 @@ export function injectContext(
     title: doc.title ?? doc._pageTitle ?? projectConfig.name ?? "",
     params: route._pathParams ?? {},
   };
-
-  // Resolve ContentCollection and ContentEntry $prototype entries
-  if (contentTypes.size > 0) {
-    resolveContentPrototypes(doc.state, contentTypes, route._pathParams ?? {});
-  }
 
   // Merge project-level state into page state (page wins on conflicts)
   if (projectConfig.state) {
@@ -109,50 +103,4 @@ export function injectContext(
   }
 
   return doc;
-}
-
-/**
- * Resolve ContentCollection and ContentEntry $prototype state entries.
- *
- * Replaces state entries like: { "$prototype": "ContentCollection", "contentType": "blog", ... }
- * with the actual resolved content type data.
- *
- * @param {Record<string, unknown>} state - Page state (mutated)
- * @param {Map<string, ContentLoaderEntry[]>} contentTypes - Loaded content types
- * @param {Record<string, string>} params - Route parameters for $ref resolution
- */
-function resolveContentPrototypes(state, contentTypes, params) {
-  for (const [key, value] of Object.entries(state)) {
-    if (!value || typeof value !== "object" || !(/** @type {JxMutableNode} */ (value).$prototype))
-      continue;
-    const v = /** @type {JxPrototypeDef} */ (value);
-
-    if (v.$prototype === "ContentCollection") {
-      const entries = contentTypes.get(/** @type {string} */ (v.contentType));
-      if (!entries) {
-        console.warn(`ContentCollection: content type "${v.contentType}" not found`);
-        state[key] = [];
-        continue;
-      }
-      state[key] = queryContentType(entries, {
-        filter: v.filter,
-        sort: v.sort,
-        limit: v.limit,
-      });
-    } else if (v.$prototype === "ContentEntry") {
-      const entries = contentTypes.get(/** @type {string} */ (v.contentType));
-      if (!entries) {
-        console.warn(`ContentEntry: content type "${v.contentType}" not found`);
-        state[key] = null;
-        continue;
-      }
-      // Resolve the ID — may reference $params
-      let id = v.id;
-      if (id && typeof id === "object" && id.$ref?.startsWith("#/$params/")) {
-        const paramName = id.$ref.replace("#/$params/", "");
-        id = params[paramName];
-      }
-      state[key] = findEntry(entries, /** @type {string} */ (id));
-    }
-  }
 }

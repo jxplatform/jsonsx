@@ -1,15 +1,42 @@
 /** Resolve.js — Generic $src module proxy + timing: "server" function proxy */
 
 import { resolve, relative, dirname } from "node:path";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { createRequire } from "node:module";
+import { loadContentTypes } from "@jxsuite/compiler/content-loader";
+
+/**
+ * Lazy-load project context (project.json + content types) for class instantiation.
+ *
+ * @param {string} projectRoot
+ * @returns {Promise<{
+ *   config: Record<string, unknown>;
+ *   contentTypes: Map<string, unknown[]>;
+ *   root: string;
+ * } | null>}
+ */
+async function loadProjectContext(projectRoot) {
+  const projectJsonPath = resolve(projectRoot, "project.json");
+  if (!existsSync(projectJsonPath)) return null;
+  try {
+    const config = JSON.parse(readFileSync(projectJsonPath, "utf8"));
+    const contentTypes = config.contentTypes
+      ? await loadContentTypes(projectRoot, config)
+      : new Map();
+    return { config, contentTypes, root: projectRoot };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Handle POST /**jx_resolve** — proxy $prototype + $src entries.
  *
  * @param {Request} req
  * @param {string} root
+ * @param {string | null} [activeProjectRoot]
  */
-export async function handleResolve(req, root) {
+export async function handleResolve(req, root, activeProjectRoot = null) {
   let body;
   try {
     body = await req.json();
@@ -22,12 +49,25 @@ export async function handleResolve(req, root) {
 
   let moduleAbsPath;
   try {
-    if ($base) {
-      const docUrlPath = new URL($base).pathname;
-      const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-      moduleAbsPath = resolve(resolve(root, "." + docDir), $src);
+    if ($src.startsWith("./") || $src.startsWith("../")) {
+      // Relative path
+      if ($base) {
+        const docUrlPath = new URL($base).pathname;
+        const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
+        moduleAbsPath = resolve(resolve(root, "." + docDir), $src);
+      } else {
+        moduleAbsPath = resolve(activeProjectRoot || root, $src);
+      }
     } else {
-      moduleAbsPath = resolve(root, $src);
+      // npm/bare specifier — use createRequire from project root, fall back to server package
+      const projectRoot = activeProjectRoot || root;
+      const projRequire = createRequire(resolve(projectRoot, "package.json"));
+      try {
+        moduleAbsPath = projRequire.resolve($src);
+      } catch {
+        const serverRequire = createRequire(import.meta.url);
+        moduleAbsPath = serverRequire.resolve($src);
+      }
     }
   } catch (/** @type {unknown} */ e) {
     return new Response(
@@ -53,6 +93,14 @@ export async function handleResolve(req, root) {
     try {
       const content = readFileSync(moduleAbsPath, "utf8");
       const classDef = JSON.parse(content);
+
+      // Inject project context for classes that need it
+      const projectRoot = activeProjectRoot || root;
+      const projectCtx = await loadProjectContext(projectRoot);
+      if (projectCtx) {
+        config._project = projectCtx;
+      }
+      config._document = { route: { _pathParams: {} }, state: {} };
 
       if (classDef.$implementation) {
         // Hybrid mode: redirect to the JS implementation

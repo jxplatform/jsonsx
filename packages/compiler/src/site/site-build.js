@@ -405,11 +405,14 @@ async function compilePage(
   delete layoutDoc._pageHead;
   delete layoutDoc._pageTitle;
 
-  // Inject $site and $page context, resolve ContentCollection/ContentEntry
+  // Inject $site and $page context
   injectContext(layoutDoc, projectConfig, route, contentTypes, projectRoot);
 
   // Resolve generic $prototype entries via .class.json imports
-  await resolvePrototypes(layoutDoc, route, projectRoot);
+  await resolvePrototypes(layoutDoc, route, projectRoot, {
+    config: projectConfig,
+    contentTypes,
+  });
 
   // Build scope from resolved state so template strings in title/$head can be evaluated
   const scope = buildInitialScope(layoutDoc.state ?? {});

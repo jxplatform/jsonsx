@@ -88,6 +88,11 @@ import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.
  *   description?: string;
  *   examples?: string[];
  *   name?: string;
+ *   items?: {
+ *     type?: string;
+ *     properties?: Record<string, Record<string, unknown>>;
+ *     required?: string[];
+ *   };
  * }} SchemaProperty
  */
 
@@ -386,6 +391,36 @@ export function renderSignalsTemplate(S, ctx) {
           @change=${(/** @type {Event} */ e) => {
             const type = /** @type {HTMLInputElement} */ (e.target).value;
             if (!type) return;
+
+            // Handle import-based prototypes (e.g., "import:ContentCollection")
+            if (type.startsWith("import:")) {
+              const protoName = type.slice(7);
+              const src = projectState?.projectConfig?.imports?.[protoName];
+              let n = "$" + protoName.charAt(0).toLowerCase() + protoName.slice(1);
+              let i = 1;
+              const base = n;
+              while (S.document.state && S.document.state[n]) {
+                n = base + i++;
+              }
+              transactDoc(activeTab.value, (t) =>
+                mutateAddDef(
+                  t,
+                  n,
+                  /** @type {Record<string, JsonValue>} */ ({ $prototype: protoName }),
+                ),
+              );
+              expandedSignal = n;
+              if (src) {
+                fetchPluginSchema(
+                  { $prototype: protoName, $src: src },
+                  /** @type {{ documentPath?: string }} */ (S),
+                ).then(() => ctx.renderLeftPanel());
+              } else {
+                ctx.renderLeftPanel();
+              }
+              return;
+            }
+
             const template = DEF_TEMPLATES[type];
             if (!template) return;
             const isFunction = type === "function";
@@ -418,6 +453,14 @@ export function renderSignalsTemplate(S, ctx) {
           <sp-menu-item value="map">Map</sp-menu-item>
           <sp-menu-item value="formData">FormData</sp-menu-item>
           <sp-menu-item value="external">External Module…</sp-menu-item>
+          ${projectState?.projectConfig?.imports
+            ? html`<sp-menu-divider></sp-menu-divider>${Object.keys(
+                  projectState.projectConfig.imports,
+                ).map(
+                  (/** @type {string} */ k) =>
+                    html`<sp-menu-item value="import:${k}">${k}</sp-menu-item>`,
+                )}`
+            : nothing}
           <sp-menu-divider></sp-menu-divider>
           <sp-menu-item value="function">Function</sp-menu-item>
         </sp-picker>
@@ -736,9 +779,6 @@ function renderDataSourceFields(
       )}
     `;
   }
-  if (proto === "ContentEntry" || proto === "ContentCollection") {
-    return renderContentPrototypeFields(name, def, proto);
-  }
   if (proto === "Set" || proto === "Map" || proto === "FormData") {
     const fieldName = proto === "FormData" ? "fields" : "default";
     const fieldLabel = proto === "FormData" ? "Fields" : "Default";
@@ -758,117 +798,6 @@ function renderDataSourceFields(
   }
   // Schema-driven fallback
   return renderExternalPrototypeEditorTemplate(S, name, def, ctx);
-}
-
-/** ContentEntry/ContentCollection fields for signal editor */
-function renderContentPrototypeFields(
-  /** @type {string} */ name,
-  /** @type {SignalDef} */ def,
-  /** @type {string} */ proto,
-) {
-  const contentTypes = projectState?.projectConfig?.contentTypes;
-  const typeNames = contentTypes ? Object.keys(contentTypes) : [];
-  const currentType = def.contentType || "";
-  const schema = /** @type {ContentTypeSchema | undefined} */ (
-    currentType && contentTypes?.[currentType]?.schema
-  ) ||
-  undefined;
-
-  const contentTypeField = typeNames.length
-    ? html`
-        <div class="signal-field-row">
-          <label class="signal-field-label">Content Type</label>
-          <sp-picker
-            size="s"
-            value=${currentType}
-            style="width:100%"
-            @change=${(/** @type {Event} */ e) => {
-              const v = /** @type {HTMLSelectElement} */ (e.target).value;
-              transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { contentType: v }));
-            }}
-          >
-            ${typeNames.map((t) => html`<sp-menu-item value=${t}>${t}</sp-menu-item>`)}
-          </sp-picker>
-        </div>
-      `
-    : signalFieldRow("Content Type", currentType, (/** @type {string} */ v) =>
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { contentType: v })),
-      );
-
-  /** @type {import("lit-html").TemplateResult | symbol} */
-  let entryFields = nothing;
-  if (proto === "ContentEntry") {
-    const idVal = def.id;
-    const idStr =
-      idVal && typeof idVal === "object" && /** @type {Record<string, unknown>} */ (idVal).$ref
-        ? /** @type {string} */ (/** @type {Record<string, unknown>} */ (idVal).$ref)
-        : typeof idVal === "string"
-          ? idVal
-          : "";
-    entryFields = signalFieldRow("ID", idStr, (/** @type {string} */ v) => {
-      const val = v.startsWith("#/") ? { $ref: v } : v;
-      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { id: val }));
-    });
-  } else {
-    const filterStr = def.filter ? JSON.stringify(def.filter) : "";
-    const sortStr = def.sort ? `${def.sort.field || ""} ${def.sort.order || ""}`.trim() : "";
-    const limitStr = def.limit != null ? String(def.limit) : "";
-    entryFields = html`
-      ${signalFieldRow("Filter", filterStr, (/** @type {string} */ v) => {
-        try {
-          const parsed = v ? JSON.parse(v) : undefined;
-          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { filter: parsed }));
-        } catch {}
-      })}
-      ${signalFieldRow("Sort", sortStr, (/** @type {string} */ v) => {
-        if (!v) {
-          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { sort: undefined }));
-          return;
-        }
-        const [field, order] = v.split(" ");
-        transactDoc(activeTab.value, (t) =>
-          mutateUpdateDef(t, name, { sort: { field, order: order || "asc" } }),
-        );
-      })}
-      ${signalFieldRow("Limit", limitStr, (/** @type {string} */ v) => {
-        const num = v ? parseInt(v, 10) : undefined;
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { limit: num }));
-      })}
-    `;
-  }
-
-  /** @type {import("lit-html").TemplateResult | symbol} */
-  let schemaFields = nothing;
-  if (schema?.properties) {
-    const fields = Object.entries(schema.properties);
-    const required = new Set(schema.required || []);
-    schemaFields = html`
-      <div style="margin-top:8px;padding:6px 0;border-top:1px solid var(--border-dim)">
-        <div style="font-size:11px;color:var(--fg-dim);margin-bottom:4px;font-weight:500">
-          Fields (${currentType})
-        </div>
-        ${fields.map(
-          ([field, fieldDef]) => html`
-            <div style="font-size:11px;padding:2px 0;display:flex;gap:4px;align-items:center">
-              <code style="color:var(--fg-default)">${field}</code>
-              <span style="color:var(--fg-dim)">${/** @type {any} */ (fieldDef).type || ""}</span>
-              ${required.has(field)
-                ? html`<span style="color:var(--color-accent,#f36f32);font-size:9px">req</span>`
-                : nothing}
-            </div>
-          `,
-        )}
-      </div>
-    `;
-  }
-
-  return html`
-    ${contentTypeField}
-    ${signalFieldRow("Prototype", proto, (/** @type {string} */ v) =>
-      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $prototype: v })),
-    )}
-    ${entryFields} ${schemaFields}
-  `;
 }
 
 /** Function fields for signal editor */
@@ -1208,6 +1137,111 @@ function renderEmitsEditorTemplate(
 // ─── Plugin schema-driven form rendering ────────────────────────────────────
 
 /**
+ * Resolve a schema enum value. Handles: - Plain arrays (pass through) - `$ref` objects pointing to
+ * `#/$context/contentTypes` (resolves to project content type keys) - `$ref` objects pointing to
+ * `#/$context/contentTypes/{@param}/schema/properties` (dependent enum) - Legacy `"$contentTypes"`
+ * string sentinel (deprecated)
+ *
+ * @param {unknown} enumDef
+ * @param {Record<string, unknown>} [parentDef] - Parent def for resolving dependent refs
+ * @returns {string[] | undefined}
+ */
+function resolveSchemaEnum(enumDef, parentDef) {
+  if (Array.isArray(enumDef)) return enumDef;
+  if (enumDef && typeof enumDef === "object") {
+    const ref = /** @type {Record<string, unknown>} */ (enumDef).$ref;
+    if (ref === "#/$context/contentTypes") {
+      return Object.keys(projectState?.projectConfig?.contentTypes ?? {});
+    }
+    if (typeof ref === "string" && ref.startsWith("#/$context/contentTypes/{@")) {
+      const match = ref.match(/#\/\$context\/contentTypes\/\{@(\w+)\}\/schema\/properties/);
+      if (match && parentDef) {
+        const paramName = match[1];
+        const typeName = /** @type {string | undefined} */ (parentDef[paramName]);
+        if (typeName) {
+          const ct = /** @type {Record<string, unknown> | undefined} */ (
+            projectState?.projectConfig?.contentTypes?.[typeName]
+          );
+          const schema = /** @type {Record<string, unknown> | undefined} */ (ct?.schema);
+          const props = /** @type {Record<string, unknown> | undefined} */ (schema?.properties);
+          if (props) return Object.keys(props);
+        }
+      }
+      return undefined;
+    }
+  }
+  if (enumDef === "$contentTypes") {
+    return Object.keys(projectState?.projectConfig?.contentTypes ?? {});
+  }
+  return undefined;
+}
+
+/**
+ * Render a single inline field within an array-of-objects row. Dispatches by schema type: enum →
+ * picker, boolean → switch, number → number-field, else → textfield.
+ *
+ * @param {string} key
+ * @param {Record<string, unknown>} schema
+ * @param {unknown} value
+ * @param {(val: unknown) => void} onChange
+ * @param {Record<string, unknown>} [parentDef] - Parent def for resolving dependent enum refs
+ */
+function renderInlineField(key, schema, value, onChange, parentDef) {
+  const enumValues = resolveSchemaEnum(schema.enum, parentDef);
+
+  if (enumValues) {
+    return html`<sp-picker
+      size="s"
+      label=${key}
+      value=${value !== undefined ? String(value) : "__none__"}
+      @change=${(/** @type {Event} */ e) =>
+        onChange(
+          /** @type {HTMLInputElement} */ (e.target).value === "__none__"
+            ? undefined
+            : /** @type {HTMLInputElement} */ (e.target).value,
+        )}
+    >
+      <sp-menu-item value="__none__">—</sp-menu-item>
+      ${enumValues.map(
+        (/** @type {string} */ v) => html`<sp-menu-item value=${v}>${v}</sp-menu-item>`,
+      )}
+    </sp-picker>`;
+  }
+  if (schema.type === "boolean") {
+    return html`<sp-switch
+      size="s"
+      ?checked=${!!value}
+      @change=${(/** @type {Event} */ e) =>
+        onChange(/** @type {HTMLInputElement} */ (e.target).checked)}
+      >${key}</sp-switch
+    >`;
+  }
+  if (schema.type === "integer" || schema.type === "number") {
+    return html`<sp-number-field
+      size="s"
+      label=${key}
+      .value=${value !== undefined ? value : nothing}
+      step=${schema.type === "integer" ? "1" : nothing}
+      @change=${(/** @type {Event} */ e) => {
+        const parsed =
+          schema.type === "integer"
+            ? parseInt(/** @type {HTMLInputElement} */ (e.target).value, 10)
+            : parseFloat(/** @type {HTMLInputElement} */ (e.target).value);
+        onChange(isNaN(parsed) ? undefined : parsed);
+      }}
+    ></sp-number-field>`;
+  }
+  return html`<sp-textfield
+    size="s"
+    label=${key}
+    placeholder=${key}
+    .value=${value ?? ""}
+    @input=${(/** @type {Event} */ e) =>
+      onChange(/** @type {HTMLInputElement} */ (e.target).value || undefined)}
+  ></sp-textfield>`;
+}
+
+/**
  * Render config form fields from a JSON Schema `properties` object. Maps schema types to
  * appropriate form controls.
  */
@@ -1216,19 +1250,21 @@ export function renderSchemaFieldsTemplate(
   /** @type {SignalDef} */ def,
   /** @type {string} */ name,
   /** @type {SignalsPanelState} */ _S,
+  /** @type {SignalsPanelCtx | null} */ ctx = null,
 ) {
   if (!schema?.properties) return nothing;
 
   const required = new Set(schema.required ?? []);
 
-  return Object.entries(schema.properties)
+  const propertyFields = Object.entries(schema.properties)
     .filter(([prop]) => !STUDIO_RESERVED_KEYS.has(prop))
     .map(([prop, ps]) => {
       const currentValue = def[prop];
       const labelText = prop + (required.has(prop) ? " *" : "");
 
       let control;
-      if (ps.enum) {
+      const enumValues = resolveSchemaEnum(ps.enum, def);
+      if (enumValues) {
         control = html`
           <sp-picker
             size="s"
@@ -1247,7 +1283,7 @@ export function renderSchemaFieldsTemplate(
               )}
           >
             ${!required.has(prop) ? html`<sp-menu-item value="__none__">—</sp-menu-item>` : nothing}
-            ${ps.enum.map(
+            ${enumValues.map(
               (/** @type {string} */ val) => html`<sp-menu-item value=${val}>${val}</sp-menu-item>`,
             )}
           </sp-picker>
@@ -1271,7 +1307,7 @@ export function renderSchemaFieldsTemplate(
           max=${ifDefined(ps.maximum)}
           step=${ps.type === "integer" ? "1" : nothing}
           .value=${currentValue !== undefined ? currentValue : nothing}
-          placeholder=${ps.default !== undefined ? String(ps.default) : nothing}
+          placeholder=${ps.default != null ? String(ps.default) : nothing}
           @change=${(/** @type {Event} */ e) => {
             clearTimeout(debounce);
             debounce = setTimeout(() => {
@@ -1335,6 +1371,73 @@ export function renderSchemaFieldsTemplate(
             ></sp-textfield>
           </div>
         `;
+      } else if (ps.type === "array" && ps.items?.type === "object" && ps.items?.properties) {
+        // Array of objects with defined schema → multi-row inline form
+        const rows = Array.isArray(currentValue) ? currentValue : [];
+        const itemProps = /** @type {Record<string, Record<string, unknown>>} */ (
+          ps.items.properties
+        );
+        control = html`
+          <div class="array-object-field">
+            ${rows.map(
+              (/** @type {Record<string, unknown>} */ row, /** @type {number} */ idx) => html`
+                <div
+                  class="array-object-row"
+                  style="display:flex;gap:4px;align-items:center;margin-bottom:4px"
+                >
+                  ${Object.entries(itemProps).map(([propKey, propSchema]) =>
+                    renderInlineField(
+                      propKey,
+                      propSchema,
+                      row[propKey],
+                      (val) => {
+                        const updated = [...rows];
+                        updated[idx] = { ...updated[idx], [propKey]: val };
+                        transactDoc(activeTab.value, (t) =>
+                          mutateUpdateDef(t, name, { [prop]: updated }),
+                        );
+                      },
+                      def,
+                    ),
+                  )}
+                  <sp-action-button
+                    quiet
+                    size="s"
+                    @click=${() => {
+                      const updated = rows.filter(
+                        (/** @type {unknown} */ _, /** @type {number} */ i) => i !== idx,
+                      );
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateDef(t, name, { [prop]: updated.length ? updated : undefined }),
+                      );
+                      ctx?.renderLeftPanel();
+                    }}
+                  >
+                    <sp-icon-delete slot="icon"></sp-icon-delete>
+                  </sp-action-button>
+                </div>
+              `,
+            )}
+            <sp-action-button
+              quiet
+              size="s"
+              @click=${(/** @type {Event} */ e) => {
+                e.stopPropagation();
+                /** @type {Record<string, unknown>} */
+                const newRow = {};
+                for (const [k, v] of Object.entries(itemProps)) {
+                  if (/** @type {Record<string, unknown>} */ (v).default !== undefined)
+                    newRow[k] = /** @type {Record<string, unknown>} */ (v).default;
+                }
+                transactDoc(activeTab.value, (t) =>
+                  mutateUpdateDef(t, name, { [prop]: [...rows, newRow] }),
+                );
+                ctx?.renderLeftPanel();
+              }}
+              >+ Add</sp-action-button
+            >
+          </div>
+        `;
       } else if (ps.type === "array" || ps.type === "object") {
         /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce;
@@ -1388,6 +1491,8 @@ export function renderSchemaFieldsTemplate(
         widget: control,
       });
     });
+
+  return html`${propertyFields}`;
 }
 
 /**
@@ -1403,8 +1508,12 @@ export function renderExternalPrototypeEditorTemplate(
   // Schema-driven config fields (async with cache)
   /** @type {import("lit-html").TemplateResult | typeof nothing} */
   let schemaContent = nothing;
-  if (def.$src && def.$prototype) {
-    const cacheKey = `${def.$src}::${def.$prototype}`;
+  const importedPath = def.$prototype
+    ? projectState?.projectConfig?.imports?.[def.$prototype]
+    : null;
+  const resolvedSrc = def.$src || importedPath;
+  if (resolvedSrc && def.$prototype) {
+    const cacheKey = `${resolvedSrc}::${def.$prototype}`;
     if (pluginSchemaCache.has(cacheKey)) {
       const schema = pluginSchemaCache.get(cacheKey);
       if (schema) {
@@ -1412,7 +1521,7 @@ export function renderExternalPrototypeEditorTemplate(
           ${schema.description
             ? html`<div class="signal-hint" style="padding:4px 0 8px">${schema.description}</div>`
             : nothing}
-          ${renderSchemaFieldsTemplate(schema, def, name, S)}
+          ${renderSchemaFieldsTemplate(schema, def, name, S, ctx)}
         `;
       }
     } else {
@@ -1429,14 +1538,22 @@ export function renderExternalPrototypeEditorTemplate(
   }
 
   return html`
-    ${signalFieldRow("Source", def.$src || "", (/** @type {string} */ v) => {
-      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined }));
-      pluginSchemaCache.delete(`${v}::${def.$prototype}`);
-    })}
-    ${signalFieldRow("Prototype", def.$prototype || "", (/** @type {string} */ v) => {
-      transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $prototype: v || undefined }));
-      pluginSchemaCache.delete(`${def.$src}::${v}`);
-    })}
+    ${importedPath
+      ? html`<div class="signal-hint" style="padding:4px 0 2px;font-size:11px;color:var(--fg-dim)">
+          ${def.$prototype}
+        </div>`
+      : html`
+          ${signalFieldRow("Source", def.$src || "", (/** @type {string} */ v) => {
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $src: v || undefined }));
+            pluginSchemaCache.delete(`${v}::${def.$prototype}`);
+          })}
+          ${signalFieldRow("Prototype", def.$prototype || "", (/** @type {string} */ v) => {
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateDef(t, name, { $prototype: v || undefined }),
+            );
+            pluginSchemaCache.delete(`${def.$src}::${v}`);
+          })}
+        `}
     ${def.$export
       ? signalFieldRow("Export", def.$export || "", (/** @type {string} */ v) =>
           transactDoc(activeTab.value, (t) =>

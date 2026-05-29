@@ -197,12 +197,15 @@ describe("resolvePrototypes", () => {
     }
   });
 
-  test("resolves MarkdownFile as a built-in prototype (no imports needed)", async () => {
+  test("resolves MarkdownFile via explicit imports", async () => {
     const mdFixtures = join(import.meta.dir, "_fixtures_builtin_md");
     mkdirSync(mdFixtures, { recursive: true });
     writeFileSync(join(mdFixtures, "test.md"), "---\ntitle: Test Page\n---\n\nHello world\n");
     try {
       const doc = {
+        imports: {
+          MarkdownFile: "@jxsuite/parser/MarkdownFile.class.json",
+        },
         state: {
           page: {
             $prototype: "MarkdownFile",
@@ -222,7 +225,7 @@ describe("resolvePrototypes", () => {
     }
   });
 
-  test("resolves MarkdownCollection as a built-in prototype (no imports needed)", async () => {
+  test("resolves MarkdownCollection via explicit imports", async () => {
     const mdFixtures = join(import.meta.dir, "_fixtures_builtin_mdc");
     mkdirSync(mdFixtures, { recursive: true });
     writeFileSync(
@@ -235,6 +238,9 @@ describe("resolvePrototypes", () => {
     );
     try {
       const doc = {
+        imports: {
+          MarkdownCollection: "@jxsuite/parser/MarkdownCollection.class.json",
+        },
         state: {
           posts: {
             $prototype: "MarkdownCollection",

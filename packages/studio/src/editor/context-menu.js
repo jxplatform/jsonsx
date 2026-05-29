@@ -31,7 +31,7 @@ import { startLayerTitleEdit } from "../panels/layers-panel.js";
 
 const JX_MIME = "web application/jx+json";
 
-/** @param {JxNode} node */
+/** @param {JxNode | string} node */
 function nodeToHtml(node) {
   if (typeof node === "string") return node;
   const tag = node.tagName || "div";
@@ -98,8 +98,8 @@ async function readFromClipboard() {
         const blob = await item.getType("text/html");
         const htmlStr = await blob.text();
         const nodes = htmlToJx(htmlStr);
-        const jxNodes = nodes.map((n) =>
-          typeof n === "string" ? { tagName: "p", textContent: n } : n,
+        const jxNodes = /** @type {JxNode[]} */ (
+          nodes.map((n) => (typeof n === "string" ? { tagName: "p", textContent: n } : n))
         );
         if (jxNodes.length > 0) return jxNodes;
       }

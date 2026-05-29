@@ -381,67 +381,9 @@ function validateEntries(entries, schema, contentTypeName) {
   }
 }
 
-// ─── Content Type Querying ───────────────────────────────────────────────────
+// ─── Content Type Querying (re-exported from @jxsuite/parser/content) ────────
 
-/**
- * Query a loaded content type with filter, sort, and limit. Implements the ContentCollection
- * $prototype resolution.
- *
- * @param {ContentLoaderEntry[]} entries - Full content type entries
- * @param {{
- *   filter?: Record<string, unknown>;
- *   sort?: { field: string; order?: string };
- *   limit?: number;
- * }} [query]
- *   - Query options
- * @returns {ContentLoaderEntry[]} Filtered, sorted, limited entries
- */
-export function queryContentType(entries, query = {}) {
-  let result = [...entries];
-
-  // Filter
-  if (query.filter && typeof query.filter === "object") {
-    result = result.filter((entry) => {
-      for (const [key, expected] of Object.entries(
-        /** @type {Record<string, unknown>} */ (query.filter),
-      )) {
-        const actual = entry.data[key];
-        if (actual !== expected) return false;
-      }
-      return true;
-    });
-  }
-
-  // Sort
-  if (query.sort) {
-    const { field, order = "asc" } = query.sort;
-    result.sort((a, b) => {
-      const aVal = /** @type {string | number} */ (a.data[field] ?? "");
-      const bVal = /** @type {string | number} */ (b.data[field] ?? "");
-      if (aVal < bVal) return order === "asc" ? -1 : 1;
-      if (aVal > bVal) return order === "asc" ? 1 : -1;
-      return 0;
-    });
-  }
-
-  // Limit
-  if (query.limit && query.limit > 0) {
-    result = result.slice(0, query.limit);
-  }
-
-  return result;
-}
-
-/**
- * Find a single entry by ID in a content type. Implements the ContentEntry $prototype resolution.
- *
- * @param {ContentLoaderEntry[]} entries - Full content type entries
- * @param {string} id - Entry ID to find
- * @returns {ContentLoaderEntry | null} The matching entry or null
- */
-export function findEntry(entries, id) {
-  return entries.find((e) => e.id === id) ?? null;
-}
+export { queryContentType, findEntry } from "@jxsuite/parser/content";
 
 // ─── Content Type Reference Resolution ──────────────────────────────────────
 

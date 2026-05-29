@@ -227,6 +227,7 @@ export function mutateUpdateAttribute(tab, path, attr, value) {
  * @param {string | undefined} value
  */
 export function mutateUpdateMediaStyle(tab, path, mediaName, prop, value) {
+  if (!mediaName) return mutateUpdateStyle(tab, path, prop, value);
   const node = getNodeAtPath(tab.doc.document, path);
   if (!node.style) node.style = {};
   const key = `@${mediaName}`;

@@ -13,7 +13,6 @@ import {
   buildScope,
   defineElement,
   setSkipServerFunctions,
-  setSkipContentResolution,
 } from "@jxsuite/runtime";
 import {
   getEffectiveElements,
@@ -139,7 +138,6 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
   // failed proxy calls and infinite reactive retries (also covers
   // async custom element connectedCallbacks that run after this function returns)
   setSkipServerFunctions(canvasMode !== "preview");
-  setSkipContentResolution(canvasMode !== "preview");
 
   let renderDoc =
     canvasMode === "preview"
@@ -219,9 +217,9 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       /** @type {(JxElement | string)[]} */ (renderDoc.$elements),
     );
 
-    // In content mode (markdown), auto-discover components for directive-based
-    // custom elements that have no explicit $elements registration.
-    if (S.mode === "content" && componentRegistry.length > 0) {
+    // In content mode (markdown) or when a layout is applied, auto-discover components
+    // for custom elements that have no explicit $elements registration.
+    if ((S.mode === "content" || layoutWrapped) && componentRegistry.length > 0) {
       const existingRefs = new Set(
         effectiveElements.map((/** @type {JxElement | string} */ e) =>
           typeof e === "string" ? e : e?.$ref,
@@ -367,6 +365,9 @@ export async function renderCanvasLive(gen, doc, canvasEl) {
       for (const entry of effectiveHead) {
         if (!entry?.tagName) continue;
         const tag = entry.tagName.toLowerCase();
+        // Skip inline scripts — they can contain arbitrary JS/HTML that throws
+        // when the browser tries to execute it in the studio context
+        if (tag === "script" && !entry.attributes?.src) continue;
         const attrs = { ...entry.attributes };
         for (const key of ["href", "src"]) {
           const val = attrs[key];

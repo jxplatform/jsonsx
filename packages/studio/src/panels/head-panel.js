@@ -9,11 +9,44 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
-import { debouncedStyleCommit, projectState } from "../store.js";
+import { debouncedStyleCommit, renderOnly, projectState } from "../store.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact.js";
 import { findContentTypeSchema } from "../utils/studio-utils.js";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts.js";
+import { invalidateLayoutCache } from "../site-context.js";
+import { getPlatform } from "../platform.js";
+
+// ─── Layout picker ──────────────────────────────────────────────────────────
+
+/** @type {{ name: string; path: string }[] | null} */
+let layoutEntries = null;
+
+async function loadLayoutEntries() {
+  try {
+    const platform = getPlatform();
+    const listing = await platform.listDirectory("layouts");
+    layoutEntries = listing
+      .filter(
+        (/** @type {{ type: string; name: string }} */ f) =>
+          f.type === "file" && f.name.endsWith(".json"),
+      )
+      .map((/** @type {{ type: string; name: string }} */ f) => ({
+        name: f.name
+          .replace(/\.json$/, "")
+          .replace(/[-_]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase()),
+        path: `./layouts/${f.name}`,
+      }));
+  } catch {
+    layoutEntries = [];
+  }
+  renderOnly("leftPanel");
+}
+
+export function invalidateLayoutPickerCache() {
+  layoutEntries = null;
+}
 
 // ─── Field definitions ───────────────────────────────────────────────────
 
@@ -282,9 +315,79 @@ export function renderHeadTemplate({ document: doc, applyMutation, renderLeftPan
   const isContent = tab?.doc.mode === "content";
   const frontmatterSection = isContent ? renderFrontmatterSection() : nothing;
 
+  // Layout field
+  const isPage =
+    tab?.documentPath &&
+    projectState?.isSiteProject &&
+    (tab.documentPath.startsWith("pages/") || tab.documentPath.startsWith("./pages/"));
+
+  /** @type {import("lit-html").TemplateResult | symbol} */
+  let layoutSection = nothing;
+  if (isPage) {
+    if (layoutEntries === null) {
+      loadLayoutEntries();
+    } else {
+      const currentLayout = doc.$layout;
+      const defaultLayout = projectState?.projectConfig?.defaults?.layout;
+      const displayValue =
+        currentLayout === false ? "__none__" : currentLayout ? currentLayout : "__default__";
+      const defaultLabel = defaultLayout
+        ? defaultLayout
+            .replace(/^\.\/layouts\//, "")
+            .replace(/\.json$/, "")
+            .replace(/[-_]+/g, " ")
+            .replace(/\b\w/g, (/** @type {string} */ c) => c.toUpperCase())
+        : "";
+
+      layoutSection = html`
+        <div class="imports-section">
+          <div class="imports-section-header">
+            <span class="imports-section-title">Layout</span>
+          </div>
+          <div class="head-section-body">
+            ${renderFieldRow({
+              prop: "layout",
+              label: "Layout",
+              hasValue: currentLayout !== undefined,
+              onClear: () =>
+                applyMutation((/** @type {JxMutableNode} */ d) => {
+                  delete d.$layout;
+                }),
+              widget: html`
+                <sp-picker
+                  size="s"
+                  value=${displayValue}
+                  @change=${(/** @type {Event} */ e) => {
+                    const val = /** @type {HTMLInputElement} */ (e.target).value;
+                    applyMutation((/** @type {JxMutableNode} */ d) => {
+                      if (val === "__default__") delete d.$layout;
+                      else if (val === "__none__") d.$layout = false;
+                      else d.$layout = val;
+                    });
+                    invalidateLayoutCache();
+                  }}
+                >
+                  <sp-menu-item value="__default__"
+                    >Default${defaultLabel ? ` (${defaultLabel})` : ""}</sp-menu-item
+                  >
+                  <sp-menu-item value="__none__">None</sp-menu-item>
+                  <sp-menu-divider></sp-menu-divider>
+                  ${layoutEntries.map(
+                    (/** @type {{ name: string; path: string }} */ l) =>
+                      html`<sp-menu-item value=${l.path}>${l.name}</sp-menu-item>`,
+                  )}
+                </sp-picker>
+              `,
+            })}
+          </div>
+        </div>
+      `;
+    }
+  }
+
   return html`
     <div class="imports-panel">
-      ${frontmatterSection}
+      ${frontmatterSection} ${layoutSection}
 
       <!-- Page section -->
       <div class="imports-section">

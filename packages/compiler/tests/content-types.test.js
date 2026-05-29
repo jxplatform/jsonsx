@@ -13,6 +13,7 @@ import {
 } from "../src/site/content-loader.js";
 import { discoverPages, expandDynamicRoutes } from "../src/site/pages-discovery.js";
 import { injectContext } from "../src/site/context-injection.js";
+import { resolvePrototypes } from "../src/site/prototype-resolver.js";
 import { loadProjectConfig } from "../src/site/site-loader.js";
 import { buildSite } from "../src/site/site-build.js";
 
@@ -45,6 +46,10 @@ beforeAll(() => {
     url: "https://test.com",
     defaults: { layout: "./layouts/base.json", lang: "en" },
     build: { outDir: "./dist" },
+    imports: {
+      ContentCollection: "@jxsuite/parser/ContentCollection.class.json",
+      ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
+    },
     contentTypes: {
       blog: {
         source: "./content/blog/",
@@ -397,6 +402,9 @@ describe("$prototype resolution in context-injection", () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
+      imports: {
+        ContentCollection: "@jxsuite/parser/ContentCollection.class.json",
+      },
       state: {
         posts: {
           $prototype: "ContentCollection",
@@ -410,6 +418,7 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/blog", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
+    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
 
     expect(Array.isArray(doc.state.posts)).toBe(true);
     expect(doc.state.posts.length).toBe(2); // non-drafts
@@ -420,6 +429,9 @@ describe("$prototype resolution in context-injection", () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
+      imports: {
+        ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
+      },
       state: {
         post: {
           $prototype: "ContentEntry",
@@ -435,6 +447,7 @@ describe("$prototype resolution in context-injection", () => {
     };
 
     injectContext(doc, projectConfig, route, contentTypes);
+    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
 
     expect(doc.state.post).not.toBeNull();
     expect(doc.state.post.id).toBe("hello-world");
@@ -445,6 +458,9 @@ describe("$prototype resolution in context-injection", () => {
   it("returns null for missing ContentEntry", async () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const doc = {
+      imports: {
+        ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
+      },
       state: {
         post: {
           $prototype: "ContentEntry",
@@ -457,6 +473,7 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/blog/nope", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
+    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
 
     expect(doc.state.post).toBeNull();
   });
@@ -465,6 +482,9 @@ describe("$prototype resolution in context-injection", () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     /** @type {any} */
     const doc = {
+      imports: {
+        ContentCollection: "@jxsuite/parser/ContentCollection.class.json",
+      },
       state: {
         items: {
           $prototype: "ContentCollection",
@@ -476,6 +496,7 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
+    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
 
     expect(doc.state.items).toEqual([]);
   });
@@ -759,5 +780,171 @@ describe("content-loader edge cases", () => {
     const descSorted = queryContentType(entries, { sort: { field: "score", order: "desc" } });
     expect(descSorted[0].data.score).toBe(30);
     expect(descSorted[2].data.score).toBe(10);
+  });
+});
+
+// ── Array-based filter and multi-field sort ─────────────────────────────────
+
+describe("queryContentType — array filter with operators", () => {
+  /** @type {any[]} */
+  const entries = [
+    { id: "a", data: { title: "Alpha Guide", score: 10, draft: false, tags: ["web"] }, body: null },
+    { id: "b", data: { title: "Beta Post", score: 25, draft: true, tags: [] }, body: null },
+    {
+      id: "c",
+      data: { title: "Gamma Tutorial", score: 15, draft: false, tags: ["api", "web"] },
+      body: null,
+    },
+    { id: "d", data: { title: "", score: 5, draft: false, tags: null }, body: null },
+  ];
+
+  it("== operator matches exact values", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "draft", op: "==", value: true }],
+    });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe("b");
+  });
+
+  it("!= operator excludes values", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "draft", op: "!=", value: true }],
+    });
+    expect(result.length).toBe(3);
+    expect(result.every((e) => e.data.draft === false)).toBe(true);
+  });
+
+  it("contains operator matches substring", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "title", op: "contains", value: "Guide" }],
+    });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe("a");
+  });
+
+  it("not contains operator excludes substring", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "title", op: "not contains", value: "Post" }],
+    });
+    expect(result.length).toBe(3);
+    expect(result.every((e) => !(/** @type {string} */ (e.data.title).includes("Post")))).toBe(
+      true,
+    );
+  });
+
+  it("> operator for numeric comparison", () => {
+    const result = queryContentType(entries, { filter: [{ field: "score", op: ">", value: 10 }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
+  });
+
+  it("< operator for numeric comparison", () => {
+    const result = queryContentType(entries, { filter: [{ field: "score", op: "<", value: 15 }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
+  });
+
+  it(">= operator", () => {
+    const result = queryContentType(entries, { filter: [{ field: "score", op: ">=", value: 15 }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
+  });
+
+  it("<= operator", () => {
+    const result = queryContentType(entries, { filter: [{ field: "score", op: "<=", value: 10 }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
+  });
+
+  it("empty operator detects null/empty string/empty array", () => {
+    const result = queryContentType(entries, { filter: [{ field: "tags", op: "empty" }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["b", "d"]);
+  });
+
+  it("not empty operator detects non-null/non-empty", () => {
+    const result = queryContentType(entries, { filter: [{ field: "tags", op: "not empty" }] });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["a", "c"]);
+  });
+
+  it("empty operator on string field", () => {
+    const result = queryContentType(entries, { filter: [{ field: "title", op: "empty" }] });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe("d");
+  });
+
+  it("multiple rules are ANDed together", () => {
+    const result = queryContentType(entries, {
+      filter: [
+        { field: "draft", op: "==", value: false },
+        { field: "score", op: ">", value: 5 },
+      ],
+    });
+    expect(result.length).toBe(2);
+    expect(result.map((e) => e.id).sort()).toEqual(["a", "c"]);
+  });
+
+  it("field 'id' matches entry.id", () => {
+    const result = queryContentType(entries, { filter: [{ field: "id", op: "==", value: "c" }] });
+    expect(result.length).toBe(1);
+    expect(result[0].data.title).toBe("Gamma Tutorial");
+  });
+
+  it("legacy plain-object filter still works", () => {
+    const result = queryContentType(entries, { filter: { draft: false, score: 10 } });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe("a");
+  });
+});
+
+describe("queryContentType — multi-field sort", () => {
+  /** @type {any[]} */
+  const entries = [
+    { id: "1", data: { category: "B", title: "Zebra" }, body: null },
+    { id: "2", data: { category: "A", title: "Mango" }, body: null },
+    { id: "3", data: { category: "B", title: "Apple" }, body: null },
+    { id: "4", data: { category: "A", title: "Cherry" }, body: null },
+  ];
+
+  it("sorts by multiple fields (array format)", () => {
+    const result = queryContentType(entries, {
+      sort: [
+        { field: "category", order: "asc" },
+        { field: "title", order: "asc" },
+      ],
+    });
+    expect(result.map((e) => e.id)).toEqual(["4", "2", "3", "1"]);
+  });
+
+  it("multi-field sort with mixed orders", () => {
+    const result = queryContentType(entries, {
+      sort: [
+        { field: "category", order: "asc" },
+        { field: "title", order: "desc" },
+      ],
+    });
+    expect(result.map((e) => e.id)).toEqual(["2", "4", "1", "3"]);
+  });
+
+  it("legacy single-object sort still works", () => {
+    const result = queryContentType(entries, { sort: { field: "title", order: "asc" } });
+    expect(result[0].data.title).toBe("Apple");
+    expect(result[3].data.title).toBe("Zebra");
+  });
+
+  it("sorts by id field", () => {
+    const result = queryContentType(entries, { sort: [{ field: "id", order: "desc" }] });
+    expect(result.map((e) => e.id)).toEqual(["4", "3", "2", "1"]);
+  });
+
+  it("combined array filter + array sort + limit", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "category", op: "==", value: "B" }],
+      sort: [{ field: "title", order: "asc" }],
+      limit: 1,
+    });
+    expect(result.length).toBe(1);
+    expect(result[0].data.title).toBe("Apple");
   });
 });

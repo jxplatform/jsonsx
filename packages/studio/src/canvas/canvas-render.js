@@ -664,11 +664,12 @@ function applyCanvasMediaOverrides(canvasEl, activeBreakpoints) {
   const tab = activeTab.value;
   if (!tab) return;
   const docMedia = getEffectiveMedia(tab.doc.document.$media || {});
-  const validBreakpoints = new Set();
+  // Build a set of CSS condition texts that match active breakpoints
+  const activeConditions = new Set();
   for (const name of activeBreakpoints) {
-    if (docMedia[name]) validBreakpoints.add(name);
+    if (docMedia[name]) activeConditions.add(docMedia[name]);
   }
-  const overrides = collectMediaOverrides(document.styleSheets, validBreakpoints);
+  const overrides = collectMediaOverrides(document.styleSheets, activeConditions);
   applyOverridesToCanvas(canvasEl, overrides);
 }
 

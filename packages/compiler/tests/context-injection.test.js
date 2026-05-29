@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { injectContext } from "../src/site/context-injection.js";
+import { resolvePrototypes } from "../src/site/prototype-resolver.js";
 
 // ─── injectContext ──────────────────────────────────────────────────────────
 
@@ -183,15 +184,22 @@ describe("injectContext", () => {
     expect(doc.$elements[0].$ref).toBe("./components/card.json");
   });
 
-  test("resolves ContentEntry with missing content type gracefully", () => {
+  test("resolves ContentEntry with missing content type gracefully", async () => {
     /** @type {Record<string, any>} */
     const doc = {
+      imports: {
+        ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
+      },
       state: {
         post: { $prototype: "ContentEntry", contentType: "nonexistent", id: "abc" },
       },
     };
     const contentTypes = /** @type {any} */ (new Map([["posts", [{ id: "x", data: {} }]]]));
-    injectContext(doc, baseProject, baseRoute, contentTypes);
+    injectContext(doc, baseProject, /** @type {any} */ (baseRoute), contentTypes);
+    await resolvePrototypes(doc, /** @type {any} */ (baseRoute), import.meta.dir, {
+      config: baseProject,
+      contentTypes,
+    });
     expect(doc.state.post).toBeNull();
   });
 });

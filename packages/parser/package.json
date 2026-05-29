@@ -14,9 +14,13 @@
   "type": "module",
   "exports": {
     ".": "./src/md.js",
+    "./content": "./src/content.js",
+    "./ContentCollection.class.json": "./src/ContentCollection.class.json",
+    "./ContentEntry.class.json": "./src/ContentEntry.class.json",
     "./MarkdownCollection.class.json": "./src/MarkdownCollection.class.json",
     "./MarkdownFile.class.json": "./src/MarkdownFile.class.json",
-    "./transpile": "./src/transpile.js"
+    "./transpile": "./src/transpile.js",
+    "./html-to-jx": "./src/html-to-jx.js"
   },
   "publishConfig": {
     "provenance": true

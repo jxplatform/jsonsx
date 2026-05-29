@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ContentEntry",
+  "description": "Fetch a single entry from a content type by ID",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./content.js",
+
+  "$defs": {
+    "parameters": {
+      "contentType": {
+        "identifier": "contentType",
+        "type": { "type": "string", "enum": { "$ref": "#/$context/contentTypes" } },
+        "description": "Content type to query"
+      },
+      "id": {
+        "identifier": "id",
+        "type": { "type": "string" },
+        "description": "Entry ID to fetch"
+      }
+    },
+
+    "fields": {
+      "config": {
+        "role": "field",
+        "access": "private",
+        "scope": "instance",
+        "identifier": "config",
+        "type": { "type": "object" },
+        "description": "Raw configuration object passed to the constructor"
+      }
+    },
+
+    "constructor": {
+      "role": "constructor",
+      "$prototype": "Function",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/contentType" },
+        { "$ref": "#/$defs/parameters/id" }
+      ],
+      "body": ["this.config = config;"],
+      "description": "Stores the configuration for deferred resolution"
+    },
+
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "instance",
+        "identifier": "resolve",
+        "parameters": [],
+        "description": "Fetch the entry by ID from the content type"
+      }
+    }
+  }
+}

@@ -843,6 +843,13 @@ function collapsePropsToAttrMap(propsObj) {
         mdAttrKey = key.slice(1);
       }
       // Strip @ prefix for media queries (inside style.* paths)
+      if (key === "@") {
+        // Bare "@" (no media name) — treat contents as base-level style props
+        if (value && typeof value === "object" && !Array.isArray(value)) {
+          walk(/** @type {Record<string, unknown>} */ (value), prefix);
+        }
+        continue;
+      }
       if (key.startsWith("@--")) {
         mdAttrKey = key.slice(1);
       }
