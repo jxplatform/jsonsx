@@ -41,3 +41,11 @@ jobs:
           path: packages/desktop/artifacts/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          files: packages/desktop/artifacts/*
