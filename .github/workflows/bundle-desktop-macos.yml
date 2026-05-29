@@ -1,4 +1,4 @@
-name: Build Desktop Release
+name: Build Desktop (macOS)
 
 on:
   push:
@@ -9,16 +9,13 @@ jobs:
   build:
     name: Build (${{ matrix.platform }})
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            platform: linux-x64
           - os: macos-latest
             platform: macos-arm64
           - os: macos-26-intel
             platform: macos-x64
-          - os: windows-latest
-            platform: windows-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -35,26 +32,7 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            build-essential \
-            cmake \
-            pkg-config
-
-      - name: Install WiX Toolset (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          dotnet tool install --global wix
-          wix eula accept wix7
-
-      - name: Free disk space (macOS)
-        if: runner.os == 'macOS'
+      - name: Free disk space
         run: |
           echo "Disk space before cleanup:"
           df -h /
@@ -74,7 +52,7 @@ jobs:
         run: bun run build
 
       - name: Import code signing certificate
-        if: runner.os == 'macOS'
+        if: env.CERTIFICATE_BASE64 != ''
         env:
           CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -94,10 +72,12 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Write Apple API Key File
-        if: runner.os == 'macOS'
+        if: env.APPLE_API_KEY_BASE64 != ''
+        env:
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
         run: |
           mkdir -p ~/.apple/keys
-          echo "${{ secrets.APPLE_API_KEY_BASE64 }}" | base64 --decode > ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
+          echo "$APPLE_API_KEY_BASE64" | base64 --decode > ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
 
       - name: Build desktop installer
         env:
@@ -109,7 +89,7 @@ jobs:
         run: bun run desktop:stable
 
       - name: Clean up signing materials
-        if: always() && runner.os == 'macOS'
+        if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
           rm -f ~/.apple/keys/AuthKey_${{ secrets.APPLE_API_KEY_ID }}.p8
@@ -121,25 +101,3 @@ jobs:
           path: packages/desktop/artifacts/
           if-no-files-found: error
           retention-days: 7
-
-  release:
-    name: Publish GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: artifacts/
-          merge-multiple: true
-
-      - name: Attach artifacts to release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ github.ref_name }}
-          draft: false
-          files: artifacts/*

@@ -1,0 +1,43 @@
+name: Build Desktop (Windows)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Build (windows-x64)
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install WiX Toolset
+        run: |
+          dotnet tool install --global wix
+          wix eula accept wix7
+
+      - name: Build workspace packages
+        run: bun run build
+
+      - name: Build desktop installer
+        run: bun run desktop:stable
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-x64
+          path: packages/desktop/artifacts/
+          if-no-files-found: error
+          retention-days: 7
