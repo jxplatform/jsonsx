@@ -43,8 +43,8 @@
     "@jxsuite/server": "workspace:^"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.0.1",
-    "@commitlint/config-conventional": "^21.0.1",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
     "@release-it/bumper": "^7.0.5",
     "@release-it/conventional-changelog": "^11.0.0",
     "@typescript/native-preview": "^7.0.0-dev.20260527.2",
