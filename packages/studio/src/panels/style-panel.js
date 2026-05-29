@@ -592,6 +592,50 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
         },
       );
 
+      const isOpen = isFiltering ? true : (tab.session.ui.styleSections[sec.key] ?? false);
+
+      if (!isOpen) {
+        return html`
+          <sp-accordion-item
+            label=${sec.label}
+            .open=${false}
+            @sp-accordion-item-toggle=${(/** @type {Event} */ e) => {
+              activeTab.value.session.ui.styleSections = {
+                ...activeTab.value.session.ui.styleSections,
+                [sec.key]: /** @type {HTMLElement & { open: boolean }} */ (e.target).open,
+              };
+            }}
+          >
+            ${sectionActiveProps.length > 0
+              ? html`
+                  <span slot="heading" style="display:flex;align-items:center;gap:6px">
+                    ${sec.label}
+                    <span
+                      class="set-dot set-dot--section"
+                      title="Clear all ${sec.label.toLowerCase()} properties"
+                      @click=${(/** @type {Event} */ e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        transactDoc(activeTab.value, (t) => {
+                          for (const { prop, entry } of sectionActiveProps) {
+                            if (activeStyle[prop] !== undefined) commitMutate(t, prop, undefined);
+                            if (inferInputType(entry) === "shorthand") {
+                              for (const l of /** @type {CssLonghand[]} */ (getLonghands(prop))) {
+                                if (activeStyle[l.name] !== undefined)
+                                  commitMutate(t, l.name, undefined);
+                              }
+                            }
+                          }
+                        });
+                      }}
+                    ></span>
+                  </span>
+                `
+              : nothing}
+          </sp-accordion-item>
+        `;
+      }
+
       const rows = [];
       for (const { prop, entry } of entries) {
         const val = activeStyle[prop];
@@ -644,7 +688,6 @@ function styleSidebarTemplate(node, activeMediaTab, activeSelector, effectiveSty
       }
 
       if (isFiltering && rows.length === 0) return nothing;
-      const isOpen = isFiltering ? true : (tab.session.ui.styleSections[sec.key] ?? false);
 
       return html`
         <sp-accordion-item
