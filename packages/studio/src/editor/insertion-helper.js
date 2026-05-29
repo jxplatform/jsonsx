@@ -129,7 +129,8 @@ function onMouseMove(e) {
   if (!_ctx || !_helper) return;
 
   const { getCanvasMode } = _ctx;
-  if (getCanvasMode() !== "design") {
+  const mode = getCanvasMode();
+  if (mode !== "design" && mode !== "edit") {
     hide();
     return;
   }
@@ -222,7 +223,7 @@ function showAt(el, edge, path, parentPath, idx) {
   // Set CSS anchor on target element
   if (_currentAnchor !== el) {
     clearAnchor();
-    el.style.anchorName = "--jx-insert";
+    /** @type {any} */ (el.style).anchorName = "--jx-insert";
     _currentAnchor = el;
   }
 
@@ -258,7 +259,7 @@ function hideNow() {
 
 function clearAnchor() {
   if (_currentAnchor) {
-    _currentAnchor.style.anchorName = "";
+    /** @type {any} */ (_currentAnchor.style).anchorName = "";
     _currentAnchor = null;
   }
 }
