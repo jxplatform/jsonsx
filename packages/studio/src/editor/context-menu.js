@@ -33,7 +33,7 @@ export function copyNode() {
   if (!tab?.session.selection) return;
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
   if (!node) return;
-  workspace.clipboard = structuredClone(node);
+  workspace.clipboard = JSON.parse(JSON.stringify(node));
   statusMessage("Copied");
 }
 
@@ -43,7 +43,7 @@ export function cutNode() {
   const sel = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, sel);
   if (!node) return;
-  workspace.clipboard = structuredClone(node);
+  workspace.clipboard = JSON.parse(JSON.stringify(node));
   transactDoc(tab, (t) => mutateRemoveNode(t, sel));
   statusMessage("Cut");
 }
@@ -52,7 +52,7 @@ export function pasteNode() {
   if (!workspace.clipboard) return;
   const tab = activeTab.value;
   if (!tab) return;
-  const clip = workspace.clipboard;
+  const clip = JSON.parse(JSON.stringify(workspace.clipboard));
   const pPath = tab.session.selection || [];
   const parent = getNodeAtPath(tab.doc.document, pPath);
   if (!parent) return;
@@ -60,10 +60,10 @@ export function pasteNode() {
   if (tab.session.selection && tab.session.selection.length >= 2) {
     const pp = /** @type {JxPath} */ (parentElementPath(tab.session.selection));
     const idx = /** @type {number} */ (childIndex(tab.session.selection));
-    transactDoc(tab, (t) => mutateInsertNode(t, pp, idx + 1, structuredClone(clip)));
+    transactDoc(tab, (t) => mutateInsertNode(t, pp, idx + 1, clip));
   } else {
     const idx = parent.children ? parent.children.length : 0;
-    transactDoc(tab, (t) => mutateInsertNode(t, pPath, idx, structuredClone(clip)));
+    transactDoc(tab, (t) => mutateInsertNode(t, pPath, idx, clip));
   }
   statusMessage("Pasted");
 }
@@ -215,24 +215,23 @@ export function showContextMenu(e, path, opts = {}) {
     });
   }
   if (workspace.clipboard) {
-    const clip = workspace.clipboard;
     items.push({ label: "—" });
     items.push({
       label: "Paste inside",
       action: () => {
+        const clip = JSON.parse(JSON.stringify(workspace.clipboard));
         const idx = node.children ? node.children.length : 0;
-        transactDoc(activeTab.value, (t) => mutateInsertNode(t, path, idx, structuredClone(clip)));
+        transactDoc(activeTab.value, (t) => mutateInsertNode(t, path, idx, clip));
       },
     });
     if (path.length >= 2) {
       items.push({
         label: "Paste after",
         action: () => {
+          const clip = JSON.parse(JSON.stringify(workspace.clipboard));
           const pp = /** @type {JxPath} */ (parentElementPath(path));
           const idx = /** @type {number} */ (childIndex(path));
-          transactDoc(activeTab.value, (t) =>
-            mutateInsertNode(t, pp, idx + 1, structuredClone(clip)),
-          );
+          transactDoc(activeTab.value, (t) => mutateInsertNode(t, pp, idx + 1, clip));
         },
       });
     }
