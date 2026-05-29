@@ -37,7 +37,7 @@ export function renderHeadEditor(container) {
     } else if (tag === "script") {
       attrs.src = "";
     } else if (tag === "style") {
-      entry.content = "";
+      entry.textContent = "";
     }
     headEntries.push(entry);
     save();
@@ -57,7 +57,7 @@ export function renderHeadEditor(container) {
   ) => {
     const entry = headEntries[idx];
     if (key === "content" && (entry.tagName === "script" || entry.tagName === "style")) {
-      entry.content = val;
+      entry.textContent = val;
     } else {
       if (!entry.attributes) entry.attributes = {};
       entry.attributes[key] = val;
@@ -180,7 +180,7 @@ function renderEntryFields(entry, idx, updateEntry) {
                 <label class="settings-field-label">Script body</label>
                 <textarea
                   class="head-code-editor"
-                  .value=${entry.content || ""}
+                  .value=${entry.textContent || ""}
                   @input=${onFieldChange("content")}
                   rows="6"
                   spellcheck="false"
@@ -195,7 +195,7 @@ function renderEntryFields(entry, idx, updateEntry) {
           <label class="settings-field-label">Style body</label>
           <textarea
             class="head-code-editor"
-            .value=${entry.content || ""}
+            .value=${entry.textContent || ""}
             @input=${onFieldChange("content")}
             rows="8"
             spellcheck="false"

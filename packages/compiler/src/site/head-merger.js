@@ -94,7 +94,9 @@ function headEntryKey(entry) {
 
   // <style> — unique per content hash
   if (tag === "style") {
-    const content = Array.isArray(entry.children) ? entry.children.join("") : "";
+    const content = Array.isArray(entry.children)
+      ? entry.children.join("")
+      : (entry.textContent ?? "");
     return `style:${simpleHash(content)}`;
   }
 
@@ -149,7 +151,9 @@ function renderHeadEntry(entry) {
   if (VOID.has(tag)) return open;
 
   // Elements with content
-  const content = Array.isArray(entry.children) ? entry.children.join("") : "";
+  const content = Array.isArray(entry.children)
+    ? entry.children.join("")
+    : (entry.textContent ?? "");
   return `${open}${content}</${tag}>`;
 }
 
