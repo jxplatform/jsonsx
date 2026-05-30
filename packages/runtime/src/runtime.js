@@ -606,11 +606,13 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
 
   for (const [key, rules] of Object.entries(media)) {
     if (key === "@--") continue; // base canvas width, not a real media query
-    const query = key.startsWith("@--")
-      ? (mediaQueries[key.slice(1)] ?? key.slice(1))
-      : key.slice(1);
+    const atRule = key.startsWith("@--")
+      ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
+      : key.startsWith("@(")
+        ? `@media ${key.slice(1)}`
+        : key;
     const scope = `[data-jx="${uid}"]`;
-    css += `@media ${query} { ${scope} { ${toCSSText(rules)} } }\n`;
+    css += `${atRule} { ${scope} { ${toCSSText(rules)} } }\n`;
 
     function emitMediaNested(
       /** @type {string} */ parentSel,
@@ -627,7 +629,7 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
               ? `${parentSel}${sel}`
               : `${parentSel} ${sel}`;
         const props = toCSSText(sub);
-        if (props) css += `@media ${query} { ${resolved} { ${props} } }\n`;
+        if (props) css += `${atRule} { ${resolved} { ${props} } }\n`;
         emitMediaNested(resolved, sub);
       }
     }

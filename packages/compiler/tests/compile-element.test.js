@@ -794,3 +794,87 @@ describe("compileElement — refToExpr edge cases", () => {
     expect(content).toContain("Hello world");
   });
 });
+
+// ─── $media propagation through opts ──────────────────────────────────────────
+
+describe("compileElement — $media opts", () => {
+  test("assigns class names when $media opts are provided", async () => {
+    const result = await compileElement(
+      {
+        tagName: "test-media-prop",
+        children: [
+          {
+            tagName: "button",
+            style: {
+              display: "none",
+              "@--md": { display: "block" },
+            },
+          },
+        ],
+      },
+      { $media: { "--md": "(max-width: 768px)" } },
+    );
+    const content = result.files[0].content;
+    expect(content).toContain('class="test-media-prop-0"');
+  });
+
+  test("component's own $media takes precedence over opts $media", async () => {
+    const result = await compileElement(
+      {
+        tagName: "test-media-override",
+        $media: { "--md": "(max-width: 900px)" },
+        children: [
+          {
+            tagName: "div",
+            style: { "@--md": { color: "red" } },
+          },
+        ],
+      },
+      { $media: { "--md": "(max-width: 768px)" } },
+    );
+    const content = result.files[0].content;
+    expect(content).toContain('class="test-media-override-0"');
+  });
+
+  test("assigns class names for elements with @starting-style", async () => {
+    const result = await compileElement({
+      tagName: "test-starting-style",
+      children: [
+        {
+          tagName: "nav",
+          style: {
+            transform: "translateX(100%)",
+            ":popover-open": { transform: "translateX(0)" },
+            "@starting-style": {
+              ":popover-open": { transform: "translateX(100%)" },
+            },
+          },
+        },
+      ],
+    });
+    const content = result.files[0].content;
+    expect(content).toContain('class="test-starting-style-0"');
+  });
+
+  test("popover and popovertarget attributes are rendered", async () => {
+    const result = await compileElement({
+      tagName: "test-popover-attrs",
+      children: [
+        {
+          tagName: "button",
+          attributes: { popovertarget: "my-menu", "aria-label": "Toggle" },
+          textContent: "Menu",
+        },
+        {
+          tagName: "nav",
+          id: "my-menu",
+          attributes: { popover: "" },
+          children: [{ tagName: "a", attributes: { href: "/" }, textContent: "Home" }],
+        },
+      ],
+    });
+    const content = result.files[0].content;
+    expect(content).toContain('popovertarget="my-menu"');
+    expect(content).toContain("popover");
+  });
+});

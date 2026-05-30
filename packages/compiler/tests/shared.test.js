@@ -997,3 +997,188 @@ describe("preRenderComponentHtml", () => {
     expect(result).toContain("<p>Body</p>");
   });
 });
+
+// ─── @starting-style and non-media at-rules ─────────────────────────────────
+
+describe("compileStyles — non-media at-rules", () => {
+  test("@starting-style emits without @media wrapper", () => {
+    const doc = {
+      tagName: "div",
+      id: "panel",
+      style: {
+        transform: "translateX(100%)",
+        "@starting-style": {
+          ":popover-open": { transform: "translateX(100%)" },
+        },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@starting-style");
+    expect(result).not.toContain("@media starting-style");
+    expect(result).toContain("#panel:popover-open");
+    expect(result).toContain("transform: translateX(100%)");
+  });
+
+  test("@starting-style with multiple nested selectors", () => {
+    const doc = {
+      tagName: "div",
+      id: "menu",
+      style: {
+        "@starting-style": {
+          ":popover-open": { opacity: "0" },
+          "&:popover-open::backdrop": { opacity: "0" },
+        },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@starting-style { #menu:popover-open { opacity: 0 } }");
+    expect(result).toContain("@starting-style { #menu:popover-open::backdrop { opacity: 0 } }");
+  });
+
+  test("@starting-style does not emit empty base rule", () => {
+    const doc = {
+      tagName: "div",
+      id: "x",
+      style: {
+        "@starting-style": {
+          ":popover-open": { opacity: "1" },
+        },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).not.toContain("@starting-style { #x {  } }");
+    expect(result).not.toContain("@starting-style { #x { } }");
+  });
+
+  test("@supports emits as-is without @media wrapper", () => {
+    const doc = {
+      tagName: "div",
+      id: "s",
+      style: {
+        "@supports (display: grid)": { display: "grid" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@supports (display: grid) { #s { display: grid } }");
+    expect(result).not.toContain("@media");
+  });
+
+  test("@(condition) shorthand still emits as @media", () => {
+    const doc = {
+      tagName: "div",
+      id: "m",
+      style: {
+        "@(max-width: 600px)": { fontSize: "14px" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("@media (max-width: 600px)");
+    expect(result).toContain("font-size: 14px");
+  });
+
+  test("@--breakpoint still resolves from mediaQueries map", () => {
+    const doc = {
+      tagName: "div",
+      id: "b",
+      style: {
+        "@--lg": { fontSize: "20px" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc, { "--lg": "(min-width: 1024px)" });
+    expect(result).toContain("@media (min-width: 1024px)");
+    expect(result).toContain("font-size: 20px");
+  });
+});
+
+describe("compileStyles — :popover-open and ::backdrop pseudo selectors", () => {
+  test(":popover-open emits correct selector", () => {
+    const doc = {
+      tagName: "div",
+      id: "pop",
+      style: {
+        ":popover-open": { transform: "translateX(0)" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("#pop:popover-open { transform: translateX(0) }");
+  });
+
+  test("::backdrop emits correct selector", () => {
+    const doc = {
+      tagName: "div",
+      id: "pop",
+      style: {
+        "::backdrop": { backgroundColor: "rgba(0,0,0,0.5)" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("#pop::backdrop { background-color: rgba(0,0,0,0.5) }");
+  });
+
+  test("&:popover-open::backdrop emits compound selector", () => {
+    const doc = {
+      tagName: "div",
+      id: "pop",
+      style: {
+        "&:popover-open::backdrop": { opacity: "1" },
+      },
+      children: [],
+    };
+    const result = compileStyles(doc);
+    expect(result).toContain("#pop:popover-open::backdrop { opacity: 1 }");
+  });
+});
+
+describe("buildComponentCSS — $media propagation", () => {
+  test("resolves @--md breakpoint from provided mediaQueries", () => {
+    const doc = {
+      tagName: "my-nav",
+      style: { display: "block" },
+      children: [
+        {
+          tagName: "button",
+          style: {
+            display: "none",
+            "@--md": { display: "block" },
+          },
+        },
+      ],
+    };
+    const css = buildComponentCSS("my-nav", doc.style, doc, {
+      "--md": "(max-width: 768px)",
+    });
+    expect(css).toContain("@media (max-width: 768px)");
+    expect(css).toContain("display: block");
+  });
+
+  test("handles @starting-style in child elements", () => {
+    const doc = {
+      tagName: "my-menu",
+      style: {},
+      children: [
+        {
+          tagName: "nav",
+          id: "flyout",
+          style: {
+            "@starting-style": {
+              ":popover-open": { transform: "translateX(100%)" },
+            },
+          },
+        },
+      ],
+    };
+    const css = buildComponentCSS("my-menu", doc.style, doc, {});
+    expect(css).toContain(
+      "@starting-style { #flyout:popover-open { transform: translateX(100%) } }",
+    );
+    expect(css).not.toContain("@media");
+  });
+});

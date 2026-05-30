@@ -518,11 +518,11 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
       for (const [key, val] of Object.entries(obj)) {
         if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
         if (key.startsWith("@")) {
-          const query = key.startsWith("@--")
-            ? (mediaQueries[key.slice(1)] ?? key.slice(1))
-            : key.slice(1);
+          const atRule = key.startsWith("@--")
+            ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
+            : key;
           const mProps = toCSSText(val);
-          if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
+          if (mProps) rules.push(`${atRule} { ${selector} { ${mProps} } }`);
           for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
             if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
             if (sel.startsWith("@")) continue;
@@ -532,7 +532,7 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
                 ? `${selector}${sel}`
                 : `${selector} ${sel}`;
             const subProps = toCSSText(sub);
-            if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
+            if (subProps) rules.push(`${atRule} { ${resolved} { ${subProps} } }`);
           }
           continue;
         }
@@ -558,10 +558,12 @@ export function compileStyles(doc, mediaQueries = {}, projectStyle = null) {
         emitProjectRules(key, val);
       } else if (key.startsWith("@")) {
         // @media block at top level
-        const query = key.startsWith("@--")
-          ? (mediaQueries[key.slice(1)] ?? key.slice(1))
-          : key.slice(1);
-        rules.push(`@media ${query} { body { ${toCSSText(/** @type {object} */ (val))} } }`);
+        const atRule = key.startsWith("@--")
+          ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
+          : key.startsWith("@(")
+            ? `@media ${key.slice(1)}`
+            : key;
+        rules.push(`${atRule} { body { ${toCSSText(/** @type {object} */ (val))} } }`);
       }
     }
     // Collect CSS custom properties into :root {}
@@ -610,11 +612,13 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
   for (const [key, val] of Object.entries(obj)) {
     if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
     if (key.startsWith("@")) {
-      const query = key.startsWith("@--")
-        ? (mediaQueries[key.slice(1)] ?? key.slice(1))
-        : key.slice(1);
+      const atRule = key.startsWith("@--")
+        ? `@media ${mediaQueries[key.slice(1)] ?? key.slice(1)}`
+        : key.startsWith("@(")
+          ? `@media ${key.slice(1)}`
+          : key;
       const mProps = toCSSText(val);
-      if (mProps) rules.push(`@media ${query} { ${selector} { ${mProps} } }`);
+      if (mProps) rules.push(`${atRule} { ${selector} { ${mProps} } }`);
       for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
         if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
         if (sel.startsWith("@")) continue;
@@ -624,7 +628,7 @@ function emitNestedElement(selector, obj, rules, mediaQueries) {
             ? `${selector}${sel}`
             : `${selector} ${sel}`;
         const subProps = toCSSText(sub);
-        if (subProps) rules.push(`@media ${query} { ${resolved} { ${subProps} } }`);
+        if (subProps) rules.push(`${atRule} { ${resolved} { ${subProps} } }`);
       }
       continue;
     }
@@ -688,10 +692,13 @@ export function collectStyles(
     for (const [prop, val] of Object.entries(def.style)) {
       if (val === null || typeof val !== "object" || Array.isArray(val)) continue;
       if (prop.startsWith("@")) {
-        const query = prop.startsWith("@--")
-          ? (mediaQueries[prop.slice(1)] ?? prop.slice(1))
-          : prop.slice(1);
-        rules.push(`@media ${query} { ${selector} { ${toCSSText(val)} } }`);
+        const atRule = prop.startsWith("@--")
+          ? `@media ${mediaQueries[prop.slice(1)] ?? prop.slice(1)}`
+          : prop.startsWith("@(")
+            ? `@media ${prop.slice(1)}`
+            : prop;
+        const atBaseProps = toCSSText(val);
+        if (atBaseProps) rules.push(`${atRule} { ${selector} { ${atBaseProps} } }`);
         for (const [sel, nestedRules] of Object.entries(
           /** @type {Record<string, unknown>} */ (val),
         )) {
@@ -703,7 +710,7 @@ export function collectStyles(
             : sel.startsWith(":") || sel.startsWith(".") || sel.startsWith("[")
               ? `${selector}${sel}`
               : `${selector} ${sel}`;
-          rules.push(`@media ${query} { ${resolved} { ${toCSSText(nestedRules)} } }`);
+          rules.push(`${atRule} { ${resolved} { ${toCSSText(nestedRules)} } }`);
         }
       } else {
         const resolved = prop.startsWith("&")
@@ -1038,10 +1045,12 @@ export function buildComponentCSS(tagName, styleDef, doc = null, mediaQueries = 
 
     for (const [prop, val] of Object.entries(styleDef)) {
       if (prop.startsWith("@")) {
-        const query = prop.startsWith("@--")
-          ? (mediaQueries[prop.slice(1)] ?? prop.slice(1))
-          : prop.slice(1);
-        rules.push(`@media ${query} { ${tagName} { ${toCSSText(/** @type {object} */ (val))} } }`);
+        const atRule = prop.startsWith("@--")
+          ? `@media ${mediaQueries[prop.slice(1)] ?? prop.slice(1)}`
+          : prop.startsWith("@(")
+            ? `@media ${prop.slice(1)}`
+            : prop;
+        rules.push(`${atRule} { ${tagName} { ${toCSSText(/** @type {object} */ (val))} } }`);
       } else if (
         prop.startsWith(":") ||
         prop.startsWith(".") ||

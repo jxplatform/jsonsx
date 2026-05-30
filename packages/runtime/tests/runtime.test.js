@@ -1420,3 +1420,86 @@ describe("Jx", () => {
     expect(document.body.children.length).toBe(before + 1);
   });
 });
+
+// ─── $media inheritance in buildScope ───────────────────────────────────────
+
+describe("buildScope — $media inheritance", () => {
+  const BASE = "http://localhost/";
+
+  test("sets $media on state when doc has $media", async () => {
+    const state = await buildScope(
+      { $media: { "--md": "(max-width: 768px)" }, state: {} },
+      {},
+      BASE,
+    );
+    expect(state.$media).toEqual({ "--md": "(max-width: 768px)" });
+  });
+
+  test("inherits $media from parentScope when doc has no $media", async () => {
+    const parentScope = { $media: { "--sm": "(max-width: 640px)" } };
+    const state = await buildScope({ state: {} }, parentScope, BASE);
+    expect(state.$media).toEqual({ "--sm": "(max-width: 640px)" });
+  });
+
+  test("doc $media overrides inherited $media", async () => {
+    const parentScope = { $media: { "--md": "(max-width: 768px)" } };
+    const state = await buildScope(
+      { $media: { "--md": "(max-width: 900px)" }, state: {} },
+      parentScope,
+      BASE,
+    );
+    expect(state.$media).toEqual({ "--md": "(max-width: 900px)" });
+  });
+
+  test("does not add $media to empty doc state when _rootMedia is empty", async () => {
+    const state = await buildScope({}, {}, BASE);
+    expect(Object.keys(state).length).toBe(0);
+  });
+});
+
+// ─── applyStyle — non-media at-rules ────────────────────────────────────────
+
+describe("applyStyle — non-media at-rules", () => {
+  /** @type {HTMLElement} */
+  let el;
+  beforeEach(() => {
+    el = document.createElement("div");
+    document.head.querySelectorAll("style").forEach((s) => s.remove());
+  });
+
+  test("@starting-style emits without @media wrapper", () => {
+    applyStyle(el, {
+      "@starting-style": {
+        ":popover-open": { transform: "translateX(100%)" },
+      },
+    });
+    const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
+    expect(style.textContent).toContain("@starting-style");
+    expect(style.textContent).not.toContain("@media starting-style");
+    expect(style.textContent).toContain(":popover-open");
+    expect(style.textContent).toContain("transform: translateX(100%)");
+  });
+
+  test("@supports emits as-is", () => {
+    applyStyle(el, {
+      "@supports (display: grid)": { display: "grid" },
+    });
+    const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
+    expect(style.textContent).toContain("@supports (display: grid)");
+    expect(style.textContent).not.toContain("@media");
+  });
+
+  test("@(condition) emits as @media shorthand", () => {
+    applyStyle(el, {
+      "@(max-width: 600px)": { fontSize: "14px" },
+    });
+    const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
+    expect(style.textContent).toContain("@media (max-width: 600px)");
+  });
+
+  test("@--breakpoint still resolves from mediaQueries", () => {
+    applyStyle(el, { "@--lg": { fontSize: "20px" } }, { "--lg": "(min-width: 1024px)" });
+    const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
+    expect(style.textContent).toContain("@media (min-width: 1024px)");
+  });
+});
