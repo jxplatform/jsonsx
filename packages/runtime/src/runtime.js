@@ -570,6 +570,27 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
   const nested = {};
   /** @type {Record<string, any>} */
   const media = {};
+  /** @type {Record<string, string>} */
+  const baseDecls = {};
+
+  // Collect properties overridden by media queries so we can avoid inline styles for them
+  /** @type {Set<string>} */
+  const mediaOverriddenProps = new Set();
+  for (const [prop, val] of Object.entries(styleDef)) {
+    if (prop.startsWith("@") && val && typeof val === "object") {
+      for (const k of Object.keys(val)) {
+        if (
+          !k.startsWith(":") &&
+          !k.startsWith(".") &&
+          !k.startsWith("&") &&
+          !k.startsWith("[") &&
+          !k.startsWith("@")
+        ) {
+          mediaOverriddenProps.add(k);
+        }
+      }
+    }
+  }
 
   for (const [prop, val] of Object.entries(styleDef)) {
     if (prop.startsWith("@")) media[prop] = val;
@@ -586,17 +607,21 @@ export function applyStyle(el, styleDef, mediaQueries = {}, state = {}) {
         /** @type {Record<string, string>} */ (/** @type {unknown} */ (el.style))[prop] =
           evaluateTemplate(val, state);
       });
+    else if (mediaOverriddenProps.has(prop)) baseDecls[prop] = val;
     else /** @type {Record<string, string>} */ (/** @type {unknown} */ (el.style))[prop] = val;
   }
 
   const hasNested = Object.keys(nested).length > 0;
   const hasMedia = Object.keys(media).length > 0;
-  if (!hasNested && !hasMedia) return;
+  const hasBaseDecls = Object.keys(baseDecls).length > 0;
+  if (!hasNested && !hasMedia && !hasBaseDecls) return;
 
   const uid = `jx-${Math.random().toString(36).slice(2, 7)}`;
   el.dataset.jx = uid;
 
   let css = "";
+  const baseCSS = toCSSText(baseDecls);
+  if (baseCSS) css += `[data-jx="${uid}"] { ${baseCSS} }\n`;
 
   function emitNested(/** @type {string} */ scope, /** @type {Record<string, any>} */ rules) {
     const props = toCSSText(rules);
@@ -697,8 +722,7 @@ function renderMappedArray(def, state, options) {
   applyProperties(container, def, state);
   applyStyle(container, def.style ?? {}, state["$media"] ?? {}, state);
   applyAttributes(container, def.attributes ?? {}, state);
-  const { items: _items, of: _of, map: mapDef, filter: filterRef, sort: sortRef } = def.children;
-  const itemsSrc = _items ?? _of;
+  const { items: itemsSrc, map: mapDef, filter: filterRef, sort: sortRef } = def.children;
 
   effect(() => {
     container.innerHTML = "";

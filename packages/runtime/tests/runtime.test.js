@@ -616,8 +616,9 @@ describe("applyStyle", () => {
       { color: "green", ":focus": { outline: "2px solid blue" }, "@--sm": { color: "red" } },
       { "--sm": "(min-width: 640px)" },
     );
-    expect(el.style.color).toBe("green");
+    // color is in stylesheet (not inline) because it's overridden by a media query
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
+    expect(style.textContent).toContain("color: green");
     expect(style.textContent).toContain("]:focus");
     expect(style.textContent).toContain("@media (min-width: 640px)");
   });
