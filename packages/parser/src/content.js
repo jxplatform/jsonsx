@@ -119,6 +119,7 @@ export function findEntry(entries, id) {
  * @typedef {{
  *   contentType?: string;
  *   id?: unknown;
+ *   field?: string;
  *   _project?: { contentTypes?: Map<string, ContentLoaderEntry[]>; [k: string]: unknown };
  *   _document?: { route?: { _pathParams?: Record<string, string> }; [k: string]: unknown };
  *   [k: string]: unknown;
@@ -146,7 +147,7 @@ export class ContentEntry {
   }
 
   resolve() {
-    const { contentType, id, _project, _document } = this.config;
+    const { contentType, id, field, _project, _document } = this.config;
     const entries = _project?.contentTypes?.get(contentType ?? "");
     if (!entries) return null;
 
@@ -161,6 +162,9 @@ export class ContentEntry {
     }
     if (!resolvedId) return null;
 
+    if (field && field !== "id") {
+      return entries.find((e) => e.data[field] === resolvedId) ?? null;
+    }
     return findEntry(entries, /** @type {string} */ (resolvedId));
   }
 }

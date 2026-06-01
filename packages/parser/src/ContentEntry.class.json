@@ -17,6 +17,11 @@
         "identifier": "id",
         "type": { "type": "string" },
         "description": "Entry ID to fetch"
+      },
+      "field": {
+        "identifier": "field",
+        "type": { "type": "string", "default": "id" },
+        "description": "Field to match against — defaults to 'id' (the entry slug). Set to a frontmatter field name (e.g. 'sku') to match by data field instead."
       }
     },
 
