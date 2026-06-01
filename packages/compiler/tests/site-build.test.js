@@ -1065,7 +1065,7 @@ describe("buildSite — dynamic routes with content types", () => {
       JSON.stringify({
         name: "Dynamic Test",
         build: { outDir: "./dist" },
-        contentTypes: { posts: { source: "./content/posts/*.json" } },
+        contentTypes: { posts: { source: "./content/posts/", format: "json" } },
       }),
       "utf8",
     );

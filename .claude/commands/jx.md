@@ -263,7 +263,7 @@ Layouts wrap page content. Use `{ "tagName": "slot" }` for the page content inse
   "style": { "fontFamily": "system-ui, sans-serif", "margin": "0" },
   "contentTypes": {
     "blog": {
-      "source": "./blog/**/*.md",
+      "source": "./content/blog/",
       "schema": { "type": "object", "properties": { "title": { "type": "string" } }, "required": ["title"] }
     }
   },

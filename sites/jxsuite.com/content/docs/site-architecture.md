@@ -79,7 +79,8 @@ Define collections in `content/content.config.json` with JSON Schema validation:
 {
   "contentTypes": {
     "blog": {
-      "source": "./blog/**/*.md",
+      "source": "./content/blog/",
+      "format": "md",
       "schema": {
         "type": "object",
         "properties": {

@@ -161,17 +161,17 @@
       "type": "object"
     },
     "contentTypes": {
-      "description": "Content type definitions. Each key is a content type name; the value defines the source glob, frontmatter schema, and element dependencies.",
+      "description": "Content type definitions. Each key is a content type name; the value defines the source directory, frontmatter schema, and element dependencies.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "properties": {
           "source": {
-            "description": "Glob pattern for content files relative to the content directory.",
+            "description": "Path to the content directory relative to the project root.",
             "type": "string",
             "examples": [
-              "./blog/**/*.md",
-              "./docs/**/*.md"
+              "./content/blog/",
+              "./content/docs/"
             ]
           },
           "schema": {

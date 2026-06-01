@@ -123,10 +123,10 @@ export function inferInputType(entry) {
 }
 
 /**
- * Match a document path to a content type and return its schema. Uses simple directory-prefix +
- * extension matching against the content type's `source` glob.
+ * Match a document path to a content type and return its schema. Compares the content type's
+ * `source` directory against the document path prefix, using `format` for extension matching.
  *
- * @param {string | null} documentPath — project-relative path (e.g. "blog/hello.md")
+ * @param {string | null} documentPath — project-relative path (e.g. "content/products/widget.md")
  * @param {ProjectConfig | null | undefined} projectConfig — parsed project.json
  * @returns {{ name: string; schema: ContentTypeSchema } | null}
  */

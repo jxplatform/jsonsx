@@ -598,19 +598,21 @@ function expandMapTemplate(template, scope) {
         return expandMapTemplate(/** @type {JxMutableNode} */ (child), scope);
       });
     } else if (k === "style" && v && typeof v === "object") {
-      node.style = { ...v };
-      for (const [sk, sv] of Object.entries(node.style)) {
+      const style = /** @type {Record<string, unknown>} */ ({ ...v });
+      for (const [sk, sv] of Object.entries(style)) {
         if (typeof sv === "string" && isTemplateString(sv)) {
-          node.style[sk] = evaluateMapTemplate(sv, scope) ?? sv;
+          style[sk] = evaluateMapTemplate(sv, scope) ?? sv;
         }
       }
+      node.style = style;
     } else if (k === "attributes" && v && typeof v === "object") {
-      node.attributes = { ...v };
-      for (const [ak, av] of Object.entries(node.attributes)) {
+      const attrs = /** @type {Record<string, unknown>} */ ({ ...v });
+      for (const [ak, av] of Object.entries(attrs)) {
         if (typeof av === "string" && isTemplateString(av)) {
-          node.attributes[ak] = evaluateMapTemplate(av, scope) ?? av;
+          attrs[ak] = evaluateMapTemplate(av, scope) ?? av;
         }
       }
+      node.attributes = attrs;
     } else if (typeof v === "string" && isTemplateString(v)) {
       node[k] = evaluateMapTemplate(v, scope) ?? v;
     } else {
@@ -701,15 +703,17 @@ function resolveDocTemplates(node, scope) {
       items = itemsSrc;
     }
     if (Array.isArray(items) && arrayDef.map) {
-      node.children = items.map((item, index) => {
-        const childScope = Object.create(scope);
-        childScope.$map = { item, index };
-        childScope["$map/item"] = item;
-        childScope["$map/index"] = index;
-        const expanded = expandMapTemplate(arrayDef.map, childScope);
-        resolveDocTemplates(expanded, childScope);
-        return expanded;
-      });
+      node.children = /** @type {(string | JxElement)[]} */ (
+        items.map((item, index) => {
+          const childScope = Object.create(scope);
+          childScope.$map = { item, index };
+          childScope["$map/item"] = item;
+          childScope["$map/index"] = index;
+          const expanded = expandMapTemplate(arrayDef.map, childScope);
+          resolveDocTemplates(/** @type {JxElement} */ (expanded), childScope);
+          return expanded;
+        })
+      );
       return;
     }
   }

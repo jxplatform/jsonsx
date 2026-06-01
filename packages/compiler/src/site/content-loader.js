@@ -9,7 +9,7 @@
  * @module content-loader
  */
 
-import { readFileSync, readdirSync, existsSync, globSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
 
 // ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
@@ -291,9 +291,7 @@ async function loadContentType(name, contentTypeDef, projectRoot) {
   /** @type {string[]} */
   let files;
 
-  if (source.includes("*") || source.includes("?")) {
-    files = globSync(source, { cwd: projectRoot }).map((f) => resolve(projectRoot, f));
-  } else if (extname(source)) {
+  if (extname(source)) {
     files = existsSync(resolvedSource) ? [resolvedSource] : [];
   } else {
     const format = contentTypeDef.format || "md";

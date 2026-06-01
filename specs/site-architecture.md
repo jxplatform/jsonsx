@@ -500,7 +500,8 @@ Collections are defined in `the `collections` key in project.json`:
   "$schema": "https://jxsuite.com/schema/project/v1",
   "contentTypes": {
     "blog": {
-      "source": "./blog/",
+      "source": "./content/blog/",
+      "format": "md",
       "schema": {
         "type": "object",
         "properties": {

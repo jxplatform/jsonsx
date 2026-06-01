@@ -142,7 +142,7 @@ async function collectFiles(dir, platform) {
 }
 
 /**
- * Match a file path against project contentTypes source globs to find its content type name.
+ * Match a file path against project contentTypes source directories to find its content type name.
  * Returns the content type name (capitalized) or null if no match.
  *
  * @param {string} filePath
