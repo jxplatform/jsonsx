@@ -18,6 +18,7 @@ import {
   mutateRenameDef,
 } from "../tabs/transact.js";
 import { renderFieldRow } from "../ui/field-row.js";
+import { renderExpressionEditor, expressionHint } from "../ui/expression-editor.js";
 import { renderMediaPicker } from "../ui/media-picker.js";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services.js";
 
@@ -118,6 +119,7 @@ const DEF_TEMPLATES = /** @type {Record<string, SignalDef>} */ ({
   map: { $prototype: "Map", default: {} },
   formData: { $prototype: "FormData", fields: {} },
   function: { $prototype: "Function", body: "", parameters: [] },
+  expression: { $expression: { operator: "=", target: null } },
   external: { $prototype: "", $src: "" },
 });
 
@@ -148,6 +150,7 @@ const STUDIO_RESERVED_KEYS = new Set([
 export function defCategory(def) {
   if (!def) return "state";
   const d = /** @type {SignalDef} */ (def);
+  if (d.$expression) return "expression";
   if (d.$handler || d.$prototype === "Function") return "function";
   if (d.$compute) return "computed";
   if (d.$prototype) return "data";
@@ -162,6 +165,7 @@ export function defCategory(def) {
 export function defBadgeLabel(def) {
   if (!def) return "S";
   const d = /** @type {SignalDef} */ (def);
+  if (d.$expression) return "E";
   if (d.$handler || d.$prototype === "Function") return "F";
   if (d.$compute) return "C";
   if (d.$prototype) return d.$prototype.charAt(0);
@@ -176,6 +180,7 @@ export function defBadgeLabel(def) {
  */
 export function defHint(name, def) {
   if (!def) return "";
+  if (def.$expression) return expressionHint(def.$expression);
   if (def.$prototype === "Function") {
     if (def.body) return def.body.length > 20 ? def.body.slice(0, 20) + "..." : def.body;
     if (def.$src) return def.$src;
@@ -314,6 +319,7 @@ export function renderSignalsTemplate(S, ctx) {
     state: [],
     computed: [],
     data: [],
+    expression: [],
     function: [],
   });
   for (const [name, def] of entries) {
@@ -324,6 +330,7 @@ export function renderSignalsTemplate(S, ctx) {
     { key: "state", label: "State", items: groups.state },
     { key: "computed", label: "Computed", items: groups.computed },
     { key: "data", label: "Data", items: groups.data },
+    { key: "expression", label: "Expressions", items: groups.expression },
     { key: "function", label: "Functions", items: groups.function },
   ];
 
@@ -462,6 +469,7 @@ export function renderSignalsTemplate(S, ctx) {
                 )}`
             : nothing}
           <sp-menu-divider></sp-menu-divider>
+          <sp-menu-item value="expression">Expression</sp-menu-item>
           <sp-menu-item value="function">Function</sp-menu-item>
         </sp-picker>
       </div>
@@ -697,6 +705,16 @@ function renderSignalEditorTemplate(
     fields = renderDataSourceFields(S, name, def, textareaRow, pickerRow, ctx);
   } else if (cat === "function") {
     fields = renderFunctionFields(S, name, def, textareaRow, ctx);
+  } else if (cat === "expression") {
+    const exprNode = def.$expression || { operator: "=", target: null };
+    fields = html`
+      ${renderExpressionEditor(
+        exprNode,
+        (/** @type {any} */ newNode) =>
+          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $expression: newNode })),
+        { stateDefs: Object.keys(S.document.state || {}), allowEventRef: false },
+      )}
+    `;
   }
 
   return html`${nameField}${fields}`;

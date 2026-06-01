@@ -131,7 +131,11 @@ export function stripEventHandlers(node) {
   /** @type {Record<string, unknown>} */
   const out = {};
   for (const [k, v] of Object.entries(node)) {
-    if (k.startsWith("on") && typeof v === "object" && (v?.$ref || v?.$prototype === "Function"))
+    if (
+      k.startsWith("on") &&
+      typeof v === "object" &&
+      (v?.$ref || v?.$prototype === "Function" || v?.$expression)
+    )
       continue;
     if (k === "children") {
       out.children = Array.isArray(v) ? v.map(stripEventHandlers) : stripEventHandlers(v);

@@ -195,6 +195,9 @@
           "$ref": "#/$defs/ExternalClassDef"
         },
         {
+          "$ref": "#/$defs/ExpressionEntry"
+        },
+        {
           "type": "object",
           "not": {
             "anyOf": [
@@ -211,6 +214,11 @@
               {
                 "required": [
                   "type"
+                ]
+              },
+              {
+                "required": [
+                  "$expression"
                 ]
               }
             ]
@@ -1019,1195 +1027,3281 @@
         },
         "onabort": {
           "description": "Event handler for the \"abort\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onactivate": {
           "description": "Event handler for the \"activate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onaddsourcebuffer": {
           "description": "Event handler for the \"addsourcebuffer\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onaddtrack": {
           "description": "Event handler for the \"addtrack\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onadvertisementreceived": {
           "description": "Event handler for the \"advertisementreceived\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onafterprint": {
           "description": "Event handler for the \"afterprint\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onanimationcancel": {
           "description": "Event handler for the \"animationcancel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onanimationend": {
           "description": "Event handler for the \"animationend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onanimationiteration": {
           "description": "Event handler for the \"animationiteration\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onanimationstart": {
           "description": "Event handler for the \"animationstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onappinstalled": {
           "description": "Event handler for the \"appinstalled\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onaudioend": {
           "description": "Event handler for the \"audioend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onaudioprocess": {
           "description": "Event handler for the \"audioprocess\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onaudiostart": {
           "description": "Event handler for the \"audiostart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onauxclick": {
           "description": "Event handler for the \"auxclick\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onavailabilitychanged": {
           "description": "Event handler for the \"availabilitychanged\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbackgroundfetchabort": {
           "description": "Event handler for the \"backgroundfetchabort\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbackgroundfetchclick": {
           "description": "Event handler for the \"backgroundfetchclick\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbackgroundfetchfail": {
           "description": "Event handler for the \"backgroundfetchfail\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbackgroundfetchsuccess": {
           "description": "Event handler for the \"backgroundfetchsuccess\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforeinput": {
           "description": "Event handler for the \"beforeinput\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforeinstallprompt": {
           "description": "Event handler for the \"beforeinstallprompt\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforematch": {
           "description": "Event handler for the \"beforematch\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforeprint": {
           "description": "Event handler for the \"beforeprint\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforetoggle": {
           "description": "Event handler for the \"beforetoggle\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbeforexrselect": {
           "description": "Event handler for the \"beforexrselect\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbegin": {
           "description": "Event handler for the \"begin\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onblocked": {
           "description": "Event handler for the \"blocked\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onblur": {
           "description": "Event handler for the \"blur\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onboundary": {
           "description": "Event handler for the \"boundary\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbufferedamountlow": {
           "description": "Event handler for the \"bufferedamountlow\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onbufferedchange": {
           "description": "Event handler for the \"bufferedchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncancel": {
           "description": "Event handler for the \"cancel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncanmakepayment": {
           "description": "Event handler for the \"canmakepayment\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncanplay": {
           "description": "Event handler for the \"canplay\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncanplaythrough": {
           "description": "Event handler for the \"canplaythrough\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncaptureaction": {
           "description": "Event handler for the \"captureaction\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncapturedmousechange": {
           "description": "Event handler for the \"capturedmousechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncapturehandlechange": {
           "description": "Event handler for the \"capturehandlechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onchange": {
           "description": "Event handler for the \"change\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncharacterboundsupdate": {
           "description": "Event handler for the \"characterboundsupdate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncharacteristicvaluechanged": {
           "description": "Event handler for the \"characteristicvaluechanged\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onchargingchange": {
           "description": "Event handler for the \"chargingchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onchargingtimechange": {
           "description": "Event handler for the \"chargingtimechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onclick": {
           "description": "Event handler for the \"click\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onclose": {
           "description": "Event handler for the \"close\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onclosing": {
           "description": "Event handler for the \"closing\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncommand": {
           "description": "Event handler for the \"command\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncomplete": {
           "description": "Event handler for the \"complete\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncompositionend": {
           "description": "Event handler for the \"compositionend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncompositionstart": {
           "description": "Event handler for the \"compositionstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onconnect": {
           "description": "Event handler for the \"connect\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onconnecting": {
           "description": "Event handler for the \"connecting\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onconnectionavailable": {
           "description": "Event handler for the \"connectionavailable\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onconnectionstatechange": {
           "description": "Event handler for the \"connectionstatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontentdelete": {
           "description": "Event handler for the \"contentdelete\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontextlost": {
           "description": "Event handler for the \"contextlost\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontextmenu": {
           "description": "Event handler for the \"contextmenu\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontextoverflow": {
           "description": "Event handler for the \"contextoverflow\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontextrestored": {
           "description": "Event handler for the \"contextrestored\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncontrollerchange": {
           "description": "Event handler for the \"controllerchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncookiechange": {
           "description": "Event handler for the \"cookiechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncopy": {
           "description": "Event handler for the \"copy\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncuechange": {
           "description": "Event handler for the \"cuechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncurrententrychange": {
           "description": "Event handler for the \"currententrychange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncurrentscreenchange": {
           "description": "Event handler for the \"currentscreenchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oncut": {
           "description": "Event handler for the \"cut\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondataavailable": {
           "description": "Event handler for the \"dataavailable\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondatachannel": {
           "description": "Event handler for the \"datachannel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondblclick": {
           "description": "Event handler for the \"dblclick\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondequeue": {
           "description": "Event handler for the \"dequeue\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondevicechange": {
           "description": "Event handler for the \"devicechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondevicemotion": {
           "description": "Event handler for the \"devicemotion\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondeviceorientation": {
           "description": "Event handler for the \"deviceorientation\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondeviceorientationabsolute": {
           "description": "Event handler for the \"deviceorientationabsolute\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondischargingtimechange": {
           "description": "Event handler for the \"dischargingtimechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondisconnect": {
           "description": "Event handler for the \"disconnect\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondispose": {
           "description": "Event handler for the \"dispose\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondownloadprogress": {
           "description": "Event handler for the \"downloadprogress\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondrag": {
           "description": "Event handler for the \"drag\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondragend": {
           "description": "Event handler for the \"dragend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondragenter": {
           "description": "Event handler for the \"dragenter\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondragleave": {
           "description": "Event handler for the \"dragleave\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondragover": {
           "description": "Event handler for the \"dragover\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondragstart": {
           "description": "Event handler for the \"dragstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondrop": {
           "description": "Event handler for the \"drop\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ondurationchange": {
           "description": "Event handler for the \"durationchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onemptied": {
           "description": "Event handler for the \"emptied\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onencrypted": {
           "description": "Event handler for the \"encrypted\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onend": {
           "description": "Event handler for the \"end\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onended": {
           "description": "Event handler for the \"ended\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onendstreaming": {
           "description": "Event handler for the \"endstreaming\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onenter": {
           "description": "Event handler for the \"enter\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onenterpictureinpicture": {
           "description": "Event handler for the \"enterpictureinpicture\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onerror": {
           "description": "Event handler for the \"error\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onexit": {
           "description": "Event handler for the \"exit\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfencedtreeclick": {
           "description": "Event handler for the \"fencedtreeclick\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfetch": {
           "description": "Event handler for the \"fetch\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfinish": {
           "description": "Event handler for the \"finish\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfocus": {
           "description": "Event handler for the \"focus\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onformdata": {
           "description": "Event handler for the \"formdata\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onframeratechange": {
           "description": "Event handler for the \"frameratechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfreeze": {
           "description": "Event handler for the \"freeze\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfullscreenchange": {
           "description": "Event handler for the \"fullscreenchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onfullscreenerror": {
           "description": "Event handler for the \"fullscreenerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongamepadconnected": {
           "description": "Event handler for the \"gamepadconnected\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongamepaddisconnected": {
           "description": "Event handler for the \"gamepaddisconnected\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongatheringstatechange": {
           "description": "Event handler for the \"gatheringstatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongattserverdisconnected": {
           "description": "Event handler for the \"gattserverdisconnected\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongeometrychange": {
           "description": "Event handler for the \"geometrychange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ongotpointercapture": {
           "description": "Event handler for the \"gotpointercapture\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onhashchange": {
           "description": "Event handler for the \"hashchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onicecandidate": {
           "description": "Event handler for the \"icecandidate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onicecandidateerror": {
           "description": "Event handler for the \"icecandidateerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oniceconnectionstatechange": {
           "description": "Event handler for the \"iceconnectionstatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onicegatheringstatechange": {
           "description": "Event handler for the \"icegatheringstatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oninput": {
           "description": "Event handler for the \"input\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oninputreport": {
           "description": "Event handler for the \"inputreport\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oninputsourceschange": {
           "description": "Event handler for the \"inputsourceschange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oninstall": {
           "description": "Event handler for the \"install\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "oninvalid": {
           "description": "Event handler for the \"invalid\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onisolationchange": {
           "description": "Event handler for the \"isolationchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onkeydown": {
           "description": "Event handler for the \"keydown\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onkeyframerequest": {
           "description": "Event handler for the \"keyframerequest\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onkeypress": {
           "description": "Event handler for the \"keypress\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onkeystatuseschange": {
           "description": "Event handler for the \"keystatuseschange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onkeyup": {
           "description": "Event handler for the \"keyup\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onlanguagechange": {
           "description": "Event handler for the \"languagechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onlayoutchange": {
           "description": "Event handler for the \"layoutchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onleavepictureinpicture": {
           "description": "Event handler for the \"leavepictureinpicture\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onlevelchange": {
           "description": "Event handler for the \"levelchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onload": {
           "description": "Event handler for the \"load\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadeddata": {
           "description": "Event handler for the \"loadeddata\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadedmetadata": {
           "description": "Event handler for the \"loadedmetadata\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadend": {
           "description": "Event handler for the \"loadend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloading": {
           "description": "Event handler for the \"loading\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadingdone": {
           "description": "Event handler for the \"loadingdone\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadingerror": {
           "description": "Event handler for the \"loadingerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onloadstart": {
           "description": "Event handler for the \"loadstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onlocation": {
           "description": "Event handler for the \"location\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onlostpointercapture": {
           "description": "Event handler for the \"lostpointercapture\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmanagedconfigurationchange": {
           "description": "Event handler for the \"managedconfigurationchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmark": {
           "description": "Event handler for the \"mark\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmessage": {
           "description": "Event handler for the \"message\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmessageerror": {
           "description": "Event handler for the \"messageerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmidimessage": {
           "description": "Event handler for the \"midimessage\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmousedown": {
           "description": "Event handler for the \"mousedown\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmouseenter": {
           "description": "Event handler for the \"mouseenter\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmouseleave": {
           "description": "Event handler for the \"mouseleave\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmousemove": {
           "description": "Event handler for the \"mousemove\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmouseout": {
           "description": "Event handler for the \"mouseout\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmouseover": {
           "description": "Event handler for the \"mouseover\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmouseup": {
           "description": "Event handler for the \"mouseup\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onmute": {
           "description": "Event handler for the \"mute\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnavigate": {
           "description": "Event handler for the \"navigate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnavigateerror": {
           "description": "Event handler for the \"navigateerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnavigatesuccess": {
           "description": "Event handler for the \"navigatesuccess\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnegotiationneeded": {
           "description": "Event handler for the \"negotiationneeded\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnomatch": {
           "description": "Event handler for the \"nomatch\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnotificationclick": {
           "description": "Event handler for the \"notificationclick\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onnotificationclose": {
           "description": "Event handler for the \"notificationclose\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onoffline": {
           "description": "Event handler for the \"offline\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ononline": {
           "description": "Event handler for the \"online\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onopen": {
           "description": "Event handler for the \"open\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onorientationchange": {
           "description": "Event handler for the \"orientationchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpagehide": {
           "description": "Event handler for the \"pagehide\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpagereveal": {
           "description": "Event handler for the \"pagereveal\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpageshow": {
           "description": "Event handler for the \"pageshow\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpageswap": {
           "description": "Event handler for the \"pageswap\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpaste": {
           "description": "Event handler for the \"paste\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpause": {
           "description": "Event handler for the \"pause\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpayerdetailchange": {
           "description": "Event handler for the \"payerdetailchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpaymentmethodchange": {
           "description": "Event handler for the \"paymentmethodchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpaymentrequest": {
           "description": "Event handler for the \"paymentrequest\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onperiodicsync": {
           "description": "Event handler for the \"periodicsync\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onplay": {
           "description": "Event handler for the \"play\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onplaying": {
           "description": "Event handler for the \"playing\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointercancel": {
           "description": "Event handler for the \"pointercancel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerdown": {
           "description": "Event handler for the \"pointerdown\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerenter": {
           "description": "Event handler for the \"pointerenter\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerleave": {
           "description": "Event handler for the \"pointerleave\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerlockchange": {
           "description": "Event handler for the \"pointerlockchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerlockerror": {
           "description": "Event handler for the \"pointerlockerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointermove": {
           "description": "Event handler for the \"pointermove\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerout": {
           "description": "Event handler for the \"pointerout\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerover": {
           "description": "Event handler for the \"pointerover\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerrawupdate": {
           "description": "Event handler for the \"pointerrawupdate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpointerup": {
           "description": "Event handler for the \"pointerup\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpopstate": {
           "description": "Event handler for the \"popstate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onportalactivate": {
           "description": "Event handler for the \"portalactivate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onprerenderingchange": {
           "description": "Event handler for the \"prerenderingchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onprioritychange": {
           "description": "Event handler for the \"prioritychange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onprocessorerror": {
           "description": "Event handler for the \"processorerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onprogress": {
           "description": "Event handler for the \"progress\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpromptaction": {
           "description": "Event handler for the \"promptaction\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpromptdismiss": {
           "description": "Event handler for the \"promptdismiss\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpush": {
           "description": "Event handler for the \"push\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onpushsubscriptionchange": {
           "description": "Event handler for the \"pushsubscriptionchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onquotaoverflow": {
           "description": "Event handler for the \"quotaoverflow\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onratechange": {
           "description": "Event handler for the \"ratechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onreading": {
           "description": "Event handler for the \"reading\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onreadingerror": {
           "description": "Event handler for the \"readingerror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onreadystatechange": {
           "description": "Event handler for the \"readystatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onredraw": {
           "description": "Event handler for the \"redraw\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onreflectionchange": {
           "description": "Event handler for the \"reflectionchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onrejectionhandled": {
           "description": "Event handler for the \"rejectionhandled\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onrelease": {
           "description": "Event handler for the \"release\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onremove": {
           "description": "Event handler for the \"remove\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onremovesourcebuffer": {
           "description": "Event handler for the \"removesourcebuffer\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onremovetrack": {
           "description": "Event handler for the \"removetrack\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onrepeat": {
           "description": "Event handler for the \"repeat\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onreset": {
           "description": "Event handler for the \"reset\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onresize": {
           "description": "Event handler for the \"resize\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onresourcetimingbufferfull": {
           "description": "Event handler for the \"resourcetimingbufferfull\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onresult": {
           "description": "Event handler for the \"result\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onresume": {
           "description": "Event handler for the \"resume\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onrtctransform": {
           "description": "Event handler for the \"rtctransform\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onscreenschange": {
           "description": "Event handler for the \"screenschange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onscroll": {
           "description": "Event handler for the \"scroll\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onscrollend": {
           "description": "Event handler for the \"scrollend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsecuritypolicyviolation": {
           "description": "Event handler for the \"securitypolicyviolation\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onseeked": {
           "description": "Event handler for the \"seeked\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onseeking": {
           "description": "Event handler for the \"seeking\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onselect": {
           "description": "Event handler for the \"select\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onselectedcandidatepairchange": {
           "description": "Event handler for the \"selectedcandidatepairchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onselectend": {
           "description": "Event handler for the \"selectend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onselectionchange": {
           "description": "Event handler for the \"selectionchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onselectstart": {
           "description": "Event handler for the \"selectstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onserviceadded": {
           "description": "Event handler for the \"serviceadded\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onservicechanged": {
           "description": "Event handler for the \"servicechanged\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onserviceremoved": {
           "description": "Event handler for the \"serviceremoved\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onshippingaddresschange": {
           "description": "Event handler for the \"shippingaddresschange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onshippingoptionchange": {
           "description": "Event handler for the \"shippingoptionchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onshow": {
           "description": "Event handler for the \"show\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsignalingstatechange": {
           "description": "Event handler for the \"signalingstatechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsinkchange": {
           "description": "Event handler for the \"sinkchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onslotchange": {
           "description": "Event handler for the \"slotchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsnapchanged": {
           "description": "Event handler for the \"snapchanged\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsnapchanging": {
           "description": "Event handler for the \"snapchanging\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsoundend": {
           "description": "Event handler for the \"soundend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsoundstart": {
           "description": "Event handler for the \"soundstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsourceclose": {
           "description": "Event handler for the \"sourceclose\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsourceended": {
           "description": "Event handler for the \"sourceended\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsourceopen": {
           "description": "Event handler for the \"sourceopen\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onspeechend": {
           "description": "Event handler for the \"speechend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onspeechstart": {
           "description": "Event handler for the \"speechstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsqueeze": {
           "description": "Event handler for the \"squeeze\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsqueezeend": {
           "description": "Event handler for the \"squeezeend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsqueezestart": {
           "description": "Event handler for the \"squeezestart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstalled": {
           "description": "Event handler for the \"stalled\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstart": {
           "description": "Event handler for the \"start\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstartstreaming": {
           "description": "Event handler for the \"startstreaming\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstatechange": {
           "description": "Event handler for the \"statechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstop": {
           "description": "Event handler for the \"stop\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onstorage": {
           "description": "Event handler for the \"storage\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsubmit": {
           "description": "Event handler for the \"submit\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsuccess": {
           "description": "Event handler for the \"success\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsuspend": {
           "description": "Event handler for the \"suspend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onsync": {
           "description": "Event handler for the \"sync\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onterminate": {
           "description": "Event handler for the \"terminate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontextformatupdate": {
           "description": "Event handler for the \"textformatupdate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontextupdate": {
           "description": "Event handler for the \"textupdate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontimeout": {
           "description": "Event handler for the \"timeout\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontimeupdate": {
           "description": "Event handler for the \"timeupdate\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontoggle": {
           "description": "Event handler for the \"toggle\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontonechange": {
           "description": "Event handler for the \"tonechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontoolchange": {
           "description": "Event handler for the \"toolchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontouchcancel": {
           "description": "Event handler for the \"touchcancel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontouchend": {
           "description": "Event handler for the \"touchend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontouchmove": {
           "description": "Event handler for the \"touchmove\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontouchstart": {
           "description": "Event handler for the \"touchstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontrack": {
           "description": "Event handler for the \"track\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontransitioncancel": {
           "description": "Event handler for the \"transitioncancel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontransitionend": {
           "description": "Event handler for the \"transitionend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontransitionrun": {
           "description": "Event handler for the \"transitionrun\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "ontransitionstart": {
           "description": "Event handler for the \"transitionstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onuncapturederror": {
           "description": "Event handler for the \"uncapturederror\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onunhandledrejection": {
           "description": "Event handler for the \"unhandledrejection\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onunload": {
           "description": "Event handler for the \"unload\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onunmute": {
           "description": "Event handler for the \"unmute\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onupdate": {
           "description": "Event handler for the \"update\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onupdateend": {
           "description": "Event handler for the \"updateend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onupdatefound": {
           "description": "Event handler for the \"updatefound\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onupdatestart": {
           "description": "Event handler for the \"updatestart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onupgradeneeded": {
           "description": "Event handler for the \"upgradeneeded\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onvalidationstatuschange": {
           "description": "Event handler for the \"validationstatuschange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onversionchange": {
           "description": "Event handler for the \"versionchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onvisibilitychange": {
           "description": "Event handler for the \"visibilitychange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onvoiceschanged": {
           "description": "Event handler for the \"voiceschanged\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onvolumechange": {
           "description": "Event handler for the \"volumechange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwaiting": {
           "description": "Event handler for the \"waiting\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwaitingforkey": {
           "description": "Event handler for the \"waitingforkey\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwebkitanimationend": {
           "description": "Event handler for the \"webkitanimationend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwebkitanimationiteration": {
           "description": "Event handler for the \"webkitanimationiteration\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwebkitanimationstart": {
           "description": "Event handler for the \"webkitanimationstart\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwebkittransitionend": {
           "description": "Event handler for the \"webkittransitionend\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onwheel": {
           "description": "Event handler for the \"wheel\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         },
         "onzoomlevelchange": {
           "description": "Event handler for the \"zoomlevelchange\" event.",
-          "$ref": "#/$defs/RefObject"
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RefObject"
+            },
+            {
+              "$ref": "#/$defs/ExpressionEntry"
+            }
+          ]
         }
       },
       "additionalProperties": {
@@ -18767,6 +20861,339 @@
         "$map/item/text",
         "$map/item/done"
       ]
+    },
+    "ExpressionPointer": {
+      "description": "A JSON Pointer $ref operand within an expression node.",
+      "type": "object",
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "pattern": "^(\\$map/|\\$reduce/|event#/|#/|parent#/|window#/|document#/)"
+        }
+      },
+      "required": [
+        "$ref"
+      ],
+      "additionalProperties": false
+    },
+    "ExpressionLiteral": {
+      "description": "A non-reactive operand: scalar or array of operands.",
+      "anyOf": [
+        {
+          "type": "string",
+          "not": {
+            "pattern": "\\$\\{"
+          }
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExpressionOperand"
+          }
+        }
+      ]
+    },
+    "ExpressionOperand": {
+      "description": "Anything that may appear in target or value: a pointer, a literal, or a nested expression node.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ExpressionPointer"
+        },
+        {
+          "$ref": "#/$defs/ExpressionNode"
+        },
+        {
+          "$ref": "#/$defs/ExpressionLiteral"
+        }
+      ]
+    },
+    "UnaryOperator": {
+      "enum": [
+        "!",
+        "-"
+      ]
+    },
+    "BinaryOperator": {
+      "enum": [
+        "+",
+        "-",
+        "*",
+        "/",
+        "%",
+        "===",
+        "!==",
+        "<",
+        "<=",
+        ">",
+        ">=",
+        "&&",
+        "||"
+      ]
+    },
+    "AssignmentOperator": {
+      "enum": [
+        "=",
+        "+=",
+        "-=",
+        "*=",
+        "/="
+      ]
+    },
+    "NoArgMethod": {
+      "enum": [
+        "pop",
+        "shift"
+      ]
+    },
+    "OneArgMethod": {
+      "enum": [
+        "push",
+        "unshift"
+      ]
+    },
+    "SpliceMethod": {
+      "const": "splice"
+    },
+    "ReduceMethod": {
+      "const": "reduce"
+    },
+    "MapFilterMethod": {
+      "enum": [
+        "map",
+        "filter"
+      ]
+    },
+    "ExpressionNode": {
+      "description": "The core expression node. operator + target, with value gated by arity.",
+      "type": "object",
+      "required": [
+        "operator",
+        "target"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/ExpressionOperand"
+        },
+        "value": {
+          "$ref": "#/$defs/ExpressionOperand"
+        },
+        "initial": {
+          "$ref": "#/$defs/ExpressionOperand"
+        }
+      },
+      "oneOf": [
+        {
+          "title": "Unary — target only, no value",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/UnaryOperator"
+            }
+          },
+          "required": [
+            "operator"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "initial"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "title": "Binary — left in target, right in value",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/BinaryOperator"
+            }
+          },
+          "required": [
+            "operator",
+            "value"
+          ],
+          "not": {
+            "required": [
+              "initial"
+            ]
+          }
+        },
+        {
+          "title": "Assignment — writable target, value required",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/AssignmentOperator"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            }
+          },
+          "required": [
+            "operator",
+            "value"
+          ],
+          "not": {
+            "required": [
+              "initial"
+            ]
+          }
+        },
+        {
+          "title": "pop / shift — array receiver, no value",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/NoArgMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            }
+          },
+          "required": [
+            "operator"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "value"
+                ]
+              },
+              {
+                "required": [
+                  "initial"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "title": "push / unshift — array receiver, single value argument",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/OneArgMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            }
+          },
+          "required": [
+            "operator",
+            "value"
+          ],
+          "not": {
+            "required": [
+              "initial"
+            ]
+          }
+        },
+        {
+          "title": "splice — array receiver, [start, deleteCount, ...items]",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/SpliceMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ExpressionOperand"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "operator",
+            "value"
+          ],
+          "not": {
+            "required": [
+              "initial"
+            ]
+          }
+        },
+        {
+          "title": "reduce — pure fold; per-item expression in value, seed in initial",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/ReduceMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            },
+            "value": {
+              "$ref": "#/$defs/ExpressionNode"
+            }
+          },
+          "required": [
+            "operator",
+            "value",
+            "initial"
+          ]
+        },
+        {
+          "title": "map / filter — pure; per-item expression in value, no initial",
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/MapFilterMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            },
+            "value": {
+              "$ref": "#/$defs/ExpressionNode"
+            }
+          },
+          "required": [
+            "operator",
+            "value"
+          ],
+          "not": {
+            "required": [
+              "initial"
+            ]
+          }
+        }
+      ]
+    },
+    "ExpressionEntry": {
+      "description": "A declarative expression entry (Shape 5). Used as a state entry or inline event handler.",
+      "type": "object",
+      "required": [
+        "$expression"
+      ],
+      "properties": {
+        "$expression": {
+          "$ref": "#/$defs/ExpressionNode"
+        },
+        "$title": {
+          "type": "string"
+        },
+        "$description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
     "ElementPropertyValue": {
       "oneOf": [

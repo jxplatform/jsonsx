@@ -21,6 +21,7 @@ import {
   Jx,
   setSkipServerFunctions,
 } from "../src/runtime.js";
+import { evaluateExpression, isMutating } from "../src/expression.js";
 
 /** @type {(...args: Parameters<typeof _renderNode>) => HTMLElement} */
 const renderNode = /** @type {any} */ (_renderNode);
@@ -1501,5 +1502,312 @@ describe("applyStyle — non-media at-rules", () => {
     applyStyle(el, { "@--lg": { fontSize: "20px" } }, { "--lg": "(min-width: 1024px)" });
     const style = /** @type {HTMLStyleElement} */ (document.head.querySelector("style"));
     expect(style.textContent).toContain("@media (min-width: 1024px)");
+  });
+});
+
+// ─── $expression (Shape 5) ───────────────────────────────────────────────────
+
+describe("isMutating", () => {
+  test("identifies mutating operators", () => {
+    expect(isMutating("=")).toBe(true);
+    expect(isMutating("+=")).toBe(true);
+    expect(isMutating("push")).toBe(true);
+    expect(isMutating("splice")).toBe(true);
+  });
+  test("identifies pure operators", () => {
+    expect(isMutating("+")).toBe(false);
+    expect(isMutating("!")).toBe(false);
+    expect(isMutating("===")).toBe(false);
+    expect(isMutating("reduce")).toBe(false);
+  });
+});
+
+describe("evaluateExpression — pure operators", () => {
+  const state = reactive({ count: 5, flag: true, items: [1, 2, 3] });
+
+  test("unary ! negation", () => {
+    const node = { operator: "!", target: { $ref: "#/state/flag" } };
+    expect(evaluateExpression(node, state, null)).toBe(false);
+  });
+
+  test("unary - negation", () => {
+    const node = { operator: "-", target: { $ref: "#/state/count" } };
+    expect(evaluateExpression(node, state, null)).toBe(-5);
+  });
+
+  test("binary arithmetic +", () => {
+    const node = { operator: "+", target: { $ref: "#/state/count" }, value: 3 };
+    expect(evaluateExpression(node, state, null)).toBe(8);
+  });
+
+  test("binary arithmetic *", () => {
+    const node = { operator: "*", target: 4, value: 3 };
+    expect(evaluateExpression(node, state, null)).toBe(12);
+  });
+
+  test("comparison ===", () => {
+    const node = { operator: "===", target: { $ref: "#/state/count" }, value: 5 };
+    expect(evaluateExpression(node, state, null)).toBe(true);
+  });
+
+  test("comparison !==", () => {
+    const node = { operator: "!==", target: { $ref: "#/state/count" }, value: 3 };
+    expect(evaluateExpression(node, state, null)).toBe(true);
+  });
+
+  test("logical &&", () => {
+    const node = {
+      operator: "&&",
+      target: { $ref: "#/state/flag" },
+      value: { $ref: "#/state/count" },
+    };
+    expect(evaluateExpression(node, state, null)).toBe(5);
+  });
+
+  test("logical ||", () => {
+    const node = { operator: "||", target: false, value: { $ref: "#/state/count" } };
+    expect(evaluateExpression(node, state, null)).toBe(5);
+  });
+
+  test("nested expression: count + 1", () => {
+    const node = {
+      operator: "+",
+      target: { $ref: "#/state/count" },
+      value: { operator: "*", target: 2, value: 3 },
+    };
+    expect(evaluateExpression(node, state, null)).toBe(11);
+  });
+
+  test("throws on unknown operator", () => {
+    const node = { operator: "**", target: 2, value: 3 };
+    expect(() => evaluateExpression(node, state, null)).toThrow('unknown operator "**"');
+  });
+});
+
+describe("evaluateExpression — mutating operators", () => {
+  test("assignment =", () => {
+    const state = reactive({ count: 0 });
+    const node = { operator: "=", target: { $ref: "#/state/count" }, value: 42 };
+    evaluateExpression(node, state, null);
+    expect(state.count).toBe(42);
+  });
+
+  test("compound +=", () => {
+    const state = reactive({ count: 10 });
+    const node = { operator: "+=", target: { $ref: "#/state/count" }, value: 5 };
+    evaluateExpression(node, state, null);
+    expect(state.count).toBe(15);
+  });
+
+  test("compound -=", () => {
+    const state = reactive({ count: 10 });
+    const node = { operator: "-=", target: { $ref: "#/state/count" }, value: 3 };
+    evaluateExpression(node, state, null);
+    expect(state.count).toBe(7);
+  });
+
+  test("toggle via = and nested !", () => {
+    const state = reactive({ dark: false });
+    const node = {
+      operator: "=",
+      target: { $ref: "#/state/dark" },
+      value: { operator: "!", target: { $ref: "#/state/dark" } },
+    };
+    evaluateExpression(node, state, null);
+    expect(state.dark).toBe(true);
+    evaluateExpression(node, state, null);
+    expect(state.dark).toBe(false);
+  });
+
+  test("push to array", () => {
+    const state = reactive({ items: [1, 2] });
+    const node = { operator: "push", target: { $ref: "#/state/items" }, value: 3 };
+    evaluateExpression(node, state, null);
+    expect(state.items).toEqual([1, 2, 3]);
+  });
+
+  test("pop from array", () => {
+    const state = reactive({ items: [1, 2, 3] });
+    const node = { operator: "pop", target: { $ref: "#/state/items" } };
+    evaluateExpression(node, state, null);
+    expect(state.items).toEqual([1, 2]);
+  });
+
+  test("splice array", () => {
+    const state = reactive({ items: ["a", "b", "c", "d"] });
+    const node = { operator: "splice", target: { $ref: "#/state/items" }, value: [1, 2] };
+    evaluateExpression(node, state, null);
+    expect(state.items).toEqual(["a", "d"]);
+  });
+
+  test("assignment with event# ref", () => {
+    const state = reactive({ name: "" });
+    const event = { target: { value: "hello" } };
+    const node = {
+      operator: "=",
+      target: { $ref: "#/state/name" },
+      value: { $ref: "event#/target/value" },
+    };
+    evaluateExpression(node, state, /** @type {any} */ (event), undefined);
+    expect(state.name).toBe("hello");
+  });
+
+  test("assignment to nested path", () => {
+    const state = reactive({ user: { name: "old" } });
+    const node = { operator: "=", target: { $ref: "#/state/user/name" }, value: "new" };
+    evaluateExpression(node, state, null);
+    expect(state.user.name).toBe("new");
+  });
+});
+
+describe("evaluateExpression — aggregates", () => {
+  test("reduce: sum", () => {
+    const state = reactive({ nums: [1, 2, 3, 4] });
+    const node = {
+      operator: "reduce",
+      target: { $ref: "#/state/nums" },
+      initial: 0,
+      value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+    };
+    expect(evaluateExpression(node, state, null)).toBe(10);
+  });
+
+  test("reduce: cart total (acc + price * qty)", () => {
+    const state = reactive({
+      cart: [
+        { price: 10, qty: 2 },
+        { price: 5, qty: 3 },
+      ],
+    });
+    const node = {
+      operator: "reduce",
+      target: { $ref: "#/state/cart" },
+      initial: 0,
+      value: {
+        operator: "+",
+        target: { $ref: "$reduce/acc" },
+        value: {
+          operator: "*",
+          target: { $ref: "$map/item/price" },
+          value: { $ref: "$map/item/qty" },
+        },
+      },
+    };
+    expect(evaluateExpression(node, state, null)).toBe(35);
+  });
+
+  test("map: double each item", () => {
+    const state = reactive({ nums: [1, 2, 3] });
+    const node = {
+      operator: "map",
+      target: { $ref: "#/state/nums" },
+      value: { operator: "*", target: { $ref: "$map/item" }, value: 2 },
+    };
+    expect(evaluateExpression(node, state, null)).toEqual([2, 4, 6]);
+  });
+
+  test("filter: keep items > 2", () => {
+    const state = reactive({ nums: [1, 2, 3, 4] });
+    const node = {
+      operator: "filter",
+      target: { $ref: "#/state/nums" },
+      value: { operator: ">", target: { $ref: "$map/item" }, value: 2 },
+    };
+    expect(evaluateExpression(node, state, null)).toEqual([3, 4]);
+  });
+});
+
+describe("buildScope — $expression (Shape 5)", () => {
+  test("mutating expression becomes a handler function", async () => {
+    const scope = await buildScope({
+      state: {
+        count: 0,
+        increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+      },
+    });
+    expect(typeof scope.increment).toBe("function");
+    scope.increment(scope, null);
+    expect(scope.count).toBe(1);
+  });
+
+  test("pure expression becomes a computed value", async () => {
+    const scope = await buildScope({
+      state: {
+        a: 3,
+        b: 4,
+        sum: {
+          $expression: {
+            operator: "+",
+            target: { $ref: "#/state/a" },
+            value: { $ref: "#/state/b" },
+          },
+        },
+      },
+    });
+    expect(scope.sum).toBe(7);
+  });
+
+  test("pure reduce expression is reactive", async () => {
+    const scope = await buildScope({
+      state: {
+        nums: [1, 2, 3],
+        total: {
+          $expression: {
+            operator: "reduce",
+            target: { $ref: "#/state/nums" },
+            initial: 0,
+            value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+          },
+        },
+      },
+    });
+    expect(scope.total).toBe(6);
+    scope.nums.push(4);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(scope.total).toBe(10);
+  });
+
+  test("named expression bound via $ref from event handler", async () => {
+    const scope = await buildScope({
+      state: {
+        count: 0,
+        increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+      },
+    });
+    const el = renderNode({ tagName: "button", onclick: { $ref: "#/state/increment" } }, scope);
+    el.dispatchEvent(new Event("click"));
+    expect(scope.count).toBe(1);
+  });
+
+  test("inline $expression on event handler", async () => {
+    const scope = await buildScope({ state: { count: 0 } });
+    const el = renderNode(
+      {
+        tagName: "button",
+        onclick: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 5 } },
+      },
+      scope,
+    );
+    el.dispatchEvent(new Event("click"));
+    expect(scope.count).toBe(5);
+  });
+
+  test("$expression not treated as plain object value", async () => {
+    const scope = await buildScope({
+      state: {
+        toggle: {
+          $expression: {
+            operator: "=",
+            target: { $ref: "#/state/on" },
+            value: { operator: "!", target: { $ref: "#/state/on" } },
+          },
+        },
+        on: false,
+      },
+    });
+    expect(typeof scope.toggle).toBe("function");
+    expect(scope.on).toBe(false);
+    scope.toggle(scope, null);
+    expect(scope.on).toBe(true);
   });
 });

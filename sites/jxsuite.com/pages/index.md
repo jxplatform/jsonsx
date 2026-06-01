@@ -26,6 +26,7 @@ $elements:
   - "$ref": "../components/stat-card.json"
   - "$ref": "../components/pillar-card.json"
   - "$ref": "../components/section-label.json"
+  - "$ref": "../components/interactive-demo.json"
 ---
 
 ::::::hero{style.padding="clamp(5rem, 12vw, 10rem) clamp(1rem, 3vw, 2rem) clamp(4rem, 8vw, 6rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
@@ -140,54 +141,15 @@ Every alternative solves one problem and creates another. Jx is the synthesis.
 ::section-label{props.text="How It Works"}
 
 :::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
-JSON in, HTML out.
+JSON in, components out.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
-Write a JSON document — or design it visually in Studio. The compiler produces static HTML with zero JavaScript by default.
+Declare state and behavior in JSON. The compiler produces a reactive web component — or static HTML with zero JavaScript.
 :::
 ::::
 
-::::div{style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="1.5rem" style.--md.gridTemplateColumns="1fr"}
-:::code-panel{props.filename="hero.json" props.badge="INPUT"}
-
-```
-{
-  "tagName": "section",
-  "style": {
-    "padding": "4rem 2rem",
-    "textAlign": "center"
-  },
-  "children": [
-    {
-      "tagName": "h1",
-      "textContent": "Welcome to ${state.name}"
-    },
-    {
-      "tagName": "p",
-      "textContent": "${state.description}"
-    }
-  ]
-}
-```
-
-:::
-
-:::code-panel{props.filename="index.html" props.badge="OUTPUT"}
-
-```
-<section style="padding:4rem 2rem;
-  text-align:center">
-  <h1>Welcome to Acme Corp</h1>
-  <p>We build things that matter.</p>
-</section>
-
-<!-- Zero JavaScript. Pure HTML + CSS.
-     Deploys to any static host. -->
-```
-
-:::
-::::
+::interactive-demo{}
 :::::
 ::::::
 

@@ -194,4 +194,41 @@ describe("generateSchema", () => {
     expect(schema.$defs.StateRef.pattern).toBe("^#/state/");
     expect(schema.$defs.MapRef.pattern).toBe("^\\$map/(item|index)(/.*)?$");
   });
+
+  test("ExpressionEntry is defined in schema $defs", async () => {
+    const schema = /** @type {any} */ (await generateSchema());
+    expect(schema.$defs.ExpressionEntry).toBeDefined();
+    expect(schema.$defs.ExpressionEntry.required).toContain("$expression");
+  });
+
+  test("ExpressionNode enforces operator-specific constraints via oneOf", async () => {
+    const schema = /** @type {any} */ (await generateSchema());
+    const node = schema.$defs.ExpressionNode;
+    expect(node.oneOf.length).toBeGreaterThanOrEqual(7);
+  });
+
+  test("StateEntry includes ExpressionEntry (Shape 5)", async () => {
+    const schema = /** @type {any} */ (await generateSchema());
+    const stateEntry = schema.$defs.StateEntry;
+    const refs = stateEntry.oneOf
+      .filter(/** @param {any} e */ (e) => e.$ref)
+      .map(/** @param {any} e */ (e) => e.$ref);
+    expect(refs).toContain("#/$defs/ExpressionEntry");
+  });
+
+  test("event handlers accept ExpressionEntry inline", async () => {
+    const schema = /** @type {any} */ (await generateSchema());
+    const onclick = schema.$defs.ElementDef.properties.onclick;
+    const refs = onclick.oneOf.map(/** @param {any} e */ (e) => e.$ref);
+    expect(refs).toContain("#/$defs/ExpressionEntry");
+    expect(refs).toContain("#/$defs/RefObject");
+  });
+
+  test("ExpressionEntry plain object exclusion prevents false match", async () => {
+    const schema = /** @type {any} */ (await generateSchema());
+    const plainObj = schema.$defs.StateEntry.oneOf.find(
+      /** @param {any} e */ (e) => e.type === "object" && e.not,
+    );
+    expect(JSON.stringify(plainObj.not)).toContain("$expression");
+  });
 });

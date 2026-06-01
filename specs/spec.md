@@ -484,13 +484,16 @@ For each entry in state:
 2. Value is a string, number, boolean, null, or array?
    → Shape 1: Naked value (reactive property)
 
-3. Value is an object with "$prototype"?
+3. Value is an object with "$expression"?
+   → Shape 5: Expression (declarative operation; mutating → handler, pure → computed)
+
+4. Value is an object with "$prototype"?
    → Shape 4: Prototype (function, data source, or external class)
 
-4. Value is an object with "default" (no "$prototype")?
+5. Value is an object with "default" (no "$prototype")?
    → Shape 2: Typed value (reactive property with type metadata)
 
-5. Value is a plain object (no reserved keys)?
+6. Value is a plain object (no reserved keys)?
    → Shape 1: Object value (reactive property)
 ```
 
@@ -599,11 +602,13 @@ When a `$ref` resolves to a reactive state property or computed, the binding is 
 
 ### 7.4 `$ref` Resolution Order
 
-1. `$map/` prefix — iteration context (highest priority)
-2. `#/state/` — current component scope
-3. `parent#/` — explicitly passed props
-4. `window#/` — global window properties
-5. `document#/` — global document properties
+1. `$map/` — iteration context (highest priority)
+2. `$reduce/acc` — fold accumulator (reduce per-item expression only)
+3. `event#/` — handler event context (handler position only)
+4. `#/state/` — current component scope
+5. `parent#/` — explicitly passed props
+6. `window#/` — global window properties
+7. `document#/` — global document properties
 
 > **Status: Implemented.** Runtime `resolveRef` handles all schemes.
 
@@ -1309,6 +1314,11 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 | `name`               | Inline function explicit name                                     |
 | `description`        | Documentation string                                              |
 | `observedAttributes` | HTML attributes the custom element watches                        |
+| `$expression`        | Declarative operation, mutating or pure (Shape 5)                 |
+| `operator`           | Operator token within an expression node                          |
+| `target`             | Operand the operator acts on                                      |
+| `value`              | Right-hand operand, or per-item expression for aggregates         |
+| `initial`            | Seed accumulator for the reduce aggregate operator                |
 | `onMount`            | Lifecycle: connected and rendered                                 |
 | `onUnmount`          | Lifecycle: disconnected                                           |
 | `onAdopted`          | Lifecycle: adopted into new document                              |
@@ -1317,15 +1327,308 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 ## 18. Standards Alignment
 
-| Feature                | Standard                        |
-| ---------------------- | ------------------------------- |
-| `$ref`, `$defs`, `$id` | JSON Schema 2020-12             |
-| JSON Pointer paths     | RFC 6901                        |
-| Reactivity             | `@vue/reactivity` (Vue 3)       |
-| Custom elements        | Web Components v1               |
-| Style properties       | CSSOM camelCase                 |
-| Media breakpoints      | CSS `@custom-media` convention  |
-| Module loading         | ECMAScript Modules / `import()` |
+| Feature                 | Standard                        |
+| ----------------------- | ------------------------------- |
+| `$ref`, `$defs`, `$id`  | JSON Schema 2020-12             |
+| JSON Pointer paths      | RFC 6901                        |
+| Reactivity              | `@vue/reactivity` (Vue 3)       |
+| Custom elements         | Web Components v1               |
+| Style properties        | CSSOM camelCase                 |
+| Media breakpoints       | CSS `@custom-media` convention  |
+| Module loading          | ECMAScript Modules / `import()` |
+| `$expression` operators | ECMAScript operator punctuators |
+| Array / aggregate ops   | ECMAScript `Array.prototype`    |
+| `event#` scheme         | DOM `Event` interface           |
+
+---
+
+## 19. Declarative Expressions (`$expression`)
+
+### 19.1 Motivation
+
+The Rule of Least Power (§2.2) defines a ladder of escalating power:
+
+> `$ref` bindings → template expressions → handler functions
+
+A gap exists between the third and fourth rungs. The moment an interaction must _write_ state — `state.count++`, `state.items.push(x)` — the only available tool is a Shape 4 `$prototype: "Function"` with a `body` string. A `body` string is opaque JavaScript: it cannot be validated by JSON Schema tooling, inspected by the visual builder, or analyzed by the compiler without parsing embedded source.
+
+`$expression` introduces the missing rung: a **declarative operation** that mutates state through structure rather than through an interpreted string. It covers the common case of simple event-driven state changes — toggling a boolean, incrementing a counter, adding or removing array items — while `body` remains the escape hatch for logic that cannot be expressed declaratively.
+
+This mirrors the relationship between `${}` and `$ref` established in §6.5: prefer the least powerful form; escalate only when necessary.
+
+| Rung                     | Power   | Static-analyzable  | Use when                                    |
+| ------------------------ | ------- | ------------------ | ------------------------------------------- |
+| `$ref` binding           | Lowest  | Yes                | Reading a signal                            |
+| `${}` template           | Low     | Yes                | Single-use computed read                    |
+| **`$expression`**        | **Mid** | **Yes**            | **Simple declarative state mutation**       |
+| `$prototype: "Function"` | Highest | No (`body` opaque) | Logic not expressible as a single operation |
+
+### 19.2 Form
+
+An `$expression` entry is an object containing a single `$expression` key whose value is an **expression node**. An expression node applies an `operator` to a `target`, optionally with a `value`:
+
+```json
+{
+  "$expression": {
+    "operator": "=",
+    "target": { "$ref": "#/state/darkMode" },
+    "value": { "operator": "!", "target": { "$ref": "#/state/darkMode" } }
+  }
+}
+```
+
+| Field      | Required          | Description                                                             |
+| ---------- | ----------------- | ----------------------------------------------------------------------- |
+| `operator` | Yes               | An operator token from the blessed set (§19.4)                          |
+| `target`   | Yes               | The operand the operator acts on. A `$ref`, a literal, or a nested node |
+| `value`    | By operator arity | The right-hand operand. A `$ref`, a literal, an array, or a nested node |
+
+**Operand resolution.** `target` and `value` are resolved with the same rules as any `$ref` (§7.4). Consistent with §2.3, all references to state use explicit JSON Pointer `$ref` — never a raw `state.x` string. A `target` of `{ "$ref": "$map/item/qty" }` therefore resolves through map context exactly as elsewhere in the document.
+
+**Recursion.** A `value` or `target` may itself be an expression node (no `$expression` wrapper required on nested nodes — the wrapper appears only at the `state` entry or handler boundary). This permits compound expressions such as `counter = counter + 1`:
+
+```json
+{
+  "$expression": {
+    "operator": "=",
+    "target": { "$ref": "#/state/counter" },
+    "value": { "operator": "+", "target": { "$ref": "#/state/counter" }, "value": 1 }
+  }
+}
+```
+
+### 19.3 Operator Arity
+
+An expression node is one of two **modes**, determined entirely by its operator:
+
+- **Mutating** — the node writes to its `target` and returns nothing. Used as an event handler. (`=`, the compound assigns, and the array-mutation methods.)
+- **Pure** — the node computes and returns a value, mutating nothing. Used as a computed `state` value or as a nested operand. (Unary, binary, and the aggregate operators.)
+
+The mode is not declared; it follows from the blessed operator set (§19.4). The compiler routes a mutating node to a handler and a pure node to a `computed()` (§19.8). A pure node may nest inside either mode; a mutating node may only appear at a handler boundary, never as an operand.
+
+| Arity      | Mode     | Uses `target`  | Uses `value`        | Operators                                   |
+| ---------- | -------- | -------------- | ------------------- | ------------------------------------------- |
+| Unary      | Pure     | Yes            | No                  | `!`, `-` (negation)                         |
+| Binary     | Pure     | Yes (left)     | Yes (right)         | `+ - * / %`, `=== !== < <= > >=`, `&& \|\|` |
+| Assignment | Mutating | Yes (LHS)      | Yes (RHS)           | `=`, `+= -= *= /=`                          |
+| Method     | Mutating | Yes (receiver) | Args (see below)    | `push`, `pop`, `shift`, `unshift`, `splice` |
+| Aggregate  | Pure     | Yes (source)   | Per-item expression | `reduce`, `map`, `filter` (see §19.4a)      |
+
+For **binary** operators, `target` is the left operand and `value` the right; the result is a value (it does not mutate). For **assignment** operators, `target` is the assignable location (a writable `$ref`) and the operation mutates it. For **method** operators, `target` is the array receiver and `value` carries the arguments: a single value for `push`/`unshift`, an array of arguments for `splice` (`[start, deleteCount, ...items]`), and omitted for `pop`/`shift`. **Aggregate** operators are defined in §19.4a.
+
+```json
+{ "operator": "push",   "target": { "$ref": "#/state/cart" }, "value": { "$ref": "$map/item" } }
+{ "operator": "splice", "target": { "$ref": "#/state/cart" }, "value": [{ "$ref": "$map/index" }, 1] }
+{ "operator": "pop",    "target": { "$ref": "#/state/cart" } }
+{ "operator": "+=",     "target": { "$ref": "$map/item/qty" }, "value": 1 }
+```
+
+### 19.4 Blessed Operator Set
+
+The operator set is **closed**. An operator outside this list is a compile-time error; logic requiring it must use a `body` string. The set is chosen to cover the mutation patterns already present in `body` strings across the existing examples (e.g. Appendix A's `push`, `splice`, and `!`-toggle handlers).
+
+| Category               | Tokens                                  |
+| ---------------------- | --------------------------------------- |
+| Assignment             | `=` `+=` `-=` `*=` `/=`                 |
+| Unary                  | `!` `-`                                 |
+| Arithmetic (binary)    | `+` `-` `*` `/` `%`                     |
+| Comparison             | `===` `!==` `<` `<=` `>` `>=`           |
+| Logical (binary)       | `&&` `\|\|`                             |
+| Array mutation methods | `push` `pop` `shift` `unshift` `splice` |
+| Aggregate (pure)       | `reduce` `map` `filter`                 |
+
+All tokens except the methods are genuine ECMAScript operator punctuators. The array and aggregate methods are genuine `Array.prototype` methods. No token in this table is invented.
+
+### 19.4a Aggregate Operators
+
+Aggregate operators are **pure** (§19.1): they read an array `target` and return a derived value, mutating nothing. They are the declarative replacement for the callback-in-a-string pattern a Shape 3 template would otherwise require (`"${state.cart.reduce(...)}"`), keeping the per-item computation as an inspectable expression tree rather than opaque source.
+
+Their `value` is a single **per-item expression node** evaluated once per element of `target`, in a scope where the existing `$map/` context (§7.2) is bound to the current element:
+
+| Reference                   | Bound during aggregation             |
+| --------------------------- | ------------------------------------ |
+| `{ "$ref": "$map/item" }`   | The current array element            |
+| `{ "$ref": "$map/index" }`  | The current zero-based integer index |
+| `{ "$ref": "$reduce/acc" }` | The accumulator (`reduce` only)      |
+
+This is the same `$map/` binding §10.2 establishes for mapped-array templates; an aggregate's per-item expression is conceptually identical to a `map`'s per-item template, so no new iteration concept is introduced. `$reduce/acc` is the sole new pointer — the fold accumulator, resolvable only inside a `reduce` per-item expression.
+
+| Operator | `value` (per-item expression)              | `initial`  | Returns                            |
+| -------- | ------------------------------------------ | ---------- | ---------------------------------- |
+| `reduce` | step: combines `$reduce/acc` with the item | Required   | The final accumulator value        |
+| `map`    | the value to produce per item              | Disallowed | A new array of the produced values |
+| `filter` | a predicate (truthy = keep)                | Disallowed | A new array of the kept elements   |
+
+`reduce` requires an `initial` field — the seed accumulator. `map` and `filter` must not declare `initial`.
+
+**Cart total** — `cart.reduce((acc, item) => acc + item.price * item.qty, 0)`:
+
+```json
+{
+  "total": {
+    "$expression": {
+      "operator": "reduce",
+      "target": { "$ref": "#/state/cart" },
+      "initial": 0,
+      "value": {
+        "operator": "+",
+        "target": { "$ref": "$reduce/acc" },
+        "value": {
+          "operator": "*",
+          "target": { "$ref": "$map/item/price" },
+          "value": { "$ref": "$map/item/qty" }
+        }
+      }
+    }
+  }
+}
+```
+
+**Filter then count** composes by nesting an aggregate as the `target` of another — `cart.filter(i => i.qty > 0)`:
+
+```json
+{
+  "operator": "filter",
+  "target": { "$ref": "#/state/cart" },
+  "value": { "operator": ">", "target": { "$ref": "$map/item/qty" }, "value": 0 }
+}
+```
+
+Aggregate `map`/`filter` are the inline, declarative form of the `filter`/`sort` hooks gestured at in §10.3 — those hooks accept a `$ref` to a function today; an aggregate expression expresses the same predicate structurally.
+
+### 19.5 The `event#` Reference Scheme
+
+Handlers receive `(state, event)` (§4.3). To allow `$expression` handlers to read event data without escalating to a `body` string, the reference system (§7.2) is extended with one scheme:
+
+| Scheme        | Example                 | Resolves to                          |
+| ------------- | ----------------------- | ------------------------------------ |
+| Event context | `"event#/target/value"` | A property path on the handler event |
+
+`event#` is resolvable only within an expression node used as an event handler. Referencing it from a `state`-entry expression that is not invoked as a handler is a compile-time error. It is inserted into the §7.4 resolution order immediately below `$map/`:
+
+```
+1. $map/       — iteration context
+2. $reduce/acc — fold accumulator (reduce per-item expression only)
+3. event#/     — handler event context (handler position only)
+4. #/state/    — current component scope
+5. parent#/    — explicitly passed props
+6. window#/    — global window properties
+7. document#/  — global document properties
+```
+
+Example — an input handler with no `body` string:
+
+```json
+{
+  "tagName": "input",
+  "attributes": { "placeholder": "Item name" },
+  "oninput": {
+    "$expression": {
+      "operator": "=",
+      "target": { "$ref": "#/state/name" },
+      "value": { "$ref": "event#/target/value" }
+    }
+  }
+}
+```
+
+### 19.6 Placement
+
+`$expression` is valid in two positions:
+
+1. **As a `state` entry** (a named, reusable operation — Shape 5, §19.7):
+
+   ```json
+   {
+     "state": {
+       "toggleTheme": {
+         "$expression": {
+           "operator": "=",
+           "target": { "$ref": "#/state/darkMode" },
+           "value": { "operator": "!", "target": { "$ref": "#/state/darkMode" } }
+         }
+       }
+     }
+   }
+   ```
+
+2. **Inline as an event handler value** on any element, in place of a `$ref` to a function:
+
+   ```json
+   {
+     "tagName": "button",
+     "textContent": "Toggle",
+     "onclick": {
+       "$expression": {
+         "operator": "=",
+         "target": { "$ref": "#/state/darkMode" },
+         "value": { "operator": "!", "target": { "$ref": "#/state/darkMode" } }
+       }
+     }
+   }
+   ```
+
+A named `state` expression may be bound to multiple elements via `$ref` (`"onclick": { "$ref": "#/state/toggleTheme" }`), exactly as a Function entry is. Prefer the named form when reused; prefer the inline form for single-use handlers (cf. §6.5).
+
+A **pure** expression (§19.1) used as a `state` entry is a computed value — it is read via `$ref` or `${}` like any Shape 3 computed (`"textContent": { "$ref": "#/state/total" }`). A **mutating** expression used as a `state` entry is a handler, bound to events. The mode follows from the operator; it is not declared.
+
+### 19.7 Shape Detection (amends §5.7)
+
+A new branch is inserted **before** the `$prototype` check, since the entry is identified by its own reserved key:
+
+```
+For each entry in state:
+
+1. Value is a string containing "${"?
+   → Shape 3: Computed (computed())
+
+2. Value is a string, number, boolean, null, or array?
+   → Shape 1: Naked value (reactive property)
+
+3. Value is an object with "$expression"?
+   → Shape 5: Expression (declarative operation; mutating → handler, pure → computed)
+
+4. Value is an object with "$prototype"?
+   → Shape 4: Prototype (function, data source, or external class)
+
+5. Value is an object with "default" (no "$prototype")?
+   → Shape 2: Typed value (reactive property with type metadata)
+
+6. Value is a plain object (no reserved keys)?
+   → Shape 1: Object value (reactive property)
+```
+
+### 19.8 Compilation
+
+An `$expression` lowers to the **same target** as the equivalent `body` string (§4.3, §5.5): a function over the `state` reactive proxy. The difference is that the function is _constructed from structure_ rather than parsed from a source string, so it is fully analyzable before emission and never requires `eval`/`new Function`.
+
+The toggle expression:
+
+```json
+{
+  "operator": "=",
+  "target": { "$ref": "#/state/darkMode" },
+  "value": { "operator": "!", "target": { "$ref": "#/state/darkMode" } }
+}
+```
+
+compiles to the equivalent of:
+
+```js
+(state, event) => {
+  state.darkMode = !state.darkMode;
+};
+```
+
+Reactivity is identical to a hand-written handler — Vue tracks the reads and writes on the `state` proxy. Array-mutation operators compile to in-place mutations (`state.cart.push(...)`), which Vue tracks per §5.5.
+
+A **pure** expression (§19.1) lowers instead to a `computed()` (the same target as a Shape 3 template, §5.3), since it returns a value and mutates nothing. The cart-total `reduce` compiles to the equivalent of:
+
+```js
+computed(() => state.cart.reduce((acc, item) => acc + item.price * item.qty, 0));
+```
+
+The per-item expression node becomes the callback body, with `$reduce/acc` bound to the accumulator parameter and `$map/item` / `$map/index` to the element and index. Because the source array is read inside the `computed`, Vue tracks it — the total recomputes whenever the cart or any line's `price`/`qty` changes. As with handlers, the callback is _constructed from the node tree_, never parsed from a string, so it stays analyzable and the visual builder can render each node as an editable form control.
 
 ---
 
@@ -1422,4 +1725,123 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 
 ---
 
-_Jx Specification v2.0.0-draft — subject to revision_
+## Appendix C — Cart Example (Declarative Handlers)
+
+This rewrites the mutating handlers of Appendix A's idiom using `$expression`, leaving only genuinely complex logic as `body`.
+
+```json
+{
+  "$schema": "https://jxsuite.com/schema/v1",
+  "$id": "Cart",
+
+  "$defs": {
+    "CartLine": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" },
+        "price": { "type": "number", "minimum": 0 },
+        "qty": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["id", "name", "price", "qty"]
+    }
+  },
+
+  "state": {
+    "cart": {
+      "type": { "type": "array", "items": { "$ref": "#/$defs/CartLine" } },
+      "default": []
+    },
+    "draftName": "",
+    "count": "${state.cart.length}",
+
+    "total": {
+      "$expression": {
+        "operator": "reduce",
+        "target": { "$ref": "#/state/cart" },
+        "initial": 0,
+        "value": {
+          "operator": "+",
+          "target": { "$ref": "$reduce/acc" },
+          "value": {
+            "operator": "*",
+            "target": { "$ref": "$map/item/price" },
+            "value": { "$ref": "$map/item/qty" }
+          }
+        }
+      }
+    },
+
+    "setDraft": {
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/draftName" },
+        "value": { "$ref": "event#/target/value" }
+      }
+    },
+
+    "clearCart": {
+      "$expression": {
+        "operator": "splice",
+        "target": { "$ref": "#/state/cart" },
+        "value": [0, { "$ref": "#/state/count" }]
+      }
+    }
+  },
+
+  "tagName": "shopping-cart",
+
+  "children": [
+    { "tagName": "h2", "textContent": "${state.count} items — $${state.total}" },
+    {
+      "tagName": "input",
+      "attributes": { "placeholder": "Item name" },
+      "oninput": { "$ref": "#/state/setDraft" }
+    },
+    {
+      "tagName": "button",
+      "textContent": "Clear",
+      "onclick": { "$ref": "#/state/clearCart" }
+    },
+    {
+      "tagName": "ul",
+      "children": {
+        "$prototype": "Array",
+        "items": { "$ref": "#/state/cart" },
+        "map": {
+          "tagName": "li",
+          "children": [
+            "${$map.item.name} ×${$map.item.qty} ",
+            {
+              "tagName": "button",
+              "textContent": "+",
+              "onclick": {
+                "$expression": {
+                  "operator": "+=",
+                  "target": { "$ref": "$map/item/qty" },
+                  "value": 1
+                }
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "remove",
+              "onclick": {
+                "$expression": {
+                  "operator": "splice",
+                  "target": { "$ref": "#/state/cart" },
+                  "value": [{ "$ref": "$map/index" }, 1]
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+_Jx Specification v2.1.0-draft — subject to revision_

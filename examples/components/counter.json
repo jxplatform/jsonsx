@@ -14,19 +14,25 @@
       "description": "Dynamic button label derived from count"
     },
     "increment": {
-      "$prototype": "Function",
-      "body": "state.count++",
-      "description": "Increase count by 1"
+      "$expression": {
+        "operator": "+=",
+        "target": { "$ref": "#/state/count" },
+        "value": 1
+      },
+      "$description": "Increase count by 1"
     },
     "decrement": {
       "$prototype": "Function",
       "body": "state.count = Math.max(0, state.count - 1)",
-      "description": "Decrease count by 1"
+      "description": "Decrease count by 1 (uses Math.max — not expressible declaratively)"
     },
     "reset": {
-      "$prototype": "Function",
-      "body": "state.count = 0",
-      "description": "Reset count to 0"
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/count" },
+        "value": 0
+      },
+      "$description": "Reset count to 0"
     }
   },
 

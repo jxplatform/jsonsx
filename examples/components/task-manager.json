@@ -110,8 +110,11 @@
           "tagName": "button",
           "textContent": "All",
           "onclick": {
-            "$prototype": "Function",
-            "body": "state.filter = 'all'"
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/filter" },
+              "value": "all"
+            }
           },
           "style": {
             "flex": "1",
@@ -127,8 +130,11 @@
           "tagName": "button",
           "textContent": "Active",
           "onclick": {
-            "$prototype": "Function",
-            "body": "state.filter = 'active'"
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/filter" },
+              "value": "active"
+            }
           },
           "style": {
             "flex": "1",
@@ -145,8 +151,11 @@
           "tagName": "button",
           "textContent": "Done",
           "onclick": {
-            "$prototype": "Function",
-            "body": "state.filter = 'done'"
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/filter" },
+              "value": "done"
+            }
           },
           "style": {
             "flex": "1",

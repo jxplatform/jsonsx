@@ -45,16 +45,16 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
-    "@release-it/bumper": "^7.0.5",
-    "@release-it/conventional-changelog": "^11.0.0",
+    "@release-it/bumper": "^7.0.6",
+    "@release-it/conventional-changelog": "^11.0.1",
     "@typescript/native-preview": "^7.0.0-dev.20260527.2",
     "bun2nix": "^2.1.0",
     "chrome-devtools-mcp": "^1.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.5",
+    "lint-staged": "^17.0.7",
     "oxfmt": "^0.52.0",
     "oxlint": "^1.67.0",
-    "release-it": "^20.0.1"
+    "release-it": "^20.2.0"
   },
   "lint-staged": {
     "*.{js,ts}": [

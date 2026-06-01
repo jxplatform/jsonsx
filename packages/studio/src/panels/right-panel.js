@@ -108,12 +108,14 @@ export function unmount() {
   _lastTab = null;
 }
 
+let _rafId = 0;
+
 export function render() {
   if (!_ctx) return;
   if (_rendering) return;
   if (!_scheduled) {
     _scheduled = true;
-    queueMicrotask(_flush);
+    _rafId = requestAnimationFrame(_flush);
   }
 }
 
@@ -143,8 +145,10 @@ function _ensureContainers() {
 
 function _flush() {
   _scheduled = false;
+  _rafId = 0;
   if (!_ctx) return;
   if (_rendering) return;
+  if (_hasFocus || isColorPopoverOpen()) return;
   _rendering = true;
   try {
     const ctx = /** @type {RightPanelCtx} */ (_ctx);

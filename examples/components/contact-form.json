@@ -23,19 +23,25 @@
       "body": "return state.nameValid && state.emailValid && state.messageValid;"
     },
     "setName": {
-      "$prototype": "Function",
-      "parameters": ["event"],
-      "body": "state.name = event.target.value;"
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/name" },
+        "value": { "$ref": "event#/target/value" }
+      }
     },
     "setEmail": {
-      "$prototype": "Function",
-      "parameters": ["event"],
-      "body": "state.email = event.target.value;"
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/email" },
+        "value": { "$ref": "event#/target/value" }
+      }
     },
     "setMessage": {
-      "$prototype": "Function",
-      "parameters": ["event"],
-      "body": "state.message = event.target.value;"
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/message" },
+        "value": { "$ref": "event#/target/value" }
+      }
     },
     "submit": {
       "$prototype": "Function",

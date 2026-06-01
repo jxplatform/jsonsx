@@ -3,6 +3,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { activeTab } from "../workspace/workspace.js";
 import { transactDoc, mutateUpdateProperty } from "../tabs/transact.js";
+import { renderExpressionEditor } from "../ui/expression-editor.js";
 
 export const EVENT_NAMES = [
   "onclick",
@@ -66,7 +67,7 @@ export function eventsSidebarTemplate(helpers) {
     if (!k.startsWith("on")) return false;
     const v = node[k];
     if (!v || typeof v !== "object") return false;
-    return v.$ref || v.$prototype === "Function";
+    return v.$ref || v.$prototype === "Function" || v.$expression;
   });
 
   return html`
@@ -79,6 +80,8 @@ export function eventsSidebarTemplate(helpers) {
         ${eventKeys.map((evKey) => {
           const evVal = node[evKey];
           const isInline = evVal.$prototype === "Function";
+          const isExpression = evVal.$expression != null;
+          const currentMode = isInline ? "inline" : isExpression ? "$expression" : "ref";
           return html`
             <div class="event-binding">
               <div class="event-row">
@@ -103,14 +106,21 @@ export function eventsSidebarTemplate(helpers) {
                 <sp-picker
                   size="s"
                   class="event-mode"
-                  .value=${live(isInline ? "inline" : "ref")}
+                  .value=${live(currentMode)}
                   @change=${(/** @type {Event} */ e) => {
-                    if (/** @type {HTMLInputElement} */ (e.target).value === "inline") {
+                    const newMode = /** @type {HTMLInputElement} */ (e.target).value;
+                    if (newMode === "inline") {
                       transactDoc(activeTab.value, (t) =>
                         mutateUpdateProperty(t, selection, evKey, {
                           $prototype: "Function",
                           body: "",
                           parameters: [],
+                        }),
+                      );
+                    } else if (newMode === "$expression") {
+                      transactDoc(activeTab.value, (t) =>
+                        mutateUpdateProperty(t, selection, evKey, {
+                          $expression: { operator: "=", target: null },
                         }),
                       );
                     } else {
@@ -127,6 +137,7 @@ export function eventsSidebarTemplate(helpers) {
                   }}
                 >
                   <sp-menu-item value="inline">inline</sp-menu-item>
+                  <sp-menu-item value="$expression">$expression</sp-menu-item>
                   <sp-menu-item value="ref">$ref</sp-menu-item>
                 </sp-picker>
                 <sp-action-button
@@ -176,35 +187,50 @@ export function eventsSidebarTemplate(helpers) {
                       </sp-action-button>
                     </div>
                   `
-                : html`
-                    <sp-picker
-                      size="s"
-                      class="event-handler"
-                      .value=${live(evVal.$ref || "__none__")}
-                      @change=${(/** @type {Event} */ e) => {
-                        if (
-                          /** @type {HTMLInputElement} */ (e.target).value &&
-                          /** @type {HTMLInputElement} */ (e.target).value !== "__none__"
-                        ) {
-                          transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, selection, evKey, {
-                              $ref: /** @type {HTMLInputElement} */ (e.target).value,
-                            }),
-                          );
-                        } else {
-                          transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, selection, evKey, undefined),
-                          );
-                        }
-                      }}
-                    >
-                      <sp-menu-item value="__none__">— none —</sp-menu-item>
-                      ${functionDefs.map(
-                        ([fName]) =>
-                          html`<sp-menu-item value=${`#/state/${fName}`}>${fName}</sp-menu-item>`,
-                      )}
-                    </sp-picker>
-                  `}
+                : isExpression
+                  ? html`
+                      <div class="event-body-row">
+                        ${renderExpressionEditor(
+                          evVal.$expression,
+                          (/** @type {any} */ newNode) =>
+                            transactDoc(activeTab.value, (t) =>
+                              mutateUpdateProperty(t, selection, evKey, {
+                                $expression: newNode,
+                              }),
+                            ),
+                          { stateDefs: Object.keys(defs), allowEventRef: true },
+                        )}
+                      </div>
+                    `
+                  : html`
+                      <sp-picker
+                        size="s"
+                        class="event-handler"
+                        .value=${live(evVal.$ref || "__none__")}
+                        @change=${(/** @type {Event} */ e) => {
+                          if (
+                            /** @type {HTMLInputElement} */ (e.target).value &&
+                            /** @type {HTMLInputElement} */ (e.target).value !== "__none__"
+                          ) {
+                            transactDoc(activeTab.value, (t) =>
+                              mutateUpdateProperty(t, selection, evKey, {
+                                $ref: /** @type {HTMLInputElement} */ (e.target).value,
+                              }),
+                            );
+                          } else {
+                            transactDoc(activeTab.value, (t) =>
+                              mutateUpdateProperty(t, selection, evKey, undefined),
+                            );
+                          }
+                        }}
+                      >
+                        <sp-menu-item value="__none__">— none —</sp-menu-item>
+                        ${functionDefs.map(
+                          ([fName]) =>
+                            html`<sp-menu-item value=${`#/state/${fName}`}>${fName}</sp-menu-item>`,
+                        )}
+                      </sp-picker>
+                    `}
             </div>
           `;
         })}

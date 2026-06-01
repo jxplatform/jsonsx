@@ -6,9 +6,17 @@
  */
 
 import { camelToKebab, toCSSText, RESERVED_KEYS } from "@jxsuite/runtime";
+import { compileExpression, isMutating, evaluateExpression } from "@jxsuite/runtime/expression";
 
 // Re-export runtime utilities used by submodules
-export { camelToKebab, toCSSText, RESERVED_KEYS };
+export {
+  camelToKebab,
+  toCSSText,
+  RESERVED_KEYS,
+  compileExpression,
+  isMutating,
+  evaluateExpression,
+};
 
 // CDN defaults
 export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.32";
@@ -231,7 +239,7 @@ export function buildInitialScope(defs = {}, parentScope = null) {
       setOwnScopeValue(scope, key, cloneValue(d.default));
       continue;
     }
-    if (!d.$prototype && !isSchemaOnly(d)) {
+    if (!d.$prototype && !("$expression" in d) && !isSchemaOnly(d)) {
       setOwnScopeValue(scope, key, cloneValue(d));
     }
   }
@@ -243,6 +251,17 @@ export function buildInitialScope(defs = {}, parentScope = null) {
     }
     if (!def || typeof def !== "object") continue;
     const d = /** @type {JxStateObject & JxPrototypeDef} */ (def);
+    if ("$expression" in d) {
+      const node = /** @type {any} */ (d).$expression;
+      if (isMutating(node.operator)) {
+        setOwnScopeValue(scope, key, (/** @type {any} */ s, /** @type {any} */ event) =>
+          evaluateExpression(node, s, event),
+        );
+      } else {
+        defineLazyScopeValue(scope, key, () => evaluateExpression(node, scope, null));
+      }
+      continue;
+    }
     if (d.$prototype === "Function") {
       if (d.body) {
         const fn = new Function("state", ...(d.parameters ?? d.arguments ?? []), d.body);

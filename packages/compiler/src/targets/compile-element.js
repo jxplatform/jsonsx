@@ -6,7 +6,14 @@
  */
 
 import { camelToKebab, RESERVED_KEYS } from "@jxsuite/runtime";
-import { escapeHtml, tagNameToClassName, isSchemaOnly, collectStyles } from "../shared.js";
+import {
+  escapeHtml,
+  tagNameToClassName,
+  isSchemaOnly,
+  collectStyles,
+  compileExpression,
+  isMutating,
+} from "../shared.js";
 
 /**
  * Compile a Jx custom element document to a JS module string.
@@ -230,7 +237,14 @@ export function emitElementModule(doc, className, elementImports) {
 
   for (const [key, def] of Object.entries(defs)) {
     const d = /** @type {JxMutableNode} */ (def);
-    if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function") {
+    if (d && typeof d === "object" && !Array.isArray(d) && "$expression" in d) {
+      const node = /** @type {any} */ (d).$expression;
+      if (isMutating(node.operator)) {
+        functionEntries.push([key, d]);
+      } else {
+        computedEntries.push([key, d]);
+      }
+    } else if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function") {
       if (typeof d.body === "string" && d.body.includes("return")) {
         computedEntries.push([key, d]);
       } else {
@@ -255,7 +269,10 @@ export function emitElementModule(doc, className, elementImports) {
   // Emit functions: this.state.fnName = (state) => { body } or imported $src function
   for (const [key, def] of functionEntries) {
     lines.push("");
-    if (def.$src) {
+    if ("$expression" in def) {
+      const compiled = compileExpression(def.$expression, { statePrefix: "s", eventParam: "e" });
+      lines.push(`    this.state.${key} = (s, e) => { ${compiled}; };`);
+    } else if (def.$src) {
       // $src function — wrap imported function so it receives state
       const args = def.parameters ?? def.arguments ?? ["state"];
       const paramList = args.join(", ");
@@ -272,7 +289,13 @@ export function emitElementModule(doc, className, elementImports) {
   // Emit computed signals — $src or inline body
   for (const [key, def] of computedEntries) {
     lines.push("");
-    if (def.$src) {
+    if ("$expression" in def) {
+      const compiled = compileExpression(def.$expression, {
+        statePrefix: "this.state",
+        eventParam: "e",
+      });
+      lines.push(`    this.state.${key} = computed(() => ${compiled});`);
+    } else if (def.$src) {
       lines.push(`    this.state.${key} = computed(() => ${key}(this.state));`);
     } else {
       lines.push(`    this.state.${key} = computed(() => {`);
@@ -491,6 +514,12 @@ function emitLitNode(def, indent) {
       parts.push(
         `@${eventName}="\${(e) => ${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}(s, e)}"`,
       );
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+      const compiled = compileExpression(/** @type {any} */ (val).$expression, {
+        statePrefix: "s",
+        eventParam: "e",
+      });
+      parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     } else if (
       val &&
       typeof val === "object" &&
@@ -561,6 +590,12 @@ function emitMappedArray(arrayDef, indent) {
       parts.push(
         `@${eventName}="\${(e) => ${refToExpr(/** @type {string} */ (/** @type {JxMutableNode} */ (val).$ref))}(s, e)}"`,
       );
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+      const compiled = compileExpression(/** @type {any} */ (val).$expression, {
+        statePrefix: "s",
+        eventParam: "e",
+      });
+      parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     }
   }
 

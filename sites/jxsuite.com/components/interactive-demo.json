@@ -1,0 +1,236 @@
+{
+  "$schema": "../../../packages/schema/schema.json",
+  "$id": "InteractiveDemo",
+
+  "state": {
+    "activeTab": "source",
+    "count": 0,
+    "increment": {
+      "$expression": {
+        "operator": "+=",
+        "target": { "$ref": "#/state/count" },
+        "value": 1
+      }
+    },
+    "reset": {
+      "$expression": {
+        "operator": "=",
+        "target": { "$ref": "#/state/count" },
+        "value": 0
+      }
+    }
+  },
+
+  "tagName": "interactive-demo",
+  "style": {
+    "display": "block",
+    "borderRadius": "12px",
+    "border": "1px solid var(--color-border, #e0e0e0)",
+    "overflow": "hidden",
+    "boxShadow": "0 4px 24px rgba(0,0,0,0.06)"
+  },
+
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "background": "var(--color-bg-surface, #f8f9fa)",
+        "borderBottom": "1px solid var(--color-border, #e0e0e0)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "textContent": "Jx Source",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/activeTab" },
+              "value": "source"
+            }
+          },
+          "style": {
+            "padding": "0.75rem 1.25rem",
+            "border": "none",
+            "borderBottom": "${state.activeTab === 'source' ? '2px solid var(--color-accent, #007bff)' : '2px solid transparent'}",
+            "background": "transparent",
+            "cursor": "pointer",
+            "fontSize": "0.875rem",
+            "fontWeight": "${state.activeTab === 'source' ? '600' : '400'}",
+            "color": "${state.activeTab === 'source' ? 'var(--color-accent, #007bff)' : 'var(--color-text-secondary, #6c757d)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Compiled",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/activeTab" },
+              "value": "compiled"
+            }
+          },
+          "style": {
+            "padding": "0.75rem 1.25rem",
+            "border": "none",
+            "borderBottom": "${state.activeTab === 'compiled' ? '2px solid var(--color-accent, #007bff)' : '2px solid transparent'}",
+            "background": "transparent",
+            "cursor": "pointer",
+            "fontSize": "0.875rem",
+            "fontWeight": "${state.activeTab === 'compiled' ? '600' : '400'}",
+            "color": "${state.activeTab === 'compiled' ? 'var(--color-accent, #007bff)' : 'var(--color-text-secondary, #6c757d)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Result",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/activeTab" },
+              "value": "result"
+            }
+          },
+          "style": {
+            "padding": "0.75rem 1.25rem",
+            "border": "none",
+            "borderBottom": "${state.activeTab === 'result' ? '2px solid var(--color-accent, #007bff)' : '2px solid transparent'}",
+            "background": "transparent",
+            "cursor": "pointer",
+            "fontSize": "0.875rem",
+            "fontWeight": "${state.activeTab === 'result' ? '600' : '400'}",
+            "color": "${state.activeTab === 'result' ? 'var(--color-accent, #007bff)' : 'var(--color-text-secondary, #6c757d)'}"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.activeTab === 'source' ? 'block' : 'none'}"
+      },
+      "children": [
+        {
+          "tagName": "pre",
+          "style": {
+            "margin": "0",
+            "padding": "1.5rem",
+            "background": "#1e1e2e",
+            "color": "#cdd6f4",
+            "fontFamily": "'JetBrains Mono', 'Fira Code', monospace",
+            "fontSize": "0.8125rem",
+            "lineHeight": "1.7",
+            "overflowX": "auto"
+          },
+          "children": [
+            {
+              "tagName": "code",
+              "textContent": "{\n  \"tagName\": \"my-counter\",\n  \"state\": {\n    \"count\": 0,\n    \"increment\": {\n      \"$expression\": {\n        \"operator\": \"+=\",\n        \"target\": { \"$ref\": \"#/state/count\" },\n        \"value\": 1\n      }\n    },\n    \"reset\": {\n      \"$expression\": {\n        \"operator\": \"=\",\n        \"target\": { \"$ref\": \"#/state/count\" },\n        \"value\": 0\n      }\n    }\n  },\n  \"children\": [\n    { \"tagName\": \"span\",\n      \"textContent\": { \"$ref\": \"#/state/count\" } },\n    { \"tagName\": \"button\", \"textContent\": \"+\",\n      \"onclick\": { \"$ref\": \"#/state/increment\" } },\n    { \"tagName\": \"button\", \"textContent\": \"Reset\",\n      \"onclick\": { \"$ref\": \"#/state/reset\" } }\n  ]\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.activeTab === 'compiled' ? 'block' : 'none'}"
+      },
+      "children": [
+        {
+          "tagName": "pre",
+          "style": {
+            "margin": "0",
+            "padding": "1.5rem",
+            "background": "#1e1e2e",
+            "color": "#cdd6f4",
+            "fontFamily": "'JetBrains Mono', 'Fira Code', monospace",
+            "fontSize": "0.8125rem",
+            "lineHeight": "1.7",
+            "overflowX": "auto"
+          },
+          "children": [
+            {
+              "tagName": "code",
+              "textContent": "// Generated by @jxsuite/compiler\nimport { reactive, effect } from '@vue/reactivity';\nimport { render, html } from 'lit-html';\n\nclass MyCounter extends HTMLElement {\n  constructor() {\n    super();\n    this.state = reactive({ count: 0 });\n\n    // $expression → compiled handler\n    this.state.increment = (s) => {\n      s.count += 1;\n    };\n    this.state.reset = (s) => {\n      s.count = 0;\n    };\n  }\n\n  connectedCallback() {\n    this.#dispose = effect(() =>\n      render(this.template(), this)\n    );\n  }\n}\n\ncustomElements.define('my-counter', MyCounter);"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.activeTab === 'result' ? 'flex' : 'none'}",
+        "flexDirection": "column",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "padding": "3rem 2rem",
+        "minHeight": "220px",
+        "gap": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "textContent": "${state.count}",
+          "style": {
+            "fontSize": "4rem",
+            "fontWeight": "700",
+            "fontVariantNumeric": "tabular-nums",
+            "color": "var(--color-accent, #007bff)",
+            "lineHeight": "1"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "gap": "0.75rem"
+          },
+          "children": [
+            {
+              "tagName": "button",
+              "textContent": "+",
+              "onclick": { "$ref": "#/state/increment" },
+              "style": {
+                "padding": "0.625rem 1.5rem",
+                "fontSize": "1.125rem",
+                "fontWeight": "600",
+                "border": "none",
+                "borderRadius": "8px",
+                "backgroundColor": "var(--color-accent, #007bff)",
+                "color": "white",
+                "cursor": "pointer",
+                ":hover": { "opacity": "0.9" }
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "Reset",
+              "onclick": { "$ref": "#/state/reset" },
+              "style": {
+                "padding": "0.625rem 1.5rem",
+                "fontSize": "1.125rem",
+                "fontWeight": "500",
+                "border": "1px solid var(--color-border, #dee2e6)",
+                "borderRadius": "8px",
+                "backgroundColor": "transparent",
+                "cursor": "pointer",
+                ":hover": { "backgroundColor": "var(--color-bg-surface, #f8f9fa)" }
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "textContent": "This counter is live \u2014 built from the JSON on the left.",
+          "style": {
+            "margin": "0",
+            "fontSize": "0.8125rem",
+            "color": "var(--color-text-secondary, #6c757d)"
+          }
+        }
+      ]
+    }
+  ]
+}

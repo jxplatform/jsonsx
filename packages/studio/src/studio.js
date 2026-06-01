@@ -368,8 +368,9 @@ initWelcome({
   cloneRepository: () => cloneRepository({ openRecentProject }),
 });
 
-// Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change
-let _canvasRenderScheduled = false;
+// Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change.
+// Uses double-RAF so the canvas render yields to higher-priority panel paints first.
+let _canvasRafId = 0;
 effect(() => {
   const tab = activeTab.value;
   if (tab) {
@@ -383,15 +384,16 @@ effect(() => {
     void tab.session.ui.stylebookFilter;
     void tab.session.ui.stylebookCustomizedOnly;
   }
-  if (!_canvasRenderScheduled) {
-    _canvasRenderScheduled = true;
-    queueMicrotask(() => {
-      _canvasRenderScheduled = false;
-      try {
-        renderCanvas();
-      } catch (e) {
-        console.error("renderCanvas error:", e);
-      }
+  if (!_canvasRafId) {
+    _canvasRafId = requestAnimationFrame(() => {
+      _canvasRafId = requestAnimationFrame(() => {
+        _canvasRafId = 0;
+        try {
+          renderCanvas();
+        } catch (e) {
+          console.error("renderCanvas error:", e);
+        }
+      });
     });
   }
 });

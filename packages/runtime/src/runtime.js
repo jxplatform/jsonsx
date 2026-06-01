@@ -13,6 +13,7 @@
  */
 
 import { reactive, ref, computed, effect, isRef, onEffectCleanup } from "@vue/reactivity";
+import { evaluateExpression, isMutating } from "./expression.js";
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -161,6 +162,7 @@ export async function buildScope(doc, parentScope = {}, base = location.href) {
     // 4. Object
     if (typeof def === "object") {
       if (def.$prototype) continue; // handled in later passes
+      if ("$expression" in def) continue; // handled in pass 2.5
       if (def.timing === "server" && def.$src && def.$export) continue; // handled in fifth pass
       if ("default" in def) {
         raw[key] = def.default;
@@ -178,6 +180,19 @@ export async function buildScope(doc, parentScope = {}, base = location.href) {
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def === "string" && def.includes("${")) {
       state[key] = computed(() => evaluateTemplate(def, state));
+    }
+  }
+
+  // Pass 2.5: $expression entries (Shape 5)
+  for (const [key, def] of Object.entries(defs)) {
+    if (def && typeof def === "object" && !Array.isArray(def) && "$expression" in def) {
+      const node = /** @type {any} */ (def).$expression;
+      if (isMutating(node.operator)) {
+        state[key] = (/** @type {any} */ s, /** @type {any} */ event) =>
+          evaluateExpression(node, s, event);
+      } else {
+        state[key] = computed(() => evaluateExpression(node, state, null));
+      }
     }
   }
 
@@ -493,6 +508,13 @@ function applyProperties(el, def, state) {
         const fn = new Function(...params, val.body);
         const scope = state;
         el.addEventListener(key.slice(2), (e) => fn(scope, e));
+        continue;
+      }
+      // Event handler: inline $expression
+      if (val && typeof val === "object" && "$expression" in val) {
+        const node = /** @type {any} */ (val).$expression;
+        const scope = state;
+        el.addEventListener(key.slice(2), (e) => evaluateExpression(node, scope, e));
         continue;
       }
     }

@@ -23,6 +23,8 @@ import {
   escapeHtml,
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
+  compileExpression,
+  isMutating,
 } from "../shared.js";
 
 /**
@@ -84,6 +86,19 @@ export function compileClient(raw, opts) {
     }
 
     const d = /** @type {JxMutableNode} */ (def);
+
+    // $expression: Shape 5
+    if ("$expression" in d) {
+      const node = /** @type {any} */ (d).$expression;
+      if (isMutating(node.operator)) {
+        const compiled = compileExpression(node, { statePrefix: "state", eventParam: "e" });
+        onEntries.push([key, { args: ["state", "e"], body: compiled }]);
+      } else {
+        const compiled = compileExpression(node, { statePrefix: "state", eventParam: "e" });
+        computedEntries.push([key, `() => ${compiled}`]);
+      }
+      continue;
+    }
 
     // $prototype: "Function"
     if (d.$prototype === "Function") {
@@ -273,6 +288,15 @@ function buildClientNode(def, raw, context, bindings, handlers, counter) {
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
       handlers.set(key, { args: v.parameters ?? v.arguments ?? ["state", "event"], body: v.body });
+      needsBind = true;
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+      const key = `_h${counter.h++}`;
+      bindAttrs.push(`@${eventName}="${key}"`);
+      const compiled = compileExpression(/** @type {any} */ (val).$expression, {
+        statePrefix: "state",
+        eventParam: "e",
+      });
+      handlers.set(key, { args: ["state", "e"], body: compiled });
       needsBind = true;
     }
   }
@@ -500,6 +524,12 @@ function emitLitMapTemplate(def) {
     ) {
       const body = mapRefsToLit(/** @type {string} */ (/** @type {JxMutableNode} */ (val).body));
       attrs += " @" + eventName + "=${(e) => { " + body + " }}";
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+      const compiled = compileExpression(/** @type {any} */ (val).$expression, {
+        statePrefix: "state",
+        eventParam: "e",
+      });
+      attrs += " @" + eventName + "=${(e) => { state.$map = { item, index }; " + compiled + "; }}";
     }
   }
 
