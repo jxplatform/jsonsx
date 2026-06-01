@@ -37,14 +37,18 @@ jobs:
           echo "Disk space before cleanup:"
           df -h /
           sudo rm -rf /Applications/Xcode*.app
-          sudo rm -rf /Users/runner/Library/Android
+          sudo rm -rf /Developer/MonoTouch
+          sudo rm -rf /Library/Frameworks/Mono.framework
+          sudo rm -rf /Library/Frameworks/Xamarin.iOS.framework
+          sudo rm -rf /Library/Frameworks/Xamarin.Mac.framework
           sudo rm -rf /opt/homebrew/Cellar || true
-          sudo rm -rf /usr/local/Cellar || true
-          sudo rm -rf /usr/local/share/powershell || true
-          sudo rm -rf /usr/local/lib/node_modules || true
           sudo rm -rf /opt/homebrew/lib/node_modules || true
           sudo rm -rf /Users/runner/.dotnet || true
+          sudo rm -rf /Users/runner/Library/Android
           sudo rm -rf /Users/runner/Library/Caches/Homebrew || true
+          sudo rm -rf /usr/local/Cellar || true
+          sudo rm -rf /usr/local/lib/node_modules || true
+          sudo rm -rf /usr/local/share/powershell || true
           echo "Disk space after cleanup:"
           df -h /
 
