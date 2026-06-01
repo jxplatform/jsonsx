@@ -37,6 +37,7 @@ import {
   collectServerEntries,
   renderStaticNode,
   resolveStaticValue,
+  resolveRefValue,
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
 } from "../shared.js";
@@ -435,7 +436,9 @@ async function compilePage(
   expandComponents(layoutDoc, componentDefs);
 
   // Strip resolved timing: "compiler" state entries — they're now baked into the tree
-  // and keeping them would cause isDynamic() to misclassify the page as dynamic
+  // and keeping them would cause isDynamic() to misclassify the page as dynamic.
+  // Also strip resolved content arrays (from ContentCollection) that have been
+  // baked into unrolled map templates.
   if (layoutDoc.state) {
     for (const [key, def] of Object.entries(layoutDoc.state)) {
       if (key === "$site" || key === "$page") continue;
@@ -445,6 +448,8 @@ async function compilePage(
         !Array.isArray(def) &&
         /** @type {JxMutableNode} */ (def).timing === "compiler"
       ) {
+        delete layoutDoc.state[key];
+      } else if (Array.isArray(def)) {
         delete layoutDoc.state[key];
       }
     }
@@ -577,6 +582,69 @@ function isBareSpecifier(s) {
 }
 
 /**
+ * Deep-clone a map template, resolving template strings and $ref values against the given scope.
+ *
+ * @param {JxMutableNode} template
+ * @param {Record<string, unknown>} scope
+ * @returns {JxMutableNode}
+ */
+function expandMapTemplate(template, scope) {
+  if (!template || typeof template !== "object") return template;
+  const node = /** @type {JxMutableNode} */ ({});
+  for (const [k, v] of Object.entries(template)) {
+    if (k === "children" && Array.isArray(v)) {
+      node.children = v.map((child) => {
+        if (typeof child === "string") return child;
+        return expandMapTemplate(/** @type {JxMutableNode} */ (child), scope);
+      });
+    } else if (k === "style" && v && typeof v === "object") {
+      node.style = { ...v };
+      for (const [sk, sv] of Object.entries(node.style)) {
+        if (typeof sv === "string" && isTemplateString(sv)) {
+          node.style[sk] = evaluateMapTemplate(sv, scope) ?? sv;
+        }
+      }
+    } else if (k === "attributes" && v && typeof v === "object") {
+      node.attributes = { ...v };
+      for (const [ak, av] of Object.entries(node.attributes)) {
+        if (typeof av === "string" && isTemplateString(av)) {
+          node.attributes[ak] = evaluateMapTemplate(av, scope) ?? av;
+        }
+      }
+    } else if (typeof v === "string" && isTemplateString(v)) {
+      node[k] = evaluateMapTemplate(v, scope) ?? v;
+    } else {
+      node[k] = v;
+    }
+  }
+  return node;
+}
+
+/**
+ * Evaluate a template string in the context of a mapped array item. Exposes `item`, `index`,
+ * `state`, and `$map` as local variables.
+ *
+ * @param {string} str
+ * @param {Record<string, unknown>} scope
+ * @returns {unknown}
+ */
+function evaluateMapTemplate(str, scope) {
+  try {
+    const item = /** @type {Record<string, unknown>} */ (scope.$map)?.item;
+    const index = /** @type {Record<string, unknown>} */ (scope.$map)?.index;
+    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
+    if (singleExprMatch) {
+      const fn = new Function("state", "$map", "item", "index", `return (${singleExprMatch[1]})`);
+      return fn(scope, scope.$map, item, index);
+    }
+    const fn = new Function("state", "$map", "item", "index", `return \`${str}\``);
+    return fn(scope, scope.$map, item, index);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Recursively resolve template strings in a document tree against a scope. Mutates the document in
  * place — evaluates ${...} in innerHTML, textContent, style values, and attribute values.
  *
@@ -617,6 +685,34 @@ function resolveDocTemplates(node, scope) {
     }
   }
   const rawChildren = /** @type {unknown} */ (node.children);
+  if (
+    rawChildren &&
+    typeof rawChildren === "object" &&
+    !Array.isArray(rawChildren) &&
+    /** @type {JxMutableNode} */ (rawChildren).$prototype === "Array"
+  ) {
+    const arrayDef = /** @type {JxMutableNode} */ (rawChildren);
+    const itemsSrc = arrayDef.items;
+    let items = null;
+    if (itemsSrc && typeof itemsSrc === "object" && /** @type {JxMutableNode} */ (itemsSrc).$ref) {
+      const ref = /** @type {string} */ (/** @type {JxMutableNode} */ (itemsSrc).$ref);
+      items = resolveRefValue(ref, scope);
+    } else if (Array.isArray(itemsSrc)) {
+      items = itemsSrc;
+    }
+    if (Array.isArray(items) && arrayDef.map) {
+      node.children = items.map((item, index) => {
+        const childScope = Object.create(scope);
+        childScope.$map = { item, index };
+        childScope["$map/item"] = item;
+        childScope["$map/index"] = index;
+        const expanded = expandMapTemplate(arrayDef.map, childScope);
+        resolveDocTemplates(expanded, childScope);
+        return expanded;
+      });
+      return;
+    }
+  }
   if (typeof rawChildren === "string" && isTemplateString(rawChildren)) {
     const resolved = evaluateStaticTemplate(rawChildren, scope);
     if (Array.isArray(resolved)) {
