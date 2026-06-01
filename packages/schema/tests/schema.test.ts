@@ -51,9 +51,11 @@ describe("generateProjectSchema", () => {
     expect(schema.additionalProperties).toBe(false);
   });
 
-  test("contentTypes entries have source, schema, $elements", () => {
+  test("contentTypes entries reference ContentTypeDef", () => {
     const collectionEntry = schema.properties.contentTypes.additionalProperties;
-    const collProps = Object.keys(collectionEntry.properties);
+    expect(collectionEntry.$ref).toBe("#/$defs/ContentTypeDef");
+    const contentTypeDef = schema.$defs.ContentTypeDef;
+    const collProps = Object.keys(contentTypeDef.properties);
     expect(collProps).toContain("source");
     expect(collProps).toContain("schema");
     expect(collProps).toContain("$elements");

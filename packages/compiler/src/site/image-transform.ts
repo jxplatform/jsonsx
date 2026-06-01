@@ -14,6 +14,7 @@ import { getCached, setCached } from "./image-cache";
 import type { ImageConfig } from "./image-optimizer";
 import type { ImageManifest } from "./image-optimizer";
 import type { CacheManifest } from "./image-cache";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 const SKIP_EXTENSIONS = new Set([".svg", ".gif"]);
 const EXTERNAL_PREFIXES = ["http://", "https://", "data:", "//"];

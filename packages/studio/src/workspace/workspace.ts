@@ -3,6 +3,7 @@ import { createTab, disposeTab } from "../tabs/tab";
 import type { Tab } from "../tabs/tab";
 
 import type { ComponentEntry } from "../files/components";
+import type { JxStyle } from "@jxsuite/schema/types";
 
 interface FileEntry {
   name: string;

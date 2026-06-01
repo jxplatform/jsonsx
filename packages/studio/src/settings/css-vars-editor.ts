@@ -10,6 +10,8 @@ import { updateSiteConfig } from "../site-context";
 import { getEffectiveMedia } from "../site-context";
 import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils";
 
+import type { JxStyle } from "@jxsuite/schema/types";
+
 /** @param {HTMLElement} container */
 export function renderCssVarsEditor(container: HTMLElement) {
   const config = projectState?.projectConfig || {};

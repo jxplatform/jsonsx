@@ -7,11 +7,15 @@
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
     ".": "./src/schema.ts",
+    "./types": "./types.ts",
+    "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",
     "./project-schema.json": "./project-schema.json"
   },
   "files": [
     "src/",
+    "defs/",
+    "types.ts",
     "*.json",
     "!package.json"
   ],
@@ -32,5 +36,8 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",
-  "version": "0.23.2"
+  "version": "0.23.2",
+  "devDependencies": {
+    "json-schema-to-ts": "^3.1.1"
+  }
 }

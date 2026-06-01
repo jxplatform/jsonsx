@@ -6,6 +6,8 @@
  * on the current tab.
  */
 
+import type { JxStyle } from "@jxsuite/schema/types";
+
 /**
  * Compute the inherited style object for a given breakpoint tab.
  *
@@ -29,21 +31,21 @@ export function computeInheritedStyle(
   if (!activeSelector) {
     // Start with base flat props
     for (const [p, v] of Object.entries(style)) {
-      if (typeof v !== "object") inherited[p] = v ?? "";
+      if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
     }
     // Layer each media block in order until current tab
     for (const name of mediaNames) {
       if (name === activeTab) break;
-      const block = style[`@${name}`] || {};
+      const block = (style[`@${name}`] || {}) as JxStyle;
       for (const [p, v] of Object.entries(block)) {
-        if (typeof v !== "object") inherited[p] = v ?? "";
+        if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
       }
     }
   } else {
     // Selector inheritance: base selector → each media's selector block in order
-    const baseSel = style[activeSelector] || {};
+    const baseSel = (style[activeSelector] || {}) as JxStyle;
     for (const [p, v] of Object.entries(baseSel)) {
-      if (typeof v !== "object") inherited[p] = v ?? "";
+      if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
     }
     for (const name of mediaNames) {
       if (name === activeTab) break;

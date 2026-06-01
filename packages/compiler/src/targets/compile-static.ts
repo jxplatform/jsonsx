@@ -14,6 +14,7 @@ import {
   escapeHtml,
 } from "../shared";
 import { emitElementModule } from "./compile-element";
+import type { JxStyle } from "@jxsuite/schema/types";
 
 /**
  * Compile a static document to HTML, with dynamic subtrees as islands.

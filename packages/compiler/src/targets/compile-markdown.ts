@@ -10,6 +10,7 @@ import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkGfm from "remark-gfm";
 import { buildInitialScope, evaluateStaticTemplate, isTemplateString } from "../shared";
+import type { JxElement, JxDocument, JxStateDefinition } from "@jxsuite/schema/types";
 
 // ─── Tag classification ────────────────────────────────────────────────────
 

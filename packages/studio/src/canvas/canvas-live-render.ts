@@ -30,6 +30,8 @@ import { buildNestedSiteCSS } from "./nested-site-style";
 
 export { buildNestedSiteCSS } from "./nested-site-style";
 
+import type { JxElement } from "@jxsuite/schema/types";
+
 /** @param {Event} e */
 function _preventNav(e: Event) {
   if ((e.target as HTMLElement).closest("a[href]")) {

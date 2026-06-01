@@ -8,6 +8,8 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getActivePanel, findCanvasElement } from "../canvas/canvas-helpers";
 
+import type { JxStyle } from "@jxsuite/schema/types";
+
 const pseudoStyleHost = document.createElement("div");
 pseudoStyleHost.style.display = "contents";
 (document.querySelector("sp-theme") || document.body).appendChild(pseudoStyleHost);

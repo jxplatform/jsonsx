@@ -13,6 +13,12 @@
  */
 
 import { resolve, dirname, relative } from "node:path";
+import type {
+  JxElement,
+  JxDocument,
+  JxStateDefinition,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 /**
  * Inject $site and $page context into a page document's state.

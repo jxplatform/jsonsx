@@ -11,6 +11,7 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
+import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
 
 // ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
 
@@ -268,6 +269,7 @@ export function getContentTypeElements(
  */
 async function loadContentType(name: string, contentTypeDef: ContentTypeDef, projectRoot: string) {
   const source = contentTypeDef.source;
+  if (!source) return [];
   const schema = contentTypeDef.schema;
 
   // Derive directive allowedNames from content type $elements (tag names from npm packages)

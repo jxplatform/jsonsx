@@ -1,5 +1,7 @@
 /** Google Fonts helpers — shared between head-panel (per-page) and head-editor (project-level). */
 
+import type { JxHeadEntry } from "@jxsuite/schema/types";
+
 export const GFONTS_CSS_PREFIX = "https://fonts.googleapis.com/css2?";
 export const GFONTS_PRECONNECT_ORIGINS = [
   "https://fonts.googleapis.com",

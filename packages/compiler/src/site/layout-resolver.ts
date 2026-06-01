@@ -15,6 +15,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import type { JxElement, JxDocument } from "@jxsuite/schema/types";
 
 /**
  * Resolve a page's layout, wrapping the page content in the layout structure.

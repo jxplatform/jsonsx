@@ -7,6 +7,14 @@
 
 import { camelToKebab, toCSSText, RESERVED_KEYS } from "@jxsuite/runtime";
 import { compileExpression, isMutating, evaluateExpression } from "@jxsuite/runtime/expression";
+import type {
+  JxElement,
+  JxStyle,
+  JxStateDefinition,
+  JxPrototypeDef,
+  JxStateObject,
+  JxMappedArray,
+} from "@jxsuite/schema/types";
 
 // Re-export runtime utilities used by submodules
 export {

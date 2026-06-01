@@ -46,6 +46,13 @@ import { resolvePrototypes } from "./prototype-resolver";
 import { compileMarkdown } from "../targets/compile-markdown";
 import { transformImageNodes } from "./image-transform";
 import { loadCache, saveCache } from "./image-cache";
+import type {
+  JxElement,
+  JxStyle,
+  JxHeadEntry,
+  JxStateDefinition,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 /**
  * Build an entire Jx site from a project directory.
@@ -473,7 +480,13 @@ async function compilePage(
 
   // Transform <img> nodes for responsive image optimization
   if (imageCache && projectConfig.images?.optimize && outDir) {
-    await transformImageNodes(layoutDoc, projectConfig.images, projectRoot, outDir, imageCache);
+    await transformImageNodes(
+      layoutDoc,
+      projectConfig.images as import("./image-optimizer").ImageConfig,
+      projectRoot,
+      outDir,
+      imageCache,
+    );
   }
 
   // Compile the document using the existing compiler

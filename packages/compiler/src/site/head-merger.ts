@@ -14,6 +14,8 @@
  * - Charset and viewport are auto-injected if missing
  */
 
+import type { JxHeadEntry } from "@jxsuite/schema/types";
+
 /**
  * Merge $head arrays from site, layout, and page levels.
  *

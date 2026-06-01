@@ -1,5 +1,7 @@
 /** Canvas media/breakpoint utilities — pure functions extracted for testability. */
 
+import type { JxStyle } from "@jxsuite/schema/types";
+
 /**
  * Classify $media entries into size breakpoints (get a canvas each) and feature queries (rendered
  * as toolbar toggles).
@@ -76,7 +78,7 @@ export function applyCanvasStyle(
     }
   }
   for (const [key, val] of Object.entries(styleDef)) {
-    if (!key.startsWith("@") || typeof val !== "object") continue;
+    if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
     const mediaName = key.slice(1);
     if (mediaName === "--") continue;
     if (activeBreakpoints.has(mediaName) || featureToggles[mediaName]) {

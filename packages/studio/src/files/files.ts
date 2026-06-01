@@ -36,6 +36,8 @@ import { loadMarkdown } from "./file-ops";
 import { view } from "../view";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
 
+import type { JxElement } from "@jxsuite/schema/types";
+
 // ─── File icon map ────────────────────────────────────────────────────────────
 
 const fileIconMap = {

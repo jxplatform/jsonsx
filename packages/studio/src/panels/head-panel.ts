@@ -17,6 +17,8 @@ import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts
 import { invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 
+import type { JxHeadEntry } from "@jxsuite/schema/types";
+
 interface MetaField {
   label: string;
   attr: "name" | "property";
@@ -529,8 +531,11 @@ function renderFrontmatterSection() {
 
   const fm = tab.doc.content?.frontmatter || {};
   const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
-  const schemaProps = col?.schema?.properties;
-  const requiredFields = new Set(col?.schema?.required || []);
+  const schema = col?.schema as
+    | { properties?: Record<string, FmSchemaEntry>; required?: string[] }
+    | undefined;
+  const schemaProps = schema?.properties;
+  const requiredFields = new Set(schema?.required || []);
 
   /** @type {{ field: string; entry: FmSchemaEntry; value: JsonValue }[]} */
   const fields = [];

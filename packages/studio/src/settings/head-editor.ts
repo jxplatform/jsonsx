@@ -14,6 +14,8 @@ import {
   cleanupGoogleFontPreconnects,
 } from "../utils/google-fonts";
 
+import type { JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
+
 /** @param {HTMLElement} container */
 export function renderHeadEditor(container: HTMLElement) {
   const config = (projectState?.projectConfig || {}) as ProjectConfig;

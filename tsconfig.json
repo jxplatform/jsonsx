@@ -10,6 +10,12 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["types.d.ts", "packages/**/src/**/*", "packages/**/tests/**/*"],
+  "include": [
+    "types.d.ts",
+    "packages/**/src/**/*",
+    "packages/**/tests/**/*",
+    "packages/schema/types.ts",
+    "packages/schema/defs/**/*"
+  ],
   "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets"]
 }

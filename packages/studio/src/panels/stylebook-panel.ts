@@ -287,7 +287,7 @@ export function refreshStylebookStyles() {
         // Media overrides nested in tag style
         if (activeBreakpoints.size > 0) {
           for (const [key, val] of Object.entries(tagStyle)) {
-            if (!key.startsWith("@") || typeof val !== "object") continue;
+            if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
             const mediaName = key.slice(1);
             if (mediaName === "--") continue;
             if (activeBreakpoints.has(mediaName)) {
@@ -305,7 +305,7 @@ export function refreshStylebookStyles() {
       // Top-level @media keys
       if (activeBreakpoints.size > 0) {
         for (const [key, val] of Object.entries(rootStyle)) {
-          if (!key.startsWith("@") || typeof val !== "object") continue;
+          if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
           const mediaName = key.slice(1);
           if (mediaName === "--") continue;
           if (activeBreakpoints.has(mediaName)) {
@@ -450,7 +450,7 @@ export function buildStylebookElement(
     if (activeBreakpoints) {
       // Check media overrides nested inside the tag style (selector wraps media)
       for (const [key, val] of Object.entries(tagStyle)) {
-        if (!key.startsWith("@") || typeof val !== "object") continue;
+        if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
         const mediaName = key.slice(1);
         if (mediaName === "--") continue;
         if (activeBreakpoints.has(mediaName)) {
@@ -469,7 +469,7 @@ export function buildStylebookElement(
   if (activeBreakpoints) {
     const tagPath = compoundTag || entry.tag;
     for (const [key, val] of Object.entries(rootStyle)) {
-      if (!key.startsWith("@") || typeof val !== "object") continue;
+      if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
       const mediaName = key.slice(1);
       if (mediaName === "--") continue;
       if (activeBreakpoints.has(mediaName)) {
@@ -546,7 +546,7 @@ function hasTagStyle(rootStyle: Record<string, unknown>, tag: string) {
   const s = _resolveNestedStyle(rootStyle, tag);
   if (s && typeof s === "object" && Object.keys(s).length > 0) return true;
   for (const [key, val] of Object.entries(rootStyle)) {
-    if (!key.startsWith("@") || typeof val !== "object") continue;
+    if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
     const ms = _resolveNestedStyle(val as Record<string, unknown>, tag);
     if (ms && typeof ms === "object" && Object.keys(ms).length > 0) return true;
   }

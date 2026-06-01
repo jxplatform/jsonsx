@@ -1,0 +1,107 @@
+export const BUILT_IN_PROTOTYPES = [
+  "Function",
+  "Request",
+  "URLSearchParams",
+  "FormData",
+  "LocalStorage",
+  "SessionStorage",
+  "Cookie",
+  "IndexedDB",
+  "Array",
+  "Set",
+  "Map",
+  "Blob",
+  "ReadableStream",
+] as const;
+
+export const externalClassDefSchema = {
+  description:
+    'An external class / data source. $prototype is a constructor name (not "Function"). ' +
+    "When $prototype is not in the built-in registry, $src is required. " +
+    "All state entries are reactive by default.",
+  type: "object",
+  required: ["$prototype"],
+  properties: {
+    $prototype: {
+      description: "Constructor name — built-in Web API class or external class name.",
+      type: "string",
+      not: { const: "Function" },
+      examples: [
+        "Request",
+        "URLSearchParams",
+        "FormData",
+        "LocalStorage",
+        "SessionStorage",
+        "Cookie",
+        "IndexedDB",
+        "Array",
+        "Set",
+        "Map",
+        "Blob",
+        "ReadableStream",
+        "MarkdownCollection",
+        "MyParser",
+      ],
+    },
+    $src: {
+      description: "External module specifier. Required when $prototype is not a built-in.",
+      type: "string",
+      examples: ["@jxsuite/md", "./lib/my-parser.js", "npm:@myorg/data"],
+    },
+    $export: {
+      description: "Named export in $src module. Defaults to the $prototype value.",
+      type: "string",
+    },
+    timing: { type: "string", enum: ["compiler", "server", "client"] },
+    manual: { type: "boolean" },
+    debounce: { type: "integer", minimum: 0 },
+    url: { $ref: "#/$defs/StringOrRef" },
+    method: {
+      type: "string",
+      enum: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+    },
+    headers: { type: "object", additionalProperties: { type: "string" } },
+    body: {},
+    responseType: {
+      type: "string",
+      enum: ["json", "text", "blob", "arraybuffer", "document", ""],
+    },
+    key: { type: "string" },
+    name: { type: "string" },
+    maxAge: { type: "integer" },
+    expires: { type: "string" },
+    path: { type: "string" },
+    domain: { type: "string" },
+    secure: { type: "boolean" },
+    sameSite: { type: "string", enum: ["strict", "lax", "none"] },
+    database: { type: "string" },
+    store: { type: "string" },
+    version: { type: "integer", minimum: 1 },
+    keyPath: { type: "string" },
+    autoIncrement: { type: "boolean" },
+    indexes: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["name", "keyPath"],
+        properties: {
+          name: { type: "string" },
+          keyPath: {
+            oneOf: [{ type: "string" }, { type: "array", items: { type: "string" } }],
+          },
+          unique: { type: "boolean" },
+        },
+      },
+    },
+    default: {},
+    description: { type: "string" },
+    items: {},
+    map: { $ref: "#/$defs/ElementDef" },
+    filter: { $ref: "#/$defs/RefObject" },
+    sort: { $ref: "#/$defs/RefObject" },
+    src: {
+      description: "Configuration property passed to external class constructor.",
+      type: "string",
+    },
+  },
+} as const;

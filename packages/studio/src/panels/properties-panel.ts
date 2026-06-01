@@ -34,6 +34,8 @@ import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
+import type { JxPrototypeDef } from "@jxsuite/schema/types";
+
 interface SignalOption {
   value: string;
   label: string;

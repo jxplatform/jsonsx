@@ -9,6 +9,7 @@ import { getEffectiveElements } from "../site-context";
 import { componentRegistry } from "../files/components";
 
 import type { ComponentEntry } from "../files/components";
+import type { JxElement } from "@jxsuite/schema/types";
 
 /**
  * @param {{

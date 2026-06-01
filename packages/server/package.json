@@ -30,6 +30,7 @@
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/parser": "workspace:^",
+    "@jxsuite/schema": "^0.23.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^5.0.0",
     "zod": "^4.4.3"

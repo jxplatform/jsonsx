@@ -4,6 +4,8 @@
  * These are all side-effect-free functions used by style/properties/events panels.
  */
 
+import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
+
 /**
  * CamelCase → kebab-case for inline style attributes
  *

@@ -7,6 +7,8 @@ import { getPlatform } from "../platform";
 import { openFileInTab } from "../files/files";
 import { closeSettingsModal } from "./settings-modal";
 
+import type { ProjectConfig } from "@jxsuite/schema/types";
+
 /** @param {HTMLElement} container */
 export function renderGeneralSettings(container: HTMLElement) {
   const config = (projectState?.projectConfig || {}) as ProjectConfig;

@@ -5,6 +5,8 @@ import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateUpdateProperty } from "../tabs/transact";
 import { renderExpressionEditor } from "../ui/expression-editor";
 
+import type { JxPrototypeDef } from "@jxsuite/schema/types";
+
 export const EVENT_NAMES = [
   "onclick",
   "oninput",

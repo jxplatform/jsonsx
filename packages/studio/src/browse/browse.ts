@@ -22,6 +22,7 @@ import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime
 import { loadMarkdown } from "../files/file-ops";
 
 import type { ComponentEntry } from "../files/components";
+import type { ContentTypeDef } from "@jxsuite/schema/types";
 
 // ─── Category definitions ────────────────────────────────────────────────────
 

@@ -160,47 +160,15 @@
       "description": "Site-wide reactive state available to all pages.",
       "type": "object"
     },
+    "$defs": {
+      "description": "Global type definitions available to all pages.",
+      "type": "object"
+    },
     "contentTypes": {
       "description": "Content type definitions. Each key is a content type name; the value defines the source directory, frontmatter schema, and element dependencies.",
       "type": "object",
       "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "source": {
-            "description": "Path to the content directory relative to the project root.",
-            "type": "string",
-            "examples": [
-              "./content/blog/",
-              "./content/docs/"
-            ]
-          },
-          "schema": {
-            "description": "JSON Schema for validating frontmatter of content type entries.",
-            "type": "object"
-          },
-          "$elements": {
-            "description": "Custom elements available in markdown directives for this content type.",
-            "type": "array",
-            "items": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "required": [
-                    "$ref"
-                  ],
-                  "properties": {
-                    "$ref": {
-                      "type": "string"
-                    }
-                  }
-                },
-                {
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        }
+        "$ref": "#/$defs/ContentTypeDef"
       }
     },
     "redirects": {
@@ -261,6 +229,9 @@
         }
       }
     },
+    "images": {
+      "$ref": "#/$defs/ImageConfig"
+    },
     "i18n": {
       "description": "Internationalization configuration.",
       "type": "object",
@@ -297,5 +268,100 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "ImageConfig": {
+      "description": "Image optimization configuration for the project.",
+      "type": "object",
+      "properties": {
+        "optimize": {
+          "type": "boolean"
+        },
+        "widths": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "formats": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quality": {
+          "type": "object",
+          "properties": {
+            "webp": {
+              "type": "number"
+            },
+            "avif": {
+              "type": "number"
+            },
+            "jpeg": {
+              "type": "number"
+            },
+            "png": {
+              "type": "number"
+            }
+          }
+        },
+        "sizes": {
+          "type": "string"
+        },
+        "lazyLoad": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ContentTypeDef": {
+      "description": "Content type definition. Defines the source directory, frontmatter schema, and element dependencies.",
+      "type": "object",
+      "properties": {
+        "source": {
+          "description": "Path to the content directory relative to the project root.",
+          "type": "string",
+          "examples": [
+            "./content/blog/",
+            "./content/docs/"
+          ]
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "md",
+            "json",
+            "csv",
+            "yaml"
+          ]
+        },
+        "schema": {
+          "description": "JSON Schema for validating frontmatter of content type entries.",
+          "type": "object"
+        },
+        "$elements": {
+          "description": "Custom elements available in markdown directives for this content type.",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "$ref"
+                ],
+                "properties": {
+                  "$ref": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
 }

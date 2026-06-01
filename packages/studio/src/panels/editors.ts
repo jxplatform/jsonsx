@@ -14,6 +14,7 @@ import { view } from "../view";
 import { codeService, setLintMarkers, getFunctionArgs } from "../services/code-services";
 
 import type { OxLintDiagnostic } from "../services/code-services";
+import type { JxPrototypeDef } from "@jxsuite/schema/types";
 
 type EditingTarget =
   | { type: "def"; defName: string }

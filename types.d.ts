@@ -429,7 +429,7 @@ interface ContentLoaderEntry {
 }
 
 interface ContentTypeDef {
-  source: string;
+  source?: string;
   format?: "md" | "json" | "csv" | "yaml";
   schema?: ContentTypeSchema;
   $elements?: (string | { $ref: string })[];
@@ -473,12 +473,12 @@ interface DirEntry {
 }
 
 interface ImageConfig {
-  optimize: boolean;
-  widths: number[];
-  formats: string[];
-  quality: { webp?: number; avif?: number; jpeg?: number; png?: number };
-  sizes: string;
-  lazyLoad: boolean;
+  optimize?: boolean;
+  widths?: number[];
+  formats?: string[];
+  quality?: { webp?: number; avif?: number; jpeg?: number; png?: number };
+  sizes?: string;
+  lazyLoad?: boolean;
 }
 
 interface ProjectConfig {

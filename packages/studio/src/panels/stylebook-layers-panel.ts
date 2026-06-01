@@ -6,6 +6,7 @@ import { activeTab } from "../workspace/workspace";
 import { componentRegistry } from "../files/components";
 
 import type { StylebookEntry } from "./stylebook-panel";
+import type { JxStyle } from "@jxsuite/schema/types";
 
 /**
  * @param {JxStyle} rootStyle

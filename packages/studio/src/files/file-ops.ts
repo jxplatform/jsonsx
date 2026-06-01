@@ -16,6 +16,8 @@ import { getPlatform } from "../platform";
 import { activeTab, openTab } from "../workspace/workspace";
 import { isEditing, stopEditing } from "../editor/inline-edit";
 
+import type { JxElement } from "@jxsuite/schema/types";
+
 /** Open a file via the File System Access API (or fallback input). */
 export async function openFile() {
   try {
