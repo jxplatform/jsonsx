@@ -202,7 +202,7 @@ import {
   mutateMoveNode,
   mutateRemoveNode,
   mutateUpdateProperty,
-} from "../tabs/transact.js";
+} from "../tabs/transact";
 ```
 
 ### 5e. Export `enterLayerTitleEdit` for context menu use
@@ -239,8 +239,8 @@ items.push({
 ### 6b. Import dependencies
 
 ```js
-import { enterLayerTitleEdit } from "../panels/layers-panel.js";
-import { pathKey } from "../store.js"; // likely already imported
+import { enterLayerTitleEdit } from "../panels/layers-panel";
+import { pathKey } from "../store"; // likely already imported
 ```
 
 ### 6c. Pass `ctx` through to `showContextMenu`

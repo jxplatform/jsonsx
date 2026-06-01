@@ -1,8 +1,8 @@
 import { describe, test, expect, mock } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { DirEntry, ComponentMeta } from "../src/rpc-schema.ts";
-import type { StudioSchema } from "../src/handlers.ts";
+import type { DirEntry, ComponentMeta } from "../src/rpc-schema";
+import type { StudioSchema } from "../src/handlers";
 
 mock.module("electrobun/bun", () => ({
   Utils: { openFileDialog: async () => [] },

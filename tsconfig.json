@@ -1,14 +1,9 @@
 {
   "compilerOptions": {
-    /* JavaScript Support */
-    "allowJs": true,
-    "checkJs": true,
-    "noEmit": true /* Crucial: Do not compile/output files */,
-    /* Strict Type-Checking Options */
-    "strict": true /* Enable all strict type-checking options */,
+    "noEmit": true,
+    "strict": true,
     "noImplicitAny": true,
     "strictNullChecks": true,
-    /* Environment */
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",

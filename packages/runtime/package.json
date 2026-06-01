@@ -14,16 +14,16 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/runtime.js",
-    "./expression": "./src/expression.js"
+    ".": "./src/runtime.ts",
+    "./expression": "./src/expression.ts"
   },
   "publishConfig": {
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/runtime.js --outdir dist --target browser --sourcemap=linked",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
+    "build": "bun build ./src/runtime.ts --outdir dist --target browser --sourcemap=linked",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {

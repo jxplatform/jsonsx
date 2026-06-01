@@ -134,7 +134,7 @@ This indirection is for grep-ability and for the (unlikely) future where you mig
 Create `packages/studio/src/tabs/tab.js` defining the `Tab` factory and lifecycle:
 
 ```js
-import { reactive, effectScope } from "../reactivity.js";
+import { reactive, effectScope } from "../reactivity";
 
 export function createTab({ id, documentPath, fileHandle, document, frontmatter }) {
   const scope = effectScope();
@@ -198,8 +198,8 @@ This is the single most important reason to choose `@vue/reactivity` over `@prea
 Create `packages/studio/src/workspace/workspace.js`:
 
 ```js
-import { reactive, computed } from "../reactivity.js";
-import { createTab, disposeTab } from "../tabs/tab.js";
+import { reactive, computed } from "../reactivity";
+import { createTab, disposeTab } from "../tabs/tab";
 
 export const workspace = reactive({
   projectRoot: null,
@@ -379,10 +379,10 @@ Each panel's `mount(rootEl, getState)` (from Phase 4) becomes `mount(rootEl)`. I
 
 ```js
 // panels/right/index.js
-import { effect, effectScope } from "../../reactivity.js";
-import { activeTab } from "../../workspace/workspace.js";
+import { effect, effectScope } from "../../reactivity";
+import { activeTab } from "../../workspace/workspace";
 import { litRender } from "lit-html";
-import { rightPanelTemplate } from "./template.js";
+import { rightPanelTemplate } from "./template";
 
 let scope = null;
 

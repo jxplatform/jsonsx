@@ -13,21 +13,21 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/md.js",
-    "./content": "./src/content.js",
+    ".": "./src/md.ts",
+    "./content": "./src/content.ts",
     "./ContentCollection.class.json": "./src/ContentCollection.class.json",
     "./ContentEntry.class.json": "./src/ContentEntry.class.json",
     "./MarkdownCollection.class.json": "./src/MarkdownCollection.class.json",
     "./MarkdownFile.class.json": "./src/MarkdownFile.class.json",
-    "./transpile": "./src/transpile.js",
-    "./html-to-jx": "./src/html-to-jx.js"
+    "./transpile": "./src/transpile.ts",
+    "./html-to-jx": "./src/html-to-jx.ts"
   },
   "publishConfig": {
     "provenance": true
   },
   "scripts": {
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
@@ -35,7 +35,7 @@
     "hast-util-from-html": "^2.0.3",
     "hast-util-whitespace": "^3.0.0",
     "mdast-util-to-string": "^4.0.0",
-    "property-information": "^7.1.0",
+    "property-information": "^7.2.0",
     "rehype-stringify": "^10.0.1",
     "remark-directive": "^4.0.0",
     "remark-frontmatter": "^5.0.0",

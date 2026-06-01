@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
-import type { DirEntry, ComponentMeta } from "../src/rpc-schema.ts";
+import type { DirEntry, ComponentMeta } from "../src/rpc-schema";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_chromium_rpc");
 

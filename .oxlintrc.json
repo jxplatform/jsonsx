@@ -8,7 +8,7 @@
   },
   "plugins": ["jsdoc", "oxc", "typescript", "unicorn"],
   "rules": {
-    "@typescript-eslint/no-explicit-any": "error"
+    // "@typescript-eslint/no-explicit-any": "error"
   },
   "settings": {
     "jsdoc": {

@@ -15,7 +15,7 @@ These files only call `getState()` to read fields. They never write back via `se
 Replace:
 
 ```javascript
-import { getState } from "../store.js";
+import { getState } from "../store";
 // ...
 const S = getState();
 const doc = S.document;
@@ -24,7 +24,7 @@ const doc = S.document;
 With:
 
 ```javascript
-import { activeTab } from "../workspace/workspace.js";
+import { activeTab } from "../workspace/workspace";
 // ...
 const tab = activeTab.value;
 const doc = tab.doc.document;

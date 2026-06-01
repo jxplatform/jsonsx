@@ -6,7 +6,7 @@
   },
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
-    ".": "./src/schema.js",
+    ".": "./src/schema.ts",
     "./schema.json": "./schema.json",
     "./project-schema.json": "./project-schema.json"
   },
@@ -26,9 +26,9 @@
     "url": "git+https://github.com/jxsuite/jx.git"
   },
   "scripts": {
-    "schema": "bun run src/schema.js",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
+    "schema": "bun run src/schema.ts",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",

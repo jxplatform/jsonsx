@@ -15,14 +15,14 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/studio.js",
-    "./platform.js": "./src/platform.js"
+    ".": "./src/studio.ts",
+    "./platform.js": "./src/platform.ts"
   },
   "publishConfig": {
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/studio.js --outdir dist --target browser --sourcemap=linked && bun build ./node_modules/monaco-editor/esm/vs/editor/editor.worker.js --outdir dist/workers --target browser --entry-naming editor.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/json/json.worker.js --outdir dist/workers --target browser --entry-naming json.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js --outdir dist/workers --target browser --entry-naming ts.worker.js",
+    "build": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked && bun build ./node_modules/monaco-editor/esm/vs/editor/editor.worker.js --outdir dist/workers --target browser --entry-naming editor.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/json/json.worker.js --outdir dist/workers --target browser --entry-naming json.worker.js && bun build ./node_modules/monaco-editor/esm/vs/language/typescript/ts.worker.js --outdir dist/workers --target browser --entry-naming ts.worker.js",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",

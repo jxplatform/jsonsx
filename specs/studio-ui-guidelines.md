@@ -204,7 +204,7 @@ All text input handlers must debounce before committing to state. Standard delay
 **Shared utility** (preferred for style properties):
 
 ```javascript
-import { debouncedStyleCommit } from "../store.js";
+import { debouncedStyleCommit } from "../store";
 
 @input=${debouncedStyleCommit("prop:name", 400, (e) => onChange(e.target.value))}
 ```
@@ -382,7 +382,7 @@ Fixed-position toolbar that follows the selected element:
 All mutations produce a new state object. Never modify state in place.
 
 ```javascript
-import { update } from "../store.js";
+import { update } from "../store";
 
 // Correct: produce new state via mutation helper
 update(updateStyle(S, path, prop, value));

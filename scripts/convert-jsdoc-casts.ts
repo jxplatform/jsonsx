@@ -374,7 +374,8 @@ function replaceExprCasts(input: string, filePath: string, replacements: Replace
     // 2. If innerExpr is a simple identifier (no operators/dots/calls), and it's in a
     //    function parameter position, treat it as a param, not a cast.
     //    A simple identifier followed by , or ) after the balanced group = param
-    if (/^\w+$/.test(innerExpr)) {
+    //    BUT if followed by . or [ (property access), it's definitely a cast.
+    if (/^\w+$/.test(innerExpr) && !afterClose.startsWith(".") && !afterClose.startsWith("[")) {
       if (afterClose.startsWith(",") || afterClose.startsWith(")")) continue;
       // Check if we're inside a function/arrow param list by looking at context before
       const beforeCtx = input.slice(Math.max(0, match.index - 60), match.index);

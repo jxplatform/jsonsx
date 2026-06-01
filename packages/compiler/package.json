@@ -9,7 +9,7 @@
     "directory": "packages/compiler"
   },
   "bin": {
-    "jx": "./src/cli.js"
+    "jx": "./src/cli.ts"
   },
   "files": [
     "src/",
@@ -17,23 +17,23 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/compiler.js",
-    "./content-loader": "./src/site/content-loader.js",
-    "./context-injection": "./src/site/context-injection.js",
-    "./head-merger": "./src/site/head-merger.js",
-    "./layout-resolver": "./src/site/layout-resolver.js",
-    "./pages-discovery": "./src/site/pages-discovery.js",
-    "./site": "./src/site/site-build.js",
-    "./site-loader": "./src/site/site-loader.js"
+    ".": "./src/compiler.ts",
+    "./content-loader": "./src/site/content-loader.ts",
+    "./context-injection": "./src/site/context-injection.ts",
+    "./head-merger": "./src/site/head-merger.ts",
+    "./layout-resolver": "./src/site/layout-resolver.ts",
+    "./pages-discovery": "./src/site/pages-discovery.ts",
+    "./site": "./src/site/site-build.ts",
+    "./site-loader": "./src/site/site-loader.ts"
   },
   "publishConfig": {
     "provenance": true
   },
   "scripts": {
-    "build": "bun build src/compiler.js --outdir=dist --format=esm --minify",
-    "build:site": "bun src/cli.js build",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
+    "build": "bun build src/compiler.ts --outdir=dist --format=esm --minify",
+    "build:site": "bun src/cli.ts build",
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {

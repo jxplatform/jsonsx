@@ -9,17 +9,17 @@
     "directory": "packages/create"
   },
   "bin": {
-    "create-jxsuite": "./index.js"
+    "create-jxsuite": "./index.ts"
   },
   "files": [
-    "index.js",
-    "generate.js",
+    "index.ts",
+    "generate.ts",
     "template/"
   ],
   "type": "module",
   "exports": {
-    ".": "./index.js",
-    "./generate": "./generate.js"
+    ".": "./index.ts",
+    "./generate": "./generate.ts"
   },
   "publishConfig": {
     "provenance": true
