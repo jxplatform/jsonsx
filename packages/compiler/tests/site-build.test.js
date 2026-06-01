@@ -544,7 +544,7 @@ describe("buildSite — component CSS generation", () => {
     const html = readFileSync(resolve(COMP_TMP, "dist/index.html"), "utf8");
     expect(html).toContain('href="/components/my-button.css"');
     // Component JS is bundled as app.js or per-component module
-    expect(html).toContain('src="/app.js"');
+    expect(html).toContain('src="./app.js"');
   });
 });
 

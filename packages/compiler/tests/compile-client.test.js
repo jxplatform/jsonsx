@@ -510,7 +510,7 @@ describe("compileClient — module structure", () => {
   test("custom modulePath reflected in output", () => {
     const doc = { tagName: "div", children: [] };
     const { html, files } = compileClient(doc, { title: "Test", modulePath: "scripts/main.js" });
-    expect(html).toContain('src="/scripts/main.js"');
+    expect(html).toContain('src="./scripts/main.js"');
     expect(files[0].path).toBe("scripts/main.js");
   });
 
