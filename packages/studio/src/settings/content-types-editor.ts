@@ -10,6 +10,7 @@ import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { fieldCardTpl, addFieldFormTpl, schemaForType, detectFieldFormat } from "./schema-field-ui";
+import { toCamelCase } from "../utils/studio-utils";
 
 import type { ProjectConfig, ContentTypeSchema } from "@jxsuite/schema/types";
 
@@ -73,8 +74,9 @@ function handleNewContentType(rerender: () => void) {
 
 /** @param {() => void} rerender */
 function handleAddField(rerender: () => void) {
-  const name = newFieldState.name.trim();
-  if (!name || !selectedContentType) return;
+  const raw = newFieldState.name.trim();
+  if (!raw || !selectedContentType) return;
+  const name = toCamelCase(raw);
 
   const schema = getSelectedSchema();
   if (!schema) return;
@@ -134,16 +136,17 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
  */
 function handleRenameField(oldName: string, newName: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema?.properties || !newName || schema.properties[newName]) return;
+  const normalized = toCamelCase(newName);
+  if (!schema?.properties || !normalized || schema.properties[normalized]) return;
 
   const newProps: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(schema.properties)) {
-    newProps[key === oldName ? newName : key] = val;
+    newProps[key === oldName ? normalized : key] = val;
   }
   schema.properties = newProps;
 
   if (schema.required) {
-    schema.required = schema.required.map((r: string) => (r === oldName ? newName : r));
+    schema.required = schema.required.map((r: string) => (r === oldName ? normalized : r));
   }
 
   rerender();
@@ -214,12 +217,15 @@ function handleAddNestedField(
   const parent = schema?.properties?.[parentName];
   if (!parent) return;
 
+  const name = toCamelCase(fieldState.name);
+  if (!name) return;
+
   if (!parent.properties) parent.properties = {};
-  parent.properties[fieldState.name] = schemaForType(fieldState.type);
+  parent.properties[name] = schemaForType(fieldState.type);
 
   if (fieldState.required) {
     if (!parent.required) parent.required = [];
-    if (!parent.required.includes(fieldState.name)) parent.required.push(fieldState.name);
+    if (!parent.required.includes(name)) parent.required.push(name);
   }
 
   rerender();
@@ -278,16 +284,17 @@ function handleRenameNested(
 ) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent?.properties || !newChild || parent.properties[newChild]) return;
+  const normalized = toCamelCase(newChild);
+  if (!parent?.properties || !normalized || parent.properties[normalized]) return;
 
   const newProps: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(parent.properties)) {
-    newProps[key === oldChild ? newChild : key] = val;
+    newProps[key === oldChild ? normalized : key] = val;
   }
   parent.properties = newProps;
 
   if (parent.required) {
-    parent.required = parent.required.map((r: string) => (r === oldChild ? newChild : r));
+    parent.required = parent.required.map((r: string) => (r === oldChild ? normalized : r));
   }
 
   rerender();

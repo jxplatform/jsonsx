@@ -27,6 +27,12 @@ export function camelToLabel(prop: string) {
   return prop.replace(/([A-Z])/g, " $1").replace(/^./, (c: string) => c.toUpperCase());
 }
 
+export function toCamelCase(str: string): string {
+  return str
+    .replace(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+    .replace(/^[A-Z]/, (c) => c.toLowerCase());
+}
+
 /**
  * Convert a kebab-case CSS value to Title Case for picker display (e.g. "border-box" → "Border
  * Box")

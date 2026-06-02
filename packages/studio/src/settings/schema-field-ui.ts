@@ -4,6 +4,7 @@
  */
 
 import { html, nothing } from "lit-html";
+import { camelToLabel } from "../utils/studio-utils";
 
 export interface SchemaProperty {
   type?: string;
@@ -86,6 +87,9 @@ export function fieldCardTpl(
   return html`
     <div class="schema-field-card">
       <div class="schema-field-row">
+        <sp-field-label size="s" class="schema-field-label"
+          >${camelToLabel(fieldName)}</sp-field-label
+        >
         <sp-textfield
           size="s"
           quiet
