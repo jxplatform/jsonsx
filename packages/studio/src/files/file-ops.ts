@@ -96,11 +96,18 @@ export async function loadMarkdown(source: string) {
   // Content markdown — children form the root-level document body
   const children = doc.children ?? [];
   if (children.length === 0) children.push({ tagName: "p", children: [] });
-  const contentDoc = { children };
+
+  const documentKeys = new Set(["state", "imports"]);
+  const contentDoc: Record<string, unknown> = { children };
 
   const frontmatter: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
-    if (key !== "children") frontmatter[key] = value;
+    if (key === "children") continue;
+    if (documentKeys.has(key)) {
+      contentDoc[key] = value;
+    } else {
+      frontmatter[key] = value;
+    }
   }
 
   return { document: contentDoc, frontmatter };
