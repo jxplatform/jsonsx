@@ -113,16 +113,16 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
           return;
         }
         done({
-          items: { $ref: `#/$defs/${name}` },
-          filter: filterDef ? { $ref: `#/$defs/${filterDef}` } : undefined,
-          sort: sortDef ? { $ref: `#/$defs/${sortDef}` } : undefined,
+          items: { $ref: `#/state/${name}` },
+          filter: filterDef ? { $ref: `#/state/${filterDef}` } : undefined,
+          sort: sortDef ? { $ref: `#/state/${sortDef}` } : undefined,
           newDef: { name },
         });
       } else {
         done({
-          items: { $ref: `#/$defs/${source}` },
-          filter: filterDef ? { $ref: `#/$defs/${filterDef}` } : undefined,
-          sort: sortDef ? { $ref: `#/$defs/${sortDef}` } : undefined,
+          items: { $ref: `#/state/${source}` },
+          filter: filterDef ? { $ref: `#/state/${filterDef}` } : undefined,
+          sort: sortDef ? { $ref: `#/state/${sortDef}` } : undefined,
         });
       }
     }
