@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/jx.svg" alt="Jx" width="80" height="80">
+  <img src="branding/jx_flattened.svg" alt="Jx" width="80" height="80">
 </p>
 
 <p align="center">
