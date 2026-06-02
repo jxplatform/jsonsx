@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Stylebook layers panel — shows element/variable tree when in stylebook (settings) mode. */
 
 import { html, nothing } from "lit-html";

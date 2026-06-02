@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * File Operations — open, save, export documents.
  *

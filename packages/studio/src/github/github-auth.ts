@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * GitHub OAuth Device Flow authentication for Jx Studio.
  *

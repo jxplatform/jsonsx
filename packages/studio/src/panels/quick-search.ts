@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";

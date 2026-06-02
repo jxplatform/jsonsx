@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * DnD registration functions — extracted from studio.js (Phase 4). Registers drag-and-drop behavior
  * on layer rows, component cards, and element cards.

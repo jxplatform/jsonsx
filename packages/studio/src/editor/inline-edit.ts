@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Inline-edit.js — Contenteditable inline editing for content mode
  *

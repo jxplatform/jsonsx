@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 interface RecentProject {
   name: string;
   root: string;

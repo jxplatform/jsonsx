@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Signals panel — signal/def helpers, signals template, CEM editors, plugin schema forms.
  *

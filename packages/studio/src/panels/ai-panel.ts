@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Ai-panel.js — Claude AI Assistant tab for the right panel
  *

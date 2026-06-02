@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas Diff — computes visual diff between original and current Jx documents.
  *

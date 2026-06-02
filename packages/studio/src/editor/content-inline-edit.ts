@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { renderOnly, getNodeAtPath, parentElementPath, childIndex, canvasPanels } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateInsertNode, mutateUpdateProperty } from "../tabs/transact";

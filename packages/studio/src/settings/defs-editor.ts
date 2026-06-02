@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Definitions Editor — visual editor for project-level $defs (JSON Schema type definitions).
  *

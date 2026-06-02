@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Git panel — Source control sidebar with sync status, branch selector, Local Changes / History
  * tabs, commit form, and changed-components view.

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Site context helpers - merge site-level definitions with file-level.
  *

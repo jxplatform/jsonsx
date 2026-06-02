@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas DnD — extracted from studio.js (Phase 4m). Registers canvas elements as drag-and-drop
  * targets using @atlaskit/pragmatic-drag-and-drop.

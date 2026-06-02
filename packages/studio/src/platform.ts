@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Platform.js — Platform Abstraction Layer (PAL)
  *

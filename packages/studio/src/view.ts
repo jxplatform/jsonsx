@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * View.js — Transient view state for Jx Studio
  *

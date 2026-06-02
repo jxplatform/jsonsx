@@ -1,21 +1,29 @@
 {
   "compilerOptions": {
-    "noEmit": true,
-    "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "target": "ESNext",
+    "allowJs": false,
+    "checkJs": false,
+    "declaration": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": ["ES2020"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "strict": true,
+    "strictNullChecks": true,
+    "target": "ESNext",
+    "types": []
   },
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets"],
   "include": [
     "types.d.ts",
     "packages/**/src/**/*",
     "packages/**/tests/**/*",
     "packages/schema/types.ts",
     "packages/schema/defs/**/*"
-  ],
-  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets"]
+  ]
 }

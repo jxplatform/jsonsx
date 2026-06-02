@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import type { JxMutableNode, JxPath, ProjectConfig } from "@jxsuite/schema/types";
 
 // ─── Git & Platform Types ───────────────────────────────────────────────────

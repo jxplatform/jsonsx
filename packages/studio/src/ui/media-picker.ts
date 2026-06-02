@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Media Picker — combobox-style widget for selecting project media files.
  *

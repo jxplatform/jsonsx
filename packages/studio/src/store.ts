@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Store.js — Shared state hub for Jx Studio
  *

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Left panel — orchestrator that delegates to per-tab render functions.
  *

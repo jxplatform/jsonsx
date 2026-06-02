@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Layers panel — document tree view showing element hierarchy with collapse, selection, move
  * actions, and drag-and-drop reordering.

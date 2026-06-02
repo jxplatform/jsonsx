@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Block action bar — extracted from studio.js (Phase 4h). Floating toolbar above selected elements
  * with parent selector, move arrows, drag handle, component actions, and inline formatting.

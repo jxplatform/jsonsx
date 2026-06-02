@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Slash-menu.js — Shared slash command menu for element insertion
  *

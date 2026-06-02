@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Jx Declarative Expression Engine (spec §19)
  *

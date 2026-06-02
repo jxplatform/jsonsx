@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Canvas media/breakpoint utilities — pure functions extracted for testability. */
 
 import type { JxStyle } from "@jxsuite/schema/types";

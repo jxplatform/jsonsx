@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Component inline edit — extracted from studio.js (Phase 4j). Manages plaintext-only editing on
  * canvas elements in design mode, with slash menu delegation for block insertion.

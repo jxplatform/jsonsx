@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Value Selector — Dual-mode styled combobox custom element.
  *

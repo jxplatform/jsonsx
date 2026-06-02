@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 const g = globalThis as unknown as {
   __jxPlatform?: {
     windowControls?: {

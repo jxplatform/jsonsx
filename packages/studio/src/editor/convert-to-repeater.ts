@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // ─── Convert to Repeater ──────────────────────────────────────────────────────
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";

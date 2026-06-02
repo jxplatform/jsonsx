@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Manage view — project-level file browser with grid and table views.
  *

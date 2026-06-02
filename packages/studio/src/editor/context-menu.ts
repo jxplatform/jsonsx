@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
 import { html } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";

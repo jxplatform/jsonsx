@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** General settings section — favicon, platform adapter, breakpoints, and other site-wide config. */
 
 import { html, render as litRender, nothing } from "lit-html";

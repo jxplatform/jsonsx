@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Unit-selector.js — Number + unit picker widget.
  *

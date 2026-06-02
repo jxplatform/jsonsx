@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * State.js — Builder state model and mutation API
  *

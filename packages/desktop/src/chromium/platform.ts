@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import type { StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {

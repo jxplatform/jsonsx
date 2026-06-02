@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Color-selector.js — Color input widget with swatch, text field, and popover picker.
  *

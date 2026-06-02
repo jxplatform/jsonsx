@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // ─── Data Explorer ──────────────────────────────────────────────────────────
 
 import { html, nothing } from "lit-html";

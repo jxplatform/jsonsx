@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Head panel — Page meta, OpenGraph, Frontmatter, and custom `$head` entries.
  *

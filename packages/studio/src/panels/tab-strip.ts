@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Tab strip — renders open tabs above the canvas area.
  *

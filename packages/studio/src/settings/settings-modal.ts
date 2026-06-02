@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Settings modal — site-wide project settings (CSS variables, definitions, content types, head,
  * general). Modeled after VS Code / Obsidian settings panels: left sidebar nav + right content

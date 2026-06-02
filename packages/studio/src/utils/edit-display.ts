@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Edit-mode display transforms — extracted from studio.js (Phase 4i). Pure stateless functions that
  * convert document trees for visual editing (template expressions, $map, $switch, empty

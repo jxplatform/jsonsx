@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Browse modal — fullscreen overlay for the project file browser (Manage view). Opens via toolbar
  * button; selecting a file closes the modal and opens it in the editor.

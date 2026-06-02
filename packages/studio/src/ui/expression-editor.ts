@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "./field-row";

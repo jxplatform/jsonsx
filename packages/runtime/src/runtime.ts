@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Jx — JSON-native reactive web component runtime
  * @version 3.0.0

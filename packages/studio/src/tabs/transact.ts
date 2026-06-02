@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { toRaw } from "../reactivity";
 import { getNodeAtPath, parentElementPath, childIndex, pathsEqual, isAncestor } from "../state";
 

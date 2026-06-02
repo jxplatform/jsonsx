@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas panel utilities — extracted from studio.js (Phase 4l). Panzoom infrastructure: panel DOM
  * template creation, centering, transform application, zoom indicator, and fit-to-screen.

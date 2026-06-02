@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Insertion-helper.js — Single floating "+" button for element insertion on the canvas.
  *

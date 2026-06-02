@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Studio.js — Jx Studio main application
  *

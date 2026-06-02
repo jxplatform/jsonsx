@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Content Types Editor — visual schema builder for project content types.
  *

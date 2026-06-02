@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Head editor — structured form for managing $head entries (link, meta, script, style tags) with
  * Monaco editor for script/style bodies. Also manages project-level Google Fonts.

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas helpers — extracted from studio.js (Phase 4n). Shared query/utility functions used by
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.

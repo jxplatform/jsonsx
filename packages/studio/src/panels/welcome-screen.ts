@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Welcome screen — shown when no project is loaded and no document tabs are open. Mimics VS Code's
  * welcome tab with start actions and recent projects.

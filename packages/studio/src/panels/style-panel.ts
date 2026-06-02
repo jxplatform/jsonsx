@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Style panel — CSS property editor with media breakpoint tabs, selector dropdown, section
  * accordion, shorthand expand/compress, and filter.

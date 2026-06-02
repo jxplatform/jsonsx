@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";

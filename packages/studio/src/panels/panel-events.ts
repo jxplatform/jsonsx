@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Panel events — extracted from studio.js (Phase 4m). Unified event handler system for canvas
  * panels: click-to-select, double-click inline edit, context menu, hover tracking, insertion

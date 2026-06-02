@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Schema field UI — shared field-card and add-field-dialog templates for the content types and
  * definitions editors.

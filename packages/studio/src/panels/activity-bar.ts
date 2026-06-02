@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Activity bar — tab icons for switching left panel views. */
 
 import { html, render as litRender, nothing } from "lit-html";

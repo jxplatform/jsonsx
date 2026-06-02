@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Preview render — extracted from studio.js (Phase 4m). Structural preview renderer that creates
  * DOM from Jx node trees as a fallback when runtime rendering fails.

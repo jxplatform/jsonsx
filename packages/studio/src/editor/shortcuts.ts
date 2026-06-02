@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Shortcuts.js — Keyboard shortcuts for Jx Studio
  *

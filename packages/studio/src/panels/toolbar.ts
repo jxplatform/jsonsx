@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Toolbar panel — extracted from studio.js renderToolbar(). Owns rendering of breadcrumbs, file
  * ops, feature toggles, and mode switcher.

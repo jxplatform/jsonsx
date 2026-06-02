@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** Collect slot elements from the document tree. */

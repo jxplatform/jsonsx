@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Editor panels — extracted from studio.js (Phase 4g). Monaco-based function editor (JS mode) and
  * completion provider for state scope variables.

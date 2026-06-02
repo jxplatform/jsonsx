@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas render — extracted from studio.js (Phase 4o). Multi-mode canvas rendering orchestrator:
  * dispatches to manage/settings/source/edit/design/preview rendering paths.

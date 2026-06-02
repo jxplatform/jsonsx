@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Button-group.js — Action group + overflow picker widget.
  *

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Pseudo-state preview — extracted from studio.js (Phase 4m). When a pseudo-selector (:hover,
  * :focus, etc.) is active in the style sidebar, force those styles onto the selected element.

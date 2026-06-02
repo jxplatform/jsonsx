@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Elements panel — block/component palette with categorized accordion and search filter. */
 
 import { html, nothing } from "lit-html";

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Properties panel — inspector for element attributes, component props, media, and frontmatter. */
 
 import { html, nothing } from "lit-html";

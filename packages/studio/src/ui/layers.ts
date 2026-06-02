@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { render as litRender, nothing, html } from "lit-html";
 
 let _popoverLayer: HTMLElement;

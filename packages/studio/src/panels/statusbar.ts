@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Statusbar — status message display for Jx Studio */
 
 import { statusbarEl, getNodeAtPath, nodeLabel, updateSession, renderOnly } from "../store";

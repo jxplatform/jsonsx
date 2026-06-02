@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * CSS Variables editor — form-based editor for managing design tokens. Colors and fonts are NOT
  * media-aware; sizes/spacing are media-aware.

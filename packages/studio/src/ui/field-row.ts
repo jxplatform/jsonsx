@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Field-row.js — Universal field row layout for all Studio panels.
  *

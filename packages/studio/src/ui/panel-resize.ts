@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Panel-resize.js — Draggable resize handles for left and right sidebars.
  *

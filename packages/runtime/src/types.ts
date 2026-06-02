@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import type { JxPath } from "@jxsuite/schema/types";
 export type { JxPath };
 

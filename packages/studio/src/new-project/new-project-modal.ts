@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * New Project modal — guides the user through creating a new Jx project. Fields mirror the CLI
  * scaffolder: name, description, url, adapter.

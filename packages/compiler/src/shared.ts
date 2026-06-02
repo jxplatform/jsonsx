@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Shared.js — Shared compiler utilities
  *

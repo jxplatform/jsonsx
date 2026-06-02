@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Md-convert.js — Bidirectional mdast ↔ Jx conversion
  *

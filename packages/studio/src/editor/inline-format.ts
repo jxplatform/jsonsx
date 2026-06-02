@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Inline-format.js — Inline formatting engine for contenteditable editing
  *

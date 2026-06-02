@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Publish a local project to GitHub — creates a new repo and pushes. */
 
 import { html } from "lit-html";

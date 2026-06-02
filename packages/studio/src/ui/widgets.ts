@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Widgets.js — Widget type dispatcher and simple widget renderers.
  *

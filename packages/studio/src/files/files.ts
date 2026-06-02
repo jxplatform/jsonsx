@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * File tree management — project loading, file tree rendering, and file CRUD.
  *

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Shared panel utilities — portable helpers extracted from studio.js. These functions depend only
  * on store.js / state.js exports (no circular deps).

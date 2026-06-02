@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
 import type { StudioRPC } from "./rpc-schema";

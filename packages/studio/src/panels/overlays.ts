@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Overlays panel — renders hover/selection overlay boxes on canvas panels. Delegates block action
  * bar rendering to studio.js via ctx callback.

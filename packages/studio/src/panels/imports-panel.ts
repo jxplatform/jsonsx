@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Imports panel — context-aware import manager with cherry-pick component selection.
  *

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /** Style input widgets — keyword, select, combobox, and font renderers for the style panel. */
 
 import { html } from "lit-html";

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Canvas live render — extracted from studio.js (Phase 4p). Async runtime rendering pipeline that
  * builds live canvas DOM using @jxsuite/runtime. Handles element registration, scope building, path

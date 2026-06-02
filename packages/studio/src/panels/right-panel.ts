@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /**
  * Right panel — orchestrates Properties / Events / Style tabs. The heavy sub-templates
  * (propertiesSidebarTemplate, renderStylePanelTemplate) remain in studio.js and are passed via ctx
