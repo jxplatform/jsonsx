@@ -119,7 +119,9 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       }
     } else if (typeof v === "string" && v.includes("${")) {
       // Template string in a display property → show raw expression
-      out[k] = templateToEditDisplay(v);
+      // For URL-bearing attributes, use empty string to avoid triggering network requests
+      const isUrlAttr = k === "src" || k === "href" || k === "poster" || k === "action";
+      out[k] = isUrlAttr ? "" : templateToEditDisplay(v);
     } else if (v && typeof v === "object" && (v as Record<string, unknown>).$ref) {
       // $ref binding → show ref path as literal text
       const ref = (v as Record<string, unknown>).$ref as string;
