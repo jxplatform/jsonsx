@@ -8,6 +8,8 @@
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 const mediaTags = new Set(["img", "video", "source", "iframe", "audio"]);
+const TRANSPARENT_PX =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
 /**
  * Convert a template string to a displayable expression for edit mode. Replaces ${expr} with ❮ expr
@@ -142,22 +144,16 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
         }
       }
     } else if (k === "attributes" && isMediaElement && v && typeof v === "object") {
-      // Process attributes for media elements: strip src/poster to prevent broken images
+      // Process attributes for media elements: replace src/poster with transparent pixel
       const attrs = v as Record<string, unknown>;
       const processed: Record<string, unknown> = {};
       for (const [ak, av] of Object.entries(attrs)) {
         if (ak === "src" || ak === "poster") {
           if (typeof av === "string" && av !== "" && !av.includes("${")) {
-            // Real static value — keep it
             processed[ak] = av;
           } else {
-            // Empty, template, or $ref — omit and ensure placeholder
             needsMediaPlaceholder = true;
-            if (typeof av === "string" && av.includes("${")) {
-              // Show template display for alt text but not for src
-            } else if (av && typeof av === "object" && (av as Record<string, unknown>).$ref) {
-              // $ref binding — omit src entirely
-            }
+            processed[ak] = TRANSPARENT_PX;
           }
         } else if (typeof av === "string" && av.includes("${")) {
           const isUrlAttr = ak === "href" || ak === "action";
@@ -184,11 +180,11 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       }
     } else if (typeof v === "string" && v.includes("${")) {
       // Template string in a display property → show raw expression
-      // For URL-bearing attributes on media elements, omit entirely (placeholder CSS handles it)
       const isMediaSrc =
         (k === "src" || k === "poster") && mediaTags.has((obj.tagName as string) || "");
       if (isMediaSrc) {
         needsMediaPlaceholder = true;
+        out[k] = TRANSPARENT_PX;
       } else {
         const isUrlAttr = k === "src" || k === "href" || k === "poster" || k === "action";
         out[k] = isUrlAttr ? "" : templateToEditDisplay(v);
@@ -201,17 +197,19 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
         (k === "src" || k === "poster") && mediaTags.has((obj.tagName as string) || "");
       if (isMediaSrc) {
         needsMediaPlaceholder = true;
+        out[k] = TRANSPARENT_PX;
       } else {
         out[k] = `{${label}}`;
       }
     } else {
-      // Empty src/poster on media elements → omit to prevent broken image, use placeholder
+      // Empty src/poster on media elements → use transparent pixel placeholder
       if (
         (k === "src" || k === "poster") &&
         v === "" &&
         mediaTags.has((obj.tagName as string) || "")
       ) {
         needsMediaPlaceholder = true;
+        out[k] = TRANSPARENT_PX;
       } else {
         out[k] = prepareForEditMode(v as JxMutableNode);
       }
