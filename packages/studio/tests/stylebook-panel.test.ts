@@ -6,6 +6,7 @@ import {
   renderComponentPreview,
 } from "../src/panels/stylebook-panel";
 import { setProjectState } from "../src/store";
+import type { ProjectState } from "../src/types";
 
 beforeEach(() => {
   setProjectState({ projectConfig: null, expanded: new Set() } as unknown as ProjectState);

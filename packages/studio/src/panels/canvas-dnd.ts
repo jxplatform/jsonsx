@@ -14,17 +14,8 @@ import { view } from "../view";
 import { applyDropInstruction } from "../panels/dnd";
 import { effectiveZoom } from "../canvas/canvas-helpers";
 
-export interface CanvasPanel {
-  mediaName: string | null;
-  element: HTMLElement | null;
-  canvas: HTMLElement;
-  overlay: HTMLElement;
-  overlayClk: HTMLElement;
-  viewport: HTMLElement;
-  scrollContainer: HTMLElement | null;
-  dropLine: HTMLElement;
-  _width: number | null;
-}
+import type { CanvasPanel } from "../types";
+export type { CanvasPanel };
 
 type JxPath = (string | number)[];
 

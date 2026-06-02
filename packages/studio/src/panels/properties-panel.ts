@@ -3,6 +3,7 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { getNodeAtPath, debouncedStyleCommit, renderOnly, projectState } from "../store";
+import type { JsonValue } from "../types";
 import {
   transactDoc,
   mutateUpdateProperty,

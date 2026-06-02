@@ -8,6 +8,8 @@
  * = third child of first child
  */
 
+import type { ProjectState } from "./types";
+
 export type JxPath = (string | number)[];
 
 interface HistorySnapshot {

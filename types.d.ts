@@ -176,54 +176,6 @@ interface StudioPlatform {
   aiDeleteSession(id: string): Promise<void>;
 }
 
-// ─── Studio UI Types ────────────────────────────────────────────────────────
-
-interface InlineEditDef {
-  path: JxPath;
-  mediaName?: string;
-}
-
-interface FunctionEditDef {
-  type: string;
-  defName?: string;
-  path?: JxPath;
-  eventKey?: string;
-  key?: string;
-  body?: string;
-  parameters?: string[];
-}
-
-interface DocumentStackEntry {
-  document: JxMutableNode;
-  documentPath: string | null;
-  selection: JxPath | null;
-  dirty?: boolean;
-  mode?: string;
-  sourceFormat?: string | null;
-}
-
-interface GitDiffState {
-  filePath: string;
-  originalContent: string;
-  currentContent: string;
-  isMarkdown: boolean;
-  fileStatus: string;
-}
-
-// ─── Canvas Panel ───────────────────────────────────────────────────────────
-
-interface CanvasPanel {
-  mediaName: string;
-  element: HTMLElement | null;
-  canvas: HTMLElement | null;
-  overlay: HTMLElement | null;
-  overlayClk: HTMLElement | null;
-  viewport: HTMLElement | null;
-  scrollContainer: HTMLElement | null;
-  dropLine: HTMLElement | null;
-  _width: number | null;
-}
-
 // ─── Render Options ─────────────────────────────────────────────────────────
 
 interface JxRenderOptions {
@@ -385,10 +337,6 @@ interface JxHeadEntry {
 
 type JxPath = (string | number)[];
 
-// ─── Utility Types ──────────────────────────────────────────────────────────
-
-type JsonValue = string | number | boolean | object | null | undefined;
-
 // ─── Parser Output ───────────────────────────────────────────────────────────
 
 interface MarkdownFileResult {
@@ -446,21 +394,6 @@ interface SiteRoute {
   urlPattern: string;
   sourcePath?: string;
   _pathParams?: Record<string, string>;
-  [key: string]: unknown;
-}
-
-/** Studio project state (file tree, git, etc.) */
-interface ProjectState {
-  root?: string;
-  name: string;
-  projectRoot: string;
-  isSiteProject: boolean;
-  projectConfig: ProjectConfig | null;
-  dirs: Map<string, DirEntry[]>;
-  expanded: Set<string>;
-  selectedPath: string | null;
-  searchQuery: string;
-  projectDirs?: string[];
   [key: string]: unknown;
 }
 

@@ -8,6 +8,7 @@ import { updateSession, updateUi } from "../store";
 import { undo as tabUndo, redo as tabRedo } from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import type { DocumentStackEntry } from "../types";
 import { getEffectiveMedia } from "../site-context";
 import { mediaDisplayName } from "./shared";
 import { view, applyPanelCollapse } from "../view";

@@ -32,9 +32,9 @@ async function saveProjectConfig() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Get the selected $def schema object. */
-function getSelectedDef() {
+function getSelectedDef(): ContentTypeSchema | undefined {
   const config = projectState?.projectConfig;
-  return config?.$defs?.[selectedDef as string];
+  return config?.$defs?.[selectedDef as string] as ContentTypeSchema | undefined;
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -406,7 +406,7 @@ export function renderDefsEditor(container: HTMLElement) {
   if (!selectedDef || !defs[selectedDef]) {
     editorTpl = html`<div class="settings-empty-state">Select or create a type definition</div>`;
   } else {
-    const def = defs[selectedDef];
+    const def = defs[selectedDef] as ContentTypeSchema;
     const properties = def.properties || {};
     const required = def.required || [];
 

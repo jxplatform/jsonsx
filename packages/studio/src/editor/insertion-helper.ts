@@ -8,6 +8,7 @@
 import { showSlashMenu } from "./slash-menu";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateInsertNode } from "../tabs/transact";
+import type { CanvasPanel } from "../types";
 
 interface ObservableSubscription {
   subscribe(observer: { next: (e: Event) => void }): void;
@@ -16,13 +17,6 @@ interface ObservableSubscription {
 
 interface ObservableElement {
   on: (event: string, options?: object) => ObservableSubscription; // Creates an
-}
-
-interface CanvasPanel {
-  canvas: HTMLElement; // The canvas content element.
-  overlayClk: HTMLElement & ObservableElement; // The overlay click-capture layer.
-  overlay: HTMLElement; // The overlay rendering layer.
-  viewport: HTMLElement; // The viewport container (containing block for anchor
 }
 
 interface InsertionHelperContext {

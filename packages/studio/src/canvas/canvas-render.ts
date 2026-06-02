@@ -47,17 +47,7 @@ import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
 
 import type { CanvasPanel } from "../panels/canvas-dnd";
-
-export interface GitDiffState {
-  filePath: string;
-  originalContent: string;
-  currentContent: string;
-  isMarkdown: boolean;
-  fileStatus: string;
-  originalDoc?: JxMutableNode | null;
-  currentDoc?: JxMutableNode | null;
-  original?: JxMutableNode | null;
-}
+import type { GitDiffState, InlineEditDef } from "../types";
 
 interface CanvasRenderCtx {
   getCanvasMode: () => string;

@@ -10,6 +10,7 @@ import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
 import { renderMediaPicker } from "../ui/media-picker";
 import { debouncedStyleCommit, renderOnly, projectState } from "../store";
+import type { JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact";
 import { findContentTypeSchema } from "../utils/studio-utils";

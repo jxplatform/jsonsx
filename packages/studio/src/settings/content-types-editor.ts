@@ -32,9 +32,11 @@ async function saveProjectConfig() {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Get the schema object for the selected content type. */
-function getSelectedSchema() {
+function getSelectedSchema(): ContentTypeSchema | undefined {
   const config = projectState?.projectConfig;
-  return config?.contentTypes?.[selectedContentType as string]?.schema;
+  return config?.contentTypes?.[selectedContentType as string]?.schema as
+    | ContentTypeSchema
+    | undefined;
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -428,7 +430,7 @@ export function renderContentTypesEditor(container: HTMLElement) {
     editorTpl = html`<div class="settings-empty-state">Select or create a content type</div>`;
   } else {
     const col = contentTypes[selectedContentType];
-    const schema = col.schema || {};
+    const schema = (col.schema || {}) as ContentTypeSchema;
     const properties = schema.properties || {};
     const required = schema.required || [];
 

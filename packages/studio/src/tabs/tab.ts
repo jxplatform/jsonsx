@@ -1,4 +1,5 @@
 import { reactive, effectScope } from "../reactivity";
+import type { GitDiffState, InlineEditDef, FunctionEditDef, DocumentStackEntry } from "../types";
 
 export interface TabUi {
   rightTab: string;

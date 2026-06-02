@@ -95,6 +95,7 @@ import { addRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import { cloneRepository } from "./panels/git-panel";
+import type { DocumentStackEntry, GitDiffState } from "./types";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -113,7 +114,7 @@ function setCanvasMode(mode: string) {
   if (tab) tab.session.ui.canvasMode = mode;
 }
 
-let gitDiffState: import("./canvas/canvas-render.js").GitDiffState | null = null;
+let gitDiffState: GitDiffState | null = null;
 
 // ─── Component registry ───────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ initCanvasRender({
   get gitDiffState() {
     return gitDiffState;
   },
-  setGitDiffState: (state: import("./canvas/canvas-render.js").GitDiffState | null) => {
+  setGitDiffState: (state: GitDiffState | null) => {
     gitDiffState = state;
   },
 });
@@ -413,7 +414,7 @@ leftPanelMod.mount({
   setupTreeKeyboard,
   registerFileTreeDnD,
   cloneRepository: () => cloneRepository({ openRecentProject }),
-  setGitDiffState: (state: import("./canvas/canvas-render.js").GitDiffState | null) => {
+  setGitDiffState: (state: GitDiffState | null) => {
     gitDiffState = state;
   },
 });

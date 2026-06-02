@@ -4,7 +4,7 @@ import { getNodeAtPath, parentElementPath, childIndex, pathsEqual, isAncestor } 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
 
-type JsonValue = string | number | boolean | object | null | undefined;
+import type { JsonValue } from "../types";
 
 const HISTORY_LIMIT = 100;
 

@@ -12,6 +12,7 @@ import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { transact, mutateUpdateFrontmatter } from "../tabs/transact";
+import type { GitDiffState, JsonValue } from "../types";
 
 import { renderLayersTemplate } from "./layers-panel";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
