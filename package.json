@@ -33,7 +33,7 @@
     "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
     "release": "release-it",
-    "test": "bun run --workspaces test",
+    "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "typecheck": "tsgo",
     "typecheck:legacy": "tsc",
@@ -51,7 +51,7 @@
     "bun2nix": "^2.1.0",
     "chrome-devtools-mcp": "^1.1.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.7",
+    "nano-staged": "^1.0.2",
     "oxfmt": "^0.53.0",
     "oxlint": "^1.68.0",
     "release-it": "^20.2.0",
@@ -59,16 +59,12 @@
     "ts-migrate-plugins": "^0.1.35",
     "typescript": "6.0.3"
   },
-  "lint-staged": {
-    "*.{js,ts}": [
-      "oxfmt",
+  "nano-staged": {
+    "*": [
+      "oxfmt --no-error-on-unmatched-pattern"
+    ],
+    "*.{ts}": [
       "oxlint --fix"
-    ],
-    "*.{md,html,css}": [
-      "oxfmt --no-error-on-unmatched-pattern"
-    ],
-    "*.json": [
-      "oxfmt --no-error-on-unmatched-pattern"
     ]
   },
   "release-it": {

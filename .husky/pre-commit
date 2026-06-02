@@ -1,1 +1,1 @@
-bunx lint-staged
+./node_modules/.bin/nano-staged
