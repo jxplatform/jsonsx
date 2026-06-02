@@ -402,6 +402,7 @@ A function with only `body` (no `arguments`) and no event binding acts as a comp
 | `body`        | If no `$src` | Raw function body string                                               |
 | `arguments`   | No           | Array of parameter name strings. Default: `[]`                         |
 | `parameters`  | No           | Array of CEM-compatible parameter objects (alternative to `arguments`) |
+| `returns`     | No           | JSON Schema describing the return value type                           |
 | `name`        | No           | Explicit function name. Default: the `state` key name                  |
 | `$src`        | If no `body` | External module specifier                                              |
 | `$export`     | No           | Named export in `$src` module. Default: `state` key name               |
@@ -1031,6 +1032,18 @@ For **third-party or project-local** classes, `$src` on any `state` entry with a
 2. `instance.value` — synchronous getter or property
 3. `instance` itself — fallback
 
+**Return type declaration:** Methods in a `.class.json` definition may declare a `returns` field containing a JSON Schema type descriptor. This allows tooling (visual builders, type checkers, autocomplete) to reason about a method's output without executing it:
+
+```json
+"resolve": {
+  "role": "method",
+  "$prototype": "Function",
+  "returns": { "type": "array", "items": { "$ref": "#/$defs/ContentLoaderEntry" } }
+}
+```
+
+The `returns` value is a standard JSON Schema object (`type`, `items`, `properties`, `$ref`, etc.). It may reference local `$defs` within the same `.class.json` file. For classes whose `resolve()` returns an array, this signals to tooling that instances are valid sources for mapped iteration (§10).
+
 **Reactivity (optional):**
 
 ```js
@@ -1055,6 +1068,21 @@ All non-Function external classes **must** use a `.class.json` file as their `$s
     },
     "fields": {
       "forecasts": { "type": "array" }
+    },
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "$prototype": "Function",
+        "returns": { "type": "array", "items": { "$ref": "#/$defs/ForecastDay" } }
+      }
+    },
+    "ForecastDay": {
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "high": { "type": "number" },
+        "low": { "type": "number" }
+      }
     }
   },
   "$implementation": "./weather.js"
@@ -1062,6 +1090,8 @@ All non-Function external classes **must** use a `.class.json` file as their `$s
 ```
 
 When `$src` points to a `.class.json` file, the runtime reads the schema and follows `$implementation` to instantiate the class from the JS module. If no `$implementation` is present, the runtime dynamically constructs a class from the schema definition (self-contained mode).
+
+The `returns` field on a method uses standard JSON Schema to describe the output type. It may use `$ref` to reference `$defs` entries within the same class definition. Tooling uses this metadata to determine capabilities — for example, a method whose `returns` declares `"type": "array"` indicates the class is a valid data source for mapped iteration (§10).
 
 > **Status: Implemented.** Runtime enforces `.class.json` entrypoint for all non-Function external prototypes. `$implementation` in the schema optionally redirects to a JS module. Dev server handles resolution via proxy. Compiler emits `.class.json` → ES class.
 
@@ -1311,6 +1341,7 @@ Custom elements may carry annotations compatible with the Custom Elements Manife
 | `body`               | Inline function body                                              |
 | `arguments`          | Function parameter names (string array)                           |
 | `parameters`         | CEM-compatible function parameter objects                         |
+| `returns`            | JSON Schema describing a function/method return type              |
 | `name`               | Inline function explicit name                                     |
 | `description`        | Documentation string                                              |
 | `observedAttributes` | HTML attributes the custom element watches                        |

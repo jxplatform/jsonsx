@@ -31,6 +31,7 @@ export interface ClassJsonMethod {
   getter?: { body: string };
   setter?: { parameters?: ClassJsonParam[]; body: string };
   parameters?: ClassJsonParam[];
+  returns?: Record<string, unknown>;
 }
 
 export interface ClassJsonParameterDef {

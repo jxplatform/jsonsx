@@ -121,6 +121,148 @@ const childClass = {
 };
 writeFileSync(join(FIXTURES, "PostCollection.class.json"), JSON.stringify(childClass), "utf8");
 
+// Class with `returns` on resolve method
+const classWithReturns = {
+  $prototype: "Class",
+  title: "ContentCollection",
+  description: "A collection that returns an array",
+  $defs: {
+    parameters: {
+      contentType: {
+        identifier: "contentType",
+        type: { type: "string" },
+        description: "Content type to query",
+      },
+    },
+    constructor: {
+      role: "constructor",
+      $prototype: "Function",
+      parameters: [{ $ref: "#/$defs/parameters/contentType" }],
+    },
+    methods: {
+      resolve: {
+        role: "method",
+        $prototype: "Function",
+        access: "public",
+        scope: "instance",
+        identifier: "resolve",
+        parameters: [],
+        returns: { type: "array" },
+        description: "Query entries",
+      },
+    },
+  },
+};
+writeFileSync(
+  join(FIXTURES, "ContentCollection.class.json"),
+  JSON.stringify(classWithReturns),
+  "utf8",
+);
+
+// Class with resolve method but NO returns annotation
+const classWithoutReturns = {
+  $prototype: "Class",
+  title: "EventEmitter",
+  description: "Emitter with no declared return type",
+  $defs: {
+    parameters: {
+      channel: {
+        identifier: "channel",
+        type: { type: "string" },
+        description: "Channel name",
+      },
+    },
+    methods: {
+      resolve: {
+        role: "method",
+        $prototype: "Function",
+        access: "public",
+        scope: "instance",
+        identifier: "resolve",
+        parameters: [],
+        description: "Emit event",
+      },
+    },
+  },
+};
+writeFileSync(
+  join(FIXTURES, "EventEmitter.class.json"),
+  JSON.stringify(classWithoutReturns),
+  "utf8",
+);
+
+// Class with returns on resolve that has a complex schema
+const classWithComplexReturns = {
+  $prototype: "Class",
+  title: "TypedQuery",
+  description: "Returns items with a schema",
+  $defs: {
+    parameters: {
+      query: { identifier: "query", type: { type: "string" } },
+    },
+    methods: {
+      resolve: {
+        role: "method",
+        $prototype: "Function",
+        access: "public",
+        scope: "instance",
+        identifier: "resolve",
+        parameters: [],
+        returns: {
+          type: "array",
+          items: { type: "object", properties: { id: { type: "string" } } },
+        },
+      },
+    },
+  },
+};
+writeFileSync(
+  join(FIXTURES, "TypedQuery.class.json"),
+  JSON.stringify(classWithComplexReturns),
+  "utf8",
+);
+
+// Parent class with returns, to test inheritance
+const parentWithReturns = {
+  $prototype: "Class",
+  title: "BaseQuery",
+  description: "Base query returning array",
+  $defs: {
+    parameters: {
+      src: { identifier: "src", type: { type: "string" } },
+    },
+    constructor: {
+      role: "constructor",
+      $prototype: "Function",
+      parameters: [{ $ref: "#/$defs/parameters/src" }],
+    },
+    methods: {
+      resolve: {
+        role: "method",
+        $prototype: "Function",
+        identifier: "resolve",
+        parameters: [],
+        returns: { type: "array" },
+      },
+    },
+  },
+};
+writeFileSync(join(FIXTURES, "BaseQuery.class.json"), JSON.stringify(parentWithReturns), "utf8");
+
+// Child that extends parent with returns but has no own resolve method
+const childNoResolve = {
+  $prototype: "Class",
+  title: "ChildQuery",
+  description: "Child without own resolve",
+  extends: { $ref: "./BaseQuery.class.json" },
+  $defs: {
+    parameters: {
+      filter: { identifier: "filter", type: { type: "string" } },
+    },
+  },
+};
+writeFileSync(join(FIXTURES, "ChildQuery.class.json"), JSON.stringify(childNoResolve), "utf8");
+
 // Class with format: "json-schema" type parameter
 const parameterizedClass = {
   $prototype: "Class",
@@ -1036,6 +1178,64 @@ describe("plugin-schema — base resolution", () => {
     const data = await res.json();
     expect(data.schema).toBeNull();
     expect(data.error).toBeDefined();
+  });
+});
+
+// ─── extractStudioSchema — returns from resolve method ──────────────────────
+
+describe("plugin-schema — returns annotation", () => {
+  test("includes returns when resolve method has returns", async () => {
+    const { req, url } = schemaRequest(
+      `./_studio_fixtures/ContentCollection.class.json`,
+      "ContentCollection",
+    );
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    expect(schema.returns).toEqual({ type: "array" });
+  });
+
+  test("omits returns when resolve method has no returns annotation", async () => {
+    const { req, url } = schemaRequest(
+      `./_studio_fixtures/EventEmitter.class.json`,
+      "EventEmitter",
+    );
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    expect(schema.returns).toBeUndefined();
+  });
+
+  test("preserves complex returns schema", async () => {
+    const { req, url } = schemaRequest(`./_studio_fixtures/TypedQuery.class.json`, "TypedQuery");
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    expect(schema.returns).toEqual({
+      type: "array",
+      items: { type: "object", properties: { id: { type: "string" } } },
+    });
+  });
+
+  test("omits returns when class has no methods at all", async () => {
+    const { req, url } = schemaRequest(`./_studio_fixtures/DataSource.class.json`, "DataSource");
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    expect(schema.returns).toBeUndefined();
+  });
+
+  test("child does not inherit parent returns (only own resolve matters)", async () => {
+    const { req, url } = schemaRequest(`./_studio_fixtures/ChildQuery.class.json`, "ChildQuery");
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    // Child has no own resolve method, so no returns
+    expect(schema.returns).toBeUndefined();
+    // But still inherits parent properties
+    expect(schema.properties.src).toBeDefined();
+  });
+
+  test("parent itself returns its resolve annotation", async () => {
+    const { req, url } = schemaRequest(`./_studio_fixtures/BaseQuery.class.json`, "BaseQuery");
+    const res = await callApi(req, url, import.meta.dir);
+    const { schema } = await res.json();
+    expect(schema.returns).toEqual({ type: "array" });
   });
 });
 

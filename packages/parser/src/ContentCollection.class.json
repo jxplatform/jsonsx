@@ -4,7 +4,7 @@
   "description": "Query a project content type with filter, sort, and limit",
   "$prototype": "Class",
   "extends": "Object",
-  "$implementation": "./content.js",
+  "$implementation": "./content.ts",
 
   "$defs": {
     "parameters": {
@@ -105,6 +105,7 @@
         "scope": "instance",
         "identifier": "resolve",
         "parameters": [],
+        "returns": { "type": "array" },
         "description": "Query the content type entries with filter, sort, and limit"
       }
     }

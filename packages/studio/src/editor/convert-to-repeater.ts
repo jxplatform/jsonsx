@@ -6,6 +6,7 @@ import { activeTab } from "../workspace/workspace";
 import { transactDoc } from "../tabs/transact";
 import { showDialog } from "../ui/layers";
 import { defCategory } from "../panels/signals-panel";
+import { fetchPluginSchema } from "../services/code-services";
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -61,13 +62,29 @@ export async function convertToRepeater() {
  * @param {Record<string, unknown>} defs
  * @returns {Promise<RepeaterConfig | null>}
  */
-function promptRepeaterConfig(defs: Record<string, unknown>) {
+async function promptRepeaterConfig(defs: Record<string, unknown>) {
   const arrayDefs = Object.entries(defs).filter(
     ([, d]) =>
       (d as Record<string, unknown> | null)?.type === "array" ||
       Array.isArray((d as Record<string, unknown> | null)?.default) ||
       (d as Record<string, unknown> | null)?.$prototype === "Array",
   );
+
+  const tab = activeTab.value;
+  const docPath = tab?.documentPath;
+  for (const [name, d] of Object.entries(defs)) {
+    const def = d as Record<string, unknown> | null;
+    if (!def?.$prototype || def.$prototype === "Function" || def.$prototype === "Array") continue;
+    if (arrayDefs.some(([n]) => n === name)) continue;
+    const schema = await fetchPluginSchema(
+      { $src: def.$src as string | undefined, $prototype: def.$prototype as string },
+      { documentPath: docPath || undefined },
+    );
+    if (schema?.returns?.type === "array") {
+      arrayDefs.push([name, d]);
+    }
+  }
+
   const fnDefs = Object.entries(defs).filter(([, d]) => defCategory(d) === "function");
 
   let source = arrayDefs.length > 0 ? arrayDefs[0][0] : "__new__";

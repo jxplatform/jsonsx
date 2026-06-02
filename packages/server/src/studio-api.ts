@@ -1181,9 +1181,12 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string) {
     }
   }
 
+  const resolveMethod = classDef.$defs?.methods?.resolve;
+
   return {
     description: classDef.description ?? classDef.title,
     properties,
     required: [...requiredSet],
+    ...(resolveMethod?.returns ? { returns: resolveMethod.returns } : {}),
   };
 }
