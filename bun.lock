@@ -42,7 +42,7 @@
       "name": "@jxsuite/compiler",
       "version": "0.25.0",
       "bin": {
-        "jx": "./src/cli.ts",
+        "jx": "./dist/cli.js",
       },
       "dependencies": {
         "@apidevtools/json-schema-ref-parser": "^15.3.5",
