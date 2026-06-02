@@ -54,7 +54,6 @@ describe("renderGitPanel — state rendering", () => {
       }),
       gitBranches: async () => ({ current: "main", branches: ["main"] }),
       gitLog: async () => [],
-      gitClone: undefined,
     };
   });
 
@@ -74,7 +73,7 @@ describe("renderGitPanel — state rendering", () => {
   });
 
   test("no project without clone support — no Clone button", () => {
-    mockPlatform.gitClone = undefined;
+    delete (mockPlatform as Record<string, unknown>).gitClone;
     setProjectState(null);
     const result = renderGitPanel({ ui: {} }, {});
     const output = renderToString(result);

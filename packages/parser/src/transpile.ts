@@ -372,7 +372,7 @@ export function mdastNodeToJx(node: MdastNode) {
     }
 
     case "inlineCode":
-      el.textContent = node.value;
+      el.textContent = node.value ?? null;
       break;
 
     case "link":
@@ -406,7 +406,7 @@ export function mdastNodeToJx(node: MdastNode) {
       el.children = [
         {
           tagName: "code",
-          textContent: node.value,
+          textContent: node.value ?? null,
           ...(node.lang ? { className: `language-${node.lang}` } : {}),
         },
       ];

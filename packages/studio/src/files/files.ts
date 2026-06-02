@@ -899,7 +899,7 @@ export async function openFileInTab(path: string) {
       id,
       documentPath: path,
       document,
-      frontmatter,
+      ...(frontmatter != null && { frontmatter }),
       sourceFormat: path.endsWith(".md") ? "md" : null,
     });
     requireProjectState().selectedPath = path;

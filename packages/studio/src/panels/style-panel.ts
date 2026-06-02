@@ -98,13 +98,14 @@ function renderStyleRow(
   const type = inferInputType(entry);
   const hasVal = value !== undefined && value !== "";
   const placeholder = !hasVal && inheritedValue ? String(inheritedValue) : "";
+  const spanVal = gridMode && (entry as Record<string, unknown>).$span === 2 ? 2 : undefined;
   return renderFieldRow({
     prop,
     label: propLabel(entry, prop),
     hasValue: hasVal,
     onClear: onDelete,
     widget: widgetForType(type, entry, prop, value, onCommit, { placeholder }),
-    span: gridMode && (entry as Record<string, unknown>).$span === 2 ? 2 : undefined,
+    ...(spanVal != null && { span: spanVal }),
     warning: isWarning,
   });
 }

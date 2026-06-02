@@ -258,12 +258,13 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
                 return { name, type: typeof d, default: d };
               }
               const entry = d as Record<string, unknown>;
-              return {
+              const result: { name: string; type?: string; default?: unknown; format?: string } = {
                 name,
-                type: entry.type as string | undefined,
                 default: entry.default,
-                format: entry.format as string | undefined,
               };
+              if (entry.type != null) result.type = entry.type as string;
+              if (entry.format != null) result.format = entry.format as string;
+              return result;
             }),
           hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
         });
@@ -395,9 +396,11 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
     }
   }
 
-  return {
-    description: classDef.description ?? classDef.title,
+  const result: StudioSchema = {
     properties,
     required: [...requiredSet],
   };
+  const desc = classDef.description ?? classDef.title;
+  if (desc != null) result.description = desc;
+  return result;
 }

@@ -78,8 +78,11 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
     if (!def?.$prototype || def.$prototype === "Function" || def.$prototype === "Array") continue;
     if (arrayDefs.some(([n]) => n === name)) continue;
     const schema = await fetchPluginSchema(
-      { $src: def.$src as string | undefined, $prototype: def.$prototype as string },
-      { documentPath: docPath || undefined },
+      {
+        ...(def.$src != null && { $src: def.$src as string }),
+        $prototype: def.$prototype as string,
+      },
+      { ...(docPath != null && { documentPath: docPath }) },
     );
     if (schema?.returns?.type === "array") {
       arrayDefs.push([name, d]);
@@ -115,15 +118,15 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
         }
         done({
           items: { $ref: `#/state/${name}` },
-          filter: filterDef ? { $ref: `#/state/${filterDef}` } : undefined,
-          sort: sortDef ? { $ref: `#/state/${sortDef}` } : undefined,
+          ...(filterDef && { filter: { $ref: `#/state/${filterDef}` } }),
+          ...(sortDef && { sort: { $ref: `#/state/${sortDef}` } }),
           newDef: { name },
         });
       } else {
         done({
           items: { $ref: `#/state/${source}` },
-          filter: filterDef ? { $ref: `#/state/${filterDef}` } : undefined,
-          sort: sortDef ? { $ref: `#/state/${sortDef}` } : undefined,
+          ...(filterDef && { filter: { $ref: `#/state/${filterDef}` } }),
+          ...(sortDef && { sort: { $ref: `#/state/${sortDef}` } }),
         });
       }
     }

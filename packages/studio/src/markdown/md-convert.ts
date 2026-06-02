@@ -100,7 +100,7 @@ function convertMdastNode(node: MdastNode) {
     case "paragraph": {
       // If contains only a single text child, flatten to textContent
       if (node.children?.length === 1 && node.children[0].type === "text") {
-        el.textContent = node.children[0].value;
+        el.textContent = node.children[0].value ?? null;
       } else if (node.children?.length) {
         el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
           | JxElement
@@ -111,14 +111,14 @@ function convertMdastNode(node: MdastNode) {
     }
 
     case "text":
-      el.textContent = node.value;
+      el.textContent = node.value ?? null;
       break;
 
     case "emphasis":
     case "strong":
     case "delete": {
       if (node.children?.length === 1 && node.children[0].type === "text") {
-        el.textContent = node.children[0].value;
+        el.textContent = node.children[0].value ?? null;
       } else if (node.children?.length) {
         el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
           | JxElement
@@ -129,14 +129,14 @@ function convertMdastNode(node: MdastNode) {
     }
 
     case "inlineCode":
-      el.textContent = node.value;
+      el.textContent = node.value ?? null;
       break;
 
     case "link":
       el.attributes = { href: node.url ?? "" };
       if (node.title) el.attributes.title = node.title;
       if (node.children?.length === 1 && node.children[0].type === "text") {
-        el.textContent = node.children[0].value;
+        el.textContent = node.children[0].value ?? null;
       } else if (node.children?.length) {
         el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
           | JxElement
@@ -177,7 +177,7 @@ function convertMdastNode(node: MdastNode) {
       el.children = [
         {
           tagName: "code",
-          textContent: node.value,
+          textContent: node.value ?? null,
           ...(node.lang ? { attributes: { class: `language-${node.lang}` } } : {}),
         },
       ];
@@ -214,7 +214,7 @@ function convertMdastNode(node: MdastNode) {
 
     case "tableCell":
       if (node.children?.length === 1 && node.children[0].type === "text") {
-        el.textContent = node.children[0].value;
+        el.textContent = node.children[0].value ?? null;
       } else if (node.children?.length) {
         el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
           | JxElement
@@ -232,14 +232,14 @@ function convertMdastNode(node: MdastNode) {
  * @returns {JxElement | null}
  */
 function convertDirective(node: MdastNode) {
-  const el: JxElement = { tagName: node.name };
+  const el: JxElement = { tagName: node.name ?? "div" };
   if (node.attributes && Object.keys(node.attributes).length > 0) {
     el.attributes = { ...node.attributes };
   }
   if (node.type === "textDirective") {
     // Text directives place label as textContent
     if (node.children?.length === 1 && node.children[0].type === "text") {
-      el.textContent = node.children[0].value;
+      el.textContent = node.children[0].value ?? null;
     } else if (node.children?.length) {
       el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
         | JxElement

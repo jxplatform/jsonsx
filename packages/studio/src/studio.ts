@@ -559,7 +559,7 @@ if (_projectParam) {
             id: fileRelPath,
             documentPath: fileRelPath,
             document: parsedDoc,
-            frontmatter,
+            ...(frontmatter != null && { frontmatter }),
             sourceFormat: isMd ? "md" : null,
           });
 

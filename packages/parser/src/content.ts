@@ -147,15 +147,15 @@ export class ContentCollection {
     const entries = _project?.contentTypes?.get(contentType ?? "");
     if (!entries) return [];
     return queryContentType(entries, {
-      filter: filter as
-        | Record<string, unknown>
-        | Array<{ field: string; op: string; value?: unknown }>
-        | undefined,
-      sort: sort as
-        | { field: string; order?: string }
-        | Array<{ field: string; order?: string }>
-        | undefined,
-      limit,
+      ...(filter != null && {
+        filter: filter as
+          | Record<string, unknown>
+          | Array<{ field: string; op: string; value?: unknown }>,
+      }),
+      ...(sort != null && {
+        sort: sort as { field: string; order?: string } | Array<{ field: string; order?: string }>,
+      }),
+      ...(limit != null && { limit }),
     });
   }
 }

@@ -471,8 +471,8 @@ async function compilePage(
   const mergedHead = mergeHead(resolvedSiteHead, resolvedLayoutHead, resolvedPageHead, {
     title,
     charset: projectConfig.defaults?.charset ?? "utf-8",
-    siteName: projectConfig.name,
-    siteUrl: projectConfig.url,
+    ...(projectConfig.name != null && { siteName: projectConfig.name }),
+    ...(projectConfig.url != null && { siteUrl: projectConfig.url }),
     pageUrl: route.urlPattern,
   });
 

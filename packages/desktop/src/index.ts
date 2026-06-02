@@ -140,7 +140,9 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       },
       aiAuthStatus: () => getAuthStatus(),
       aiCreateSession: (params) =>
-        createSession(projectRoot, params.message, { systemPrompt: params.systemPrompt }),
+        createSession(projectRoot, params.message, {
+          ...(params.systemPrompt != null && { systemPrompt: params.systemPrompt }),
+        }),
       aiSendMessage: (params) => {
         sendMessage(params.id, params.message);
       },

@@ -33,7 +33,7 @@ export async function handleAiRoute(
     try {
       const body = (await req.json()) as { message: string; systemPrompt?: string };
       const result = createSession(projectRoot, body.message, {
-        systemPrompt: body.systemPrompt,
+        ...(body.systemPrompt != null && { systemPrompt: body.systemPrompt }),
       });
       return Response.json(result);
     } catch (err: unknown) {

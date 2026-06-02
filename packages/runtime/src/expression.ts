@@ -306,6 +306,8 @@ export function evaluateExpression(
       });
     }
   }
+
+  return undefined;
 }
 
 // ─── Compiler: Expression → JS Source ────────────────────────────────────────

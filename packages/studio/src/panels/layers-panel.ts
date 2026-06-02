@@ -53,7 +53,8 @@ export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
   const input = document.createElement("input");
   input.className = "layer-title-input";
   input.value = node.$title || "";
-  input.placeholder = nodeLabel({ ...node, $title: undefined });
+  const { $title: _, ...nodeWithoutTitle } = node;
+  input.placeholder = nodeLabel(nodeWithoutTitle);
   label.after(input);
   input.focus();
   input.select();

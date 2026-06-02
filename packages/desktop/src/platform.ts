@@ -222,7 +222,7 @@ export function createDesktopPlatform() {
     },
 
     async discoverComponents(dir?: string) {
-      return rpc.request.discoverComponents({ dir });
+      return rpc.request.discoverComponents({ ...(dir != null && { dir }) });
     },
 
     async codeService(action: string, payload: unknown) {
@@ -234,7 +234,11 @@ export function createDesktopPlatform() {
     },
 
     async fetchPluginSchema(src: string, prototype?: string, base?: string) {
-      return rpc.request.fetchPluginSchema({ src, prototype, base });
+      return rpc.request.fetchPluginSchema({
+        src,
+        ...(prototype != null && { prototype }),
+        ...(base != null && { base }),
+      });
     },
 
     async gitStatus() {
@@ -246,7 +250,7 @@ export function createDesktopPlatform() {
     },
 
     async gitLog(limit?: number) {
-      return rpc.request.gitLog({ limit });
+      return rpc.request.gitLog({ ...(limit != null && { limit }) });
     },
 
     async gitStage(files: string[]) {
@@ -282,7 +286,7 @@ export function createDesktopPlatform() {
     },
 
     async gitDiff(path?: string) {
-      return rpc.request.gitDiff({ path });
+      return rpc.request.gitDiff({ ...(path != null && { path }) });
     },
 
     async gitDiscard(files: string[]) {

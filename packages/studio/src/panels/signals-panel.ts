@@ -426,7 +426,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
               if (src) {
                 fetchPluginSchema(
                   { $prototype: protoName, $src: src },
-                  { documentPath: S.documentPath ?? undefined },
+                  { ...(S.documentPath != null && { documentPath: S.documentPath }) },
                 ).then(() => ctx.renderLeftPanel());
               } else {
                 ctx.renderLeftPanel();
@@ -964,12 +964,9 @@ function renderParameterEditorTemplate(
                 style="flex:1"
                 @change=${(e: Event) => {
                   const next = [...params];
-                  next[i] = {
-                    ...next[i],
-                    type: (e.target as HTMLInputElement).value
-                      ? { text: (e.target as HTMLInputElement).value }
-                      : undefined,
-                  };
+                  const val = (e.target as HTMLInputElement).value;
+                  const { type: _t, ...rest } = next[i];
+                  next[i] = val ? { ...rest, type: { text: val } } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -982,10 +979,9 @@ function renderParameterEditorTemplate(
                 style="flex:2"
                 @change=${(e: Event) => {
                   const next = [...params];
-                  next[i] = {
-                    ...next[i],
-                    description: (e.target as HTMLInputElement).value || undefined,
-                  };
+                  const val = (e.target as HTMLInputElement).value;
+                  const { description: _d, ...rest } = next[i];
+                  next[i] = val ? { ...rest, description: val } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -997,10 +993,9 @@ function renderParameterEditorTemplate(
                 .checked=${!!p.optional}
                 @change=${(e: Event) => {
                   const next = [...params];
-                  next[i] = {
-                    ...next[i],
-                    optional: (e.target as HTMLInputElement).checked || undefined,
-                  };
+                  const checked = (e.target as HTMLInputElement).checked;
+                  const { optional: _o, ...rest } = next[i];
+                  next[i] = checked ? { ...rest, optional: true } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -1073,12 +1068,9 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             style="flex:1"
             @change=${(e: Event) => {
               const next = [...emits];
-              next[i] = {
-                ...next[i],
-                type: (e.target as HTMLInputElement).value
-                  ? { text: (e.target as HTMLInputElement).value }
-                  : undefined,
-              };
+              const val = (e.target as HTMLInputElement).value;
+              const { type: _t, ...rest } = next[i];
+              next[i] = val ? { ...rest, type: { text: val } } : rest;
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -1089,10 +1081,9 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             style="flex:2"
             @change=${(e: Event) => {
               const next = [...emits];
-              next[i] = {
-                ...next[i],
-                description: (e.target as HTMLInputElement).value || undefined,
-              };
+              const val = (e.target as HTMLInputElement).value;
+              const { description: _d, ...rest } = next[i];
+              next[i] = val ? { ...rest, description: val } : rest;
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -1516,7 +1507,9 @@ export function renderExternalPrototypeEditorTemplate(
       >
         Loading schema…
       </div>`;
-      fetchPluginSchema(def, { documentPath: S.documentPath ?? undefined }).then((schema) => {
+      fetchPluginSchema(def, {
+        ...(S.documentPath != null && { documentPath: S.documentPath }),
+      }).then((schema) => {
         if (schema) ctx.renderLeftPanel();
       });
     }

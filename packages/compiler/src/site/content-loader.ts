@@ -132,17 +132,17 @@ async function loadMarkdownEntry(filePath: string, directiveOptions?: unknown) {
   const { MarkdownFile } = await getMarkdownModule();
   const file = new MarkdownFile({ src: filePath, directiveOptions });
   const result = file.resolve();
+  const _meta: ContentLoaderEntry["_meta"] = {};
+  if (result.$excerpt != null) _meta.excerpt = result.$excerpt;
+  if (result.$toc != null) _meta.toc = result.$toc;
+  if (result.$readingTime != null) _meta.readingTime = result.$readingTime;
+  if (result.$wordCount != null) _meta.wordCount = result.$wordCount;
   return {
     id: result.slug,
     data: result.frontmatter,
     body: readFileSync(filePath, "utf-8"),
     $children: result.$children,
-    _meta: {
-      excerpt: result.$excerpt,
-      toc: result.$toc,
-      readingTime: result.$readingTime,
-      wordCount: result.$wordCount,
-    },
+    _meta,
   };
 }
 
