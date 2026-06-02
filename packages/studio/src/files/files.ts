@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /**
  * File tree management — project loading, file tree rendering, and file CRUD.
  *

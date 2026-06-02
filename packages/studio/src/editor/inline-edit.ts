@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /**
  * Inline-edit.js — Contenteditable inline editing for content mode
  *

@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /**
  * Stylebook panel — renders the Stylebook mode canvas (element catalog with per-file style
  * defaults). Extracted from studio.js Phase 4e.
