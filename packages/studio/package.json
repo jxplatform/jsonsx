@@ -16,7 +16,7 @@
   "type": "module",
   "exports": {
     ".": "./src/studio.ts",
-    "./platform.js": "./src/platform.ts",
+    "./platform": "./src/platform.ts",
     "./types": "./src/types.ts"
   },
   "publishConfig": {
