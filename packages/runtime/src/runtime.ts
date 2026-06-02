@@ -1179,6 +1179,13 @@ async function resolveClassJson(
   const src = def.$src;
   let classDef;
 
+  // Bare specifiers (package references like @scope/pkg/file) can't be fetched directly —
+  // go straight to dev proxy which can resolve them via node_modules.
+  const isBareSpecifier = !src.startsWith(".") && !src.startsWith("/") && !src.startsWith("http");
+  if (isBareSpecifier) {
+    return resolveViaDevProxy(def, state, key, base);
+  }
+
   // Try fetching the .class.json file directly
   try {
     const url = base ? new URL(src, base).href : src;
