@@ -4,7 +4,7 @@
   "description": "Fetch a single entry from a content type by ID",
   "$prototype": "Class",
   "extends": "Object",
-  "$implementation": "./content.js",
+  "$implementation": "./content.ts",
 
   "$defs": {
     "parameters": {
