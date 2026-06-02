@@ -4,7 +4,7 @@
     "checkJs": false,
     "declaration": true,
     "exactOptionalPropertyTypes": true,
-    "lib": ["ES2020"],
+    "lib": ["ESNext"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
