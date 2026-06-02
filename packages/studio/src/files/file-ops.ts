@@ -195,7 +195,8 @@ export async function exportFile() {
 export function serializeDocument(tab: import("../tabs/tab.js").Tab) {
   if (tab.doc.sourceFormat === "md") {
     const fm = tab.doc.content?.frontmatter || {};
-    const fullDoc = { ...fm, children: tab.doc.document.children ?? [] };
+    const doc = tab.doc.document;
+    const fullDoc = { ...fm, ...doc, children: doc.children ?? [] };
     return jxDocToMd(/** @type {JxMutableNode} */ (fullDoc));
   }
   if (tab.doc.mode === "content") {
