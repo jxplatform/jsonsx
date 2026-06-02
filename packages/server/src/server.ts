@@ -193,7 +193,7 @@ export async function createDevServer(options: {
 
     async fetch(req) {
       const url = new URL(req.url);
-      let path = url.pathname;
+      let path = decodeURIComponent(url.pathname);
       if (path.endsWith("/")) path += "index.html";
       else if (path === "") path = "/index.html";
 
