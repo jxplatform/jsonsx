@@ -1,14 +1,11 @@
-/**
- * @type {{
- *   __jxPlatform?: {
- *     windowControls?: {
- *       getFrame: () => Promise<{ x: number; y: number; width: number; height: number }>;
- *       setFrame: (x: number, y: number, w: number, h: number) => void;
- *     };
- *   };
- * }}
- */
-const g = globalThis as any;
+const g = globalThis as unknown as {
+  __jxPlatform?: {
+    windowControls?: {
+      getFrame: () => Promise<{ x: number; y: number; width: number; height: number }>;
+      setFrame: (x: number, y: number, w: number, h: number) => void;
+    };
+  };
+};
 
 const EDGES = [
   "top",

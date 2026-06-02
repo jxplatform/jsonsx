@@ -1,5 +1,5 @@
 /**
- * Site-build.js — Multi-page build orchestrator
+ * Site-build — Multi-page build orchestrator
  *
  * Coordinates the full site build pipeline: 1. Load project.json 2. Discover pages/ routes 3.
  * Expand dynamic routes ($paths) 4. For each route: resolve layout, merge $head, inject context,

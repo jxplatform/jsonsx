@@ -47,14 +47,16 @@ export function mountAiPanel() {
   checkAuth();
 }
 
+const _g = globalThis as unknown as { __jxRightPanelRender?: { render: () => void } };
+
 function rerenderPanel() {
-  const { render } = ((globalThis as any).__jxRightPanelRender as any) || {};
+  const { render } = _g.__jxRightPanelRender || {};
   if (render) render();
   requestAnimationFrame(() => mountQuikChat());
 }
 
 export function registerRightPanelRender(fn: () => void) {
-  (globalThis as any).__jxRightPanelRender = { render: fn };
+  _g.__jxRightPanelRender = { render: fn };
 }
 
 // ─── QuikChat Mount ────────────────────────────────────────────────────────

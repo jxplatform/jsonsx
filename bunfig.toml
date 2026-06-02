@@ -6,4 +6,5 @@ coveragePathIgnorePatterns = [
   "**/_fixtures_proto/**",
   "**/tests/_studio_fixtures/**",
   "**/tests/fixtures/**",
+  "./result/**",
 ]

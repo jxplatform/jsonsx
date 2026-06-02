@@ -203,7 +203,7 @@ function showAt(el: HTMLElement, edge: string, path: JxPath, parentPath: JxPath,
   // Set CSS anchor on target element
   if (_currentAnchor !== el) {
     clearAnchor();
-    (el.style as any).anchorName = "--jx-insert";
+    (el.style as CSSStyleDeclaration & Record<string, string>).anchorName = "--jx-insert";
     _currentAnchor = el;
   }
 
@@ -239,7 +239,7 @@ function hideNow() {
 
 function clearAnchor() {
   if (_currentAnchor) {
-    (_currentAnchor.style as any).anchorName = "";
+    (_currentAnchor.style as CSSStyleDeclaration & Record<string, string>).anchorName = "";
     _currentAnchor = null;
   }
 }

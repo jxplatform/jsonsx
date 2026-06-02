@@ -78,7 +78,7 @@ async function processStream(session: Session, stream: AsyncGenerator<SDKMessage
       broadcast(session, message.type, message);
     }
   } catch (err) {
-    if ((err as any).name !== "AbortError") {
+    if (err instanceof Error && err.name !== "AbortError") {
       broadcast(session, "error", { type: "error", error: String(err) });
     }
   } finally {
@@ -227,7 +227,7 @@ export function streamSession(id: string) {
       session.sseClients.add(sendRef);
 
       for (const msg of session.messages) {
-        sendRef((msg as any).type || "message", msg);
+        sendRef(((msg as Record<string, unknown>).type as string) || "message", msg);
       }
 
       const heartbeat = setInterval(() => {
@@ -275,9 +275,13 @@ export async function getAuthStatus() {
 
     for await (const msg of testStream) {
       if (msg.type === "assistant") {
-        const content = (msg as any).message?.content;
-        if (Array.isArray(content)) {
-          const text = content.find((b) => b.type === "text");
+        const content = (msg as Record<string, unknown>).message as
+          | { content?: unknown[] }
+          | undefined;
+        if (Array.isArray(content?.content)) {
+          const text = content.content.find((b: any) => b.type === "text") as
+            | { text?: string }
+            | undefined;
           if (text?.text?.toLowerCase().includes("error")) {
             clearTimeout(timeout);
             ctrl.abort();
@@ -289,11 +293,11 @@ export async function getAuthStatus() {
         return { authenticated: true };
       }
       if (msg.type === "result") {
-        const result = msg as any;
+        const result = msg as Record<string, unknown>;
         clearTimeout(timeout);
         ctrl.abort();
         if (result.is_error) {
-          return { authenticated: false, error: result.result || "API error" };
+          return { authenticated: false, error: (result.result as string) || "API error" };
         }
         return { authenticated: true };
       }

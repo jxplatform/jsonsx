@@ -54,13 +54,13 @@ export function evaluateFilterRule(
     case "not contains":
       return typeof actual === "string" && !actual.includes(String(rule.value ?? ""));
     case ">":
-      return (actual as any) > (rule.value as any);
+      return Number(actual) > Number(rule.value);
     case "<":
-      return (actual as any) < (rule.value as any);
+      return Number(actual) < Number(rule.value);
     case ">=":
-      return (actual as any) >= (rule.value as any);
+      return Number(actual) >= Number(rule.value);
     case "<=":
-      return (actual as any) <= (rule.value as any);
+      return Number(actual) <= Number(rule.value);
     default:
       return true;
   }

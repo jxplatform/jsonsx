@@ -7,6 +7,7 @@
 
 import { camelToKebab, toCSSText, RESERVED_KEYS } from "@jxsuite/runtime";
 import { compileExpression, isMutating, evaluateExpression } from "@jxsuite/runtime/expression";
+import type { ExpressionNode } from "@jxsuite/runtime/expression";
 import type {
   JxElement,
   JxMutableNode,
@@ -26,6 +27,7 @@ export {
   isMutating,
   evaluateExpression,
 };
+export type { ExpressionNode };
 
 // CDN defaults
 export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.32";
@@ -261,9 +263,11 @@ export function buildInitialScope(
     if (!def || typeof def !== "object") continue;
     const d = def as JxStateObject & JxPrototypeDef;
     if ("$expression" in d) {
-      const node = (d as any).$expression;
+      const node = (d as Record<string, unknown>).$expression as ExpressionNode;
       if (isMutating(node.operator)) {
-        setOwnScopeValue(scope, key, (s: any, event: any) => evaluateExpression(node, s, event));
+        setOwnScopeValue(scope, key, (s: Record<string, any>, event: Event) =>
+          evaluateExpression(node, s, event),
+        );
       } else {
         defineLazyScopeValue(scope, key, () => evaluateExpression(node, scope, null));
       }

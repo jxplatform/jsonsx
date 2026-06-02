@@ -14,6 +14,7 @@ import {
   compileExpression,
   isMutating,
 } from "../shared";
+import type { ExpressionNode } from "../shared";
 import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
@@ -239,7 +240,7 @@ export function emitElementModule(
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
     if (d && typeof d === "object" && !Array.isArray(d) && "$expression" in d) {
-      const node = (d as any).$expression;
+      const node = (d as Record<string, unknown>).$expression as ExpressionNode;
       if (isMutating(node.operator)) {
         functionEntries.push([key, d]);
       } else {
@@ -510,10 +511,13 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
         `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
       );
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
-      const compiled = compileExpression((val as any).$expression, {
-        statePrefix: "s",
-        eventParam: "e",
-      });
+      const compiled = compileExpression(
+        (val as Record<string, unknown>).$expression as ExpressionNode,
+        {
+          statePrefix: "s",
+          eventParam: "e",
+        },
+      );
       parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
       parts.push(
@@ -579,10 +583,13 @@ function emitMappedArray(arrayDef: JxMutableNode, indent: string) {
         `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
       );
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
-      const compiled = compileExpression((val as any).$expression, {
-        statePrefix: "s",
-        eventParam: "e",
-      });
+      const compiled = compileExpression(
+        (val as Record<string, unknown>).$expression as ExpressionNode,
+        {
+          statePrefix: "s",
+          eventParam: "e",
+        },
+      );
       parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     }
   }

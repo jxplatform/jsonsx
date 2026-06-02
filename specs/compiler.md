@@ -387,7 +387,7 @@ app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));
 export default app;
 ```
 
-> **Status: Implemented.** `compile-server.js` exports `compileServer` (per-route) and `compileSiteServer` (site-wide). `site-build.js` orchestrates entry collection and `dist/worker.js` generation when `build.adapter` is set. Server source files are copied into `dist/components/` so the worker's relative imports resolve.
+> **Status: Implemented.** `compile-server.js` exports `compileServer` (per-route) and `compileSiteServer` (site-wide). `site-build` orchestrates entry collection and `dist/worker.js` generation when `build.adapter` is set. Server source files are copied into `dist/components/` so the worker's relative imports resolve.
 
 ---
 
@@ -483,7 +483,7 @@ Processed images are cached to `.jx-cache/images/manifest.json` to avoid redunda
 
 ### 7.6 Build Integration
 
-In `site-build.js`, the pipeline integrates at step 6 (per-route compilation):
+In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
 1. Cache loaded if `projectConfig.images.optimize === true`
 2. For each page, `transformImageNodes()` is called with the cache, config, project root, and output directory
@@ -529,7 +529,7 @@ For dynamic documents that are not custom elements, the compiler emits:
 | Island serialization                 | `<script type="application/Jx+json">` hydration islands           | **Not implemented**                                                              |
 | Bundle manifest                      | Exact dependency manifest from JSON analysis                      | **Partially implemented** (imports collected but no standalone manifest file)    |
 | Multi-page build                     | Orchestrate compilation across all pages in a site project        | **Not implemented**                                                              |
-| Layout resolution                    | Resolve `$layout` and `<slot>` insertion during compilation       | **Implemented** via `site-build.js`                                              |
+| Layout resolution                    | Resolve `$layout` and `<slot>` insertion during compilation       | **Implemented** via `site-build`                                                 |
 | `$head` merge                        | Merge site + layout + page `<head>` entries with deduplication    | **Implemented** via `head-merger.js`                                             |
 | `$paths` expansion                   | Generate one page per content entry for dynamic routes            | **Implemented** via `pages-discovery.js`                                         |
 | `ContentCollection` / `ContentEntry` | New `$prototype` values for querying content at build time        | **Implemented** via `content-loader.js`                                          |

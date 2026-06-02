@@ -6,11 +6,11 @@
  * @module expression
  */
 
-interface ExpressionNode {
+export interface ExpressionNode {
   operator: string;
-  target: any;
-  value?: any;
-  initial?: any;
+  target: unknown;
+  value?: unknown;
+  initial?: unknown;
 }
 
 interface CompileOpts {
@@ -67,31 +67,29 @@ export function isMutating(op: string) {
 
 // ─── Runtime Evaluation ──────────────────────────────────────────────────────
 
-/**
- * Resolve an operand to its runtime value.
- *
- * @param {any} operand
- * @param {Record<string, any>} state
- * @param {Event | null} event
- * @param {{ acc?: any; item?: any; index?: number }} [iterCtx]
- * @returns {any}
- */
+interface IterCtx {
+  acc?: unknown;
+  item?: unknown;
+  index?: number;
+}
+
+/** Resolve an operand to its runtime value. */
 function resolveOperand(
-  operand: any,
+  operand: unknown,
   state: Record<string, any>,
   event: Event | null,
-  iterCtx?: { acc?: any; item?: any; index?: number },
+  iterCtx?: IterCtx,
 ): unknown {
   if (operand === null || operand === undefined) return operand;
 
   // Nested expression node
   if (typeof operand === "object" && !Array.isArray(operand) && "operator" in operand) {
-    return evaluateExpression(operand, state, event, iterCtx);
+    return evaluateExpression(operand as ExpressionNode, state, event, iterCtx);
   }
 
   // $ref pointer
   if (typeof operand === "object" && !Array.isArray(operand) && "$ref" in operand) {
-    return resolveExprRef(operand.$ref, state, event, iterCtx);
+    return resolveExprRef((operand as { $ref: string }).$ref, state, event, iterCtx);
   }
 
   // Array of operands (e.g., splice args)
@@ -103,21 +101,12 @@ function resolveOperand(
   return operand;
 }
 
-/**
- * Resolve a $ref string within expression context. Handles event#/, $reduce/acc, $map/, #/state/,
- * and other schemes.
- *
- * @param {string} ref
- * @param {Record<string, any>} state
- * @param {Event | null} event
- * @param {{ acc?: any; item?: any; index?: number }} [iterCtx]
- * @returns {any}
- */
+/** Resolve a $ref string within expression context. */
 function resolveExprRef(
   ref: string,
   state: Record<string, any>,
   event: Event | null,
-  iterCtx?: { acc?: any; item?: any; index?: number },
+  iterCtx?: IterCtx,
 ) {
   if (ref === "$reduce/acc") {
     return iterCtx?.acc;
@@ -151,20 +140,12 @@ function resolveExprRef(
   return state[ref] ?? null;
 }
 
-/**
- * Resolve a $ref to a writable location — returns { obj, key } for assignment.
- *
- * @param {string} ref
- * @param {Record<string, any>} state
- * @param {Event | null} event
- * @param {{ acc?: any; item?: any; index?: number }} [iterCtx]
- * @returns {{ obj: any; key: string }}
- */
+/** Resolve a $ref to a writable location — returns { obj, key } for assignment. */
 function resolveWritableRef(
   ref: string,
   state: Record<string, any>,
   event: Event | null,
-  iterCtx?: { acc?: any; item?: any; index?: number },
+  iterCtx?: IterCtx,
 ) {
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
@@ -194,20 +175,12 @@ function resolveWritableRef(
   return { obj: state, key: ref };
 }
 
-/**
- * Evaluate an expression node at runtime.
- *
- * @param {ExpressionNode} node
- * @param {Record<string, any>} state
- * @param {Event | null} event
- * @param {{ acc?: any; item?: any; index?: number }} [iterCtx]
- * @returns {any}
- */
+/** Evaluate an expression node at runtime. */
 export function evaluateExpression(
   node: ExpressionNode,
   state: Record<string, any>,
   event: Event | null,
-  iterCtx?: { acc?: any; item?: any; index?: number },
+  iterCtx?: IterCtx,
 ): unknown {
   const { operator, target, value, initial } = node;
 
@@ -259,7 +232,12 @@ export function evaluateExpression(
   // ─── Assignment ───
   if (ASSIGNMENT_OPS.has(operator)) {
     const rhs = resolveOperand(value, state, event, iterCtx) as number;
-    const { obj, key } = resolveWritableRef(target.$ref, state, event, iterCtx);
+    const { obj, key } = resolveWritableRef(
+      (target as { $ref: string }).$ref,
+      state,
+      event,
+      iterCtx,
+    );
     switch (operator) {
       case "=":
         obj[key] = rhs;
@@ -304,18 +282,26 @@ export function evaluateExpression(
     const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
     if (operator === "reduce") {
       const seed: unknown = resolveOperand(initial, state, event, iterCtx);
-      return arr.reduce((acc: any, item: any, index: number) => {
-        return evaluateExpression(value, state, event, { acc, item, index });
+      return arr.reduce((acc: unknown, item: unknown, index: number) => {
+        return evaluateExpression(value as ExpressionNode, state, event, { acc, item, index });
       }, seed);
     }
     if (operator === "map") {
-      return arr.map((item: any, index: number) => {
-        return evaluateExpression(value, state, event, { ...iterCtx, item, index });
+      return arr.map((item: unknown, index: number) => {
+        return evaluateExpression(value as ExpressionNode, state, event, {
+          ...iterCtx,
+          item,
+          index,
+        });
       });
     }
     if (operator === "filter") {
-      return arr.filter((item: any, index: number) => {
-        return evaluateExpression(value, state, event, { ...iterCtx, item, index });
+      return arr.filter((item: unknown, index: number) => {
+        return evaluateExpression(value as ExpressionNode, state, event, {
+          ...iterCtx,
+          item,
+          index,
+        });
       });
     }
   }
@@ -323,25 +309,19 @@ export function evaluateExpression(
 
 // ─── Compiler: Expression → JS Source ────────────────────────────────────────
 
-/**
- * Compile an operand to a JS source string.
- *
- * @param {any} operand
- * @param {CompileOpts} opts
- * @returns {string}
- */
-function compileOperand(operand: any, opts: CompileOpts): string {
+/** Compile an operand to a JS source string. */
+function compileOperand(operand: unknown, opts: CompileOpts): string {
   if (operand === null) return "null";
   if (operand === undefined) return "undefined";
 
   // Nested expression node
   if (typeof operand === "object" && !Array.isArray(operand) && "operator" in operand) {
-    return compileExpression(operand, opts);
+    return compileExpression(operand as ExpressionNode, opts);
   }
 
   // $ref pointer
   if (typeof operand === "object" && !Array.isArray(operand) && "$ref" in operand) {
-    return compileRef(operand.$ref, opts);
+    return compileRef((operand as { $ref: string }).$ref, opts);
   }
 
   // Array of operands
@@ -396,16 +376,10 @@ function compileRef(ref: string, opts: CompileOpts) {
   return `${s}.${ref}`;
 }
 
-/**
- * Compile a writable $ref target to its JS equivalent (for LHS of assignment).
- *
- * @param {any} target
- * @param {CompileOpts} opts
- * @returns {string}
- */
-function compileTarget(target: any, opts: CompileOpts): string {
-  if (typeof target === "object" && "$ref" in target) {
-    return compileRef(target.$ref, opts);
+/** Compile a writable $ref target to its JS equivalent (for LHS of assignment). */
+function compileTarget(target: unknown, opts: CompileOpts): string {
+  if (typeof target === "object" && target !== null && "$ref" in target) {
+    return compileRef((target as { $ref: string }).$ref, opts);
   }
   return compileOperand(target, opts);
 }
@@ -466,7 +440,7 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
   // ─── Aggregates (pure) ───
   if (AGGREGATE_OPS.has(operator)) {
     const arr: string = compileOperand(target, opts);
-    const itemExpr: string = compileExpression(value, opts);
+    const itemExpr: string = compileExpression(value as ExpressionNode, opts);
     if (operator === "reduce") {
       const seed: string = compileOperand(initial, opts);
       return `${arr}.reduce((_acc, _item, _index) => ${itemExpr}, ${seed})`;
@@ -484,11 +458,7 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 
-/**
- * @param {any} obj
- * @param {string} path
- * @returns {any}
- */
-function getPath(obj: any, path: string) {
-  return path.split(/[./]/).reduce((o, k) => (o as any)?.[k], obj);
+/** Resolve a dotted/slashed path on an object. */
+function getPath(obj: unknown, path: string): unknown {
+  return path.split(/[./]/).reduce((o, k) => (o as Record<string, unknown>)?.[k], obj);
 }

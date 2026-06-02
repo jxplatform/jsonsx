@@ -26,6 +26,7 @@ import {
   compileExpression,
   isMutating,
 } from "../shared";
+import type { ExpressionNode } from "../shared";
 import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
@@ -85,7 +86,7 @@ export function compileClient(
 
     // $expression: Shape 5
     if ("$expression" in d) {
-      const node = (d as any).$expression;
+      const node = (d as Record<string, unknown>).$expression as ExpressionNode;
       if (isMutating(node.operator)) {
         const compiled = compileExpression(node, { statePrefix: "state", eventParam: "e" });
         onEntries.push([key, { args: ["state", "e"], body: compiled }]);
@@ -289,10 +290,13 @@ function buildClientNode(
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
-      const compiled = compileExpression((val as any).$expression, {
-        statePrefix: "state",
-        eventParam: "e",
-      });
+      const compiled = compileExpression(
+        (val as Record<string, unknown>).$expression as ExpressionNode,
+        {
+          statePrefix: "state",
+          eventParam: "e",
+        },
+      );
       handlers.set(key, { args: ["state", "e"], body: compiled });
       needsBind = true;
     }
@@ -510,10 +514,13 @@ function emitLitMapTemplate(def: JxMutableNode) {
       const body = mapRefsToLit((val as JxMutableNode).body as string);
       attrs += " @" + eventName + "=${(e) => { " + body + " }}";
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
-      const compiled = compileExpression((val as any).$expression, {
-        statePrefix: "state",
-        eventParam: "e",
-      });
+      const compiled = compileExpression(
+        (val as Record<string, unknown>).$expression as ExpressionNode,
+        {
+          statePrefix: "state",
+          eventParam: "e",
+        },
+      );
       attrs += " @" + eventName + "=${(e) => { state.$map = { item, index }; " + compiled + "; }}";
     }
   }

@@ -195,9 +195,13 @@ export async function buildScope(
   // Pass 2.5: $expression entries (Shape 5)
   for (const [key, def] of Object.entries(defs)) {
     if (def && typeof def === "object" && !Array.isArray(def) && "$expression" in def) {
-      const node = (def as any).$expression;
+      const node = (def as Record<string, unknown>).$expression as {
+        operator: string;
+        target: unknown;
+        value?: unknown;
+      };
       if (isMutating(node.operator)) {
-        state[key] = (s: any, event: any) => evaluateExpression(node, s, event);
+        state[key] = (s: Record<string, any>, event: Event) => evaluateExpression(node, s, event);
       } else {
         state[key] = computed(() => evaluateExpression(node, state, null));
       }
@@ -533,7 +537,11 @@ function applyProperties(el: HTMLElement, def: Record<string, any>, state: Recor
       }
       // Event handler: inline $expression
       if (val && typeof val === "object" && "$expression" in val) {
-        const node = (val as any).$expression;
+        const node = (val as Record<string, unknown>).$expression as {
+          operator: string;
+          target: unknown;
+          value?: unknown;
+        };
         const scope = state;
         el.addEventListener(key.slice(2), (e) => evaluateExpression(node, scope, e));
         continue;

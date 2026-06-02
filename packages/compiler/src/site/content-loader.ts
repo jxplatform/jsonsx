@@ -115,7 +115,7 @@ let _mdModule: {
  */
 async function getMarkdownModule() {
   if (!_mdModule) {
-    _mdModule = (await import("@jxsuite/parser")) as any;
+    _mdModule = (await import("@jxsuite/parser")) as unknown as NonNullable<typeof _mdModule>;
   }
   return _mdModule as NonNullable<typeof _mdModule>;
 }
