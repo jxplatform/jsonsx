@@ -18,6 +18,8 @@ import {
   codeService,
   locateFile,
   fetchPluginSchema,
+  jxResolve,
+  jxServerFunction,
 } from "./handlers";
 import {
   gitStatus,
@@ -91,6 +93,8 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       codeService: (params) => codeService(params),
       locateFile: (params) => locateFile(params),
       fetchPluginSchema: (params) => fetchPluginSchema(params),
+      jxResolve: (params) => jxResolve(params),
+      jxServerFunction: (params) => jxServerFunction(params),
       gitStatus: () => gitStatus(),
       gitBranches: () => gitBranches(),
       gitLog: (params) => gitLog(params),

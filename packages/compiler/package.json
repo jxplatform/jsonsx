@@ -41,7 +41,7 @@
     "@apidevtools/json-schema-ref-parser": "^15.3.5",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
-    "@jxsuite/schema": "^0.23.2",
+    "@jxsuite/schema": "^0.25.0",
     "remark-gfm": "^4.0.1",
     "remark-stringify": "^11.0.0",
     "sharp": "^0.34.5",

@@ -34,6 +34,32 @@ export function createDesktopPlatform() {
         : input instanceof URL
           ? input.href
           : (input as Request).url;
+
+    // Route the runtime's dev-proxy endpoints through RPC. The runtime POSTs to relative
+    // "/__jx_resolve__" (class resolution) and "/__jx_server__" (server functions); under the
+    // views:// protocol these would otherwise resolve to a missing view resource.
+    let pathname = url;
+    try {
+      pathname = new URL(url, location.href).pathname;
+    } catch {}
+    if (pathname === "/__jx_resolve__" || pathname === "/__jx_server__") {
+      const body = init?.body != null ? String(init.body) : "{}";
+      const handler =
+        pathname === "/__jx_server__" ? rpc.request.jxServerFunction : rpc.request.jxResolve;
+      try {
+        const { status, body: resBody } = await handler({ body });
+        return new Response(resBody, {
+          status,
+          headers: { "content-type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e) }), {
+          status: 500,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
     if (url.startsWith("views://")) {
       const path = url.replace(/^views:\/\/[^/]+\//, "");
       try {

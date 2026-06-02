@@ -1,6 +1,7 @@
 import { readdir, readFile, writeFile, rename, stat, mkdir, rm } from "node:fs/promises";
 import { resolve, relative, join, basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
+import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
@@ -301,12 +302,26 @@ export async function fetchPluginSchema(params: {
 
   let moduleAbsPath: string;
   try {
-    if (params.base) {
-      const docUrlPath = new URL(params.base).pathname;
-      const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-      moduleAbsPath = resolve(resolve(root, "." + docDir), params.src);
+    if (params.src.startsWith("./") || params.src.startsWith("../")) {
+      // Relative path — resolve against the document's directory when a base is provided
+      if (params.base) {
+        const docUrlPath = new URL(params.base).pathname;
+        const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
+        moduleAbsPath = resolve(resolve(root, "." + docDir), params.src);
+      } else {
+        moduleAbsPath = resolve(root, params.src);
+      }
     } else {
-      moduleAbsPath = resolve(root, params.src);
+      // npm/bare specifier (e.g. "@jxsuite/parser/ContentCollection.class.json") — resolve
+      // through the project's node_modules, falling back to the desktop package's own require.
+      const { createRequire } = await import("node:module");
+      const projRequire = createRequire(resolve(root, "package.json"));
+      try {
+        moduleAbsPath = projRequire.resolve(params.src);
+      } catch {
+        const selfRequire = createRequire(import.meta.url);
+        moduleAbsPath = selfRequire.resolve(params.src);
+      }
     }
   } catch {
     return null;
@@ -340,6 +355,41 @@ export async function fetchPluginSchema(params: {
   } catch {
     return null;
   }
+}
+
+// ─── Class / server-function resolution ────────────────────────────────────────
+
+export interface ProxyResult {
+  status: number;
+  body: string;
+}
+
+/**
+ * Proxy a $prototype + $src class resolution. Mirrors the dev server's POST /**jx_resolve**: loads
+ * project context (content types) and runs the class's resolve() server-side. This is what makes
+ * ContentCollection / MarkdownCollection and friends return live data in the studio.
+ */
+export async function jxResolve(params: { body: string }): Promise<ProxyResult> {
+  const root = requireRoot();
+  const req = new Request("http://localhost/__jx_resolve__", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: params.body,
+  });
+  const res = await handleResolve(req, root, null);
+  return { status: res.status, body: await res.text() };
+}
+
+/** Proxy a timing: "server" function call. Mirrors the dev server's POST /**jx_server**. */
+export async function jxServerFunction(params: { body: string }): Promise<ProxyResult> {
+  const root = requireRoot();
+  const req = new Request("http://localhost/__jx_server__", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: params.body,
+  });
+  const res = await handleServerFunction(req, root);
+  return { status: res.status, body: await res.text() };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

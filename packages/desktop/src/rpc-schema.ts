@@ -154,6 +154,15 @@ export type StudioRPC = {
         params: { src: string; prototype?: string; base?: string };
         response: unknown | null;
       };
+      // Class / server-function resolution (mirrors dev-server /__jx_resolve__ & /__jx_server__)
+      jxResolve: {
+        params: { body: string };
+        response: { status: number; body: string };
+      };
+      jxServerFunction: {
+        params: { body: string };
+        response: { status: number; body: string };
+      };
       // Git
       gitStatus: {
         params: void;
