@@ -288,7 +288,6 @@ export function resolveDefaultForCanvas(
 
 /** Simple field row for signal editors — vertical stacked layout. */
 export function signalFieldRow(label: string, value: string, onChange: (value: string) => void) {
-  let debounce: ReturnType<typeof setTimeout> | undefined;
   return renderFieldRow({
     prop: label,
     label,
@@ -296,10 +295,10 @@ export function signalFieldRow(label: string, value: string, onChange: (value: s
     widget: html`
       <sp-textfield
         size="s"
-        value=${value}
-        @input=${(e: Event) => {
-          clearTimeout(debounce);
-          debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
+        .value=${value}
+        @change=${(e: Event) => {
+          const v = (e.target as HTMLInputElement).value;
+          if (v !== value) onChange(v);
         }}
       ></sp-textfield>
     `,
