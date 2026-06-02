@@ -7,6 +7,8 @@
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
+const mediaTags = new Set(["img", "video", "source", "iframe", "audio"]);
+
 /**
  * Convert a template string to a displayable expression for edit mode. Replaces ${expr} with ❮ expr
  * ❯ so the runtime renders it as literal text.
@@ -48,9 +50,42 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   const /** @type {Record<string, unknown>} */ obj = node as Record<string, unknown>;
 
   const out: Record<string, unknown> = {};
+  let needsMediaPlaceholder = false;
+  const isMediaElement = mediaTags.has((obj.tagName as string) || "");
+
+  // Check if this media element lacks a resolvable src (top-level or in attributes)
+  if (isMediaElement) {
+    const attrs = obj.attributes as Record<string, unknown> | undefined;
+    const topSrc = obj.src;
+    const attrSrc = attrs?.src;
+    const topPoster = obj.poster;
+    const attrPoster = attrs?.poster;
+    const hasSrc = (topSrc && topSrc !== "") || (attrSrc && attrSrc !== "");
+    const hasPoster = (topPoster && topPoster !== "") || (attrPoster && attrPoster !== "");
+    if (!hasSrc && !hasPoster) {
+      needsMediaPlaceholder = true;
+    }
+  }
+
   for (const [k, v] of Object.entries(obj)) {
-    if (k === "state" || k === "$media" || k === "$props" || k === "$elements") {
+    if (k === "state" || k === "$media" || k === "$elements") {
       out[k] = v; // preserve as-is for runtime resolution
+    } else if (k === "$props" && v && typeof v === "object") {
+      // Process $props values: convert template strings to display format
+      const propsOut: Record<string, unknown> = {};
+      for (const [pk, pv] of Object.entries(v)) {
+        if (typeof pv === "string" && pv.includes("${")) {
+          const isUrlAttr = pk === "src" || pk === "href" || pk === "poster" || pk === "action";
+          propsOut[pk] = isUrlAttr ? "" : templateToEditDisplay(pv);
+        } else if (pv && typeof pv === "object" && (pv as Record<string, unknown>).$ref) {
+          const ref = (pv as Record<string, unknown>).$ref as string;
+          const label = ref.startsWith("#/state/") ? ref.slice(8) : ref;
+          propsOut[pk] = `{${label}}`;
+        } else {
+          propsOut[pk] = pv;
+        }
+      }
+      out[k] = propsOut;
     } else if (k === "children") {
       if (Array.isArray(v)) {
         out.children = v.map(prepareForEditMode);
@@ -106,6 +141,36 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
           ];
         }
       }
+    } else if (k === "attributes" && isMediaElement && v && typeof v === "object") {
+      // Process attributes for media elements: strip src/poster to prevent broken images
+      const attrs = v as Record<string, unknown>;
+      const processed: Record<string, unknown> = {};
+      for (const [ak, av] of Object.entries(attrs)) {
+        if (ak === "src" || ak === "poster") {
+          if (typeof av === "string" && av !== "" && !av.includes("${")) {
+            // Real static value — keep it
+            processed[ak] = av;
+          } else {
+            // Empty, template, or $ref — omit and ensure placeholder
+            needsMediaPlaceholder = true;
+            if (typeof av === "string" && av.includes("${")) {
+              // Show template display for alt text but not for src
+            } else if (av && typeof av === "object" && (av as Record<string, unknown>).$ref) {
+              // $ref binding — omit src entirely
+            }
+          }
+        } else if (typeof av === "string" && av.includes("${")) {
+          const isUrlAttr = ak === "href" || ak === "action";
+          processed[ak] = isUrlAttr ? "" : templateToEditDisplay(av);
+        } else if (av && typeof av === "object" && (av as Record<string, unknown>).$ref) {
+          const ref = (av as Record<string, unknown>).$ref as string;
+          const label = ref.startsWith("#/state/") ? ref.slice(8) : ref;
+          processed[ak] = `{${label}}`;
+        } else {
+          processed[ak] = av;
+        }
+      }
+      out.attributes = processed;
     } else if (k === "style") {
       // Replace template strings in style values with empty strings
       if (v && typeof v === "object") {
@@ -119,16 +184,37 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       }
     } else if (typeof v === "string" && v.includes("${")) {
       // Template string in a display property → show raw expression
-      // For URL-bearing attributes, use empty string to avoid triggering network requests
-      const isUrlAttr = k === "src" || k === "href" || k === "poster" || k === "action";
-      out[k] = isUrlAttr ? "" : templateToEditDisplay(v);
+      // For URL-bearing attributes on media elements, omit entirely (placeholder CSS handles it)
+      const isMediaSrc =
+        (k === "src" || k === "poster") && mediaTags.has((obj.tagName as string) || "");
+      if (isMediaSrc) {
+        needsMediaPlaceholder = true;
+      } else {
+        const isUrlAttr = k === "src" || k === "href" || k === "poster" || k === "action";
+        out[k] = isUrlAttr ? "" : templateToEditDisplay(v);
+      }
     } else if (v && typeof v === "object" && (v as Record<string, unknown>).$ref) {
       // $ref binding → show ref path as literal text
       const ref = (v as Record<string, unknown>).$ref as string;
       const label = ref.startsWith("#/state/") ? ref.slice(8) : ref;
-      out[k] = `{${label}}`;
+      const isMediaSrc =
+        (k === "src" || k === "poster") && mediaTags.has((obj.tagName as string) || "");
+      if (isMediaSrc) {
+        needsMediaPlaceholder = true;
+      } else {
+        out[k] = `{${label}}`;
+      }
     } else {
-      out[k] = prepareForEditMode(v as JxMutableNode);
+      // Empty src/poster on media elements → omit to prevent broken image, use placeholder
+      if (
+        (k === "src" || k === "poster") &&
+        v === "" &&
+        mediaTags.has((obj.tagName as string) || "")
+      ) {
+        needsMediaPlaceholder = true;
+      } else {
+        out[k] = prepareForEditMode(v as JxMutableNode);
+      }
     }
   }
 
@@ -199,6 +285,14 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
           ? out.className + " empty-container-placeholder"
           : "empty-container-placeholder";
       }
+    }
+  }
+
+  // Media elements with missing/dynamic src get a placeholder class
+  if (needsMediaPlaceholder) {
+    const cls = (out.className as string) || "";
+    if (!cls.includes("empty-media-placeholder")) {
+      out.className = cls ? cls + " empty-media-placeholder" : "empty-media-placeholder";
     }
   }
 

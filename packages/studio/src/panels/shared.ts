@@ -66,7 +66,7 @@ export function defaultDef(tag: string) {
   else if (tag === "blockquote") def.textContent = "Quote";
   else if (tag === "pre") def.textContent = "Preformatted text";
   else if (tag === "input") def.attributes = { type: "text", placeholder: "Enter text..." };
-  else if (tag === "img") def.attributes = { src: "", alt: "Image" };
+  else if (tag === "img") def.attributes = { alt: "Image" };
   else if (tag === "iframe") def.attributes = { src: "" };
   else if (tag === "select") def.children = [{ tagName: "option", textContent: "Option 1" }];
   else if (tag === "ul" || tag === "ol") def.children = [{ tagName: "li", textContent: "Item" }];
