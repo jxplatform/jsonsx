@@ -1,1 +1,1 @@
-./node_modules/.bin/nano-staged
+bunx nano-staged
