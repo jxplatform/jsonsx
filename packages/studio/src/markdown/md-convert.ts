@@ -540,14 +540,14 @@ function collectDirectiveAttrs(el: JxElement) {
   const propsObj: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(el)) {
-    if (
-      key === "tagName" ||
-      key === "children" ||
-      key === "textContent" ||
-      key === "innerHTML" ||
-      key === "attributes"
-    )
+    if (key === "tagName" || key === "textContent" || key === "innerHTML" || key === "attributes")
       continue;
+    if (key === "children") {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        propsObj.children = value;
+      }
+      continue;
+    }
     propsObj[key] = value;
   }
 
@@ -589,7 +589,12 @@ function convertToDirective(el: JxElement, isBlock: boolean): MdastNode {
   }
 
   // Block without children → leafDirective
-  const childArray = el.children as (JxElement | string)[] | undefined;
+  const rawChildren = el.children;
+  const childrenIsObject =
+    rawChildren && typeof rawChildren === "object" && !Array.isArray(rawChildren);
+  const childArray = childrenIsObject
+    ? undefined
+    : (rawChildren as (JxElement | string)[] | undefined);
   if (!childArray?.length && el.textContent == null) {
     return {
       type: "leafDirective",
