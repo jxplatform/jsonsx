@@ -9,7 +9,8 @@
       "Bash(bun run *)",
       "Bash(oxlint packages/runtime/src/runtime.js)",
       "Bash(oxlint .)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(node /home/batonac/Development/jx/packages/compiler/dist/cli.js --help)"
     ]
   }
 }
