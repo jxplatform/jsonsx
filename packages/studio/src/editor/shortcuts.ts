@@ -46,7 +46,7 @@ export function initShortcuts(
     setPan: (x: number, y: number) => void;
     applyTransform: () => void;
     positionZoomIndicator: () => void;
-    componentInlineEdit: object | null;
+    componentInlineEdit: Record<string, unknown> | null;
     saveFile: () => void;
     openProject: () => void;
     enterEditOnPath: (path: JxPath) => void;

@@ -143,10 +143,15 @@ export { resolveNpmPath };
 export async function createDevServer(options: {
   root: string;
   port?: number;
-  builds?: { entrypoints: string[]; outdir: string; match?: Function | RegExp; label?: string }[];
+  builds?: {
+    entrypoints: string[];
+    outdir: string;
+    match?: ((path: string) => boolean) | RegExp;
+    label?: string;
+  }[];
   watch?: boolean | object;
   studio?: boolean;
-  middleware?: Function;
+  middleware?: (req: Request, url: URL) => Response | null | Promise<Response | null>;
 }) {
   const {
     root,

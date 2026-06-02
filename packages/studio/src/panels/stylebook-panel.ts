@@ -49,13 +49,22 @@ interface StylebookPanel {
 }
 
 interface StylebookCtx {
-  canvasPanelTemplate: Function;
-  applyTransform: Function;
-  observeCenterUntilStable: Function;
-  renderZoomIndicator: Function;
-  updateActivePanelHeaders: Function;
-  overlayBoxDescriptor: Function;
-  effectiveZoom: Function;
+  canvasPanelTemplate: (
+    mediaName: string | null,
+    label: string | null,
+    fullWidth: boolean,
+    width?: number | null,
+  ) => { tpl: import("lit-html").TemplateResult; panel: any };
+  applyTransform: () => void;
+  observeCenterUntilStable: () => void;
+  renderZoomIndicator: () => void;
+  updateActivePanelHeaders: () => void;
+  overlayBoxDescriptor: (
+    el: Element,
+    type: string,
+    panel: any,
+  ) => { cls: string; top: string; left: string; width: string; height: string };
+  effectiveZoom: () => number;
 }
 
 interface ComponentEntry {

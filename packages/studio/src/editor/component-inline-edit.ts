@@ -25,15 +25,29 @@ import { isSlashMenuOpen, showSlashMenu, dismissSlashMenu } from "./slash-menu";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
 
-/** @type {{ findCanvasElement: Function } | null} */
+/**
+ * @type {{
+ *   findCanvasElement: (
+ *     path: import("../state").JxPath,
+ *     canvasEl: HTMLElement,
+ *   ) => HTMLElement | null;
+ * } | null}
+ */
 let _ctx = null;
 
 /**
  * Initialize the component inline edit module.
  *
- * @param {{ findCanvasElement: Function }} ctx
+ * @param {{
+ *   findCanvasElement: (
+ *     path: import("../state").JxPath,
+ *     canvasEl: HTMLElement,
+ *   ) => HTMLElement | null;
+ * }} ctx
  */
-export function initComponentInlineEdit(ctx: { findCanvasElement: Function }) {
+export function initComponentInlineEdit(ctx: {
+  findCanvasElement: (path: JxPath, canvasEl: HTMLElement) => HTMLElement | null;
+}) {
   _ctx = ctx;
 }
 

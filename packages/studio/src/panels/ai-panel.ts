@@ -53,7 +53,7 @@ function rerenderPanel() {
   requestAnimationFrame(() => mountQuikChat());
 }
 
-export function registerRightPanelRender(fn: Function) {
+export function registerRightPanelRender(fn: () => void) {
   (globalThis as any).__jxRightPanelRender = { render: fn };
 }
 

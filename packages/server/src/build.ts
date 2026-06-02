@@ -11,7 +11,12 @@
  * }[]} builds
  */
 export async function buildAll(
-  builds: { entrypoints: string[]; outdir: string; match?: Function | RegExp; label?: string }[],
+  builds: {
+    entrypoints: string[];
+    outdir: string;
+    match?: ((path: string) => boolean) | RegExp;
+    label?: string;
+  }[],
 ) {
   for (const entry of builds) {
     const { match: _match, label, ...opts } = entry;
@@ -39,7 +44,12 @@ export async function buildAll(
  * @returns {Promise<{ rebuilt: string[]; success: boolean }>}
  */
 export async function rebuild(
-  builds: { entrypoints: string[]; outdir: string; match?: Function | RegExp; label?: string }[],
+  builds: {
+    entrypoints: string[];
+    outdir: string;
+    match?: ((path: string) => boolean) | RegExp;
+    label?: string;
+  }[],
   changedFile: string,
 ) {
   const rebuilt = [];

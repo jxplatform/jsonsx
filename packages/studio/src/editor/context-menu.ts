@@ -58,7 +58,7 @@ function nodeToHtml(node: JxNode | string) {
  *
  * @param {object} json
  */
-async function writeToClipboard(json: object) {
+async function writeToClipboard(json: Record<string, unknown>) {
   workspace.clipboard = json;
   try {
     await navigator.clipboard.write([

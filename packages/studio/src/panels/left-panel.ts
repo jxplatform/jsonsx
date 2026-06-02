@@ -7,6 +7,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import type { TemplateResult } from "lit-html";
 import { leftPanel, updateSession } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
@@ -22,18 +23,18 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
 interface LeftPanelCtx {
   getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
-  renderImportsTemplate: Function;
-  renderFilesTemplate: Function;
-  renderSignalsTemplate: Function;
-  renderDataExplorerTemplate: Function;
-  renderHeadTemplate: Function;
-  renderGitPanel: Function;
+  renderImportsTemplate: (...args: any[]) => TemplateResult;
+  renderFilesTemplate: (...args: any[]) => TemplateResult;
+  renderSignalsTemplate: (...args: any[]) => TemplateResult;
+  renderDataExplorerTemplate: (...args: any[]) => TemplateResult;
+  renderHeadTemplate: (...args: any[]) => TemplateResult;
+  renderGitPanel: (...args: any[]) => TemplateResult;
   renderCanvas: () => void;
   defCategory: (def: unknown) => string;
   defBadgeLabel: (def: unknown) => string;
   navigateToComponent: (path: string) => void;
-  webdata: object;
-  defaultDef: (tag: string) => object;
+  webdata: Record<string, unknown>;
+  defaultDef: (tag: string) => Record<string, unknown>;
   registerLayersDnD: () => void;
   registerElementsDnD: () => void;
   registerComponentsDnD: () => void;

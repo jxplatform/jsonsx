@@ -6,6 +6,7 @@
 import { html } from "lit-html";
 import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
@@ -25,7 +26,7 @@ let _error: string = "";
 let _creating: boolean = false;
 
 /** @type {((result: { root: string; config: object } | null) => void) | null} */
-let _resolve: ((result: { root: string; config: object } | null) => void) | null = null;
+let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void) | null = null;
 
 /**
  * Open the New Project modal. Returns a promise that resolves with the created project info (or
@@ -33,7 +34,7 @@ let _resolve: ((result: { root: string; config: object } | null) => void) | null
  *
  * @returns {Promise<{ root: string; config: object } | null>}
  */
-export function openNewProjectModal(): Promise<{ root: string; config: object } | null> {
+export function openNewProjectModal(): Promise<{ root: string; config: ProjectConfig } | null> {
   if (_handle) return Promise.resolve(null);
   _form = { name: "", description: "", url: "", adapter: "static", directory: "" };
   _error = "";

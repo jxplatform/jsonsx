@@ -64,10 +64,10 @@ const toolbarIconMap = {
 
 /**
  * @param {string} label
- * @param {Function} onClick
+ * @param {() => void} onClick
  * @param {string} [iconTag]
  */
-function tbBtnTpl(label: string, onClick: Function, iconTag?: string) {
+function tbBtnTpl(label: string, onClick: () => void, iconTag?: string) {
   return html`
     <sp-action-button size="s" @click=${onClick}>
       ${iconTag ? toolbarIconMap[iconTag] : nothing} ${label}

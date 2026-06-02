@@ -51,8 +51,8 @@ export function registerPanelEvents(panel: CanvasPanel) {
   const opts = { signal: ac.signal };
   view.canvasEventCleanups.push(() => ac.abort());
 
-  /** @param {Function} fn */
-  function withPanelPointerEvents(fn: Function) {
+  /** @param {() => unknown} fn */
+  function withPanelPointerEvents(fn: () => unknown) {
     const els = canvas.querySelectorAll("*") as NodeListOf<HTMLElement>;
     for (const el of els) el.style.pointerEvents = "auto";
     overlayClk.style.display = "none";

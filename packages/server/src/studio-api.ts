@@ -1051,8 +1051,8 @@ export async function handleStudioApi(
         systemPrompt: body.systemPrompt,
       });
       return Response.json(result);
-    } catch (e: any) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (e) {
+      return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
   }
 
@@ -1075,8 +1075,8 @@ export async function handleStudioApi(
       const body = await req.json();
       claude.sendMessage(id, body.message);
       return Response.json({ ok: true });
-    } catch (e: any) {
-      return Response.json({ error: e.message }, { status: 500 });
+    } catch (e) {
+      return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
     }
   }
 

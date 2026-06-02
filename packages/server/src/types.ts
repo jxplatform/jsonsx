@@ -1,7 +1,7 @@
 export interface BuildEntry {
   entrypoints: string[];
   outdir: string;
-  match?: Function | RegExp;
+  match?: ((path: string) => boolean) | RegExp;
   label?: string;
 }
 

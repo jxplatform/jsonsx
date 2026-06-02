@@ -475,7 +475,7 @@ export async function generateSchemaString() {
   return JSON.stringify(await generateSchema(), null, 2);
 }
 
-export async function validateDocument(doc: object) {
+export async function validateDocument(doc: Record<string, unknown>) {
   let Ajv, addFormats;
   try {
     // @ts-ignore — optional peer dependency

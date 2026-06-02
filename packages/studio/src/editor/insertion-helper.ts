@@ -18,12 +18,12 @@ interface ObservableSubscription {
 }
 
 interface ObservableElement {
-  on: (event: string, options?: object) => ObservableSubscription; // Creates an
+  on: (event: string, options?: Record<string, unknown>) => ObservableSubscription;
 }
 
 interface InsertionHelperContext {
   getCanvasMode: () => string; // Returns the active canvas mode.
-  withPanelPointerEvents: (fn: Function) => unknown; // Executes fn with pointer-events
+  withPanelPointerEvents: (fn: () => unknown) => unknown; // Executes fn with pointer-events
   effectiveZoom: () => number; // Returns the current zoom scale factor.
   defaultDef: (tag: string) => object; // Creates a default element definition for a tag.
   parentElementPath: (path: JxPath) => JxPath | null; // Returns the parent element path,

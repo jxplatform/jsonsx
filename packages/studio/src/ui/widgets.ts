@@ -91,7 +91,21 @@ export function renderNumberInput(
  * @param {string} prop — property key
  * @param {string | number | undefined} value — current value
  * @param {(val: string | number) => void} onCommit — commit callback
- * @param {{ placeholder?: string; renderSelect?: Function; renderCombobox?: Function }} [opts]
+ * @param {{
+ *   placeholder?: string;
+ *   renderSelect?: (
+ *     entry: Record<string, unknown>,
+ *     prop: string,
+ *     value: string | number | undefined,
+ *     onCommit: (val: string | number) => void,
+ *   ) => import("lit-html").TemplateResult;
+ *   renderCombobox?: (
+ *     entry: Record<string, unknown>,
+ *     prop: string,
+ *     value: string | number | undefined,
+ *     onCommit: (val: string | number) => void,
+ *   ) => import("lit-html").TemplateResult;
+ * }} [opts]
  * @returns {import("lit-html").TemplateResult}
  */
 export function widgetForType(
@@ -100,7 +114,21 @@ export function widgetForType(
   prop: string,
   value: string | number | undefined,
   onCommit: (val: string | number) => void,
-  opts: { placeholder?: string; renderSelect?: Function; renderCombobox?: Function } = {},
+  opts: {
+    placeholder?: string;
+    renderSelect?: (
+      entry: Record<string, unknown>,
+      prop: string,
+      value: any,
+      onCommit: (val: string | number) => void,
+    ) => import("lit-html").TemplateResult;
+    renderCombobox?: (
+      entry: Record<string, unknown>,
+      prop: string,
+      value: any,
+      onCommit: (val: string | number) => void,
+    ) => import("lit-html").TemplateResult;
+  } = {},
 ) {
   switch (type) {
     case "button-group":

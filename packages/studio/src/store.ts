@@ -98,9 +98,9 @@ const _styleDebounceTimers = new Map();
 /**
  * @param {string} prop
  * @param {number} ms
- * @param {Function} fn
+ * @param {(...args: unknown[]) => void} fn
  */
-export function debouncedStyleCommit(prop: string, ms: number, fn: Function) {
+export function debouncedStyleCommit(prop: string, ms: number, fn: (...args: any[]) => void) {
   return (...args: unknown[]) => {
     clearTimeout(_styleDebounceTimers.get(prop));
     _styleDebounceTimers.set(
@@ -170,9 +170,9 @@ const _renderers: Map<string, Function> = new Map();
  * Register a named renderer. Called at module import time by each module.
  *
  * @param {string} name
- * @param {Function} fn
+ * @param {() => void} fn
  */
-export function registerRenderer(name: string, fn: Function) {
+export function registerRenderer(name: string, fn: () => void) {
   _renderers.set(name, fn);
 }
 
@@ -254,7 +254,7 @@ export function updateUi(field: string, value: unknown) {
  *
  * @param {object} patch
  */
-export function updateCanvas(patch: object) {
+export function updateCanvas(patch: Record<string, unknown>) {
   const tab = activeTab.value;
   if (tab) {
     for (const [k, v] of Object.entries(patch)) {

@@ -85,15 +85,15 @@ export function renderCssVarsEditor(container: HTMLElement) {
 
 /**
  * @param {[string, string | number][]} vars
- * @param {Function} updateVar
- * @param {Function} deleteVar
- * @param {Function} addVar
+ * @param {(name: string, val: string) => void} updateVar
+ * @param {(name: string) => void} deleteVar
+ * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  */
 function renderColorSection(
   vars: [string, string | number][],
-  updateVar: Function,
-  deleteVar: Function,
-  addVar: Function,
+  updateVar: (name: string, val: string) => void,
+  deleteVar: (name: string) => void,
+  addVar: (prefix: string, friendlyName: string, val: string) => void,
 ) {
   return html`
     <div class="css-vars-group">
@@ -128,15 +128,15 @@ function renderColorSection(
 
 /**
  * @param {[string, string | number][]} vars
- * @param {Function} updateVar
- * @param {Function} deleteVar
- * @param {Function} addVar
+ * @param {(name: string, val: string) => void} updateVar
+ * @param {(name: string) => void} deleteVar
+ * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  */
 function renderFontSection(
   vars: [string, string | number][],
-  updateVar: Function,
-  deleteVar: Function,
-  addVar: Function,
+  updateVar: (name: string, val: string) => void,
+  deleteVar: (name: string) => void,
+  addVar: (prefix: string, friendlyName: string, val: string) => void,
 ) {
   return html`
     <div class="css-vars-group">
@@ -167,17 +167,17 @@ function renderFontSection(
 
 /**
  * @param {[string, string | number][]} vars
- * @param {Function} updateVar
- * @param {Function} deleteVar
- * @param {Function} addVar
+ * @param {(name: string, val: string) => void} updateVar
+ * @param {(name: string) => void} deleteVar
+ * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  * @param {JxStyle} rootStyle
  * @param {string[]} mediaNames
  */
 function renderSizeSection(
   vars: [string, string | number][],
-  updateVar: Function,
-  deleteVar: Function,
-  addVar: Function,
+  updateVar: (name: string, val: string) => void,
+  deleteVar: (name: string) => void,
+  addVar: (prefix: string, friendlyName: string, val: string) => void,
   rootStyle: JxStyle,
   mediaNames: string[],
 ) {
@@ -213,17 +213,17 @@ function renderSizeSection(
 
 /**
  * @param {[string, string | number][]} vars
- * @param {Function} updateVar
- * @param {Function} deleteVar
- * @param {Function} addVar
+ * @param {(name: string, val: string) => void} updateVar
+ * @param {(name: string) => void} deleteVar
+ * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  * @param {JxStyle} rootStyle
  * @param {string[]} mediaNames
  */
 function renderOtherSection(
   vars: [string, string | number][],
-  updateVar: Function,
-  deleteVar: Function,
-  addVar: Function,
+  updateVar: (name: string, val: string) => void,
+  deleteVar: (name: string) => void,
+  addVar: (prefix: string, friendlyName: string, val: string) => void,
   rootStyle: JxStyle,
   mediaNames: string[],
 ) {
@@ -298,13 +298,13 @@ function renderMediaOverrides(varName: string, rootStyle: JxStyle, mediaNames: s
  * @param {string} prefix
  * @param {string} placeholder
  * @param {string} valuePlaceholder
- * @param {Function} addVar
+ * @param {(prefix: string, friendlyName: string, val: string) => void} addVar
  */
 function renderAddRow(
   prefix: string,
   placeholder: string,
   valuePlaceholder: string,
-  addVar: Function,
+  addVar: (prefix: string, friendlyName: string, val: string) => void,
 ) {
   let nameEl: HTMLInputElement | null = null;
   let valEl: HTMLInputElement | null = null;

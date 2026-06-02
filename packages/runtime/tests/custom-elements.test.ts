@@ -86,8 +86,8 @@ describe("Custom Elements", () => {
     try {
       await defineElement({ tagName: "nohyphen", state: {} });
       expect(true).toBe(false);
-    } catch (e: any) {
-      expect(e.message).toContain("must contain a hyphen");
+    } catch (e) {
+      expect((e as Error).message).toContain("must contain a hyphen");
     }
   });
 

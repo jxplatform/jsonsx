@@ -34,7 +34,7 @@ import type { JxElement } from "@jxsuite/schema/types";
  * @param {function} [maybeVisitor]
  */
 function visit(
-  tree: object,
+  tree: MdastNode,
   typeOrVisitor: string | ((node: MdastNode) => void),
   maybeVisitor?: (node: MdastNode) => void,
 ) {
@@ -84,7 +84,7 @@ function readingTime(text: string) {
  * @param {object} tree - Mdast AST
  * @returns {{ depth: number; text: string; id: string }[]}
  */
-function extractToc(tree: object) {
+function extractToc(tree: MdastNode) {
   /** @type {{ depth: number; text: string; id: string }[]} */
   const entries: TocEntry[] = [];
   visit(tree, "heading", (node: MdastNode) => {
@@ -106,7 +106,7 @@ function extractToc(tree: object) {
  * @param {object} tree - Mdast AST
  * @returns {string} Plain text of first paragraph, or empty string
  */
-function extractExcerpt(tree: object) {
+function extractExcerpt(tree: MdastNode) {
   let firstParagraph: MdastNode | null = null;
   visit(tree, "paragraph", (node: MdastNode) => {
     if (!firstParagraph) firstParagraph = node;
@@ -255,7 +255,7 @@ export class MarkdownCollection {
     sortBy?: string;
     sortOrder?: string;
     limit?: number;
-    filter?: Function;
+    filter?: (result: MarkdownFileResult) => boolean;
     remarkPlugins?: unknown[];
     rehypePlugins?: unknown[];
     basePath?: string;
@@ -267,7 +267,7 @@ export class MarkdownCollection {
    * @param {string} [config.sortBy] Default is `'frontmatter.date'`
    * @param {string} [config.sortOrder] Default is `'desc'`
    * @param {number} [config.limit]
-   * @param {Function} [config.filter] - Filter function
+   * @param {(result: MarkdownFileResult) => boolean} [config.filter] - Filter function
    * @param {unknown[]} [config.remarkPlugins] Default is `[]`
    * @param {unknown[]} [config.rehypePlugins] Default is `[]`
    * @param {string} [config.basePath] - Base path for resolving glob
@@ -278,7 +278,7 @@ export class MarkdownCollection {
     sortBy?: string;
     sortOrder?: string;
     limit?: number;
-    filter?: Function;
+    filter?: (result: MarkdownFileResult) => boolean;
     remarkPlugins?: unknown[];
     rehypePlugins?: unknown[];
     basePath?: string;

@@ -38,7 +38,7 @@ interface SignalsPanelState {
 interface SignalsPanelCtx {
   renderLeftPanel(): void;
   renderCanvas(): void;
-  updateSession(patch: object): void;
+  updateSession(patch: Record<string, unknown>): void;
 }
 
 interface CemParameter {
@@ -707,8 +707,18 @@ function renderDataSourceFields(
   S: SignalsPanelState,
   name: string,
   def: SignalDef,
-  textareaRow: Function,
-  pickerRow: Function,
+  textareaRow: (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    opts?: { minHeight?: string; mono?: boolean },
+  ) => import("lit-html").TemplateResult,
+  pickerRow: (
+    label: string,
+    options: string[],
+    currentVal: string,
+    onChange: (value: string) => void,
+  ) => import("lit-html").TemplateResult,
   ctx: SignalsPanelCtx,
 ) {
   const proto = def.$prototype;
@@ -800,7 +810,12 @@ function renderFunctionFields(
   S: SignalsPanelState,
   name: string,
   def: SignalDef,
-  textareaRow: Function,
+  textareaRow: (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    opts?: { minHeight?: string; mono?: boolean },
+  ) => import("lit-html").TemplateResult,
   ctx: SignalsPanelCtx,
 ) {
   const descriptionField = signalFieldRow("Description", def.description || "", (v: string) =>
