@@ -14,11 +14,11 @@
  */
 
 import { resolve, join } from "node:path";
-import { buildAll } from "./build";
-import { createWatcher, injectSSE } from "./watch";
-import { handleResolve, handleServerFunction } from "./resolve";
-import { handleStudioApi } from "./studio-api";
-import { handleCodeApi } from "./code-api";
+import { buildAll } from "./build.ts";
+import { createWatcher, injectSSE } from "./watch.ts";
+import { handleResolve, handleServerFunction } from "./resolve.ts";
+import { handleStudioApi } from "./studio-api.ts";
+import { handleCodeApi } from "./code-api.ts";
 import { existsSync, readFileSync } from "node:fs";
 
 /**

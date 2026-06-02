@@ -12,8 +12,8 @@ import {
   buildAttrs,
   compileStyles,
   escapeHtml,
-} from "../shared";
-import { emitElementModule } from "./compile-element";
+} from "../shared.ts";
+import { emitElementModule } from "./compile-element.ts";
 import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**

@@ -9,7 +9,7 @@
 import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkGfm from "remark-gfm";
-import { buildInitialScope, evaluateStaticTemplate, isTemplateString } from "../shared";
+import { buildInitialScope, evaluateStaticTemplate, isTemplateString } from "../shared.ts";
 import type {
   JxElement,
   JxDocument,

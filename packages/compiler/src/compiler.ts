@@ -21,12 +21,20 @@ import {
   tagNameToClassName,
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
-} from "./shared";
-import { compileServer, compileSiteServer, compilePagesFunctions } from "./targets/compile-server";
+} from "./shared.ts";
+import {
+  compileServer,
+  compileSiteServer,
+  compilePagesFunctions,
+} from "./targets/compile-server.ts";
 
-import { compileElement, compileElementPage, emitElementModule } from "./targets/compile-element";
-import { compileStaticPage } from "./targets/compile-static";
-import { compileClient } from "./targets/compile-client";
+import {
+  compileElement,
+  compileElementPage,
+  emitElementModule,
+} from "./targets/compile-element.ts";
+import { compileStaticPage } from "./targets/compile-static.ts";
+import { compileClient } from "./targets/compile-client.ts";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // Re-exports for consumers

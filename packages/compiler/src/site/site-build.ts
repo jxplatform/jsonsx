@@ -20,13 +20,13 @@ import {
   readdirSync,
 } from "node:fs";
 import { resolve, dirname, join } from "node:path";
-import { loadProjectConfig } from "./site-loader";
-import { discoverPages, expandDynamicRoutes } from "./pages-discovery";
-import { resolveLayout } from "./layout-resolver";
-import { mergeHead, renderHead } from "./head-merger";
-import { injectContext } from "./context-injection";
-import { compile, compileServer, compileSiteServer, compilePagesFunctions } from "../compiler";
-import { compileElement } from "../targets/compile-element";
+import { loadProjectConfig } from "./site-loader.ts";
+import { discoverPages, expandDynamicRoutes } from "./pages-discovery.ts";
+import { resolveLayout } from "./layout-resolver.ts";
+import { mergeHead, renderHead } from "./head-merger.ts";
+import { injectContext } from "./context-injection.ts";
+import { compile, compileServer, compileSiteServer, compilePagesFunctions } from "../compiler.ts";
+import { compileElement } from "../targets/compile-element.ts";
 import {
   buildInitialScope,
   isTemplateString,
@@ -40,12 +40,12 @@ import {
   resolveRefValue,
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
-} from "../shared";
-import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./content-loader";
-import { resolvePrototypes } from "./prototype-resolver";
-import { compileMarkdown } from "../targets/compile-markdown";
-import { transformImageNodes } from "./image-transform";
-import { loadCache, saveCache } from "./image-cache";
+} from "../shared.ts";
+import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./content-loader.ts";
+import { resolvePrototypes } from "./prototype-resolver.ts";
+import { compileMarkdown } from "../targets/compile-markdown.ts";
+import { transformImageNodes } from "./image-transform.ts";
+import { loadCache, saveCache } from "./image-cache.ts";
 import type {
   JxElement,
   JxMutableNode,
@@ -55,7 +55,7 @@ import type {
   ProjectConfig,
 } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
-import type { SiteRoute } from "../types";
+import type { SiteRoute } from "../types.ts";
 
 /**
  * Build an entire Jx site from a project directory.

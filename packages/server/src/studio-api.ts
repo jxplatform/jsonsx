@@ -11,8 +11,8 @@ import { resolve, relative, basename, dirname, isAbsolute } from "node:path";
 import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
 import { readFileSync, existsSync } from "node:fs";
 import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
-import * as claude from "./claude-session";
-import type { ClassJsonDef } from "./types";
+import * as claude from "./claude-session.ts";
+import type { ClassJsonDef } from "./types.ts";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (p: string) => p.replaceAll("\\", "/");

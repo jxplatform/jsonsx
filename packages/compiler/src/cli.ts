@@ -36,7 +36,7 @@ if (command === "build") {
   console.log(`Building site from ${projectRoot}...`);
 
   try {
-    const { buildSite } = await import("./site/site-build");
+    const { buildSite } = await import("./site/site-build.ts");
     const result = await buildSite(projectRoot, { verbose, clean });
 
     if (result.errors.length > 0) {

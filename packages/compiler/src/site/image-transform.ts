@@ -8,13 +8,13 @@
 
 import { existsSync } from "node:fs";
 import { resolve, extname, basename } from "node:path";
-import { processImage, buildSrcset, contentHash, configHash } from "./image-optimizer";
-import { getCached, setCached } from "./image-cache";
+import { processImage, buildSrcset, contentHash, configHash } from "./image-optimizer.ts";
+import { getCached, setCached } from "./image-cache.ts";
 
-import type { ImageConfig } from "./image-optimizer";
-import type { ImageManifest } from "./image-optimizer";
+import type { ImageConfig } from "./image-optimizer.ts";
+import type { ImageManifest } from "./image-optimizer.ts";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { CacheManifest } from "./image-cache";
+import type { CacheManifest } from "./image-cache.ts";
 import type { JxDocument } from "@jxsuite/schema/types";
 
 const SKIP_EXTENSIONS = new Set([".svg", ".gif"]);

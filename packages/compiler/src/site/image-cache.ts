@@ -7,10 +7,10 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { contentHash, configHash } from "./image-optimizer";
+import { contentHash, configHash } from "./image-optimizer.ts";
 
-import type { ImageManifest } from "./image-optimizer";
-import type { ImageConfig } from "./image-optimizer";
+import type { ImageManifest } from "./image-optimizer.ts";
+import type { ImageConfig } from "./image-optimizer.ts";
 
 interface CacheEntry {
   source: string; // Relative path to source image

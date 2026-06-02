@@ -6,7 +6,7 @@
  * queryContentType, findEntry) used by both the classes and the server endpoint.
  */
 
-import type { ContentLoaderEntry } from "./types";
+import type { ContentLoaderEntry } from "./types.ts";
 
 interface CollectionConfig {
   contentType?: string;

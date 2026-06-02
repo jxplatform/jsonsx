@@ -14,8 +14,8 @@
  */
 
 import { reactive, ref, computed, effect, isRef, onEffectCleanup } from "@vue/reactivity";
-import { evaluateExpression, isMutating } from "./expression";
-import type { JxRenderOptions, DynamicClass, JxPath } from "./types";
+import { evaluateExpression, isMutating } from "./expression.ts";
+import type { JxRenderOptions, DynamicClass, JxPath } from "./types.ts";
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "allowJs": false,
     "checkJs": false,
     "declaration": true,
@@ -16,9 +17,9 @@
     "strict": true,
     "strictNullChecks": true,
     "target": "ESNext",
-    "types": []
+    "types": ["bun-types"]
   },
-  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets"],
+  "exclude": ["node_modules", "**/node_modules", "**/dist", "**/assets", "packages/desktop"],
   "include": [
     "types.d.ts",
     "packages/**/src/**/*",

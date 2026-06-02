@@ -6,7 +6,7 @@
  */
 
 import $RefParser from "@apidevtools/json-schema-ref-parser";
-import { collectServerEntries } from "../shared";
+import { collectServerEntries } from "../shared.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
 /**

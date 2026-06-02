@@ -25,8 +25,8 @@ import {
   DEFAULT_LIT_HTML_SRC,
   compileExpression,
   isMutating,
-} from "../shared";
-import type { ExpressionNode } from "../shared";
+} from "../shared.ts";
+import type { ExpressionNode } from "../shared.ts";
 import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**

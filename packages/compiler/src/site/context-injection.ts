@@ -20,7 +20,7 @@ import type {
   ProjectConfig,
 } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
-import type { SiteRoute } from "../types";
+import type { SiteRoute } from "../types.ts";
 
 /**
  * Inject $site and $page context into a page document's state.

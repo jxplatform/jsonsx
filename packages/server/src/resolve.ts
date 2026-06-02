@@ -5,7 +5,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { loadContentTypes } from "@jxsuite/compiler/content-loader";
 import type { DynamicClass } from "@jxsuite/runtime/types";
-import type { ClassJsonDef } from "./types";
+import type { ClassJsonDef } from "./types.ts";
 
 /**
  * Lazy-load project context (project.json + content types) for class instantiation.

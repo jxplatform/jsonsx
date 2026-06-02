@@ -2,8 +2,8 @@
 
 import chokidar from "chokidar";
 import { relative } from "node:path";
-import { rebuild } from "./build";
-import type { BuildEntry } from "./types";
+import { rebuild } from "./build.ts";
+import type { BuildEntry } from "./types.ts";
 
 const DEFAULT_IGNORE = [
   "**/node_modules/**",

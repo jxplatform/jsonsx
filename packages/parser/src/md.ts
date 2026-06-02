@@ -20,8 +20,8 @@ import remarkDirective from "remark-directive";
 import { readFileSync } from "node:fs";
 import { basename, extname, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
-import { mdastNodeToJx } from "./transpile";
-import type { MarkdownFileResult, TocEntry, MdastNode } from "./types";
+import { mdastNodeToJx } from "./transpile.ts";
+import type { MarkdownFileResult, TocEntry, MdastNode } from "./types.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
 // ─── Tree utilities (inline to avoid Bun ESM resolution issues with unist-util-*) ──
@@ -351,4 +351,4 @@ export {
   convertChildren,
   jxKey,
   mdKey,
-} from "./transpile";
+} from "./transpile.ts";

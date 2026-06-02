@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { runCli } from "./compiler";
+import { runCli } from "./compiler.ts";
 
 const [, , src, out] = process.argv;
 if (src) {
