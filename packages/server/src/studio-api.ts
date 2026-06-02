@@ -613,10 +613,13 @@ export async function handleStudioApi(
       return new Response((e as Error).message, { status: 400 });
     }
     try {
-      return Response.json({
-        content: await readFile(abs, "utf8"),
-        path: fp,
-      });
+      return Response.json(
+        {
+          content: await readFile(abs, "utf8"),
+          path: fp,
+        },
+        { headers: { "Cache-Control": "public, max-age=5" } },
+      );
     } catch (e) {
       return (e as NodeJS.ErrnoException).code === "ENOENT"
         ? new Response("Not found", { status: 404 })

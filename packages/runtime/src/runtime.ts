@@ -61,17 +61,17 @@ export async function Jx(
 
 // ─── Step 1: Resolve ──────────────────────────────────────────────────────────
 
-/**
- * Fetch and parse a Jx JSON source. Accepts a URL string, absolute URL, or a pre-parsed object.
- *
- * @param {string | Record<string, any>} source
- * @returns {Promise<any>}
- */
+const _resolveCache = new Map<string, Promise<any>>();
+
 export async function resolve(source: string | Record<string, any>) {
   if (typeof source !== "string") return source;
-  const res = await fetch(source);
-  if (!res.ok) throw new Error(`Jx: failed to fetch ${source} (${res.status})`);
-  return res.json();
+  if (_resolveCache.has(source)) return _resolveCache.get(source)!;
+  const p = fetch(source).then((res) => {
+    if (!res.ok) throw new Error(`Jx: failed to fetch ${source} (${res.status})`);
+    return res.json();
+  });
+  _resolveCache.set(source, p);
+  return p;
 }
 
 // ─── Step 2: Build scope ──────────────────────────────────────────────────────
@@ -1716,9 +1716,13 @@ function injectHead(entries: any[], _base: string) {
  * @param {string} [base] - Base URL for resolving $src imports
  * @returns {Promise<void>}
  */
+const _definedSources = new Set<string>();
+
 export async function defineElement(source: string | Record<string, any>, base?: string) {
   if (typeof source === "string") {
     base = new URL(source, base ?? location.href).href;
+    if (_definedSources.has(base)) return;
+    _definedSources.add(base);
     source = await resolve(source);
   }
   base = base ?? location.href;

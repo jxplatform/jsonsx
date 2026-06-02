@@ -258,12 +258,22 @@ litRender(
     <datalist id="tag-names">
       ${webdata.allTags.map((tag: string) => html`<option value=${tag}></option>`)}
     </datalist>
-    <datalist id="css-props">
-      ${webdata.cssProps.map(([name]: string[]) => html`<option value=${name}></option>`)}
-    </datalist>
+    <datalist id="css-props"></datalist>
   `,
   datalistHost,
 );
+
+requestIdleCallback(() => {
+  const dl = document.getElementById("css-props");
+  if (!dl) return;
+  const frag = document.createDocumentFragment();
+  for (const [name] of webdata.cssProps) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    frag.appendChild(opt);
+  }
+  dl.appendChild(frag);
+});
 
 initCssData(webdata);
 

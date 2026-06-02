@@ -485,10 +485,15 @@ export function renderCanvas() {
     canvasWrap,
   );
 
-  for (const { panel, activeSet } of panelEntries) {
+  for (let i = 0; i < panelEntries.length; i++) {
+    const { panel, activeSet } = panelEntries[i];
     const p = panel as CanvasPanel;
     canvasPanels.push(p);
-    renderCanvasIntoPanel(p, activeSet, featureToggles);
+    if (i === 0) {
+      renderCanvasIntoPanel(p, activeSet, featureToggles);
+    } else {
+      setTimeout(() => renderCanvasIntoPanel(p, activeSet, featureToggles), 0);
+    }
   }
 
   // Highlight active panel header
