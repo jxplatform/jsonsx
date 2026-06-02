@@ -43,7 +43,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-a039v1mZExwVnPihb4IXSwIb0l2VW/+tl7qLOxx7ZnU=";
+    outputHash = "sha256-1L47X5hdJ+G/bQwYKUbAJzKN87+9nfIn6pTMTKFY0O4=";
   };
 in
 stdenv.mkDerivation {
