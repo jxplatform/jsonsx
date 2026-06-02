@@ -15,7 +15,8 @@
       "PowerShell(bun run typecheck 2>&1)",
       "Bash(cat electrobun.config*)",
       "Bash(find . -maxdepth 2 -name \"electrobun*\" -not -path \"*/node_modules/*\")",
-      "PowerShell(cd C:\\\\Users\\\\kevin\\\\jx\\\\packages\\\\parser; bun test --isolate tests/content.test.ts 2>$null | Select-Object -First 15; Write-Output \"EXIT=$LASTEXITCODE\")"
+      "PowerShell(cd C:\\\\Users\\\\kevin\\\\jx\\\\packages\\\\parser; bun test --isolate tests/content.test.ts 2>$null | Select-Object -First 15; Write-Output \"EXIT=$LASTEXITCODE\")",
+      "Bash(node /home/batonac/Development/jx/packages/compiler/dist/cli.js --help)"
     ]
   }
 }
