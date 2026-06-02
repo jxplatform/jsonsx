@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { injectContext } from "../src/site/context-injection";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
+import type { SiteRoute } from "../src/types";
 
 // ─── injectContext ──────────────────────────────────────────────────────────
 

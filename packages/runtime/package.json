@@ -15,7 +15,8 @@
   "type": "module",
   "exports": {
     ".": "./src/runtime.ts",
-    "./expression": "./src/expression.ts"
+    "./expression": "./src/expression.ts",
+    "./types": "./src/types.ts"
   },
   "publishConfig": {
     "provenance": true
@@ -27,6 +28,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
+    "@jxsuite/schema": "workspace:^",
     "@vue/reactivity": "^3.5.35"
   },
   "devDependencies": {

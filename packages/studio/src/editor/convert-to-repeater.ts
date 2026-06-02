@@ -7,6 +7,8 @@ import { transactDoc } from "../tabs/transact";
 import { showDialog } from "../ui/layers";
 import { defCategory } from "../panels/signals-panel";
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 interface RepeaterConfig {
   items: { $ref: string } | unknown[];
   filter?: { $ref: string };

@@ -10,6 +10,8 @@ import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 
 import type { JxContentResult } from "./inline-edit";
 import type { SlashCommand } from "./inline-edit";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * Enter rich-text inline editing on a canvas element (edit/content mode).

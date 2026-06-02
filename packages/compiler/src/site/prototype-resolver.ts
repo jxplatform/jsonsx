@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import type { JxDocument } from "@jxsuite/schema/types";
+import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * Prototype names handled elsewhere (builtins + legacy content system). These are skipped by the

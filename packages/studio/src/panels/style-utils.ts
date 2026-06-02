@@ -1,5 +1,7 @@
 /** Style utilities — pure CSS helper functions used by the style panel. */
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 import { getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { camelToKebab } from "../utils/studio-utils";

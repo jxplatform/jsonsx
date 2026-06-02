@@ -96,6 +96,8 @@ import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import { cloneRepository } from "./panels/git-panel";
 import type { DocumentStackEntry, GitDiffState } from "./types";
+import type { JxPath } from "./state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted

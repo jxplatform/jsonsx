@@ -3,6 +3,8 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform";
 import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-ops";
 import { activeTab, openTab, closeTab } from "../src/workspace/workspace";
+import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { StudioPlatform } from "../src/types";
 
 // ─── loadMarkdown ─────────────────────────────────────────────────────────────
 

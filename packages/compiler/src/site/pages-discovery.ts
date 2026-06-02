@@ -12,6 +12,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, relative, extname, join } from "node:path";
+import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 
 interface Route {
   urlPattern: string; // URL pattern (e.g. "/blog/:slug")

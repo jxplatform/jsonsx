@@ -195,3 +195,42 @@ export interface ProjectConfig {
   style?: JxStyle;
   [key: string]: unknown;
 }
+
+// ─── Editor/Mutation Types ──────────────────────────────────────────────────────
+
+export interface JxMutableNode {
+  tagName?: string;
+  textContent?: string | null;
+  innerHTML?: string;
+  children?: (JxMutableNode | string)[];
+  style?: Record<string, any>;
+  attributes?: Record<string, any>;
+  className?: string;
+  id?: string;
+  $ref?: string;
+  $props?: Record<string, unknown>;
+  $switch?: string | { $ref: string };
+  cases?: Record<string, JxMutableNode>;
+  $prototype?: string;
+  $title?: string;
+  $id?: string;
+  $src?: string;
+  state?: Record<string, any>;
+  $elements?: (JxMutableNode | string | { $ref: string })[];
+  $head?: JxHeadEntry[];
+  $media?: Record<string, string>;
+  $defs?: Record<string, any>;
+  [key: string]: any;
+}
+
+// ─── Paths ──────────────────────────────────────────────────────────────────────
+
+export type JxPath = (string | number)[];
+
+// ─── Content Type Schema ────────────────────────────────────────────────────────
+
+export interface ContentTypeSchema {
+  properties?: Record<string, any>;
+  required?: string[];
+  [key: string]: unknown;
+}

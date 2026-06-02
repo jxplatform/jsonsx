@@ -3,6 +3,7 @@
 import { statusbarEl, getNodeAtPath, nodeLabel, updateSession, renderOnly } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import type { JxPath } from "../state";
 
 // ─── Module state ────────────────────────────────────────────────────────────
 

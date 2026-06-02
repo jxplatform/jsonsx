@@ -24,7 +24,8 @@
     "./layout-resolver": "./src/site/layout-resolver.ts",
     "./pages-discovery": "./src/site/pages-discovery.ts",
     "./site": "./src/site/site-build.ts",
-    "./site-loader": "./src/site/site-loader.ts"
+    "./site-loader": "./src/site/site-loader.ts",
+    "./types": "./src/types.ts"
   },
   "publishConfig": {
     "provenance": true

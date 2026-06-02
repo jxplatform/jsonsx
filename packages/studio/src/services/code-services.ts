@@ -4,6 +4,8 @@ import { getPlatform } from "../platform";
 import { projectState } from "../state";
 import { getNodeAtPath } from "../store";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export interface OxLintDiagnostic {
   severity: string;

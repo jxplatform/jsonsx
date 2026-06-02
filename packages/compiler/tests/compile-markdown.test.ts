@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { compileMarkdown } from "../src/targets/compile-markdown";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 // ─── compileMarkdown ────────────────────────────────────────────────────────
 

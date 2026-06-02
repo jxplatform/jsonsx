@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { htmlToJx } from "../src/html-to-jx";
+import type { JxElement } from "@jxsuite/schema/types";
 
 describe("htmlToJx", () => {
   test("simple element with attributes", () => {

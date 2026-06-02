@@ -5,6 +5,7 @@ import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
 
 import type { JsonValue } from "../types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 const HISTORY_LIMIT = 100;
 

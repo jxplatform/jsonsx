@@ -18,6 +18,8 @@ import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { htmlToJx } from "./html-to-jx";
+import type { MdastNode } from "./types";
+import type { JxDocument, JxElement } from "@jxsuite/schema/types";
 export { htmlToJx };
 
 // ─── Dot-path expansion ─────────────────────────────────────────────────────

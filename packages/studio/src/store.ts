@@ -9,6 +9,8 @@
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
 import { activeTab } from "./workspace/workspace";
+import type { JxPath } from "./state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export {
   createState,

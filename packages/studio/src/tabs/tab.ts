@@ -1,5 +1,13 @@
 import { reactive, effectScope } from "../reactivity";
-import type { GitDiffState, InlineEditDef, FunctionEditDef, DocumentStackEntry } from "../types";
+import type {
+  GitDiffState,
+  InlineEditDef,
+  FunctionEditDef,
+  DocumentStackEntry,
+  GitStatusResult,
+  GitBranchesResult,
+} from "../types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export interface TabUi {
   rightTab: string;

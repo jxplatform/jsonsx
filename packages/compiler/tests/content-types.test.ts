@@ -16,6 +16,8 @@ import { injectContext } from "../src/site/context-injection";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
 import { loadProjectConfig } from "../src/site/site-loader";
 import { buildSite } from "../src/site/site-build";
+import type { ContentLoaderEntry } from "@jxsuite/parser/types";
+import type { JxElement } from "@jxsuite/schema/types";
 
 const TMP = resolve(import.meta.dir, "__test-content__");
 

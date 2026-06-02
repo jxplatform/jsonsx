@@ -7,6 +7,8 @@ import { elToPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { applyCanvasStyle } from "../utils/canvas-media";
 import { resolveDefaultForCanvas } from "../panels/signals-panel";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * Recursively render a Jx node to the canvas DOM. Media-aware: applies base styles + active

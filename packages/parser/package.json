@@ -20,7 +20,8 @@
     "./MarkdownCollection.class.json": "./src/MarkdownCollection.class.json",
     "./MarkdownFile.class.json": "./src/MarkdownFile.class.json",
     "./transpile": "./src/transpile.ts",
-    "./html-to-jx": "./src/html-to-jx.ts"
+    "./html-to-jx": "./src/html-to-jx.ts",
+    "./types": "./src/types.ts"
   },
   "publishConfig": {
     "provenance": true
@@ -31,6 +32,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
+    "@jxsuite/schema": "workspace:^",
     "glob": "^13.0.6",
     "hast-util-from-html": "^2.0.3",
     "hast-util-whitespace": "^3.0.0",

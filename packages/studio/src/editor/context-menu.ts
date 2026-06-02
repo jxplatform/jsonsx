@@ -20,6 +20,7 @@ import { renderPopover } from "../ui/layers";
 import { startLayerTitleEdit } from "../panels/layers-panel";
 
 import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 type JxNode = JxMutableNode;
 

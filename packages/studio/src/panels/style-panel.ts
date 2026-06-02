@@ -39,6 +39,7 @@ import { widgetForType } from "./style-inputs";
 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 interface CssLonghand {
   name: string;

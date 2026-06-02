@@ -48,6 +48,7 @@ import * as overlaysPanel from "../panels/overlays";
 
 import type { CanvasPanel } from "../panels/canvas-dnd";
 import type { GitDiffState, InlineEditDef } from "../types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 interface CanvasRenderCtx {
   getCanvasMode: () => string;

@@ -27,6 +27,7 @@ import { compileServer, compileSiteServer, compilePagesFunctions } from "./targe
 import { compileElement, compileElementPage, emitElementModule } from "./targets/compile-element";
 import { compileStaticPage } from "./targets/compile-static";
 import { compileClient } from "./targets/compile-client";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // Re-exports for consumers
 export {

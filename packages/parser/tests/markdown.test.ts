@@ -2,6 +2,8 @@ import { describe, test, expect, beforeAll, afterAll, spyOn } from "bun:test";
 import { resolve as resolvePath, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+import type { MarkdownFileResult, TocEntry } from "../src/types";
+import type { JxElement } from "@jxsuite/schema/types";
 
 try {
   GlobalRegistrator.register();

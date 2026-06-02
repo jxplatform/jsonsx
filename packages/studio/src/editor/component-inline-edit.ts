@@ -13,6 +13,7 @@ import {
   elToPath,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
+import type { JxPath } from "../state";
 import {
   transactDoc,
   mutateRemoveNode,

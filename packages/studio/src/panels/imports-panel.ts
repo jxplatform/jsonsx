@@ -15,7 +15,7 @@ import { getPlatform } from "../platform";
 import { showConfirmDialog } from "../ui/layers";
 
 import type { ComponentEntry } from "../files/components";
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 
 interface ImportsContext {
   renderLeftPanel: () => void;

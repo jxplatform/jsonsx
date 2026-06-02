@@ -9,6 +9,8 @@ import { showSlashMenu } from "./slash-menu";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateInsertNode } from "../tabs/transact";
 import type { CanvasPanel } from "../types";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 interface ObservableSubscription {
   subscribe(observer: { next: (e: Event) => void }): void;

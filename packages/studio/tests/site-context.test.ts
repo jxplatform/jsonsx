@@ -2,6 +2,7 @@ import "./with-dom.js";
 import { describe, test, expect, beforeEach } from "bun:test";
 import { setProjectState } from "../src/store";
 import type { ProjectState } from "../src/types";
+import type { JxStyle } from "@jxsuite/schema/types";
 import {
   getEffectiveMedia,
   getEffectiveStyle,

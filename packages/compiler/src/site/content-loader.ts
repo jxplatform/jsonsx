@@ -11,7 +11,13 @@
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
-import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
+import type {
+  ProjectConfig,
+  ContentTypeDef,
+  ContentTypeSchema,
+  JxMutableNode,
+} from "@jxsuite/schema/types";
+import type { MarkdownFileResult, ContentLoaderEntry } from "@jxsuite/parser/types";
 
 // ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
 

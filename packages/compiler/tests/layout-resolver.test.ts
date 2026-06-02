@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test";
 import { resolveLayout } from "../src/site/layout-resolver";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import type { JxElement } from "@jxsuite/schema/types";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_layout");
 

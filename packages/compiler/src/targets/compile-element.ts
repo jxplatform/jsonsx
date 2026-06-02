@@ -14,7 +14,7 @@ import {
   compileExpression,
   isMutating,
 } from "../shared";
-import type { JxStyle } from "@jxsuite/schema/types";
+import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * Compile a Jx custom element document to a JS module string.

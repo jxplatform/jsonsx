@@ -5,6 +5,8 @@
  * "modified" status up the tree for structural changes (children added/removed/reordered).
  */
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 type DiffStatus = "added" | "removed" | "modified";
 
 interface DiffResult {

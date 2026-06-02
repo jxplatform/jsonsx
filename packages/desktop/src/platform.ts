@@ -1,6 +1,7 @@
 import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
 import type { StudioRPC } from "./rpc-schema";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 
 export function createDesktopPlatform() {
   const rpc = Electroview.defineRPC<StudioRPC>({

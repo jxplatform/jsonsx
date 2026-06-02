@@ -48,11 +48,14 @@ import { transformImageNodes } from "./image-transform";
 import { loadCache, saveCache } from "./image-cache";
 import type {
   JxElement,
+  JxMutableNode,
   JxStyle,
   JxHeadEntry,
   JxStateDefinition,
   ProjectConfig,
 } from "@jxsuite/schema/types";
+import type { ContentLoaderEntry } from "@jxsuite/parser/types";
+import type { SiteRoute } from "../types";
 
 /**
  * Build an entire Jx site from a project directory.

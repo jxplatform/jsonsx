@@ -5,6 +5,8 @@
  * Schema 2020-12 class definition.
  */
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 /**
  * Compile a .class.json schema to a JavaScript ES module string.
  *

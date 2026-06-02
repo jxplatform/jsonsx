@@ -26,7 +26,7 @@ import {
   compileExpression,
   isMutating,
 } from "../shared";
-import type { JxStyle } from "@jxsuite/schema/types";
+import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * Compile a Jx document to pre-rendered HTML + reactive JS module.

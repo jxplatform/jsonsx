@@ -28,6 +28,8 @@ import { view } from "../view";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { renderComponentPreview } from "./stylebook-panel";
 import { defaultDef, unsafeTags } from "./shared";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 interface DragCanDragArgs {
   element: HTMLElement;

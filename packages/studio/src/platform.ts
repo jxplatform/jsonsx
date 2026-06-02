@@ -11,6 +11,8 @@
  * See spec/desktop.md §3 for the full StudioPlatform interface.
  */
 
+import type { StudioPlatform } from "./types";
+
 const g = globalThis as unknown as { __jxPlatform?: StudioPlatform };
 
 /** @param {StudioPlatform} platform */

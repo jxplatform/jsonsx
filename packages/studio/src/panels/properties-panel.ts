@@ -3,7 +3,7 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { getNodeAtPath, debouncedStyleCommit, renderOnly, projectState } from "../store";
-import type { JsonValue } from "../types";
+import type { JsonValue, DirEntry } from "../types";
 import {
   transactDoc,
   mutateUpdateProperty,
@@ -35,7 +35,8 @@ import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
-import type { JxPrototypeDef } from "@jxsuite/schema/types";
+import type { JxPrototypeDef, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxPath } from "../state";
 
 interface SignalOption {
   value: string;

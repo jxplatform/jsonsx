@@ -8,7 +8,13 @@
 import { projectState, setProjectState, requireProjectState } from "./store";
 import { getPlatform } from "./platform";
 
-import type { JxElement, JxStyle, JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  JxElement,
+  JxMutableNode,
+  JxStyle,
+  JxHeadEntry,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 /**
  * Merge site $media with document $media. Document keys win on conflict.

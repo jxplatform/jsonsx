@@ -3,6 +3,7 @@
 import chokidar from "chokidar";
 import { relative } from "node:path";
 import { rebuild } from "./build";
+import type { BuildEntry } from "./types";
 
 const DEFAULT_IGNORE = [
   "**/node_modules/**",

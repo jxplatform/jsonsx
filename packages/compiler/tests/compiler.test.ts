@@ -1,6 +1,7 @@
 import { describe, test, expect, spyOn } from "bun:test";
 import { compile, isDynamic, runCli } from "../src/compiler";
 import { isClassJsonSrc } from "../src/shared";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── isClassJsonSrc ─────────────────────────────────────────────────────────
 

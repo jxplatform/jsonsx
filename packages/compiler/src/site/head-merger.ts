@@ -15,6 +15,7 @@
  */
 
 import type { JxHeadEntry } from "@jxsuite/schema/types";
+import type { HeadMergeContext } from "../types";
 
 /**
  * Merge $head arrays from site, layout, and page levels.

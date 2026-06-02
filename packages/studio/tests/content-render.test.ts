@@ -4,6 +4,7 @@ import { createState, setProjectState } from "../src/state";
 import { getEffectiveElements, getEffectiveStyle, getEffectiveMedia } from "../src/site-context";
 import { computeRelativePath } from "../src/files/components";
 import { loadMarkdown } from "../src/files/file-ops";
+import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

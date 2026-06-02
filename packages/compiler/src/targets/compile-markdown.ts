@@ -10,7 +10,13 @@ import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkGfm from "remark-gfm";
 import { buildInitialScope, evaluateStaticTemplate, isTemplateString } from "../shared";
-import type { JxElement, JxDocument, JxStateDefinition } from "@jxsuite/schema/types";
+import type {
+  JxElement,
+  JxDocument,
+  JxStateDefinition,
+  JxMutableNode,
+} from "@jxsuite/schema/types";
+import type { MdastNode } from "@jxsuite/parser/types";
 
 // ─── Tag classification ────────────────────────────────────────────────────
 

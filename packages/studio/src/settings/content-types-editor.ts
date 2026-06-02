@@ -11,7 +11,7 @@ import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { fieldCardTpl, addFieldFormTpl, schemaForType, detectFieldFormat } from "./schema-field-ui";
 
-import type { ProjectConfig } from "@jxsuite/schema/types";
+import type { ProjectConfig, ContentTypeSchema } from "@jxsuite/schema/types";
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 

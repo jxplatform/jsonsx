@@ -6,6 +6,8 @@
 import { canvasPanels, elToPath, pathsEqual, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { isInlineInContext } from "../editor/inline-edit";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 let _ctx: { getCanvasMode: () => string; getZoom: () => number } | null = null;
 

@@ -1,6 +1,7 @@
 import "./with-dom.js";
 import { describe, test, expect, beforeEach, mock } from "bun:test";
 import { render as litRender } from "lit-html";
+import type { StudioPlatform } from "../src/types";
 
 let mockPlatform: Partial<StudioPlatform>;
 

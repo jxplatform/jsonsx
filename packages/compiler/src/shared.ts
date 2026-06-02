@@ -9,6 +9,7 @@ import { camelToKebab, toCSSText, RESERVED_KEYS } from "@jxsuite/runtime";
 import { compileExpression, isMutating, evaluateExpression } from "@jxsuite/runtime/expression";
 import type {
   JxElement,
+  JxMutableNode,
   JxStyle,
   JxStateDefinition,
   JxPrototypeDef,

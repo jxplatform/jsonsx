@@ -13,6 +13,7 @@ import { getCached, setCached } from "./image-cache";
 
 import type { ImageConfig } from "./image-optimizer";
 import type { ImageManifest } from "./image-optimizer";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CacheManifest } from "./image-cache";
 import type { JxDocument } from "@jxsuite/schema/types";
 

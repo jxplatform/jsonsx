@@ -1,6 +1,7 @@
 import "./with-dom.js";
 import { effect } from "../src/reactivity";
 import { createTab, disposeTab } from "../src/tabs/tab";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
   transactDoc,
   undo,

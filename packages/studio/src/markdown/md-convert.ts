@@ -17,7 +17,8 @@ import remarkGfm from "remark-gfm";
 import { MD_ALL } from "./md-allowlist";
 import { htmlToJx } from "@jxsuite/parser/transpile";
 
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+import type { MdastNode } from "@jxsuite/parser/types";
 
 // ─── mdast → Jx ──────────────────────────────────────────────────────────
 

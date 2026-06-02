@@ -1,4 +1,5 @@
 import type { RPCSchema } from "electrobun/bun";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 

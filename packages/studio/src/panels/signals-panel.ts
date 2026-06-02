@@ -22,6 +22,7 @@ import { renderFieldRow } from "../ui/field-row";
 import { renderExpressionEditor, expressionHint } from "../ui/expression-editor";
 import { renderMediaPicker } from "../ui/media-picker";
 import type { TabUi } from "../tabs/tab";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
 
 interface SignalsPanelState {

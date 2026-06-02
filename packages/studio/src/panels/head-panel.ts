@@ -10,7 +10,7 @@ import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
 import { renderMediaPicker } from "../ui/media-picker";
 import { debouncedStyleCommit, renderOnly, projectState } from "../store";
-import type { JsonValue } from "../types";
+import type { JsonValue, DirEntry } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact";
 import { findContentTypeSchema } from "../utils/studio-utils";
@@ -18,7 +18,7 @@ import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts
 import { invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 
-import type { JxHeadEntry } from "@jxsuite/schema/types";
+import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
 interface MetaField {
   label: string;

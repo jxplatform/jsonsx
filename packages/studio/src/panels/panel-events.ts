@@ -22,6 +22,7 @@ import { defaultDef } from "../panels/shared";
 import { bubbleInlinePath, findCanvasElement, effectiveZoom } from "../canvas/canvas-helpers";
 import { layoutElements, activeLayoutPath } from "../canvas/canvas-live-render";
 import type { CanvasPanel } from "./canvas-dnd";
+import type { JxPath } from "../state";
 
 interface PanelEventsCtx {
   getCanvasMode: () => string;

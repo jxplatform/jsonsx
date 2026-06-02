@@ -1,6 +1,7 @@
 import "./with-dom.js";
 import { describe, test, expect, mock, beforeEach } from "bun:test";
 import { registerPlatform } from "../src/platform";
+import type { StudioPlatform } from "../src/types";
 
 // Mock monaco-editor
 mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({

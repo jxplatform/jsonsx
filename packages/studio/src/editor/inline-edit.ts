@@ -7,6 +7,8 @@
 
 import elementsMeta from "../../data/elements-meta.json";
 import { toggleInlineFormat, normalizeInlineContent } from "./inline-format";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 export interface InlineAction {
   tag: string;
   label: string;

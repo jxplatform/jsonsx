@@ -3,6 +3,7 @@ import { whitespace } from "hast-util-whitespace";
 import { find, html as htmlInfo } from "property-information";
 
 import type { Nodes as HastNode } from "hast";
+import type { JxElement } from "@jxsuite/schema/types";
 
 /**
  * Convert an HTML string into an array of Jx tree nodes.

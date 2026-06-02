@@ -17,6 +17,8 @@ import {
   VOID_ELEMENTS,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
+import type { JxPath } from "../state";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
   transactDoc,
   mutateMoveNode,

@@ -30,7 +30,7 @@ import { buildNestedSiteCSS } from "./nested-site-style";
 
 export { buildNestedSiteCSS } from "./nested-site-style";
 
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 
 /** @param {Event} e */
 function _preventNav(e: Event) {

@@ -4,6 +4,8 @@
  * placeholders).
  */
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 /**
  * Convert a template string to a displayable expression for edit mode. Replaces ${expr} with ❮ expr
  * ❯ so the runtime renders it as literal text.

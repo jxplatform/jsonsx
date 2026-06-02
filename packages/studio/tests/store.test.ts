@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { describe, test, expect } from "bun:test";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
   isNestedSelector,
   stripEventHandlers,

@@ -6,6 +6,8 @@
  * queryContentType, findEntry) used by both the classes and the server endpoint.
  */
 
+import type { ContentLoaderEntry } from "./types";
+
 interface CollectionConfig {
   contentType?: string;
   filter?: unknown;

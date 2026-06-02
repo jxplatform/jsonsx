@@ -1,3 +1,15 @@
+import type { StudioPlatform } from "@jxsuite/studio/types";
+import type { ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  DirEntry,
+  ComponentMeta,
+  PackageInfo,
+  CodeServiceResult,
+  GitStatusResult,
+  GitBranchesResult,
+  GitLogEntry,
+} from "../rpc-schema";
+
 export function createDesktopPlatform(): StudioPlatform {
   const ws = new WebSocket(`ws://${location.host}`);
   let nextId = 1;

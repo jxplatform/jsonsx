@@ -14,7 +14,8 @@
   "type": "module",
   "exports": {
     ".": "./src/server.ts",
-    "./claude-session": "./src/claude-session.ts"
+    "./claude-session": "./src/claude-session.ts",
+    "./types": "./src/types.ts"
   },
   "publishConfig": {
     "provenance": true
@@ -30,7 +31,8 @@
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/parser": "workspace:^",
-    "@jxsuite/schema": "^0.23.2",
+    "@jxsuite/runtime": "workspace:^",
+    "@jxsuite/schema": "workspace:^",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "chokidar": "^5.0.0",
     "zod": "^4.4.3"

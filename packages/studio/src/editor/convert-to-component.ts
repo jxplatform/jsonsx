@@ -9,6 +9,8 @@ import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 import { showDialog } from "../ui/layers";
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 
 /** Convert the currently selected element into a reusable component. */

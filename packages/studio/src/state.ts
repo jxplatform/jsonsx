@@ -9,6 +9,7 @@
  */
 
 import type { ProjectState } from "./types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export type JxPath = (string | number)[];
 

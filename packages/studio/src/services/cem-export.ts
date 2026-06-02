@@ -1,3 +1,5 @@
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 /** Collect slot elements from the document tree. */
 export function collectSlots(node: JxMutableNode | null | undefined, slots: string[] = []) {
   if (node?.tagName === "slot") {

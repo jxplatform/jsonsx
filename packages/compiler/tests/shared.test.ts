@@ -27,6 +27,7 @@ import {
   renderStaticNode,
   preRenderComponentHtml,
 } from "../src/shared";
+import type { JxStateDefinition, JxMutableNode, JxElement } from "@jxsuite/schema/types";
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 

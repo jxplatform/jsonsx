@@ -13,6 +13,7 @@ import { view } from "../view";
 import { showDialog, showConfirmDialog } from "../ui/layers";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
+import type { StudioPlatform } from "../types";
 
 interface GitFileEntry {
   path: string;

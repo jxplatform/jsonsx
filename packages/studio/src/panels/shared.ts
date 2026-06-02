@@ -3,6 +3,8 @@
  * on store.js / state.js exports (no circular deps).
  */
 
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
 /**
  * Convert a $media key like "--tablet" to a friendly display name "Tablet". "--" returns "Base".
  *

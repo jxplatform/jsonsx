@@ -17,7 +17,7 @@ import { effectiveZoom } from "../canvas/canvas-helpers";
 import type { CanvasPanel } from "../types";
 export type { CanvasPanel };
 
-type JxPath = (string | number)[];
+import type { JxPath } from "../state";
 
 interface DropInstruction {
   type: "reorder-above" | "reorder-below" | "make-child";

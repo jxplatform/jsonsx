@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import type { StudioPlatform } from "../src/types";
 
 if (typeof globalThis.localStorage === "undefined") {
   const store = new Map();
