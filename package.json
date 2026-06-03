@@ -89,6 +89,7 @@
       "@release-it/bumper": {
         "out": [
           "packages/compiler/package.json",
+          "packages/create/package.json",
           "packages/desktop/package.json",
           "packages/parser/package.json",
           "packages/runtime/package.json",

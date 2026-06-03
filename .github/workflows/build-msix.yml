@@ -28,7 +28,7 @@ jobs:
         uses: ChristopheLav/windows-sdk-install@v1
         with:
           version-sdk: 26100
-          features: 'OptionId.SigningTools'
+          features: "OptionId.SigningTools"
 
       - name: Build workspace packages
         run: bun run build

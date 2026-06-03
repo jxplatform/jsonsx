@@ -45,3 +45,7 @@ jobs:
           bun pm pack
           npm publish --provenance *.tgz
         working-directory: packages/studio
+      - run: |
+          bun pm pack
+          npm publish --provenance *.tgz
+        working-directory: packages/create
