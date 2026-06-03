@@ -4,7 +4,7 @@
   "description": "Jx platform home page and documentation",
   "license": "MIT",
   "scripts": {
-    "build": "jx build",
+    "build": "bunx jx build",
     "upgrade": "bunx npm-check-updates -u && bun install",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage"
