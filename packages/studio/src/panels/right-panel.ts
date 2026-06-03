@@ -8,6 +8,7 @@
 import { html, render as litRender } from "lit-html";
 import { updateUi, rightPanel } from "../store";
 import { effect, effectScope } from "../reactivity";
+import { createPanelScheduler, type PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
 import { tabIcon } from "./activity-bar";
 import { eventsSidebarTemplate } from "./events-panel";
@@ -34,27 +35,7 @@ let _ctx: RightPanelCtx | null = null;
 
 let _scope: import("@vue/reactivity").EffectScope | null = null;
 
-let _rendering = false;
-let _scheduled = false;
-let _hasFocus = false;
-
-function _isTextInput(el: Element | null) {
-  if (!el) return false;
-  const tag = el.tagName.toLowerCase();
-  if (tag === "input" || tag === "textarea") return true;
-  if (tag === "sp-textfield" || tag === "sp-number-field" || tag === "sp-search") return true;
-  if (el.shadowRoot?.activeElement) return _isTextInput(el.shadowRoot.activeElement);
-  return false;
-}
-
-function _onFocusIn(e: FocusEvent) {
-  _hasFocus = _isTextInput(e.target as Element);
-}
-
-function _onFocusOut() {
-  _hasFocus = false;
-  render();
-}
+let _scheduler: PanelScheduler | null = null;
 
 /**
  * Mount the right panel.
@@ -65,8 +46,12 @@ export function mount(ctx: RightPanelCtx) {
   _ctx = ctx;
   mountAiPanel();
   registerRightPanelRender(render);
-  rightPanel.addEventListener("focusin", _onFocusIn);
-  rightPanel.addEventListener("focusout", _onFocusOut);
+  _scheduler = createPanelScheduler({
+    root: rightPanel,
+    render: _doRender,
+    blockWhile: isColorPopoverOpen,
+  });
+  _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -84,9 +69,7 @@ export function mount(ctx: RightPanelCtx) {
       void tab.session.ui.styleFilterActive;
       void tab.session.ui.inspectorSections;
 
-      if (!_hasFocus && !isColorPopoverOpen()) {
-        render();
-      }
+      render();
     });
   });
 }
@@ -95,9 +78,8 @@ export function unmount() {
   _scope?.stop();
   _scope = null;
   _ctx = null;
-  rightPanel.removeEventListener("focusin", _onFocusIn);
-  rightPanel.removeEventListener("focusout", _onFocusOut);
-  _hasFocus = false;
+  _scheduler?.unbind();
+  _scheduler = null;
   _propsContainer = null;
   _eventsContainer = null;
   _styleContainer = null;
@@ -105,15 +87,12 @@ export function unmount() {
   _lastTab = null;
 }
 
-let _rafId = 0;
-
+/**
+ * Request a render. Coalesced and deferred while a text input in the panel is focused or a color
+ * popover is open (so explicit callers can never clobber a field mid-edit).
+ */
 export function render() {
-  if (!_ctx) return;
-  if (_rendering) return;
-  if (!_scheduled) {
-    _scheduled = true;
-    _rafId = requestAnimationFrame(_flush);
-  }
+  _scheduler?.schedule();
 }
 
 let _propsContainer: HTMLElement | null = null;
@@ -135,13 +114,8 @@ function _ensureContainers() {
   _assistantContainer.style.cssText = "display:flex;flex-direction:column;overflow:hidden";
 }
 
-function _flush() {
-  _scheduled = false;
-  _rafId = 0;
+function _doRender() {
   if (!_ctx) return;
-  if (_rendering) return;
-  if (_hasFocus || isColorPopoverOpen()) return;
-  _rendering = true;
   try {
     const ctx = _ctx as RightPanelCtx;
     const aTab = activeTab.value;
@@ -236,8 +210,6 @@ function _flush() {
     _lastTab = tab;
   } catch (e) {
     console.error("right-panel render error:", e);
-  } finally {
-    _rendering = false;
   }
   requestAnimationFrame(() => mountQuikChat());
   _ctx.updateForcedPseudoPreview();

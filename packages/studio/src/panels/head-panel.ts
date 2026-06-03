@@ -9,8 +9,9 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
+import { spTextField, spTextArea, spNumberField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
-import { debouncedStyleCommit, renderOnly, projectState } from "../store";
+import { renderOnly, projectState } from "../store";
 import type { JsonValue, DirEntry } from "../types";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact";
@@ -237,32 +238,13 @@ function renderMetaFieldRow(
     });
   }
 
+  const commit = (v: string) =>
+    applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, v.trim()));
+  const placeholder =
+    field.key === "viewport" ? "width=device-width, initial-scale=1" : `${field.label}…`;
   const widget = field.multiline
-    ? html`
-        <sp-textfield
-          size="s"
-          multiline
-          .value=${live(val)}
-          placeholder="${field.label}…"
-          @input=${debouncedStyleCommit(`head:${field.key}`, 400, (e: Event) => {
-            const content = (e.target as HTMLInputElement).value?.trim() ?? "";
-            applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, content));
-          })}
-        ></sp-textfield>
-      `
-    : html`
-        <sp-textfield
-          size="s"
-          .value=${live(val)}
-          placeholder=${field.key === "viewport"
-            ? "width=device-width, initial-scale=1"
-            : `${field.label}…`}
-          @input=${debouncedStyleCommit(`head:${field.key}`, 400, (e: Event) => {
-            const content = (e.target as HTMLInputElement).value?.trim() ?? "";
-            applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, content));
-          })}
-        ></sp-textfield>
-      `;
+    ? spTextArea(`head:${field.key}`, val, commit, { placeholder: `${field.label}…` })
+    : spTextField(`head:${field.key}`, val, commit, { placeholder });
 
   return renderFieldRow({
     prop: field.key,
@@ -396,20 +378,17 @@ export function renderHeadTemplate({
               applyMutation((d: JxMutableNode) => {
                 delete d.title;
               }),
-            widget: html`
-              <sp-textfield
-                size="s"
-                .value=${live(title)}
-                placeholder="Page title…"
-                @input=${debouncedStyleCommit("head:title", 400, (e: Event) => {
-                  const val = (e.target as HTMLInputElement).value?.trim() ?? "";
-                  applyMutation((d: JxMutableNode) => {
-                    if (val) d.title = val;
-                    else delete d.title;
-                  });
-                })}
-              ></sp-textfield>
-            `,
+            widget: spTextField(
+              "head:title",
+              title,
+              (v: string) =>
+                applyMutation((d: JxMutableNode) => {
+                  const val = v.trim();
+                  if (val) d.title = val;
+                  else delete d.title;
+                }),
+              { placeholder: "Page title…" },
+            ),
           })}
           ${PAGE_FIELDS.map((field) => renderMetaFieldRow(field, head, applyMutation))}
           ${renderFieldRow({
@@ -620,28 +599,26 @@ function renderFmField(
   }
 
   if (entry.type === "array") {
-    const display = Array.isArray(value) ? value.join(", ") : value || "";
+    const display = Array.isArray(value) ? value.join(", ") : (value as string) || "";
     return renderFieldRow({
       prop: field,
       label: displayLabel,
       hasValue: hasVal,
       onClear,
-      widget: html`
-        <sp-textfield
-          size="s"
-          placeholder="comma, separated"
-          .value=${live(display)}
-          @input=${debouncedStyleCommit(`fm:${field}`, 400, (e: Event) => {
-            const arr = (e.target as HTMLInputElement).value
-              ? (e.target as HTMLInputElement).value
-                  .split(",")
-                  .map((s: string) => s.trim())
-                  .filter(Boolean)
-              : undefined;
-            transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
-          })}
-        ></sp-textfield>
-      `,
+      widget: spTextField(
+        `fm:${field}`,
+        display,
+        (v: string) => {
+          const arr = v
+            ? v
+                .split(",")
+                .map((s: string) => s.trim())
+                .filter(Boolean)
+            : undefined;
+          transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, arr));
+        },
+        { placeholder: "comma, separated" },
+      ),
     });
   }
 
@@ -684,19 +661,9 @@ function renderFmField(
       label: displayLabel,
       hasValue: hasVal,
       onClear,
-      widget: html`
-        <sp-number-field
-          size="s"
-          hide-stepper
-          .value=${live(value !== undefined ? Number(value) : undefined)}
-          @change=${debouncedStyleCommit(`fm:${field}`, 400, (e: Event) => {
-            const v = (e.target as HTMLInputElement).value;
-            transactDoc(activeTab.value, (t) =>
-              mutateUpdateFrontmatter(t, field, isNaN(Number(v)) ? undefined : Number(v)),
-            );
-          })}
-        ></sp-number-field>
-      `,
+      widget: spNumberField(value !== undefined ? Number(value) : undefined, (n) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, n)),
+      ),
     });
   }
 
@@ -705,17 +672,12 @@ function renderFmField(
     label: displayLabel,
     hasValue: hasVal,
     onClear,
-    widget: html`
-      <sp-textfield
-        size="s"
-        placeholder=${entry.format === "date" ? "YYYY-MM-DD" : ""}
-        .value=${live(value || "")}
-        @input=${debouncedStyleCommit(`fm:${field}`, 400, (e: Event) => {
-          transactDoc(activeTab.value, (t) =>
-            mutateUpdateFrontmatter(t, field, (e.target as HTMLInputElement).value || undefined),
-          );
-        })}
-      ></sp-textfield>
-    `,
+    widget: spTextField(
+      `fm:${field}`,
+      (value as string) || "",
+      (v: string) =>
+        transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
+      { placeholder: entry.format === "date" ? "YYYY-MM-DD" : "" },
+    ),
   });
 }

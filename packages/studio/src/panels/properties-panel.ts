@@ -20,6 +20,7 @@ import { view } from "../view";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
+import { spTextField, spTextArea } from "../ui/field-input";
 import {
   attrLabel,
   inferInputType,
@@ -96,28 +97,17 @@ function bindableFieldRow(
         (d as JxPrototypeDef)?.$prototype !== "Function",
   );
 
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let debounce: ReturnType<typeof setTimeout> | undefined;
-  const onInput = (e: Event) => {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
-  };
-
   const staticVal = isBound ? "" : (rawValue ?? "");
+  const fieldKey = `prop:${label}`;
   const staticTpl =
     type === "textarea"
-      ? html`<sp-textfield
-          multiline
-          size="s"
-          .value=${live(staticVal)}
-          @input=${onInput}
-        ></sp-textfield>`
+      ? spTextArea(fieldKey, String(staticVal), (v: string) => onChange(v))
       : type === "checkbox"
         ? html`<sp-checkbox
             ?checked=${!!staticVal}
             @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
           ></sp-checkbox>`
-        : html`<sp-textfield size="s" .value=${live(staticVal)} @input=${onInput}></sp-textfield>`;
+        : spTextField(fieldKey, String(staticVal), (v: string) => onChange(v));
 
   const boundTpl = html`
     <sp-picker
@@ -476,15 +466,14 @@ function renderComponentPropsFieldsTemplate(
         } else if (prop.format === "color") {
           widgetTpl = renderColorSelector(prop.name, staticVal, onChange);
         } else if (prop.format === "date") {
-          widgetTpl = html`<sp-textfield
-            size="s"
-            placeholder="YYYY-MM-DD"
-            .value=${live(staticVal)}
-            @input=${(e: Event) => {
-              clearTimeout(debounce);
-              debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
-            }}
-          ></sp-textfield>`;
+          widgetTpl = spTextField(
+            `cprop:${prop.name}`,
+            String(staticVal),
+            (v: string) => onChange(v),
+            {
+              placeholder: "YYYY-MM-DD",
+            },
+          );
         } else if (parsed.kind === "boolean") {
           widgetTpl = html`<sp-checkbox
             size="s"
@@ -511,14 +500,9 @@ function renderComponentPropsFieldsTemplate(
               onChange(e.detail?.value ?? (e.target as HTMLInputElement).value)}
           ></jx-value-selector>`;
         } else {
-          widgetTpl = html`<sp-textfield
-            size="s"
-            .value=${live(staticVal)}
-            @input=${(e: Event) => {
-              clearTimeout(debounce);
-              debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 400);
-            }}
-          ></sp-textfield>`;
+          widgetTpl = spTextField(`cprop:${prop.name}`, String(staticVal), (v: string) =>
+            onChange(v),
+          );
         }
 
         return html`
@@ -1085,20 +1069,11 @@ export function renderPropertiesPanelTemplate(ctx: {
               : nothing}
             <sp-field-label size="s">ID</sp-field-label>
           </div>
-          <sp-textfield
-            size="s"
-            .value=${live(node.$id || "")}
-            @input=${debouncedStyleCommit("prop:$id", 400, (e: Event) => {
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(
-                  t,
-                  path,
-                  "$id",
-                  (e.target as HTMLInputElement).value || undefined,
-                ),
-              );
-            })}
-          ></sp-textfield>
+          ${spTextField("prop:$id", String(node.$id || ""), (v: string) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateProperty(t, path, "$id", v || undefined),
+            ),
+          )}
         </div>
         <div class="style-row" data-prop="className">
           <div class="style-row-label">
@@ -1116,20 +1091,11 @@ export function renderPropertiesPanelTemplate(ctx: {
               : nothing}
             <sp-field-label size="s">Class</sp-field-label>
           </div>
-          <sp-textfield
-            size="s"
-            .value=${live(node.className || "")}
-            @input=${debouncedStyleCommit("prop:className", 400, (e: Event) => {
-              transactDoc(activeTab.value, (t) =>
-                mutateUpdateProperty(
-                  t,
-                  path,
-                  "className",
-                  (e.target as HTMLInputElement).value || undefined,
-                ),
-              );
-            })}
-          ></sp-textfield>
+          ${spTextField("prop:className", String(node.className || ""), (v: string) =>
+            transactDoc(activeTab.value, (t) =>
+              mutateUpdateProperty(t, path, "className", v || undefined),
+            ),
+          )}
         </div>
         ${!Array.isArray(node.children) || node.children.length === 0
           ? html`
@@ -1149,25 +1115,14 @@ export function renderPropertiesPanelTemplate(ctx: {
                     : nothing}
                   <sp-field-label size="s">Text Content</sp-field-label>
                 </div>
-                <sp-textfield
-                  size="s"
-                  multiline
-                  .value=${live(
-                    typeof node.textContent === "string"
-                      ? node.textContent
-                      : (node.textContent ?? ""),
-                  )}
-                  @input=${debouncedStyleCommit("prop:textContent", 400, (e: Event) => {
+                ${spTextArea(
+                  "prop:textContent",
+                  typeof node.textContent === "string" ? node.textContent : "",
+                  (v: string) =>
                     transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(
-                        t,
-                        path,
-                        "textContent",
-                        (e.target as HTMLInputElement).value || undefined,
-                      ),
-                    );
-                  })}
-                ></sp-textfield>
+                      mutateUpdateProperty(t, path, "textContent", v || undefined),
+                    ),
+                )}
               </div>
             `
           : nothing}

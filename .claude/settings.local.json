@@ -1,22 +1,6 @@
 {
+  "enableWorkflows": true,
   "permissions": {
-    "allow": [
-      "Bash(bun --version)",
-      "Bash(bun test:*)",
-      "Bash(bun add:*)",
-      "Bash(grep -E \"^\\(tests\\\\\\\\\\\\\\\\|✓|✗|fail|pass|error:|All tests|[0-9]+ tests\\)\")",
-      "Bash(xargs cat:*)",
-      "Bash(bun run *)",
-      "Bash(oxlint packages/runtime/src/runtime.js)",
-      "Bash(oxlint .)",
-      "Bash(echo \"exit: $?\")",
-      "Bash(/__\" src/ )",
-      "Bash(grep -rn \"__jx_server__\\\\|__jx_resolve__\\\\|fetch\\(\\\\\"/__\\\\|fetch\\(`/__\" src/ )",
-      "PowerShell(bun run typecheck 2>&1)",
-      "Bash(cat electrobun.config*)",
-      "Bash(find . -maxdepth 2 -name \"electrobun*\" -not -path \"*/node_modules/*\")",
-      "PowerShell(cd C:\\\\Users\\\\kevin\\\\jx\\\\packages\\\\parser; bun test --isolate tests/content.test.ts 2>$null | Select-Object -First 15; Write-Output \"EXIT=$LASTEXITCODE\")",
-      "Bash(node /home/batonac/Development/jx/packages/compiler/dist/cli.js --help)"
-    ]
+    "allow": ["Edit", "Write", "Bash(*)"]
   }
 }

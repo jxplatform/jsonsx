@@ -1,0 +1,27 @@
+{
+  "tagName": "main",
+  "state": {
+    "$docs": {
+      "$prototype": "ContentCollection",
+      "contentType": "docs",
+      "sort": { "field": "order", "order": "asc" }
+    }
+  },
+  "children": [
+    {
+      "tagName": "h1",
+      "children": ["Docs"]
+    },
+    {
+      "tagName": "ul",
+      "children": {
+        "$prototype": "Array",
+        "$map": "$docs",
+        "$template": {
+          "tagName": "li",
+          "children": ["${item.data.title}"]
+        }
+      }
+    }
+  ]
+}

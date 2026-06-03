@@ -20,6 +20,7 @@ import {
   mutateRenameDef,
 } from "../tabs/transact";
 import { renderFieldRow } from "../ui/field-row";
+import { spTextField, rawTextArea } from "../ui/field-input";
 import { renderExpressionEditor, expressionHint } from "../ui/expression-editor";
 import { renderMediaPicker } from "../ui/media-picker";
 import type { TabUi } from "../tabs/tab";
@@ -293,16 +294,16 @@ export function signalFieldRow(label: string, value: string, onChange: (value: s
     prop: label,
     label,
     hasValue: false,
-    widget: html`
-      <sp-textfield
-        size="s"
-        .value=${value}
-        @change=${(e: Event) => {
-          const v = (e.target as HTMLInputElement).value;
-          if (v !== value) onChange(v);
-        }}
-      ></sp-textfield>
-    `,
+    // commitMode "blur": signal fields (rename, src, etc.) commit on blur/Enter only — a debounced
+    // mid-typing commit would, e.g., rename the signal on every keystroke pause.
+    widget: spTextField(
+      `sig:${label}`,
+      value,
+      (v: string) => {
+        if (v !== value) onChange(v);
+      },
+      { commitMode: "blur" },
+    ),
   });
 }
 
@@ -511,35 +512,23 @@ function renderSignalEditorTemplate(
     });
   };
 
-  // Helper for textarea rows
+  // Helper for textarea rows — uses the shared draft layer (commits on blur/Enter and a 500ms
+  // debounce) so a panel re-render mid-edit can't truncate the in-progress text.
   const textareaRow = (
     label: string,
     value: string,
     onChange: (value: string) => void,
     opts: { minHeight?: string; mono?: boolean } = {},
   ) => {
-    let debounce: ReturnType<typeof setTimeout> | undefined;
     return renderFieldRow({
       prop: label,
       label,
       hasValue: false,
-      widget: html`
-        <textarea
-          class="field-input"
-          style=${styleMap({
-            minHeight: opts.minHeight || "40px",
-            ...(opts.mono && {
-              fontFamily: "'SF Mono','Fira Code','Consolas',monospace",
-              fontSize: "11px",
-            }),
-          })}
-          .value=${value}
-          @input=${(e: Event) => {
-            clearTimeout(debounce);
-            debounce = setTimeout(() => onChange((e.target as HTMLInputElement).value), 500);
-          }}
-        ></textarea>
-      `,
+      widget: rawTextArea(`sig:${label}`, value, onChange, {
+        debounceMs: 500,
+        ...(opts.minHeight != null && { minHeight: opts.minHeight }),
+        ...(opts.mono != null && { mono: opts.mono }),
+      }),
     });
   };
 

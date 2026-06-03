@@ -11,6 +11,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { leftPanel, updateSession } from "../store";
 import { effect, effectScope } from "../reactivity";
+import { createPanelScheduler, type PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { transact, mutateUpdateFrontmatter } from "../tabs/transact";
@@ -49,18 +50,7 @@ let _ctx: LeftPanelCtx | null = null;
 
 let _scope: import("@vue/reactivity").EffectScope | null = null;
 
-let _rendering = false;
-let _scheduled = false;
-let _hasFocus = false;
-
-function _onFocusIn() {
-  _hasFocus = true;
-}
-
-function _onFocusOut() {
-  _hasFocus = false;
-  render();
-}
+let _scheduler: PanelScheduler | null = null;
 
 /**
  * Mount the left panel orchestrator.
@@ -69,8 +59,8 @@ function _onFocusOut() {
  */
 export function mount(ctx: LeftPanelCtx) {
   _ctx = ctx;
-  leftPanel.addEventListener("focusin", _onFocusIn);
-  leftPanel.addEventListener("focusout", _onFocusOut);
+  _scheduler = createPanelScheduler({ root: leftPanel, render: _doRender });
+  _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
@@ -85,9 +75,7 @@ export function mount(ctx: LeftPanelCtx) {
         void tab.session.ui.gitLoading;
         void tab.session.ui.gitError;
       }
-      if (!_hasFocus) {
-        render();
-      }
+      render();
     });
   });
 }
@@ -96,25 +84,21 @@ export function unmount() {
   _scope?.stop();
   _scope = null;
   _ctx = null;
-  leftPanel.removeEventListener("focusin", _onFocusIn);
-  leftPanel.removeEventListener("focusout", _onFocusOut);
-  _hasFocus = false;
+  _scheduler?.unbind();
+  _scheduler = null;
 }
 
+/**
+ * Request a render. Coalesced and deferred while a text input in the panel is focused (so explicit
+ * callers — renderOnly("leftPanel"), tab switches, etc. — can never clobber a field mid-edit).
+ */
 export function render() {
-  if (!_ctx) return;
-  if (_rendering) return;
-  if (!_scheduled) {
-    _scheduled = true;
-    queueMicrotask(_flush);
-  }
+  _scheduler?.schedule();
 }
 
-function _flush() {
-  _scheduled = false;
+/** Actual DOM paint, invoked by the scheduler. Includes a Lit-marker-corruption recovery retry. */
+function _doRender() {
   if (!_ctx) return;
-  if (_rendering) return;
-  _rendering = true;
   try {
     _render();
   } catch (e) {
@@ -127,8 +111,6 @@ function _flush() {
     } catch (e2) {
       console.error("left-panel retry failed:", e2);
     }
-  } finally {
-    _rendering = false;
   }
 
   if (view.leftTab === "layers") {
