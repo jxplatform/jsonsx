@@ -36,6 +36,8 @@ jobs:
 
       - run: bun run generate:schema
 
+      - run: bun run build:parser
+
       - run: bun run build:compiler
 
       - run: bun run --cwd sites/jxsuite.com build

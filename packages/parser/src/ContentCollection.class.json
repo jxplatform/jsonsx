@@ -4,7 +4,7 @@
   "description": "Query a project content type with filter, sort, and limit",
   "$prototype": "Class",
   "extends": "Object",
-  "$implementation": "./content.ts",
+  "$implementation": "../dist/content.js",
 
   "$defs": {
     "parameters": {

@@ -9,7 +9,8 @@
     "directory": "packages/parser"
   },
   "files": [
-    "src/"
+    "src/",
+    "dist"
   ],
   "type": "module",
   "exports": {
@@ -27,6 +28,8 @@
     "provenance": true
   },
   "scripts": {
+    "prepare": "bun build src/content.ts --outdir=dist --format=esm --target=node",
+    "build": "bun run prepare",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
