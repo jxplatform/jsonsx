@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bunx nano-staged --unstaged --quiet --bail || exit 2"
+            "command": "if [ -f package.json ] && grep -q '\"nano-staged\"' package.json; then bunx nano-staged --unstaged --quiet --bail || exit 2; fi"
           }
         ]
       }
