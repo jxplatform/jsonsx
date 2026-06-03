@@ -55,7 +55,7 @@ describe("draft commit semantics", () => {
     scheduleDraftCommit("d1", 20, (v) => (committed = v));
     expect(committed).toBe(null); // nothing committed synchronously
     await new Promise((r) => setTimeout(r, 45));
-    expect(committed).toBe("abc"); // latest value, not the earlier "ab"
+    expect(committed as string | null).toBe("abc"); // latest value, not the earlier "ab"
     // Draft is kept after a debounced commit so the field stays controlled while focused.
     expect(getFieldValue("d1", "doc")).toBe("abc");
     clearDraft("d1");
@@ -81,7 +81,7 @@ describe("draft commit semantics", () => {
       committed = v;
       calls++;
     });
-    expect(committed).toBe("typed");
+    expect(committed as string | null).toBe("typed");
     expect(hasDraft("d3")).toBe(false);
     await new Promise((r) => setTimeout(r, 80));
     expect(calls).toBe(1); // the debounce timer was cancelled by commitField

@@ -11,7 +11,7 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { canvasWrap, canvasPanels, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { loadMarkdown } from "../files/file-ops";
+import { loadMarkdown, serializeDocument } from "../files/file-ops";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
@@ -75,6 +75,22 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
   _ctx = ctx;
 }
 
+/** Monaco language for the source view of a tab's document. */
+function sourceLang(tab: import("../tabs/tab.js").Tab) {
+  if (tab.doc.sourceFormat === "md") return "markdown";
+  return (tab.documentPath || "").endsWith(".js") ? "javascript" : "json";
+}
+
+/**
+ * The full source text for the source view. Markdown files serialize to their on-disk form
+ * (frontmatter YAML — title, $head, etc. — plus the body), not just the JSON of the body tree.
+ */
+function sourceContent(tab: import("../tabs/tab.js").Tab, lang: string) {
+  if (lang === "markdown") return serializeDocument(tab);
+  if (lang === "javascript") return tab.doc.document?.toString?.() || "";
+  return JSON.stringify(tab.doc.document, null, 2);
+}
+
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) {
@@ -118,15 +134,15 @@ export function renderCanvas() {
     view.functionEditor = null;
   }
 
-  // Source mode: update existing Monaco editor without recreating
+  // Source mode: update existing Monaco editor without recreating. Don't replace the buffer while
+  // the user is actively typing in it — that would reformat under the cursor (the source view is
+  // the editing surface here, mirroring the panel draft-state behaviour).
   if (canvasMode === "source" && view.monacoEditor) {
-    const filePath = tab.documentPath || "document.json";
-    const isJs = filePath.endsWith(".js");
-    const newVal = isJs ? S.document?.toString?.() || "" : JSON.stringify(S.document, null, 2);
-    const currentVal = view.monacoEditor.getValue();
-    if (currentVal !== newVal) {
-      view.monacoEditor._ignoreNextChange = true;
-      view.monacoEditor.setValue(newVal);
+    const editor = view.monacoEditor;
+    const newVal = sourceContent(tab, sourceLang(tab));
+    if (!editor.hasTextFocus() && editor.getValue() !== newVal) {
+      editor._ignoreNextChange = true;
+      editor.setValue(newVal);
     }
     return;
   }
@@ -234,9 +250,8 @@ export function renderCanvas() {
     );
 
     const filePath = tab.documentPath || "document.json";
-    const lang = filePath.endsWith(".js") ? "javascript" : "json";
-    const content =
-      lang === "json" ? JSON.stringify(S.document, null, 2) : S.document?.toString?.() || "";
+    const lang = sourceLang(tab);
+    const content = sourceContent(tab, lang);
     const modelUri = monaco.Uri.parse("file:///" + filePath);
     const model = monaco.editor.createModel(content, lang, modelUri);
     view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
@@ -262,10 +277,20 @@ export function renderCanvas() {
         return;
       }
       clearTimeout(debounce);
-      debounce = setTimeout(() => {
+      debounce = setTimeout(async () => {
         const tab = activeTab.value;
         if (!tab) return;
-        if (lang === "json") {
+        if (lang === "markdown") {
+          try {
+            // Parse the full markdown source back into body + frontmatter (title, $head, etc.).
+            const { document, frontmatter } = await loadMarkdown(editor.getValue());
+            tab.doc.document = document as JxMutableNode;
+            tab.doc.content.frontmatter = frontmatter;
+            tab.doc.dirty = true;
+          } catch {
+            // Unparseable markdown — don't update state
+          }
+        } else if (lang === "json") {
           try {
             tab.doc.document = JSON.parse(editor.getValue());
             tab.doc.dirty = true;
