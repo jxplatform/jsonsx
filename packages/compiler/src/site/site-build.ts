@@ -93,7 +93,7 @@ export async function buildSite(
     const hasOptimized = existsSync(optimizedDir);
     let tmpOptimized = "";
     if (hasOptimized) {
-      tmpOptimized = resolve(projectRoot, ".jx-cache/_optimized_tmp");
+      tmpOptimized = resolve(projectRoot, ".cache/_optimized_tmp");
       renameSync(optimizedDir, tmpOptimized);
     }
     rmSync(outDir, { recursive: true, force: true });

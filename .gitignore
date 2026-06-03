@@ -7,7 +7,7 @@
 dist/
 node_modules/
 result
-.jx-cache/
+.cache/
 
 # Windows reserved device names (confuse git's directory walker)
 nul

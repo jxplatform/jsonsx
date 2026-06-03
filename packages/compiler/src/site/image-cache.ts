@@ -2,7 +2,7 @@
  * Image-cache.js — Content-hash based cache for processed image variants.
  *
  * Stores a manifest of previously processed images so that unchanged sources can skip re-encoding
- * on subsequent builds. Cache lives in .jx-cache/images/.
+ * on subsequent builds. Cache lives in .cache/images/.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
@@ -41,7 +41,7 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
  * @returns {CacheManifest}
  */
 export function loadCache(projectRoot: string) {
-  const manifestPath = resolve(projectRoot, ".jx-cache/images/manifest.json");
+  const manifestPath = resolve(projectRoot, ".cache/images/manifest.json");
   if (!existsSync(manifestPath)) {
     return { version: 1, entries: {} };
   }
@@ -59,7 +59,7 @@ export function loadCache(projectRoot: string) {
  * @param {CacheManifest} cache
  */
 export function saveCache(projectRoot: string, cache: CacheManifest) {
-  const cacheDir = resolve(projectRoot, ".jx-cache/images");
+  const cacheDir = resolve(projectRoot, ".cache/images");
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(resolve(cacheDir, "manifest.json"), JSON.stringify(cache, null, 2), "utf8");
 }

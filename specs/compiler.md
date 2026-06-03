@@ -475,7 +475,7 @@ Individual `<img>` nodes can override global settings via attributes:
 
 ### 7.5 Caching (`image-cache.js`)
 
-Processed images are cached to `.jx-cache/images/manifest.json` to avoid redundant re-encoding across builds.
+Processed images are cached to `.cache/images/manifest.json` to avoid redundant re-encoding across builds.
 
 - **Cache key:** `{contentHash}:{configHash}` — MD5 of source file contents + MD5 of optimization config (`widths`, `formats`, `quality`)
 - **Invalidation:** Source file changes, config changes, or missing variant files in `dist/`

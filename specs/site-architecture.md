@@ -1005,12 +1005,12 @@ Individual `<img>` nodes can override global defaults:
 
 The optimizer caches processed images to avoid redundant re-encoding on subsequent builds:
 
-- **Cache location:** `.jx-cache/images/manifest.json`
+- **Cache location:** `.cache/images/manifest.json`
 - **Cache key:** `{contentHash}:{configHash}` — MD5 of the source file contents combined with MD5 of the optimization config (`widths`, `formats`, `quality`)
 - **Invalidation:** A cache entry is invalidated when the source image changes (new content hash), the optimization config changes (new config hash), or the output variant files are missing from `dist/`
 - **Persistence:** The cache file survives `dist/` cleanup — only the variant files are regenerated
 
-The `.jx-cache/` directory should be added to `.gitignore` but can optionally be committed for CI build speed.
+The `.cache/` directory should be added to `.gitignore` but can optionally be committed for CI build speed.
 
 ### 9.3 Referencing Media
 

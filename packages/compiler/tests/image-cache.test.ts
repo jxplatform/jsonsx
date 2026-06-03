@@ -25,8 +25,8 @@ describe("image-cache", () => {
   });
 
   test("loadCache returns empty manifest on corrupt JSON", () => {
-    mkdirSync(join(TMP, ".jx-cache/images"), { recursive: true });
-    writeFileSync(join(TMP, ".jx-cache/images/manifest.json"), "not json");
+    mkdirSync(join(TMP, ".cache/images"), { recursive: true });
+    writeFileSync(join(TMP, ".cache/images/manifest.json"), "not json");
     const cache = loadCache(TMP);
     expect(cache).toEqual({ version: 1, entries: {} });
     rmSync(TMP, { recursive: true, force: true });

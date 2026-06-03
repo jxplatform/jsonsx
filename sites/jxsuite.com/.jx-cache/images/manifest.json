@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "entries": {
+    "095efe1f:524fa95b": {
+      "source": "/studio.png",
+      "manifest": {
+        "original": {
+          "width": 4434,
+          "height": 2140,
+          "format": "png"
+        },
+        "variants": [
+          {
+            "width": 320,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-320-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-320-095efe1f.webp"
+          },
+          {
+            "width": 320,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-320-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-320-095efe1f.avif"
+          },
+          {
+            "width": 640,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-640-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-640-095efe1f.webp"
+          },
+          {
+            "width": 640,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-640-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-640-095efe1f.avif"
+          },
+          {
+            "width": 960,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-960-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-960-095efe1f.webp"
+          },
+          {
+            "width": 960,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-960-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-960-095efe1f.avif"
+          },
+          {
+            "width": 1280,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-1280-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-1280-095efe1f.webp"
+          },
+          {
+            "width": 1280,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-1280-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-1280-095efe1f.avif"
+          },
+          {
+            "width": 1920,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-1920-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-1920-095efe1f.webp"
+          },
+          {
+            "width": 1920,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-1920-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-1920-095efe1f.avif"
+          },
+          {
+            "width": 4434,
+            "format": "webp",
+            "outputPath": "/images/_optimized/studio-4434-095efe1f.webp",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-4434-095efe1f.webp"
+          },
+          {
+            "width": 4434,
+            "format": "avif",
+            "outputPath": "/images/_optimized/studio-4434-095efe1f.avif",
+            "absolutePath": "/home/batonac/Development/jx/sites/jxsuite.com/dist/images/_optimized/studio-4434-095efe1f.avif"
+          }
+        ],
+        "contentHash": "095efe1f"
+      },
+      "timestamp": 1779133066665
+    }
+  }
+}

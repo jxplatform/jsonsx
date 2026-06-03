@@ -476,8 +476,8 @@ describe("buildSite — optimized images preservation", () => {
     // Pre-create dist/images/_optimized with a cached file
     mkdirSync(resolve(OPT_TMP, "dist/images/_optimized"), { recursive: true });
     writeFileSync(resolve(OPT_TMP, "dist/images/_optimized/cached.webp"), "fake-image", "utf8");
-    // Ensure .jx-cache parent exists for renameSync target
-    mkdirSync(resolve(OPT_TMP, ".jx-cache"), { recursive: true });
+    // Ensure .cache parent exists for renameSync target
+    mkdirSync(resolve(OPT_TMP, ".cache"), { recursive: true });
   });
 
   afterAll(() => {
@@ -1138,9 +1138,9 @@ describe("buildSite — image optimization cache logging", () => {
       "utf8",
     );
     // Pre-populate cache with an entry so the "Optimized N image(s)" log triggers
-    mkdirSync(resolve(IMG_TMP, ".jx-cache/images"), { recursive: true });
+    mkdirSync(resolve(IMG_TMP, ".cache/images"), { recursive: true });
     writeFileSync(
-      resolve(IMG_TMP, ".jx-cache/images/manifest.json"),
+      resolve(IMG_TMP, ".cache/images/manifest.json"),
       JSON.stringify({
         version: 1,
         entries: { "test.jpg": { hash: "abc", outputs: ["test.webp"] } },
@@ -1157,7 +1157,7 @@ describe("buildSite — image optimization cache logging", () => {
     const result = await buildSite(IMG_TMP, { verbose: true });
     expect(result.errors).toHaveLength(0);
     // Verify cache was saved
-    expect(existsSync(resolve(IMG_TMP, ".jx-cache/images/manifest.json"))).toBe(true);
+    expect(existsSync(resolve(IMG_TMP, ".cache/images/manifest.json"))).toBe(true);
   });
 });
 
