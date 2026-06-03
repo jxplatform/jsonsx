@@ -1,13 +1,33 @@
 import { describe, test, expect } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { cacheKey, loadCache, saveCache, getCached, setCached } from "../src/site/image-cache";
+import {
+  cacheKey,
+  loadCache,
+  saveCache,
+  getCached,
+  setCached,
+  getImageCacheDir,
+  _testResetNpmCacheBase,
+} from "../src/site/image-cache";
 
 const TMP = join(import.meta.dir, "__test-image-cache__");
 
+// Reset memoised npm cache base before each test so path resolution is fresh
+function setup() {
+  _testResetNpmCacheBase();
+  mkdirSync(TMP, { recursive: true });
+}
+
+function teardown() {
+  rmSync(TMP, { recursive: true, force: true });
+  rmSync(getImageCacheDir(TMP), { recursive: true, force: true });
+  _testResetNpmCacheBase();
+}
+
 describe("image-cache", () => {
   test("cacheKey produces consistent hash for same content and config", () => {
-    mkdirSync(TMP, { recursive: true });
+    setup();
     const imgPath = join(TMP, "test.png");
     writeFileSync(imgPath, Buffer.from("fake-image-data"));
 
@@ -16,24 +36,29 @@ describe("image-cache", () => {
     const key2 = cacheKey(imgPath, config);
     expect(key1).toBe(key2);
     expect(key1).toContain(":");
-    rmSync(TMP, { recursive: true, force: true });
+    teardown();
   });
 
   test("loadCache returns empty manifest when no cache exists", () => {
+    _testResetNpmCacheBase();
     const cache = loadCache("/nonexistent/path");
     expect(cache).toEqual({ version: 1, entries: {} });
   });
 
   test("loadCache returns empty manifest on corrupt JSON", () => {
-    mkdirSync(join(TMP, ".cache/images"), { recursive: true });
-    writeFileSync(join(TMP, ".cache/images/manifest.json"), "not json");
+    setup();
+    // Write corrupt JSON to wherever loadCache will look
+    const cacheDir = getImageCacheDir(TMP);
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(join(cacheDir, "manifest.json"), "not json");
+
     const cache = loadCache(TMP);
     expect(cache).toEqual({ version: 1, entries: {} });
-    rmSync(TMP, { recursive: true, force: true });
+    teardown();
   });
 
   test("saveCache and loadCache round-trip", () => {
-    mkdirSync(TMP, { recursive: true });
+    setup();
     const cache: any = {
       version: 1,
       entries: {
@@ -47,7 +72,7 @@ describe("image-cache", () => {
     saveCache(TMP, cache);
     const loaded = loadCache(TMP);
     expect(loaded.entries["abc:def"].source).toBe("img.png");
-    rmSync(TMP, { recursive: true, force: true });
+    teardown();
   });
 
   test("getCached returns null for missing key", () => {

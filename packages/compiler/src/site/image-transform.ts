@@ -9,7 +9,7 @@
 import { existsSync } from "node:fs";
 import { resolve, extname, basename } from "node:path";
 import { processImage, buildSrcset, contentHash, configHash } from "./image-optimizer.ts";
-import { getCached, setCached } from "./image-cache.ts";
+import { getCached, setCached, getImageCacheDir } from "./image-cache.ts";
 
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageManifest } from "./image-optimizer.ts";
@@ -44,8 +44,7 @@ async function resolveManifest(
   }
 
   if (!cached) console.log(`    Optimizing ${basename(absoluteSrc)}...`);
-  const cacheImgDir = resolve(projectRoot, ".cache/images");
-  const manifest = await processImage(absoluteSrc, cacheImgDir, config);
+  const manifest = await processImage(absoluteSrc, getImageCacheDir(projectRoot), config);
   setCached(cache, key, src, manifest);
   return manifest;
 }

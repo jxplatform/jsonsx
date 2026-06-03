@@ -2,11 +2,14 @@
  * Image-cache.js — Content-hash based cache for processed image variants.
  *
  * Stores a manifest of previously processed images so that unchanged sources can skip re-encoding
- * on subsequent builds. Cache lives in .cache/images/.
+ * on subsequent builds. Cache lives in the npm global cache directory under jxsuite-images/ so that
+ * CI environments (e.g. Cloudflare Pages) can persist it via their npm cache layer.
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, basename } from "node:path";
+import { execSync } from "node:child_process";
+import { tmpdir } from "node:os";
 import { contentHash, configHash } from "./image-optimizer.ts";
 
 import type { ImageManifest } from "./image-optimizer.ts";
@@ -23,6 +26,56 @@ export interface CacheManifest {
   entries: Record<string, CacheEntry>; // Cached entries keyed by content+config hash
 }
 
+// ─── Cache directory resolution ──────────────────────────────────────────────
+
+let _npmCacheBase: string | null | undefined = undefined; // undefined = not yet resolved
+
+/** Reset the memoized npm cache base so the next call re-evaluates. Tests only. */
+export function _testResetNpmCacheBase() {
+  _npmCacheBase = undefined;
+}
+
+/**
+ * Directly set the memoized npm cache base. Pass null to force the project-local fallback. Tests
+ * only.
+ */
+export function _testSetNpmCacheBase(value: string | null) {
+  _npmCacheBase = value;
+}
+
+/**
+ * Return the image cache directory for a project.
+ *
+ * Prefers the npm global cache (`npm config get cache`) so CI environments that cache ~/.npm (e.g.
+ * Cloudflare Pages) automatically persist optimized images across builds. Falls back to
+ * .cache/images inside the project root when npm is unavailable.
+ *
+ * Result is memoized — `npm config get cache` is only spawned once per process.
+ *
+ * @param {string} projectRoot
+ * @returns {string}
+ */
+export function getImageCacheDir(projectRoot: string): string {
+  if (_npmCacheBase === undefined) {
+    try {
+      const result = execSync("npm config get cache", {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+        cwd: tmpdir(), // avoid ENOWORKSPACES when cwd is inside an npm workspace
+      }).trim();
+      _npmCacheBase = result && result !== "undefined" ? result : null;
+    } catch {
+      _npmCacheBase = null;
+    }
+  }
+  if (_npmCacheBase) {
+    return resolve(_npmCacheBase, "jxsuite-images", basename(projectRoot));
+  }
+  return resolve(projectRoot, ".cache/images");
+}
+
+// ─── Cache key ───────────────────────────────────────────────────────────────
+
 /**
  * Build a cache key from source file content and config.
  *
@@ -34,6 +87,8 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
   return `${contentHash(srcPath)}:${configHash(config)}`;
 }
 
+// ─── Load / save ─────────────────────────────────────────────────────────────
+
 /**
  * Load the cache manifest from disk, or return an empty one.
  *
@@ -41,7 +96,7 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
  * @returns {CacheManifest}
  */
 export function loadCache(projectRoot: string) {
-  const manifestPath = resolve(projectRoot, ".cache/images/manifest.json");
+  const manifestPath = resolve(getImageCacheDir(projectRoot), "manifest.json");
   if (!existsSync(manifestPath)) {
     return { version: 1, entries: {} };
   }
@@ -59,10 +114,12 @@ export function loadCache(projectRoot: string) {
  * @param {CacheManifest} cache
  */
 export function saveCache(projectRoot: string, cache: CacheManifest) {
-  const cacheDir = resolve(projectRoot, ".cache/images");
+  const cacheDir = getImageCacheDir(projectRoot);
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(resolve(cacheDir, "manifest.json"), JSON.stringify(cache, null, 2), "utf8");
 }
+
+// ─── Entry access ─────────────────────────────────────────────────────────────
 
 /**
  * Check if a cache entry exists and its output files are still present.

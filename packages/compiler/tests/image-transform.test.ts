@@ -65,6 +65,7 @@ mock.module("../src/site/image-optimizer.js", () => ({
 mock.module("../src/site/image-cache.js", () => ({
   getCached: mock(() => null),
   setCached: mock(() => {}),
+  getImageCacheDir: mock((root: string) => root + "/.cache/images"),
 }));
 
 const { transformImageNodes } = await import("../src/site/image-transform.js");

@@ -9,6 +9,7 @@ import { resolveLayout } from "../src/site/layout-resolver";
 import { mergeHead, renderHead } from "../src/site/head-merger";
 import { injectContext } from "../src/site/context-injection";
 import { buildSite } from "../src/site/site-build";
+import { _testResetNpmCacheBase, _testSetNpmCacheBase } from "../src/site/image-cache.ts";
 
 const TMP = resolve(import.meta.dir, "__test-site__");
 
@@ -459,7 +460,7 @@ describe("buildSite — missing pages/", () => {
 describe("buildSite — optimized images cache-to-dist", () => {
   const OPT_TMP = resolve(import.meta.dir, "__test-site-opt-images__");
 
-  beforeAll(() => {
+  function setupProject() {
     rmSync(OPT_TMP, { recursive: true, force: true });
     mkdirSync(OPT_TMP, { recursive: true });
     writeFileSync(
@@ -473,19 +474,58 @@ describe("buildSite — optimized images cache-to-dist", () => {
       JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
       "utf8",
     );
-    // Pre-populate .cache/images/_optimized as if a prior build already ran sharp
-    mkdirSync(resolve(OPT_TMP, ".cache/images/_optimized"), { recursive: true });
-    writeFileSync(resolve(OPT_TMP, ".cache/images/_optimized/cached.webp"), "fake-image", "utf8");
-  });
+  }
 
   afterAll(() => {
     rmSync(OPT_TMP, { recursive: true, force: true });
   });
 
-  it("copies cached variants to dist/images/_optimized on a clean build", async () => {
-    await buildSite(OPT_TMP, { clean: true });
-    // dist is wiped clean then variants are copied from .cache — not re-encoded
-    expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/cached.webp"))).toBe(true);
+  it("copies cached variants from the global npm cache dir to dist", async () => {
+    setupProject();
+    _testResetNpmCacheBase();
+
+    // Discover the real npm cache path and pre-populate it as a prior build would have.
+    // Use cwd: tmpdir() to avoid ENOWORKSPACES when running inside an npm workspace.
+    const { execSync } = await import("node:child_process");
+    const { tmpdir } = await import("node:os");
+    const { basename, resolve: res } = await import("node:path");
+    const npmBase = execSync("npm config get cache", {
+      encoding: "utf-8",
+      cwd: tmpdir(),
+    }).trim();
+    const npmOptDir = res(npmBase, "jxsuite-images", basename(OPT_TMP), "_optimized");
+    mkdirSync(npmOptDir, { recursive: true });
+    writeFileSync(res(npmOptDir, "npm-cached.webp"), "fake-webp", "utf8");
+
+    try {
+      await buildSite(OPT_TMP, { clean: true });
+      expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/npm-cached.webp"))).toBe(true);
+    } finally {
+      rmSync(res(npmBase, "jxsuite-images", basename(OPT_TMP)), { recursive: true, force: true });
+      _testResetNpmCacheBase();
+    }
+  });
+
+  it("falls back to project-local .cache/images when npm cache is unavailable", async () => {
+    setupProject();
+    // Force the fallback path — equivalent to execSync("npm config get cache") throwing,
+    // e.g. npm not in PATH or no network on a restricted CI image.
+    _testSetNpmCacheBase(null);
+
+    // Pre-populate the project-local cache as a prior build would have
+    mkdirSync(resolve(OPT_TMP, ".cache/images/_optimized"), { recursive: true });
+    writeFileSync(
+      resolve(OPT_TMP, ".cache/images/_optimized/local-cached.webp"),
+      "fake-webp",
+      "utf8",
+    );
+
+    try {
+      await buildSite(OPT_TMP, { clean: true });
+      expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/local-cached.webp"))).toBe(true);
+    } finally {
+      _testResetNpmCacheBase();
+    }
   });
 });
 

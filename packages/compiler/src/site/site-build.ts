@@ -44,7 +44,7 @@ import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./c
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { compileMarkdown } from "../targets/compile-markdown.ts";
 import { transformImageNodes } from "./image-transform.ts";
-import { loadCache, saveCache } from "./image-cache.ts";
+import { loadCache, saveCache, getImageCacheDir } from "./image-cache.ts";
 import type {
   JxElement,
   JxMutableNode,
@@ -257,7 +257,7 @@ export async function buildSite(
   // ── 6b. Save image cache and copy variants to dist ──────────────────────
   if (imageCache && projectConfig.images.optimize) {
     saveCache(projectRoot, imageCache);
-    const cacheOptimizedDir = resolve(projectRoot, ".cache/images/_optimized");
+    const cacheOptimizedDir = resolve(getImageCacheDir(projectRoot), "_optimized");
     if (existsSync(cacheOptimizedDir)) {
       const distOptimizedDir = resolve(outDir, "images/_optimized");
       mkdirSync(distOptimizedDir, { recursive: true });
