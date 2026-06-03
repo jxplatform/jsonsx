@@ -2,7 +2,7 @@
  * Content-loader.js — Content type loader
  *
  * Loads content types defined in project.json's `contentTypes` key. Supports Markdown (.md), JSON
- * (.json), and CSV (.csv) source files.
+ * (.json), and CSV (.csv) source files or remote URLs.
  *
  * Phase 2 implementation of site-architecture spec §6.
  *
@@ -180,24 +180,51 @@ function loadJSONEntries(filePath: string) {
  * @param {ContentTypeSchema} [schema] - Content type schema (for type coercion)
  * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
  */
-function loadCSVEntries(filePath: string, schema?: ContentTypeSchema) {
-  const csv = readFileSync(filePath, "utf-8");
-  const rows = parseCSV(csv);
-  return rows.map((row: Record<string, string>, i: number) => {
-    // Apply type coercion based on schema if available
+/**
+ * Coerce raw CSV row strings to typed values per the schema. - number: strips currency
+ * symbols/commas, returns null for empty cells - boolean: "true" → true, everything else → false -
+ * string: trimmed (already done by parseCSV, but defensively applied)
+ */
+function coerceCSVRows(
+  rows: Record<string, string>[],
+  schema?: ContentTypeSchema,
+): ContentLoaderEntry[] {
+  return rows.map((row, i) => {
     const data: Record<string, unknown> = { ...row };
     if (schema?.properties) {
       for (const [key, def] of Object.entries(schema.properties)) {
-        if (key in data) {
-          if (def.type === "number") data[key] = Number(data[key]);
-          else if (def.type === "boolean") data[key] = data[key] === "true";
+        if (!(key in data)) continue;
+        if (def.type === "number") {
+          const raw = String(data[key] ?? "").trim();
+          if (raw === "") {
+            data[key] = null;
+          } else {
+            const cleaned = raw.replace(/[$€£¥,\s]/g, "");
+            const n = Number(cleaned);
+            data[key] = isNaN(n) ? null : n;
+          }
+        } else if (def.type === "boolean") {
+          data[key] = data[key] === "true";
         }
       }
     }
-    // Use `id` column, `sku` column, or row index as the entry ID
     const id = (data.id as string | undefined) ?? (data.sku as string | undefined) ?? String(i);
     return { id, data, body: null };
   });
+}
+
+function loadCSVEntries(filePath: string, schema?: ContentTypeSchema) {
+  const rows = parseCSV(readFileSync(filePath, "utf-8"));
+  return coerceCSVRows(rows, schema);
+}
+
+/** Fetch a remote CSV URL and return ContentLoaderEntry[]. */
+async function loadRemoteCSV(url: string, schema?: ContentTypeSchema) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch CSV from ${url}: ${response.status} ${response.statusText}`);
+  }
+  return coerceCSVRows(parseCSV(await response.text()), schema);
 }
 
 // ─── Content Config ───────────────────────────────────────────────────────────
@@ -288,6 +315,18 @@ async function loadContentType(name: string, contentTypeDef: ContentTypeDef, pro
           .map((e) => (typeof e === "string" ? e : (e as JxMutableNode).$ref)),
       }
     : undefined;
+
+  // Remote URL source (e.g. Google Sheets CSV export)
+  if (source.startsWith("http://") || source.startsWith("https://")) {
+    try {
+      const entries = await loadRemoteCSV(source, schema);
+      if (schema) validateEntries(entries, schema, name);
+      return entries;
+    } catch (e) {
+      console.warn(`Content type "${name}": ${(e as Error).message}`);
+      return [];
+    }
+  }
 
   // Resolve source path and discover files
   const resolvedSource = resolve(projectRoot, source).split("\\").join("/");
