@@ -31,7 +31,8 @@
     "provenance": true
   },
   "scripts": {
-    "build": "bun build src/compiler.ts src/cli.ts --outdir=dist --format=esm --minify --target=node",
+    "prepare": "bun build src/compiler.ts src/cli.ts --outdir=dist --format=esm --minify --target=node",
+    "build": "bun run prepare",
     "build:site": "bun src/cli.ts build",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
