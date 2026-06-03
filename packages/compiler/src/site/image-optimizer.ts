@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, mkdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
+import { createRequire } from "node:module";
 
 export interface ImageVariant {
   width: number; // Pixel width of the variant
@@ -35,9 +36,22 @@ let _sharp: typeof import("sharp") | null = null;
 
 async function getSharp() {
   if (_sharp) return _sharp;
+  // Primary: dynamic import — works in tests (mock.module intercepts it) and in
+  // production installs where @img/sharp-* native packages are adjacent to cli.js.
   try {
     const sharpMod = await import("sharp");
-    _sharp = sharpMod.default;
+    _sharp = sharpMod.default as typeof import("sharp");
+    return _sharp;
+  } catch {
+    // Fall through to CJS fallback below.
+  }
+  // Fallback: resolve from the project being compiled. This covers symlinked
+  // monorepo dev environments (e.g. NixOS) where Node.js resolves import.meta.url
+  // to the compiler package's real path, making the @img/sharp-* packages
+  // unreachable via the primary import path.
+  try {
+    const req = createRequire(resolve(process.cwd(), "package.json"));
+    _sharp = req("sharp") as typeof import("sharp");
     return _sharp;
   } catch (e) {
     throw new Error(
