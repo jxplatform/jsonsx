@@ -101,7 +101,7 @@ describe("image-transform", () => {
       const config = { ...defaultConfig, optimize: false };
       const cache = { version: 1, entries: {} };
 
-      const result = await transformImageNodes(doc, config, TMP, join(TMP, "out"), cache);
+      const result = await transformImageNodes(doc, config, TMP, cache);
       expect(result.imageRefs.size).toBe(0);
     });
 
@@ -112,7 +112,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      const result = await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      const result = await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.srcset).toContain("/_optimized/hero-640-abc.avif 640w");
       expect(doc.attributes.srcset).toContain("/_optimized/hero-1200-abc.avif 1200w");
@@ -131,7 +131,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.width).toBe("400");
       expect(doc.attributes.height).toBe("300");
@@ -144,7 +144,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.loading).toBe("eager");
       expect(doc.attributes.decoding).toBeUndefined();
@@ -158,7 +158,7 @@ describe("image-transform", () => {
       const config = { ...defaultConfig, lazyLoad: false };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, config, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, config, TMP, cache);
 
       expect(doc.attributes.loading).toBeUndefined();
       expect(doc.attributes.decoding).toBeUndefined();
@@ -171,7 +171,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.srcset).toBeUndefined();
     });
@@ -183,7 +183,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.srcset).toBeUndefined();
     });
@@ -214,7 +214,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // processImage should not have been called since cache hit
       expect(processImage).not.toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // Since cached variant doesn't exist on disk, processImage should NOT be called
       // because the code only calls processImage when `!cached` (line 42)
@@ -267,7 +267,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // processImage should only be called once for the same absolute path
       expect(processImage).toHaveBeenCalledTimes(1);
@@ -287,7 +287,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // Should resolve to TMP/images/photo.jpg and transform it
       expect(doc.attributes.srcset).toBeDefined();
@@ -302,7 +302,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, config, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, config, TMP, cache);
 
       // Should use webp since avif is not available
       expect(doc.attributes.srcset).toContain("webp");
@@ -318,7 +318,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.srcset).toBeUndefined();
     });
@@ -330,7 +330,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.sizes).toBe("100vw");
     });
@@ -347,7 +347,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.children[0].children[0].attributes.srcset).toBeDefined();
     });
@@ -359,7 +359,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.innerHTML).toContain("srcset=");
       expect(doc.innerHTML).toContain("sizes=");
@@ -377,7 +377,7 @@ describe("image-transform", () => {
       };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       expect(doc.attributes.srcset).toBeDefined();
     });
@@ -389,7 +389,7 @@ describe("image-transform", () => {
       const doc: any = { tagName: "img", attributes: { src: "/images/icon.svg" } };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
 
@@ -398,7 +398,7 @@ describe("image-transform", () => {
       const doc: any = { tagName: "img", attributes: { src: "/images/anim.gif" } };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
 
@@ -406,7 +406,7 @@ describe("image-transform", () => {
       const doc: any = { tagName: "img", attributes: { src: "https://example.com/img.png" } };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
 
@@ -414,7 +414,7 @@ describe("image-transform", () => {
       const doc: any = { tagName: "img", attributes: { src: "/images/${name}.png" } };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
 
@@ -422,7 +422,7 @@ describe("image-transform", () => {
       const doc: any = { tagName: "img", attributes: { src: "data:image/png;base64,abc" } };
       const cache = { version: 1, entries: {} };
 
-      await transformImageNodes(doc, defaultConfig, TMP, join(TMP, "out"), cache);
+      await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
   });

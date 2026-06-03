@@ -14,7 +14,6 @@ import {
   copyFileSync,
   mkdirSync,
   existsSync,
-  renameSync,
   rmSync,
   cpSync,
   readdirSync,
@@ -88,20 +87,7 @@ export async function buildSite(
 
   // ── 2. Clean output directory ───────────────────────────────────────────
   if (clean && existsSync(outDir)) {
-    // Preserve optimized images across builds — sharp re-encoding is expensive
-    const optimizedDir = resolve(outDir, "images/_optimized");
-    const hasOptimized = existsSync(optimizedDir);
-    let tmpOptimized = "";
-    if (hasOptimized) {
-      tmpOptimized = resolve(projectRoot, ".cache/_optimized_tmp");
-      mkdirSync(resolve(projectRoot, ".cache"), { recursive: true });
-      renameSync(optimizedDir, tmpOptimized);
-    }
     rmSync(outDir, { recursive: true, force: true });
-    if (hasOptimized) {
-      mkdirSync(resolve(outDir, "images"), { recursive: true });
-      renameSync(tmpOptimized, optimizedDir);
-    }
   }
   mkdirSync(outDir, { recursive: true });
 
@@ -208,7 +194,6 @@ export async function buildSite(
         projectRoot,
         contentTypes,
         imageCache,
-        outDir,
         componentDefs,
       );
 
@@ -269,9 +254,15 @@ export async function buildSite(
     }
   }
 
-  // ── 6b. Save image cache ─────────────────────────────────────────────
+  // ── 6b. Save image cache and copy variants to dist ──────────────────────
   if (imageCache && projectConfig.images.optimize) {
     saveCache(projectRoot, imageCache);
+    const cacheOptimizedDir = resolve(projectRoot, ".cache/images/_optimized");
+    if (existsSync(cacheOptimizedDir)) {
+      const distOptimizedDir = resolve(outDir, "images/_optimized");
+      mkdirSync(distOptimizedDir, { recursive: true });
+      cpSync(cacheOptimizedDir, distOptimizedDir, { recursive: true });
+    }
     const totalImages = Object.keys(imageCache.entries).length;
     if (totalImages > 0) {
       log(`  Optimized ${totalImages} image(s)`);
@@ -377,7 +368,6 @@ export async function buildSite(
  * @param {string} projectRoot
  * @param {Map<string, ContentLoaderEntry[]>} [contentTypes]
  * @param {import("./image-cache.js").CacheManifest | null} [imageCache]
- * @param {string} [outDir]
  * @param {Map<string, JxElement>} [componentDefs]
  * @returns {Promise<{
  *   html: string;
@@ -392,7 +382,6 @@ async function compilePage(
   projectRoot: string,
   contentTypes: Map<string, ContentLoaderEntry[]> = new Map(),
   imageCache: import("./image-cache.js").CacheManifest | null = null,
-  outDir: string = "",
   componentDefs: Map<string, JxElement> = new Map(),
 ) {
   // Load the raw page document
@@ -483,12 +472,11 @@ async function compilePage(
   }
 
   // Transform <img> nodes for responsive image optimization
-  if (imageCache && projectConfig.images?.optimize && outDir) {
+  if (imageCache && projectConfig.images?.optimize) {
     await transformImageNodes(
       layoutDoc,
       projectConfig.images as import("./image-optimizer").ImageConfig,
       projectRoot,
-      outDir,
       imageCache,
     );
   }

@@ -24,7 +24,7 @@ const EXTERNAL_PREFIXES = ["http://", "https://", "data:", "//"];
  * @param {string} absoluteSrc
  * @param {string} src
  * @param {ImageConfig} config
- * @param {string} outDir
+ * @param {string} projectRoot
  * @param {CacheManifest} cache
  * @returns {Promise<ImageManifest>}
  */
@@ -32,7 +32,7 @@ async function resolveManifest(
   absoluteSrc: string,
   src: string,
   config: ImageConfig,
-  outDir: string,
+  projectRoot: string,
   cache: CacheManifest,
 ) {
   const key = `${contentHash(absoluteSrc)}:${configHash(config)}`;
@@ -44,7 +44,8 @@ async function resolveManifest(
   }
 
   if (!cached) console.log(`    Optimizing ${basename(absoluteSrc)}...`);
-  const manifest = await processImage(absoluteSrc, outDir, config);
+  const cacheImgDir = resolve(projectRoot, ".cache/images");
+  const manifest = await processImage(absoluteSrc, cacheImgDir, config);
   setCached(cache, key, src, manifest);
   return manifest;
 }
@@ -83,12 +84,12 @@ function resolveImagePath(src: string, projectRoot: string) {
  * Transform image nodes in a Jx document tree.
  *
  * Mutates img nodes in place, injecting srcset, sizes, width, height, loading, and decoding.
- * Returns a set of absolute source paths that need processing.
+ * Optimized variants are written to .cache/images/_optimized/ — the caller is responsible for
+ * copying them to the dist directory after all pages are compiled.
  *
  * @param {JxMutableNode | JxDocument} doc - The Jx document tree (mutated in place)
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {string} outDir
  * @param {CacheManifest} cache
  * @returns {Promise<{ imageRefs: Map<string, ImageManifest> }>}
  */
@@ -96,14 +97,13 @@ export async function transformImageNodes(
   doc: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  outDir: string,
   cache: CacheManifest,
 ) {
   const imageRefs: Map<string, ImageManifest> = new Map();
 
   if (!config.optimize) return { imageRefs };
 
-  await walkAndTransform(doc, config, projectRoot, outDir, cache, imageRefs);
+  await walkAndTransform(doc, config, projectRoot, cache, imageRefs);
 
   return { imageRefs };
 }
@@ -112,7 +112,6 @@ export async function transformImageNodes(
  * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {string} outDir
  * @param {CacheManifest} cache
  * @param {Map<string, ImageManifest>} imageRefs
  */
@@ -120,14 +119,13 @@ async function walkAndTransform(
   node: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  outDir: string,
   cache: CacheManifest,
   imageRefs: Map<string, ImageManifest>,
 ) {
   if (!node || typeof node !== "object") return;
 
   if (node.tagName === "img") {
-    await transformImgNode(node, config, projectRoot, outDir, cache, imageRefs);
+    await transformImgNode(node, config, projectRoot, cache, imageRefs);
   }
 
   if (typeof node.innerHTML === "string" && node.innerHTML.includes("<img")) {
@@ -135,7 +133,6 @@ async function walkAndTransform(
       node.innerHTML,
       config,
       projectRoot,
-      outDir,
       cache,
       imageRefs,
     );
@@ -144,7 +141,7 @@ async function walkAndTransform(
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
       if (typeof child === "string") continue;
-      await walkAndTransform(child, config, projectRoot, outDir, cache, imageRefs);
+      await walkAndTransform(child, config, projectRoot, cache, imageRefs);
     }
   }
 }
@@ -153,7 +150,6 @@ async function walkAndTransform(
  * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {string} outDir
  * @param {CacheManifest} cache
  * @param {Map<string, ImageManifest>} imageRefs
  */
@@ -161,7 +157,6 @@ async function transformImgNode(
   node: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  outDir: string,
   cache: CacheManifest,
   imageRefs: Map<string, ImageManifest>,
 ) {
@@ -177,7 +172,7 @@ async function transformImgNode(
   let manifest = imageRefs.get(absoluteSrc);
 
   if (!manifest) {
-    manifest = await resolveManifest(absoluteSrc, src, config, outDir, cache);
+    manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache);
     imageRefs.set(absoluteSrc, manifest);
   }
 
@@ -213,7 +208,6 @@ const DATA_NO_OPT_RE = /\bdata-no-optimize\b/;
  * @param {string} html
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {string} outDir
  * @param {CacheManifest} cache
  * @param {Map<string, ImageManifest>} imageRefs
  * @returns {Promise<string>}
@@ -222,7 +216,6 @@ async function transformInnerHtmlImages(
   html: string,
   config: ImageConfig,
   projectRoot: string,
-  outDir: string,
   cache: CacheManifest,
   imageRefs: Map<string, ImageManifest>,
 ) {
@@ -247,7 +240,7 @@ async function transformInnerHtmlImages(
 
     let manifest = imageRefs.get(absoluteSrc);
     if (!manifest) {
-      manifest = await resolveManifest(absoluteSrc, src, config, outDir, cache);
+      manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache);
       imageRefs.set(absoluteSrc, manifest);
     }
 

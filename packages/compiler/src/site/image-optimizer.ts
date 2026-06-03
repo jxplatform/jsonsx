@@ -118,20 +118,21 @@ export function variantFilename(stem: string, width: number, hash8: string, form
 }
 
 /**
- * Process a single source image: resize to each configured width, encode to each format.
+ * Process a single source image: resize to each configured width, encode to each format. Writes
+ * variants to cacheImgDir/_optimized/ (e.g. .cache/images/_optimized/).
  *
  * @param {string} srcPath - Absolute path to source image
- * @param {string} outDir - Absolute path to the build output directory (dist/)
+ * @param {string} cacheImgDir - Absolute path to the image cache directory (.cache/images/)
  * @param {ImageConfig} config
  * @returns {Promise<ImageManifest>}
  */
-export async function processImage(srcPath: string, outDir: string, config: ImageConfig) {
+export async function processImage(srcPath: string, cacheImgDir: string, config: ImageConfig) {
   const sharp = await getSharp();
   const meta = await getImageMetadata(srcPath);
   const hash8 = contentHash(srcPath);
   const stem = basename(srcPath, extname(srcPath));
 
-  const optimizedDir = resolve(outDir, OPTIMIZED_DIR);
+  const optimizedDir = resolve(cacheImgDir, "_optimized");
   mkdirSync(optimizedDir, { recursive: true });
 
   const variants: ImageVariant[] = [];

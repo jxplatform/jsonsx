@@ -456,7 +456,7 @@ describe("buildSite — missing pages/", () => {
 
 // ── Optimized images preservation during clean ───────────────────────────────
 
-describe("buildSite — optimized images preservation", () => {
+describe("buildSite — optimized images cache-to-dist", () => {
   const OPT_TMP = resolve(import.meta.dir, "__test-site-opt-images__");
 
   beforeAll(() => {
@@ -473,19 +473,18 @@ describe("buildSite — optimized images preservation", () => {
       JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
       "utf8",
     );
-    // Pre-create dist/images/_optimized with a cached file
-    mkdirSync(resolve(OPT_TMP, "dist/images/_optimized"), { recursive: true });
-    writeFileSync(resolve(OPT_TMP, "dist/images/_optimized/cached.webp"), "fake-image", "utf8");
-    // Ensure .cache parent exists for renameSync target
-    mkdirSync(resolve(OPT_TMP, ".cache"), { recursive: true });
+    // Pre-populate .cache/images/_optimized as if a prior build already ran sharp
+    mkdirSync(resolve(OPT_TMP, ".cache/images/_optimized"), { recursive: true });
+    writeFileSync(resolve(OPT_TMP, ".cache/images/_optimized/cached.webp"), "fake-image", "utf8");
   });
 
   afterAll(() => {
     rmSync(OPT_TMP, { recursive: true, force: true });
   });
 
-  it("preserves _optimized directory across clean builds", async () => {
+  it("copies cached variants to dist/images/_optimized on a clean build", async () => {
     await buildSite(OPT_TMP, { clean: true });
+    // dist is wiped clean then variants are copied from .cache — not re-encoded
     expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/cached.webp"))).toBe(true);
   });
 });
