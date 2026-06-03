@@ -625,6 +625,16 @@ function expandMapTemplate(template: JxMutableNode, scope: Record<string, unknow
         }
       }
       node.attributes = attrs;
+    } else if (k === "$props" && v && typeof v === "object") {
+      const props = { ...v } as Record<string, unknown>;
+      for (const [pk, pv] of Object.entries(props)) {
+        if (typeof pv === "string" && isTemplateString(pv)) {
+          const resolved = evaluateMapTemplate(pv, scope);
+          // null = evaluation error → keep template string; undefined = missing data → use null
+          props[pk] = resolved !== null ? (resolved ?? null) : pv;
+        }
+      }
+      node.$props = props;
     } else if (typeof v === "string" && isTemplateString(v)) {
       node[k] = evaluateMapTemplate(v, scope) ?? v;
     } else {
@@ -692,6 +702,13 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
     for (const [k, v] of Object.entries(node.attributes)) {
       if (typeof v === "string" && isTemplateString(v)) {
         node.attributes[k] = evaluateStaticTemplate(v, scope) ?? v;
+      }
+    }
+  }
+  if (node.$props && typeof node.$props === "object") {
+    for (const [k, v] of Object.entries(node.$props)) {
+      if (typeof v === "string" && isTemplateString(v)) {
+        node.$props[k] = evaluateStaticTemplate(v, scope) ?? v;
       }
     }
   }
