@@ -94,6 +94,7 @@ export async function buildSite(
     let tmpOptimized = "";
     if (hasOptimized) {
       tmpOptimized = resolve(projectRoot, ".cache/_optimized_tmp");
+      mkdirSync(resolve(projectRoot, ".cache"), { recursive: true });
       renameSync(optimizedDir, tmpOptimized);
     }
     rmSync(outDir, { recursive: true, force: true });

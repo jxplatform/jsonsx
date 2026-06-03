@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { resolve } from "node:path";
 
-const CLI_PATH = resolve(import.meta.dir, "../src/cli.ts");
+const CLI_PATH = resolve(import.meta.dir, "../bin/jx.js");
 const FIXTURE_SITE = resolve(import.meta.dir, "../../../sites/jxsuite.com");
 
 describe("jx cli", () => {
