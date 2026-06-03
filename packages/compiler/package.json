@@ -9,9 +9,10 @@
     "directory": "packages/compiler"
   },
   "bin": {
-    "jx": "./dist/cli.js"
+    "jx": "./bin/jx.js"
   },
   "files": [
+    "bin/",
     "src/",
     "dist"
   ],
