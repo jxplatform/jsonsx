@@ -52,7 +52,7 @@
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.9.0",
+    "@happy-dom/global-registrator": "^20.10.2",
     "@jxsuite/runtime": "workspace:^",
     "@types/hast": "^3.0.4"
   }
