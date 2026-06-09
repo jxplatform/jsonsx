@@ -9,7 +9,7 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { classMap } from "lit-html/directives/class-map.js";
-import { debouncedStyleCommit } from "../store";
+import { debouncedStyleCommit, cancelStyleDebounce } from "../store";
 
 export const UNIT_RE = /^(-?[\d.]+)(px|rem|em|%|vw|vh|svw|svh|dvh|ms|s|fr|ch|ex|deg)?$/;
 
@@ -46,26 +46,38 @@ export function renderUnitSelector(
     displayValue = isNaN(num) ? strVal : String(num);
   } else displayValue = "";
 
+  // Parse placeholder so inherited values display as "500" not "500px"
+  const placeholderMatch = placeholder.match(UNIT_RE);
+  const numericPlaceholder = placeholderMatch ? placeholderMatch[1] : placeholder || "0";
+
   const isExpression = isKeyword || (displayValue !== "" && !isNumericVal(displayValue));
   const hasUnits = units.length > 0 || keywords.length > 0;
   const btnId = `style-unit-${prop}`;
+
+  const commitValue = (rawVal: string) => {
+    const val = rawVal.trim();
+    if (val === "") {
+      onChange("");
+      return;
+    }
+    if (isNumericVal(val)) onChange(units.length > 0 ? val + currentUnit : val);
+    else onChange(val);
+  };
 
   return html`
     <div class="style-input-number-unit">
       <div class=${classMap({ "input-group": true, "is-expression": isExpression })}>
         <sp-textfield
           size="s"
-          placeholder=${placeholder || "0"}
+          placeholder=${numericPlaceholder}
           .value=${live(displayValue)}
           @input=${debouncedStyleCommit(`nui:${prop}`, 400, (e: Event) => {
-            const val = (e.target as HTMLInputElement).value.trim();
-            if (val === "") {
-              onChange("");
-              return;
-            }
-            if (isNumericVal(val)) onChange(units.length > 0 ? val + currentUnit : val);
-            else onChange(val);
+            commitValue((e.target as HTMLInputElement).value);
           })}
+          @change=${(e: Event) => {
+            cancelStyleDebounce(`nui:${prop}`);
+            commitValue((e.target as HTMLInputElement).value);
+          }}
         ></sp-textfield>
         ${hasUnits
           ? html`
