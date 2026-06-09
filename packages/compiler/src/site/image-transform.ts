@@ -57,6 +57,7 @@ async function resolveManifest(
  */
 function shouldSkip(src: string) {
   if (typeof src !== "string") return true;
+  if (!src) return true;
   if (src.includes("${")) return true;
   if (EXTERNAL_PREFIXES.some((p) => src.startsWith(p))) return true;
   if (SKIP_EXTENSIONS.has(extname(src).toLowerCase())) return true;

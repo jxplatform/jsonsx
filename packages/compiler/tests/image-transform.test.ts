@@ -426,5 +426,30 @@ describe("image-transform", () => {
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
     });
+
+    test("skips img node with empty src — does not call processImage", async () => {
+      // Regression: empty ![]() in markdown produces src="" which previously resolved
+      // to the project root directory, causing EISDIR when processImage tried to read it.
+      const doc: any = { tagName: "img", attributes: { src: "" } };
+      const cache = { version: 1, entries: {} };
+
+      await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
+      expect(processImage).not.toHaveBeenCalled();
+      expect(doc.attributes.srcset).toBeUndefined();
+    });
+
+    test("skips innerHTML <img> with empty src — does not call processImage", async () => {
+      // Same regression via the innerHTML path: a pre-rendered component containing
+      // an <img src=""> must not attempt to read the project root as an image.
+      const doc: any = {
+        tagName: "div",
+        innerHTML: '<img src="" alt="placeholder">',
+      };
+      const cache = { version: 1, entries: {} };
+
+      await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
+      expect(processImage).not.toHaveBeenCalled();
+      expect(doc.innerHTML).not.toContain("srcset=");
+    });
   });
 });
