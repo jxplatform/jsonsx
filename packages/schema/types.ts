@@ -73,6 +73,7 @@ export interface ImageConfig {
   lazyLoad?: boolean;
   service?: "build" | "cloudflare";
   binding?: string;
+  remoteDomains?: string[];
 }
 
 export type CemParameter = FromSchema<typeof cemParameterSchema>;

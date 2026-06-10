@@ -7,6 +7,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve, extname, basename } from "node:path";
 import {
   processImage,
@@ -107,6 +108,35 @@ function shouldSkip(src: string) {
   if (EXTERNAL_PREFIXES.some((p) => src.startsWith(p))) return true;
   if (SKIP_EXTENSIONS.has(extname(src).toLowerCase())) return true;
   return false;
+}
+
+/**
+ * Check if a remote src is eligible for cloudflare-service optimization: an https URL whose
+ * hostname is in the project's `images.remoteDomains` allowlist. Content data (e.g. CSV columns)
+ * routinely references externally hosted images — allowlisted hosts flow through the /_jx/image
+ * endpoint like local assets; everything else passes through untouched.
+ *
+ * @param {string} src
+ * @param {ImageConfig} config
+ * @returns {boolean}
+ */
+function isAllowedRemote(src: string, config: ImageConfig) {
+  if (config.service !== "cloudflare") return false;
+  if (!config.remoteDomains?.length) return false;
+  if (typeof src !== "string" || !src.startsWith("https://")) return false;
+  if (src.includes("${")) return false;
+  try {
+    const url = new URL(src);
+    if (SKIP_EXTENSIONS.has(extname(url.pathname).toLowerCase())) return false;
+    return config.remoteDomains.includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** 8-char cache-busting hash for a remote URL (original bytes aren't available at build time). */
+function urlHash(src: string) {
+  return createHash("sha256").update(src).digest("hex").slice(0, 8);
 }
 
 /**
@@ -216,25 +246,30 @@ async function transformImgNode(
   if (!node.attributes) node.attributes = {};
 
   const src = node.attributes.src ?? node.src;
-  if (shouldSkip(src)) return;
+  const remote = isAllowedRemote(src, config);
+  if (!remote && shouldSkip(src)) return;
   if (node.attributes["data-no-optimize"] !== undefined) return;
 
-  const absoluteSrc = resolveImagePath(src, projectRoot);
-  if (!existsSync(absoluteSrc)) return;
+  const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot);
+  if (absoluteSrc && !existsSync(absoluteSrc)) return;
 
   let srcset;
   let original: { width: number; height: number } | undefined;
 
-  if (config.service === "cloudflare") {
-    const meta = await resolveCfMeta(absoluteSrc, metaCache);
+  if (remote) {
+    // Original dimensions are unknown without fetching — emit every configured width and let
+    // the endpoint's scale-down fit avoid upscaling past the source size.
+    srcset = buildCloudflareSrcset(src, config.widths, Infinity, urlHash(src));
+  } else if (config.service === "cloudflare") {
+    const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
     srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
     original = meta;
   } else {
-    let manifest = imageRefs.get(absoluteSrc);
+    let manifest = imageRefs.get(absoluteSrc as string);
 
     if (!manifest) {
-      manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
-      imageRefs.set(absoluteSrc, manifest);
+      manifest = await resolveManifest(absoluteSrc as string, src, config, projectRoot, cache!);
+      imageRefs.set(absoluteSrc as string, manifest);
     }
 
     const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
@@ -297,24 +332,28 @@ async function transformInnerHtmlImages(
     const srcMatch = attrs.match(SRC_ATTR_RE);
     if (!srcMatch) continue;
 
-    const src = srcMatch[1];
-    if (shouldSkip(src)) continue;
+    // Attribute values in pre-rendered innerHTML are entity-escaped — decode for processing
+    const src = srcMatch[1].replaceAll("&amp;", "&");
+    const remote = isAllowedRemote(src, config);
+    if (!remote && shouldSkip(src)) continue;
 
-    const absoluteSrc = resolveImagePath(src, projectRoot);
-    if (!existsSync(absoluteSrc)) continue;
+    const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot);
+    if (absoluteSrc && !existsSync(absoluteSrc)) continue;
 
     let srcset;
     let original: { width: number; height: number } | undefined;
 
-    if (config.service === "cloudflare") {
-      const meta = await resolveCfMeta(absoluteSrc, metaCache);
+    if (remote) {
+      srcset = buildCloudflareSrcset(src, config.widths, Infinity, urlHash(src));
+    } else if (config.service === "cloudflare") {
+      const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
       srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
       original = meta;
     } else {
-      let manifest = imageRefs.get(absoluteSrc);
+      let manifest = imageRefs.get(absoluteSrc as string);
       if (!manifest) {
-        manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
-        imageRefs.set(absoluteSrc, manifest);
+        manifest = await resolveManifest(absoluteSrc as string, src, config, projectRoot, cache!);
+        imageRefs.set(absoluteSrc as string, manifest);
       }
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];

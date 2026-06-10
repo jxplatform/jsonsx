@@ -609,6 +609,91 @@ describe("image-transform", () => {
       expect(getImageMetadata).not.toHaveBeenCalled();
     });
 
+    test("optimizes allowlisted remote sources with an unclamped srcset", async () => {
+      const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
+      const remoteSrc =
+        "https://drive.usercontent.google.com/download?id=abc123&export=download/photo.jpg";
+      const doc: any = { tagName: "img", attributes: { src: remoteSrc } };
+
+      await transformImageNodes(doc, config, TMP, null, new Map());
+
+      const encoded = encodeURIComponent(remoteSrc);
+      expect(doc.attributes.srcset).toMatch(
+        new RegExp(
+          `^/_jx/image\\?src=${encoded.replace(/[.*+?^$()[\\]{}|]/g, "\\$&")}&w=640&v=[0-9a-f]{8} 640w, `,
+        ),
+      );
+      expect(doc.attributes.srcset).toContain("&w=1200&v=");
+      expect(doc.attributes.src).toBe(remoteSrc);
+      expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+      // Original dimensions are unknown for remote sources — no width/height injection
+      expect(doc.attributes.width).toBeUndefined();
+      expect(doc.attributes.height).toBeUndefined();
+      expect(doc.attributes.loading).toBe("lazy");
+      expect(getImageMetadata).not.toHaveBeenCalled();
+      expect(processImage).not.toHaveBeenCalled();
+    });
+
+    test("leaves remote sources from non-allowlisted hosts untouched", async () => {
+      const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "https://evil.example.com/img.jpg" },
+      };
+
+      await transformImageNodes(doc, config, TMP, null, new Map());
+      expect(doc.attributes.srcset).toBeUndefined();
+    });
+
+    test("ignores remoteDomains outside the cloudflare service", async () => {
+      const config = {
+        ...defaultConfig,
+        remoteDomains: ["drive.usercontent.google.com"],
+      };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "https://drive.usercontent.google.com/download?id=x/p.jpg" },
+      };
+      const cache = { version: 1, entries: {} };
+
+      await transformImageNodes(doc, config, TMP, cache);
+      expect(doc.attributes.srcset).toBeUndefined();
+    });
+
+    test("skips remote svg/gif and template sources", async () => {
+      const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
+      const docs: any[] = [
+        {
+          tagName: "img",
+          attributes: { src: "https://drive.usercontent.google.com/icon.svg" },
+        },
+        {
+          tagName: "img",
+          attributes: { src: "https://drive.usercontent.google.com/${id}.jpg" },
+        },
+      ];
+      for (const doc of docs) {
+        await transformImageNodes(doc, config, TMP, null, new Map());
+        expect(doc.attributes.srcset).toBeUndefined();
+      }
+    });
+
+    test("rewrites entity-escaped remote img tags in innerHTML", async () => {
+      const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
+      const doc: any = {
+        tagName: "div",
+        innerHTML:
+          '<img src="https://drive.usercontent.google.com/download?id=abc&amp;export=download/p.jpg" alt="P">',
+      };
+
+      await transformImageNodes(doc, config, TMP, null, new Map());
+
+      // The decoded URL is percent-encoded into the endpoint src param
+      expect(doc.innerHTML).toContain('srcset="/_jx/image?src=');
+      expect(doc.innerHTML).toContain(encodeURIComponent("id=abc&export=download"));
+      expect(doc.innerHTML).toContain('loading="lazy"');
+    });
+
     test("honors existing skip rules", async () => {
       writeFileSync(join(TMP, "public/images/icon.svg"), "<svg></svg>");
       const docs: any[] = [

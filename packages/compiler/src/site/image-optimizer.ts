@@ -32,6 +32,12 @@ export interface ImageConfig {
   lazyLoad: boolean;
   service?: "build" | "cloudflare";
   binding?: string;
+  /**
+   * Hostnames whose remote (https) images are routed through the optimization pipeline. Cloudflare
+   * service only — the generated /_jx/image endpoint fetches and transforms allowlisted remote
+   * sources; everything else is rejected to prevent open-proxy use.
+   */
+  remoteDomains?: string[];
 }
 
 let _sharp: typeof import("sharp") | null = null;

@@ -37,14 +37,23 @@ export function buildImageHandlerSource(images: ImageConfig) {
   return `const JX_IMG_WIDTHS = new Set(${JSON.stringify(images.widths ?? [])})
 const JX_IMG_FORMATS = ${JSON.stringify(tuples)} // [mime, quality] in preference order
 const JX_IMG_BINDING = ${JSON.stringify(binding)}
+const JX_IMG_REMOTE_DOMAINS = new Set(${JSON.stringify(images.remoteDomains ?? [])})
 
 async function jxHandleImage(request, env, waitUntil) {
   const url = new URL(request.url)
   const src = url.searchParams.get('src') ?? ''
   const w = Number(url.searchParams.get('w') ?? '')
 
-  // Same-origin asset paths only — never act as an open proxy.
-  if (!src.startsWith('/') || src.startsWith('//') || src.includes('..') ||
+  // Same-origin asset paths, or https sources from allowlisted remote domains —
+  // never act as an open proxy.
+  let remoteSrc = null
+  if (src.startsWith('https://')) {
+    try {
+      const remote = new URL(src)
+      if (JX_IMG_REMOTE_DOMAINS.has(remote.hostname)) remoteSrc = remote
+    } catch {}
+    if (!remoteSrc) return new Response('Invalid src', { status: 400 })
+  } else if (!src.startsWith('/') || src.startsWith('//') || src.includes('..') ||
       src.includes(':') || src.includes('\\\\') || src.includes('?') || src.includes('#')) {
     return new Response('Invalid src', { status: 400 })
   }
@@ -67,7 +76,12 @@ async function jxHandleImage(request, env, waitUntil) {
     return out
   }
 
-  const asset = await env.ASSETS.fetch(new Request(new URL(src, url.origin)))
+  const fetchSource = () =>
+    remoteSrc
+      ? fetch(remoteSrc.href, { redirect: 'follow' })
+      : env.ASSETS.fetch(new Request(new URL(src, url.origin)))
+
+  const asset = await fetchSource()
   if (!asset.ok || !asset.body) return new Response('Not found', { status: 404 })
 
   let response
@@ -75,12 +89,12 @@ async function jxHandleImage(request, env, waitUntil) {
     try {
       const result = await env[JX_IMG_BINDING]
         .input(asset.body)
-        .transform({ width: w })
+        .transform({ width: w, fit: 'scale-down' })
         .output({ format: target.mime, quality: target.quality })
       response = result.response()
     } catch (e) {
-      // Transform failed — serve the original asset untouched.
-      const retry = await env.ASSETS.fetch(new Request(new URL(src, url.origin)))
+      // Transform failed — serve the original source untouched.
+      const retry = await fetchSource()
       response = new Response(retry.body, retry)
     }
   } else {

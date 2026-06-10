@@ -48,10 +48,30 @@ describe("buildImageHandlerSource", () => {
     expect(src).toContain("src.includes('..')");
   });
 
+  test("bakes an empty remote-domain allowlist by default", () => {
+    const src = buildImageHandlerSource(images);
+    expect(src).toContain("const JX_IMG_REMOTE_DOMAINS = new Set([])");
+  });
+
+  test("accepts allowlisted remote https sources and fetches them directly", () => {
+    const src = buildImageHandlerSource({
+      ...images,
+      remoteDomains: ["drive.usercontent.google.com"],
+    });
+    expect(src).toContain(
+      'const JX_IMG_REMOTE_DOMAINS = new Set(["drive.usercontent.google.com"])',
+    );
+    expect(src).toContain("src.startsWith('https://')");
+    expect(src).toContain("JX_IMG_REMOTE_DOMAINS.has(remote.hostname)");
+    expect(src).toContain("fetch(remoteSrc.href, { redirect: 'follow' })");
+    // Non-allowlisted remote URLs still fail validation
+    expect(src).toContain("if (!remoteSrc) return new Response('Invalid src', { status: 400 })");
+  });
+
   test("transforms via the Images binding and caches at the edge", () => {
     const src = buildImageHandlerSource(images);
     expect(src).toContain(".input(asset.body)");
-    expect(src).toContain(".transform({ width: w })");
+    expect(src).toContain(".transform({ width: w, fit: 'scale-down' })");
     expect(src).toContain(".output({ format: target.mime, quality: target.quality })");
     expect(src).toContain("caches.default");
     expect(src).toContain("'Cache-Control', 'public, max-age=31536000, immutable'");

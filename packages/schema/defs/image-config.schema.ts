@@ -18,5 +18,13 @@ export const imageConfigSchema = {
     lazyLoad: { type: "boolean" },
     service: { type: "string", enum: ["build", "cloudflare"] },
     binding: { type: "string" },
+    remoteDomains: {
+      description:
+        "Hostnames whose remote (https) images are optimized through the /_jx/image endpoint " +
+        '(cloudflare service only), e.g. ["drive.usercontent.google.com"]. Remote sources from ' +
+        "other hosts are left untouched.",
+      type: "array",
+      items: { type: "string" },
+    },
   },
 } as const;
