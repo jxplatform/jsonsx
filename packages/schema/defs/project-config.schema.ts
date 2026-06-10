@@ -88,7 +88,7 @@ export const projectConfigSchema = {
       additionalProperties: { type: "string" },
       examples: [
         {
-          MarkdownFile: "@jxsuite/parser/MarkdownFile.class.json",
+          Markdown: "@jxsuite/parser/Markdown.class.json",
           MarkdownCollection: "@jxsuite/parser/MarkdownCollection.class.json",
         },
       ],

@@ -75,12 +75,6 @@
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",
     "quikchat": "^1.2.7",
-    "remark-directive": "^4.0.0",
-    "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "remark-parse": "^11.0.0",
-    "remark-stringify": "^11.0.0",
-    "unified": "^11.0.5",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

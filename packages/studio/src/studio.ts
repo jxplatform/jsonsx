@@ -40,7 +40,8 @@ import {
   setStatusbarRenderer,
   mountStatusbar,
 } from "./panels/statusbar";
-import { loadMarkdown, saveFile, exportFile, serializeDocument } from "./files/file-ops";
+import { parseSourceForPath, saveFile, exportFile, serializeDocument } from "./files/file-ops";
+import { loadFormats, formatForPath, documentExtensions } from "./format/format-host";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
@@ -168,7 +169,7 @@ async function navigateBack() {
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, serializeDocument(tab));
+      await platform.writeFile(tab.documentPath, await serializeDocument(tab));
     } catch (e) {
       const err = e as Error;
       statusMessage(`Save error: ${err.message}`);
@@ -198,7 +199,7 @@ async function navigateToLevel(targetIndex: number) {
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
-      await platform.writeFile(tab.documentPath, serializeDocument(tab));
+      await platform.writeFile(tab.documentPath, await serializeDocument(tab));
     } catch (e) {
       const err = e as Error;
       statusMessage(`Save error: ${err.message}`);
@@ -222,9 +223,8 @@ async function navigateToLevel(targetIndex: number) {
 async function closeFunctionEditor() {
   const tab = activeTab.value;
   const editing =
-    /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ (
-      tab?.session.ui.editingFunction
-    );
+    /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ tab
+      ?.session.ui.editingFunction;
   if (!editing || !tab) return;
   if (view.functionEditor) {
     const currentCode = view.functionEditor.getValue();
@@ -237,7 +237,7 @@ async function closeFunctionEditor() {
       const current = node?.[editing.eventKey as string] || {};
       transactDoc(tab, (t) =>
         mutateUpdateProperty(t, editing.path as JxPath, editing.eventKey as string, {
-          .../** @type {object} */ (current),
+          .../** @type {object} */ current,
           $prototype: "Function",
           body: bodyToStore,
         }),
@@ -531,7 +531,12 @@ if (_projectParam) {
         // When opening project.json, default to home page instead
         if (fileRelPath === "project.json" || fileRelPath.endsWith("/project.json")) {
           let opened = false;
-          for (const candidate of ["pages/index.md", "pages/index.json"]) {
+          await loadFormats();
+          const homeCandidates = [
+            ...documentExtensions("page").map((ext) => `pages/index${ext}`),
+            "pages/index.json",
+          ];
+          for (const candidate of homeCandidates) {
             try {
               await platform.readFile(candidate);
               fileRelPath = candidate;
@@ -544,12 +549,14 @@ if (_projectParam) {
 
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          let parsedDoc, frontmatter;
-          const isMd = fileRelPath.endsWith(".md");
-          if (isMd) {
-            const result = await loadMarkdown(content);
+          let parsedDoc, frontmatter, parsedMode;
+          await loadFormats();
+          const fileFormat = formatForPath(fileRelPath);
+          if (fileFormat) {
+            const result = await parseSourceForPath(fileRelPath, content);
             parsedDoc = result.document;
             frontmatter = result.frontmatter;
+            parsedMode = result.mode;
           } else {
             parsedDoc = JSON.parse(content);
           }
@@ -560,10 +567,10 @@ if (_projectParam) {
             documentPath: fileRelPath,
             document: parsedDoc,
             ...(frontmatter != null && { frontmatter }),
-            sourceFormat: isMd ? "md" : null,
+            sourceFormat: fileFormat?.name ?? null,
           });
 
-          if (isMd && activeTab.value) activeTab.value.doc.mode = "content";
+          if (parsedMode === "content" && activeTab.value) activeTab.value.doc.mode = "content";
           if (fileRelPath === "project.json" && activeTab.value) {
             activeTab.value.session.ui.canvasMode = "stylebook";
           }
@@ -671,7 +678,11 @@ async function openRecentProject(root: string) {
   }
 }
 function renderFilesTemplate() {
-  return _renderFilesTemplate({ openProject, openFileFromTree, renderLeftPanel });
+  return _renderFilesTemplate({
+    openProject,
+    openFileFromTree,
+    renderLeftPanel,
+  });
 }
 function openFileFromTree(path: string) {
   return openFileInTab(path);
@@ -718,7 +729,7 @@ function scheduleAutosave() {
     if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
       try {
         const writable = await t.fileHandle.createWritable();
-        await writable.write(serializeDocument(t));
+        await writable.write(await serializeDocument(t));
         await writable.close();
         t.doc.dirty = false;
         statusMessage("Auto-saved");

@@ -16,7 +16,9 @@ interface ViewState {
   panY: number;
   prevCanvasMode: string | null;
   monacoEditor:
-    | (import("monaco-editor").editor.IStandaloneCodeEditor & { _ignoreNextChange?: boolean })
+    | (import("monaco-editor").editor.IStandaloneCodeEditor & {
+        _ignoreNextChange?: boolean;
+      })
     | null;
   functionEditor:
     | (import("monaco-editor").editor.IStandaloneCodeEditor & {
@@ -42,7 +44,11 @@ interface ViewState {
   forcedAttrEl: HTMLElement | null;
   elementsCollapsed: Set<string>;
   elementsFilter: string;
-  lastDragInput: { clientX: number; clientY: number; [k: string]: unknown } | null;
+  lastDragInput: {
+    clientX: number;
+    clientY: number;
+    [k: string]: unknown;
+  } | null;
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
   savedRange: Range | null;

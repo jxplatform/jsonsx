@@ -395,7 +395,14 @@ Paragraph content
 `,
     );
     try {
-      const result = await compileElementPage(mdPath, { title: "MD Test" });
+      const { buildProjectFormatRegistry } = await import("../src/site/format-host");
+      const formats = await buildProjectFormatRegistry(tmpDir, {
+        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+      });
+      const result = await compileElementPage(mdPath, {
+        title: "MD Test",
+        formats,
+      });
       expect(result.html).toContain("<!DOCTYPE html>");
       expect(result.html).toContain("<test-markdown></test-markdown>");
       expect(result.files.length).toBeGreaterThanOrEqual(1);

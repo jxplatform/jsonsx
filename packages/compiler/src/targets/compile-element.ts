@@ -25,7 +25,7 @@ import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
  * @returns {Promise<{ files: { path: string; content: string; tagName: string }[] }>}
  */
 export async function compileElement(sourcePath: string | any, opts: Record<string, unknown> = {}) {
-  const { resolveElementPath, $media: optsMedia } = opts as JxMutableNode;
+  const { resolveElementPath, $media: optsMedia, formats } = opts as JxMutableNode;
   /** @type {{ path: string; content: string; tagName: string }[]} */
   const files: { path: string; content: string; tagName: string }[] = [];
   const visited: Set<string> = new Set();
@@ -45,11 +45,18 @@ export async function compileElement(sourcePath: string | any, opts: Record<stri
       filePath = parentDir ? resolve(parentDir, srcPath) : resolve(srcPath);
       if (visited.has(filePath)) return;
       visited.add(filePath);
-      if (filePath.endsWith(".md")) {
-        const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-        doc = transpileJxMarkdown(readFileSync(filePath, "utf8"));
-      } else {
+      if (filePath.endsWith(".json")) {
         doc = JSON.parse(readFileSync(filePath, "utf8"));
+      } else {
+        const { extname } = await import("node:path");
+        const ext = extname(filePath).toLowerCase();
+        const registry = formats as import("@jxsuite/schema/format-registry").FormatRegistry;
+        const entry = registry?.byExtension?.(ext, "parse");
+        if (!entry) {
+          const { unknownFormatError } = await import("../site/format-host.ts");
+          throw unknownFormatError(filePath, ext);
+        }
+        doc = (await entry.call("parse", readFileSync(filePath, "utf8"))) as JxMutableNode;
       }
     } else {
       doc = srcPath;
@@ -272,7 +279,10 @@ export function emitElementModule(
   for (const [key, def] of functionEntries) {
     lines.push("");
     if ("$expression" in def) {
-      const compiled = compileExpression(def.$expression, { statePrefix: "s", eventParam: "e" });
+      const compiled = compileExpression(def.$expression, {
+        statePrefix: "s",
+        eventParam: "e",
+      });
       lines.push(`    this.state.${key} = (s, e) => { ${compiled}; };`);
     } else if (def.$src) {
       // $src function — wrap imported function so it receives state
@@ -429,7 +439,7 @@ function emitLitChildren(
   if (!children) return "";
 
   if ((children as JxMutableNode).$prototype === "Array") {
-    return emitMappedArray(/** @type {JxMutableNode} */ (children), indent);
+    return emitMappedArray(/** @type {JxMutableNode} */ children, indent);
   }
 
   if (!Array.isArray(children)) return "";
@@ -510,7 +520,7 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
       parts.push(
         `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
       );
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const compiled = compileExpression(
         (val as Record<string, unknown>).$expression as ExpressionNode,
         {
@@ -521,7 +531,7 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
       parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
       parts.push(
-        `@${eventName}="\${(e) => { ${inlineHandlerBody(/** @type {JxMutableNode} */ (val))} }}"`,
+        `@${eventName}="\${(e) => { ${inlineHandlerBody(/** @type {JxMutableNode} */ val)} }}"`,
       );
     }
   }
@@ -582,7 +592,7 @@ function emitMappedArray(arrayDef: JxMutableNode, indent: string) {
       parts.push(
         `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
       );
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const compiled = compileExpression(
         (val as Record<string, unknown>).$expression as ExpressionNode,
         {

@@ -60,6 +60,11 @@ mock.module("../src/site/image-optimizer.js", () => ({
   }),
   contentHash: mock(() => "abcd1234"),
   configHash: mock(() => "cfg12345"),
+  getImageMetadata: mock(async () => ({
+    width: 1200,
+    height: 800,
+    format: "png",
+  })),
 }));
 
 mock.module("../src/site/image-cache.js", () => ({
@@ -69,7 +74,8 @@ mock.module("../src/site/image-cache.js", () => ({
 }));
 
 const { transformImageNodes } = await import("../src/site/image-transform.js");
-const { processImage, buildSrcset }: any = await import("../src/site/image-optimizer.js");
+const { processImage, buildSrcset, getImageMetadata }: any =
+  await import("../src/site/image-optimizer.js");
 const { getCached, setCached }: any = await import("../src/site/image-cache.js");
 
 const defaultConfig = {
@@ -98,7 +104,10 @@ describe("image-transform", () => {
 
   describe("transformImageNodes", () => {
     test("returns empty imageRefs when config.optimize is false", async () => {
-      const doc: any = { tagName: "img", attributes: { src: "/images/hero.png" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
       const config = { ...defaultConfig, optimize: false };
       const cache = { version: 1, entries: {} };
 
@@ -387,7 +396,10 @@ describe("image-transform", () => {
   describe("shouldSkip (tested via transformImageNodes)", () => {
     test("skips SVG images", async () => {
       writeFileSync(join(TMP, "public/images/icon.svg"), "<svg></svg>");
-      const doc: any = { tagName: "img", attributes: { src: "/images/icon.svg" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/icon.svg" },
+      };
       const cache = { version: 1, entries: {} };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
@@ -396,7 +408,10 @@ describe("image-transform", () => {
 
     test("skips GIF images", async () => {
       writeFileSync(join(TMP, "public/images/anim.gif"), "GIF89a");
-      const doc: any = { tagName: "img", attributes: { src: "/images/anim.gif" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/anim.gif" },
+      };
       const cache = { version: 1, entries: {} };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
@@ -404,7 +419,10 @@ describe("image-transform", () => {
     });
 
     test("skips external URLs", async () => {
-      const doc: any = { tagName: "img", attributes: { src: "https://example.com/img.png" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "https://example.com/img.png" },
+      };
       const cache = { version: 1, entries: {} };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
@@ -412,7 +430,10 @@ describe("image-transform", () => {
     });
 
     test("skips template literal expressions", async () => {
-      const doc: any = { tagName: "img", attributes: { src: "/images/${name}.png" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/${name}.png" },
+      };
       const cache = { version: 1, entries: {} };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
@@ -420,7 +441,10 @@ describe("image-transform", () => {
     });
 
     test("skips data: URIs", async () => {
-      const doc: any = { tagName: "img", attributes: { src: "data:image/png;base64,abc" } };
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "data:image/png;base64,abc" },
+      };
       const cache = { version: 1, entries: {} };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
@@ -450,6 +474,159 @@ describe("image-transform", () => {
       await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
       expect(processImage).not.toHaveBeenCalled();
       expect(doc.innerHTML).not.toContain("srcset=");
+    });
+  });
+
+  describe("cloudflare mode", () => {
+    const cfConfig = { ...defaultConfig, service: "cloudflare" as const };
+
+    beforeEach(() => {
+      getImageMetadata.mockReset();
+      getImageMetadata.mockResolvedValue({
+        width: 1200,
+        height: 800,
+        format: "png",
+      });
+    });
+
+    test("builds srcset of /_jx/image endpoint URLs without calling processImage", async () => {
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(doc.attributes.srcset).toBe(
+        "/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=abcd1234 640w, " +
+          "/_jx/image?src=%2Fimages%2Fhero.png&w=1200&v=abcd1234 1200w",
+      );
+      expect(doc.attributes.src).toBe("/images/hero.png");
+      expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
+      expect(doc.attributes.width).toBe("1200");
+      expect(doc.attributes.height).toBe("800");
+      expect(doc.attributes.loading).toBe("lazy");
+      expect(doc.attributes.decoding).toBe("async");
+      expect(processImage).not.toHaveBeenCalled();
+    });
+
+    test("excludes widths larger than the original image", async () => {
+      getImageMetadata.mockResolvedValue({
+        width: 800,
+        height: 600,
+        format: "png",
+      });
+
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(doc.attributes.srcset).toBe(
+        "/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=abcd1234 640w",
+      );
+    });
+
+    test("sets no srcset when the image is narrower than every configured width", async () => {
+      getImageMetadata.mockResolvedValue({
+        width: 320,
+        height: 240,
+        format: "png",
+      });
+
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(doc.attributes.srcset).toBeUndefined();
+      // Dimensions and lazy loading still apply
+      expect(doc.attributes.width).toBe("320");
+      expect(doc.attributes.height).toBe("240");
+      expect(doc.attributes.loading).toBe("lazy");
+    });
+
+    test("memoizes metadata across duplicate references", async () => {
+      const doc: any = {
+        tagName: "div",
+        children: [
+          { tagName: "img", attributes: { src: "/images/hero.png" } },
+          { tagName: "img", attributes: { src: "/images/hero.png" } },
+        ],
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(getImageMetadata).toHaveBeenCalledTimes(1);
+      expect(doc.children[0].attributes.srcset).toContain("/_jx/image?src=");
+      expect(doc.children[1].attributes.srcset).toContain("/_jx/image?src=");
+    });
+
+    test("shares the metadata cache across calls when provided", async () => {
+      const metaCache = new Map();
+      const docA: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+      const docB: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+
+      await transformImageNodes(docA, cfConfig, TMP, null, metaCache);
+      await transformImageNodes(docB, cfConfig, TMP, null, metaCache);
+
+      expect(getImageMetadata).toHaveBeenCalledTimes(1);
+    });
+
+    test("rewrites innerHTML img tags to endpoint URLs", async () => {
+      const doc: any = {
+        tagName: "div",
+        innerHTML: '<img src="/images/hero.png" alt="Hero">',
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(doc.innerHTML).toContain('srcset="/_jx/image?src=%2Fimages%2Fhero.png&w=640');
+      expect(doc.innerHTML).toContain('src="/images/hero.png"');
+      expect(doc.innerHTML).toContain('width="1200"');
+      expect(doc.innerHTML).toContain('height="800"');
+      expect(doc.innerHTML).toContain('loading="lazy"');
+      expect(processImage).not.toHaveBeenCalled();
+    });
+
+    test("skips innerHTML img tags that already have srcset", async () => {
+      const html = '<img src="/images/hero.png" srcset="/x.avif 640w">';
+      const doc: any = { tagName: "div", innerHTML: html };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      expect(doc.innerHTML).toBe(html);
+      expect(getImageMetadata).not.toHaveBeenCalled();
+    });
+
+    test("honors existing skip rules", async () => {
+      writeFileSync(join(TMP, "public/images/icon.svg"), "<svg></svg>");
+      const docs: any[] = [
+        { tagName: "img", attributes: { src: "https://example.com/img.png" } },
+        { tagName: "img", attributes: { src: "/images/icon.svg" } },
+        { tagName: "img", attributes: { src: "/images/${name}.png" } },
+        {
+          tagName: "img",
+          attributes: { src: "/images/hero.png", "data-no-optimize": "" },
+        },
+        { tagName: "img", attributes: { src: "/images/nonexistent.png" } },
+      ];
+
+      for (const doc of docs) {
+        await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+        expect(doc.attributes.srcset).toBeUndefined();
+      }
+      expect(getImageMetadata).not.toHaveBeenCalled();
     });
   });
 });

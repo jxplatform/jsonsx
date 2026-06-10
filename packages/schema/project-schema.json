@@ -120,7 +120,7 @@
       },
       "examples": [
         {
-          "MarkdownFile": "@jxsuite/parser/MarkdownFile.class.json",
+          "Markdown": "@jxsuite/parser/Markdown.class.json",
           "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json"
         }
       ]
@@ -311,6 +311,16 @@
         },
         "lazyLoad": {
           "type": "boolean"
+        },
+        "service": {
+          "type": "string",
+          "enum": [
+            "build",
+            "cloudflare"
+          ]
+        },
+        "binding": {
+          "type": "string"
         }
       }
     },
@@ -327,13 +337,8 @@
           ]
         },
         "format": {
-          "type": "string",
-          "enum": [
-            "md",
-            "json",
-            "csv",
-            "yaml"
-          ]
+          "description": "Import name of a format class declared in the project imports map (e.g. \"Markdown\", \"Csv\"). When omitted, the format is derived from the source file extension via the format registry. \"json\" is the only built-in.",
+          "type": "string"
         },
         "schema": {
           "description": "JSON Schema for validating frontmatter of content type entries.",

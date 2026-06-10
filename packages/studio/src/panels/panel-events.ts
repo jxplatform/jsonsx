@@ -211,7 +211,9 @@ export function registerPanelEvents(panel: CanvasPanel) {
           let path = elToPath.get(el);
           if (path) {
             path = bubbleInlinePath(tab?.doc.document, path);
-            showContextMenu(e, path, { onEditComponent: ctx.navigateToComponent });
+            showContextMenu(e, path, {
+              onEditComponent: ctx.navigateToComponent,
+            });
             return;
           }
         }

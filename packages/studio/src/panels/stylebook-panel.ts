@@ -65,7 +65,13 @@ interface StylebookCtx {
     el: Element,
     type: string,
     panel: any,
-  ) => { cls: string; top: string; left: string; width: string; height: string };
+  ) => {
+    cls: string;
+    top: string;
+    left: string;
+    width: string;
+    height: string;
+  };
   effectiveZoom: () => number;
 }
 
@@ -235,11 +241,11 @@ export function renderStylebookMode(ctx: StylebookCtx) {
         ${panelEntries.map((e) => e.tpl)}
       </div>
     `,
-    /** @type {HTMLElement} */ (canvasWrap),
+    /** @type {HTMLElement} */ canvasWrap,
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(/** @type {import("./canvas-dnd.js").CanvasPanel} */ (panel));
+    canvasPanels.push(/** @type {import("./canvas-dnd.js").CanvasPanel} */ panel);
     renderIntoPanel(panel, activeSet);
   }
   if (hasMedia) {
@@ -321,7 +327,7 @@ export function refreshStylebookStyles() {
           if (mediaName === "--") continue;
           if (activeBreakpoints.has(mediaName)) {
             const mediaTagStyle = _resolveNestedStyle(
-              /** @type {Record<string, unknown>} */ (val),
+              /** @type {Record<string, unknown>} */ val,
               tag,
             );
             if (mediaTagStyle && typeof mediaTagStyle === "object") {
@@ -389,7 +395,11 @@ export function renderStylebookOverlays() {
 
     if (hoverTag && hoverTag !== selectedTag) {
       const el = findStylebookEl(panel.canvas, hoverTag);
-      if (el) boxes.push({ ..._ctx.overlayBoxDescriptor(el, "hover", panel), label: undefined });
+      if (el)
+        boxes.push({
+          ..._ctx.overlayBoxDescriptor(el, "hover", panel),
+          label: undefined,
+        });
     }
 
     if (selectedTag) {
@@ -408,7 +418,12 @@ export function renderStylebookOverlays() {
           (b) => html`
             <div
               class=${b.cls}
-              style=${styleMap({ top: b.top, left: b.left, width: b.width, height: b.height })}
+              style=${styleMap({
+                top: b.top,
+                left: b.left,
+                width: b.width,
+                height: b.height,
+              })}
             >
               ${b.label ? html`<div class="overlay-label">${b.label}</div>` : nothing}
             </div>
@@ -441,7 +456,7 @@ export function buildStylebookElement(
   if (entry.attributes) {
     for (const [k, v] of Object.entries(entry.attributes)) {
       try {
-        el.setAttribute(k, /** @type {string} */ (v));
+        el.setAttribute(k, /** @type {string} */ v);
       } catch {}
     }
   }
@@ -519,7 +534,8 @@ export async function renderComponentPreview(comp: ComponentEntry) {
         return _componentFallback(comp.tagName);
       }
     } else {
-      if (comp.path && /\.md$/i.test(comp.path)) {
+      if (comp.path && !comp.path.endsWith(".json")) {
+        // Format-class component sources (e.g. markdown) can't be imported as modules
         return _componentFallback(comp.tagName);
       }
       const root = projectState?.projectRoot;

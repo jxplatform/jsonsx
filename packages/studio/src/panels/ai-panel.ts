@@ -48,7 +48,9 @@ export function mountAiPanel() {
   checkAuth();
 }
 
-const _g = globalThis as unknown as { __jxRightPanelRender?: { render: () => void } };
+const _g = globalThis as unknown as {
+  __jxRightPanelRender?: { render: () => void };
+};
 
 function rerenderPanel() {
   const { render } = _g.__jxRightPanelRender || {};

@@ -71,6 +71,8 @@ export interface ImageConfig {
   quality?: { webp?: number; avif?: number; jpeg?: number; png?: number };
   sizes?: string;
   lazyLoad?: boolean;
+  service?: "build" | "cloudflare";
+  binding?: string;
 }
 
 export type CemParameter = FromSchema<typeof cemParameterSchema>;

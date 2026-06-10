@@ -71,8 +71,16 @@ describe("resolvePrototypes", () => {
   test("skips entries with timing != compiler", async () => {
     const doc = {
       state: {
-        serverFn: { $prototype: "MyClass", timing: "server", $src: "./x.class.json" },
-        clientFn: { $prototype: "MyClass", timing: "client", $src: "./x.class.json" },
+        serverFn: {
+          $prototype: "MyClass",
+          timing: "server",
+          $src: "./x.class.json",
+        },
+        clientFn: {
+          $prototype: "MyClass",
+          timing: "client",
+          $src: "./x.class.json",
+        },
       },
     };
     await resolvePrototypes(doc, {}, "/tmp");
@@ -146,7 +154,12 @@ describe("resolvePrototypes", () => {
     try {
       const doc = {
         state: {
-          result: { $prototype: "Multiplier", $src: "./Multiplier.class.json", a: 2, b: 8 },
+          result: {
+            $prototype: "Multiplier",
+            $src: "./Multiplier.class.json",
+            a: 2,
+            b: 8,
+          },
         },
       };
       await resolvePrototypes(doc, {}, FIXTURES);
@@ -196,18 +209,18 @@ describe("resolvePrototypes", () => {
     }
   });
 
-  test("resolves MarkdownFile via explicit imports", async () => {
+  test("resolves Markdown via explicit imports", async () => {
     const mdFixtures = join(import.meta.dir, "_fixtures_builtin_md");
     mkdirSync(mdFixtures, { recursive: true });
     writeFileSync(join(mdFixtures, "test.md"), "---\ntitle: Test Page\n---\n\nHello world\n");
     try {
       const doc = {
         imports: {
-          MarkdownFile: "@jxsuite/parser/MarkdownFile.class.json",
+          Markdown: "@jxsuite/parser/Markdown.class.json",
         },
         state: {
           page: {
-            $prototype: "MarkdownFile",
+            $prototype: "Markdown",
             src: "./test.md",
             timing: "compiler",
           },

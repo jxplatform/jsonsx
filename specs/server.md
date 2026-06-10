@@ -68,7 +68,11 @@ When `$src` points to a `.class.json` file:
 Executes `timing: "server"` functions during development. The runtime sends:
 
 ```json
-{ "$src": "./dashboard.server.js", "$export": "fetchMetrics", "arguments": { "userId": 42 } }
+{
+  "$src": "./dashboard.server.js",
+  "$export": "fetchMetrics",
+  "arguments": { "userId": 42 }
+}
 ```
 
 The server imports the module, calls the exported function with the provided arguments, and returns the result as JSON.

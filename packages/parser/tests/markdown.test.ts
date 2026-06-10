@@ -12,7 +12,7 @@ try {
 }
 
 import { buildScope, resolvePrototype, isSignal, RESERVED_KEYS } from "@jxsuite/runtime";
-import { MarkdownFile, MarkdownCollection } from "../src/md";
+import { Markdown, MarkdownCollection } from "../src/md";
 import { readFileSync } from "node:fs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,18 +50,18 @@ function setupClassJsonFetchMock(fileMap: Record<string, string>) {
 
 // ─── MarkdownFile ─────────────────────────────────────────────────────────────
 
-describe("MarkdownFile", () => {
+describe("Markdown", () => {
   /** @type {any} */ let result: MarkdownFileResult;
 
-  beforeAll(() => {
-    const mf = new MarkdownFile({
+  beforeAll(async () => {
+    const mf = new Markdown({
       src: join(FIXTURE_DIR, "getting-started.md"),
     });
-    result = mf.resolve();
+    result = await mf.resolve();
   });
 
   test("constructor stores config", () => {
-    const mf = new MarkdownFile({ src: "test.md" });
+    const mf = new Markdown({ src: "test.md" });
     expect(mf.config.src).toBe("test.md");
   });
 
@@ -160,27 +160,27 @@ describe("MarkdownFile", () => {
     expect(result.$wordCount).toBeGreaterThan(0);
   });
 
-  test("basePath resolves relative src", () => {
-    const mf = new MarkdownFile({
+  test("basePath resolves relative src", async () => {
+    const mf = new Markdown({
       src: "getting-started.md",
       basePath: FIXTURE_DIR,
     });
-    const r = mf.resolve() as any;
+    const r = (await mf.resolve()) as any;
     expect(r.slug).toBe("getting-started");
   });
 });
 
 // ─── MarkdownFile with directives ─────────────────────────────────────────────
 
-describe("MarkdownFile with directives", () => {
+describe("Markdown with directives", () => {
   /** @type {any} */ let result: MarkdownFileResult;
 
-  beforeAll(() => {
-    const mf = new MarkdownFile({
+  beforeAll(async () => {
+    const mf = new Markdown({
       src: join(FIXTURE_DIR, "interactive-post.md"),
       directives: true,
     });
-    result = mf.resolve();
+    result = await mf.resolve();
   });
 
   test("$children contains custom element from container directive", () => {
@@ -359,8 +359,8 @@ describe("MarkdownCollection", () => {
 // ─── External class contract compliance ───────────────────────────────────────
 
 describe("External class contract", () => {
-  test("MarkdownFile has resolve() method", () => {
-    const mf = new MarkdownFile({ src: "test.md" });
+  test("Markdown has resolve() method", () => {
+    const mf = new Markdown({ src: "test.md" });
     expect(typeof mf.resolve).toBe("function");
   });
 
@@ -369,9 +369,9 @@ describe("External class contract", () => {
     expect(typeof mc.resolve).toBe("function");
   });
 
-  test("MarkdownFile constructor accepts single config object", () => {
+  test("Markdown constructor accepts single config object", () => {
     const config = { src: "test.md", directives: true };
-    const mf = new MarkdownFile(config);
+    const mf = new Markdown(config);
     expect(mf.config).toEqual(config);
   });
 
@@ -381,11 +381,11 @@ describe("External class contract", () => {
     expect(mc.config).toEqual(config);
   });
 
-  test("MarkdownFile.resolve returns JSON-serializable result", () => {
-    const mf = new MarkdownFile({
+  test("Markdown.resolve returns JSON-serializable result", async () => {
+    const mf = new Markdown({
       src: join(FIXTURE_DIR, "getting-started.md"),
     });
-    const result = mf.resolve() as any;
+    const result = (await mf.resolve()) as any;
     const serialized = JSON.stringify(result);
     const deserialized = JSON.parse(serialized);
     expect(deserialized.slug).toBe(result.slug);
@@ -409,7 +409,7 @@ describe("External class contract", () => {
 
 describe("Runtime external prototype ($src)", () => {
   const parserDir = resolvePath(__dirname, "..");
-  const mdFilePath = resolvePath(parserDir, "src", "MarkdownFile.class.json");
+  const mdFilePath = resolvePath(parserDir, "src", "Markdown.class.json");
   const mdCollPath = resolvePath(parserDir, "src", "MarkdownCollection.class.json");
 
   /** @type {() => void} */
@@ -417,7 +417,7 @@ describe("Runtime external prototype ($src)", () => {
 
   beforeAll(() => {
     _restore = setupClassJsonFetchMock({
-      "MarkdownFile.class.json": mdFilePath,
+      "Markdown.class.json": mdFilePath,
       "MarkdownCollection.class.json": mdCollPath,
     });
   });
@@ -434,9 +434,9 @@ describe("Runtime external prototype ($src)", () => {
     expect(RESERVED_KEYS.has("$export")).toBe(true);
   });
 
-  test("resolvePrototype with $src loads MarkdownFile", async () => {
+  test("resolvePrototype with $src loads Markdown", async () => {
     const def = {
-      $prototype: "MarkdownFile",
+      $prototype: "Markdown",
       $src: "file://" + mdFilePath,
       src: join(FIXTURE_DIR, "getting-started.md"),
     };
@@ -465,7 +465,7 @@ describe("Runtime external prototype ($src)", () => {
 
   test("resolvePrototype strips reserved keys from config", async () => {
     const def = {
-      $prototype: "MarkdownFile",
+      $prototype: "Markdown",
       $src: "file://" + mdFilePath,
       src: join(FIXTURE_DIR, "getting-started.md"),
       timing: "client",
@@ -495,7 +495,7 @@ describe("Runtime external prototype ($src)", () => {
 
   test("rejects non-Function $src pointing to .js", async () => {
     const def = {
-      $prototype: "MarkdownFile",
+      $prototype: "Markdown",
       $src: resolvePath(__dirname, "..", "md.js"),
     };
     await expect(resolvePrototype(def, {}, "$x")).rejects.toThrow(".class.json");
@@ -505,7 +505,7 @@ describe("Runtime external prototype ($src)", () => {
     const doc = {
       state: {
         $post: {
-          $prototype: "MarkdownFile",
+          $prototype: "Markdown",
           $src: "file://" + mdFilePath,
           src: join(FIXTURE_DIR, "getting-started.md"),
         },

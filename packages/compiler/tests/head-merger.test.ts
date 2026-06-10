@@ -28,9 +28,19 @@ describe("mergeHead", () => {
   });
 
   test("later layers override earlier ones (page > layout > site)", () => {
-    const site = [{ tagName: "meta", attributes: { name: "description", content: "Site desc" } }];
+    const site = [
+      {
+        tagName: "meta",
+        attributes: { name: "description", content: "Site desc" },
+      },
+    ];
     const layout: any[] = [];
-    const page = [{ tagName: "meta", attributes: { name: "description", content: "Page desc" } }];
+    const page = [
+      {
+        tagName: "meta",
+        attributes: { name: "description", content: "Page desc" },
+      },
+    ];
     const result = mergeHead(site, layout, page) as any[];
     const desc = result.find((e) => e.attributes?.name === "description");
     expect((desc as any).attributes.content).toBe("Page desc");
@@ -46,8 +56,18 @@ describe("mergeHead", () => {
   });
 
   test("deduplicates <link> by rel+href", () => {
-    const site = [{ tagName: "link", attributes: { rel: "stylesheet", href: "/style.css" } }];
-    const page = [{ tagName: "link", attributes: { rel: "stylesheet", href: "/style.css" } }];
+    const site = [
+      {
+        tagName: "link",
+        attributes: { rel: "stylesheet", href: "/style.css" },
+      },
+    ];
+    const page = [
+      {
+        tagName: "link",
+        attributes: { rel: "stylesheet", href: "/style.css" },
+      },
+    ];
     const result = mergeHead(site, [], page) as any[];
     const links = result.filter((e) => e.tagName === "link" && e.attributes?.href === "/style.css");
     expect(links).toHaveLength(1);
@@ -62,8 +82,18 @@ describe("mergeHead", () => {
   });
 
   test("deduplicates <meta property> (Open Graph)", () => {
-    const site = [{ tagName: "meta", attributes: { property: "og:title", content: "Site Title" } }];
-    const page = [{ tagName: "meta", attributes: { property: "og:title", content: "Page Title" } }];
+    const site = [
+      {
+        tagName: "meta",
+        attributes: { property: "og:title", content: "Site Title" },
+      },
+    ];
+    const page = [
+      {
+        tagName: "meta",
+        attributes: { property: "og:title", content: "Page Title" },
+      },
+    ];
     const result = mergeHead(site, [], page) as any[];
     const og = result.filter((e) => e.attributes?.property === "og:title");
     expect(og).toHaveLength(1);
@@ -138,7 +168,10 @@ describe("renderHead", () => {
 
   test("renders link elements", () => {
     const html = renderHead([
-      { tagName: "link", attributes: { rel: "stylesheet", href: "/style.css" } },
+      {
+        tagName: "link",
+        attributes: { rel: "stylesheet", href: "/style.css" },
+      },
     ]);
     expect(html).toContain('<link rel="stylesheet" href="/style.css">');
   });
@@ -155,7 +188,10 @@ describe("renderHead", () => {
 
   test("escapes attribute values", () => {
     const html = renderHead([
-      { tagName: "meta", attributes: { name: "test", content: 'value with "quotes"' } },
+      {
+        tagName: "meta",
+        attributes: { name: "test", content: 'value with "quotes"' },
+      },
     ]);
     expect(html).toContain("&quot;");
   });

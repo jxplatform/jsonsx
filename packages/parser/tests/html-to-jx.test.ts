@@ -6,7 +6,11 @@ describe("htmlToJx", () => {
   test("simple element with attributes", () => {
     const result = htmlToJx('<div class="foo" id="bar">Hello</div>');
     expect(result).toEqual([
-      { tagName: "div", attributes: { class: "foo", id: "bar" }, textContent: "Hello" },
+      {
+        tagName: "div",
+        attributes: { class: "foo", id: "bar" },
+        textContent: "Hello",
+      },
     ]);
   });
 
@@ -28,7 +32,10 @@ describe("htmlToJx", () => {
   test("script with src attribute", () => {
     const result = htmlToJx('<script src="https://example.com/embed.js"></script>');
     expect(result).toEqual([
-      { tagName: "script", attributes: { src: "https://example.com/embed.js" } },
+      {
+        tagName: "script",
+        attributes: { src: "https://example.com/embed.js" },
+      },
     ]);
   });
 

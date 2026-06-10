@@ -104,7 +104,7 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
 
   const body = getFunctionBody(editing);
   const args = getFunctionArgs(
-    /** @type {EditingTarget} */ (editing as EditingTarget),
+    /** @type {EditingTarget} */ editing as EditingTarget,
     activeTab.value?.doc.document,
   );
 

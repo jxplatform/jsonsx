@@ -96,7 +96,11 @@ For each custom element, the compiler emits a self-contained ES module:
   "style": { "display": "block", "padding": "1em" },
   "children": [
     { "tagName": "h3", "textContent": "${state.username}" },
-    { "tagName": "button", "textContent": "Set Away", "onclick": { "$ref": "#/state/setAway" } }
+    {
+      "tagName": "button",
+      "textContent": "Set Away",
+      "onclick": { "$ref": "#/state/setAway" }
+    }
   ]
 }
 ```
@@ -245,9 +249,16 @@ ${s.currentRoute === 'about' ? html`<div>About page</div>` : ''}
   "description": "Globs and parses markdown files into a collection",
   "$defs": {
     "parameters": {
-      "src": { "type": "string", "description": "Glob pattern for markdown files" },
+      "src": {
+        "type": "string",
+        "description": "Glob pattern for markdown files"
+      },
       "sortBy": { "type": "string", "default": "date" },
-      "sortOrder": { "type": "string", "default": "desc", "enum": ["asc", "desc"] },
+      "sortOrder": {
+        "type": "string",
+        "default": "desc",
+        "enum": ["asc", "desc"]
+      },
       "limit": { "type": "integer" }
     },
     "fields": {
@@ -348,14 +359,15 @@ When `build.adapter` is set in `project.json`, the site build collects all `timi
 The function signature for server entries is `(args, env)` — the second parameter receives the platform's environment bindings (e.g., Cloudflare `env` with KV, D1, email, etc.). Old functions that accept only `(args)` are unaffected since the extra parameter is ignored.
 
 ```js
-compileSiteServer(entries, { adapter, baseUrl });
+compileSiteServer(entries, { adapter, baseUrl, images });
 ```
 
-| Parameter | Type                       | Default         | Description                                       |
-| --------- | -------------------------- | --------------- | ------------------------------------------------- |
-| `entries` | `Array<{exportName, src}>` | —               | Pre-collected server entries from all components  |
-| `adapter` | `string \| null`           | `null`          | Deployment adapter; adds platform-specific output |
-| `baseUrl` | `string`                   | `"/_jx/server"` | Base path prefix for all server endpoints         |
+| Parameter | Type                       | Default         | Description                                                             |
+| --------- | -------------------------- | --------------- | ----------------------------------------------------------------------- |
+| `entries` | `Array<{exportName, src}>` | —               | Pre-collected server entries from all components                        |
+| `adapter` | `string \| null`           | `null`          | Deployment adapter; adds platform-specific output                       |
+| `baseUrl` | `string`                   | `"/_jx/server"` | Base path prefix for all server endpoints                               |
+| `images`  | `ImageConfig \| null`      | `null`          | When set, embeds the `/_jx/image` Cloudflare Images endpoint (see §7.6) |
 
 Adapter-specific behavior:
 
@@ -416,14 +428,16 @@ Image optimization is configured via `project.json` under the `images` key. All 
 }
 ```
 
-| Property   | Type       | Default                                     | Description                                                  |
-| ---------- | ---------- | ------------------------------------------- | ------------------------------------------------------------ |
-| `optimize` | `boolean`  | `true`                                      | Master switch for all image processing                       |
-| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                |
-| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)             |
-| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                       |
-| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive layout hints    |
-| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags |
+| Property   | Type       | Default                                     | Description                                                                                        |
+| ---------- | ---------- | ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `optimize` | `boolean`  | `true`                                      | Master switch for all image processing                                                             |
+| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                                                      |
+| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)                                                   |
+| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                                                             |
+| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive layout hints                                          |
+| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                                       |
+| `service`  | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = Cloudflare Images binding at request time (§7.6) |
+| `binding`  | `string`   | `"IMAGES"`                                  | Cloudflare Images binding name (`service: "cloudflare"` only)                                      |
 
 ### 7.2 Document Transformation (`transformImageNodes`)
 
@@ -481,15 +495,26 @@ Processed images are cached to `.cache/images/manifest.json` to avoid redundant 
 - **Invalidation:** Source file changes, config changes, or missing variant files in `dist/`
 - **Persistence:** Cache survives `dist/` cleanup — only variant files are regenerated
 
-### 7.6 Build Integration
+### 7.6 Cloudflare Images Service (`compile-image-endpoint.js`)
+
+When `images.service` is `"cloudflare"` (requires a Cloudflare `build.adapter`; the loader falls back to `"build"` otherwise), the Sharp variant pipeline is skipped entirely. Instead:
+
+- `transformImageNodes()` rewrites eligible `<img>` srcsets to `/_jx/image?src=<encoded>&w=<width>&v=<contentHash8>` URLs, one per configured width ≤ the original width. The original `src` is preserved as fallback. Sharp is used only for a header-only dimension read (memoized per build).
+- `compile-image-endpoint.js` generates the `/_jx/image` handler with the width whitelist, `[mime, quality]` format-preference tuples (AVIF first), and binding name baked in:
+  - `buildImageHandlerSource(images)` — shared `jxHandleImage(request, env, waitUntil)` source
+  - `buildImageWorkerRoute()` — Hono route, injected by `compileSiteServer` before the asset catch-all
+  - `compilePagesImageFunction(images)` — complete Pages Function (`dist/functions/_jx/image.js`, emitted even with zero server entries)
+- The handler validates `src`/`w` (no open proxy, whitelisted widths only), negotiates the output format from the `Accept` header, fetches the original via the `ASSETS` binding, transforms via `env.<binding>.input().transform().output()`, caches at the edge (`caches.default`), and responds with immutable `Cache-Control` and `Vary: Accept`. On transform failure or no format match it serves the original asset.
+
+### 7.7 Build Integration
 
 In `site-build`, the pipeline integrates at step 6 (per-route compilation):
 
-1. Cache loaded if `projectConfig.images.optimize === true`
-2. For each page, `transformImageNodes()` is called with the cache, config, project root, and output directory
-3. Cache saved to disk after all routes are compiled
+1. Cache loaded if `projectConfig.images.optimize === true` and `images.service` is `"build"`; in `"cloudflare"` mode a per-build dimension memo is used instead
+2. For each page, `transformImageNodes()` is called with the cache (or memo), config, project root, and output directory
+3. Cache saved to disk after all routes are compiled (`"build"` mode only)
 
-> **Status: Implemented.** `image-optimizer.js`, `image-transform.js`, and `image-cache.js` provide the full pipeline. Requires Sharp as a project dependency.
+> **Status: Implemented.** `image-optimizer.js`, `image-transform.js`, `image-cache.js`, and `compile-image-endpoint.js` provide the full pipeline. Requires Sharp as a project dependency.
 
 ---
 

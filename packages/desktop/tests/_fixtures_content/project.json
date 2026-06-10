@@ -2,17 +2,22 @@
   "name": "Content Fixture",
   "imports": {
     "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
-    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json",
+    "Markdown": "@jxsuite/parser/Markdown.class.json"
   },
   "contentTypes": {
     "docs": {
       "source": "./content/docs/",
-      "format": "md",
+      "format": "Markdown",
       "schema": {
         "type": "object",
         "properties": {
-          "title": { "type": "string" },
-          "order": { "type": "number" }
+          "title": {
+            "type": "string"
+          },
+          "order": {
+            "type": "number"
+          }
         },
         "required": ["title"]
       }

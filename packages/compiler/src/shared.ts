@@ -115,7 +115,7 @@ export function isDynamic(def: JxElement | JxMutableNode | string) {
         continue;
       if (typeof d !== "object" || d === null || Array.isArray(d)) return true;
       if ((d as JxPrototypeDef).$prototype) return true;
-      if ("default" in /** @type {object} */ (d)) return true;
+      if ("default" in /** @type {object} */ d) return true;
       if (isSchemaOnly(d)) continue;
       return true;
     }
@@ -564,7 +564,7 @@ export function compileStyles(
             : key;
           const mProps = toCSSText(val);
           if (mProps) rules.push(`${atRule} { ${selector} { ${mProps} } }`);
-          for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
+          for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
             if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
             if (sel.startsWith("@")) continue;
             const resolved = sel.startsWith("&")
@@ -663,7 +663,7 @@ function emitNestedElement(
           : key;
       const mProps = toCSSText(val);
       if (mProps) rules.push(`${atRule} { ${selector} { ${mProps} } }`);
-      for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
+      for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
         if (sub === null || typeof sub !== "object" || Array.isArray(sub)) continue;
         if (sel.startsWith("@")) continue;
         const resolved = sel.startsWith("&")
@@ -744,7 +744,7 @@ export function collectStyles(
         const atBaseProps = toCSSText(val);
         if (atBaseProps) rules.push(`${atRule} { ${selector} { ${atBaseProps} } }`);
         for (const [sel, nestedRules] of Object.entries(
-          /** @type {Record<string, unknown>} */ (val),
+          /** @type {Record<string, unknown>} */ val,
         )) {
           if (nestedRules === null || typeof nestedRules !== "object" || Array.isArray(nestedRules))
             continue;
@@ -764,7 +764,7 @@ export function collectStyles(
             : `${selector} ${prop}`;
         emitNestedElement(
           resolved,
-          /** @type {Record<string, unknown>} */ (val),
+          /** @type {Record<string, unknown>} */ val,
           rules,
           mediaQueries,
         );
@@ -889,7 +889,11 @@ function _walkServerEntries(
         entry.$export &&
         !entry.$prototype
       ) {
-        entries.set(entry.$export, { key, exportName: entry.$export, src: entry.$src });
+        entries.set(entry.$export, {
+          key,
+          exportName: entry.$export,
+          src: entry.$src,
+        });
       }
     }
   }
@@ -995,7 +999,10 @@ export function preRenderComponentHtml(
           !Array.isArray(existing) &&
           "default" in existing
         ) {
-          stateDefs[key] = { .../** @type {JxStateObject} */ (existing), default: value };
+          stateDefs[key] = {
+            .../** @type {JxStateObject} */ existing,
+            default: value,
+          };
         } else {
           stateDefs[key] = value as JxStateDefinition;
         }

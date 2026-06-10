@@ -10,12 +10,7 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
-import { unified } from "unified";
-import remarkStringify from "remark-stringify";
 import { renderPopover, showDialog, showConfirmDialog } from "../ui/layers";
-import remarkDirective from "remark-directive";
-import { stringify as stringifyYaml } from "yaml";
-import { jxToMd } from "../markdown/md-convert";
 import { createState, projectState, setProjectState, requireProjectState } from "../store";
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
@@ -34,11 +29,15 @@ import {
   replaceAllTabs,
   activeTab,
 } from "../workspace/workspace";
-import { loadMarkdown } from "./file-ops";
+import { parseSourceForPath, serializeDocument } from "./file-ops";
+import {
+  loadFormats,
+  refreshFormats,
+  formatForPath,
+  documentExtensions,
+} from "../format/format-host";
 import { view } from "../view";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
-
-import type { JxElement } from "@jxsuite/schema/types";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -71,6 +70,9 @@ export async function loadProject() {
     const result = await platform.probeRootProject();
     if (!result) return;
     const { meta, info } = result;
+
+    refreshFormats();
+    void loadFormats();
 
     setProjectState({
       root: meta.root,
@@ -120,10 +122,16 @@ export async function openProject({
 
     const { config, handle } = result;
 
-    replaceAllTabs({ id: "initial", document: { tagName: "div", children: [] } });
+    replaceAllTabs({
+      id: "initial",
+      document: { tagName: "div", children: [] },
+    });
+
+    refreshFormats();
+    void loadFormats();
 
     setProjectState({
-      .../** @type {ProjectState} */ (projectState),
+      .../** @type {ProjectState} */ projectState,
       projectRoot: handle.root,
       isSiteProject: true,
       projectConfig: config,
@@ -172,7 +180,11 @@ export async function openProject({
 
 export async function openHomePage() {
   const platform = getPlatform();
-  const candidates = ["pages/index.md", "pages/index.json"];
+  await loadFormats();
+  const candidates = [
+    ...documentExtensions("page").map((ext) => `pages/index${ext}`),
+    "pages/index.json",
+  ];
   for (const path of candidates) {
     try {
       await platform.readFile(path);
@@ -623,7 +635,10 @@ function showFileContextMenu(
     });
   }
   items.push({ label: "\u2014" });
-  items.push({ label: "Rename\u2026", action: () => renameFile(entry, ctx.renderLeftPanel) });
+  items.push({
+    label: "Rename\u2026",
+    action: () => renameFile(entry, ctx.renderLeftPanel),
+  });
   items.push({
     label: "Delete",
     action: () => deleteFile(entry, ctx.renderLeftPanel),
@@ -680,9 +695,13 @@ async function createNewFile(dirPath = ".", renderLeftPanel: () => void) {
   const name = prompt("File name:", "untitled.json");
   if (!name) return;
   const path = dirPath === "." ? name : `${dirPath}/${name}`;
-  const content = name.endsWith(".md")
-    ? "---\ntitle: Untitled\n---\n\n"
-    : JSON.stringify({ tagName: "div", children: [{ tagName: "p", children: [] }] }, null, 2);
+  await loadFormats();
+  const format = formatForPath(name);
+  const content =
+    format?.studio?.newFileTemplate ??
+    (format
+      ? ""
+      : JSON.stringify({ tagName: "div", children: [{ tagName: "p", children: [] }] }, null, 2));
   try {
     const platform = getPlatform();
     await platform.writeFile(path, content);
@@ -816,23 +835,19 @@ export async function openFileFromTree(
   path: string,
 ) {
   const platform = getPlatform();
+  await loadFormats();
   // Auto-save current dirty document
   if (ctx.S.dirty && ctx.S.documentPath) {
     try {
-      const isContent = ctx.S.mode === "content";
-      let output;
-      if (isContent) {
-        const mdast = jxToMd(ctx.S.document as JxElement);
-        const md = unified()
-          .use(remarkDirective)
-          .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-          .stringify(mdast as unknown as import("mdast").Root);
-        const fm = ctx.S.content?.frontmatter;
-        const hasFrontmatter = fm && Object.keys(fm).length > 0;
-        output = hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;
-      } else {
-        output = JSON.stringify(ctx.S.document, null, 2);
-      }
+      const tabLike = {
+        doc: {
+          sourceFormat: formatForPath(ctx.S.documentPath)?.name ?? null,
+          mode: ctx.S.mode,
+          content: ctx.S.content,
+          document: ctx.S.document,
+        },
+      } as unknown as import("../tabs/tab.js").Tab;
+      const output = await serializeDocument(tabLike);
       await platform.writeFile(ctx.S.documentPath, output);
     } catch (e) {
       statusMessage(`Save error: ${(e as Error).message}`);
@@ -844,7 +859,7 @@ export async function openFileFromTree(
     const content = await platform.readFile(path);
     if (!content) return;
 
-    if (path.endsWith(".md")) {
+    if (formatForPath(path)) {
       await ctx.loadMarkdown(content, null);
       ctx.S.documentPath = path;
       ctx.S.dirty = false;
@@ -886,9 +901,11 @@ export async function openFileInTab(path: string) {
     const content = await platform.readFile(path);
     if (!content) return;
 
+    await loadFormats();
     let document, frontmatter;
-    if (path.endsWith(".md")) {
-      const result = await loadMarkdown(content);
+    const format = formatForPath(path);
+    if (format) {
+      const result = await parseSourceForPath(path, content);
       document = result.document;
       frontmatter = result.frontmatter;
     } else {
@@ -901,7 +918,7 @@ export async function openFileInTab(path: string) {
       documentPath: path,
       document,
       ...(frontmatter != null && { frontmatter }),
-      sourceFormat: path.endsWith(".md") ? "md" : null,
+      sourceFormat: format?.name ?? null,
     });
     requireProjectState().selectedPath = path;
     trackRecentFile({ path, name: path.split("/").pop() || path });
@@ -930,8 +947,9 @@ export async function reloadFileInTab(path: string) {
       try {
         const content = await platform.readFile(path);
         if (!content) return;
-        if (path.endsWith(".md")) {
-          const { document, frontmatter } = await loadMarkdown(content);
+        await loadFormats();
+        if (formatForPath(path)) {
+          const { document, frontmatter } = await parseSourceForPath(path, content);
           tab.doc.document = document;
           tab.doc.content.frontmatter = frontmatter;
         } else {

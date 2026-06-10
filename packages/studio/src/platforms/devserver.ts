@@ -352,9 +352,13 @@ export function createDevServerPlatform() {
       return null;
     },
 
-    /** @param {string} query */
-    async searchFiles(query: string) {
-      const glob = `**/*${query}*.{json,md}`;
+    /**
+     * @param {string} query
+     * @param {string[]} [extensions] — extra extensions beyond .json (from the format registry)
+     */
+    async searchFiles(query: string, extensions: string[] = []) {
+      const exts = ["json", ...extensions.map((e: string) => e.replace(/^\./, ""))];
+      const glob = `**/*${query}*.{${exts.join(",")}}`;
       const res = await fetch(
         `/__studio/files?dir=${encodeURIComponent(serverPath("."))}&glob=${encodeURIComponent(glob)}`,
       );
@@ -362,6 +366,31 @@ export function createDevServerPlatform() {
       const entries = await res.json();
       for (const e of entries) e.path = stripRoot(e.path);
       return entries;
+    },
+
+    // ─── Format registry ──────────────────────────────────────────────────
+
+    /** List the project's registered format classes (auto-discovered from imports). */
+    async listFormats() {
+      const res = await fetch(`/__studio/formats?dir=${encodeURIComponent(serverPath("."))}`);
+      if (!res.ok) return [];
+      return (await res.json()).formats ?? [];
+    },
+
+    /**
+     * Invoke a format capability (parse/serialize) server-side.
+     *
+     * @param {Record<string, unknown>} payload — { format, action, source?, doc?, options? }
+     */
+    async formatAction(payload: Record<string, unknown>) {
+      const res = await fetch("/__studio/format", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, dir: serverPath(".") }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Format action failed");
+      return data.result;
     },
 
     // ─── Plugin schema ────────────────────────────────────────────────────

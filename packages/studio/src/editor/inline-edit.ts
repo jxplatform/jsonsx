@@ -526,7 +526,12 @@ function domNodeToJx(node: Node) {
   const result: JxMutableNode = { tagName: tag };
 
   // Map browser execCommand output to our tag conventions
-  const tagMap: Record<string, string> = { b: "strong", i: "em", s: "del", strike: "del" };
+  const tagMap: Record<string, string> = {
+    b: "strong",
+    i: "em",
+    s: "del",
+    strike: "del",
+  };
   if (tagMap[tag]) result.tagName = tagMap[tag];
 
   // Attributes
@@ -549,7 +554,7 @@ function domNodeToJx(node: Node) {
     result.children = [];
     for (const child of childNodes) {
       const jsx = domNodeToJx(child);
-      if (jsx) result.children.push(/** @type {JxMutableNode} */ (jsx));
+      if (jsx) result.children.push(/** @type {JxMutableNode} */ jsx);
     }
   }
 

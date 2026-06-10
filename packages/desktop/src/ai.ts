@@ -31,7 +31,10 @@ export async function handleAiRoute(
 
   if (path === "/studio/ai/session" && req.method === "POST") {
     try {
-      const body = (await req.json()) as { message: string; systemPrompt?: string };
+      const body = (await req.json()) as {
+        message: string;
+        systemPrompt?: string;
+      };
       const result = createSession(projectRoot, body.message, {
         ...(body.systemPrompt != null && { systemPrompt: body.systemPrompt }),
       });

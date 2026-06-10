@@ -6,7 +6,10 @@ import { renderUnitSelector, UNIT_RE } from "../src/ui/unit-selector";
 import { cancelStyleDebounce } from "../src/store";
 
 // Minimal css-meta entry for a size property (height-like)
-const SIZE_ENTRY = { $units: ["px", "rem", "em", "%"], $keywords: ["auto", "max-content"] };
+const SIZE_ENTRY = {
+  $units: ["px", "rem", "em", "%"],
+  $keywords: ["auto", "max-content"],
+};
 // Entry with no units (unitless property)
 const UNITLESS_ENTRY = { $units: [], $keywords: [] };
 
@@ -22,7 +25,9 @@ function mount(
     html`<div>${renderUnitSelector(entry, prop, value, (v) => commits.push(v), placeholder)}</div>`,
     container,
   );
-  const tf = container.querySelector("sp-textfield") as HTMLElement & { value: string };
+  const tf = container.querySelector("sp-textfield") as HTMLElement & {
+    value: string;
+  };
   return { tf, commits, container };
 }
 
@@ -185,7 +190,9 @@ describe("renderUnitSelector — @change cancels pending @input debounce", () =>
       </div>`,
       container,
     );
-    const tf = container.querySelector("sp-textfield") as HTMLElement & { value: string };
+    const tf = container.querySelector("sp-textfield") as HTMLElement & {
+      value: string;
+    };
 
     // Simulate user typing "500" (starts 400ms debounce)
     dispatch(tf, "input", "500");

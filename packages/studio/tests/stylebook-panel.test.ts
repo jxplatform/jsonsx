@@ -9,7 +9,10 @@ import { setProjectState } from "../src/store";
 import type { ProjectState } from "../src/types";
 
 beforeEach(() => {
-  setProjectState({ projectConfig: null, expanded: new Set() } as unknown as ProjectState);
+  setProjectState({
+    projectConfig: null,
+    expanded: new Set(),
+  } as unknown as ProjectState);
 });
 
 // ─── buildStylebookElement ────────────────────────────────────────────────────
@@ -218,7 +221,7 @@ describe("renderStylebookElementsIntoCanvas CSS variables", () => {
 describe("renderComponentPreview", () => {
   test("npm component not registered → returns fallback div", async () => {
     const el = await renderComponentPreview(
-      /** @type {any} */ ({ tagName: "sl-button", source: "npm" }),
+      /** @type {any} */ { tagName: "sl-button", source: "npm" },
     );
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<sl-button>");
@@ -226,7 +229,7 @@ describe("renderComponentPreview", () => {
 
   test("npm component not registered → does not throw", async () => {
     await expect(
-      renderComponentPreview(/** @type {any} */ ({ tagName: "sl-nonexistent", source: "npm" })),
+      renderComponentPreview(/** @type {any} */ { tagName: "sl-nonexistent", source: "npm" }),
     ).resolves.toBeDefined();
   });
 

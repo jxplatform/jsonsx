@@ -25,7 +25,14 @@ export async function gitStatus(): Promise<GitStatusResult> {
   try {
     await git("rev-parse", "--is-inside-work-tree");
   } catch {
-    return { branch: "", files: [], ahead: 0, behind: 0, isRepo: false, remotes: [] };
+    return {
+      branch: "",
+      files: [],
+      ahead: 0,
+      behind: 0,
+      isRepo: false,
+      remotes: [],
+    };
   }
 
   const branch = (await git("branch", "--show-current")).trim();

@@ -128,7 +128,10 @@ export async function handleResolve(
 
       // Self-contained: construct class from schema
       const DynClass = classFromSchema(classDef);
-      const instance = new DynClass(config) as { resolve?: () => unknown; value?: unknown };
+      const instance = new DynClass(config) as {
+        resolve?: () => unknown;
+        value?: unknown;
+      };
       const value =
         typeof instance.resolve === "function"
           ? await instance.resolve()
@@ -186,12 +189,16 @@ export async function handleServerFunction(req: Request, root: string) {
   try {
     mod = await import(moduleAbsPath);
   } catch (e) {
-    return new Response(`Failed to import "${$src}": ${(e as Error).message}`, { status: 500 });
+    return new Response(`Failed to import "${$src}": ${(e as Error).message}`, {
+      status: 500,
+    });
   }
 
   const fn = mod[xport] ?? mod.default?.[xport];
   if (typeof fn !== "function") {
-    return new Response(`Export "${xport}" not found in "${$src}"`, { status: 500 });
+    return new Response(`Export "${xport}" not found in "${$src}"`, {
+      status: 500,
+    });
   }
 
   try {
@@ -246,7 +253,10 @@ function classFromSchema(classDef: ClassJsonDef) {
         const sp = (method.setter.parameters ?? []).map((p) => p.$ref?.split("/").pop() ?? "v");
         descriptor.set = new Function(...sp, method.setter.body) as (v: unknown) => void;
       }
-      Object.defineProperty(DynClass.prototype, name, { ...descriptor, configurable: true });
+      Object.defineProperty(DynClass.prototype, name, {
+        ...descriptor,
+        configurable: true,
+      });
     } else if (method.scope === "static") {
       (DynClass as DynamicClass)[name] = new Function(...params, bodyStr);
     } else {
@@ -254,6 +264,9 @@ function classFromSchema(classDef: ClassJsonDef) {
     }
   }
 
-  Object.defineProperty(DynClass, "name", { value: classDef.title, configurable: true });
+  Object.defineProperty(DynClass, "name", {
+    value: classDef.title,
+    configurable: true,
+  });
   return DynClass;
 }

@@ -1,150 +1,31 @@
 /**
- * Content-loader.js — Content type loader
+ * Content-loader.js — Format-agnostic content type loader
  *
- * Loads content types defined in project.json's `contentTypes` key. Supports Markdown (.md), JSON
- * (.json), and CSV (.csv) source files or remote URLs.
+ * Loads content types defined in project.json's `contentTypes` key. JSON sources are handled
+ * natively (Jx IS JSON); every other format dispatches through the format registry built from the
+ * project's imports map — the class's `discover` capability lists entry files and its `load`
+ * capability parses each into ContentLoaderEntry[].
  *
- * Phase 2 implementation of site-architecture spec §6.
+ * There are no implicit format defaults: a content type either names an imported format class via
+ * its `format` key, or its source extension must match a registered format. Remote http(s) sources
+ * require an explicit `format` whose class declares `format.remote: true`.
  *
  * @module content-loader
  */
 
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, basename, extname } from "node:path";
+import { buildProjectFormatRegistry, unknownFormatError } from "./format-host.ts";
+import type { FormatRegistry, FormatEntry } from "@jxsuite/schema/format-registry";
 import type {
   ProjectConfig,
   ContentTypeDef,
   ContentTypeSchema,
   JxMutableNode,
 } from "@jxsuite/schema/types";
-import type { MarkdownFileResult, ContentLoaderEntry } from "@jxsuite/parser/types";
+import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 
-// ─── CSV Parser (minimal, spec-compliant) ─────────────────────────────────────
-
-/**
- * Parse a CSV string into an array of objects using the first row as headers. Handles quoted fields
- * with commas and newlines.
- *
- * @param {string} csv - Raw CSV text
- * @returns {Record<string, string>[]} Array of row objects
- */
-function parseCSV(csv: string) {
-  const rows: Record<string, string>[] = [];
-  let current = "";
-  let inQuotes = false;
-  const lines: string[] = [];
-
-  // Split into rows respecting quoted newlines (preserve raw characters)
-  for (let i = 0; i < csv.length; i++) {
-    const ch = csv[i];
-    if (ch === '"') {
-      current += ch;
-      if (inQuotes && csv[i + 1] === '"') {
-        current += csv[i + 1];
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if ((ch === "\n" || (ch === "\r" && csv[i + 1] === "\n")) && !inQuotes) {
-      lines.push(current);
-      current = "";
-      if (ch === "\r") i++;
-    } else {
-      current += ch;
-    }
-  }
-  if (current.trim()) lines.push(current);
-
-  if (lines.length === 0) return [];
-
-  /** @param {string} line */
-  const parseRow = (line: string) => {
-    const fields: string[] = [];
-    let field = "";
-    let q = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (q && line[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          q = !q;
-        }
-      } else if (ch === "," && !q) {
-        fields.push(field);
-        field = "";
-      } else {
-        field += ch;
-      }
-    }
-    fields.push(field);
-    return fields;
-  };
-
-  const headers = parseRow(lines[0]);
-  for (let i = 1; i < lines.length; i++) {
-    const fields = parseRow(lines[i]);
-    const obj: Record<string, string> = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j].trim()] = fields[j]?.trim() ?? "";
-    }
-    rows.push(obj);
-  }
-  return rows;
-}
-
-// ─── Markdown loader ──────────────────────────────────────────────────────────
-
-/**
- * @type {{
- *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
- * } | null}
- */
-let _mdModule: {
-  MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
-} | null = null;
-
-/**
- * Lazily import @jxsuite/parser for Markdown support. This avoids hard dependency — only loads when
- * MD content types exist.
- *
- * @returns {Promise<{
- *   MarkdownFile: new (opts: Record<string, unknown>) => { resolve(): MarkdownFileResult };
- * }>}
- */
-async function getMarkdownModule() {
-  if (!_mdModule) {
-    _mdModule = (await import("@jxsuite/parser")) as unknown as NonNullable<typeof _mdModule>;
-  }
-  return _mdModule as NonNullable<typeof _mdModule>;
-}
-
-/**
- * Load a markdown file into a ContentEntry. If directiveOptions are provided, they control which
- * custom element directives are available in the markdown.
- *
- * @param {string} filePath - Absolute path to .md file
- * @param {unknown} [directiveOptions] - Options for the MarkdownDirective plugin
- * @returns {Promise<ContentLoaderEntry>} ContentEntry shape
- */
-async function loadMarkdownEntry(filePath: string, directiveOptions?: unknown) {
-  const { MarkdownFile } = await getMarkdownModule();
-  const file = new MarkdownFile({ src: filePath, directiveOptions });
-  const result = file.resolve();
-  const _meta: ContentLoaderEntry["_meta"] = {};
-  if (result.$excerpt != null) _meta.excerpt = result.$excerpt;
-  if (result.$toc != null) _meta.toc = result.$toc;
-  if (result.$readingTime != null) _meta.readingTime = result.$readingTime;
-  if (result.$wordCount != null) _meta.wordCount = result.$wordCount;
-  return {
-    id: result.slug,
-    data: result.frontmatter,
-    body: readFileSync(filePath, "utf-8"),
-    $children: result.$children,
-    _meta,
-  };
-}
+// ─── JSON loader (the single native built-in format) ─────────────────────────
 
 /**
  * Load a JSON file into ContentEntry(s). If the file is an array, each element is an entry. If it's
@@ -173,72 +54,18 @@ function loadJSONEntries(filePath: string) {
   ];
 }
 
-/**
- * Load a CSV file into ContentEntry(s).
- *
- * @param {string} filePath - Absolute path to .csv file
- * @param {ContentTypeSchema} [schema] - Content type schema (for type coercion)
- * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
- */
-/**
- * Coerce raw CSV row strings to typed values per the schema. - number: strips currency
- * symbols/commas, returns null for empty cells - boolean: "true" → true, everything else → false -
- * string: trimmed (already done by parseCSV, but defensively applied)
- */
-function coerceCSVRows(
-  rows: Record<string, string>[],
-  schema?: ContentTypeSchema,
-): ContentLoaderEntry[] {
-  return rows.map((row, i) => {
-    const data: Record<string, unknown> = { ...row };
-    if (schema?.properties) {
-      for (const [key, def] of Object.entries(schema.properties)) {
-        if (!(key in data)) continue;
-        if (def.type === "number") {
-          const raw = String(data[key] ?? "").trim();
-          if (raw === "") {
-            data[key] = null;
-          } else {
-            const cleaned = raw.replace(/[$€£¥,\s]/g, "");
-            const n = Number(cleaned);
-            data[key] = isNaN(n) ? null : n;
-          }
-        } else if (def.type === "boolean") {
-          data[key] = data[key] === "true";
-        } else if (def.type === "array") {
-          const raw = String(data[key] ?? "").trim();
-          data[key] =
-            raw === ""
-              ? []
-              : raw
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-        }
-      }
-    }
-    const id =
-      (data.id as string | undefined) ??
-      (data.sku as string | undefined) ??
-      (data.slug as string | undefined) ??
-      (data.Slug as string | undefined) ??
-      String(i);
-    return { id, data, body: null };
-  });
-}
-
-function loadCSVEntries(filePath: string, schema?: ContentTypeSchema) {
-  const rows = parseCSV(readFileSync(filePath, "utf-8"));
-  return coerceCSVRows(rows, schema);
-}
-
-/** Fetch a remote CSV URL and return ContentLoaderEntry[]. */
-async function loadRemoteCSV(url: string, schema?: ContentTypeSchema) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch CSV from ${url}: ${response.status} ${response.statusText}`);
+/** Discover .json entry files for a source (single file or directory). */
+function discoverJSONFiles(resolvedSource: string): string[] {
+  if (extname(resolvedSource)) {
+    return existsSync(resolvedSource) ? [resolvedSource] : [];
   }
-  return coerceCSVRows(parseCSV(await response.text()), schema);
+  try {
+    return readdirSync(resolvedSource, { recursive: true })
+      .filter((f) => String(f).endsWith(".json"))
+      .map((f) => resolve(resolvedSource, String(f)));
+  } catch {
+    return [];
+  }
 }
 
 // ─── Content Config ───────────────────────────────────────────────────────────
@@ -269,18 +96,26 @@ export function loadContentConfig(projectRoot: string, projectConfig?: ProjectCo
  *
  * @param {string} projectRoot - Project root directory
  * @param {ProjectConfig} [projectConfig] - Already-loaded project config
+ * @param {FormatRegistry} [registry] - Pre-built format registry (built from imports if omitted)
  * @returns {Promise<Map<string, ContentLoaderEntry[]>>} Map of content type name → array of
  *   ContentEntry
  */
-export async function loadContentTypes(projectRoot: string, projectConfig?: ProjectConfig) {
+export async function loadContentTypes(
+  projectRoot: string,
+  projectConfig?: ProjectConfig,
+  registry?: FormatRegistry,
+) {
   const result = loadContentConfig(projectRoot, projectConfig);
   if (!result) return new Map();
 
   const { config } = result;
   const contentTypes: Map<string, ContentLoaderEntry[]> = new Map();
+  if (Object.keys(config.contentTypes).length === 0) return contentTypes;
+
+  const formats = registry ?? (await buildProjectFormatRegistry(projectRoot, projectConfig));
 
   for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
-    const entries = await loadContentType(name, contentTypeDef, projectRoot);
+    const entries = await loadContentType(name, contentTypeDef, projectRoot, formats);
     contentTypes.set(name, entries);
   }
 
@@ -307,14 +142,20 @@ export function getContentTypeElements(
 }
 
 /**
- * Load a single content type by its definition.
+ * Load a single content type by its definition, dispatching through the format registry.
  *
  * @param {string} name - Content type name
  * @param {ContentTypeDef} contentTypeDef - Content type definition from project.json
  * @param {string} projectRoot - Absolute path to project root directory
+ * @param {FormatRegistry} registry - Format registry built from project imports
  * @returns {Promise<ContentLoaderEntry[]>} Array of ContentEntry
  */
-async function loadContentType(name: string, contentTypeDef: ContentTypeDef, projectRoot: string) {
+async function loadContentType(
+  name: string,
+  contentTypeDef: ContentTypeDef,
+  projectRoot: string,
+  registry: FormatRegistry,
+) {
   const source = contentTypeDef.source;
   if (!source) return [];
   const schema = contentTypeDef.schema;
@@ -330,10 +171,38 @@ async function loadContentType(name: string, contentTypeDef: ContentTypeDef, pro
       }
     : undefined;
 
-  // Remote URL source (e.g. Google Sheets CSV export)
+  // Resolve the format class: explicit `format` (an import name) wins; "json" is native
+  const formatName = contentTypeDef.format;
+  let entry: FormatEntry | undefined;
+  if (formatName && formatName !== "json") {
+    entry = registry.byName(formatName);
+    if (!entry) {
+      throw new Error(
+        `Content type "${name}": format "${formatName}" is not an imported format class. ` +
+          `Add it to project.json imports, e.g. "${formatName}": "@jxsuite/parser/${formatName}.class.json".`,
+      );
+    }
+  }
+
+  // Remote URL source — requires an explicit remote-capable format (no implicit fallback)
   if (source.startsWith("http://") || source.startsWith("https://")) {
+    if (!entry) {
+      throw new Error(
+        `Content type "${name}": remote sources require an explicit "format" naming an ` +
+          `imported format class with "remote": true (e.g. "Csv").`,
+      );
+    }
+    if (!entry.remote) {
+      throw new Error(
+        `Content type "${name}": format "${entry.name}" does not support remote sources ` +
+          `(its format block lacks "remote": true).`,
+      );
+    }
     try {
-      const entries = await loadRemoteCSV(source, schema);
+      const entries = (await entry.call("load", source, {
+        schema,
+        directiveOptions,
+      })) as ContentLoaderEntry[];
       if (schema) validateEntries(entries, schema, name);
       return entries;
     } catch (e) {
@@ -342,38 +211,44 @@ async function loadContentType(name: string, contentTypeDef: ContentTypeDef, pro
     }
   }
 
-  // Resolve source path and discover files
   const resolvedSource = resolve(projectRoot, source).split("\\").join("/");
-  /** @type {string[]} */
-  let files: string[];
+  const ext = extname(source).toLowerCase();
 
-  if (extname(source)) {
-    files = existsSync(resolvedSource) ? [resolvedSource] : [];
-  } else {
-    const format = contentTypeDef.format || "md";
-    const ext = `.${format}`;
-    const dir = resolvedSource.endsWith("/") ? resolvedSource : resolvedSource + "/";
-    try {
-      files = readdirSync(dir, { recursive: true })
-        .filter((f) => String(f).endsWith(ext))
-        .map((f) => resolve(dir, String(f)));
-    } catch {
-      files = [];
-    }
+  // JSON — the native built-in
+  if (formatName === "json" || (!entry && ext === ".json")) {
+    const files = discoverJSONFiles(resolvedSource);
+    const entries: ContentLoaderEntry[] = [];
+    for (const filePath of files) entries.push(...loadJSONEntries(filePath));
+    if (schema) validateEntries(entries, schema, name);
+    return entries;
   }
 
+  // Derive the format from the source extension when no explicit format is named
+  if (!entry && ext) {
+    entry = registry.byExtension(ext, "load");
+  }
+  if (!entry) {
+    throw unknownFormatError(
+      source,
+      ext || `content type "${name}" (directory sources need an explicit "format")`,
+    );
+  }
+
+  // Discover entry files via the class, then load each
+  const files = entry.capabilities.discover
+    ? ((await entry.call("discover", source, {
+        baseDir: projectRoot,
+      })) as string[])
+    : [resolvedSource];
+
   const entries: ContentLoaderEntry[] = [];
-
   for (const filePath of files) {
-    const ext = extname(filePath).toLowerCase();
-
-    if (ext === ".md") {
-      entries.push(await loadMarkdownEntry(filePath, directiveOptions));
-    } else if (ext === ".json") {
-      entries.push(...loadJSONEntries(filePath));
-    } else if (ext === ".csv") {
-      entries.push(...loadCSVEntries(filePath, schema));
-    }
+    entries.push(
+      ...((await entry.call("load", filePath, {
+        schema,
+        directiveOptions,
+      })) as ContentLoaderEntry[]),
+    );
   }
 
   // Validate entries against schema if present

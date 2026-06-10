@@ -12,7 +12,10 @@ function makeDoc(): JxMutableNode {
   return {
     tagName: "div",
     children: [
-      { tagName: "section", children: [{ tagName: "h2", textContent: "title" }] },
+      {
+        tagName: "section",
+        children: [{ tagName: "h2", textContent: "title" }],
+      },
       { tagName: "p", textContent: "first" },
       { tagName: "p", textContent: "second" },
     ],

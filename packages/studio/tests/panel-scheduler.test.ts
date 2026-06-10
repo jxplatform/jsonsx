@@ -51,7 +51,11 @@ describe("panel scheduler", () => {
     const root = document.createElement("div");
     let blocked = true;
     let renders = 0;
-    const s = createPanelScheduler({ root, render: () => renders++, blockWhile: () => blocked });
+    const s = createPanelScheduler({
+      root,
+      render: () => renders++,
+      blockWhile: () => blocked,
+    });
     s.flushNow();
     expect(renders).toBe(0);
     blocked = false;

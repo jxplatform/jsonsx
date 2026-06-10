@@ -157,7 +157,7 @@ export function fieldCardTpl(
                 nestedFieldCardTpl(
                   fieldName,
                   name,
-                  /** @type {SchemaProperty} */ (sub),
+                  /** @type {SchemaProperty} */ sub,
                   nestedRequired.includes(name),
                   handlers,
                 ),
@@ -274,7 +274,11 @@ function nestedAddFieldTpl(parentName: string, handlers: FieldHandlers) {
             const typePicker = row?.querySelector("sp-picker") as HTMLInputElement | null;
             const type = typePicker?.value || "string";
             if (name && handlers.onAddNestedField) {
-              handlers.onAddNestedField(parentName, { name, type, required: false });
+              handlers.onAddNestedField(parentName, {
+                name,
+                type,
+                required: false,
+              });
               target.value = "";
             }
           }
@@ -295,7 +299,11 @@ function nestedAddFieldTpl(parentName: string, handlers: FieldHandlers) {
           const name = nameInput?.value?.trim();
           const type = typePicker?.value || "string";
           if (name && handlers.onAddNestedField) {
-            handlers.onAddNestedField(parentName, { name, type, required: false });
+            handlers.onAddNestedField(parentName, {
+              name,
+              type,
+              required: false,
+            });
             if (nameInput) nameInput.value = "";
           }
         }}

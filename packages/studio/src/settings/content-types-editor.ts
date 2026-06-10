@@ -466,7 +466,7 @@ export function renderContentTypesEditor(container: HTMLElement) {
       ([name, def]) =>
         fieldCardTpl(
           name,
-          /** @type {import("./schema-field-ui.js").SchemaProperty} */ (def),
+          /** @type {import("./schema-field-ui.js").SchemaProperty} */ def,
           required.includes(name),
           handlers,
           contentTypeNames,
@@ -497,7 +497,12 @@ export function renderContentTypesEditor(container: HTMLElement) {
               onConfirm: () => handleAddField(rerender),
               onCancel: () => {
                 showAddField = false;
-                newFieldState = { name: "", type: "string", format: "", required: false };
+                newFieldState = {
+                  name: "",
+                  type: "string",
+                  format: "",
+                  required: false,
+                };
                 rerender();
               },
             })

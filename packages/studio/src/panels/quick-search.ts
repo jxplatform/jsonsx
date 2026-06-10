@@ -4,6 +4,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
+import { loadFormats, documentExtensions, formatByExtension } from "../format/format-host";
 import { openFileInTab } from "../files/files";
 import { getRecentFiles, trackRecentFile } from "../recent-projects";
 import { getLayerSlot } from "../ui/layers";
@@ -46,7 +47,8 @@ async function doSearch(query: string) {
   }
   try {
     const platform = getPlatform();
-    _results = await platform.searchFiles(query.trim().toLowerCase());
+    await loadFormats();
+    _results = await platform.searchFiles(query.trim().toLowerCase(), documentExtensions());
     _selectedIndex = 0;
     renderOverlay();
   } catch {
@@ -95,14 +97,9 @@ function selectItem(item: { path: string; name?: string }) {
 
 function fileIcon(name: string) {
   const ext = name.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "json":
-      return html`<sp-icon-file-code size="s"></sp-icon-file-code>`;
-    case "md":
-      return html`<sp-icon-file-txt size="s"></sp-icon-file-txt>`;
-    default:
-      return html`<sp-icon-document size="s"></sp-icon-document>`;
-  }
+  if (ext === "json") return html`<sp-icon-file-code size="s"></sp-icon-file-code>`;
+  if (ext && formatByExtension(ext)) return html`<sp-icon-file-txt size="s"></sp-icon-file-txt>`;
+  return html`<sp-icon-document size="s"></sp-icon-document>`;
 }
 
 function dirPart(path: string) {
@@ -149,7 +146,10 @@ function renderOverlay() {
           ${items.map(
             (item, i) => html`
               <div
-                class=${classMap({ "quick-search-item": true, selected: i === _selectedIndex })}
+                class=${classMap({
+                  "quick-search-item": true,
+                  selected: i === _selectedIndex,
+                })}
                 @click=${() => selectItem(item)}
                 @mouseenter=${() => {
                   _selectedIndex = i;

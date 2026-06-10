@@ -31,8 +31,10 @@ import type { JxPath } from "../state";
  *   navigateToComponent: (path: string) => void;
  * } | null}
  */
-let _ctx: { getCanvasMode: () => string; navigateToComponent: (path: string) => void } | null =
-  null;
+let _ctx: {
+  getCanvasMode: () => string;
+  navigateToComponent: (path: string) => void;
+} | null = null;
 
 /**
  * Initialize the block action bar module.

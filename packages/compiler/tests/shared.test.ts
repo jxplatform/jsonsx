@@ -90,9 +90,11 @@ describe("isDynamic", () => {
   });
 
   test("returns true for state with $prototype", () => {
-    expect(isDynamic({ state: { counter: { $prototype: "Function", body: "state.x++" } } })).toBe(
-      true,
-    );
+    expect(
+      isDynamic({
+        state: { counter: { $prototype: "Function", body: "state.x++" } },
+      }),
+    ).toBe(true);
   });
 
   test("returns true for state with default value", () => {
@@ -108,9 +110,11 @@ describe("isDynamic", () => {
   });
 
   test("returns true for Array children", () => {
-    expect(isDynamic({ children: { $prototype: "Array", items: { $ref: "#/state/list" } } })).toBe(
-      true,
-    );
+    expect(
+      isDynamic({
+        children: { $prototype: "Array", items: { $ref: "#/state/list" } },
+      }),
+    ).toBe(true);
   });
 
   test("returns true for $ref bindings", () => {
@@ -160,7 +164,9 @@ describe("isDynamic", () => {
   test("skips timing: compiler entries", () => {
     expect(
       isDynamic({
-        state: { data: { timing: "compiler", $src: "./data.js", $export: "getData" } },
+        state: {
+          data: { timing: "compiler", $src: "./data.js", $export: "getData" },
+        },
       }),
     ).toBe(false);
   });
@@ -249,7 +255,10 @@ describe("buildInitialScope", () => {
   });
 
   test("template strings become lazy computed values", () => {
-    const scope = buildInitialScope({ count: 5, doubled: "${state.count * 2}" });
+    const scope = buildInitialScope({
+      count: 5,
+      doubled: "${state.count * 2}",
+    });
     expect(scope.doubled).toBe(10);
   });
 
@@ -270,7 +279,9 @@ describe("buildInitialScope", () => {
   });
 
   test("schema-only entries are not set", () => {
-    const scope = buildInitialScope({ MyType: { type: "string", description: "A type" } });
+    const scope = buildInitialScope({
+      MyType: { type: "string", description: "A type" },
+    });
     expect(scope.MyType).toBeUndefined();
   });
 
@@ -487,7 +498,11 @@ describe("collectServerEntries", () => {
     };
     const entries = collectServerEntries(doc);
     expect(entries).toHaveLength(1);
-    expect(entries[0]).toEqual({ key: "data", exportName: "getData", src: "./api.js" });
+    expect(entries[0]).toEqual({
+      key: "data",
+      exportName: "getData",
+      src: "./api.js",
+    });
   });
 
   test("skips entries without $export", () => {
@@ -502,7 +517,12 @@ describe("collectServerEntries", () => {
   test("skips entries with $prototype", () => {
     const doc = {
       state: {
-        data: { timing: "server", $src: "./api.js", $export: "getData", $prototype: "Function" },
+        data: {
+          timing: "server",
+          $src: "./api.js",
+          $export: "getData",
+          $prototype: "Function",
+        },
       },
     };
     expect(collectServerEntries(doc)).toHaveLength(0);
@@ -527,14 +547,19 @@ describe("isComponentFullyStatic", () => {
   });
 
   test("returns false for event handlers", () => {
-    expect(isComponentFullyStatic({ tagName: "button", onclick: { $ref: "#/state/fn" } })).toBe(
-      false,
-    );
+    expect(
+      isComponentFullyStatic({
+        tagName: "button",
+        onclick: { $ref: "#/state/fn" },
+      }),
+    ).toBe(false);
   });
 
   test("returns false for $prototype in state", () => {
     expect(
-      isComponentFullyStatic({ state: { fn: { $prototype: "Function", body: "state.x++" } } }),
+      isComponentFullyStatic({
+        state: { fn: { $prototype: "Function", body: "state.x++" } },
+      }),
     ).toBe(false);
   });
 
@@ -549,7 +574,10 @@ describe("isComponentFullyStatic", () => {
 
 describe("buildComponentCSS", () => {
   test("generates CSS for flat styles", () => {
-    const css = buildComponentCSS("my-comp", { color: "red", fontSize: "16px" });
+    const css = buildComponentCSS("my-comp", {
+      color: "red",
+      fontSize: "16px",
+    });
     expect(css).toContain("my-comp {");
     expect(css).toContain("color: red;");
     expect(css).toContain("font-size: 16px;");
@@ -620,7 +648,12 @@ describe("buildAttrs", () => {
 
   test("excludes media-overridden properties from inline style", () => {
     const result = buildAttrs(
-      { style: { fontSize: "14px", "@(min-width: 768px)": { fontSize: "18px" } } },
+      {
+        style: {
+          fontSize: "14px",
+          "@(min-width: 768px)": { fontSize: "18px" },
+        },
+      },
       null,
     );
     expect(result).not.toContain("font-size: 14px");
@@ -780,7 +813,9 @@ describe("compileStyles", () => {
 
   test("emits projectStyle media blocks on body", () => {
     const doc = { tagName: "div", children: [] };
-    const projectStyle = { "@(prefers-color-scheme: dark)": { backgroundColor: "#111" } };
+    const projectStyle = {
+      "@(prefers-color-scheme: dark)": { backgroundColor: "#111" },
+    };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain("@media (prefers-color-scheme: dark)");
     expect(result).toContain("body {");
@@ -796,7 +831,10 @@ describe("compileStyles", () => {
 
   test("emits projectStyle element selectors with object values", () => {
     const doc = { tagName: "div", children: [] };
-    const projectStyle = { html: { margin: "0" }, "*": { boxSizing: "border-box" } };
+    const projectStyle = {
+      html: { margin: "0" },
+      "*": { boxSizing: "border-box" },
+    };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain("html {");
     expect(result).toContain("margin: 0");

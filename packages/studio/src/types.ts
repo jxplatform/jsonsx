@@ -67,7 +67,11 @@ export interface StudioPlatform {
   } | null>;
   probeRootProject(): Promise<{
     meta: { root: string; name: string };
-    info: { isSiteProject: boolean; projectConfig?: ProjectConfig | null; directories?: string[] };
+    info: {
+      isSiteProject: boolean;
+      projectConfig?: ProjectConfig | null;
+      directories?: string[];
+    };
   } | null>;
   listDirectory(dir: string): Promise<DirEntry[]>;
   readFile(path: string): Promise<string>;
@@ -81,11 +85,17 @@ export interface StudioPlatform {
   removePackage(name: string): Promise<unknown>;
   listPackages(): Promise<PackageInfo[]>;
   codeService(action: string, payload: unknown): Promise<CodeServiceResult | null>;
-  resolveSiteContext(
-    filePath: string,
-  ): Promise<{ sitePath: string | null; projectConfig?: ProjectConfig; fileRelPath?: string }>;
+  resolveSiteContext(filePath: string): Promise<{
+    sitePath: string | null;
+    projectConfig?: ProjectConfig;
+    fileRelPath?: string;
+  }>;
   locateFile(name: string): Promise<string | null>;
-  searchFiles(query: string): Promise<DirEntry[]>;
+  searchFiles(query: string, extensions?: string[]): Promise<DirEntry[]>;
+  /** List the project's registered format classes (auto-discovered from imports). */
+  listFormats?(): Promise<unknown[]>;
+  /** Invoke a format capability (parse/serialize) — { format, action, source?, doc?, options? }. */
+  formatAction?(payload: Record<string, unknown>): Promise<unknown>;
   fetchPluginSchema(src: string, prototype?: string, base?: string): Promise<unknown>;
   gitStatus(): Promise<GitStatusResult>;
   gitBranches(): Promise<GitBranchesResult>;
@@ -156,7 +166,6 @@ export interface GitDiffState {
   filePath: string;
   originalContent: string;
   currentContent: string;
-  isMarkdown: boolean;
   fileStatus: string;
   originalDoc?: unknown;
   currentDoc?: unknown;

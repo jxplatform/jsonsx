@@ -2,74 +2,119 @@
 /**
  * File Operations — open, save, export documents.
  *
- * All functions read/write directly from/to `activeTab.value` (the reactive tab).
+ * All functions read/write directly from/to `activeTab.value` (the reactive tab). `.json` is the
+ * native document format; every other extension dispatches through the project's format registry
+ * (parse to open, serialize to save).
  */
 
-import { unified } from "unified";
-import remarkStringify from "remark-stringify";
-import remarkDirective from "remark-directive";
-import remarkGfm from "remark-gfm";
-import { stringify as stringifyYaml } from "yaml";
-import { jxToMd, jxDocToMd } from "../markdown/md-convert";
 import { locateDocument } from "../services/code-services";
 import { statusMessage } from "../panels/statusbar";
 import { getPlatform } from "../platform";
 import { activeTab, openTab } from "../workspace/workspace";
 import { isEditing, stopEditing } from "../editor/inline-edit";
+import {
+  loadFormats,
+  getFormats,
+  formatForPath,
+  formatByName,
+  formatParse,
+  formatSerialize,
+  defaultContentFormat,
+  splitFormatDocument,
+  type StudioFormat,
+} from "../format/format-host";
 
-import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+/**
+ * Parse a format-class source string into document + frontmatter + mode per the format's
+ * $studio.documentMode hints.
+ *
+ * @param {StudioFormat} format
+ * @param {string} source
+ */
+export async function parseFormatSource(format: StudioFormat, source: string) {
+  const doc = await formatParse(format.name, source);
+  return splitFormatDocument(format, doc);
+}
+
+/**
+ * Parse a source string for a file path, dispatching by extension through the format registry.
+ * Returns null for `.json` (native — callers JSON.parse) and throws when no format class claims the
+ * extension.
+ *
+ * @param {string} path
+ * @param {string} source
+ */
+export async function parseSourceForPath(path: string, source: string) {
+  await loadFormats();
+  const format = formatForPath(path);
+  if (!format || !format.capabilities.parse) {
+    throw new Error(
+      `No format class imported for "${path}" — add one to project.json imports ` +
+        `(e.g. "Markdown": "@jxsuite/parser/Markdown.class.json")`,
+    );
+  }
+  const result = await parseFormatSource(format, source);
+  return { ...result, format };
+}
 
 /** Open a file via the File System Access API (or fallback input). */
 export async function openFile() {
   try {
-    if ("showOpenFilePicker" in window) {
-      const [handle] = await (
-        window as unknown as { showOpenFilePicker: Function }
-      ).showOpenFilePicker({
-        types: [
-          { description: "Jx Component", accept: { "application/json": [".json"] } },
-          { description: "Markdown Content", accept: { "text/markdown": [".md"] } },
-        ],
-      });
-      const file = await handle.getFile();
-      const text = await file.text();
-      const documentPath = await locateDocument(handle.name);
+    await loadFormats();
+    const formats = getFormats();
+    const pickerTypes = [
+      {
+        description: "Jx Component",
+        accept: { "application/json": [".json"] },
+      },
+      ...formats
+        .filter((f) => f.capabilities.parse)
+        .map((f) => ({
+          description: f.name,
+          accept: { [f.mediaType ?? "text/plain"]: f.extensions },
+        })),
+    ];
+    const acceptExts = [".json", ...formats.flatMap((f) => f.extensions)].join(",");
 
-      if (handle.name.endsWith(".md")) {
-        const { document, frontmatter } = await loadMarkdown(text);
+    const handleSource = async (
+      name: string,
+      text: string,
+      handle: FileSystemFileHandle | null = null,
+    ) => {
+      const documentPath = handle ? await locateDocument(name) : null;
+      const format = formatForPath(name);
+      if (format) {
+        const { document, frontmatter } = await parseFormatSource(format, text);
         openTab({
-          id: handle.name,
+          id: name,
           documentPath,
           fileHandle: handle,
           document,
           frontmatter,
-          sourceFormat: "md",
+          sourceFormat: format.name,
         });
       } else {
         const document = JSON.parse(text);
-        openTab({ id: handle.name, documentPath, fileHandle: handle, document });
+        openTab({ id: name, documentPath, fileHandle: handle, document });
       }
+      statusMessage(`Opened ${name}`);
+    };
 
-      statusMessage(`Opened ${handle.name}`);
+    if ("showOpenFilePicker" in window) {
+      const [handle] = await (
+        window as unknown as { showOpenFilePicker: Function }
+      ).showOpenFilePicker({ types: pickerTypes });
+      const file = await handle.getFile();
+      await handleSource(handle.name, await file.text(), handle);
     } else {
       // Fallback: file input
       const input = document.createElement("input");
       input.type = "file";
-      input.accept = ".json,.md";
+      input.accept = acceptExts;
       input.onchange = async () => {
         const file = input.files?.[0];
         if (!file) return;
-        const text = await file.text();
-
-        if (file.name.endsWith(".md")) {
-          const { document, frontmatter } = await loadMarkdown(text);
-          openTab({ id: file.name, document, frontmatter, sourceFormat: "md" });
-        } else {
-          const document = JSON.parse(text);
-          openTab({ id: file.name, document });
-        }
-
-        statusMessage(`Opened ${file.name}`);
+        await handleSource(file.name, await file.text());
       };
       input.click();
     }
@@ -78,49 +123,13 @@ export async function openFile() {
   }
 }
 
-/**
- * Parse a markdown string into document + frontmatter (pure — no side effects).
- *
- * @param {string} source Markdown text
- * @returns {Promise<{ document: JxMutableNode; frontmatter: Record<string, unknown> }>}
- */
-export async function loadMarkdown(source: string) {
-  const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-  const doc = transpileJxMarkdown(source) as JxMutableNode;
-
-  const isComponent = doc.tagName && String(doc.tagName).includes("-");
-
-  if (isComponent) {
-    return { document: doc, frontmatter: {} };
-  }
-
-  // Content markdown — children form the root-level document body
-  const children = doc.children ?? [];
-  if (children.length === 0) children.push({ tagName: "p", children: [] });
-
-  const documentKeys = new Set(["state", "imports"]);
-  const contentDoc: Record<string, unknown> = { children };
-
-  const frontmatter: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(doc)) {
-    if (key === "children") continue;
-    if (documentKeys.has(key)) {
-      contentDoc[key] = value;
-    } else {
-      frontmatter[key] = value;
-    }
-  }
-
-  return { document: contentDoc, frontmatter };
-}
-
 /** Save the current document back to its source location. */
 export async function saveFile() {
   if (isEditing()) stopEditing();
   const tab = activeTab.value;
   if (!tab) return;
   try {
-    const output = serializeDocument(tab);
+    const output = await serializeDocument(tab);
 
     if (tab.documentPath) {
       const platform = getPlatform();
@@ -136,7 +145,7 @@ export async function saveFile() {
          *     close: () => Promise<void>;
          *   }>;
          * }}
-         */ (tab.fileHandle).createWritable();
+         */ tab.fileHandle.createWritable();
       await writable.write(output);
       await writable.close();
       tab.doc.dirty = false;
@@ -149,23 +158,29 @@ export async function saveFile() {
   }
 }
 
+/** The output format for a tab: its source format, or the default content format. */
+function tabFormat(tab: import("../tabs/tab.js").Tab): StudioFormat | undefined {
+  return (
+    formatByName(tab.doc.sourceFormat) ??
+    (tab.doc.mode === "content" ? defaultContentFormat() : undefined)
+  );
+}
+
 /** Export the current document to a new location (Save As / download). */
 export async function exportFile() {
   const tab = activeTab.value;
   if (!tab) return;
   try {
-    const isContent = tab.doc.mode === "content";
-    const output = serializeDocument(tab);
-    const mimeType = isContent ? "text/markdown" : "application/json";
-    const ext = isContent ? ".md" : ".json";
-    const description = isContent ? "Markdown Content" : "Jx Component";
+    await loadFormats();
+    const format = tabFormat(tab);
+    const output = await serializeDocument(tab);
+    const mimeType = format ? (format.mediaType ?? "text/plain") : "application/json";
+    const ext = format ? format.extensions[0] : ".json";
+    const description = format ? format.name : "Jx Component";
+    const fallbackName = format ? `content${ext}` : "component.json";
 
     if ("showSaveFilePicker" in window) {
-      const suggestedName = tab.documentPath
-        ? tab.documentPath.split("/").pop()
-        : isContent
-          ? "content.md"
-          : "component.json";
+      const suggestedName = tab.documentPath ? tab.documentPath.split("/").pop() : fallbackName;
       const handle = await (
         window as unknown as { showSaveFilePicker: Function }
       ).showSaveFilePicker({
@@ -183,7 +198,7 @@ export async function exportFile() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = isContent ? "content.md" : "component.json";
+      a.download = fallbackName;
       a.click();
       URL.revokeObjectURL(url);
       tab.doc.dirty = false;
@@ -195,28 +210,32 @@ export async function exportFile() {
 }
 
 /**
- * Serialize the current document to its output format (JSON or Markdown).
+ * Serialize the current document to its output format. Format tabs round-trip through the format
+ * class's serialize capability; everything else is native JSON.
  *
  * @param {import("../tabs/tab.js").Tab} tab
- * @returns {string}
+ * @returns {Promise<string>}
  */
-export function serializeDocument(tab: import("../tabs/tab.js").Tab) {
-  if (tab.doc.sourceFormat === "md") {
+export async function serializeDocument(tab: import("../tabs/tab.js").Tab): Promise<string> {
+  await loadFormats();
+  const sourceFormat = formatByName(tab.doc.sourceFormat);
+  if (sourceFormat?.capabilities.serialize) {
     const fm = tab.doc.content?.frontmatter || {};
     const doc = tab.doc.document;
     const fullDoc = { ...fm, ...doc, children: doc.children ?? [] };
-    return jxDocToMd(/** @type {JxMutableNode} */ (fullDoc));
+    return formatSerialize(sourceFormat.name, fullDoc, { mode: "roundtrip" });
   }
   if (tab.doc.mode === "content") {
-    const mdast = jxToMd(tab.doc.document as JxElement);
-    const md = unified()
-      .use(remarkGfm)
-      .use(remarkDirective)
-      .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(mdast as unknown as import("mdast").Root);
-    const fm = tab.doc.content?.frontmatter;
-    const hasFrontmatter = fm && Object.keys(fm).length > 0;
-    return hasFrontmatter ? `---\n${stringifyYaml(fm).trim()}\n---\n\n${md}` : md;
+    const format = defaultContentFormat();
+    if (format) {
+      const fm = tab.doc.content?.frontmatter ?? {};
+      const hasFrontmatter = Object.keys(fm).length > 0;
+      const fullDoc = { ...fm, ...tab.doc.document };
+      return formatSerialize(format.name, fullDoc, {
+        mode: "roundtrip",
+        frontmatter: hasFrontmatter,
+      });
+    }
   }
   return JSON.stringify(tab.doc.document, null, 2);
 }

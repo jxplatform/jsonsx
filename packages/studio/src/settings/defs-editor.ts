@@ -460,7 +460,12 @@ export function renderDefsEditor(container: HTMLElement) {
               onConfirm: () => handleAddField(rerender),
               onCancel: () => {
                 showAddField = false;
-                newFieldState = { name: "", type: "string", format: "", required: false };
+                newFieldState = {
+                  name: "",
+                  type: "string",
+                  format: "",
+                  required: false,
+                };
                 rerender();
               },
             })

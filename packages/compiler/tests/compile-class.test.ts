@@ -625,7 +625,10 @@ describe("compileClassJson — full integration", () => {
       $defs: {
         parameters: {
           src: { identifier: "src", type: { type: "string" } },
-          directives: { identifier: "directives", type: { type: "boolean", default: false } },
+          directives: {
+            identifier: "directives",
+            type: { type: "boolean", default: false },
+          },
         },
         fields: {
           config: {
@@ -672,8 +675,18 @@ describe("compileClassJson — full integration", () => {
       $id: "https://example.com/Complex.class.json",
       $defs: {
         fields: {
-          count: { role: "field", access: "public", scope: "static", initializer: 0 },
-          data: { role: "field", access: "private", scope: "instance", default: [] },
+          count: {
+            role: "field",
+            access: "public",
+            scope: "static",
+            initializer: 0,
+          },
+          data: {
+            role: "field",
+            access: "private",
+            scope: "instance",
+            default: [],
+          },
         },
         constructor: {
           role: "constructor",

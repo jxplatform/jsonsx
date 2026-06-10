@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/Markdown.class.json",
+  "title": "Markdown",
+  "description": "Markdown format for Jx: parse/serialize Jx Markdown documents, load markdown content entries, and resolve markdown files at runtime",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./markdown.js",
+
+  "format": {
+    "extensions": [".md"],
+    "mediaType": "text/markdown",
+    "documentKinds": ["page", "component", "content"],
+    "exportTarget": true,
+    "remote": false
+  },
+
+  "$studio": {
+    "icon": "markdown",
+    "modes": ["design", "preview", "source"],
+    "documentMode": {
+      "default": "content",
+      "componentWhen": { "frontmatterKey": "tagName", "matches": ".+-.+" }
+    },
+    "newFileTemplate": "---\ntitle: Untitled\n---\n\n",
+    "elements": {
+      "block": [
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "blockquote",
+        "ul",
+        "ol",
+        "li",
+        "pre",
+        "hr",
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td"
+      ],
+      "inline": ["em", "strong", "del", "code", "a", "img", "br"],
+      "void": ["hr", "br", "img"],
+      "textOnly": ["code"],
+      "nesting": {
+        "_root": { "block": true, "inline": false, "directive": true },
+        "h1": { "block": false, "inline": true, "directive": false },
+        "h2": { "block": false, "inline": true, "directive": false },
+        "h3": { "block": false, "inline": true, "directive": false },
+        "h4": { "block": false, "inline": true, "directive": false },
+        "h5": { "block": false, "inline": true, "directive": false },
+        "h6": { "block": false, "inline": true, "directive": false },
+        "p": { "block": false, "inline": true, "directive": true },
+        "blockquote": { "block": true, "inline": false, "directive": true },
+        "ul": { "only": ["li"] },
+        "ol": { "only": ["li"] },
+        "li": { "block": true, "inline": true, "directive": true },
+        "pre": { "only": ["code"] },
+        "table": { "only": ["thead", "tbody"] },
+        "thead": { "only": ["tr"] },
+        "tbody": { "only": ["tr"] },
+        "tr": { "only": ["th", "td"] },
+        "th": { "block": false, "inline": true, "directive": false },
+        "td": { "block": false, "inline": true, "directive": false },
+        "em": { "block": false, "inline": true, "directive": false },
+        "strong": { "block": false, "inline": true, "directive": false },
+        "del": { "block": false, "inline": true, "directive": false },
+        "a": { "block": false, "inline": true, "directive": false }
+      }
+    }
+  },
+
+  "$defs": {
+    "parameters": {
+      "src": {
+        "identifier": "src",
+        "type": { "type": "string" },
+        "description": "Path to markdown file",
+        "examples": ["./content/about.md"]
+      },
+      "directives": {
+        "identifier": "directives",
+        "type": { "type": "boolean", "default": false },
+        "description": "Enable remark-directive plugin"
+      },
+      "basePath": {
+        "identifier": "basePath",
+        "type": { "type": "string" },
+        "description": "Base path for resolving src"
+      }
+    },
+
+    "returnTypes": {
+      "JxDocument": {
+        "type": "object",
+        "description": "Jx JSON document: frontmatter keys at top level, body as children"
+      },
+      "MarkdownFileResult": {
+        "type": "object",
+        "description": "Parsed markdown file result",
+        "properties": {
+          "slug": { "type": "string", "description": "Filename without extension" },
+          "path": { "type": "string", "description": "Absolute file path" },
+          "frontmatter": { "type": "object", "description": "YAML frontmatter key-value pairs" },
+          "$children": { "type": "array", "description": "JX node tree" },
+          "$excerpt": { "type": "string", "description": "First paragraph as plain text" },
+          "$toc": {
+            "type": "array",
+            "description": "Table of contents entries",
+            "items": {
+              "type": "object",
+              "properties": {
+                "depth": { "type": "integer" },
+                "text": { "type": "string" },
+                "id": { "type": "string" }
+              }
+            }
+          },
+          "$readingTime": { "type": "integer", "description": "Estimated reading time in minutes" },
+          "$wordCount": { "type": "integer", "description": "Total word count" }
+        }
+      },
+      "ContentLoaderEntries": {
+        "type": "array",
+        "description": "Content entries: { id, data, body, $children, _meta }"
+      }
+    },
+
+    "fields": {
+      "config": {
+        "role": "field",
+        "access": "private",
+        "scope": "instance",
+        "identifier": "config",
+        "type": { "type": "object" },
+        "description": "Raw configuration object passed to the constructor"
+      }
+    },
+
+    "constructor": {
+      "role": "constructor",
+      "$prototype": "Function",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/src" },
+        { "$ref": "#/$defs/parameters/directives" },
+        { "$ref": "#/$defs/parameters/basePath" }
+      ],
+      "body": ["this.config = config;"],
+      "description": "Stores the configuration for deferred resolution"
+    },
+
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "instance",
+        "identifier": "resolve",
+        "parameters": [],
+        "returnType": { "$ref": "#/$defs/returnTypes/MarkdownFileResult" },
+        "description": "Parse and resolve the configured markdown file (runtime on-demand access)"
+      },
+      "parse": {
+        "role": "parse",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "parse",
+        "timing": ["compiler", "server", "client"],
+        "parameters": [
+          {
+            "identifier": "source",
+            "type": { "type": "string" },
+            "description": "Raw markdown source"
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/JxDocument" },
+        "description": "Transpile Jx Markdown source into a Jx JSON document"
+      },
+      "serialize": {
+        "role": "serialize",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "serialize",
+        "timing": ["compiler", "server", "client"],
+        "parameters": [
+          {
+            "identifier": "doc",
+            "type": { "type": "object" },
+            "description": "Jx JSON document"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["roundtrip", "export"],
+                  "default": "roundtrip",
+                  "description": "roundtrip: lossless with frontmatter and directives; export: clean GFM"
+                },
+                "frontmatter": { "type": "boolean", "default": true }
+              }
+            },
+            "description": "Serialization options"
+          }
+        ],
+        "returnType": { "type": "string" },
+        "description": "Serialize a Jx document to markdown source"
+      },
+      "discover": {
+        "role": "discover",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "discover",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "source",
+            "type": { "type": "string" },
+            "description": "Content-type source: file path or directory"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": { "baseDir": { "type": "string" } }
+            }
+          }
+        ],
+        "returnType": { "type": "array", "items": { "type": "string" } },
+        "description": "List markdown entry files for a content-type source"
+      },
+      "load": {
+        "role": "load",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "load",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "path",
+            "type": { "type": "string" },
+            "description": "Absolute path to a markdown file"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "directiveOptions": { "type": "object" },
+                "directives": { "type": "boolean" }
+              }
+            }
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/ContentLoaderEntries" },
+        "description": "Load one markdown file into content entries (frontmatter as data, body preserved)"
+      }
+    }
+  }
+}

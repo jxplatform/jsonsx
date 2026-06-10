@@ -28,7 +28,10 @@ function setup() {
     join(TMP, "node_modules/@jxsuite/parser/package.json"),
     JSON.stringify({
       name: "@jxsuite/parser",
-      exports: { ".": { import: "./index.js" }, "./transpile": "./transpile.js" },
+      exports: {
+        ".": { import: "./index.js" },
+        "./transpile": "./transpile.js",
+      },
     }),
   );
   writeFileSync(join(TMP, "node_modules/@jxsuite/parser/index.js"), "export default {};");
@@ -72,7 +75,9 @@ describe("resolveNpmPath", () => {
   });
 
   test("handles node_modules in URL path", () => {
-    mkdirSync(join(TMP, "sub/node_modules/@jxsuite/parser"), { recursive: true });
+    mkdirSync(join(TMP, "sub/node_modules/@jxsuite/parser"), {
+      recursive: true,
+    });
     writeFileSync(
       join(TMP, "sub/node_modules/@jxsuite/parser/package.json"),
       JSON.stringify({

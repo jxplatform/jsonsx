@@ -88,10 +88,16 @@ export function compileClient(
     if ("$expression" in d) {
       const node = (d as Record<string, unknown>).$expression as ExpressionNode;
       if (isMutating(node.operator)) {
-        const compiled = compileExpression(node, { statePrefix: "state", eventParam: "e" });
+        const compiled = compileExpression(node, {
+          statePrefix: "state",
+          eventParam: "e",
+        });
         onEntries.push([key, { args: ["state", "e"], body: compiled }]);
       } else {
-        const compiled = compileExpression(node, { statePrefix: "state", eventParam: "e" });
+        const compiled = compileExpression(node, {
+          statePrefix: "state",
+          eventParam: "e",
+        });
         computedEntries.push([key, `() => ${compiled}`]);
       }
       continue;
@@ -235,7 +241,15 @@ function buildClientNode(
   context: any,
   bindings: Map<string, string>,
   handlers: Map<string, any>,
-  counter: { t: number; s: number; h: number; m: number; sw: number; l: number; needsLit: boolean },
+  counter: {
+    t: number;
+    s: number;
+    h: number;
+    m: number;
+    sw: number;
+    l: number;
+    needsLit: boolean;
+  },
 ) {
   // String children are text nodes
   if (typeof def === "string") {
@@ -285,9 +299,12 @@ function buildClientNode(
       const v = val as JxMutableNode;
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
-      handlers.set(key, { args: v.parameters ?? v.arguments ?? ["state", "event"], body: v.body });
+      handlers.set(key, {
+        args: v.parameters ?? v.arguments ?? ["state", "event"],
+        body: v.body,
+      });
       needsBind = true;
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
       const compiled = compileExpression(
@@ -513,7 +530,7 @@ function emitLitMapTemplate(def: JxMutableNode) {
     } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
       const body = mapRefsToLit((val as JxMutableNode).body as string);
       attrs += " @" + eventName + "=${(e) => { " + body + " }}";
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ (val)) {
+    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const compiled = compileExpression(
         (val as Record<string, unknown>).$expression as ExpressionNode,
         {
@@ -594,7 +611,15 @@ function emitClientModule(
   onEntries: [string, any][],
   initBlocks: string[],
   srcImportMap: Map<string, Set<string>>,
-  counter: { t: number; s: number; h: number; m: number; sw: number; l: number; needsLit: boolean },
+  counter: {
+    t: number;
+    s: number;
+    h: number;
+    m: number;
+    sw: number;
+    l: number;
+    needsLit: boolean;
+  },
   _reactivitySrc: string,
 ) {
   const lines: string[] = [];

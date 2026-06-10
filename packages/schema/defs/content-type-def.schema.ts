@@ -9,8 +9,11 @@ export const contentTypeDefSchema = {
       examples: ["./content/blog/", "./content/docs/"],
     },
     format: {
+      description:
+        "Import name of a format class declared in the project imports map " +
+        '(e.g. "Markdown", "Csv"). When omitted, the format is derived from the ' +
+        'source file extension via the format registry. "json" is the only built-in.',
       type: "string",
-      enum: ["md", "json", "csv", "yaml"],
     },
     schema: {
       description: "JSON Schema for validating frontmatter of content type entries.",

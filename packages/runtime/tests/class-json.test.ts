@@ -21,8 +21,20 @@ const selfContainedClassDef = {
   title: "Adder",
   $defs: {
     fields: {
-      a: { role: "field", access: "public", scope: "instance", identifier: "a", default: 0 },
-      b: { role: "field", access: "public", scope: "instance", identifier: "b", default: 0 },
+      a: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "a",
+        default: 0,
+      },
+      b: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "b",
+        default: 0,
+      },
     },
     methods: {
       resolve: {
@@ -114,7 +126,13 @@ const classWithConstructorBody = {
   title: "Tagged",
   $defs: {
     fields: {
-      tag: { role: "field", access: "public", scope: "instance", identifier: "tag", default: "" },
+      tag: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "tag",
+        default: "",
+      },
     },
     constructor: {
       role: "constructor",
@@ -176,7 +194,9 @@ function setupFetchMock(classDefMap: any) {
 
 describe("resolveClassJson — self-contained", () => {
   test("resolves self-contained .class.json with resolve() method", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const sig = (await resolvePrototype(
         { $prototype: "Adder", $src: "./Adder.class.json", a: 3, b: 7 },
@@ -191,10 +211,16 @@ describe("resolveClassJson — self-contained", () => {
   });
 
   test("resolves .class.json with value accessor (no resolve method)", async () => {
-    const restore = setupFetchMock({ "Greeter.class.json": classWithValueProp });
+    const restore = setupFetchMock({
+      "Greeter.class.json": classWithValueProp,
+    });
     try {
       const sig = (await resolvePrototype(
-        { $prototype: "Greeter", $src: "./Greeter.class.json", greeting: "Alice" },
+        {
+          $prototype: "Greeter",
+          $src: "./Greeter.class.json",
+          greeting: "Alice",
+        },
         {},
         "$greeting",
       )) as any;
@@ -206,7 +232,9 @@ describe("resolveClassJson — self-contained", () => {
   });
 
   test("uses default field values when config omitted", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const sig = (await resolvePrototype(
         { $prototype: "Adder", $src: "./Adder.class.json" },
@@ -220,7 +248,9 @@ describe("resolveClassJson — self-contained", () => {
   });
 
   test("private fields map to _-prefixed public fields", async () => {
-    const restore = setupFetchMock({ "Secret.class.json": privateFieldsClassDef });
+    const restore = setupFetchMock({
+      "Secret.class.json": privateFieldsClassDef,
+    });
     try {
       const sig = (await resolvePrototype(
         { $prototype: "Secret", $src: "./Secret.class.json" },
@@ -235,7 +265,9 @@ describe("resolveClassJson — self-contained", () => {
   });
 
   test("config values override defaults", async () => {
-    const restore = setupFetchMock({ "Secret.class.json": privateFieldsClassDef });
+    const restore = setupFetchMock({
+      "Secret.class.json": privateFieldsClassDef,
+    });
     try {
       const sig = (await resolvePrototype(
         { $prototype: "Secret", $src: "./Secret.class.json", data: "custom" },
@@ -249,7 +281,9 @@ describe("resolveClassJson — self-contained", () => {
   });
 
   test("auto-wraps external prototype in ref", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const sig = (await resolvePrototype(
         { $prototype: "Adder", $src: "./Adder.class.json", a: 2, b: 3 },
@@ -268,7 +302,9 @@ describe("resolveClassJson — self-contained", () => {
 
 describe("classFromSchema — via resolvePrototype", () => {
   test("static methods are attached to class", async () => {
-    const restore = setupFetchMock({ "Utils.class.json": classWithStaticMethod });
+    const restore = setupFetchMock({
+      "Utils.class.json": classWithStaticMethod,
+    });
     try {
       // Static methods aren't directly testable via resolve since resolve()
       // returns instance, but instance methods work
@@ -286,7 +322,9 @@ describe("classFromSchema — via resolvePrototype", () => {
   });
 
   test("constructor body is executed", async () => {
-    const restore = setupFetchMock({ "Tagged.class.json": classWithConstructorBody });
+    const restore = setupFetchMock({
+      "Tagged.class.json": classWithConstructorBody,
+    });
     try {
       const val = (await resolvePrototype(
         { $prototype: "Tagged", $src: "./Tagged.class.json", prefix: "test" },
@@ -300,7 +338,9 @@ describe("classFromSchema — via resolvePrototype", () => {
   });
 
   test("initializer field takes priority when no config", async () => {
-    const restore = setupFetchMock({ "Initer.class.json": classWithInitializer });
+    const restore = setupFetchMock({
+      "Initer.class.json": classWithInitializer,
+    });
     try {
       const val = (await resolvePrototype(
         { $prototype: "Initer", $src: "./Initer.class.json" },
@@ -314,7 +354,9 @@ describe("classFromSchema — via resolvePrototype", () => {
   });
 
   test("class name is set on constructed class", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       // Auto-wrapped as ref; resolve() returns a number, not the instance
       const val = (await resolvePrototype(
@@ -337,8 +379,8 @@ describe("resolveClassJson — hybrid $implementation", () => {
     const parserDir = resolvePath(__dirname, "..", "..", "parser", "src");
     const hybridDef = {
       $prototype: "Class",
-      title: "MarkdownFile",
-      $implementation: "./md.js",
+      title: "Markdown",
+      $implementation: "./markdown.js",
     };
     const schemaSrc = "file://" + join(parserDir, "MdFile.class.json");
     const restore = setupFetchMock({ "MdFile.class.json": hybridDef });
@@ -346,7 +388,7 @@ describe("resolveClassJson — hybrid $implementation", () => {
       const fixtureDir = resolvePath(__dirname, "..", "..", "..", "examples", "content", "posts");
       const sig = (await resolvePrototype(
         {
-          $prototype: "MarkdownFile",
+          $prototype: "Markdown",
           $src: schemaSrc,
           src: join(fixtureDir, "getting-started.md"),
         },
@@ -402,7 +444,9 @@ describe("resolveClassJson — fallback", () => {
 
 describe("buildScope — .class.json $src", () => {
   test("integrates .class.json in buildScope", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const doc = {
         state: {
@@ -433,10 +477,17 @@ describe("resolveExternalPrototype — .class.json enforcement", () => {
   });
 
   test("allows .class.json $src for non-Function prototypes", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const sig = await resolvePrototype(
-        { $prototype: "Adder", $src: "http://localhost/Adder.class.json", a: 1, b: 2 },
+        {
+          $prototype: "Adder",
+          $src: "http://localhost/Adder.class.json",
+          a: 1,
+          b: 2,
+        },
         {},
         "$sum",
       );
@@ -452,7 +503,9 @@ describe("resolveExternalPrototype — .class.json enforcement", () => {
 
 describe("buildScope — import map", () => {
   test("bare $prototype resolved via doc.imports", async () => {
-    const restore = setupFetchMock({ "Adder.class.json": selfContainedClassDef });
+    const restore = setupFetchMock({
+      "Adder.class.json": selfContainedClassDef,
+    });
     try {
       const doc = {
         imports: { Adder: "http://localhost/Adder.class.json" },

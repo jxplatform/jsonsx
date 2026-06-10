@@ -127,7 +127,7 @@ function extractExcerpt(tree: MdastNode) {
  * @param {unknown} [config.directiveOptions] - Directive plugin options
  * @returns {MarkdownFileResult}
  */
-function processMarkdown(
+export function processMarkdown(
   source: string,
   filePath: string,
   config: {
@@ -162,7 +162,7 @@ function processMarkdown(
     (n: MdastNode) => n.type !== "yaml" && n.type !== "toml",
   ) as MdastNode[];
   const $children = bodyNodes
-    .map(/** @type {(n: MdastNode) => any} */ (mdastNodeToJx))
+    .map(/** @type {(n: MdastNode) => any} */ mdastNodeToJx)
     .filter(Boolean) as (JxElement | string)[];
 
   return {
@@ -189,56 +189,13 @@ function getNestedValue(obj: Record<string, unknown> | MarkdownFileResult, path:
     .split(".")
     .reduce(
       (o: unknown, k) => (o as Record<string, unknown> | undefined)?.[k],
-      /** @type {unknown} */ (obj),
+      /** @type {unknown} */ obj,
     );
 }
 
-// ─── MarkdownFile ─────────────────────────────────────────────────────────────
+// ─── Markdown format class (re-exported from browser-safe module) ────────────
 
-/**
- * Parse a single markdown file. Satisfies the Jx external class contract ($prototype).
- *
- * @example
- *   { "$prototype": "MarkdownFile", "$src": "@jxsuite/md", "src": "./content/about.md" }
- */
-export class MarkdownFile {
-  config: {
-    src: string;
-    remarkPlugins?: unknown[];
-    rehypePlugins?: unknown[];
-    basePath?: string;
-    directives?: boolean;
-  };
-  /**
-   * @param {object} config
-   * @param {string} config.src - File path to markdown file
-   * @param {unknown[]} [config.remarkPlugins] Default is `[]`
-   * @param {unknown[]} [config.rehypePlugins] Default is `[]`
-   * @param {string} [config.basePath] - Base path for resolving src
-   * @param {boolean} [config.directives] - Enable directive support
-   */
-  constructor(config: {
-    src: string;
-    remarkPlugins?: unknown[];
-    rehypePlugins?: unknown[];
-    basePath?: string;
-    directives?: boolean;
-  }) {
-    this.config = config;
-  }
-
-  /**
-   * Parse and resolve the markdown file.
-   *
-   * @returns {MarkdownFileResult}
-   */
-  resolve() {
-    const { src, basePath, ...processorConfig } = this.config;
-    const filePath = basePath ? resolvePath(basePath, src) : resolvePath(src);
-    const source = readFileSync(filePath, "utf-8");
-    return processMarkdown(source, filePath, processorConfig);
-  }
-}
+export { Markdown } from "./markdown.ts";
 
 // ─── MarkdownCollection ───────────────────────────────────────────────────────
 
@@ -316,7 +273,7 @@ export class MarkdownCollection {
     // Filter
     let filtered = results;
     if (typeof filter === "function") {
-      filtered = results.filter(/** @type {(r: MarkdownFileResult) => boolean} */ (filter));
+      filtered = results.filter(/** @type {(r: MarkdownFileResult) => boolean} */ filter);
     }
 
     // Sort

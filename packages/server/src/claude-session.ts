@@ -297,7 +297,10 @@ export async function getAuthStatus() {
         clearTimeout(timeout);
         ctrl.abort();
         if (result.is_error) {
-          return { authenticated: false, error: (result.result as string) || "API error" };
+          return {
+            authenticated: false,
+            error: (result.result as string) || "API error",
+          };
         }
         return { authenticated: true };
       }
@@ -318,5 +321,9 @@ export async function getAuthStatus() {
 export function getSession(id: string) {
   const session = sessions.get(id);
   if (!session) return null;
-  return { id: session.id, status: session.status, messageCount: session.messages.length };
+  return {
+    id: session.id,
+    status: session.status,
+    messageCount: session.messages.length,
+  };
 }

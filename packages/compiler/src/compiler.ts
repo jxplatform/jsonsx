@@ -74,11 +74,19 @@ export async function compile(sourcePath: string | any, opts: Record<string, unk
   let raw;
   if (typeof sourcePath === "string") {
     const source = readFileSync(sourcePath, "utf8");
-    if (sourcePath.endsWith(".md")) {
-      const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-      raw = transpileJxMarkdown(source);
-    } else {
+    if (sourcePath.endsWith(".json")) {
       raw = JSON.parse(source);
+    } else {
+      const { extname } = await import("node:path");
+      const ext = extname(sourcePath).toLowerCase();
+      const registry = (opts as JxMutableNode)
+        .formats as import("@jxsuite/schema/format-registry").FormatRegistry;
+      const entry = registry?.byExtension?.(ext, "parse");
+      if (!entry) {
+        const { unknownFormatError } = await import("./site/format-host.ts");
+        throw unknownFormatError(sourcePath, ext);
+      }
+      raw = await entry.call("parse", source);
     }
   } else {
     raw = sourcePath;
@@ -97,7 +105,12 @@ export async function compile(sourcePath: string | any, opts: Record<string, unk
 
   // Route 1: Fully static → plain HTML/CSS
   if (!isDynamic(raw)) {
-    return compileStaticPage(raw, { title, reactivitySrc, litHtmlSrc, projectStyle });
+    return compileStaticPage(raw, {
+      title,
+      reactivitySrc,
+      litHtmlSrc,
+      projectStyle,
+    });
   }
 
   // Route 2: Custom element tagName (contains hyphen) → lit-html web component
@@ -105,7 +118,11 @@ export async function compile(sourcePath: string | any, opts: Record<string, unk
     const tagName = raw.tagName;
     const className = tagNameToClassName(tagName);
     const moduleContent = emitElementModule(raw, className, []);
-    const moduleFile = { path: `${tagName}.js`, content: moduleContent, tagName };
+    const moduleFile = {
+      path: `${tagName}.js`,
+      content: moduleContent,
+      tagName,
+    };
     const styleBlock = compileStyles(raw, raw.$media ?? {});
 
     const html = `<!DOCTYPE html>
@@ -162,7 +179,7 @@ export async function runCli(src: string, out?: string) {
   }
   if (server && out) {
     const serverOut = out.replace(/(\.[^.]+)?$/, "-server.js");
-    writeFileSync(serverOut, /** @type {string} */ (server), "utf8");
+    writeFileSync(serverOut, /** @type {string} */ server, "utf8");
     console.error(`Server handler written to ${serverOut}`);
   }
 }

@@ -1,8 +1,10 @@
 /**
  * Pages-discovery.js — File-based route discovery
  *
- * Scans the pages/ directory and builds a route table mapping URL paths to their source JSON files,
- * layouts, and metadata.
+ * Scans the pages/ directory and builds a route table mapping URL paths to their source files,
+ * layouts, and metadata. `.json` pages are native; any other extension must be claimed by a format
+ * class (with the `parse` capability and a "page" document kind) registered from the project's
+ * imports map.
  *
  * Conventions (per site-architecture spec §4): pages/index.json → / pages/about.json → /about
  * pages/about/index.json → /about pages/blog/[slug].json → /blog/:slug (dynamic)
@@ -12,11 +14,13 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve, relative, extname, join } from "node:path";
+import type { FormatRegistry } from "@jxsuite/schema/format-registry";
+import type { JxDocument } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 
 interface Route {
   urlPattern: string; // URL pattern (e.g. "/blog/:slug")
-  sourcePath: string; // Absolute path to the .json source file
+  sourcePath: string; // Absolute path to the source file
   relativePath: string; // Path relative to pages/ dir
   isDynamic: boolean; // Whether route has parameters
   isCatchAll: boolean; // Whether route uses [...param] spread
@@ -26,14 +30,44 @@ interface Route {
 }
 
 /**
+ * Read a page document, dispatching by extension: .json natively, anything else via the format
+ * registry's parse capability.
+ *
+ * @param {string} filePath - Absolute path to the page source
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<JxDocument>}
+ */
+export async function readPageDocument(
+  filePath: string,
+  registry?: FormatRegistry,
+): Promise<JxDocument> {
+  const source = readFileSync(filePath, "utf8");
+  if (filePath.endsWith(".json")) {
+    return JSON.parse(source);
+  }
+  const ext = extname(filePath).toLowerCase();
+  const entry = registry?.byExtension(ext, "parse");
+  if (!entry) {
+    throw new Error(
+      `No format class imported for "${ext}" (${filePath}). ` +
+        `Add a format class to project.json imports, e.g. ` +
+        `"Markdown": "@jxsuite/parser/Markdown.class.json".`,
+    );
+  }
+  return (await entry.call("parse", source)) as JxDocument;
+}
+
+/**
  * Discover all routable pages in a pages/ directory.
  *
  * @param {string} pagesDir - Absolute path to the pages/ directory
- * @returns {Route[]} Sorted route table (static routes first, then dynamic)
+ * @param {FormatRegistry} [registry] - Format registry; its "page"-kind extensions are routable
+ * @returns {Promise<Route[]>} Sorted route table (static routes first, then dynamic)
  */
-export function discoverPages(pagesDir: string) {
+export async function discoverPages(pagesDir: string, registry?: FormatRegistry) {
   const routes: Route[] = [];
-  walkDir(pagesDir, pagesDir, routes);
+  const pageExtensions = new Set([".json", ...(registry?.documentExtensions("page") ?? [])]);
+  await walkDir(pagesDir, pagesDir, routes, pageExtensions, registry);
 
   // Sort: static routes first, then by specificity (more segments = more specific)
   routes.sort((a, b) => {
@@ -51,8 +85,16 @@ export function discoverPages(pagesDir: string) {
  * @param {string} dir
  * @param {string} pagesRoot
  * @param {Route[]} routes
+ * @param {Set<string>} pageExtensions
+ * @param {FormatRegistry} [registry]
  */
-function walkDir(dir: string, pagesRoot: string, routes: Route[]) {
+async function walkDir(
+  dir: string,
+  pagesRoot: string,
+  routes: Route[],
+  pageExtensions: Set<string>,
+  registry?: FormatRegistry,
+) {
   const entries = readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
@@ -61,19 +103,19 @@ function walkDir(dir: string, pagesRoot: string, routes: Route[]) {
     if (entry.isDirectory()) {
       // Skip underscore-prefixed directories
       if (entry.name.startsWith("_")) continue;
-      walkDir(fullPath, pagesRoot, routes);
+      await walkDir(fullPath, pagesRoot, routes, pageExtensions, registry);
       continue;
     }
 
-    // Only process .json and .md files
-    const ext = extname(entry.name);
-    if (ext !== ".json" && ext !== ".md") continue;
+    // Only process .json and registered page-format files
+    const ext = extname(entry.name).toLowerCase();
+    if (!pageExtensions.has(ext)) continue;
 
     // Skip underscore-prefixed files (local components, not routes)
     if (entry.name.startsWith("_")) continue;
 
     const relativePath = relative(pagesRoot, fullPath);
-    const route = fileToRoute(relativePath, fullPath);
+    const route = await fileToRoute(relativePath, fullPath, registry);
     if (route) routes.push(route);
   }
 }
@@ -83,11 +125,13 @@ function walkDir(dir: string, pagesRoot: string, routes: Route[]) {
  *
  * @param {string} relativePath - E.g. "blog/[slug].json"
  * @param {string} absolutePath - Full filesystem path
- * @returns {Route}
+ * @param {FormatRegistry} [registry]
+ * @returns {Promise<Route>}
  */
-function fileToRoute(relativePath: string, absolutePath: string) {
-  // Remove .json or .md extension
-  let urlPath = relativePath.replace(/\.(json|md)$/, "");
+async function fileToRoute(relativePath: string, absolutePath: string, registry?: FormatRegistry) {
+  // Remove the source extension
+  const ext = extname(relativePath);
+  let urlPath = ext ? relativePath.slice(0, -ext.length) : relativePath;
 
   // Normalize path separators
   urlPath = urlPath.split("\\").join("/");
@@ -127,20 +171,9 @@ function fileToRoute(relativePath: string, absolutePath: string) {
   /** @type {string | null} */
   let $layout = null;
   try {
-    const source = readFileSync(absolutePath, "utf8");
-    if (absolutePath.endsWith(".md")) {
-      // Parse YAML frontmatter for $layout
-      const fmMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      if (fmMatch) {
-        // Quick regex extraction — avoids full YAML dependency
-        const layoutMatch = fmMatch[1].match(/^\$layout:\s*(.+)/m);
-        if (layoutMatch) $layout = layoutMatch[1].trim().replace(/^['"]|['"]$/g, "");
-      }
-    } else {
-      const raw = JSON.parse(source);
-      if (typeof raw.$layout === "string") {
-        $layout = raw.$layout;
-      }
+    const doc = await readPageDocument(absolutePath, registry);
+    if (typeof doc.$layout === "string") {
+      $layout = doc.$layout;
     }
   } catch {
     // Skip unreadable files — will error during compilation
@@ -168,12 +201,14 @@ function fileToRoute(relativePath: string, absolutePath: string) {
  * @param {Route[]} routes - Discovered route table
  * @param {string} projectRoot - Project root for resolving $ref paths
  * @param {Map<string, any[]>} [contentTypes] - Loaded content types (from content-loader)
+ * @param {FormatRegistry} [registry] - Format registry for reading non-JSON dynamic pages
  * @returns {Promise<Route[]>} Expanded routes with concrete paths
  */
 export async function expandDynamicRoutes(
   routes: Route[],
   projectRoot: string,
   contentTypes: Map<string, any[]> = new Map(),
+  registry?: FormatRegistry,
 ) {
   const expanded: Route[] = [];
 
@@ -187,7 +222,7 @@ export async function expandDynamicRoutes(
     /** @type {Record<string, unknown>} */
     let raw;
     try {
-      raw = JSON.parse(readFileSync(route.sourcePath, "utf8"));
+      raw = await readPageDocument(route.sourcePath, registry);
     } catch {
       expanded.push(route);
       continue;

@@ -82,7 +82,11 @@ describe("Workspace primitive", () => {
 
   test("activeTab computed updates reactively on tab switch", () => {
     openTab({ id: "t1", document: { tagName: "div" }, documentPath: "a.json" });
-    openTab({ id: "t2", document: { tagName: "span" }, documentPath: "b.json" });
+    openTab({
+      id: "t2",
+      document: { tagName: "span" },
+      documentPath: "b.json",
+    });
 
     let observedPath: string | null = null;
     const stop = effect(() => {
@@ -139,7 +143,11 @@ describe("renameTab", () => {
   });
 
   test("re-keys tab in the tabs map", () => {
-    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
+    openTab({
+      id: "pages/old.md",
+      document: { tagName: "div" },
+      documentPath: "pages/old.md",
+    });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
 
@@ -166,9 +174,21 @@ describe("renameTab", () => {
   });
 
   test("updates tabOrder preserving position", () => {
-    openTab({ id: "a.json", document: { tagName: "div" }, documentPath: "a.json" });
-    openTab({ id: "pages/old.md", document: { tagName: "p" }, documentPath: "pages/old.md" });
-    openTab({ id: "c.json", document: { tagName: "span" }, documentPath: "c.json" });
+    openTab({
+      id: "a.json",
+      document: { tagName: "div" },
+      documentPath: "a.json",
+    });
+    openTab({
+      id: "pages/old.md",
+      document: { tagName: "p" },
+      documentPath: "pages/old.md",
+    });
+    openTab({
+      id: "c.json",
+      document: { tagName: "span" },
+      documentPath: "c.json",
+    });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
 
@@ -176,7 +196,11 @@ describe("renameTab", () => {
   });
 
   test("updates activeTabId when renaming the active tab", () => {
-    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
+    openTab({
+      id: "pages/old.md",
+      document: { tagName: "div" },
+      documentPath: "pages/old.md",
+    });
     expect(workspace.activeTabId).toBe("pages/old.md");
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
@@ -186,8 +210,16 @@ describe("renameTab", () => {
   });
 
   test("does not change activeTabId when renaming a non-active tab", () => {
-    openTab({ id: "pages/old.md", document: { tagName: "div" }, documentPath: "pages/old.md" });
-    openTab({ id: "active.json", document: { tagName: "span" }, documentPath: "active.json" });
+    openTab({
+      id: "pages/old.md",
+      document: { tagName: "div" },
+      documentPath: "pages/old.md",
+    });
+    openTab({
+      id: "active.json",
+      document: { tagName: "span" },
+      documentPath: "active.json",
+    });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
 
@@ -195,7 +227,11 @@ describe("renameTab", () => {
   });
 
   test("no-op for nonexistent tab id", () => {
-    openTab({ id: "a.json", document: { tagName: "div" }, documentPath: "a.json" });
+    openTab({
+      id: "a.json",
+      document: { tagName: "div" },
+      documentPath: "a.json",
+    });
 
     renameTab("nonexistent", "new-id", "new-path");
 
@@ -204,7 +240,11 @@ describe("renameTab", () => {
   });
 
   test("handles moving into a subdirectory", () => {
-    openTab({ id: "index.md", document: { tagName: "div" }, documentPath: "index.md" });
+    openTab({
+      id: "index.md",
+      document: { tagName: "div" },
+      documentPath: "index.md",
+    });
 
     renameTab("index.md", "pages/index.md", "pages/index.md");
 

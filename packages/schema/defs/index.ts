@@ -69,6 +69,8 @@ export {
   classConstructorDefSchema,
   classMethodDefSchema,
   classDefSchema,
+  formatDefSchema,
+  studioHintsSchema,
 } from "./class-def.schema";
 
 // Content & project

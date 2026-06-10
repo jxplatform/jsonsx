@@ -163,7 +163,11 @@ export function buildFontOptions(
  * @param {string} prop @param {string} value @param {(value: string) => void} onChange
  */
 export function renderComboboxInput(
-  entry: { enum?: string[]; examples?: string[]; presets?: { title: string; value: string }[] },
+  entry: {
+    enum?: string[];
+    examples?: string[];
+    presets?: { title: string; value: string }[];
+  },
   prop: string,
   value: string,
   onChange: (value: string) => void,

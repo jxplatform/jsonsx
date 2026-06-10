@@ -44,7 +44,12 @@ let _helper: HTMLElement | null = null;
 
 let _currentAnchor: HTMLElement | null = null;
 
-let _insertionPoint: { edge: string; path: JxPath; parentPath: JxPath; idx: number } | null = null;
+let _insertionPoint: {
+  edge: string;
+  path: JxPath;
+  parentPath: JxPath;
+  idx: number;
+} | null = null;
 
 let _abort: AbortController | null = null;
 
@@ -87,8 +92,12 @@ export function mount(ctx: InsertionHelperContext) {
     viewport.on("mousemove", { signal: _abort.signal }).subscribe({ next: onMouseMove });
     viewport.on("mouseleave", { signal: _abort.signal }).subscribe({ next: hide });
   } else {
-    panel.viewport.addEventListener("mousemove", onMouseMove, { signal: _abort.signal });
-    panel.viewport.addEventListener("mouseleave", hide, { signal: _abort.signal });
+    panel.viewport.addEventListener("mousemove", onMouseMove, {
+      signal: _abort.signal,
+    });
+    panel.viewport.addEventListener("mouseleave", hide, {
+      signal: _abort.signal,
+    });
   }
 }
 

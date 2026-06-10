@@ -15,7 +15,10 @@ if (typeof globalThis.localStorage === "undefined") {
 const STORAGE_KEY = "jx_github_token";
 
 let mockFetchResponses: { ok?: boolean; json: unknown; status?: number }[] = [];
-let mockFetchCalls: { url: string; opts: { body: string; headers: Record<string, string> } }[] = [];
+let mockFetchCalls: {
+  url: string;
+  opts: { body: string; headers: Record<string, string> };
+}[] = [];
 const originalFetch = globalThis.fetch;
 
 /** @param {{ ok?: boolean; json: unknown; status?: number }[]} responses */
@@ -96,7 +99,11 @@ describe("publishToGithub", () => {
 
   test("creates repo, adds remote, and pushes on success", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
-    showDialogResult = { name: "my-repo", description: "A test", isPrivate: true };
+    showDialogResult = {
+      name: "my-repo",
+      description: "A test",
+      isPrivate: true,
+    };
 
     setupFetch([
       {
@@ -136,7 +143,10 @@ describe("publishToGithub", () => {
       {
         ok: false,
         status: 422,
-        json: { message: "Validation Failed", errors: [{ message: "name already exists" }] },
+        json: {
+          message: "Validation Failed",
+          errors: [{ message: "name already exists" }],
+        },
       },
     ]);
 
@@ -147,7 +157,11 @@ describe("publishToGithub", () => {
 
   test("returns false when push fails", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
-    showDialogResult = { name: "push-fail-repo", description: "", isPrivate: true };
+    showDialogResult = {
+      name: "push-fail-repo",
+      description: "",
+      isPrivate: true,
+    };
     mockPlatform.gitPush = mock(() => Promise.reject(new Error("push rejected")));
 
     setupFetch([
@@ -167,7 +181,11 @@ describe("publishToGithub", () => {
 
   test("sends correct Accept header to GitHub API", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
-    showDialogResult = { name: "header-test", description: "desc", isPrivate: false };
+    showDialogResult = {
+      name: "header-test",
+      description: "desc",
+      isPrivate: false,
+    };
 
     setupFetch([
       {

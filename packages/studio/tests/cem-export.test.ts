@@ -23,7 +23,10 @@ describe("collectSlots", () => {
     const node = {
       tagName: "div",
       children: [
-        { tagName: "header", children: [{ tagName: "slot", attributes: { name: "header" } }] },
+        {
+          tagName: "header",
+          children: [{ tagName: "slot", attributes: { name: "header" } }],
+        },
         { tagName: "main", children: [{ tagName: "slot" }] },
         {
           tagName: "footer",
@@ -102,7 +105,11 @@ describe("exportCemManifest", () => {
         tagName: "my-counter",
         state: {
           count: { type: "number", default: 0, description: "Current count" },
-          increment: { $prototype: "Function", body: "state.count++", description: "Add one" },
+          increment: {
+            $prototype: "Function",
+            body: "state.count++",
+            description: "Add one",
+          },
         },
         children: [],
       },
@@ -121,7 +128,13 @@ describe("exportCemManifest", () => {
           handleChange: {
             $prototype: "Function",
             body: "",
-            emits: [{ name: "change", type: "CustomEvent", description: "Value changed" }],
+            emits: [
+              {
+                name: "change",
+                type: "CustomEvent",
+                description: "Value changed",
+              },
+            ],
           },
         },
         children: [],
@@ -149,7 +162,11 @@ describe("exportCemManifest", () => {
       document: {
         tagName: "my-themed",
         state: {},
-        style: { "--primary": "#007bff", "--secondary": "#6c757d", color: "inherit" },
+        style: {
+          "--primary": "#007bff",
+          "--secondary": "#6c757d",
+          color: "inherit",
+        },
         children: [],
       },
     };

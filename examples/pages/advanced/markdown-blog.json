@@ -3,7 +3,7 @@
   "$layout": "../../layouts/example.json",
   "imports": {
     "MarkdownCollection": "../../packages/parser/MarkdownCollection.class.json",
-    "MarkdownFile": "../../packages/parser/MarkdownFile.class.json"
+    "Markdown": "../../packages/parser/Markdown.class.json"
   },
   "state": {
     "posts": {
@@ -14,7 +14,7 @@
     },
     "currentSlug": { "type": "string", "default": "getting-started" },
     "currentPost": {
-      "$prototype": "MarkdownFile",
+      "$prototype": "Markdown",
       "src": "../../content/posts/${state.currentSlug}.md"
     },
     "selectPost": {

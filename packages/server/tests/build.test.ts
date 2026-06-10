@@ -82,7 +82,12 @@ describe("rebuild", () => {
       Bun.write(entryFile, "export const y = 99;");
 
       const builds = [
-        { entrypoints: [entryFile], outdir: OUTDIR, match: () => true, label: "matched" },
+        {
+          entrypoints: [entryFile],
+          outdir: OUTDIR,
+          match: () => true,
+          label: "matched",
+        },
       ];
       const result = await rebuild(builds, "something.js");
       expect(result.rebuilt).toContain("matched");
@@ -99,7 +104,12 @@ describe("rebuild", () => {
       Bun.write(entryFile, "export const z = 0;");
 
       const builds = [
-        { entrypoints: [entryFile], outdir: OUTDIR, match: /\.js$/, label: "js-rebuild" },
+        {
+          entrypoints: [entryFile],
+          outdir: OUTDIR,
+          match: /\.js$/,
+          label: "js-rebuild",
+        },
       ];
       const result = await rebuild(builds, "src/util.js");
       expect(result.rebuilt).toContain("js-rebuild");
@@ -131,7 +141,12 @@ describe("rebuild", () => {
     Bun.build = async () => ({ success: false, logs: ["stub: build failed"] });
     try {
       const builds = [
-        { entrypoints: ["x.js"], outdir: "/tmp/stub-out", match: /\.js$/, label: "failing-build" },
+        {
+          entrypoints: ["x.js"],
+          outdir: "/tmp/stub-out",
+          match: /\.js$/,
+          label: "failing-build",
+        },
       ];
       const result = await rebuild(builds, "x.js");
       expect(result.success).toBe(false);

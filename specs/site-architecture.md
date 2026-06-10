@@ -147,7 +147,11 @@ The `project.json` file at the project root defines site-wide settings. It is th
   },
 
   "$head": [
-    { "tagName": "meta", "name": "viewport", "content": "width=device-width, initial-scale=1" },
+    {
+      "tagName": "meta",
+      "name": "viewport",
+      "content": "width=device-width, initial-scale=1"
+    },
     { "tagName": "link", "rel": "icon", "href": "/favicon.svg" },
     { "tagName": "link", "rel": "stylesheet", "href": "/fonts/inter.css" }
   ],
@@ -346,7 +350,11 @@ A layout is a standard Jx file that uses HTML `<slot>` elements — the same mec
       "tagName": "head",
       "children": [
         { "tagName": "meta", "charset": "utf-8" },
-        { "tagName": "meta", "name": "viewport", "content": "width=device-width, initial-scale=1" },
+        {
+          "tagName": "meta",
+          "name": "viewport",
+          "content": "width=device-width, initial-scale=1"
+        },
         { "tagName": "title", "textContent": "${$page.title ?? $site.name}" }
       ]
     },
@@ -374,7 +382,11 @@ Pages declare their layout via `$layout`:
   "$layout": "../layouts/base.json",
   "$head": [
     { "tagName": "title", "textContent": "About Us" },
-    { "tagName": "meta", "name": "description", "content": "Learn about our company" }
+    {
+      "tagName": "meta",
+      "name": "description",
+      "content": "Learn about our company"
+    }
   ],
   "children": [
     {
@@ -501,7 +513,7 @@ Collections are defined in `the `collections` key in project.json`:
   "contentTypes": {
     "blog": {
       "source": "./content/blog/",
-      "format": "md",
+      "format": "Markdown",
       "schema": {
         "type": "object",
         "properties": {
@@ -647,7 +659,11 @@ A `ContentEntry` resolves to:
 ```json
 {
   "id": "hello-world",
-  "data": { "title": "Hello World", "pubDate": "2024-01-15", "tags": ["intro"] },
+  "data": {
+    "title": "Hello World",
+    "pubDate": "2024-01-15",
+    "tags": ["intro"]
+  },
   "body": "# Hello\n\nThis is my first post.",
   "$children": [
     { "tagName": "h1", "textContent": "Hello" },
@@ -699,7 +715,9 @@ content/
 **Key rules:**
 
 - One directory per collection (named after the collection)
-- For directory-based collections (`format: "md"`), each file is one entry
+- `format` names a **format class** from the project `imports` map (e.g. `"Markdown"`, `"Csv"`) — see specs/extensions.md. `"json"` is the only built-in. When omitted, the format is derived from the source file extension via the format registry; directory sources require an explicit `format`.
+- Remote `http(s)` sources require an explicit `format` whose class declares `"remote": true` (e.g. `Csv`). There is no implicit remote format.
+- For directory-based collections, the format class's `discover` capability lists entry files; each file is one entry
 - For file-based collections (single CSV or JSON file as `source`), one file contains many entries
 - Media can be co-located next to content entries
 - The collection directory name matches the key in `project.json `collections``
@@ -811,7 +829,11 @@ Pages declare metadata via `$head`. The compiler resolves these into `<head>` el
 {
   "$head": [
     { "tagName": "title", "textContent": "My Blog Post — My Site" },
-    { "tagName": "meta", "name": "description", "content": "A great blog post about things" },
+    {
+      "tagName": "meta",
+      "name": "description",
+      "content": "A great blog post about things"
+    },
     { "tagName": "meta", "property": "og:title", "content": "My Blog Post" },
     {
       "tagName": "meta",
@@ -824,8 +846,16 @@ Pages declare metadata via `$head`. The compiler resolves these into `<head>` el
       "content": "https://example.com/blog/images/hero.jpg"
     },
     { "tagName": "meta", "property": "og:type", "content": "article" },
-    { "tagName": "meta", "name": "twitter:card", "content": "summary_large_image" },
-    { "tagName": "link", "rel": "canonical", "href": "https://example.com/blog/my-post" }
+    {
+      "tagName": "meta",
+      "name": "twitter:card",
+      "content": "summary_large_image"
+    },
+    {
+      "tagName": "link",
+      "rel": "canonical",
+      "href": "https://example.com/blog/my-post"
+    }
   ]
 }
 ```
@@ -837,9 +867,20 @@ Metadata values support template strings referencing state and `$params`:
 ```json
 {
   "$head": [
-    { "tagName": "title", "textContent": "${state.post.data.title} — ${$site.name}" },
-    { "tagName": "meta", "name": "description", "content": "${state.post.data.description}" },
-    { "tagName": "link", "rel": "canonical", "href": "${$site.url}/blog/${$params.slug}" }
+    {
+      "tagName": "title",
+      "textContent": "${state.post.data.title} — ${$site.name}"
+    },
+    {
+      "tagName": "meta",
+      "name": "description",
+      "content": "${state.post.data.description}"
+    },
+    {
+      "tagName": "link",
+      "rel": "canonical",
+      "href": "${$site.url}/blog/${$params.slug}"
+    }
   ]
 }
 ```
@@ -936,19 +977,23 @@ Image optimization is configured in `project.json` under the `images` key. All p
     "formats": ["webp", "avif"],
     "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
     "sizes": "(max-width: 768px) 100vw, 50vw",
-    "lazyLoad": true
+    "lazyLoad": true,
+    "service": "build",
+    "binding": "IMAGES"
   }
 }
 ```
 
-| Property   | Type       | Default                                     | Description                                                    |
-| ---------- | ---------- | ------------------------------------------- | -------------------------------------------------------------- |
-| `optimize` | `boolean`  | `true`                                      | Master switch — set to `false` to disable all image processing |
-| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                  |
-| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)               |
-| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                         |
-| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints             |
-| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags   |
+| Property   | Type       | Default                                     | Description                                                                                                         |
+| ---------- | ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `optimize` | `boolean`  | `true`                                      | Master switch — set to `false` to disable all image processing                                                      |
+| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                                                                       |
+| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)                                                                    |
+| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                                                                              |
+| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints                                                                  |
+| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                                                        |
+| `service`  | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = runtime transforms via the Cloudflare Images binding (see §9.2.6) |
+| `binding`  | `string`   | `"IMAGES"`                                  | Cloudflare Images binding name (only used when `service` is `"cloudflare"`)                                         |
 
 #### 9.2.2 Build-Time Behavior
 
@@ -1011,6 +1056,31 @@ The optimizer caches processed images to avoid redundant re-encoding on subseque
 - **Persistence:** The cache file survives `dist/` cleanup — only the variant files are regenerated
 
 The `.cache/` directory should be added to `.gitignore` but can optionally be committed for CI build speed.
+
+#### 9.2.6 Cloudflare Images Service
+
+Setting `"service": "cloudflare"` (requires `build.adapter` of `"cloudflare-workers"` or `"cloudflare-pages"`; otherwise the loader warns and falls back to `"build"`) replaces the build-time Sharp pipeline with on-demand transformation at the edge via the [Cloudflare Images binding](https://developers.cloudflare.com/images/transform-images/bindings/):
+
+- **No variants are generated at build time** — Sharp is only used to read original image dimensions (for `width`/`height` attributes), and `.cache/images/` / `dist/images/_optimized/` are not used.
+- **srcset rewriting** — eligible `<img>` nodes (same skip rules as §9.2.3) get a `srcset` of endpoint URLs, one per configured width ≤ the original width:
+  `/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=<hash8> 640w, ...`
+  The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
+- **Generated endpoint** — the build emits a `GET /_jx/image` handler: a Hono route inside `dist/worker.js` (cloudflare-workers) or a Pages Function at `dist/functions/_jx/image.js` (cloudflare-pages). The handler:
+  1. Validates `src` (same-origin paths only — never an open proxy) and `w` against the configured width whitelist (400 otherwise).
+  2. Negotiates the output format from the request's `Accept` header against the configured `formats` (AVIF preferred), falling back to original-asset passthrough when nothing matches.
+  3. Fetches the original via the `ASSETS` binding and pipes it through `env.<binding>.input(...).transform({ width }).output({ format, quality })`.
+  4. Caches the response at the edge (`caches.default`) and serves `Cache-Control: public, max-age=31536000, immutable` with `Vary: Accept`.
+- **Required wrangler config** — the deployment must declare the Images binding (and, for Workers, an assets binding):
+
+  ```jsonc
+  {
+    "images": { "binding": "IMAGES" },
+    // cloudflare-workers only:
+    "assets": { "directory": "./dist", "binding": "ASSETS" },
+  }
+  ```
+
+  Projects scaffolded with `bun create @jxsuite` and a Cloudflare adapter include this automatically; the build prints a reminder. If the binding is missing at runtime, the endpoint serves the original asset unchanged, and browsers always have the untouched `src` to fall back on.
 
 ### 9.3 Referencing Media
 
@@ -1227,6 +1297,8 @@ For each route:
     Resolve $head       → merge site + layout + page heads
     Resolve state       → inject content entries, site state
     Transform images    → generate responsive variants, inject srcset/sizes
+                          (images.service "cloudflare": no variants — srcset
+                           points at the generated /_jx/image endpoint)
     Compile             → existing compiler routes (static/dynamic/custom-element)
     ↓
 Bundle server entries   → dist/worker.js (if adapter set, else per-route _server.js)
@@ -1348,42 +1420,47 @@ The collection config can specify locale awareness:
 
 The build output is standard static files deployable anywhere. When `build.adapter` is set, the compiler additionally generates platform-specific files:
 
-| Provider         | Extra Output                                                     |
-| ---------------- | ---------------------------------------------------------------- |
-| _(none)_         | Just `dist/` with HTML/CSS/JS/assets                             |
-| `"cloudflare"`   | `dist/worker.js` (Hono server with asset fallback), `_redirects` |
-| `"netlify"`      | `_redirects`, `_headers`                                         |
-| `"vercel"`       | `vercel.json` with redirects/headers                             |
-| `"github-pages"` | `.nojekyll`, 404.html                                            |
+| Provider               | Extra Output                                                            |
+| ---------------------- | ----------------------------------------------------------------------- |
+| _(none)_               | Just `dist/` with HTML/CSS/JS/assets                                    |
+| `"cloudflare-workers"` | `dist/worker.js` (Hono server with asset fallback), `_redirects`        |
+| `"cloudflare-pages"`   | `dist/functions/` (Pages Functions, one per server entry), `_redirects` |
+| `"node"` / `"bun"`     | `dist/worker.js` (Hono server, no asset fallback)                       |
 
 Configured in `project.json`:
 
 ```json
 {
   "build": {
-    "adapter": "cloudflare"
+    "adapter": "cloudflare-pages"
   }
 }
 ```
 
 #### 14.1.1 `build.adapter` Properties
 
-| Property        | Type             | Default       | Description                                                                                      |
-| --------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------ |
-| `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                               |
-| `format`        | `string`         | `"directory"` | URL format: `"directory"` (trailing slash) or `"file"`                                           |
-| `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                                          |
-| `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare"`, `"netlify"`, `"vercel"`, `"github-pages"`, `"node"`, `"bun"` |
+| Property        | Type             | Default       | Description                                                                         |
+| --------------- | ---------------- | ------------- | ----------------------------------------------------------------------------------- |
+| `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                  |
+| `format`        | `string`         | `"directory"` | URL format: `"directory"` (trailing slash) or `"file"`                              |
+| `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                             |
+| `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, `"bun"` |
 
 When `adapter` is set and the site contains `timing: "server"` entries, the compiler:
 
 1. Collects all server entries from components and pages
 2. Deduplicates by export name
 3. Skips per-route `_server.js` generation
-4. Emits a single `dist/worker.js` via `compileSiteServer()`
+4. Emits a single `dist/worker.js` via `compileSiteServer()` (or per-entry Pages Functions under `dist/functions/` for `"cloudflare-pages"`)
 5. Adds adapter-specific boilerplate (e.g., Cloudflare asset fallback via `c.env.ASSETS.fetch()`)
 
 The generated `dist/worker.js` is a build artifact inside `dist/` and is excluded by the standard `dist/` gitignore rule.
+
+#### 14.1.2 Cloudflare Image Transformation
+
+When `images.service` is `"cloudflare"` (§9.2.6), the adapter codegen additionally emits the `/_jx/image` endpoint — a Hono route inside `dist/worker.js` (registered before the asset catch-all) for `"cloudflare-workers"`, or `dist/functions/_jx/image.js` for `"cloudflare-pages"`. The endpoint is emitted even when the site has no `timing: "server"` entries.
+
+The deployment's wrangler config must declare the Images binding (name from `images.binding`, default `IMAGES`) and, for Workers, an `ASSETS` assets binding. Image transformations must be enabled for the account/zone. Scaffolded Cloudflare projects include a `wrangler.jsonc` with both bindings.
 
 ### 14.2 Build Artifacts
 

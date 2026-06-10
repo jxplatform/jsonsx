@@ -146,7 +146,11 @@ A Jx component is a single `.json` file. All state, computed values, and functio
   "tagName": "my-counter",
   "children": [
     { "tagName": "span", "textContent": "${state.count}" },
-    { "tagName": "button", "textContent": "+", "onclick": { "$ref": "#/state/increment" } }
+    {
+      "tagName": "button",
+      "textContent": "+",
+      "onclick": { "$ref": "#/state/increment" }
+    }
   ]
 }
 ```
@@ -213,7 +217,10 @@ This separation aligns `$defs` with its standard JSON Schema 2020-12 meaning and
 {
   "$defs": {
     "Count": { "type": "integer", "minimum": 0, "maximum": 100 },
-    "Status": { "type": "string", "enum": ["idle", "loading", "success", "error"] },
+    "Status": {
+      "type": "string",
+      "enum": ["idle", "loading", "success", "error"]
+    },
     "TodoItem": {
       "type": "object",
       "properties": {
@@ -284,7 +291,10 @@ Every entry in `state` falls into exactly one of four shapes, determinable by in
       "description": "Current counter value"
     },
     "status": {
-      "type": { "type": "string", "enum": ["idle", "loading", "success", "error"] },
+      "type": {
+        "type": "string",
+        "enum": ["idle", "loading", "success", "error"]
+      },
       "default": "idle"
     }
   }
@@ -1073,7 +1083,10 @@ All non-Function external classes **must** use a `.class.json` file as their `$s
       "resolve": {
         "role": "method",
         "$prototype": "Function",
-        "returns": { "type": "array", "items": { "$ref": "#/$defs/ForecastDay" } }
+        "returns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ForecastDay" }
+        }
       }
     },
     "ForecastDay": {
@@ -1106,7 +1119,11 @@ To avoid repeating `$src` paths across every state entry, a document may declare
     "GeoLocation": "./lib/GeoLocation.class.json"
   },
   "state": {
-    "forecast": { "$prototype": "WeatherForecast", "location": "Lancaster, PA", "days": 5 },
+    "forecast": {
+      "$prototype": "WeatherForecast",
+      "location": "Lancaster, PA",
+      "days": 5
+    },
     "coords": { "$prototype": "GeoLocation", "address": "123 Main St" }
   }
 }
@@ -1423,7 +1440,11 @@ An `$expression` entry is an object containing a single `$expression` key whose 
   "$expression": {
     "operator": "=",
     "target": { "$ref": "#/state/counter" },
-    "value": { "operator": "+", "target": { "$ref": "#/state/counter" }, "value": 1 }
+    "value": {
+      "operator": "+",
+      "target": { "$ref": "#/state/counter" },
+      "value": 1
+    }
   }
 }
 ```
@@ -1521,7 +1542,11 @@ This is the same `$map/` binding §10.2 establishes for mapped-array templates; 
 {
   "operator": "filter",
   "target": { "$ref": "#/state/cart" },
-  "value": { "operator": ">", "target": { "$ref": "$map/item/qty" }, "value": 0 }
+  "value": {
+    "operator": ">",
+    "target": { "$ref": "$map/item/qty" },
+    "value": 0
+  }
 }
 ```
 
@@ -1576,7 +1601,10 @@ Example — an input handler with no `body` string:
          "$expression": {
            "operator": "=",
            "target": { "$ref": "#/state/darkMode" },
-           "value": { "operator": "!", "target": { "$ref": "#/state/darkMode" } }
+           "value": {
+             "operator": "!",
+             "target": { "$ref": "#/state/darkMode" }
+           }
          }
        }
      }
@@ -1706,7 +1734,11 @@ The per-item expression node becomes the callback body, with `$reduce/acc` bound
   },
 
   "tagName": "todo-app",
-  "style": { "fontFamily": "system-ui", "maxWidth": "480px", "margin": "2rem auto" },
+  "style": {
+    "fontFamily": "system-ui",
+    "maxWidth": "480px",
+    "margin": "2rem auto"
+  },
 
   "children": [
     { "tagName": "h1", "textContent": "${state.summary}" },
@@ -1823,7 +1855,10 @@ This rewrites the mutating handlers of Appendix A's idiom using `$expression`, l
   "tagName": "shopping-cart",
 
   "children": [
-    { "tagName": "h2", "textContent": "${state.count} items — $${state.total}" },
+    {
+      "tagName": "h2",
+      "textContent": "${state.count} items — $${state.total}"
+    },
     {
       "tagName": "input",
       "attributes": { "placeholder": "Item name" },

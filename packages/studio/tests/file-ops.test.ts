@@ -1,32 +1,61 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach, beforeAll } from "bun:test";
 import { registerPlatform } from "../src/platform";
-import { loadMarkdown, openFile, saveFile, exportFile } from "../src/files/file-ops";
+import { parseSourceForPath, openFile, saveFile, exportFile } from "../src/files/file-ops";
 import { activeTab, openTab, closeTab } from "../src/workspace/workspace";
+import { seedMarkdownFormat, mockFormatAction } from "./format-fixture";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioPlatform } from "../src/types";
 
-// ─── loadMarkdown ─────────────────────────────────────────────────────────────
+beforeAll(() => {
+  seedMarkdownFormat();
+});
 
-describe("loadMarkdown", () => {
+const formatPlatform = { formatAction: mockFormatAction };
+
+// ─── parseSourceForPath ──────────────────────────────────────────────────────
+
+describe("parseSourceForPath", () => {
+  beforeAll(() => {
+    registerPlatform(formatPlatform as unknown as StudioPlatform);
+  });
+
   test("returns content state for plain markdown", async () => {
-    const result = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Hello\n\nWorld");
+    const result = await parseSourceForPath(
+      "post.md",
+      "---\ntitle: Test Post\n---\n\n# Hello\n\nWorld",
+    );
     expect(result.document).toBeDefined();
     expect((result.document as JxMutableNode).children).toBeDefined();
     expect((result.frontmatter as Record<string, unknown>).title).toBe("Test Post");
+    expect(result.mode).toBe("content");
+    expect(result.format.name).toBe("Markdown");
   });
 
   test("returns component state for hyphenated tagName", async () => {
-    const result = await loadMarkdown("---\ntagName: my-component\n---\n# Content\n");
+    const result = await parseSourceForPath(
+      "comp.md",
+      "---\ntagName: my-component\n---\n# Content\n",
+    );
     expect((result.document as JxMutableNode).tagName).toBe("my-component");
     expect(result.frontmatter).toEqual({});
+    expect(result.mode).toBe("component");
   });
 
   test("extracts frontmatter keys excluding children", async () => {
-    const result = await loadMarkdown("---\ntitle: Test Post\n---\n\n# Content doc");
+    const result = await parseSourceForPath(
+      "post.md",
+      "---\ntitle: Test Post\n---\n\n# Content doc",
+    );
     expect(result.frontmatter).toBeDefined();
     expect((result.frontmatter as Record<string, unknown>).children).toBeUndefined();
     expect((result.frontmatter as Record<string, unknown>).title).toBe("Test Post");
+  });
+
+  test("throws for unregistered extensions", async () => {
+    await expect(parseSourceForPath("data.toml", "a = 1")).rejects.toThrow(
+      /No format class imported/,
+    );
   });
 });
 
@@ -34,7 +63,7 @@ describe("loadMarkdown", () => {
 
 describe("openFile", () => {
   beforeEach(() => {
-    registerPlatform({} as unknown as StudioPlatform);
+    registerPlatform(formatPlatform as unknown as StudioPlatform);
     delete (window as any).showOpenFilePicker;
     // Close any existing tabs
     for (const id of activeTab.value ? [activeTab.value.id] : []) {
@@ -72,7 +101,7 @@ describe("openFile", () => {
 
     const tab = activeTab.value;
     expect(tab).not.toBeNull();
-    expect(tab!.doc.sourceFormat).toBe("md");
+    expect(tab!.doc.sourceFormat).toBe("Markdown");
     expect((tab as unknown as { fileHandle: unknown }).fileHandle).toEqual(mockHandle);
   });
 
@@ -101,6 +130,7 @@ describe("saveFile", () => {
   test("saves via platform when documentPath exists", async () => {
     let written: any = null;
     registerPlatform({
+      ...formatPlatform,
       writeFile: (path: any, content: any) => {
         written = { path, content };
       },
@@ -131,7 +161,7 @@ describe("saveFile", () => {
       }),
     };
 
-    registerPlatform({} as unknown as StudioPlatform);
+    registerPlatform(formatPlatform as unknown as StudioPlatform);
     openTab({
       id: "test-save-fs",
       fileHandle: mockHandle as unknown as FileSystemFileHandle,
@@ -146,7 +176,7 @@ describe("saveFile", () => {
   });
 
   test("shows message when no save target", async () => {
-    registerPlatform({} as unknown as StudioPlatform);
+    registerPlatform(formatPlatform as unknown as StudioPlatform);
     openTab({
       id: "test-no-target",
       document: { tagName: "div" },
@@ -156,9 +186,10 @@ describe("saveFile", () => {
     await saveFile();
   });
 
-  test("serializes markdown source format with jxDocToMd", async () => {
+  test("serializes markdown source format via the format class", async () => {
     let writtenContent = null;
     registerPlatform({
+      ...formatPlatform,
       writeFile: (_path: any, content: any) => {
         writtenContent = content;
       },
@@ -167,8 +198,11 @@ describe("saveFile", () => {
     openTab({
       id: "test-md-save",
       documentPath: "pages/post.md",
-      document: { tagName: "div", children: [{ tagName: "p", textContent: "Hello" }] },
-      sourceFormat: "md",
+      document: {
+        tagName: "div",
+        children: [{ tagName: "p", textContent: "Hello" }],
+      },
+      sourceFormat: "Markdown",
     });
     activeTab.value!.doc.dirty = true;
 
@@ -180,6 +214,7 @@ describe("saveFile", () => {
 
   test("handles save error gracefully", async () => {
     registerPlatform({
+      ...formatPlatform,
       writeFile: () => {
         throw new Error("disk full");
       },
@@ -271,7 +306,7 @@ describe("exportFile", () => {
     openTab({
       id: "test-md-export",
       document: { children: [{ tagName: "p", textContent: "Hello" }] },
-      sourceFormat: "md",
+      sourceFormat: "Markdown",
     });
     // Content mode is set by sourceFormat being "md" in createTab
     // But for this test we need mode=content explicitly

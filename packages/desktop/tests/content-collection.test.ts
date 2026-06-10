@@ -50,7 +50,10 @@ describe("ContentCollection desktop integration", () => {
     });
 
     expect(status).toBe(200);
-    const entries = JSON.parse(body) as { id: string; data: Record<string, unknown> }[];
+    const entries = JSON.parse(body) as {
+      id: string;
+      data: Record<string, unknown>;
+    }[];
     expect(Array.isArray(entries)).toBe(true);
     expect(entries.map((e) => e.data.title)).toEqual(["Getting Started", "Advanced"]);
     setProjectRoot(null);

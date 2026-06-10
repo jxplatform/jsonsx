@@ -77,7 +77,10 @@ export function renderDataExplorerTemplate(
           return html`
             <div class="data-row">
               <div
-                class=${classMap({ "data-row-header": true, expanded: isExpanded })}
+                class=${classMap({
+                  "data-row-header": true,
+                  expanded: isExpanded,
+                })}
                 @click=${() => {
                   if (expandedDataKeys.has(name)) expandedDataKeys.delete(name);
                   else expandedDataKeys.add(name);
@@ -86,7 +89,11 @@ export function renderDataExplorerTemplate(
               >
                 <span class="signal-badge ${defCategory(def)}">${defBadgeLabel(def)}</span>
                 <span class="data-name">${name}</span>
-                <span class=${classMap({ "data-type": true, "data-pending": unwrapped === null })}
+                <span
+                  class=${classMap({
+                    "data-type": true,
+                    "data-pending": unwrapped === null,
+                  })}
                   >${dataTypeLabel(value)}</span
                 >
               </div>

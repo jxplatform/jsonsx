@@ -420,14 +420,20 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                 mutateAddDef(
                   t,
                   n,
-                  /** @type {Record<string, JsonValue>} */ ({ $prototype: protoName }),
+                  /** @type {Record<string, JsonValue>} */ {
+                    $prototype: protoName,
+                  },
                 ),
               );
               expandedSignal = n;
               if (src) {
                 fetchPluginSchema(
                   { $prototype: protoName, $src: src },
-                  { ...(S.documentPath != null && { documentPath: S.documentPath }) },
+                  {
+                    ...(S.documentPath != null && {
+                      documentPath: S.documentPath,
+                    }),
+                  },
                 ).then(() => ctx.renderLeftPanel());
               } else {
                 ctx.renderLeftPanel();
@@ -683,7 +689,10 @@ function renderSignalEditorTemplate(
         exprNode,
         (newNode: any) =>
           transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $expression: newNode })),
-        { stateDefs: Object.keys(S.document.state || {}), allowEventRef: false },
+        {
+          stateDefs: Object.keys(S.document.state || {}),
+          allowEventRef: false,
+        },
       )}
     `;
   }
@@ -830,7 +839,9 @@ function renderFunctionFields(
             quiet
             title="Open in code editor"
             @click=${() => {
-              ctx.updateSession({ ui: { editingFunction: { type: "def", defName: name } } });
+              ctx.updateSession({
+                ui: { editingFunction: { type: "def", defName: name } },
+              });
               ctx.renderCanvas();
             }}
           >
@@ -940,7 +951,10 @@ function renderParameterEditorTemplate(
                 style="flex:1"
                 @change=${(e: Event) => {
                   const next = [...params];
-                  next[i] = { ...next[i], name: (e.target as HTMLInputElement).value };
+                  next[i] = {
+                    ...next[i],
+                    name: (e.target as HTMLInputElement).value,
+                  };
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
                   );
@@ -995,7 +1009,9 @@ function renderParameterEditorTemplate(
                 @click=${() => {
                   const next = params.filter((_: unknown, j: number) => j !== i);
                   transactDoc(activeTab.value, (t) =>
-                    mutateUpdateDef(t, name, { parameters: next.length ? next : undefined }),
+                    mutateUpdateDef(t, name, {
+                      parameters: next.length ? next : undefined,
+                    }),
                   );
                 }}
                 >×</span
@@ -1007,7 +1023,9 @@ function renderParameterEditorTemplate(
           class="kv-add"
           @click=${() =>
             transactDoc(activeTab.value, (t) =>
-              mutateUpdateDef(t, name, { parameters: [...params, { name: "" }] }),
+              mutateUpdateDef(t, name, {
+                parameters: [...params, { name: "" }],
+              }),
             )}
         >
           + Add parameter
@@ -1046,7 +1064,10 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             style="flex:1"
             @change=${(e: Event) => {
               const next = [...emits];
-              next[i] = { ...next[i], name: (e.target as HTMLInputElement).value };
+              next[i] = {
+                ...next[i],
+                name: (e.target as HTMLInputElement).value,
+              };
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
           />
@@ -1289,7 +1310,9 @@ export function renderSchemaFieldsTemplate(
                   ? parseInt((e.target as HTMLInputElement).value, 10)
                   : parseFloat((e.target as HTMLInputElement).value);
               transactDoc(activeTab.value, (t) =>
-                mutateUpdateDef(t, name, { [prop]: isNaN(parsed) ? undefined : parsed }),
+                mutateUpdateDef(t, name, {
+                  [prop]: isNaN(parsed) ? undefined : parsed,
+                }),
               );
             }, 400);
           }}
@@ -1375,7 +1398,9 @@ export function renderSchemaFieldsTemplate(
                     @click=${() => {
                       const updated = rows.filter((_: unknown, i: number) => i !== idx);
                       transactDoc(activeTab.value, (t) =>
-                        mutateUpdateDef(t, name, { [prop]: updated.length ? updated : undefined }),
+                        mutateUpdateDef(t, name, {
+                          [prop]: updated.length ? updated : undefined,
+                        }),
                       );
                       ctx?.renderLeftPanel();
                     }}

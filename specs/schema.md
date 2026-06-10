@@ -121,7 +121,9 @@ Validates `.class.json` files with:
 - `$defs.returnTypes` — output type schemas
 - `$defs.fields` — class fields with role, access, scope
 - `$defs.constructor` — constructor definition
-- `$defs.methods` — methods and accessors
+- `$defs.methods` — methods and accessors; capability roles `parse`, `serialize`, `discover`, `load` (with a `timing` array) mark static format capabilities (see specs/extensions.md)
+- `format` — format-extension participation block (`extensions`, `mediaType`, `documentKinds`, `exportTarget`, `remote`)
+- `$studio` — studio control-surface hints (modes, documentMode, newFileTemplate, element/nesting constraints)
 
 ---
 

@@ -148,7 +148,9 @@ describe("compileSiteServer", () => {
 
   test("cloudflare-workers adapter adds asset fallback", () => {
     const entries = [{ exportName: "fn", src: "./fn.js" }];
-    const result = compileSiteServer(entries, { adapter: "cloudflare-workers" });
+    const result = compileSiteServer(entries, {
+      adapter: "cloudflare-workers",
+    });
     expect(result).toContain("c.env.ASSETS.fetch(c.req.raw)");
   });
 
@@ -169,7 +171,9 @@ describe("compileSiteServer", () => {
       { exportName: "fnA", src: "./a.js" },
       { exportName: "fnB", src: "./b.js" },
     ];
-    const result = compileSiteServer(entries, { adapter: "cloudflare-workers" });
+    const result = compileSiteServer(entries, {
+      adapter: "cloudflare-workers",
+    });
     expect(result).toContain("app.post('/_jx/server/fnA'");
     expect(result).toContain("app.post('/_jx/server/fnB'");
     expect(result).toContain("import { fnA } from './a.js'");

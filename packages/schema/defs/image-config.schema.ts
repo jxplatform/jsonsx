@@ -16,5 +16,7 @@ export const imageConfigSchema = {
     },
     sizes: { type: "string" },
     lazyLoad: { type: "boolean" },
+    service: { type: "string", enum: ["build", "cloudflare"] },
+    binding: { type: "string" },
   },
 } as const;

@@ -73,7 +73,10 @@ export function ensureGoogleFontPreconnects(head: JxHeadEntry[]) {
         e?.attributes?.href === origin,
     );
     if (!exists) {
-      const attrs: Record<string, string | boolean> = { rel: "preconnect", href: origin };
+      const attrs: Record<string, string | boolean> = {
+        rel: "preconnect",
+        href: origin,
+      };
       if (origin === "https://fonts.gstatic.com") attrs.crossorigin = "";
       head.push({ tagName: "link", attributes: attrs });
     }

@@ -98,7 +98,7 @@ export function injectContext(
         ...(doc.$elements as (string | JxElement)[]),
       ]) {
         const key =
-          typeof entry === "string" ? entry : /** @type {{ $ref?: string }} */ (entry)?.$ref;
+          typeof entry === "string" ? entry : /** @type {{ $ref?: string }} */ entry?.$ref;
         if (key && !seen.has(key)) {
           seen.add(key);
           merged.push(entry);

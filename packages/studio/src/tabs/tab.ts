@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { reactive, effectScope } from "../reactivity";
+import { formatByName, formatForPath } from "../format/format-host";
 import type {
   GitDiffState,
   InlineEditDef,
@@ -47,7 +48,11 @@ export interface Tab {
   documentPath: string | null;
   fileHandle: FileSystemFileHandle | null;
   capabilities: { modes: string[] };
-  scope: { stop(): void; run<T>(fn: () => T): T | undefined; [k: string]: unknown };
+  scope: {
+    stop(): void;
+    run<T>(fn: () => T): T | undefined;
+    [k: string]: unknown;
+  };
   doc: {
     document: JxMutableNode;
     content: { frontmatter: Record<string, unknown> };
@@ -152,8 +157,7 @@ export function createTab({
       document,
       sourceFormat,
       content: { frontmatter: frontmatter || {} },
-      mode:
-        sourceFormat === "md" ? "content" : documentPath?.endsWith(".md") ? "content" : "component",
+      mode: inferDocumentMode(documentPath, sourceFormat),
       handlersSource: null,
       dirty: false,
     }),
@@ -163,7 +167,12 @@ export function createTab({
       clipboard: null,
       documentStack: [],
       ui: createDefaultUi(),
-      canvas: { status: "idle", scope: null, error: null, pendingInlineEdit: null },
+      canvas: {
+        status: "idle",
+        scope: null,
+        error: null,
+        pendingInlineEdit: null,
+      },
     }),
     history: reactive({
       snapshots: [{ document: structuredClone(document), selection: null }],
@@ -181,9 +190,23 @@ export function createTab({
  */
 function inferModes(documentPath: string | null | undefined, sourceFormat: string | null) {
   if (documentPath === "project.json") return ["stylebook", "source"];
-  if (sourceFormat === "md" || documentPath?.endsWith(".md"))
-    return ["edit", "design", "preview", "source"];
+  const format = formatByName(sourceFormat) ?? formatForPath(documentPath);
+  if (format) return format.studio?.modes ?? ["edit", "design", "preview", "source"];
   return ALL_MODES;
+}
+
+/**
+ * Document mode for a new tab: format-class documents default to their $studio.documentMode
+ * (content unless promoted to component); JSON is component.
+ *
+ * @param {string | null | undefined} documentPath
+ * @param {string | null} sourceFormat
+ * @returns {string}
+ */
+function inferDocumentMode(documentPath: string | null | undefined, sourceFormat: string | null) {
+  const format = formatByName(sourceFormat) ?? formatForPath(documentPath);
+  if (format) return format.studio?.documentMode?.default ?? "content";
+  return "component";
 }
 
 /**

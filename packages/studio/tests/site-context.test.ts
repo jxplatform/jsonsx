@@ -31,12 +31,16 @@ describe("getEffectiveMedia", () => {
     setProjectState({
       projectConfig: { $media: { "--lg": "(min-width: 1024px)" } },
     } as unknown as ProjectState);
-    expect(getEffectiveMedia(undefined)).toEqual({ "--lg": "(min-width: 1024px)" });
+    expect(getEffectiveMedia(undefined)).toEqual({
+      "--lg": "(min-width: 1024px)",
+    });
   });
 
   test("merges site and doc media (doc wins)", () => {
     setProjectState({
-      projectConfig: { $media: { "--md": "(min-width: 768px)", "--lg": "(min-width: 1024px)" } },
+      projectConfig: {
+        $media: { "--md": "(min-width: 768px)", "--lg": "(min-width: 1024px)" },
+      },
     } as unknown as ProjectState);
     const docMedia = { "--md": "(min-width: 800px)" };
     const result = getEffectiveMedia(docMedia);
@@ -58,7 +62,9 @@ describe("getEffectiveStyle", () => {
   });
 
   test("returns site style when no doc style", () => {
-    setProjectState({ projectConfig: { style: { margin: "0" } } } as unknown as ProjectState);
+    setProjectState({
+      projectConfig: { style: { margin: "0" } },
+    } as unknown as ProjectState);
     expect(getEffectiveStyle(undefined)).toEqual({ margin: "0" });
   });
 
@@ -131,7 +137,9 @@ describe("getEffectiveElements", () => {
 
   test("deduplicates by $ref", () => {
     setProjectState({
-      projectConfig: { $elements: [{ $ref: "./a.json" }, { $ref: "./b.json" }] },
+      projectConfig: {
+        $elements: [{ $ref: "./a.json" }, { $ref: "./b.json" }],
+      },
     } as unknown as ProjectState);
     const result = getEffectiveElements([{ $ref: "./a.json" }, { $ref: "./c.json" }]);
     expect(result).toHaveLength(3);
@@ -142,7 +150,9 @@ describe("getEffectiveElements", () => {
   });
 
   test("handles string entries", () => {
-    setProjectState({ projectConfig: { $elements: ["./global.json"] } } as unknown as ProjectState);
+    setProjectState({
+      projectConfig: { $elements: ["./global.json"] },
+    } as unknown as ProjectState);
     const result = getEffectiveElements(["./global.json", "./local.json"]);
     expect(result).toHaveLength(2);
   });
@@ -162,7 +172,9 @@ describe("getEffectiveHead", () => {
 
   test("returns site head when no doc head", () => {
     const siteHead = [{ tagName: "link", attributes: { href: "/global.css" } }];
-    setProjectState({ projectConfig: { $head: siteHead } } as unknown as ProjectState);
+    setProjectState({
+      projectConfig: { $head: siteHead },
+    } as unknown as ProjectState);
     expect(getEffectiveHead(undefined)).toEqual(siteHead);
   });
 
@@ -197,7 +209,9 @@ describe("getEffectiveHead", () => {
       tagName: "meta",
       attributes: { name: "viewport", content: "width=device-width" },
     };
-    setProjectState({ projectConfig: { $head: [meta] } } as unknown as ProjectState);
+    setProjectState({
+      projectConfig: { $head: [meta] },
+    } as unknown as ProjectState);
     const result = getEffectiveHead([meta]);
     expect(result).toHaveLength(1);
   });

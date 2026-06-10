@@ -20,7 +20,13 @@ let _handle: ReturnType<typeof openModal> | null = null;
  *   directory: string;
  * }}
  */
-let _form = { name: "", description: "", url: "", adapter: "static", directory: "" };
+let _form = {
+  name: "",
+  description: "",
+  url: "",
+  adapter: "static",
+  directory: "",
+};
 
 let _error: string = "";
 
@@ -35,9 +41,18 @@ let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void)
  *
  * @returns {Promise<{ root: string; config: object } | null>}
  */
-export function openNewProjectModal(): Promise<{ root: string; config: ProjectConfig } | null> {
+export function openNewProjectModal(): Promise<{
+  root: string;
+  config: ProjectConfig;
+} | null> {
   if (_handle) return Promise.resolve(null);
-  _form = { name: "", description: "", url: "", adapter: "static", directory: "" };
+  _form = {
+    name: "",
+    description: "",
+    url: "",
+    adapter: "static",
+    directory: "",
+  };
   _error = "";
   _creating = false;
 

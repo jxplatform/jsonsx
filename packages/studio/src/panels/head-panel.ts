@@ -74,7 +74,12 @@ const PAGE_FIELDS: MetaField[] = [
 
 const OG_FIELDS: MetaField[] = [
   { label: "Title", attr: "property", key: "og:title" },
-  { label: "Description", attr: "property", key: "og:description", multiline: true },
+  {
+    label: "Description",
+    attr: "property",
+    key: "og:description",
+    multiline: true,
+  },
   { label: "Image", attr: "property", key: "og:image", media: true },
   { label: "Type", attr: "property", key: "og:type" },
 ];
@@ -243,7 +248,9 @@ function renderMetaFieldRow(
   const placeholder =
     field.key === "viewport" ? "width=device-width, initial-scale=1" : `${field.label}…`;
   const widget = field.multiline
-    ? spTextArea(`head:${field.key}`, val, commit, { placeholder: `${field.label}…` })
+    ? spTextArea(`head:${field.key}`, val, commit, {
+        placeholder: `${field.label}…`,
+      })
     : spTextField(`head:${field.key}`, val, commit, { placeholder });
 
   return renderFieldRow({
@@ -522,7 +529,7 @@ function renderFrontmatterSection() {
   const fields = [];
   if (schemaProps) {
     for (const [field, fieldSchema] of Object.entries(
-      /** @type {Record<string, FmSchemaEntry>} */ (schemaProps),
+      /** @type {Record<string, FmSchemaEntry>} */ schemaProps,
     )) {
       if (RESERVED_FM_KEYS.has(field)) continue;
       fields.push({ field, entry: fieldSchema, value: fm[field] as JsonValue });
@@ -532,7 +539,7 @@ function renderFrontmatterSection() {
       fields.push({
         field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        value: /** @type {JsonValue} */ (value),
+        value: /** @type {JsonValue} */ value,
       });
     }
   } else {
@@ -541,7 +548,7 @@ function renderFrontmatterSection() {
       fields.push({
         field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
-        value: /** @type {JsonValue} */ (value),
+        value: /** @type {JsonValue} */ value,
       });
     }
   }

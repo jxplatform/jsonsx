@@ -40,7 +40,12 @@ export function renderButtonGroup(
   const extraSelected = hasExtra && extra.includes(String(value));
 
   return html`
-    <div class=${classMap({ "button-group-combo": true, "has-overflow": hasExtra })}>
+    <div
+      class=${classMap({
+        "button-group-combo": true,
+        "has-overflow": hasExtra,
+      })}
+    >
       <sp-action-group size="s" compact>
         ${values.map(
           (v: string) => html`

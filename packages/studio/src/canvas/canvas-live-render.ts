@@ -131,7 +131,11 @@ export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
  */
 export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl: HTMLElement) {
   const tab = activeTab.value;
-  const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode, document: tab?.doc.document };
+  const S = {
+    documentPath: tab?.documentPath,
+    mode: tab?.doc.mode,
+    document: tab?.doc.document,
+  };
   const canvasMode = _ctx!.getCanvasMode();
 
   if (S.documentPath !== _failedElementsDocPath) {
@@ -384,67 +388,65 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     const $defs = await buildScope(renderDoc, {}, docBase);
     // Bail out if a newer render started while buildScope was running
     if (gen !== view.renderGeneration) return null;
-    const el = /** @type {HTMLElement} */ (
-      runtimeRenderNode(renderDoc, $defs, {
-        onNodeCreated(
-          el: HTMLElement | Text,
-          path: (string | number)[],
-          def: Record<string, unknown>,
-        ) {
-          if (!(el instanceof HTMLElement)) return;
-          // Track layout-originated elements — don't store in elToPath to avoid
-          // path collisions with remapped page content paths
-          if (layoutWrapped && def?.$__layout) {
-            layoutElements.add(el);
-            if (el.setAttribute) el.setAttribute("data-jx-layout", "");
-            return;
-          }
+    const el = /** @type {HTMLElement} */ runtimeRenderNode(renderDoc, $defs, {
+      onNodeCreated(
+        el: HTMLElement | Text,
+        path: (string | number)[],
+        def: Record<string, unknown>,
+      ) {
+        if (!(el instanceof HTMLElement)) return;
+        // Track layout-originated elements — don't store in elToPath to avoid
+        // path collisions with remapped page content paths
+        if (layoutWrapped && def?.$__layout) {
+          layoutElements.add(el);
+          if (el.setAttribute) el.setAttribute("data-jx-layout", "");
+          return;
+        }
 
-          // Remap layout-wrapped paths: strip the layout prefix so paths are
-          // relative to the original page document (which is what S.document holds)
-          let mappedPath = path;
-          if (layoutWrapped && pageContentPrefix) {
-            const pfx = pageContentPrefix;
-            if (
-              path.length >= pfx.length &&
-              pfx.every((seg: string | number, i: number) => path[i] === seg)
-            ) {
-              mappedPath = ["children", ...path.slice(pfx.length)];
-            }
+        // Remap layout-wrapped paths: strip the layout prefix so paths are
+        // relative to the original page document (which is what S.document holds)
+        let mappedPath = path;
+        if (layoutWrapped && pageContentPrefix) {
+          const pfx = pageContentPrefix;
+          if (
+            path.length >= pfx.length &&
+            pfx.every((seg: string | number, i: number) => path[i] === seg)
+          ) {
+            mappedPath = ["children", ...path.slice(pfx.length)];
           }
+        }
 
-          // Remap $map paths: wrapper and template children → real document paths
-          // prepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
-          // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
-          if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
-            for (let i = 0; i < mappedPath.length - 1; i++) {
-              if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
-                const parentKey = mappedPath.slice(0, i).join("/");
-                if (mapParentPaths.has(parentKey)) {
-                  if (mappedPath.length === i + 2) {
-                    mappedPath = mappedPath.slice(0, i + 1);
-                  } else if (
-                    mappedPath.length >= i + 4 &&
-                    mappedPath[i + 2] === "children" &&
-                    mappedPath[i + 3] === 0
-                  ) {
-                    mappedPath = [
-                      ...mappedPath.slice(0, i),
-                      "children",
-                      "map",
-                      ...mappedPath.slice(i + 4),
-                    ];
-                  }
-                  break;
+        // Remap $map paths: wrapper and template children → real document paths
+        // prepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
+        // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
+        if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
+          for (let i = 0; i < mappedPath.length - 1; i++) {
+            if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
+              const parentKey = mappedPath.slice(0, i).join("/");
+              if (mapParentPaths.has(parentKey)) {
+                if (mappedPath.length === i + 2) {
+                  mappedPath = mappedPath.slice(0, i + 1);
+                } else if (
+                  mappedPath.length >= i + 4 &&
+                  mappedPath[i + 2] === "children" &&
+                  mappedPath[i + 3] === 0
+                ) {
+                  mappedPath = [
+                    ...mappedPath.slice(0, i),
+                    "children",
+                    "map",
+                    ...mappedPath.slice(i + 4),
+                  ];
                 }
+                break;
               }
             }
           }
-          elToPath.set(el, mappedPath);
-        },
-        _path: [],
-      })
-    );
+        }
+        elToPath.set(el, mappedPath);
+      },
+      _path: [],
+    });
     if (canvasMode === "design" || canvasMode === "edit") {
       // Disable pointer events on all rendered elements for edit mode
       el.style.pointerEvents = "none";

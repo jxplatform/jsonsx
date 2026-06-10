@@ -33,7 +33,11 @@ export interface StudioState {
   mode: string;
   content: { frontmatter: Record<string, unknown> };
   ui: Record<string, unknown>;
-  canvas: { status: string; scope: Record<string, unknown> | null; error: string | null };
+  canvas: {
+    status: string;
+    scope: Record<string, unknown> | null;
+    error: string | null;
+  };
 }
 
 interface StudioStackFrame {

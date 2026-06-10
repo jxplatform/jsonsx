@@ -161,7 +161,10 @@ function resolveWritableRef(
       const obj = pathParts.length > 0 ? getPath(base, pathParts.join("/")) : base;
       return { obj, key: lastKey as string };
     }
-    return { obj: state.$map ?? state, key: key === "item" ? "$map/item" : "$map/index" };
+    return {
+      obj: state.$map ?? state,
+      key: key === "item" ? "$map/item" : "$map/index",
+    };
   }
   if (ref.startsWith("#/state/")) {
     const sub = ref.slice("#/state/".length);
@@ -284,7 +287,11 @@ export function evaluateExpression(
     if (operator === "reduce") {
       const seed: unknown = resolveOperand(initial, state, event, iterCtx);
       return arr.reduce((acc: unknown, item: unknown, index: number) => {
-        return evaluateExpression(value as ExpressionNode, state, event, { acc, item, index });
+        return evaluateExpression(value as ExpressionNode, state, event, {
+          acc,
+          item,
+          index,
+        });
       }, seed);
     }
     if (operator === "map") {

@@ -19,6 +19,21 @@ Class imports map short names to file paths, enabling `$prototype` resolution wi
 
 These cascade from site level into every page. Page-level `imports` merge on top (page wins on conflict).
 
+### Format Class Auto-Discovery
+
+Imports are also the registration mechanism for **format-extension classes** (see `specs/extensions.md`). Hosts (compiler, dev server, studio) scan the **project-level** `imports` map for `.class.json` files carrying a top-level `format` block and build a format registry from them:
+
+```json
+{
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "Csv": "@jxsuite/parser/Csv.class.json"
+  }
+}
+```
+
+With these imports in place, `.md` files are discoverable as pages/components, content types can use `"format": "Markdown"` / `"format": "Csv"`, and the studio offers the formats' editing surfaces. Without them, only `.json` is handled — there are no implicit format defaults. Page-level imports continue to drive `$prototype` state resolution but do not participate in file-extension dispatch (they cannot be read before the page itself is parsed).
+
 ### `$elements` - Component Registration
 
 `$elements` declares which custom elements a page uses. It accepts two formats:

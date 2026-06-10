@@ -310,7 +310,10 @@ async function resolveFunction(
   if (!def.body && !def.$src) {
     const params = resolveParamNames(def);
     const noop = new Function(...params, "");
-    Object.defineProperty(noop, "name", { value: def.name ?? key, configurable: true });
+    Object.defineProperty(noop, "name", {
+      value: def.name ?? key,
+      configurable: true,
+    });
     return noop;
   }
 
@@ -319,7 +322,10 @@ async function resolveFunction(
   if (def.body) {
     const params = resolveParamNames(def);
     fn = new Function(...params, def.body);
-    Object.defineProperty(fn, "name", { value: def.name ?? key, configurable: true });
+    Object.defineProperty(fn, "name", {
+      value: def.name ?? key,
+      configurable: true,
+    });
   } else {
     // $src: dynamic import
     const src = def.$src;
@@ -765,13 +771,12 @@ function renderMappedArray(
     if (!Array.isArray(items)) return;
     if (filterRef) {
       const fn = resolveRef(filterRef.$ref, state);
-      if (typeof fn === "function")
-        items = items.filter(/** @type {(v: unknown) => boolean} */ (fn));
+      if (typeof fn === "function") items = items.filter(/** @type {(v: unknown) => boolean} */ fn);
     }
     if (sortRef) {
       const fn = resolveRef(sortRef.$ref, state);
       if (typeof fn === "function")
-        items = [...items].sort(/** @type {(a: unknown, b: unknown) => number} */ (fn));
+        items = [...items].sort(/** @type {(a: unknown, b: unknown) => number} */ fn);
     }
 
     items.forEach((item, index) => {
@@ -1316,7 +1321,10 @@ function classFromSchema(classDef: Record<string, any>) {
         );
         descriptor.set = new Function(...sp, typedMethod.setter.body) as (v: unknown) => void;
       }
-      Object.defineProperty(DynClass.prototype, name, { ...descriptor, configurable: true });
+      Object.defineProperty(DynClass.prototype, name, {
+        ...descriptor,
+        configurable: true,
+      });
     } else if (typedMethod.scope === "static") {
       (DynClass as unknown as DynamicClass)[name] = new Function(...params, bodyStr);
     } else {
@@ -1324,7 +1332,10 @@ function classFromSchema(classDef: Record<string, any>) {
     }
   }
 
-  Object.defineProperty(DynClass, "name", { value: classDef.title, configurable: true });
+  Object.defineProperty(DynClass, "name", {
+    value: classDef.title,
+    configurable: true,
+  });
   const dynCtor = DynClass as unknown as DynamicClass;
   return dynCtor;
 }
@@ -1714,7 +1725,7 @@ function injectHead(entries: any[], _base: string) {
 
     const el = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
-      el.setAttribute(k, /** @type {string} */ (v));
+      el.setAttribute(k, /** @type {string} */ v);
     }
     if (entry.textContent) el.textContent = entry.textContent;
     document.head.appendChild(el);

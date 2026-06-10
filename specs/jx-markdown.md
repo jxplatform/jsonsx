@@ -6,12 +6,12 @@ Jx Markdown is primarily intended for content-heavy components. JSON remains the
 
 ## Relationship to JSON
 
-Markdown is a transpilation source — `.md` files compile to the same JSON document structure the runtime and compiler already consume. The transpiler (`transpileJxMarkdown`) produces a standard Jx JSON document from markdown source. Round-tripping is supported via `jxDocToMd`.
+Markdown is a transpilation source — `.md` files compile to the same JSON document structure the runtime and compiler already consume. The transpiler (`transpileJxMarkdown`, exposed as the `Markdown` format class's `parse` capability) produces a standard Jx JSON document from markdown source. Round-tripping is supported via `serializeJxMarkdown` (`@jxsuite/parser/serialize`, the `Markdown` class's `serialize` capability). Markdown support is opt-in: a project must import the `Markdown` format class (see specs/extensions.md) — there is no implicit `.md` handling in any host.
 
 ```
 author.md → transpileJxMarkdown() → Jx JSON → compiler/runtime
                                         ↑
-                                  jxDocToMd() ← studio editor
+                            serializeJxMarkdown() ← studio editor / site export
 ```
 
 ## Format Overview
@@ -379,6 +379,11 @@ Inverse of `expandDotPaths` — flattens a nested object to dot-path attributes.
 
 Inverse of `expandStylePaths` — strips `:` and `@` prefixes before flattening.
 
-### `jxDocToMd(doc: object): string`
+### `serializeJxMarkdown(doc: object, options?): string`
 
-Converts a Jx JSON document back to Jx Markdown source. Available in the studio via `md-convert.js`.
+Converts a Jx JSON document back to markdown source (`@jxsuite/parser/serialize`). Two modes:
+
+- `mode: "roundtrip"` (default) — lossless: YAML frontmatter from non-children doc keys, non-markdown elements emitted as directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`.
+- `mode: "export"` — lossy clean GFM: Jx decoration stripped, wrapper tags unwrapped, custom elements inlined via injected `componentDefs`, template strings evaluated via injected hooks. Used by site builds for `.md` export sidecars.
+
+This is the single Jx→markdown serializer — the studio and the compiler both dispatch to it through the `Markdown` format class.

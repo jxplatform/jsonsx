@@ -40,7 +40,7 @@
     },
     "packages/compiler": {
       "name": "@jxsuite/compiler",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "bin": {
         "jx": "./bin/jx.js",
       },
@@ -49,10 +49,7 @@
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
-        "remark-gfm": "^4.0.1",
-        "remark-stringify": "^11.0.0",
         "sharp": "^0.34.5",
-        "unified": "^11.0.5",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.10.2",
@@ -61,17 +58,18 @@
     },
     "packages/create": {
       "name": "@jxsuite/create",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "bin": {
         "create-jxsuite": "./index.ts",
       },
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.170",
         "@anthropic-ai/sdk": "^0.104.1",
+        "@jxsuite/compiler": "workspace:^",
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/schema": "workspace:^",
         "@jxsuite/server": "workspace:^",
@@ -89,7 +87,7 @@
     },
     "packages/parser": {
       "name": "@jxsuite/parser",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "glob": "^13.0.6",
@@ -104,18 +102,21 @@
         "remark-parse": "^11.0.0",
         "remark-parse-frontmatter": "^1.0.3",
         "remark-rehype": "^11.1.2",
+        "remark-stringify": "^11.0.0",
         "unified": "^11.0.5",
         "unist-util-visit": "^5.1.0",
+        "yaml": "^2.9.0",
       },
       "devDependencies": {
         "@happy-dom/global-registrator": "^20.10.2",
         "@jxsuite/runtime": "workspace:^",
         "@types/hast": "^3.0.4",
+        "@types/mdast": "^4.0.4",
       },
     },
     "packages/runtime": {
       "name": "@jxsuite/runtime",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@jxsuite/schema": "workspace:^",
         "@vue/reactivity": "^3.5.35",
@@ -126,7 +127,7 @@
     },
     "packages/schema": {
       "name": "@jxsuite/schema",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@webref/css": "^8.5.8",
         "@webref/elements": "^2.7.1",
@@ -138,7 +139,7 @@
     },
     "packages/server": {
       "name": "@jxsuite/server",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.170",
         "@anthropic-ai/sdk": "^0.104.1",
@@ -154,7 +155,7 @@
     },
     "packages/studio": {
       "name": "@jxsuite/studio",
-      "version": "0.26.2",
+      "version": "0.27.0",
       "dependencies": {
         "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
         "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.2.0",
@@ -201,12 +202,6 @@
         "lit-html": "^3.3.3",
         "monaco-editor": "^0.55.1",
         "quikchat": "^1.2.7",
-        "remark-directive": "^4.0.0",
-        "remark-frontmatter": "^5.0.0",
-        "remark-gfm": "^4.0.1",
-        "remark-parse": "^11.0.0",
-        "remark-stringify": "^11.0.0",
-        "unified": "^11.0.5",
         "yaml": "^2.9.0",
       },
       "devDependencies": {

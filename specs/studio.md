@@ -469,14 +469,16 @@ Editing styles in stylebook mode writes nested CSS rules (`& tag`) to the docume
 
 ---
 
-## 8. Content / Markdown Mode
+## 8. Content / Format Mode
 
-### 8.1 Bidirectional Conversion
+### 8.1 Format-Class Dispatch
 
-The `md-convert.js` module provides:
+The studio holds no format knowledge: `.json` is native, and every other extension dispatches through the project's **format registry** (see `specs/extensions.md`), built from the project-level `imports` map and fetched via the PAL (`listFormats`). Opening a format file invokes the class's `parse` capability; saving invokes `serialize` (`formatAction` → `POST /__studio/format` on the dev server, RPC on desktop). The format's `$studio` block drives the control surface:
 
-- `mdToJx(markdown)` — Markdown string → Jx document tree
-- `jxToMd(doc)` — Jx document tree → Markdown string
+- `modes` — which editor modes the tab offers
+- `documentMode` — content vs component classification (e.g. promote to component when frontmatter `tagName` matches `.+-.+`)
+- `newFileTemplate` — initial source for new files
+- `elements` — the element allowlist + nesting constraints, interpreted generically by `createNestingValidator` (`src/format/constraints.ts`)
 
 ### 8.2 Inline Editing
 
@@ -489,9 +491,9 @@ In content mode, text elements (headings, paragraphs, list items) are directly e
 1. **Adjacent text merge**: Adjacent bare strings are always joined. `["hello ", "world", { "tagName": "em", ... }]` → `["hello world", { "tagName": "em", ... }]`
 2. **All-text fold**: If all children are bare strings (no element siblings), they collapse into a single `textContent` property on the parent — the simpler representation.
 
-### 8.3 Markdown Loading
+### 8.3 Format File Loading
 
-The studio can load `.md` files, convert them to Jx for visual editing, and save back as markdown.
+The studio loads any registered format file (e.g. `.md` with the `Markdown` class imported), converts it to Jx for visual editing via the class's `parse` capability, and saves back through its `serialize` capability. Projects without format imports handle only `.json`.
 
 ---
 

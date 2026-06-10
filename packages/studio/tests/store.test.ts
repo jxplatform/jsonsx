@@ -63,7 +63,10 @@ describe("stripEventHandlers", () => {
   test("strips on* Function $prototype handlers", () => {
     const node = {
       tagName: "input",
-      onchange: { $prototype: "Function", body: "state.value = event.target.value" },
+      onchange: {
+        $prototype: "Function",
+        body: "state.value = event.target.value",
+      },
       type: "text",
     };
     const result = stripEventHandlers(node) as any;

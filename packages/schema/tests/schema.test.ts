@@ -116,7 +116,21 @@ describe("generateClassSchema", () => {
 
   test("$defs contains ClassMethodDef with role enum", () => {
     const methodDef = schema.$defs.ClassMethodDef;
-    expect(methodDef.properties.role.enum).toEqual(["method", "accessor"]);
+    expect(methodDef.properties.role.enum).toEqual([
+      "method",
+      "accessor",
+      "parse",
+      "serialize",
+      "discover",
+      "load",
+    ]);
+    expect(methodDef.properties.timing.items.enum).toEqual(["compiler", "server", "client"]);
+  });
+
+  test("$defs contains FormatDef and StudioHints for format classes", () => {
+    expect(schema.$defs.FormatDef.required).toEqual(["extensions"]);
+    expect(schema.properties.format).toEqual({ $ref: "#/$defs/FormatDef" });
+    expect(schema.properties.$studio).toEqual({ $ref: "#/$defs/StudioHints" });
   });
 
   test("ClassConstructorDef body accepts string or array", () => {

@@ -216,7 +216,10 @@ export function dismissContextMenu() {
 export function showContextMenu(
   e: MouseEvent,
   path: JxPath,
-  opts: { onEditComponent?: (path: string) => void; rerender?: () => void } = {},
+  opts: {
+    onEditComponent?: (path: string) => void;
+    rerender?: () => void;
+  } = {},
 ) {
   e.preventDefault();
   dismissContextMenu();

@@ -140,7 +140,10 @@ describe("resolveRef", () => {
     delete (document as any)._testProp;
   });
   test("$map/item resolves map item", () => {
-    expect(resolveRef("$map/item", child)).toEqual({ text: "hello", nested: { deep: 42 } });
+    expect(resolveRef("$map/item", child)).toEqual({
+      text: "hello",
+      nested: { deep: 42 },
+    });
   });
   test("$map/index resolves map index", () => {
     expect(resolveRef("$map/index", child)).toBe(3);
@@ -388,7 +391,12 @@ describe("buildScope", () => {
     const state = await buildScope(
       {
         state: {
-          handler: { $prototype: "Function", $src: srcUrl, $export: "myFn", parameters: ["event"] },
+          handler: {
+            $prototype: "Function",
+            $src: srcUrl,
+            $export: "myFn",
+            parameters: ["event"],
+          },
         },
       },
       {},
@@ -416,7 +424,11 @@ describe("buildScope", () => {
       buildScope(
         {
           state: {
-            bad: { $prototype: "Function", body: "return 1;", $src: "./foo.js" },
+            bad: {
+              $prototype: "Function",
+              body: "return 1;",
+              $src: "./foo.js",
+            },
           },
         },
         {},
@@ -608,7 +620,11 @@ describe("applyStyle", () => {
   test("combined inline + nested + media", () => {
     applyStyle(
       el,
-      { color: "green", ":focus": { outline: "2px solid blue" }, "@--sm": { color: "red" } },
+      {
+        color: "green",
+        ":focus": { outline: "2px solid blue" },
+        "@--sm": { color: "red" },
+      },
       { "--sm": "(min-width: 640px)" },
     );
     // color is in stylesheet (not inline) because it's overridden by a media query
@@ -714,7 +730,13 @@ describe("resolvePrototype", () => {
     }) as any;
     const state = reactive({} as Record<string, unknown>);
     await resolvePrototype(
-      { $prototype: "Request", url: "/api", method: "POST", headers: { x: "1" }, body: { a: 1 } },
+      {
+        $prototype: "Request",
+        url: "/api",
+        method: "POST",
+        headers: { x: "1" },
+        body: { a: 1 },
+      },
       state,
       "r",
     );
@@ -1298,7 +1320,10 @@ describe("computed $src + Array map integration", () => {
       state: {
         allItems: {
           type: "array",
-          default: Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: `Item ${i + 1}` })),
+          default: Array.from({ length: 12 }, (_, i) => ({
+            id: i + 1,
+            name: `Item ${i + 1}`,
+          })),
         },
         currentPage: { type: "integer", default: 1 },
         perPage: { type: "integer", default: 5 },
@@ -1531,12 +1556,20 @@ describe("evaluateExpression — pure operators", () => {
   });
 
   test("comparison ===", () => {
-    const node = { operator: "===", target: { $ref: "#/state/count" }, value: 5 };
+    const node = {
+      operator: "===",
+      target: { $ref: "#/state/count" },
+      value: 5,
+    };
     expect(evaluateExpression(node, state, null)).toBe(true);
   });
 
   test("comparison !==", () => {
-    const node = { operator: "!==", target: { $ref: "#/state/count" }, value: 3 };
+    const node = {
+      operator: "!==",
+      target: { $ref: "#/state/count" },
+      value: 3,
+    };
     expect(evaluateExpression(node, state, null)).toBe(true);
   });
 
@@ -1550,7 +1583,11 @@ describe("evaluateExpression — pure operators", () => {
   });
 
   test("logical ||", () => {
-    const node = { operator: "||", target: false, value: { $ref: "#/state/count" } };
+    const node = {
+      operator: "||",
+      target: false,
+      value: { $ref: "#/state/count" },
+    };
     expect(evaluateExpression(node, state, null)).toBe(5);
   });
 
@@ -1572,21 +1609,33 @@ describe("evaluateExpression — pure operators", () => {
 describe("evaluateExpression — mutating operators", () => {
   test("assignment =", () => {
     const state = reactive({ count: 0 });
-    const node = { operator: "=", target: { $ref: "#/state/count" }, value: 42 };
+    const node = {
+      operator: "=",
+      target: { $ref: "#/state/count" },
+      value: 42,
+    };
     evaluateExpression(node, state, null);
     expect(state.count).toBe(42);
   });
 
   test("compound +=", () => {
     const state = reactive({ count: 10 });
-    const node = { operator: "+=", target: { $ref: "#/state/count" }, value: 5 };
+    const node = {
+      operator: "+=",
+      target: { $ref: "#/state/count" },
+      value: 5,
+    };
     evaluateExpression(node, state, null);
     expect(state.count).toBe(15);
   });
 
   test("compound -=", () => {
     const state = reactive({ count: 10 });
-    const node = { operator: "-=", target: { $ref: "#/state/count" }, value: 3 };
+    const node = {
+      operator: "-=",
+      target: { $ref: "#/state/count" },
+      value: 3,
+    };
     evaluateExpression(node, state, null);
     expect(state.count).toBe(7);
   });
@@ -1606,7 +1655,11 @@ describe("evaluateExpression — mutating operators", () => {
 
   test("push to array", () => {
     const state = reactive({ items: [1, 2] });
-    const node = { operator: "push", target: { $ref: "#/state/items" }, value: 3 };
+    const node = {
+      operator: "push",
+      target: { $ref: "#/state/items" },
+      value: 3,
+    };
     evaluateExpression(node, state, null);
     expect(state.items).toEqual([1, 2, 3]);
   });
@@ -1620,7 +1673,11 @@ describe("evaluateExpression — mutating operators", () => {
 
   test("splice array", () => {
     const state = reactive({ items: ["a", "b", "c", "d"] });
-    const node = { operator: "splice", target: { $ref: "#/state/items" }, value: [1, 2] };
+    const node = {
+      operator: "splice",
+      target: { $ref: "#/state/items" },
+      value: [1, 2],
+    };
     evaluateExpression(node, state, null);
     expect(state.items).toEqual(["a", "d"]);
   });
@@ -1639,7 +1696,11 @@ describe("evaluateExpression — mutating operators", () => {
 
   test("assignment to nested path", () => {
     const state = reactive({ user: { name: "old" } });
-    const node = { operator: "=", target: { $ref: "#/state/user/name" }, value: "new" };
+    const node = {
+      operator: "=",
+      target: { $ref: "#/state/user/name" },
+      value: "new",
+    };
     evaluateExpression(node, state, null);
     expect(state.user.name).toBe("new");
   });
@@ -1652,7 +1713,11 @@ describe("evaluateExpression — aggregates", () => {
       operator: "reduce",
       target: { $ref: "#/state/nums" },
       initial: 0,
-      value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+      value: {
+        operator: "+",
+        target: { $ref: "$reduce/acc" },
+        value: { $ref: "$map/item" },
+      },
     };
     expect(evaluateExpression(node, state, null)).toBe(10);
   });
@@ -1707,7 +1772,13 @@ describe("buildScope — $expression (Shape 5)", () => {
     const scope = await buildScope({
       state: {
         count: 0,
-        increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+        increment: {
+          $expression: {
+            operator: "+=",
+            target: { $ref: "#/state/count" },
+            value: 1,
+          },
+        },
       },
     });
     expect(typeof scope.increment).toBe("function");
@@ -1741,7 +1812,11 @@ describe("buildScope — $expression (Shape 5)", () => {
             operator: "reduce",
             target: { $ref: "#/state/nums" },
             initial: 0,
-            value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+            value: {
+              operator: "+",
+              target: { $ref: "$reduce/acc" },
+              value: { $ref: "$map/item" },
+            },
           },
         },
       },
@@ -1756,7 +1831,13 @@ describe("buildScope — $expression (Shape 5)", () => {
     const scope = await buildScope({
       state: {
         count: 0,
-        increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+        increment: {
+          $expression: {
+            operator: "+=",
+            target: { $ref: "#/state/count" },
+            value: 1,
+          },
+        },
       },
     });
     const el = renderNode({ tagName: "button", onclick: { $ref: "#/state/increment" } }, scope);
@@ -1769,7 +1850,13 @@ describe("buildScope — $expression (Shape 5)", () => {
     const el = renderNode(
       {
         tagName: "button",
-        onclick: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 5 } },
+        onclick: {
+          $expression: {
+            operator: "+=",
+            target: { $ref: "#/state/count" },
+            value: 5,
+          },
+        },
       },
       scope,
     );

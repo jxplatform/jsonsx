@@ -218,8 +218,14 @@ describe("collapseStylePaths", () => {
 
 describe("applyStyleKeyMapping", () => {
   test("maps pseudo-class names to colon prefix", () => {
-    const result = applyStyleKeyMapping({ hover: { color: "red" }, focus: { outline: "none" } });
-    expect(result).toEqual({ ":hover": { color: "red" }, ":focus": { outline: "none" } });
+    const result = applyStyleKeyMapping({
+      hover: { color: "red" },
+      focus: { outline: "none" },
+    });
+    expect(result).toEqual({
+      ":hover": { color: "red" },
+      ":focus": { outline: "none" },
+    });
   });
 
   test("maps -- keys to @ prefix", () => {
@@ -324,7 +330,10 @@ Some content here.
     const doc = transpileJxMarkdown(source) as any;
     const section = doc.children[0];
     expect(section.tagName).toBe("my-section");
-    expect(section.style).toEqual({ padding: "1rem", backgroundColor: "white" });
+    expect(section.style).toEqual({
+      padding: "1rem",
+      backgroundColor: "white",
+    });
   });
 
   test("maps pseudo-class names in style.* attributes", () => {
@@ -383,7 +392,10 @@ tagName: my-comp
     const doc = transpileJxMarkdown(source) as any;
     const button = doc.children[0];
     expect(button.onclick).toBe("handleClick()");
-    expect(button.attributes).toEqual({ "aria-label": "Close", "data-id": "42" });
+    expect(button.attributes).toEqual({
+      "aria-label": "Close",
+      "data-id": "42",
+    });
   });
 
   test("handles leaf directives as self-closing elements", () => {

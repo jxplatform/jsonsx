@@ -65,7 +65,10 @@ describe("renderGitPanel — state rendering", () => {
   });
 
   test("no project with clone support — shows Clone button", () => {
-    mockPlatform.gitClone = async (_url: string) => ({ ok: true, root: "/tmp/cloned" });
+    mockPlatform.gitClone = async (_url: string) => ({
+      ok: true,
+      root: "/tmp/cloned",
+    });
     setProjectState(null);
     const result = renderGitPanel({ ui: {} }, {});
     const output = renderToString(result);
@@ -83,7 +86,14 @@ describe("renderGitPanel — state rendering", () => {
   test("project loaded, not a git repo — shows init + publish buttons", () => {
     setProjectState({ name: "test-project" });
     const ui = {
-      gitStatus: { branch: "", files: [], ahead: 0, behind: 0, isRepo: false, remotes: [] },
+      gitStatus: {
+        branch: "",
+        files: [],
+        ahead: 0,
+        behind: 0,
+        isRepo: false,
+        remotes: [],
+      },
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
@@ -185,7 +195,9 @@ describe("renderGitPanel — state rendering", () => {
 
 describe("platformSupportsClone", () => {
   test("returns true when platform has gitClone", () => {
-    mockPlatform = { gitClone: async (_url: string) => ({ ok: true, root: "" }) };
+    mockPlatform = {
+      gitClone: async (_url: string) => ({ ok: true, root: "" }),
+    };
     expect(platformSupportsClone()).toBe(true);
   });
 

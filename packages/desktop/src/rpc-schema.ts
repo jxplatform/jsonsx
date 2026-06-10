@@ -233,6 +233,21 @@ export type StudioRPC = {
         params: { query: string };
         response: DirEntry[];
       };
+      // Formats
+      listFormats: {
+        params: void;
+        response: Record<string, unknown>[];
+      };
+      formatAction: {
+        params: {
+          format: string;
+          action: string;
+          source?: string;
+          doc?: Record<string, unknown>;
+          options?: Record<string, unknown>;
+        };
+        response: unknown;
+      };
       // Packages
       addPackage: {
         params: { name: string };

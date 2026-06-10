@@ -79,7 +79,11 @@ export function isSlashMenuOpen() {
 export function showSlashMenu(
   anchorEl: HTMLElement,
   filter: string,
-  cbs: { onSelect: (cmd: SlashCommand) => void; showFilter?: boolean; commands?: SlashCommand[] },
+  cbs: {
+    onSelect: (cmd: SlashCommand) => void;
+    showFilter?: boolean;
+    commands?: SlashCommand[];
+  },
 ) {
   callbacks = cbs;
   _anchorEl = anchorEl;

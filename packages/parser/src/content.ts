@@ -13,7 +13,10 @@ interface CollectionConfig {
   filter?: unknown;
   sort?: unknown;
   limit?: number;
-  _project?: { contentTypes?: Map<string, ContentLoaderEntry[]>; [k: string]: unknown };
+  _project?: {
+    contentTypes?: Map<string, ContentLoaderEntry[]>;
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 
@@ -21,8 +24,14 @@ interface EntryConfig {
   contentType?: string;
   id?: unknown;
   field?: string;
-  _project?: { contentTypes?: Map<string, ContentLoaderEntry[]>; [k: string]: unknown };
-  _document?: { route?: { _pathParams?: Record<string, string> }; [k: string]: unknown };
+  _project?: {
+    contentTypes?: Map<string, ContentLoaderEntry[]>;
+    [k: string]: unknown;
+  };
+  _document?: {
+    route?: { _pathParams?: Record<string, string> };
+    [k: string]: unknown;
+  };
   [k: string]: unknown;
 }
 
@@ -93,7 +102,11 @@ export function queryContentType(
     if (Array.isArray(query.filter)) {
       rules = query.filter;
     } else if (typeof query.filter === "object") {
-      rules = Object.entries(query.filter).map(([field, value]) => ({ field, op: "==", value }));
+      rules = Object.entries(query.filter).map(([field, value]) => ({
+        field,
+        op: "==",
+        value,
+      }));
     } else {
       rules = [];
     }

@@ -12,8 +12,10 @@ export interface ProjectOptions {
   name: string;
   description?: string;
   url?: string;
-  adapter?: "static" | "cloudflare-pages" | "node" | "bun";
+  adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
 }
+
+const CF_ADAPTERS = ["cloudflare-pages", "cloudflare-workers"];
 
 /**
  * Generate a new Jx project at the given path.
@@ -39,13 +41,48 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
   const projectJson = buildProjectJson({ name, description, url, adapter });
   const packageJson = buildPackageJson({ name, description, adapter });
 
-  await Promise.all([
+  const writes = [
     writeFile(join(destPath, "project.json"), JSON.stringify(projectJson, null, "\t") + "\n"),
     writeFile(join(destPath, "package.json"), JSON.stringify(packageJson, null, "  ") + "\n"),
     cp(join(TEMPLATE_DIR, "gitignore"), join(destPath, ".gitignore")),
     cp(join(TEMPLATE_DIR, "layouts"), join(destPath, "layouts"), { recursive: true }),
     cp(join(TEMPLATE_DIR, "pages"), join(destPath, "pages"), { recursive: true }),
-  ]);
+  ];
+
+  if (adapter && CF_ADAPTERS.includes(adapter)) {
+    const wranglerJsonc = buildWranglerJsonc({ slug: packageJson.name, adapter });
+    writes.push(writeFile(join(destPath, "wrangler.jsonc"), wranglerJsonc));
+  }
+
+  await Promise.all(writes);
+}
+
+/**
+ * Build a wrangler.jsonc for Cloudflare adapters. Includes the Images binding so `images.service:
+ * "cloudflare"` works out of the box.
+ *
+ * @param {{ slug: string; adapter: string }} opts
+ */
+function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }) {
+  const compatibilityDate = new Date().toISOString().slice(0, 10);
+
+  const config =
+    adapter === "cloudflare-workers"
+      ? {
+          name: slug,
+          main: "./dist/worker.js",
+          compatibility_date: compatibilityDate,
+          assets: { directory: "./dist", binding: "ASSETS" },
+          images: { binding: "IMAGES" },
+        }
+      : {
+          name: slug,
+          compatibility_date: compatibilityDate,
+          pages_build_output_dir: "./dist",
+          images: { binding: "IMAGES" },
+        };
+
+  return JSON.stringify(config, null, "\t") + "\n";
 }
 
 /** @param {ProjectOptions} opts */
@@ -119,8 +156,15 @@ function buildPackageJson({
     "@jxsuite/runtime": "^0.19.0",
   };
 
-  if (adapter === "cloudflare-pages") {
+  const scripts: Record<string, string> = {
+    build: "jx build",
+    dev: "jx dev",
+  };
+
+  if (adapter && CF_ADAPTERS.includes(adapter)) {
     devDependencies["wrangler"] = "^4";
+    scripts.deploy =
+      adapter === "cloudflare-workers" ? "wrangler deploy" : "wrangler pages deploy dist";
   }
 
   return {
@@ -128,10 +172,7 @@ function buildPackageJson({
     private: true,
     description: description || "",
     license: "MIT",
-    scripts: {
-      build: "jx build",
-      dev: "jx dev",
-    },
+    scripts,
     devDependencies,
   };
 }

@@ -1,6 +1,6 @@
 /** Site-build.test.js — Tests for the Phase 1 site build pipeline */
 
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { loadProjectConfig } from "../src/site/site-loader";
@@ -55,7 +55,12 @@ beforeAll(() => {
 
   writeJSON("pages/about.json", {
     title: "About",
-    $head: [{ tagName: "meta", attributes: { name: "description", content: "About page" } }],
+    $head: [
+      {
+        tagName: "meta",
+        attributes: { name: "description", content: "About page" },
+      },
+    ],
     children: [{ tagName: "h1", children: ["About Us"] }],
   });
 
@@ -96,9 +101,9 @@ describe("site-loader", () => {
 // ── pages-discovery ───────────────────────────────────────────────────────────
 
 describe("pages-discovery", () => {
-  it("discovers static routes", () => {
+  it("discovers static routes", async () => {
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     const urls = routes.map((r) => r.urlPattern);
 
     expect(urls).toContain("/");
@@ -106,16 +111,16 @@ describe("pages-discovery", () => {
     expect(urls).toContain("/blog");
   });
 
-  it("skips underscore-prefixed files", () => {
+  it("skips underscore-prefixed files", async () => {
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     const urls = routes.map((r) => r.urlPattern);
     expect(urls).not.toContain("/_helpers");
   });
 
-  it("sorts static routes before dynamic", () => {
+  it("sorts static routes before dynamic", async () => {
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     // All routes in our fixture are static
     for (const r of routes) {
       expect(r.isDynamic).toBe(false);
@@ -162,10 +167,15 @@ describe("head-merger", () => {
   it("merges site + page heads with deduplication", () => {
     const siteHead = [{ tagName: "meta", attributes: { name: "generator", content: "Jx" } }];
     const pageHead = [
-      { tagName: "meta", attributes: { name: "description", content: "Page desc" } },
+      {
+        tagName: "meta",
+        attributes: { name: "description", content: "Page desc" },
+      },
     ];
 
-    const merged = mergeHead(siteHead, [], pageHead, { title: "Test" }) as any[];
+    const merged = mergeHead(siteHead, [], pageHead, {
+      title: "Test",
+    }) as any[];
 
     const names = merged
       .filter((e) => e.tagName === "meta" && e.attributes?.name)
@@ -269,11 +279,15 @@ describe("buildSite — server worker", () => {
     rmSync(SERVER_TMP, { recursive: true, force: true });
 
     const writeJ = (p: string, obj: unknown) => {
-      mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), {
+        recursive: true,
+      });
       writeFileSync(resolve(SERVER_TMP, p), JSON.stringify(obj, null, 2), "utf8");
     };
     const writeP = (p: string, c: string) => {
-      mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), {
+        recursive: true,
+      });
       writeFileSync(resolve(SERVER_TMP, p), c, "utf8");
     };
 
@@ -341,11 +355,15 @@ describe("buildSite — cloudflare-pages adapter", () => {
     rmSync(PAGES_TMP, { recursive: true, force: true });
 
     const writeJ = (p: string, obj: unknown) => {
-      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), {
+        recursive: true,
+      });
       writeFileSync(resolve(PAGES_TMP, p), JSON.stringify(obj, null, 2), "utf8");
     };
     const writeP = (p: string, c: string) => {
-      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), { recursive: true });
+      mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), {
+        recursive: true,
+      });
       writeFileSync(resolve(PAGES_TMP, p), c, "utf8");
     };
 
@@ -421,6 +439,88 @@ describe("buildSite — cloudflare-pages adapter", () => {
   });
 });
 
+// ── Cloudflare Images service ───────────────────────────────────────────────
+
+describe("buildSite — cloudflare images service", () => {
+  const CF_IMG_TMP = resolve(import.meta.dir, "__test-site-cf-images__");
+
+  // Cloudflare mode only reads image dimensions (no variant generation); mock sharp so the
+  // test doesn't depend on the native binary being loadable.
+  mock.module("sharp", () => ({
+    default: () => ({
+      metadata: async () => ({ width: 1280, height: 720, format: "png" }),
+    }),
+  }));
+
+  async function setupProject(adapter: string) {
+    rmSync(CF_IMG_TMP, { recursive: true, force: true });
+
+    const writeJ = (p: string, obj: unknown) => {
+      mkdirSync(resolve(CF_IMG_TMP, ...p.split("/").slice(0, -1)), {
+        recursive: true,
+      });
+      writeFileSync(resolve(CF_IMG_TMP, p), JSON.stringify(obj, null, 2), "utf8");
+    };
+
+    writeJ("project.json", {
+      name: "CF Images Test",
+      url: "https://test.com",
+      defaults: { lang: "en" },
+      images: { service: "cloudflare" },
+      build: { outDir: "./dist", adapter },
+    });
+
+    writeJ("pages/index.json", {
+      title: "Home",
+      children: [
+        {
+          tagName: "img",
+          attributes: { src: "/images/hero.png", alt: "Hero" },
+        },
+      ],
+    });
+
+    mkdirSync(resolve(CF_IMG_TMP, "public/images"), { recursive: true });
+    writeFileSync(resolve(CF_IMG_TMP, "public/images/hero.png"), "fake-png-data", "utf8");
+  }
+
+  afterAll(() => {
+    rmSync(CF_IMG_TMP, { recursive: true, force: true });
+  });
+
+  it("rewrites img srcset to /_jx/image and emits the Pages function without Sharp variants", async () => {
+    await setupProject("cloudflare-pages");
+    await buildSite(CF_IMG_TMP, { verbose: false });
+
+    const html = readFileSync(resolve(CF_IMG_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain("/_jx/image?src=%2Fimages%2Fhero.png&amp;w=640");
+    expect(html).toContain('src="/images/hero.png"');
+
+    // Pages function emitted even with zero server entries
+    const fnPath = resolve(CF_IMG_TMP, "dist/functions/_jx/image.js");
+    expect(existsSync(fnPath)).toBe(true);
+    const fn = readFileSync(fnPath, "utf8");
+    expect(fn).toContain("export async function onRequestGet(context)");
+    expect(fn).toContain("IMAGES");
+
+    // Sharp variant pipeline skipped entirely
+    expect(existsSync(resolve(CF_IMG_TMP, "dist/images/_optimized"))).toBe(false);
+    expect(existsSync(resolve(CF_IMG_TMP, ".cache/images/_optimized"))).toBe(false);
+  });
+
+  it("embeds the image route in worker.js before the ASSETS catch-all", async () => {
+    await setupProject("cloudflare-workers");
+    await buildSite(CF_IMG_TMP, { verbose: false });
+
+    const worker = readFileSync(resolve(CF_IMG_TMP, "dist/worker.js"), "utf8");
+    const imageRoute = worker.indexOf("app.get('/_jx/image'");
+    const catchAll = worker.indexOf("app.all('*'");
+    expect(imageRoute).toBeGreaterThan(-1);
+    expect(catchAll).toBeGreaterThan(-1);
+    expect(imageRoute).toBeLessThan(catchAll);
+  });
+});
+
 // ── Verbose logging ──────────────────────────────────────────────────────────
 
 describe("buildSite — verbose mode", () => {
@@ -471,7 +571,10 @@ describe("buildSite — optimized images cache-to-dist", () => {
     mkdirSync(resolve(OPT_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(OPT_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
   }
@@ -501,7 +604,10 @@ describe("buildSite — optimized images cache-to-dist", () => {
       await buildSite(OPT_TMP, { clean: true });
       expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/npm-cached.webp"))).toBe(true);
     } finally {
-      rmSync(res(npmBase, "jxsuite-images", basename(OPT_TMP)), { recursive: true, force: true });
+      rmSync(res(npmBase, "jxsuite-images", basename(OPT_TMP)), {
+        recursive: true,
+        force: true,
+      });
       _testResetNpmCacheBase();
     }
   });
@@ -513,7 +619,9 @@ describe("buildSite — optimized images cache-to-dist", () => {
     _testSetNpmCacheBase(null);
 
     // Pre-populate the project-local cache as a prior build would have
-    mkdirSync(resolve(OPT_TMP, ".cache/images/_optimized"), { recursive: true });
+    mkdirSync(resolve(OPT_TMP, ".cache/images/_optimized"), {
+      recursive: true,
+    });
     writeFileSync(
       resolve(OPT_TMP, ".cache/images/_optimized/local-cached.webp"),
       "fake-webp",
@@ -602,7 +710,10 @@ describe("buildSite — component compilation errors", () => {
     mkdirSync(resolve(ERR_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(ERR_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["OK"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["OK"] }],
+      }),
       "utf8",
     );
     mkdirSync(resolve(ERR_TMP, "components"), { recursive: true });
@@ -640,12 +751,18 @@ describe("buildSite — trailingSlash never", () => {
     mkdirSync(resolve(TS_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(TS_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
     writeFileSync(
       resolve(TS_TMP, "pages/about.json"),
-      JSON.stringify({ title: "About", children: [{ tagName: "p", children: ["About"] }] }),
+      JSON.stringify({
+        title: "About",
+        children: [{ tagName: "p", children: ["About"] }],
+      }),
       "utf8",
     );
   });
@@ -689,7 +806,10 @@ describe("buildSite — redirect patterns", () => {
     mkdirSync(resolve(RD_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(RD_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
   });
@@ -734,7 +854,10 @@ describe("buildSite — copy config", () => {
     mkdirSync(resolve(COPY_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(COPY_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
     mkdirSync(resolve(COPY_TMP, "assets"), { recursive: true });
@@ -763,7 +886,11 @@ describe("buildSite — markdown pages", () => {
     mkdirSync(MD_TMP, { recursive: true });
     writeFileSync(
       resolve(MD_TMP, "project.json"),
-      JSON.stringify({ name: "MD Test", build: { outDir: "./dist" } }),
+      JSON.stringify({
+        name: "MD Test",
+        build: { outDir: "./dist" },
+        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+      }),
       "utf8",
     );
     mkdirSync(resolve(MD_TMP, "pages"), { recursive: true });
@@ -785,7 +912,7 @@ This is a markdown page.
     rmSync(MD_TMP, { recursive: true, force: true });
   });
 
-  it("compiles .md pages via transpileJxMarkdown", async () => {
+  it("compiles .md pages via the Markdown format class", async () => {
     const result = await buildSite(MD_TMP);
     expect(result.routes).toBe(1);
     expect(result.errors).toHaveLength(0);
@@ -821,7 +948,10 @@ describe("buildSite — template string resolution", () => {
             tagName: "meta",
             attributes: { name: "description", content: "${state.metaDesc}" },
           },
-          { tagName: "meta", attributes: { name: "og:title", content: "${state.pageTitle}" } },
+          {
+            tagName: "meta",
+            attributes: { name: "og:title", content: "${state.pageTitle}" },
+          },
         ],
         children: [
           { tagName: "h1", textContent: "${state.pageTitle}" },
@@ -930,7 +1060,10 @@ describe("buildSite — bare specifier resolution in $head", () => {
     mkdirSync(resolve(BS_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(BS_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
   });
@@ -1072,7 +1205,10 @@ describe("buildSite — route compilation errors", () => {
     writeFileSync(resolve(ROUTE_ERR_TMP, "pages/broken.json"), "NOT VALID JSON", "utf8");
     writeFileSync(
       resolve(ROUTE_ERR_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["OK"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["OK"] }],
+      }),
       "utf8",
     );
   });
@@ -1110,7 +1246,10 @@ describe("buildSite — dynamic routes with content types", () => {
     mkdirSync(resolve(DYN_TMP, "pages/blog"), { recursive: true });
     writeFileSync(
       resolve(DYN_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Home"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Home"] }],
+      }),
       "utf8",
     );
     writeFileSync(
@@ -1173,7 +1312,10 @@ describe("buildSite — image optimization cache logging", () => {
     mkdirSync(resolve(IMG_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(IMG_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
     // Pre-populate cache with an entry so the "Optimized N image(s)" log triggers
@@ -1216,7 +1358,10 @@ describe("buildSite — markdown component file", () => {
     mkdirSync(resolve(MD_COMP_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(MD_COMP_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Home", children: [{ tagName: "p", children: ["Hi"] }] }),
+      JSON.stringify({
+        title: "Home",
+        children: [{ tagName: "p", children: ["Hi"] }],
+      }),
       "utf8",
     );
     mkdirSync(resolve(MD_COMP_TMP, "components"), { recursive: true });
@@ -1333,7 +1478,11 @@ describe("buildSite — component slot content expansion", () => {
         tagName: "my-wrapper",
         style: { display: "block", border: "1px solid #ccc" },
         children: [
-          { tagName: "div", attributes: { class: "wrapper" }, children: [{ tagName: "slot" }] },
+          {
+            tagName: "div",
+            attributes: { class: "wrapper" },
+            children: [{ tagName: "slot" }],
+          },
         ],
       }),
       "utf8",
@@ -1371,7 +1520,10 @@ describe("buildSite — $head textContent template resolution", () => {
       JSON.stringify({
         title: "Home",
         state: {
-          jsonLd: { default: '{"@context":"https://schema.org"}', timing: "compiler" },
+          jsonLd: {
+            default: '{"@context":"https://schema.org"}',
+            timing: "compiler",
+          },
         },
         $head: [
           {
@@ -1416,7 +1568,10 @@ describe("buildSite — lang attribute handling", () => {
     mkdirSync(resolve(LANG_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(LANG_TMP, "pages/index.json"),
-      JSON.stringify({ title: "Accueil", children: [{ tagName: "p", children: ["Bonjour"] }] }),
+      JSON.stringify({
+        title: "Accueil",
+        children: [{ tagName: "p", children: ["Bonjour"] }],
+      }),
       "utf8",
     );
   });

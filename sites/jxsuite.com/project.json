@@ -19,7 +19,7 @@
     "lazyLoad": true
   },
   "imports": {
-    "MarkdownFile": "@jxsuite/parser/MarkdownFile.class.json",
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
     "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json"
   },
   "$head": [
@@ -144,7 +144,7 @@
   "contentTypes": {
     "docs": {
       "source": "./content/docs/",
-      "format": "md",
+      "format": "Markdown",
       "schema": {
         "type": "object",
         "properties": {

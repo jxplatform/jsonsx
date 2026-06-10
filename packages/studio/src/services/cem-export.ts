@@ -54,7 +54,9 @@ export function exportCemManifest(
         ...(d.description ? { description: d.description } : {}),
         ...(d.parameters ? { parameters: d.parameters.map(normParam) } : {}),
         ...(d.deprecated
-          ? { deprecated: typeof d.deprecated === "string" ? d.deprecated : true }
+          ? {
+              deprecated: typeof d.deprecated === "string" ? d.deprecated : true,
+            }
           : {}),
       });
       // Collect emits
@@ -80,7 +82,9 @@ export function exportCemManifest(
         ...(d.attribute ? { attribute: d.attribute } : {}),
         ...(d.reflects ? { reflects: true } : {}),
         ...(d.deprecated
-          ? { deprecated: typeof d.deprecated === "string" ? d.deprecated : true }
+          ? {
+              deprecated: typeof d.deprecated === "string" ? d.deprecated : true,
+            }
           : {}),
       });
       if (d.attribute) {
@@ -132,7 +136,9 @@ export function exportCemManifest(
     ],
   };
 
-  const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(manifest, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

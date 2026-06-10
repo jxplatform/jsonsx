@@ -16,10 +16,14 @@
   "exports": {
     ".": "./src/md.ts",
     "./content": "./src/content.ts",
+    "./markdown": "./src/markdown.ts",
+    "./csv": "./src/csv.ts",
+    "./serialize": "./src/serialize.ts",
     "./ContentCollection.class.json": "./src/ContentCollection.class.json",
     "./ContentEntry.class.json": "./src/ContentEntry.class.json",
     "./MarkdownCollection.class.json": "./src/MarkdownCollection.class.json",
-    "./MarkdownFile.class.json": "./src/MarkdownFile.class.json",
+    "./Markdown.class.json": "./src/Markdown.class.json",
+    "./Csv.class.json": "./src/Csv.class.json",
     "./transpile": "./src/transpile.ts",
     "./html-to-jx": "./src/html-to-jx.ts",
     "./types": "./src/types.ts"
@@ -28,7 +32,7 @@
     "provenance": true
   },
   "scripts": {
-    "prepare": "bun build src/content.ts --outdir=dist --format=esm --target=node",
+    "prepare": "bun build src/content.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node",
     "build": "bun run prepare",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
@@ -48,12 +52,15 @@
     "remark-parse": "^11.0.0",
     "remark-parse-frontmatter": "^1.0.3",
     "remark-rehype": "^11.1.2",
+    "remark-stringify": "^11.0.0",
     "unified": "^11.0.5",
-    "unist-util-visit": "^5.1.0"
+    "unist-util-visit": "^5.1.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.2",
     "@jxsuite/runtime": "workspace:^",
-    "@types/hast": "^3.0.4"
+    "@types/hast": "^3.0.4",
+    "@types/mdast": "^4.0.4"
   }
 }

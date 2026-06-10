@@ -458,7 +458,9 @@ describe("fetchPluginSchema", () => {
         }),
       );
 
-      const schema = (await fetchPluginSchema({ src: "./Counter.class.json" })) as StudioSchema;
+      const schema = (await fetchPluginSchema({
+        src: "./Counter.class.json",
+      })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.description).toBe("A counter component");
       expect(schema.properties.initial).toBeDefined();
@@ -493,7 +495,12 @@ describe("fetchPluginSchema", () => {
           $defs: {
             parameters: {},
             fields: {
-              size: { role: "field", identifier: "size", type: { type: "string" }, default: "md" },
+              size: {
+                role: "field",
+                identifier: "size",
+                type: { type: "string" },
+                default: "md",
+              },
             },
           },
         }),
@@ -520,7 +527,11 @@ describe("fetchPluginSchema", () => {
           $defs: {
             parameters: {},
             fields: {
-              baseField: { role: "field", identifier: "baseField", type: { type: "string" } },
+              baseField: {
+                role: "field",
+                identifier: "baseField",
+                type: { type: "string" },
+              },
             },
           },
         }),
@@ -533,13 +544,19 @@ describe("fetchPluginSchema", () => {
           $defs: {
             parameters: {},
             fields: {
-              childField: { role: "field", identifier: "childField", type: { type: "number" } },
+              childField: {
+                role: "field",
+                identifier: "childField",
+                type: { type: "number" },
+              },
             },
           },
         }),
       );
 
-      const schema = (await fetchPluginSchema({ src: "./Child.class.json" })) as StudioSchema;
+      const schema = (await fetchPluginSchema({
+        src: "./Child.class.json",
+      })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.baseField).toBeDefined();
       expect(schema.properties.childField).toBeDefined();
@@ -583,7 +600,10 @@ describe("fetchPluginSchema", () => {
   test("returns null for invalid base URL", async () => {
     setup();
     try {
-      const result = await fetchPluginSchema({ src: "./Foo.class.json", base: "not-a-url" });
+      const result = await fetchPluginSchema({
+        src: "./Foo.class.json",
+        base: "not-a-url",
+      });
       expect(result).toBeNull();
     } finally {
       cleanup();
@@ -594,7 +614,10 @@ describe("fetchPluginSchema", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "Broken.class.json"), "not valid json {{{");
-      const schema = await fetchPluginSchema({ src: "./something.ts", prototype: "Broken" });
+      const schema = await fetchPluginSchema({
+        src: "./something.ts",
+        prototype: "Broken",
+      });
       expect(schema).toBeNull();
     } finally {
       cleanup();
@@ -605,7 +628,10 @@ describe("fetchPluginSchema", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "bad-module.ts"), "export syntax error %%%");
-      const schema = await fetchPluginSchema({ src: "./bad-module.ts", prototype: "BadModule" });
+      const schema = await fetchPluginSchema({
+        src: "./bad-module.ts",
+        prototype: "BadModule",
+      });
       expect(schema).toBeNull();
     } finally {
       cleanup();
@@ -635,7 +661,10 @@ describe("fetchPluginSchema", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "plain.ts"), `export function plain() { return 1; }`);
-      const result = await fetchPluginSchema({ src: "./plain.ts", prototype: "plain" });
+      const result = await fetchPluginSchema({
+        src: "./plain.ts",
+        prototype: "plain",
+      });
       // plain is a function without .schema, so returns null
       expect(result).toBeNull();
     } finally {
@@ -704,7 +733,9 @@ describe("handleResolveSiteContext", () => {
       mkdirSync(join(FIXTURES, "site"), { recursive: true });
       writeFileSync(join(FIXTURES, "site", "project.json"), '{"name": "site"}');
       mkdirSync(join(FIXTURES, "site", "pages"), { recursive: true });
-      const result = await handleResolveSiteContext({ filePath: "site/pages/index.json" });
+      const result = await handleResolveSiteContext({
+        filePath: "site/pages/index.json",
+      });
       expect(result.sitePath).toBe("site");
     } finally {
       cleanup();
@@ -715,7 +746,9 @@ describe("handleResolveSiteContext", () => {
     setup();
     try {
       mkdirSync(join(FIXTURES, "orphan"), { recursive: true });
-      const result = await handleResolveSiteContext({ filePath: "orphan/file.json" });
+      const result = await handleResolveSiteContext({
+        filePath: "orphan/file.json",
+      });
       expect(result.sitePath).toBeNull();
     } finally {
       cleanup();

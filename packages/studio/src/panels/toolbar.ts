@@ -27,7 +27,12 @@ interface ToolbarCtx {
   openFile?: (path: string) => void;
   saveFile: () => void;
   parseMediaEntries: (media: Record<string, string> | null | undefined) => {
-    sizeBreakpoints: { name: string; query: string; width: number; type: string }[];
+    sizeBreakpoints: {
+      name: string;
+      query: string;
+      width: number;
+      type: string;
+    }[];
     featureQueries: { name: string; query: string }[];
     baseWidth: number;
   };
@@ -171,7 +176,11 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
   const windowControls = (
     globalThis as unknown as {
       __jxPlatform?: {
-        windowControls?: { minimize: () => void; maximize: () => void; close: () => void };
+        windowControls?: {
+          minimize: () => void;
+          maximize: () => void;
+          close: () => void;
+        };
       };
     }
   ).__jxPlatform?.windowControls;
@@ -381,7 +390,11 @@ function toolbarTemplate() {
   const windowControls = (
     globalThis as unknown as {
       __jxPlatform?: {
-        windowControls?: { minimize: () => void; maximize: () => void; close: () => void };
+        windowControls?: {
+          minimize: () => void;
+          maximize: () => void;
+          close: () => void;
+        };
       };
     }
   ).__jxPlatform?.windowControls;

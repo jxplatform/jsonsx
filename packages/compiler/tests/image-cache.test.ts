@@ -81,7 +81,12 @@ describe("image-cache", () => {
   });
 
   test("getCached returns manifest for existing key", () => {
-    const manifest: any = { src: "img.webp", srcset: "", width: 800, height: 600 };
+    const manifest: any = {
+      src: "img.webp",
+      srcset: "",
+      width: 800,
+      height: 600,
+    };
     const cache: any = {
       version: 1,
       entries: { key1: { source: "img.png", manifest, timestamp: 123 } },
@@ -91,7 +96,12 @@ describe("image-cache", () => {
 
   test("setCached adds entry to cache", () => {
     const cache: any = { version: 1, entries: {} };
-    const manifest: any = { src: "out.webp", srcset: "", width: 400, height: 300 };
+    const manifest: any = {
+      src: "out.webp",
+      srcset: "",
+      width: 400,
+      height: 300,
+    };
     setCached(cache, "k1", "source.png", manifest);
     expect(cache.entries.k1.source).toBe("source.png");
     expect(cache.entries.k1.manifest).toEqual(manifest);

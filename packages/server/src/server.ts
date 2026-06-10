@@ -285,7 +285,9 @@ export async function createDevServer(options: {
           const bundled = bundleCache.get(cacheKey);
           if (bundled) {
             return new Response(bundled, {
-              headers: { "Content-Type": "application/javascript; charset=utf-8" },
+              headers: {
+                "Content-Type": "application/javascript; charset=utf-8",
+              },
             });
           }
         }

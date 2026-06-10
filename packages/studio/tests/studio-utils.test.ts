@@ -188,9 +188,13 @@ describe("inferInputType", () => {
 
   test("priority: shorthand > button-group > color > number-unit", () => {
     // shorthand wins over everything
-    expect(inferInputType({ $shorthand: true, $input: "button-group", format: "color" })).toBe(
-      "shorthand",
-    );
+    expect(
+      inferInputType({
+        $shorthand: true,
+        $input: "button-group",
+        format: "color",
+      }),
+    ).toBe("shorthand");
     // button-group wins over color
     expect(inferInputType({ $input: "button-group", format: "color" })).toBe("button-group");
     // color wins over number-unit

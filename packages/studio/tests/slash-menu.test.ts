@@ -211,13 +211,19 @@ describe("Slash Menu", () => {
     ];
 
     test("shows only custom commands when provided", () => {
-      showSlashMenu(anchor, "", { onSelect: () => {}, commands: customCommands });
+      showSlashMenu(anchor, "", {
+        onSelect: () => {},
+        commands: customCommands,
+      });
       const items = getMenuItems();
       expect(items.length).toBe(3);
     });
 
     test("filters within custom commands", () => {
-      showSlashMenu(anchor, "head", { onSelect: () => {}, commands: customCommands });
+      showSlashMenu(anchor, "head", {
+        onSelect: () => {},
+        commands: customCommands,
+      });
       const items = getMenuItems();
       expect(items.length).toBe(2);
     });
@@ -234,12 +240,18 @@ describe("Slash Menu", () => {
     });
 
     test("no matches in custom commands auto-dismisses", () => {
-      showSlashMenu(anchor, "xyz", { onSelect: () => {}, commands: customCommands });
+      showSlashMenu(anchor, "xyz", {
+        onSelect: () => {},
+        commands: customCommands,
+      });
       expect(isSlashMenuOpen()).toBe(false);
     });
 
     test("keyboard navigation works with custom commands", () => {
-      showSlashMenu(anchor, "", { onSelect: () => {}, commands: customCommands });
+      showSlashMenu(anchor, "", {
+        onSelect: () => {},
+        commands: customCommands,
+      });
       const items = getMenuItems();
       expect(items[0].hasAttribute("focused")).toBe(true);
 

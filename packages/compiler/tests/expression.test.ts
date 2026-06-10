@@ -19,12 +19,20 @@ describe("compileExpression — unary operators", () => {
 
 describe("compileExpression — binary operators", () => {
   test("addition", () => {
-    const node = { operator: "+", target: { $ref: "#/state/a" }, value: { $ref: "#/state/b" } };
+    const node = {
+      operator: "+",
+      target: { $ref: "#/state/a" },
+      value: { $ref: "#/state/b" },
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("(s.a + s.b)");
   });
 
   test("comparison ===", () => {
-    const node = { operator: "===", target: { $ref: "#/state/count" }, value: 0 };
+    const node = {
+      operator: "===",
+      target: { $ref: "#/state/count" },
+      value: 0,
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("(s.count === 0)");
   });
 
@@ -38,7 +46,11 @@ describe("compileExpression — binary operators", () => {
   });
 
   test("logical &&", () => {
-    const node = { operator: "&&", target: { $ref: "#/state/a" }, value: { $ref: "#/state/b" } };
+    const node = {
+      operator: "&&",
+      target: { $ref: "#/state/a" },
+      value: { $ref: "#/state/b" },
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("(s.a && s.b)");
   });
 });
@@ -50,7 +62,11 @@ describe("compileExpression — assignment operators", () => {
   });
 
   test("+= compound", () => {
-    const node = { operator: "+=", target: { $ref: "#/state/count" }, value: 1 };
+    const node = {
+      operator: "+=",
+      target: { $ref: "#/state/count" },
+      value: 1,
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("s.count += 1");
   });
 
@@ -100,7 +116,11 @@ describe("compileExpression — array methods", () => {
   });
 
   test("unshift", () => {
-    const node = { operator: "unshift", target: { $ref: "#/state/items" }, value: "new" };
+    const node = {
+      operator: "unshift",
+      target: { $ref: "#/state/items" },
+      value: "new",
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe('s.items.unshift("new")');
   });
 });
@@ -111,7 +131,11 @@ describe("compileExpression — aggregates", () => {
       operator: "reduce",
       target: { $ref: "#/state/nums" },
       initial: 0,
-      value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+      value: {
+        operator: "+",
+        target: { $ref: "$reduce/acc" },
+        value: { $ref: "$map/item" },
+      },
     };
     expect(compileExpression(node, { statePrefix: "s" })).toBe(
       "s.nums.reduce((_acc, _item, _index) => (_acc + _item), 0)",
@@ -163,7 +187,11 @@ describe("compileExpression — aggregates", () => {
 
 describe("compileExpression — $ref schemes", () => {
   test("$map/item nested path", () => {
-    const node = { operator: "+", target: { $ref: "$map/item/price" }, value: 0 };
+    const node = {
+      operator: "+",
+      target: { $ref: "$map/item/price" },
+      value: 0,
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("(_item.price + 0)");
   });
 
@@ -184,7 +212,11 @@ describe("compileExpression — $ref schemes", () => {
   });
 
   test("window#", () => {
-    const node = { operator: "+", target: { $ref: "window#/innerWidth" }, value: 0 };
+    const node = {
+      operator: "+",
+      target: { $ref: "window#/innerWidth" },
+      value: 0,
+    };
     expect(compileExpression(node, { statePrefix: "s" })).toBe("(window.innerWidth + 0)");
   });
 });
@@ -197,7 +229,13 @@ describe("compileElement — $expression state entries", () => {
       tagName: "test-expr-handler",
       state: {
         count: 0,
-        increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+        increment: {
+          $expression: {
+            operator: "+=",
+            target: { $ref: "#/state/count" },
+            value: 1,
+          },
+        },
       },
       children: [],
     });
@@ -233,7 +271,13 @@ describe("compileElement — $expression state entries", () => {
         {
           tagName: "button",
           textContent: "Click",
-          onclick: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+          onclick: {
+            $expression: {
+              operator: "+=",
+              target: { $ref: "#/state/count" },
+              value: 1,
+            },
+          },
         },
       ],
     });
@@ -270,7 +314,11 @@ describe("compileElement — $expression state entries", () => {
             operator: "reduce",
             target: { $ref: "#/state/nums" },
             initial: 0,
-            value: { operator: "+", target: { $ref: "$reduce/acc" }, value: { $ref: "$map/item" } },
+            value: {
+              operator: "+",
+              target: { $ref: "$reduce/acc" },
+              value: { $ref: "$map/item" },
+            },
           },
         },
       },
@@ -291,7 +339,11 @@ describe("buildInitialScope — $expression", () => {
       a: 3,
       b: 4,
       sum: {
-        $expression: { operator: "+", target: { $ref: "#/state/a" }, value: { $ref: "#/state/b" } },
+        $expression: {
+          operator: "+",
+          target: { $ref: "#/state/a" },
+          value: { $ref: "#/state/b" },
+        },
       },
     });
     expect(scope.sum).toBe(7);
@@ -300,7 +352,13 @@ describe("buildInitialScope — $expression", () => {
   test("mutating expression becomes a function", () => {
     const scope = buildInitialScope({
       count: 0,
-      increment: { $expression: { operator: "+=", target: { $ref: "#/state/count" }, value: 1 } },
+      increment: {
+        $expression: {
+          operator: "+=",
+          target: { $ref: "#/state/count" },
+          value: 1,
+        },
+      },
     });
     expect(typeof scope.increment).toBe("function");
     (scope as any).increment(scope, null);

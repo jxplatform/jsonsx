@@ -170,7 +170,7 @@ function _render() {
    *   content?: { frontmatter?: Record<string, unknown> };
    *   documentPath?: string;
    * }}
-   */ ({
+   */ {
     ui: aTab.session.ui,
     document: aTab.doc.document,
     mode: aTab.doc.mode,
@@ -178,7 +178,7 @@ function _render() {
     canvas: aTab.session.canvas,
     content: aTab.doc.content,
     documentPath: aTab.documentPath,
-  });
+  };
 
   /** @type {TemplateResult | typeof nothing} */
   let content;
@@ -226,12 +226,15 @@ function _render() {
             const tab = activeTab.value!;
             const fm = (tab.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
             const fmHead = fm.$head as unknown[] | undefined;
-            const tmp = { title: fm.title, $head: fmHead ? [...fmHead] : undefined };
+            const tmp = {
+              title: fm.title,
+              $head: fmHead ? [...fmHead] : undefined,
+            };
             fn(tmp);
             if (tmp.title !== fm.title)
               mutateUpdateFrontmatter(tab, "title", tmp.title as JsonValue);
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
-            mutateUpdateFrontmatter(tab, "$head", /** @type {JsonValue} */ (newHead));
+            mutateUpdateFrontmatter(tab, "$head", /** @type {JsonValue} */ newHead);
             render();
           }
         : (fn: (doc: object) => void) => {

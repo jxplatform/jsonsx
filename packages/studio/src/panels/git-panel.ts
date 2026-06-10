@@ -8,6 +8,7 @@ import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
+import { formatForPath } from "../format/format-host";
 import { updateUi, renderOnly, projectState } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
@@ -191,7 +192,9 @@ export function renderGitPanel(
 
   if (!status && !loading) {
     refreshGitStatus();
-    return html`<div class="git-panel"><div class="git-loading">Loading...</div></div>`;
+    return html`<div class="git-panel">
+      <div class="git-loading">Loading...</div>
+    </div>`;
   }
 
   if (status && !status.isRepo) {
@@ -213,7 +216,10 @@ export function renderGitPanel(
         </sp-action-button>
         <sp-action-button
           size="m"
-          @click=${() => publishToGithub({ projectName: projectState?.name || "my-project" })}
+          @click=${() =>
+            publishToGithub({
+              projectName: projectState?.name || "my-project",
+            })}
           ?disabled=${loading}
         >
           <sp-icon-share slot="icon"></sp-icon-share>
@@ -266,7 +272,10 @@ export function renderGitPanel(
     ? "Up to date"
     : `${status?.ahead ? `${status.ahead} ahead` : ""}${status?.ahead && status?.behind ? ", " : ""}${status?.behind ? `${status.behind} behind` : ""}`;
   const lastUpdatedStr = _lastUpdated
-    ? _lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? _lastUpdated.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
     : "";
 
   const hasRemotes = (status?.remotes?.length ?? 0) > 0;
@@ -332,7 +341,10 @@ export function renderGitPanel(
           </div>
           <sp-action-button
             size="s"
-            @click=${() => publishToGithub({ projectName: projectState?.name || "my-project" })}
+            @click=${() =>
+              publishToGithub({
+                projectName: projectState?.name || "my-project",
+              })}
             ?disabled=${loading}
           >
             <sp-icon-share slot="icon"></sp-icon-share>
@@ -481,7 +493,7 @@ export function renderGitPanel(
 
     const onFileClick = async () => {
       if (file.status !== "M" && file.status !== "A") return;
-      if (!file.path.endsWith(".md") && !file.path.endsWith(".json")) return;
+      if (!file.path.endsWith(".json") && !formatForPath(file.path)) return;
 
       try {
         const plat = getPlatform();
@@ -494,12 +506,10 @@ export function renderGitPanel(
           plat.readFile(file.path),
         ]);
 
-        const isMarkdown = file.path.endsWith(".md");
         const diffState = {
           filePath: file.path,
           originalContent,
           currentContent,
-          isMarkdown,
           fileStatus: file.status,
         };
 
@@ -579,7 +589,7 @@ export function renderGitPanel(
     for (const f of files) {
       const parts = f.path.split("/");
       let component;
-      if (f.path.endsWith(".json") || f.path.endsWith(".class.json") || f.path.endsWith(".md")) {
+      if (f.path.endsWith(".json") || f.path.endsWith(".class.json") || formatForPath(f.path)) {
         component = parts.length > 1 ? `/${parts[parts.length - 2]}` : `/${parts[0]}`;
       } else {
         component = "Other";

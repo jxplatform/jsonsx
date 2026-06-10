@@ -2,7 +2,12 @@
 const g = globalThis as unknown as {
   __jxPlatform?: {
     windowControls?: {
-      getFrame: () => Promise<{ x: number; y: number; width: number; height: number }>;
+      getFrame: () => Promise<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }>;
       setFrame: (x: number, y: number, w: number, h: number) => void;
     };
   };
@@ -54,7 +59,12 @@ async function startResize(
   e: MouseEvent,
   edge: string,
   wc: {
-    getFrame: () => Promise<{ x: number; y: number; width: number; height: number }>;
+    getFrame: () => Promise<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>;
     setFrame: (x: number, y: number, w: number, h: number) => void;
   },
 ) {

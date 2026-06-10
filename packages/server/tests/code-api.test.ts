@@ -62,7 +62,9 @@ describe("code-api", () => {
     });
 
     test("formats valid code", async () => {
-      const { req, url } = codeRequest("format", { code: "const x=1;const y=2;" });
+      const { req, url } = codeRequest("format", {
+        code: "const x=1;const y=2;",
+      });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(data.code).toContain("const x = 1");
@@ -70,7 +72,10 @@ describe("code-api", () => {
     });
 
     test("accepts custom args", async () => {
-      const { req, url } = codeRequest("format", { code: "return a + b;", args: ["a", "b"] });
+      const { req, url } = codeRequest("format", {
+        code: "return a + b;",
+        args: ["a", "b"],
+      });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(data.code).toContain("return a + b");
@@ -94,7 +99,9 @@ describe("code-api", () => {
     });
 
     test("minifies valid code", async () => {
-      const { req, url } = codeRequest("minify", { code: "const   x   =   1;" });
+      const { req, url } = codeRequest("minify", {
+        code: "const   x   =   1;",
+      });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(data.code).toBe("const x=1;");
@@ -126,14 +133,19 @@ describe("code-api", () => {
     });
 
     test("returns empty diagnostics for clean code", async () => {
-      const { req, url } = codeRequest("lint", { code: "const x = 1;\nreturn x;" });
+      const { req, url } = codeRequest("lint", {
+        code: "const x = 1;\nreturn x;",
+      });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(Array.isArray(data.diagnostics)).toBe(true);
     });
 
     test("accepts custom args for lint", async () => {
-      const { req, url } = codeRequest("lint", { code: "return a;", args: ["a"] });
+      const { req, url } = codeRequest("lint", {
+        code: "return a;",
+        args: ["a"],
+      });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
       expect(Array.isArray(data.diagnostics)).toBe(true);

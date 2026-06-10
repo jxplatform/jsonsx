@@ -45,8 +45,16 @@ describe("parseGitStatus", () => {
     const out = "1 MM N... 100644 100644 100644 abc123 def456 src/app.js\n";
     const result = parseGitStatus(out);
     expect(result.files).toHaveLength(2);
-    expect(result.files[0]).toEqual({ path: "src/app.js", status: "M", staged: true });
-    expect(result.files[1]).toEqual({ path: "src/app.js", status: "M", staged: false });
+    expect(result.files[0]).toEqual({
+      path: "src/app.js",
+      status: "M",
+      staged: true,
+    });
+    expect(result.files[1]).toEqual({
+      path: "src/app.js",
+      status: "M",
+      staged: false,
+    });
   });
 
   test("parses staged added file", () => {
@@ -101,10 +109,26 @@ describe("parseGitStatus", () => {
     expect(result.ahead).toBe(2);
     expect(result.behind).toBe(0);
     expect(result.files).toHaveLength(4);
-    expect(result.files[0]).toEqual({ path: "src/index.js", status: "M", staged: true });
-    expect(result.files[1]).toEqual({ path: "src/utils.js", status: "M", staged: false });
-    expect(result.files[2]).toEqual({ path: "src/new.js", status: "A", staged: true });
-    expect(result.files[3]).toEqual({ path: "untracked.txt", status: "U", staged: false });
+    expect(result.files[0]).toEqual({
+      path: "src/index.js",
+      status: "M",
+      staged: true,
+    });
+    expect(result.files[1]).toEqual({
+      path: "src/utils.js",
+      status: "M",
+      staged: false,
+    });
+    expect(result.files[2]).toEqual({
+      path: "src/new.js",
+      status: "A",
+      staged: true,
+    });
+    expect(result.files[3]).toEqual({
+      path: "untracked.txt",
+      status: "U",
+      staged: false,
+    });
   });
 });
 
@@ -166,7 +190,7 @@ describe("git endpoints", () => {
 
   test("GET status returns branch and empty files on clean repo", async () => {
     const res = await studioGitReq("/__studio/git/status");
-    const data = /** @type {{ branch: string; files: unknown[] }} */ (await res.json());
+    const data = /** @type {{ branch: string; files: unknown[] }} */ await res.json();
     expect(data.branch).toBeTruthy();
     expect(data.files).toEqual([]);
   });
@@ -184,8 +208,10 @@ describe("git endpoints", () => {
   });
 
   test("POST stage adds file to index", async () => {
-    const stageRes = await studioGitReq("/__studio/git/stage", "POST", { files: ["new.txt"] });
-    const stageData = /** @type {{ ok: boolean }} */ (await stageRes.json());
+    const stageRes = await studioGitReq("/__studio/git/stage", "POST", {
+      files: ["new.txt"],
+    });
+    const stageData = /** @type {{ ok: boolean }} */ await stageRes.json();
     expect(stageData.ok).toBe(true);
 
     const statusRes = await studioGitReq("/__studio/git/status");
@@ -209,66 +235,76 @@ describe("git endpoints", () => {
 
   test("POST commit creates a commit", async () => {
     git("add new.txt");
-    const res = await studioGitReq("/__studio/git/commit", "POST", { message: "add new file" });
-    const data = /** @type {{ ok: boolean; hash: string }} */ (await res.json());
+    const res = await studioGitReq("/__studio/git/commit", "POST", {
+      message: "add new file",
+    });
+    const data = /** @type {{ ok: boolean; hash: string }} */ await res.json();
     expect(data.ok).toBe(true);
     expect(data.hash).toBeTruthy();
 
     const statusRes = await studioGitReq("/__studio/git/status");
-    const statusData = /** @type {{ files: unknown[] }} */ (await statusRes.json());
+    const statusData = /** @type {{ files: unknown[] }} */ await statusRes.json();
     expect(statusData.files).toEqual([]);
   });
 
   test("POST commit rejects empty message", async () => {
-    const res = await studioGitReq("/__studio/git/commit", "POST", { message: "" });
+    const res = await studioGitReq("/__studio/git/commit", "POST", {
+      message: "",
+    });
     expect(res.status).toBe(400);
   });
 
   test("POST stage rejects path traversal", async () => {
-    const res = await studioGitReq("/__studio/git/stage", "POST", { files: ["../etc/passwd"] });
+    const res = await studioGitReq("/__studio/git/stage", "POST", {
+      files: ["../etc/passwd"],
+    });
     expect(res.status).toBe(400);
   });
 
   test("POST stage rejects empty files", async () => {
-    const res = await studioGitReq("/__studio/git/stage", "POST", { files: [] });
+    const res = await studioGitReq("/__studio/git/stage", "POST", {
+      files: [],
+    });
     expect(res.status).toBe(400);
   });
 
   test("GET branches returns current branch", async () => {
     const res = await studioGitReq("/__studio/git/branches");
-    const data = /** @type {{ current: string; branches: string[] }} */ (await res.json());
+    const data = /** @type {{ current: string; branches: string[] }} */ await res.json();
     expect(data.current).toBeTruthy();
     expect(data.branches).toContain(data.current);
   });
 
   test("POST create-branch creates and switches", async () => {
-    const res = await studioGitReq("/__studio/git/create-branch", "POST", { name: "test-branch" });
-    const data = /** @type {{ ok: boolean }} */ (await res.json());
+    const res = await studioGitReq("/__studio/git/create-branch", "POST", {
+      name: "test-branch",
+    });
+    const data = /** @type {{ ok: boolean }} */ await res.json();
     expect(data.ok).toBe(true);
 
     const branchRes = await studioGitReq("/__studio/git/branches");
-    const branchData = /** @type {{ current: string; branches: string[] }} */ (
-      await branchRes.json()
-    );
+    const branchData =
+      /** @type {{ current: string; branches: string[] }} */ await branchRes.json();
     expect(branchData.current).toBe("test-branch");
     expect(branchData.branches).toContain("test-branch");
   });
 
   test("POST checkout switches branch", async () => {
-    const res = await studioGitReq("/__studio/git/checkout", "POST", { branch: "main" });
-    const data = /** @type {{ ok: boolean }} */ (await res.json());
+    const res = await studioGitReq("/__studio/git/checkout", "POST", {
+      branch: "main",
+    });
+    const data = /** @type {{ ok: boolean }} */ await res.json();
     expect(data.ok).toBe(true);
 
     const branchRes = await studioGitReq("/__studio/git/branches");
-    const branchData = /** @type {{ current: string }} */ (await branchRes.json());
+    const branchData = /** @type {{ current: string }} */ await branchRes.json();
     expect(branchData.current).toBe("main");
   });
 
   test("GET log returns commit history", async () => {
     const res = await studioGitReq("/__studio/git/log?limit=5");
-    const data = /** @type {{ hash: string; message: string; author: string; date: string }[]} */ (
-      await res.json()
-    );
+    const data =
+      /** @type {{ hash: string; message: string; author: string; date: string }[]} */ await res.json();
     expect(data.length).toBeGreaterThanOrEqual(2);
     expect(data[0].hash).toBeTruthy();
     expect(data[0].message).toBeTruthy();
@@ -278,12 +314,14 @@ describe("git endpoints", () => {
   test("GET diff returns diff for modified file", async () => {
     writeFileSync(join(GIT_FIXTURE, "hello.txt"), "hello world");
     const res = await studioGitReq("/__studio/git/diff?path=hello.txt");
-    const data = /** @type {{ diff: string }} */ (await res.json());
+    const data = /** @type {{ diff: string }} */ await res.json();
     expect(data.diff).toContain("hello world");
   });
 
   test("POST discard restores file", async () => {
-    await studioGitReq("/__studio/git/discard", "POST", { files: ["hello.txt"] });
+    await studioGitReq("/__studio/git/discard", "POST", {
+      files: ["hello.txt"],
+    });
     const res = await studioGitReq("/__studio/git/status");
     const data = (await res.json()) as { files: { path: string }[] };
     const modified = data.files.find((f) => f.path === "hello.txt");
@@ -315,31 +353,28 @@ describe("git endpoints", () => {
   test("GET show returns file content at HEAD", async () => {
     const res = await studioGitReq("/__studio/git/show?path=hello.txt&ref=HEAD");
     expect(res.status).toBe(200);
-    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    const data = /** @type {{ content: string }} */ await res.json();
     expect(data.content).toBe("hello");
-    expect(data.format).toBe("json");
   });
 
-  test("GET show returns json format for .json files", async () => {
+  test("GET show returns content for .json files", async () => {
     writeFileSync(join(GIT_FIXTURE, "doc.json"), '{"tagName":"div"}');
     git("add doc.json");
     git('commit -m "add json"');
     const res = await studioGitReq("/__studio/git/show?path=doc.json&ref=HEAD");
     expect(res.status).toBe(200);
-    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    const data = /** @type {{ content: string }} */ await res.json();
     expect(data.content).toBe('{"tagName":"div"}');
-    expect(data.format).toBe("json");
   });
 
-  test("GET show returns markdown format for .md files", async () => {
+  test("GET show returns content for .md files", async () => {
     writeFileSync(join(GIT_FIXTURE, "page.md"), "# Hello");
     git("add page.md");
     git('commit -m "add md"');
     const res = await studioGitReq("/__studio/git/show?path=page.md&ref=HEAD");
     expect(res.status).toBe(200);
-    const data = /** @type {{ content: string; format: string }} */ (await res.json());
+    const data = /** @type {{ content: string }} */ await res.json();
     expect(data.content).toBe("# Hello");
-    expect(data.format).toBe("markdown");
   });
 
   test("GET show rejects missing path parameter", async () => {
@@ -360,7 +395,7 @@ describe("git endpoints", () => {
   test("GET show defaults ref to HEAD when omitted", async () => {
     const res = await studioGitReq("/__studio/git/show?path=hello.txt");
     expect(res.status).toBe(200);
-    const data = /** @type {{ content: string }} */ (await res.json());
+    const data = /** @type {{ content: string }} */ await res.json();
     expect(data.content).toBe("hello");
   });
 });

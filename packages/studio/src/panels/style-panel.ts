@@ -246,7 +246,9 @@ function renderShorthandRow(
                       mutateFn(t, shortProp, compress(vals as string[]));
                     });
                   },
-                  { placeholder: !lVal && inherited[name] ? String(inherited[name]) : "" },
+                  {
+                    placeholder: !lVal && inherited[name] ? String(inherited[name]) : "",
+                  },
                 )}
               </div>
             `;
@@ -773,7 +775,9 @@ function styleSidebarTemplate(
                       style="flex:1;text-align:left;padding:6px 10px;background:var(--spectrum-gray-200, #1a1a1a);border:none;border-radius:4px;color:var(--spectrum-gray-900, #fafafa);font-size:12px;cursor:pointer"
                       @click=${() => {
                         const newSelector = activeSelector ? `${activeSelector} ${rule}` : rule;
-                        selectStylebookTag(newSelector, undefined, { panCanvas: true });
+                        selectStylebookTag(newSelector, undefined, {
+                          panCanvas: true,
+                        });
                       }}
                     >
                       ${rule}

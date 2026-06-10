@@ -171,24 +171,30 @@ describe("chromium RPC server", () => {
 
   test("returns error for unknown method", async () => {
     const ws = await connect();
-    const result = await new Promise<{ id: number; error?: string; result?: unknown }>(
-      (resolve, reject) => {
-        const id = Math.floor(Math.random() * 100000);
-        const timeout = setTimeout(() => {
-          ws.removeEventListener("message", handler);
-          reject(new Error("timeout"));
-        }, 3000);
-        const handler = (event: MessageEvent) => {
-          const msg = JSON.parse(event.data) as { id: number; error?: string; result?: unknown };
-          if (msg.id !== id) return;
-          clearTimeout(timeout);
-          ws.removeEventListener("message", handler);
-          resolve(msg);
+    const result = await new Promise<{
+      id: number;
+      error?: string;
+      result?: unknown;
+    }>((resolve, reject) => {
+      const id = Math.floor(Math.random() * 100000);
+      const timeout = setTimeout(() => {
+        ws.removeEventListener("message", handler);
+        reject(new Error("timeout"));
+      }, 3000);
+      const handler = (event: MessageEvent) => {
+        const msg = JSON.parse(event.data) as {
+          id: number;
+          error?: string;
+          result?: unknown;
         };
-        ws.addEventListener("message", handler);
-        ws.send(JSON.stringify({ id, method: "nonexistentMethod", params: {} }));
-      },
-    ).catch((e: unknown) => e);
+        if (msg.id !== id) return;
+        clearTimeout(timeout);
+        ws.removeEventListener("message", handler);
+        resolve(msg);
+      };
+      ws.addEventListener("message", handler);
+      ws.send(JSON.stringify({ id, method: "nonexistentMethod", params: {} }));
+    }).catch((e: unknown) => e);
     // On some platforms (Windows/Bun) error responses may not deliver;
     // verify either we got the error response or the connection stays healthy
     if (result instanceof Error) {
@@ -203,24 +209,36 @@ describe("chromium RPC server", () => {
 
   test("returns error for path traversal", async () => {
     const ws = await connect();
-    const result = await new Promise<{ id: number; error?: string; result?: unknown }>(
-      (resolve, reject) => {
-        const id = Math.floor(Math.random() * 100000);
-        const timeout = setTimeout(() => {
-          ws.removeEventListener("message", handler);
-          reject(new Error("timeout"));
-        }, 3000);
-        const handler = (event: MessageEvent) => {
-          const msg = JSON.parse(event.data) as { id: number; error?: string; result?: unknown };
-          if (msg.id !== id) return;
-          clearTimeout(timeout);
-          ws.removeEventListener("message", handler);
-          resolve(msg);
+    const result = await new Promise<{
+      id: number;
+      error?: string;
+      result?: unknown;
+    }>((resolve, reject) => {
+      const id = Math.floor(Math.random() * 100000);
+      const timeout = setTimeout(() => {
+        ws.removeEventListener("message", handler);
+        reject(new Error("timeout"));
+      }, 3000);
+      const handler = (event: MessageEvent) => {
+        const msg = JSON.parse(event.data) as {
+          id: number;
+          error?: string;
+          result?: unknown;
         };
-        ws.addEventListener("message", handler);
-        ws.send(JSON.stringify({ id, method: "readFile", params: { path: "../../etc/passwd" } }));
-      },
-    ).catch((e: unknown) => e);
+        if (msg.id !== id) return;
+        clearTimeout(timeout);
+        ws.removeEventListener("message", handler);
+        resolve(msg);
+      };
+      ws.addEventListener("message", handler);
+      ws.send(
+        JSON.stringify({
+          id,
+          method: "readFile",
+          params: { path: "../../etc/passwd" },
+        }),
+      );
+    }).catch((e: unknown) => e);
     if (result instanceof Error) {
       const content = await rpc(ws, "readFile", { path: "hello.txt" });
       expect(content).toBe("Hello World");

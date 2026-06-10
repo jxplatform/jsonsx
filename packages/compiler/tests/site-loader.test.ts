@@ -55,4 +55,69 @@ describe("loadProjectConfig", () => {
       cleanup();
     }
   });
+
+  test("defaults images.service to build and binding to IMAGES", () => {
+    setup();
+    try {
+      writeFileSync(join(FIXTURES, "project.json"), JSON.stringify({ name: "Test" }), "utf8");
+      const { config } = loadProjectConfig(FIXTURES);
+      expect(config.images.service).toBe("build");
+      expect(config.images.binding).toBe("IMAGES");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("throws on unknown images.service", () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({ name: "Test", images: { service: "imgix" } }),
+        "utf8",
+      );
+      expect(() => loadProjectConfig(FIXTURES)).toThrow('Unknown images.service "imgix"');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("falls back to build service when cloudflare service has no CF adapter", () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({
+          name: "Test",
+          images: { service: "cloudflare" },
+          build: { adapter: "node" },
+        }),
+        "utf8",
+      );
+      const { config } = loadProjectConfig(FIXTURES);
+      expect(config.images.service).toBe("build");
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("preserves cloudflare service with a CF adapter", () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({
+          name: "Test",
+          images: { service: "cloudflare", binding: "MY_IMAGES" },
+          build: { adapter: "cloudflare-pages" },
+        }),
+        "utf8",
+      );
+      const { config } = loadProjectConfig(FIXTURES);
+      expect(config.images.service).toBe("cloudflare");
+      expect(config.images.binding).toBe("MY_IMAGES");
+    } finally {
+      cleanup();
+    }
+  });
 });

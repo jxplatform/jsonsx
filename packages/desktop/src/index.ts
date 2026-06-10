@@ -20,6 +20,8 @@ import {
   fetchPluginSchema,
   jxResolve,
   jxServerFunction,
+  listFormats,
+  formatAction,
 } from "./handlers";
 import {
   gitStatus,
@@ -95,6 +97,8 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       fetchPluginSchema: (params) => fetchPluginSchema(params),
       jxResolve: (params) => jxResolve(params),
       jxServerFunction: (params) => jxServerFunction(params),
+      listFormats: () => listFormats(),
+      formatAction: (params) => formatAction(params),
       gitStatus: () => gitStatus(),
       gitBranches: () => gitBranches(),
       gitLog: (params) => gitLog(params),
@@ -136,7 +140,12 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       windowClose: () => {
         win.close();
       },
-      windowGetFrame: (): { x: number; y: number; width: number; height: number } => {
+      windowGetFrame: (): {
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      } => {
         return win.getFrame();
       },
       windowSetFrame: (params) => {
@@ -145,7 +154,9 @@ const rpc = BrowserView.defineRPC<StudioRPC>({
       aiAuthStatus: () => getAuthStatus(),
       aiCreateSession: (params) =>
         createSession(projectRoot, params.message, {
-          ...(params.systemPrompt != null && { systemPrompt: params.systemPrompt }),
+          ...(params.systemPrompt != null && {
+            systemPrompt: params.systemPrompt,
+          }),
         }),
       aiSendMessage: (params) => {
         sendMessage(params.id, params.message);

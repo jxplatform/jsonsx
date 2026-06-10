@@ -8,7 +8,11 @@ import { gitStatus, gitInit, gitAddRemote, gitPush } from "../src/git";
 const FIXTURES = join(import.meta.dir, "_fixtures_git_new");
 
 function run(args: string[]) {
-  const proc = Bun.spawnSync(args, { cwd: FIXTURES, stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawnSync(args, {
+    cwd: FIXTURES,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   if (proc.exitCode !== 0) {
     throw new Error(`${args.join(" ")} failed: ${proc.stderr.toString()}`);
   }
@@ -128,7 +132,9 @@ describe("gitAddRemote", () => {
       stderr: "pipe",
     });
     if (proc.exitCode !== 0) throw new Error("git init failed");
-    Bun.spawnSync(["git", "config", "user.email", "test@test.com"], { cwd: REMOTE_DIR });
+    Bun.spawnSync(["git", "config", "user.email", "test@test.com"], {
+      cwd: REMOTE_DIR,
+    });
     Bun.spawnSync(["git", "config", "user.name", "Test"], { cwd: REMOTE_DIR });
     writeFileSync(join(REMOTE_DIR, "file.txt"), "hello");
     Bun.spawnSync(["git", "add", "."], { cwd: REMOTE_DIR });
@@ -151,19 +157,28 @@ describe("gitAddRemote", () => {
   });
 
   test("adds a remote successfully", async () => {
-    await gitAddRemote({ name: "origin", url: "https://github.com/test/repo.git" });
+    await gitAddRemote({
+      name: "origin",
+      url: "https://github.com/test/repo.git",
+    });
     const result = await gitStatus();
     expect(result.remotes).toContain("origin");
   });
 
   test("throws when remote already exists", async () => {
     await expect(
-      gitAddRemote({ name: "origin", url: "https://github.com/other/repo.git" }),
+      gitAddRemote({
+        name: "origin",
+        url: "https://github.com/other/repo.git",
+      }),
     ).rejects.toThrow();
   });
 
   test("can add a second remote with different name", async () => {
-    await gitAddRemote({ name: "upstream", url: "https://github.com/upstream/repo.git" });
+    await gitAddRemote({
+      name: "upstream",
+      url: "https://github.com/upstream/repo.git",
+    });
     const result = await gitStatus();
     expect(result.remotes).toContain("origin");
     expect(result.remotes).toContain("upstream");
@@ -185,7 +200,9 @@ describe("gitPush — setUpstream option", () => {
 
     mkdirSync(PUSH_DIR, { recursive: true });
     Bun.spawnSync(["git", "init", "-b", "main"], { cwd: PUSH_DIR });
-    Bun.spawnSync(["git", "config", "user.email", "test@test.com"], { cwd: PUSH_DIR });
+    Bun.spawnSync(["git", "config", "user.email", "test@test.com"], {
+      cwd: PUSH_DIR,
+    });
     Bun.spawnSync(["git", "config", "user.name", "Test"], { cwd: PUSH_DIR });
     writeFileSync(join(PUSH_DIR, "file.txt"), "content");
     Bun.spawnSync(["git", "add", "."], { cwd: PUSH_DIR });
@@ -199,7 +216,9 @@ describe("gitPush — setUpstream option", () => {
         GIT_COMMITTER_EMAIL: "test@test.com",
       },
     });
-    Bun.spawnSync(["git", "remote", "add", "origin", BARE_DIR], { cwd: PUSH_DIR });
+    Bun.spawnSync(["git", "remote", "add", "origin", BARE_DIR], {
+      cwd: PUSH_DIR,
+    });
     setProjectRoot(PUSH_DIR);
   });
 

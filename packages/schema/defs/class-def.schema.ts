@@ -69,14 +69,26 @@ export const classConstructorDefSchema = {
 } as const;
 
 export const classMethodDefSchema = {
-  description: "A class method or accessor definition.",
+  description:
+    "A class method or accessor definition. Capability roles (parse, serialize, discover, load) " +
+    "mark static methods that hosts (compiler, server, studio) invoke for format dispatch.",
   type: "object",
   properties: {
-    role: { type: "string", enum: ["method", "accessor"] },
+    role: {
+      type: "string",
+      enum: ["method", "accessor", "parse", "serialize", "discover", "load"],
+    },
     $prototype: { type: "string", const: "Function" },
     access: { type: "string", enum: ["public", "private", "protected"] },
     scope: { type: "string", enum: ["instance", "static"] },
     identifier: { type: "string" },
+    timing: {
+      description:
+        "Execution environments allowed to call this capability directly. " +
+        "Hosts outside the list round-trip through the dev server.",
+      type: "array",
+      items: { type: "string", enum: ["compiler", "server", "client"] },
+    },
     parameters: {
       type: "array",
       items: {
@@ -110,6 +122,100 @@ export const classMethodDefSchema = {
   },
 } as const;
 
+export const formatDefSchema = {
+  description:
+    "Format participation marker. A class carrying this block is auto-discovered from the " +
+    "project imports map and used for file-extension dispatch by the compiler, server, and studio.",
+  type: "object",
+  required: ["extensions"],
+  properties: {
+    extensions: {
+      description: 'File extensions this format claims, with leading dot (e.g. [".md"]).',
+      type: "array",
+      items: { type: "string", pattern: "^\\." },
+      minItems: 1,
+    },
+    mediaType: {
+      description: "MIME type for the format (icons, labels, HTTP).",
+      type: "string",
+    },
+    documentKinds: {
+      description:
+        '"page"/"component" allow the extension in pages/components discovery; ' +
+        '"content" allows it as a content-type source.',
+      type: "array",
+      items: { type: "string", enum: ["page", "component", "content"] },
+    },
+    exportTarget: {
+      description: "When true, site builds emit a serialized sidecar per page in this format.",
+      type: "boolean",
+    },
+    remote: {
+      description: "When true, the load capability accepts http(s) URLs as sources.",
+      type: "boolean",
+    },
+  },
+} as const;
+
+export const studioHintsSchema = {
+  description:
+    "Studio control-surface hints for a format class: editor modes, document-mode rules, " +
+    "templates, and the element/nesting constraints that gate structural editing.",
+  type: "object",
+  properties: {
+    icon: { type: "string" },
+    modes: {
+      description: "Editor modes the studio offers for documents of this format.",
+      type: "array",
+      items: { type: "string" },
+    },
+    documentMode: {
+      type: "object",
+      properties: {
+        default: { type: "string", enum: ["content", "component"] },
+        componentWhen: {
+          description:
+            "Treat the document as a component when this top-level/frontmatter key matches the regex.",
+          type: "object",
+          properties: {
+            frontmatterKey: { type: "string" },
+            matches: { type: "string" },
+          },
+        },
+      },
+    },
+    newFileTemplate: {
+      description: "Initial source text for newly created files of this format.",
+      type: "string",
+    },
+    elements: {
+      description: "Element allowlist and nesting constraints for structural editing.",
+      type: "object",
+      properties: {
+        block: { type: "array", items: { type: "string" } },
+        inline: { type: "array", items: { type: "string" } },
+        void: { type: "array", items: { type: "string" } },
+        textOnly: { type: "array", items: { type: "string" } },
+        nesting: {
+          description:
+            'Per-parent child rules keyed by tag (or "_root"): ' +
+            "{ block, inline, directive } booleans or { only: [tags] }.",
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            properties: {
+              block: { type: "boolean" },
+              inline: { type: "boolean" },
+              directive: { type: "boolean" },
+              only: { type: "array", items: { type: "string" } },
+            },
+          },
+        },
+      },
+    },
+  },
+} as const;
+
 export const classDefSchema = {
   description:
     'A .class.json schema-defined class. $prototype must be "Class". ' +
@@ -126,6 +232,8 @@ export const classDefSchema = {
       type: "string",
     },
     description: { type: "string" },
+    format: { $ref: "#/$defs/FormatDef" },
+    $studio: { $ref: "#/$defs/StudioHints" },
     extends: {
       description: "Base class — string name or $ref to another .class.json.",
       oneOf: [

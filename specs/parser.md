@@ -1,8 +1,8 @@
 # `@jxsuite/parser` Specification
 
-## Markdown Parser and External Class Integration
+## Content Formats and the Reference Format-Extension Classes
 
-**Version:** 2.0.0-draft
+**Version:** 3.0.0-draft
 **Status:** In Progress
 **License:** MIT
 
@@ -10,87 +10,136 @@
 
 ## 1. Overview
 
-`@jxsuite/parser` provides the content layer for Jx applications. It exports external classes (`MarkdownFile`, `MarkdownCollection`) that satisfy the Jx `$prototype` + `$src` external class contract, enabling markdown content to be declared as reactive data sources in Jx component files.
+`@jxsuite/parser` provides the content layer for Jx applications — and is the **reference implementation of the Jx format-extension contract** (see `specs/extensions.md`). It exports format classes (`Markdown`, `Csv`) and content-query classes (`MarkdownCollection`, `ContentCollection`, `ContentEntry`) that satisfy the Jx `$prototype` + `$src` external class contract and the format capability contract.
 
-Built on the `unified` / `remark` / `rehype` pipeline.
+The compiler, dev server, and studio contain no markdown or CSV knowledge: every capability they need is declared in this package's `.class.json` files and dispatched through the format registry. A third-party package shipping the same shape of class is indistinguishable from this one.
+
+Built on the `unified` / `remark` pipeline (markdown) and a minimal RFC 4180 parser (CSV).
 
 ---
 
 ## 2. Exports
 
-| Export               | Type          | Description                                               |
-| -------------------- | ------------- | --------------------------------------------------------- |
-| `MarkdownFile`       | Class         | Parses a single markdown file into structured data        |
-| `MarkdownCollection` | Class         | Globs markdown files into a sorted, filterable collection |
-| `MarkdownDirective`  | Remark plugin | Maps `::directive{attrs}` syntax to custom element tags   |
+| Export                            | Type           | Description                                                                       |
+| --------------------------------- | -------------- | --------------------------------------------------------------------------------- |
+| `.` (`md.ts`)                     | Module         | Node entry: `Markdown` (re-export), `MarkdownCollection`, transpiler re-exports   |
+| `./markdown`                      | Module         | Browser-safe `Markdown` format class (node-only capabilities dynamic-import `fs`) |
+| `./csv`                           | Module         | `Csv` format class + `parseCSV` / `coerceCSVRows`                                 |
+| `./serialize`                     | Module         | `serializeJxMarkdown` (roundtrip/export), `jxToMdast`, `mdastToJx`, element sets  |
+| `./transpile`                     | Module         | `transpileJxMarkdown`, `mdastNodeToJx`, dot-path utilities (browser-safe)         |
+| `./content`                       | Module         | `ContentCollection`, `ContentEntry` query classes                                 |
+| `./html-to-jx`                    | Module         | `htmlToJx` — HTML string → Jx element tree                                        |
+| `./Markdown.class.json`           | Format class   | Markdown format declaration (parse/serialize/discover/load + `$studio`)           |
+| `./Csv.class.json`                | Format class   | CSV format declaration (parse/discover/load, `remote: true`)                      |
+| `./MarkdownCollection.class.json` | External class | Glob collection of markdown files (runtime `resolve`)                             |
+| `./ContentCollection.class.json`  | External class | Query a project content type                                                      |
+| `./ContentEntry.class.json`       | External class | Fetch a single content entry                                                      |
 
 ---
 
-## 3. `MarkdownFile`
+## 3. `Markdown` — the markdown format class
 
-### 3.1 Jx Usage
+A single class carrying every capability (`Markdown.class.json`):
+
+```json
+"format": {
+  "extensions": [".md"],
+  "mediaType": "text/markdown",
+  "documentKinds": ["page", "component", "content"],
+  "exportTarget": true
+}
+```
+
+| Capability  | Scope    | Timing                   | Behavior                                                                                                                                     |
+| ----------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parse`     | static   | compiler, server, client | `transpileJxMarkdown(source)` → Jx JSON document (frontmatter → top-level keys, body → children)                                             |
+| `serialize` | static   | compiler, server, client | `serializeJxMarkdown(doc, options)` — see §5                                                                                                 |
+| `discover`  | static   | compiler, server         | List `.md` entry files for a content-type source (file or directory)                                                                         |
+| `load`      | static   | compiler, server         | One file → `ContentLoaderEntry[]` (frontmatter as `data`, raw source as `body`, `$children`, `_meta` with excerpt/toc/readingTime/wordCount) |
+| `resolve`   | instance | runtime                  | `{ "$prototype": "Markdown", "src": "./post.md" }` → `MarkdownFileResult`                                                                    |
+
+`$studio` declares the full editing control surface: editor modes, `documentMode` (content by default; component when frontmatter `tagName` matches `.+-.+`), `newFileTemplate`, and the element allowlist + nesting constraints that gate structural editing. The element sets are asserted in tests to match `MD_ELEMENTS` in `serialize.ts` (the source of truth).
+
+### 3.1 Jx Usage (runtime)
 
 ```json
 {
   "state": {
     "post": {
-      "$prototype": "MarkdownFile",
-      "$src": "@jxsuite/md",
+      "$prototype": "Markdown",
+      "$src": "@jxsuite/parser/Markdown.class.json",
       "src": "./content/posts/hello-world.md"
     }
   }
 }
 ```
 
-### 3.2 Constructor
-
-Receives a configuration object with:
-
-| Property | Type     | Required | Description                    |
-| -------- | -------- | -------- | ------------------------------ |
-| `src`    | `string` | Yes      | Path to a single markdown file |
-
-### 3.3 Resolved Value
-
-The `resolve()` method returns an object with:
+### 3.2 `MarkdownFileResult`
 
 | Property       | Type     | Description                                 |
 | -------------- | -------- | ------------------------------------------- |
 | `slug`         | `string` | Filename without extension                  |
 | `path`         | `string` | Full file path                              |
 | `frontmatter`  | `object` | Parsed YAML frontmatter                     |
-| `$body`        | `string` | Rendered HTML body                          |
-| `$excerpt`     | `string` | First paragraph as HTML                     |
+| `$children`    | `array`  | Jx node tree (MDAST → Jx, no HTML pass)     |
+| `$excerpt`     | `string` | First paragraph as plain text               |
 | `$toc`         | `array`  | Table of contents (heading id, text, depth) |
 | `$readingTime` | `number` | Estimated reading time in minutes           |
 | `$wordCount`   | `number` | Word count                                  |
 
-### 3.4 Parsing Pipeline
+---
 
-1. `remark-parse` — markdown to MDAST
-2. `remark-frontmatter` + `remark-parse-frontmatter` — YAML frontmatter extraction
-3. `remark-gfm` — GitHub Flavored Markdown (tables, strikethrough, autolinks)
-4. `remark-directive` — `::directive{attrs}` syntax parsing
-5. `MarkdownDirective` — maps directive nodes to custom element tags with `data-jx-props` encoding
-6. `remark-rehype` — MDAST to HAST
-7. `rehype-stringify` — HAST to HTML string
+## 4. `Csv` — the CSV format class
 
-> **Status: Implemented.** Full parsing pipeline with all listed output properties.
+`Csv.class.json` declares `format: { extensions: [".csv"], documentKinds: ["content"], remote: true }`.
+
+| Capability | Scope    | Timing                   | Behavior                                                            |
+| ---------- | -------- | ------------------------ | ------------------------------------------------------------------- |
+| `parse`    | static   | compiler, server, client | RFC 4180 parse + schema-driven coercion (pure)                      |
+| `discover` | static   | compiler, server         | List `.csv` entry files                                             |
+| `load`     | static   | compiler, server         | Read file **or fetch http(s) URL** → coerced `ContentLoaderEntry[]` |
+| `resolve`  | instance | runtime                  | Load the configured `src` (file or remote)                          |
+
+Coercion per the content-type schema: `number` strips currency symbols/commas (`null` for empty/invalid), `boolean` is `"true"` only, `array` is comma-split/trimmed. Entry ids resolve `idField` → `id` → `sku` → `slug` → `Slug` → row index.
 
 ---
 
-## 4. `MarkdownCollection`
+## 5. `serializeJxMarkdown` — the single Jx → markdown serializer
 
-### 4.1 Jx Usage
+`@jxsuite/parser/serialize`. Replaces the studio's former `md-convert` and the compiler's former `compile-markdown` with one bidirectional module:
+
+```ts
+serializeJxMarkdown(doc, {
+  mode?: "roundtrip" | "export",   // default "roundtrip"
+  frontmatter?: boolean,            // roundtrip: emit YAML frontmatter (default true)
+  allowlist?: Set<string>,          // roundtrip: markdown-native tags (default MD_ALL)
+  componentDefs?: Map<string, JxElement>,                       // export: inline custom elements
+  evaluateTemplate?: (value, scope) => unknown,                  // export: injected template hook
+  buildScope?: (state) => Record<string, unknown> | null,        // export: injected scope builder
+})
+```
+
+- **roundtrip** — lossless: YAML frontmatter (via the `yaml` package) from non-children doc keys; elements outside the allowlist (or carrying Jx-specific props) emit as remark directives with collapsed dot-path attributes. Inverse of `transpileJxMarkdown()`.
+- **export** — lossy clean GFM: wrappers (`div`, `section`, …) unwrapped, custom elements inlined by resolving definitions with instance `$props`, `$prototype: "Array"` descriptors expanded, `innerHTML` converted, template strings evaluated through the injected hooks (the compiler passes its static-template machinery; the default keeps templates verbatim). No frontmatter, no directives.
+
+Fenced-code language is canonical on `className` (`language-x`); `attributes.class` is read for backward compatibility.
+
+Also exported: `jxToMdast` / `mdastToJx` (roundtrip tree conversions) and the element-set constants (`MD_ELEMENTS`, `MD_BLOCK`, `MD_INLINE`, `MD_ALL`, `MD_VOID`, `MD_TEXT_ONLY`) that feed `$studio.elements`.
+
+---
+
+## 6. `MarkdownCollection`
+
+Runtime glob collection (node-only):
 
 ```json
 {
   "state": {
     "posts": {
       "$prototype": "MarkdownCollection",
-      "$src": "@jxsuite/md",
-      "src": "./content/posts/*.md",
-      "sortBy": "date",
+      "$src": "@jxsuite/parser/MarkdownCollection.class.json",
+      "src": "./posts/*.md",
+      "sortBy": "frontmatter.date",
       "sortOrder": "desc",
       "limit": 10
     }
@@ -98,134 +147,20 @@ The `resolve()` method returns an object with:
 }
 ```
 
-### 4.2 Constructor
-
-| Property    | Type     | Required | Description                                      |
-| ----------- | -------- | -------- | ------------------------------------------------ |
-| `src`       | `string` | Yes      | Glob pattern for markdown files                  |
-| `sortBy`    | `string` | No       | Frontmatter field to sort by (default: `"date"`) |
-| `sortOrder` | `string` | No       | `"asc"` or `"desc"` (default: `"desc"`)          |
-| `limit`     | `number` | No       | Maximum number of results                        |
-| `filter`    | `string` | No       | Frontmatter field filter expression              |
-
-### 4.3 Resolved Value
-
-An array of `MarkdownFile` resolved objects, sorted and filtered per configuration.
-
-> **Status: Implemented.** Full collection with glob, sort, limit, and filter.
+`resolve()` returns sorted/filtered/limited `MarkdownFileResult[]`.
 
 ---
 
-## 5. `MarkdownDirective`
+## 7. `MarkdownDirective` — `::directive{attrs}` syntax
 
-### 5.1 Purpose
-
-A remark plugin that transforms markdown directive syntax into custom element tags in the HTML output. Directive parameters are encoded as a single `data-jx-props` JSON attribute rather than individual HTML attributes. This aligns with Jx's property-based data flow (`$props` / lit-html `.property` syntax) and avoids requiring `observedAttributes` on component definitions.
-
-### 5.2 Syntax
-
-Directives follow the [remark-directive](https://github.com/remarkjs/remark-directive) syntax. Nesting uses increasing colon counts:
-
-| Directive type | Syntax                       | Use case                                        |
-| -------------- | ---------------------------- | ----------------------------------------------- |
-| Text (inline)  | `:name[label]{attrs}`        | Inline custom elements within a paragraph       |
-| Leaf (block)   | `::name{attrs}`              | Self-contained block elements (no body content) |
-| Container      | `:::name{attrs}` ... `:::`   | Block elements wrapping child content           |
-| Nested parent  | `::::name{attrs}` ... `::::` | Container wrapping other container directives   |
-
-```markdown
-::::brm-services{heading="Our Services"}
-:::brm-service{title="Masonry" image="/img/masonry.png"}
-Description paragraph here.
-:::
-:::brm-service{title="Repair" image="/img/repair.png"}
-Another description.
-:::
-::::
-```
-
-### 5.3 Output: `data-jx-props` Encoding
-
-Directive parameters are serialized as a JSON string in a single `data-jx-props` attribute:
-
-```html
-<brm-services data-jx-props='{"heading":"Our Services"}'>
-  <brm-service data-jx-props='{"title":"Masonry","image":"/img/masonry.png"}'>
-    <p>Description paragraph here.</p>
-  </brm-service>
-  <brm-service data-jx-props='{"title":"Repair","image":"/img/repair.png"}'>
-    <p>Another description.</p>
-  </brm-service>
-</brm-services>
-```
-
-The runtime reads `data-jx-props` in `connectedCallback`, parses the JSON, and merges matching keys into the component's reactive state. The attribute is removed after reading. This happens before the `$props` JS property merger, so explicit `$props` from a parent component always take precedence.
-
-Directives without parameters produce no `data-jx-props` attribute — body content is distributed via `<slot>` as usual.
-
-### 5.4 Tag Naming
-
-- Directive names containing a hyphen are used as-is (they already satisfy the custom element spec)
-- Names without a hyphen receive a configurable prefix (default: `jx-`), e.g. `::card` → `<jx-card>`
-
-### 5.5 Plugin Options
-
-| Option         | Type       | Default | Description                                               |
-| -------------- | ---------- | ------- | --------------------------------------------------------- |
-| `prefix`       | `string`   | `"jx-"` | Prefix for directive names without a hyphen               |
-| `passContent`  | `boolean`  | `true`  | Whether container directive content becomes slot children |
-| `allowedNames` | `string[]` | —       | Whitelist of allowed directive names (all if omitted)     |
-
-### 5.6 Pipeline Position
-
-`MarkdownDirective` runs as a remark plugin (MDAST phase), after `remark-directive` parses the syntax and before `remark-rehype` converts to HAST. It sets `data.hName` (tag name) and `data.hProperties` (the `data-jx-props` attribute) on each directive node.
-
-> **Status: Implemented.** Plugin registered in the remark pipeline with `data-jx-props` encoding.
+Directives map to custom element tags in the Jx tree (text/leaf/container, nesting via colon count). Directive attributes use dot-path expansion (`style.backgroundColor="blue"`), `$`-keyword mapping (`prototype=` → `$prototype`), pseudo-class/media style keys, and `--title`/`--description` annotations. Content-type `$elements` become the plugin's `allowedNames`. See `specs/jx-markdown.md` for the full dialect.
 
 ---
 
-## 6. External Class Contract Compliance
+## 8. External class contract compliance
 
-Both `MarkdownFile` and `MarkdownCollection` satisfy the Jx external class contract:
-
-| Requirement                        | Implementation                                   |
-| ---------------------------------- | ------------------------------------------------ |
-| Constructor receives config object | Yes — all properties except reserved keywords    |
-| `resolve()` async method           | Yes — returns parsed content                     |
-| `value` property                   | Accessible after resolution                      |
-| `subscribe(callback)`              | Not implemented (content is static at load time) |
+All classes satisfy the Jx external class contract: constructor receives the config object, `resolve()` returns the value (async), and `.class.json` schemas allow the dev server, compiler, and studio to introspect structure — including the format block, capability roles with `timing`, and `$studio` hints — without importing the implementation.
 
 ---
 
-## 7. `.class.json` Schemas
-
-The package includes JSON Schema definitions for both classes:
-
-- `MarkdownFile.class.json` — schema with `$implementation: "./md.js"`
-- `MarkdownCollection.class.json` — schema with `$implementation: "./md.js"`
-
-These enable the dev server and compiler to introspect class structure without importing the implementation.
-
-> **Status: Implemented.** Both `.class.json` files are present and used by the resolution pipeline.
-
----
-
-## 8. Dependencies
-
-| Package                    | Purpose                       |
-| -------------------------- | ----------------------------- |
-| `unified`                  | Pipeline orchestrator         |
-| `remark-parse`             | Markdown → MDAST              |
-| `remark-frontmatter`       | YAML frontmatter support      |
-| `remark-parse-frontmatter` | Frontmatter extraction        |
-| `remark-gfm`               | GitHub Flavored Markdown      |
-| `remark-directive`         | Directive syntax              |
-| `remark-rehype`            | MDAST → HAST                  |
-| `rehype-stringify`         | HAST → HTML                   |
-| `glob`                     | File globbing for collections |
-| `mdast-util-to-string`     | Text extraction               |
-| `unist-util-visit`         | AST traversal                 |
-
----
-
-_`@jxsuite/parser` Specification v2.0.0-draft_
+_`@jxsuite/parser` Specification v3.0.0-draft_

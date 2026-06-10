@@ -72,7 +72,11 @@ export function createDesktopPlatform(): StudioPlatform {
       } catch {
         return {
           meta: { root: ".", name: "project" },
-          info: { isSiteProject: false as const, projectConfig: null, directories: [] as string[] },
+          info: {
+            isSiteProject: false as const,
+            projectConfig: null,
+            directories: [] as string[],
+          },
         };
       }
     },
@@ -118,7 +122,10 @@ export function createDesktopPlatform(): StudioPlatform {
     },
 
     async codeService(action: string, payload: unknown) {
-      return request("codeService", { action, payload }) as Promise<CodeServiceResult | null>;
+      return request("codeService", {
+        action,
+        payload,
+      }) as Promise<CodeServiceResult | null>;
     },
 
     async locateFile(name: string) {
@@ -126,7 +133,11 @@ export function createDesktopPlatform(): StudioPlatform {
     },
 
     async fetchPluginSchema(src: string, prototype?: string, base?: string) {
-      return request("fetchPluginSchema", { src, prototype, base }) as Promise<unknown>;
+      return request("fetchPluginSchema", {
+        src,
+        prototype,
+        base,
+      }) as Promise<unknown>;
     },
 
     async gitStatus() {
@@ -197,6 +208,15 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("searchFiles", { query }) as Promise<DirEntry[]>;
     },
 
+    async listFormats() {
+      return request("listFormats", {}) as Promise<Record<string, unknown>[]>;
+    },
+
+    /** @param {Record<string, unknown>} payload */
+    async formatAction(payload: Record<string, unknown>) {
+      return request("formatAction", payload);
+    },
+
     async addPackage(name: string) {
       return request("addPackage", { name }) as Promise<unknown>;
     },
@@ -216,7 +236,10 @@ export function createDesktopPlatform(): StudioPlatform {
       adapter?: string;
       directory: string;
     }) {
-      return request("createProject", opts) as Promise<{ root: string; config: ProjectConfig }>;
+      return request("createProject", opts) as Promise<{
+        root: string;
+        config: ProjectConfig;
+      }>;
     },
 
     // AI Assistant

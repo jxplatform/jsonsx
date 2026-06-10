@@ -2,6 +2,8 @@ import { readdir, readFile, writeFile, rename, stat, mkdir, rm } from "node:fs/p
 import { resolve, relative, join, basename, dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
+import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import type { FormatRegistry, FormatCapability } from "@jxsuite/schema/format-registry";
 import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
@@ -41,6 +43,9 @@ export interface StudioSchema {
   description?: string;
   properties: Record<string, Record<string, unknown>>;
   required: string[];
+  format?: Record<string, unknown>;
+  $studio?: Record<string, unknown>;
+  capabilities?: Record<string, { identifier: string; timing: string[] }>;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -50,10 +55,67 @@ let fileDialogFn: (() => Promise<string | null>) | null = null;
 
 export function setProjectRoot(root: string | null) {
   projectRoot = root;
+  _formatRegistry = null;
 }
 
 export function getProjectRoot(): string | null {
   return projectRoot;
+}
+
+// ─── Format registry (per project root, rebuilt on project switch) ────────────
+
+let _formatRegistry: { root: string; registry: FormatRegistry } | null = null;
+
+async function getFormatRegistry(): Promise<FormatRegistry> {
+  const root = requireRoot();
+  if (_formatRegistry?.root === root) return _formatRegistry.registry;
+  let projectConfig;
+  try {
+    projectConfig = JSON.parse(readFileSync(resolve(root, "project.json"), "utf8"));
+  } catch {
+    projectConfig = undefined;
+  }
+  const registry = await buildProjectFormatRegistry(root, projectConfig);
+  _formatRegistry = { root, registry };
+  return registry;
+}
+
+/** List the project's registered format classes (auto-discovered from imports). */
+export async function listFormats() {
+  try {
+    const registry = await getFormatRegistry();
+    return registry.entries.map((e) => ({
+      name: e.name,
+      extensions: e.extensions,
+      mediaType: e.mediaType,
+      documentKinds: e.documentKinds,
+      exportTarget: e.exportTarget,
+      remote: e.remote,
+      studio: e.studio,
+      capabilities: e.capabilities,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Invoke a format capability (parse/serialize) through the registry. */
+export async function formatAction(params: {
+  format: string;
+  action: string;
+  source?: string;
+  doc?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+}) {
+  const registry = await getFormatRegistry();
+  const entry = registry.byName(params.format);
+  if (!entry) throw new Error(`Format "${params.format}" is not an imported format class`);
+  if (params.action !== "parse" && params.action !== "serialize") {
+    throw new Error(`Unsupported action "${params.action}"`);
+  }
+  return params.action === "parse"
+    ? await entry.call("parse" as FormatCapability, params.source ?? "", params.options)
+    : await entry.call("serialize" as FormatCapability, params.doc ?? {}, params.options);
 }
 
 export function setFileDialog(fn: () => Promise<string | null>) {
@@ -259,7 +321,12 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
                 return { name, type: typeof d, default: d };
               }
               const entry = d as Record<string, unknown>;
-              const result: { name: string; type?: string; default?: unknown; format?: string } = {
+              const result: {
+                name: string;
+                type?: string;
+                default?: unknown;
+                format?: string;
+              } = {
                 name,
                 default: entry.default,
               };
@@ -452,5 +519,25 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
   };
   const desc = classDef.description ?? classDef.title;
   if (desc != null) result.description = desc;
+
+  // Surface format-extension metadata (format block, studio hints, capability summary)
+  const def = classDef as Record<string, unknown>;
+  if (def.format) result.format = def.format as Record<string, unknown>;
+  if (def.$studio) result.$studio = def.$studio as Record<string, unknown>;
+  const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
+  const methods = (classDef.$defs?.methods ?? {}) as Record<
+    string,
+    { role?: string; identifier?: string; timing?: string[] }
+  >;
+  const capabilities: Record<string, { identifier: string; timing: string[] }> = {};
+  for (const [key, method] of Object.entries(methods)) {
+    if (method.role && capabilityRoles.has(method.role)) {
+      capabilities[method.role] = {
+        identifier: method.identifier ?? key,
+        timing: method.timing ?? ["compiler", "server"],
+      };
+    }
+  }
+  if (Object.keys(capabilities).length > 0) result.capabilities = capabilities;
   return result;
 }

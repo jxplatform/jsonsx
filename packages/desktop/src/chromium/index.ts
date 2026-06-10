@@ -137,7 +137,12 @@ const server = Bun.serve({
 
       const handler = handlers[msg.method];
       if (!handler) {
-        ws.send(JSON.stringify({ id: msg.id, error: `Unknown method: ${msg.method}` }));
+        ws.send(
+          JSON.stringify({
+            id: msg.id,
+            error: `Unknown method: ${msg.method}`,
+          }),
+        );
         return;
       }
 
@@ -146,7 +151,10 @@ const server = Bun.serve({
         ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
       } catch (err: unknown) {
         ws.send(
-          JSON.stringify({ id: msg.id, error: err instanceof Error ? err.message : String(err) }),
+          JSON.stringify({
+            id: msg.id,
+            error: err instanceof Error ? err.message : String(err),
+          }),
         );
       }
     },

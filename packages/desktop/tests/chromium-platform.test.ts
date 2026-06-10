@@ -8,7 +8,13 @@ const responses: Record<string, unknown> = {
     handle: { root: ".", name: "Test", projectConfig: { name: "Test" } },
   },
   listDirectory: [
-    { name: "file.json", path: "file.json", type: "file", size: 42, modified: "2025-01-01" },
+    {
+      name: "file.json",
+      path: "file.json",
+      type: "file",
+      size: 42,
+      modified: "2025-01-01",
+    },
   ],
   resolveSiteContext: { sitePath: "." },
   discoverComponents: [{ tagName: "my-btn", path: "btn.json", props: [] }],
@@ -68,7 +74,12 @@ const server = Bun.serve({
       if (msg.method === "readFile") {
         const params = msg.params as { path?: string } | undefined;
         if (params?.path === "project.json") {
-          ws.send(JSON.stringify({ id: msg.id, result: JSON.stringify({ name: "TestProject" }) }));
+          ws.send(
+            JSON.stringify({
+              id: msg.id,
+              result: JSON.stringify({ name: "TestProject" }),
+            }),
+          );
         } else {
           ws.send(JSON.stringify({ id: msg.id, result: "file content here" }));
         }
@@ -78,7 +89,12 @@ const server = Bun.serve({
       if (msg.method in responses) {
         ws.send(JSON.stringify({ id: msg.id, result: responses[msg.method] }));
       } else {
-        ws.send(JSON.stringify({ id: msg.id, error: `Unknown method: ${msg.method}` }));
+        ws.send(
+          JSON.stringify({
+            id: msg.id,
+            error: `Unknown method: ${msg.method}`,
+          }),
+        );
       }
     },
   },

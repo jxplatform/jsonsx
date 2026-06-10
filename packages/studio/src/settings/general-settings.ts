@@ -30,7 +30,9 @@ export function renderGeneralSettings(container: HTMLElement) {
   };
 
   const onAdapterChange = (e: Event) => {
-    updateSiteConfig({ build: { ...config.build, adapter: (e.target as HTMLInputElement).value } });
+    updateSiteConfig({
+      build: { ...config.build, adapter: (e.target as HTMLInputElement).value },
+    });
   };
 
   const onEditGlobalStyles = () => {

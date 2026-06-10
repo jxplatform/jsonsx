@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jxsuite.com/schemas/Csv.class.json",
+  "title": "Csv",
+  "description": "CSV content format for Jx: parse CSV files or remote CSV URLs into typed content entries",
+  "$prototype": "Class",
+  "extends": "Object",
+  "$implementation": "./csv.js",
+
+  "format": {
+    "extensions": [".csv"],
+    "mediaType": "text/csv",
+    "documentKinds": ["content"],
+    "exportTarget": false,
+    "remote": true
+  },
+
+  "$studio": {
+    "icon": "table",
+    "modes": ["source"]
+  },
+
+  "$defs": {
+    "parameters": {
+      "src": {
+        "identifier": "src",
+        "type": { "type": "string" },
+        "description": "Path or http(s) URL to a CSV file",
+        "examples": ["./content/products.csv", "https://example.com/sheet.csv"]
+      },
+      "schema": {
+        "identifier": "schema",
+        "type": { "type": "object" },
+        "format": "json-schema",
+        "description": "Per-column type schema for coercion (number, boolean, array)"
+      },
+      "idField": {
+        "identifier": "idField",
+        "type": { "type": "string" },
+        "description": "Column used as entry id (default chain: id, sku, slug, Slug, row index)"
+      },
+      "basePath": {
+        "identifier": "basePath",
+        "type": { "type": "string" },
+        "description": "Base path for resolving src"
+      }
+    },
+
+    "returnTypes": {
+      "ContentLoaderEntries": {
+        "type": "array",
+        "description": "Content entries: { id, data, body }"
+      }
+    },
+
+    "fields": {
+      "config": {
+        "role": "field",
+        "access": "private",
+        "scope": "instance",
+        "identifier": "config",
+        "type": { "type": "object" },
+        "description": "Raw configuration object passed to the constructor"
+      }
+    },
+
+    "constructor": {
+      "role": "constructor",
+      "$prototype": "Function",
+      "parameters": [
+        { "$ref": "#/$defs/parameters/src" },
+        { "$ref": "#/$defs/parameters/schema" },
+        { "$ref": "#/$defs/parameters/idField" },
+        { "$ref": "#/$defs/parameters/basePath" }
+      ],
+      "body": ["this.config = config;"],
+      "description": "Stores the configuration for deferred resolution"
+    },
+
+    "methods": {
+      "resolve": {
+        "role": "method",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "instance",
+        "identifier": "resolve",
+        "parameters": [],
+        "returnType": { "$ref": "#/$defs/returnTypes/ContentLoaderEntries" },
+        "description": "Load and coerce the configured CSV source (runtime on-demand access)"
+      },
+      "parse": {
+        "role": "parse",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "parse",
+        "timing": ["compiler", "server", "client"],
+        "parameters": [
+          {
+            "identifier": "source",
+            "type": { "type": "string" },
+            "description": "Raw CSV text"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "schema": { "type": "object" },
+                "idField": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/ContentLoaderEntries" },
+        "description": "Parse CSV text into typed content entries (pure, browser-safe)"
+      },
+      "discover": {
+        "role": "discover",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "discover",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "source",
+            "type": { "type": "string" },
+            "description": "Content-type source: file path or directory"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": { "baseDir": { "type": "string" } }
+            }
+          }
+        ],
+        "returnType": { "type": "array", "items": { "type": "string" } },
+        "description": "List CSV entry files for a content-type source"
+      },
+      "load": {
+        "role": "load",
+        "$prototype": "Function",
+        "access": "public",
+        "scope": "static",
+        "identifier": "load",
+        "timing": ["compiler", "server"],
+        "parameters": [
+          {
+            "identifier": "path",
+            "type": { "type": "string" },
+            "description": "File path or http(s) URL"
+          },
+          {
+            "identifier": "options",
+            "type": {
+              "type": "object",
+              "properties": {
+                "schema": { "type": "object" },
+                "idField": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "returnType": { "$ref": "#/$defs/returnTypes/ContentLoaderEntries" },
+        "description": "Read or fetch one CSV source and parse it into content entries"
+      }
+    }
+  }
+}

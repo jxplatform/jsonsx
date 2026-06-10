@@ -31,11 +31,18 @@ Deployment adapter:
   2) cloudflare-pages
   3) node
   4) bun
+  5) cloudflare-workers
 `);
 const adapterChoice = await rl.question("Adapter [1]: ");
 rl.close();
 
-const adapterMap = { 1: "static", 2: "cloudflare-pages", 3: "node", 4: "bun" };
+const adapterMap = {
+  1: "static",
+  2: "cloudflare-pages",
+  3: "node",
+  4: "bun",
+  5: "cloudflare-workers",
+};
 const adapter = adapterMap[adapterChoice] || "static";
 
 await generateProject(destPath, { name, description, url, adapter });

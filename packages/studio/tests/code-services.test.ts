@@ -87,7 +87,9 @@ describe("fetchPluginSchema", () => {
   test("fetches and caches schema from platform", async () => {
     const schema = { properties: { url: { type: "string" } } };
     const mockFn = mock(() => schema);
-    registerPlatform({ fetchPluginSchema: mockFn } as unknown as StudioPlatform);
+    registerPlatform({
+      fetchPluginSchema: mockFn,
+    } as unknown as StudioPlatform);
     const result = await fetchPluginSchema(
       { $src: "./DataSource.class.json", $prototype: "DataSource" },
       { documentPath: "pages/index.json" },
@@ -99,7 +101,9 @@ describe("fetchPluginSchema", () => {
   test("returns cached schema on second call", async () => {
     const schema = { properties: {} };
     const mockFn = mock(() => schema);
-    registerPlatform({ fetchPluginSchema: mockFn } as unknown as StudioPlatform);
+    registerPlatform({
+      fetchPluginSchema: mockFn,
+    } as unknown as StudioPlatform);
     const def = { $src: "./cached.js", $prototype: "Cached" };
     await fetchPluginSchema(def, {});
     await fetchPluginSchema(def, {});
@@ -110,7 +114,9 @@ describe("fetchPluginSchema", () => {
     const mockFn = mock(() => {
       throw new Error("network");
     });
-    registerPlatform({ fetchPluginSchema: mockFn } as unknown as StudioPlatform);
+    registerPlatform({
+      fetchPluginSchema: mockFn,
+    } as unknown as StudioPlatform);
     const def = { $src: "./err.js", $prototype: "Err" };
     const result = await fetchPluginSchema(def, {});
     expect(result).toBeNull();
@@ -195,7 +201,9 @@ describe("setLintMarkers", () => {
 describe("getFunctionArgs", () => {
   test("returns parameters from state def", () => {
     const editing = { type: "def", defName: "onClick" };
-    const document = { state: { onClick: { parameters: ["state", "event", "el"] } } };
+    const document = {
+      state: { onClick: { parameters: ["state", "event", "el"] } },
+    };
     expect(getFunctionArgs(editing, document)).toEqual(["state", "event", "el"]);
   });
 
@@ -212,7 +220,11 @@ describe("getFunctionArgs", () => {
   });
 
   test("returns parameters from event node", () => {
-    const editing = { type: "event", path: ["children", 0], eventKey: "onclick" };
+    const editing = {
+      type: "event",
+      path: ["children", 0],
+      eventKey: "onclick",
+    };
     const document = { children: [{ onclick: { parameters: ["state"] } }] };
     expect(getFunctionArgs(editing, document)).toEqual(["state"]);
   });

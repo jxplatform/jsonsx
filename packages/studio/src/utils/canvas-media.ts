@@ -83,7 +83,7 @@ export function applyCanvasStyle(
     const mediaName = key.slice(1);
     if (mediaName === "--") continue;
     if (activeBreakpoints.has(mediaName) || featureToggles[mediaName]) {
-      for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ (val))) {
+      for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
         if (typeof v === "string" || typeof v === "number") {
           try {
             if (prop.startsWith("--")) el.style.setProperty(prop, String(v));

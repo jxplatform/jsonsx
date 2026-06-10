@@ -57,7 +57,10 @@ export function renderStylebookLayersTemplate(ctx: {
         : [];
       return html`
         <div
-          class=${classMap({ "layer-row": true, selected: tag === selectedLeaf })}
+          class=${classMap({
+            "layer-row": true,
+            selected: tag === selectedLeaf,
+          })}
           style="padding-left:${8 + depth * 16}px"
           @click=${(e: MouseEvent) => {
             e.stopPropagation();
@@ -91,8 +94,14 @@ export function renderStylebookLayersTemplate(ctx: {
         comp: import("../files/components.js").ComponentEntry,
       ) => html`
         <div
-          class=${classMap({ "layer-row": true, selected: comp.tagName === selectedTag })}
-          @click=${() => ctx.selectStylebookTag(comp.tagName, undefined, { panCanvas: true })}
+          class=${classMap({
+            "layer-row": true,
+            selected: comp.tagName === selectedTag,
+          })}
+          @click=${() =>
+            ctx.selectStylebookTag(comp.tagName, undefined, {
+              panCanvas: true,
+            })}
         >
           <span class="layer-tag component-tag" style="background:var(--accent)">⬡</span>
           <span class="layer-label">${comp.tagName}</span>

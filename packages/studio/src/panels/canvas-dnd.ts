@@ -47,7 +47,12 @@ export function registerPanelDnD(panel: CanvasPanel) {
   // driven from the monitor using only the innermost target.
   /** Innermost drop target if it belongs to this panel's canvas, else null */
   const innermostCanvasTarget = (location: {
-    current: { dropTargets: { data: Record<string | symbol, unknown>; element: Element }[] };
+    current: {
+      dropTargets: {
+        data: Record<string | symbol, unknown>;
+        element: Element;
+      }[];
+    };
   }) => {
     const target = location.current.dropTargets[0];
     if (!target) return null;
@@ -122,7 +127,7 @@ export function registerPanelDnD(panel: CanvasPanel) {
     const isLeaf = VOID_ELEMENTS.has(tag) || !hasElementChildren;
 
     const cleanup = dropTargetForElements({
-      element: /** @type {HTMLElement} */ (el),
+      element: /** @type {HTMLElement} */ el,
       canDrop({ source }) {
         const srcPath = source.data.path as JxPath | undefined;
         if (srcPath && isAncestor(srcPath, elPath)) return false;
@@ -144,13 +149,21 @@ export function registerPanelDnD(panel: CanvasPanel) {
  */
 function getCanvasDropResult(el: HTMLElement, elPath: JxPath, isLeaf: boolean): DropResult {
   if (!view.lastDragInput)
-    return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
+    return {
+      instruction: { type: "make-child" },
+      referenceEl: el,
+      targetPath: elPath,
+    };
   const y = view.lastDragInput.clientY;
 
   if (elPath.length === 0) {
     const children = Array.from(el.children) as HTMLElement[];
     if (children.length === 0)
-      return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
+      return {
+        instruction: { type: "make-child" },
+        referenceEl: el,
+        targetPath: elPath,
+      };
     return nearestChildEdge(children, y, elPath);
   }
 
@@ -164,10 +177,22 @@ function getCanvasDropResult(el: HTMLElement, elPath: JxPath, isLeaf: boolean): 
   }
 
   if (relY < 0.25)
-    return { instruction: { type: "reorder-above" }, referenceEl: el, targetPath: elPath };
+    return {
+      instruction: { type: "reorder-above" },
+      referenceEl: el,
+      targetPath: elPath,
+    };
   if (relY > 0.75)
-    return { instruction: { type: "reorder-below" }, referenceEl: el, targetPath: elPath };
-  return { instruction: { type: "make-child" }, referenceEl: el, targetPath: elPath };
+    return {
+      instruction: { type: "reorder-below" },
+      referenceEl: el,
+      targetPath: elPath,
+    };
+  return {
+    instruction: { type: "make-child" },
+    referenceEl: el,
+    targetPath: elPath,
+  };
 }
 
 /**
@@ -202,7 +227,11 @@ function nearestChildEdge(children: HTMLElement[], cursorY: number, parentPath: 
   }
 
   const childPath = [...parentPath, "children", closestIdx];
-  return { instruction, referenceEl: children[closestIdx], targetPath: childPath };
+  return {
+    instruction,
+    referenceEl: children[closestIdx],
+    targetPath: childPath,
+  };
 }
 
 /**

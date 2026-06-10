@@ -5,13 +5,20 @@ describe("compileClient", () => {
   test("compiles counter example to pre-rendered HTML with bindings", () => {
     const counter = {
       state: {
-        count: { type: "integer", default: 0, description: "Current counter value" },
+        count: {
+          type: "integer",
+          default: 0,
+          description: "Current counter value",
+        },
         label: {
           $prototype: "Function",
           body: "const c = state.count; return c > 0 ? 'Clicked ' + c + ' time' + (c === 1 ? '' : 's') : 'Click me!';",
         },
         increment: { $prototype: "Function", body: "state.count++" },
-        decrement: { $prototype: "Function", body: "state.count = Math.max(0, state.count - 1)" },
+        decrement: {
+          $prototype: "Function",
+          body: "state.count = Math.max(0, state.count - 1)",
+        },
         reset: { $prototype: "Function", body: "state.count = 0" },
       },
       tagName: "div",
@@ -31,9 +38,21 @@ describe("compileClient", () => {
           tagName: "div",
           style: { display: "flex", gap: "0.5rem" },
           children: [
-            { tagName: "button", textContent: "\u2212", onclick: { $ref: "#/state/decrement" } },
-            { tagName: "button", textContent: "+", onclick: { $ref: "#/state/increment" } },
-            { tagName: "button", textContent: "Reset", onclick: { $ref: "#/state/reset" } },
+            {
+              tagName: "button",
+              textContent: "\u2212",
+              onclick: { $ref: "#/state/decrement" },
+            },
+            {
+              tagName: "button",
+              textContent: "+",
+              onclick: { $ref: "#/state/increment" },
+            },
+            {
+              tagName: "button",
+              textContent: "Reset",
+              onclick: { $ref: "#/state/reset" },
+            },
           ],
         },
       ],
@@ -75,7 +94,11 @@ describe("compileClient", () => {
   test("extracts default from expanded signals", () => {
     const doc = {
       state: {
-        name: { type: "string", default: "World", description: "Name to greet" },
+        name: {
+          type: "string",
+          default: "World",
+          description: "Name to greet",
+        },
       },
       tagName: "div",
       children: [{ tagName: "span", textContent: "${state.name}" }],
@@ -117,7 +140,11 @@ describe("compileClient", () => {
       },
       tagName: "div",
       children: [
-        { tagName: "button", textContent: "Click", onclick: { $ref: "#/state/doSomething" } },
+        {
+          tagName: "button",
+          textContent: "Click",
+          onclick: { $ref: "#/state/doSomething" },
+        },
       ],
     };
 
@@ -214,7 +241,11 @@ describe("compileClient — prototypes", () => {
   test("LocalStorage generates localStorage init with key and default", () => {
     const doc = {
       state: {
-        prefs: { $prototype: "LocalStorage", key: "user-prefs", default: { theme: "dark" } },
+        prefs: {
+          $prototype: "LocalStorage",
+          key: "user-prefs",
+          default: { theme: "dark" },
+        },
       },
       tagName: "div",
       children: [],
@@ -263,7 +294,10 @@ describe("compileClient — prototypes", () => {
 
   test("Request with template URL checks for undefined", () => {
     const doc = {
-      state: { id: 1, user: { $prototype: "Request", url: "/api/${state.id}" } },
+      state: {
+        id: 1,
+        user: { $prototype: "Request", url: "/api/${state.id}" },
+      },
       tagName: "div",
       children: [],
     };
@@ -275,7 +309,9 @@ describe("compileClient — prototypes", () => {
 
   test("Cookie generates document.cookie read and parse", () => {
     const doc = {
-      state: { session: { $prototype: "Cookie", name: "sid", default: "anon" } },
+      state: {
+        session: { $prototype: "Cookie", name: "sid", default: "anon" },
+      },
       tagName: "div",
       children: [],
     };
@@ -477,7 +513,10 @@ describe("compileClient — module structure", () => {
 
   test("includes computed import when computed entries present", () => {
     const doc = {
-      state: { count: 0, doubled: { $prototype: "Function", body: "return state.count * 2;" } },
+      state: {
+        count: 0,
+        doubled: { $prototype: "Function", body: "return state.count * 2;" },
+      },
       tagName: "div",
       children: [],
     };
@@ -509,7 +548,10 @@ describe("compileClient — module structure", () => {
 
   test("custom modulePath reflected in output", () => {
     const doc = { tagName: "div", children: [] };
-    const { html, files } = compileClient(doc, { title: "Test", modulePath: "scripts/main.js" });
+    const { html, files } = compileClient(doc, {
+      title: "Test",
+      modulePath: "scripts/main.js",
+    });
     expect(html).toContain('src="./scripts/main.js"');
     expect(files[0].path).toBe("scripts/main.js");
   });
@@ -717,7 +759,10 @@ describe("compileClient — mapped array advanced features", () => {
             map: {
               tagName: "button",
               textContent: "Delete",
-              onclick: { $prototype: "Function", body: "items.splice($map.index, 1)" },
+              onclick: {
+                $prototype: "Function",
+                body: "items.splice($map.index, 1)",
+              },
             },
           },
         },
@@ -809,7 +854,11 @@ describe("compileClient — $src function handlers", () => {
       },
       tagName: "div",
       children: [
-        { tagName: "button", textContent: "Go", onclick: { $ref: "#/state/doSomething" } },
+        {
+          tagName: "button",
+          textContent: "Go",
+          onclick: { $ref: "#/state/doSomething" },
+        },
       ],
     };
     const { files } = compileClient(doc, { title: "Test" });

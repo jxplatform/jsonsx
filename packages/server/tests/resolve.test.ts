@@ -15,8 +15,20 @@ const selfContainedClass = {
   $prototype: "Class",
   $defs: {
     fields: {
-      a: { role: "field", access: "public", scope: "instance", identifier: "a", default: 0 },
-      b: { role: "field", access: "public", scope: "instance", identifier: "b", default: 0 },
+      a: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "a",
+        default: 0,
+      },
+      b: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "b",
+        default: 0,
+      },
     },
     constructor: {
       role: "constructor",
@@ -64,8 +76,20 @@ const plainClass = {
   $prototype: "Class",
   $defs: {
     fields: {
-      x: { role: "field", access: "public", scope: "instance", identifier: "x", default: 0 },
-      y: { role: "field", access: "public", scope: "instance", identifier: "y", default: 0 },
+      x: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "x",
+        default: 0,
+      },
+      y: {
+        role: "field",
+        access: "public",
+        scope: "instance",
+        identifier: "y",
+        default: 0,
+      },
     },
   },
 };
@@ -267,10 +291,20 @@ describe("handleResolve — $base URL resolution", () => {
       $prototype: "Class",
       $defs: {
         fields: {
-          x: { role: "field", access: "public", scope: "instance", identifier: "x", default: 1 },
+          x: {
+            role: "field",
+            access: "public",
+            scope: "instance",
+            identifier: "x",
+            default: 1,
+          },
         },
         methods: {
-          resolve: { role: "method", identifier: "resolve", body: "return this.x * 2;" },
+          resolve: {
+            role: "method",
+            identifier: "resolve",
+            body: "return this.x * 2;",
+          },
         },
       },
     };
@@ -319,7 +353,11 @@ describe("handleResolve — $base URL resolution", () => {
           },
         },
         methods: {
-          resolve: { role: "method", identifier: "resolve", body: "return this.src;" },
+          resolve: {
+            role: "method",
+            identifier: "resolve",
+            body: "return this.src;",
+          },
         },
       },
     };
@@ -570,14 +608,20 @@ describe("handleServerFunction", () => {
   });
 
   test("returns 500 when module not found", async () => {
-    const req = mockRequest({ $src: "./_fixtures/nonexistent.js", $export: "fn" });
+    const req = mockRequest({
+      $src: "./_fixtures/nonexistent.js",
+      $export: "fn",
+    });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("Failed to import");
   });
 
   test("returns 500 when export not found in module", async () => {
-    const req = mockRequest({ $src: "./_fixtures/calc.js", $export: "nonExistent" });
+    const req = mockRequest({
+      $src: "./_fixtures/calc.js",
+      $export: "nonExistent",
+    });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(500);
     expect(await res.text()).toContain("not found");
@@ -589,7 +633,10 @@ describe("handleServerFunction", () => {
       'export function boom() { throw new Error("kaboom"); }',
     );
     try {
-      const req = mockRequest({ $src: "./_fixtures/throws.js", $export: "boom" });
+      const req = mockRequest({
+        $src: "./_fixtures/throws.js",
+        $export: "boom",
+      });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(500);
       const body = await res.json();
@@ -626,7 +673,10 @@ describe("handleServerFunction", () => {
       "export function getKeys(args) { return Object.keys(args); }",
     );
     try {
-      const req = mockRequest({ $src: "./_fixtures/keys.js", $export: "getKeys" });
+      const req = mockRequest({
+        $src: "./_fixtures/keys.js",
+        $export: "getKeys",
+      });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual([]);

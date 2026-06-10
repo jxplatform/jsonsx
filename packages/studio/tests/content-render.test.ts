@@ -3,7 +3,17 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import { createState, setProjectState } from "../src/state";
 import { getEffectiveElements, getEffectiveStyle, getEffectiveMedia } from "../src/site-context";
 import { computeRelativePath } from "../src/files/components";
-import { loadMarkdown } from "../src/files/file-ops";
+import { parseSourceForPath } from "../src/files/file-ops";
+import { registerPlatform } from "../src/platform";
+import { seedMarkdownFormat, mockFormatAction } from "./format-fixture";
+import type { StudioPlatform } from "../src/types";
+
+seedMarkdownFormat();
+registerPlatform({
+  formatAction: mockFormatAction,
+} as unknown as StudioPlatform);
+
+const loadMarkdown = (source: string) => parseSourceForPath("doc.md", source);
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -164,8 +174,16 @@ describe("buildDocBase", () => {
 describe("autoDiscoverElements", () => {
   const registry = [
     { tagName: "hero", path: "components/hero.json", source: "jx" },
-    { tagName: "product-showcase", path: "components/product-showcase.json", source: "jx" },
-    { tagName: "feature-grid", path: "components/feature-grid.json", source: "jx" },
+    {
+      tagName: "product-showcase",
+      path: "components/product-showcase.json",
+      source: "jx",
+    },
+    {
+      tagName: "feature-grid",
+      path: "components/feature-grid.json",
+      source: "jx",
+    },
     { tagName: "cta-banner", path: "components/cta-banner.json", source: "jx" },
     { tagName: "npm-widget", path: "npm-widget", source: "npm" },
   ];
@@ -415,7 +433,10 @@ describe("getEffectiveStyle", () => {
     setProjectState({
       projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
     } as any);
-    expect(getEffectiveStyle(undefined)).toEqual({ color: "blue", fontFamily: "sans-serif" });
+    expect(getEffectiveStyle(undefined)).toEqual({
+      color: "blue",
+      fontFamily: "sans-serif",
+    });
   });
 
   test("doc style overrides site style on conflict", () => {
@@ -433,7 +454,9 @@ describe("getEffectiveStyle", () => {
         style: { "& li": { margin: "0", padding: "4px" } },
       },
     } as any);
-    const result = getEffectiveStyle({ "& li": { margin: "8px", color: "red" } });
+    const result = getEffectiveStyle({
+      "& li": { margin: "8px", color: "red" },
+    });
     expect((result["& li"] as JxStyle).margin).toBe("8px");
     expect((result["& li"] as JxStyle).padding).toBe("4px");
     expect((result["& li"] as JxStyle).color).toBe("red");

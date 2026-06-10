@@ -11,7 +11,8 @@ import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { canvasWrap, canvasPanels, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { loadMarkdown, serializeDocument } from "../files/file-ops";
+import { parseSourceForPath, serializeDocument } from "../files/file-ops";
+import { formatByName, formatForPath } from "../format/format-host";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
@@ -77,16 +78,17 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
 
 /** Monaco language for the source view of a tab's document. */
 function sourceLang(tab: import("../tabs/tab.js").Tab) {
-  if (tab.doc.sourceFormat === "md") return "markdown";
+  const format = formatByName(tab.doc.sourceFormat);
+  if (format) return format.mediaType?.split("/").pop() ?? "plaintext";
   return (tab.documentPath || "").endsWith(".js") ? "javascript" : "json";
 }
 
 /**
- * The full source text for the source view. Markdown files serialize to their on-disk form
- * (frontmatter YAML — title, $head, etc. — plus the body), not just the JSON of the body tree.
+ * The full source text for the source view. Format-class files serialize to their on-disk form
+ * (e.g. frontmatter YAML plus the body for markdown), not just the JSON of the body tree.
  */
-function sourceContent(tab: import("../tabs/tab.js").Tab, lang: string) {
-  if (lang === "markdown") return serializeDocument(tab);
+async function sourceContent(tab: import("../tabs/tab.js").Tab, lang: string) {
+  if (formatByName(tab.doc.sourceFormat)) return serializeDocument(tab);
   if (lang === "javascript") return tab.doc.document?.toString?.() || "";
   return JSON.stringify(tab.doc.document, null, 2);
 }
@@ -102,7 +104,11 @@ export function renderCanvas() {
     return;
   }
   const ctx = _ctx as CanvasRenderCtx;
-  const S = { document: tab.doc.document, ui: tab.session.ui, mode: tab.doc.mode };
+  const S = {
+    document: tab.doc.document,
+    ui: tab.session.ui,
+    mode: tab.doc.mode,
+  };
   const canvasMode = ctx.getCanvasMode();
 
   // Advance render generation so stale async renders from the previous cycle bail out
@@ -139,11 +145,17 @@ export function renderCanvas() {
   // the editing surface here, mirroring the panel draft-state behaviour).
   if (canvasMode === "source" && view.monacoEditor) {
     const editor = view.monacoEditor;
-    const newVal = sourceContent(tab, sourceLang(tab));
-    if (!editor.hasTextFocus() && editor.getValue() !== newVal) {
-      editor._ignoreNextChange = true;
-      editor.setValue(newVal);
-    }
+    sourceContent(tab, sourceLang(tab))
+      .then((newVal) => {
+        if (view.monacoEditor !== editor) return;
+        if (!editor.hasTextFocus() && editor.getValue() !== newVal) {
+          editor._ignoreNextChange = true;
+          editor.setValue(newVal);
+        }
+      })
+      .catch(() => {
+        // Serialization unavailable (e.g. format service unreachable) — keep the current buffer
+      });
     return;
   }
 
@@ -251,9 +263,19 @@ export function renderCanvas() {
 
     const filePath = tab.documentPath || "document.json";
     const lang = sourceLang(tab);
-    const content = sourceContent(tab, lang);
     const modelUri = monaco.Uri.parse("file:///" + filePath);
-    const model = monaco.editor.createModel(content, lang, modelUri);
+    const model = monaco.editor.createModel("", lang, modelUri);
+    sourceContent(tab, lang)
+      .then((content) => {
+        const editor = view.monacoEditor;
+        if (editor && editor.getModel() === model) {
+          editor._ignoreNextChange = true;
+          model.setValue(content);
+        }
+      })
+      .catch(() => {
+        // Serialization unavailable — leave the buffer empty rather than crash the render
+      });
     view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
       model,
       theme: "vs-dark",
@@ -280,15 +302,18 @@ export function renderCanvas() {
       debounce = setTimeout(async () => {
         const tab = activeTab.value;
         if (!tab) return;
-        if (lang === "markdown") {
+        if (formatByName(tab.doc.sourceFormat) && tab.documentPath) {
           try {
-            // Parse the full markdown source back into body + frontmatter (title, $head, etc.).
-            const { document, frontmatter } = await loadMarkdown(editor.getValue());
+            // Parse the full source back into body + frontmatter (title, $head, etc.).
+            const { document, frontmatter } = await parseSourceForPath(
+              tab.documentPath,
+              editor.getValue(),
+            );
             tab.doc.document = document as JxMutableNode;
             tab.doc.content.frontmatter = frontmatter;
             tab.doc.dirty = true;
           } catch {
-            // Unparseable markdown — don't update state
+            // Unparseable source — don't update state
           }
         } else if (lang === "json") {
           try {
@@ -354,14 +379,18 @@ export function renderCanvas() {
 
     /** @param {string} content */
     const parseContent = (content: string) => {
-      if (gitDiffState.isMarkdown) {
-        return loadMarkdown(content).then((r) => r.document);
+      const fmtPath = gitDiffState.filePath ?? "";
+      if (formatForPath(fmtPath)) {
+        return parseSourceForPath(fmtPath, content).then((r) => r.document);
       }
       return Promise.resolve().then(() => {
         try {
           return JSON.parse(content);
         } catch {
-          return { tagName: "div", children: [{ tagName: "p", textContent: "Failed to parse" }] };
+          return {
+            tagName: "div",
+            children: [{ tagName: "p", textContent: "Failed to parse" }],
+          };
         }
       });
     };

@@ -490,12 +490,15 @@ function renderComponentPropsFieldsTemplate(
             }}
           ></sp-number-field>`;
         } else if (parsed.kind === "combobox") {
-          const options = /** @type {{ options?: string[] }} */ (parsed).options as string[];
+          const options = /** @type {{ options?: string[] }} */ parsed.options as string[];
           widgetTpl = html`<jx-value-selector
             .value=${String(staticVal)}
             size="s"
             placeholder="—"
-            .options=${options.map((o) => ({ value: o, label: camelToLabel(o) }))}
+            .options=${options.map((o) => ({
+              value: o,
+              label: camelToLabel(o),
+            }))}
             @change=${(e: Event & { detail?: { value?: string } }) =>
               onChange(e.detail?.value ?? (e.target as HTMLInputElement).value)}
           ></jx-value-selector>`;
@@ -849,7 +852,10 @@ function renderPageSection(node: JxMutableNode) {
 // ─── Layout selection panel ─────────────────────────────────────────────────
 
 function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) => void }) {
-  const { el, layoutPath } = view.layoutSelection as { el: HTMLElement; layoutPath: string };
+  const { el, layoutPath } = view.layoutSelection as {
+    el: HTMLElement;
+    layoutPath: string;
+  };
   const tagName = el?.tagName?.toLowerCase() || "element";
   const className = el?.className || "";
   const displayPath = layoutPath || "layout";

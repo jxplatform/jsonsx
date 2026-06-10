@@ -20,7 +20,14 @@ import { componentRegistry } from "../files/components";
 import { showDialog, renderPopover } from "../ui/layers";
 import { renderComponentPreview } from "../panels/stylebook-panel";
 import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime";
-import { loadMarkdown } from "../files/file-ops";
+import { parseSourceForPath } from "../files/file-ops";
+import {
+  loadFormats,
+  formatForPath,
+  formatByName,
+  documentExtensions,
+  defaultContentFormat,
+} from "../format/format-host";
 
 import type { ComponentEntry } from "../files/components";
 import type { ContentTypeDef } from "@jxsuite/schema/types";
@@ -62,7 +69,13 @@ const MEDIA_EXTENSIONS = new Set([
 let activeCategory = "all";
 let searchQuery = "";
 let viewMode: "grid" | "table" = "grid";
-let fileCache: { name: string; path: string; type: string; category: string; ext: string }[] = [];
+let fileCache: {
+  name: string;
+  path: string;
+  type: string;
+  category: string;
+  ext: string;
+}[] = [];
 let loading = false;
 /** Track which projectDirs were used for the last load, so we re-scan when they change. */
 let lastProjectDirsKey = "";
@@ -117,7 +130,13 @@ async function collectFiles(
   dir: string,
   platform: ReturnType<typeof getPlatform>,
 ): Promise<{ name: string; path: string; type: string; category: string; ext: string }[]> {
-  const results: { name: string; path: string; type: string; category: string; ext: string }[] = [];
+  const results: {
+    name: string;
+    path: string;
+    type: string;
+    category: string;
+    ext: string;
+  }[] = [];
   try {
     const entries = await platform.listDirectory(dir);
     for (const entry of entries) {
@@ -200,12 +219,16 @@ function filteredFiles() {
 
 // ─── Entity types for "New +" button ────────────────────────────────────────
 
-const ENTITY_TYPES = [
-  { key: "page", label: "Page", dir: "pages", ext: ".md" },
-  { key: "layout", label: "Layout", dir: "layouts", ext: ".json" },
-  { key: "component", label: "Component", dir: "components", ext: ".json" },
-  { key: "content", label: "Content", dir: "content", ext: ".md" },
-];
+function getEntityTypes() {
+  const pageExt = documentExtensions("page")[0] ?? ".json";
+  const contentExt = defaultContentFormat()?.extensions[0] ?? ".json";
+  return [
+    { key: "page", label: "Page", dir: "pages", ext: pageExt },
+    { key: "layout", label: "Layout", dir: "layouts", ext: ".json" },
+    { key: "component", label: "Component", dir: "components", ext: ".json" },
+    { key: "content", label: "Content", dir: "content", ext: contentExt },
+  ];
+}
 
 /**
  * Build frontmatter YAML from a content type's schema properties.
@@ -220,7 +243,7 @@ function buildFrontmatterYaml(contentTypeName: string) {
 
   let yaml = "";
   for (const [field, def] of Object.entries(col.schema.properties)) {
-    const d = /** @type {{ type?: string; format?: string }} */ (def);
+    const d = /** @type {{ type?: string; format?: string }} */ def;
     yaml += `${field}: ${yamlDefault(d.type || "", d.format || "")}\n`;
   }
   return yaml || "title: Untitled\n";
@@ -241,7 +264,12 @@ function getContentTypeTypes() {
       key: `contentType:${name}`,
       label: name.charAt(0).toUpperCase() + name.slice(1),
       dir,
-      ext: `.${d.format || "md"}`,
+      ext:
+        d.format === "json"
+          ? ".json"
+          : (formatByName(d.format)?.extensions[0] ??
+            defaultContentFormat()?.extensions[0] ??
+            ".json"),
       contentTypeName: name,
     };
   });
@@ -261,7 +289,8 @@ async function handleNewEntity(
 ) {
   const isContentType = typeKey.startsWith("contentType:");
   const contentTypeName = isContentType ? typeKey.slice("contentType:".length) : null;
-  const allTypes = [...ENTITY_TYPES, ...getContentTypeTypes()];
+  await loadFormats();
+  const allTypes = [...getEntityTypes(), ...getContentTypeTypes()];
   const typeInfo = allTypes.find((t) => t.key === typeKey);
   if (!typeInfo) return;
 
@@ -275,11 +304,13 @@ async function handleNewEntity(
   const filePath = `${typeInfo.dir}/${slug}${typeInfo.ext}`;
 
   let content;
-  if (typeInfo.ext === ".md") {
-    const frontmatter = contentTypeName
-      ? buildFrontmatterYaml(contentTypeName)
-      : "title: Untitled\n";
-    content = `---\n${frontmatter}---\n\n`;
+  const entityFormat = formatForPath(filePath);
+  if (entityFormat) {
+    if (contentTypeName) {
+      content = `---\n${buildFrontmatterYaml(contentTypeName)}---\n\n`;
+    } else {
+      content = entityFormat.studio?.newFileTemplate ?? "";
+    }
   } else {
     content = JSON.stringify({ tagName: "div", children: [] }, null, "\t");
   }
@@ -589,9 +620,10 @@ async function renderDocPreview(filePath: string) {
     const platform = getPlatform();
     const content = await platform.readFile(filePath);
     setSkipServerFunctions(true);
+    await loadFormats();
     let doc;
-    if (filePath.endsWith(".md")) {
-      const result = await loadMarkdown(content);
+    if (formatForPath(filePath)) {
+      const result = await parseSourceForPath(filePath, content);
       doc = result.document;
     } else {
       doc = JSON.parse(content);
@@ -623,7 +655,7 @@ async function loadPreview(el: Element, file: { path: string; category: string }
       } else {
         preview = ((await renderDocPreview(file.path)) as HTMLElement | undefined) || undefined;
       }
-      if (preview) _previewCache.set(file.path, /** @type {HTMLElement} */ (preview));
+      if (preview) _previewCache.set(file.path, /** @type {HTMLElement} */ preview);
     } catch {
       return;
     }
@@ -639,7 +671,13 @@ async function loadPreview(el: Element, file: { path: string; category: string }
  * @param {{ openFile: (path: string) => void }} ctx
  */
 function renderCard(
-  file: { name: string; path: string; type: string; category: string; ext: string },
+  file: {
+    name: string;
+    path: string;
+    type: string;
+    category: string;
+    ext: string;
+  },
   container: HTMLElement,
   ctx: { openFile: (path: string) => void },
 ) {
@@ -736,7 +774,9 @@ export async function renderBrowse(
           @change=${(e: Event) =>
             handleNewEntity((e.target as HTMLSelectElement).value, container, ctx)}
         >
-          ${ENTITY_TYPES.map((t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`)}
+          ${getEntityTypes().map(
+            (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
+          )}
           ${contentTypeTypes.length
             ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
                   (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,

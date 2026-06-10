@@ -189,12 +189,16 @@ function _doRender() {
     // Only render the active panel's content
     if (tab === "properties") {
       litRender(
-        renderPropertiesPanelTemplate({ navigateToComponent: ctx.navigateToComponent }),
+        renderPropertiesPanelTemplate({
+          navigateToComponent: ctx.navigateToComponent,
+        }),
         _propsContainer!,
       );
     } else if (tab === "events") {
       litRender(
-        eventsSidebarTemplate({ isCustomElementDoc: () => isCustomElementDoc(S) }),
+        eventsSidebarTemplate({
+          isCustomElementDoc: () => isCustomElementDoc(S),
+        }),
         _eventsContainer!,
       );
     } else if (tab === "style") {

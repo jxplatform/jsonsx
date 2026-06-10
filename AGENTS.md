@@ -1,7 +1,7 @@
 We're crafting a comprehensive web-based application suite that aims to encompase all available web platform APIs within a JSON Schema and provides a runtime, compiler, and visual builder to facilitate website and app builds with this schema.
 
 - Prefer WHATWG and ECMA standard alignment (current or emerging) for all nomenclature and architectural paradigms.
-- Code in strongly typed JS (using JSDoc annotations). Ensure all linting, typechecking, and tests pass following all changes.
+- Code in strongly typed Typescript. Ensure all linting, typechecking, and tests pass following all changes.
 - Implement tests in parallel with features—use native Bun + Happy DOM and other mock API providers, as appropriate.
 - Reference the general and package-specific specs (./specs) prior to planning and implementing features, update specs to reflect user requests prior to adding new features.
 - Use Chrome MCP to test new UI/UX changes prior to finishing the task.
@@ -21,3 +21,4 @@ If running on NixOS:
 - The studio interface can be accessed via: http://localhost:3000/packages/studio/index.html
 - The jxsuite.com project can be accessed via: http://localhost:3000/packages/studio/index.html?project=~/Development/jx/sites/jxsuite.com/project.json
 - Tests and validations are run at the project root level via `bun run all-the-things`
+- Tests must be run with `--isolate`

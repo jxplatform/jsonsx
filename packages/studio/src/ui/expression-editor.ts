@@ -31,7 +31,10 @@ const OPERATOR_GROUPS = [
   { label: "Arithmetic", ops: ["+", "-", "*", "/", "%"] },
   { label: "Comparison", ops: ["===", "!==", "<", "<=", ">", ">="] },
   { label: "Logical", ops: ["&&", "||"] },
-  { label: "Array methods", ops: ["push", "pop", "shift", "unshift", "splice"] },
+  {
+    label: "Array methods",
+    ops: ["push", "pop", "shift", "unshift", "splice"],
+  },
   { label: "Aggregate", ops: ["reduce", "map", "filter"] },
 ];
 
@@ -304,7 +307,12 @@ function renderLiteralEditor(operand: any, onChange: (newVal: any) => void) {
 function renderOperandEditor(
   operand: unknown,
   onChange: (newOperand: unknown) => void,
-  opts: { stateDefs: string[]; allowEventRef: boolean; depth: number; mustBeRef?: boolean },
+  opts: {
+    stateDefs: string[];
+    allowEventRef: boolean;
+    depth: number;
+    mustBeRef?: boolean;
+  },
 ): import("lit-html").TemplateResult {
   if (opts.mustBeRef) {
     const refVal = ((operand as Record<string, unknown> | null)?.$ref as string) ?? "";
@@ -337,7 +345,10 @@ function renderOperandEditor(
               (r) => onChange({ $ref: r }),
               opts,
             )
-          : renderExpressionEditor(operand, onChange, { ...opts, depth: opts.depth + 1 })}
+          : renderExpressionEditor(operand, onChange, {
+              ...opts,
+              depth: opts.depth + 1,
+            })}
     </div>
   `;
 }

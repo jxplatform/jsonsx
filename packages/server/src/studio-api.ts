@@ -7,15 +7,44 @@
  * All paths are relative to the project root. Directory traversal above root is rejected.
  */
 
-import { resolve, relative, basename, dirname, isAbsolute } from "node:path";
+import { resolve, relative, basename, dirname, extname, isAbsolute } from "node:path";
 import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
-import { readFileSync, existsSync } from "node:fs";
-import { transpileJxMarkdown } from "@jxsuite/parser/transpile";
+import { readFileSync, existsSync, statSync } from "node:fs";
+import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import * as claude from "./claude-session.ts";
 import type { ClassJsonDef } from "./types.ts";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (p: string) => p.replaceAll("\\", "/");
+
+// ─── Format registry (per project root, invalidated on project.json change) ──
+
+const formatRegistryCache = new Map<string, { mtime: number; registry: FormatRegistry }>();
+
+/**
+ * Build (or reuse) the format registry for a project root from its project.json imports map. An
+ * empty registry is returned when there is no project.json — only .json files are handled then.
+ *
+ * @param {string} projectRoot
+ * @returns {Promise<FormatRegistry>}
+ */
+async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
+  const projectJsonPath = resolve(projectRoot, "project.json");
+  let mtime = 0;
+  let projectConfig;
+  try {
+    mtime = statSync(projectJsonPath).mtimeMs;
+    projectConfig = JSON.parse(readFileSync(projectJsonPath, "utf8"));
+  } catch {
+    projectConfig = undefined;
+  }
+  const cached = formatRegistryCache.get(projectRoot);
+  if (cached && cached.mtime === mtime) return cached.registry;
+  const registry = await buildProjectFormatRegistry(projectRoot, projectConfig);
+  formatRegistryCache.set(projectRoot, { mtime, registry });
+  return registry;
+}
 
 /**
  * Check that a path is under either the server root OR the active project root. This allows file
@@ -90,7 +119,11 @@ export function parseGitStatus(out: string) {
         filePath = parts.slice(8).join(" ");
       }
       if (stagedCode !== ".") {
-        files.push({ path: filePath, status: statusMap[stagedCode] || stagedCode, staged: true });
+        files.push({
+          path: filePath,
+          status: statusMap[stagedCode] || stagedCode,
+          staged: true,
+        });
       }
       if (unstagedCode !== ".") {
         files.push({
@@ -176,7 +209,12 @@ export async function handleStudioApi(
         }
       } catch {}
 
-      return Response.json({ isSiteProject, projectConfig, directories, projectRoot });
+      return Response.json({
+        isSiteProject,
+        projectConfig,
+        directories,
+        projectRoot,
+      });
     } catch (e) {
       return Response.json({ error: (e as Error).message }, { status: 500 });
     }
@@ -278,7 +316,12 @@ export async function handleStudioApi(
       assertAccessible(destPath, root, activeProjectRoot);
 
       const { generateProject } = await import("@jxsuite/create/generate");
-      await generateProject(destPath, { name, description, url: siteUrl, adapter });
+      await generateProject(destPath, {
+        name,
+        description,
+        url: siteUrl,
+        adapter,
+      });
 
       const config = JSON.parse(await readFile(resolve(destPath, "project.json"), "utf8"));
       const projectRoot = fwd(relative(root, destPath));
@@ -359,7 +402,9 @@ export async function handleStudioApi(
       return Response.json({ error: (e as Error).message }, { status: 400 });
     }
     try {
-      const glob = new Bun.Glob("**/*.{json,md}");
+      const registry = await getFormatRegistry(scanRoot);
+      const componentExts = registry.documentExtensions("component").map((e: string) => e.slice(1));
+      const glob = new Bun.Glob(`**/*.{${["json", ...componentExts].join(",")}}`);
       const components = [];
       for await (const match of glob.scan({ cwd: scanRoot, dot: false })) {
         if (
@@ -371,14 +416,13 @@ export async function handleStudioApi(
         const fp = resolve(scanRoot, match);
         try {
           let content;
-          if (match.endsWith(".md")) {
-            const source = await readFile(fp, "utf8");
-            const fmMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-            if (!fmMatch) continue;
-            if (!/^tagName:\s*.+-.+/m.test(fmMatch[1])) continue;
-            content = transpileJxMarkdown(source);
-          } else {
+          if (match.endsWith(".json")) {
             content = JSON.parse(await readFile(fp, "utf8"));
+          } else {
+            const entry = registry.byExtension(extname(match), "parse");
+            if (!entry) continue;
+            const source = await readFile(fp, "utf8");
+            content = (await entry.call("parse", source)) as Record<string, unknown>;
           }
           if (content.tagName && content.tagName.includes("-")) {
             components.push({
@@ -401,7 +445,12 @@ export async function handleStudioApi(
                     return { name, type: typeof d, default: d };
                   }
                   const obj = d as Record<string, unknown>;
-                  return { name, type: obj.type, default: obj.default, format: obj.format };
+                  return {
+                    name,
+                    type: obj.type,
+                    default: obj.default,
+                    format: obj.format,
+                  };
                 }),
               hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
             });
@@ -514,7 +563,7 @@ export async function handleStudioApi(
           const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
           packages.push({
             name,
-            version: /** @type {string} */ (version),
+            version: /** @type {string} */ version,
             hasCem: !!depPkg.customElements,
             customElementsPath: depPkg.customElements || null,
           });
@@ -563,7 +612,11 @@ export async function handleStudioApi(
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
       const args = ["add", name];
       if (body.dev) args.splice(1, 0, "-d");
-      const proc = Bun.spawn(["bun", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(["bun", ...args], {
+        cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
         const stderr = await new Response(proc.stderr).text();
@@ -587,7 +640,11 @@ export async function handleStudioApi(
         return Response.json({ error: "Missing name" }, { status: 400 });
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
-      const proc = Bun.spawn(["bun", "remove", name], { cwd, stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(["bun", "remove", name], {
+        cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
         const stderr = await new Response(proc.stderr).text();
@@ -747,6 +804,71 @@ export async function handleStudioApi(
   }
 
   // Discover a plugin module's schema for studio form rendering
+  // Format capability proxy — studio fallback for capabilities whose timing excludes "client".
+  // Dispatches parse/serialize through the project's format registry by import name.
+  if (path === "/__studio/format" && req.method === "POST") {
+    try {
+      const body = await req.json();
+      const { format, action, source, doc, options } = body as {
+        format?: string;
+        action?: string;
+        source?: string;
+        doc?: Record<string, unknown>;
+        options?: Record<string, unknown>;
+      };
+      const dir = (body.dir as string | undefined) || activeProjectRoot || root;
+      const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+      assertAccessible(projectRoot, root, activeProjectRoot);
+
+      if (!format || !action) {
+        return Response.json({ error: "Missing format or action" }, { status: 400 });
+      }
+      if (action !== "parse" && action !== "serialize") {
+        return Response.json({ error: `Unsupported action "${action}"` }, { status: 400 });
+      }
+      const registry = await getFormatRegistry(projectRoot);
+      const entry = registry.byName(format);
+      if (!entry) {
+        return Response.json(
+          { error: `Format "${format}" is not an imported format class` },
+          { status: 404 },
+        );
+      }
+      const result =
+        action === "parse"
+          ? await entry.call("parse", source ?? "", options)
+          : await entry.call("serialize", doc ?? {}, options);
+      return Response.json({ result });
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 500 });
+    }
+  }
+
+  // Format registry listing — lets the studio introspect available formats without
+  // fetching each .class.json itself.
+  if (path === "/__studio/formats" && req.method === "GET") {
+    const dir = url.searchParams.get("dir") || activeProjectRoot || root;
+    const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+    try {
+      assertAccessible(projectRoot, root, activeProjectRoot);
+      const registry = await getFormatRegistry(projectRoot);
+      return Response.json({
+        formats: registry.entries.map((e) => ({
+          name: e.name,
+          extensions: e.extensions,
+          mediaType: e.mediaType,
+          documentKinds: e.documentKinds,
+          exportTarget: e.exportTarget,
+          remote: e.remote,
+          studio: e.studio,
+          capabilities: e.capabilities,
+        })),
+      });
+    } catch (e) {
+      return Response.json({ error: (e as Error).message }, { status: 400 });
+    }
+  }
+
   if (path === "/__studio/plugin-schema" && req.method === "GET") {
     const src = url.searchParams.get("src");
     const prototype = url.searchParams.get("prototype");
@@ -791,7 +913,9 @@ export async function handleStudioApi(
       try {
         const content = readFileSync(moduleAbsPath, "utf8");
         const classDef = JSON.parse(content);
-        return Response.json({ schema: extractStudioSchema(classDef, moduleAbsPath) });
+        return Response.json({
+          schema: extractStudioSchema(classDef, moduleAbsPath),
+        });
       } catch (e) {
         return Response.json({
           schema: null,
@@ -807,7 +931,9 @@ export async function handleStudioApi(
       try {
         const content = readFileSync(classJsonPath, "utf8");
         const classDef = JSON.parse(content);
-        return Response.json({ schema: extractStudioSchema(classDef, classJsonPath) });
+        return Response.json({
+          schema: extractStudioSchema(classDef, classJsonPath),
+        });
       } catch {
         // Fall through to JS module import
       }
@@ -818,7 +944,10 @@ export async function handleStudioApi(
       const mod = await import(moduleAbsPath);
       const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
       if (typeof ExportedClass !== "function") {
-        return Response.json({ schema: null, error: `Export "${exportName}" not found` });
+        return Response.json({
+          schema: null,
+          error: `Export "${exportName}" not found`,
+        });
       }
       return Response.json({ schema: ExportedClass.schema ?? null });
     } catch (e) {
@@ -836,7 +965,11 @@ export async function handleStudioApi(
     const gitCmd = path.slice("/__studio/git/".length);
 
     const runGit = async (args: string[]) => {
-      const proc = Bun.spawn(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(["git", ...args], {
+        cwd,
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const exitCode = await proc.exited;
       const stdout = await new Response(proc.stdout).text();
       const stderr = await new Response(proc.stderr).text();
@@ -1004,7 +1137,7 @@ export async function handleStudioApi(
         if (!fp) return Response.json({ error: "Missing path" }, { status: 400 });
         if (fp.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
         const content = await runGit(["show", `${ref}:${fp}`]);
-        return Response.json({ content, format: fp.endsWith(".md") ? "markdown" : "json" });
+        return Response.json({ content });
       }
 
       if (gitCmd === "discard" && req.method === "POST") {
@@ -1183,10 +1316,31 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string) {
 
   const resolveMethod = classDef.$defs?.methods?.resolve;
 
+  // Surface format-extension metadata: the format block, studio hints, and a
+  // capability summary ({ parse: { timing }, serialize: { timing }, ... }).
+  const def = classDef as Record<string, unknown>;
+  const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
+  const capabilities: Record<string, { identifier: string; timing: string[] }> = {};
+  const methods = (classDef.$defs?.methods ?? {}) as Record<
+    string,
+    { role?: string; identifier?: string; timing?: string[] }
+  >;
+  for (const [key, method] of Object.entries(methods)) {
+    if (method.role && capabilityRoles.has(method.role)) {
+      capabilities[method.role] = {
+        identifier: method.identifier ?? key,
+        timing: method.timing ?? ["compiler", "server"],
+      };
+    }
+  }
+
   return {
     description: classDef.description ?? classDef.title,
     properties,
     required: [...requiredSet],
     ...(resolveMethod?.returns ? { returns: resolveMethod.returns } : {}),
+    ...(def.format ? { format: def.format } : {}),
+    ...(def.$studio ? { $studio: def.$studio } : {}),
+    ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
   };
 }

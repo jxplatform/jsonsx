@@ -14,7 +14,10 @@ if (typeof globalThis.localStorage === "undefined") {
 const STORAGE_KEY = "jx_github_token";
 
 let mockFetchResponses: { ok?: boolean; json: unknown; status?: number }[] = [];
-let mockFetchCalls: { url: string; opts: { body: string; headers: Record<string, string> } }[] = [];
+let mockFetchCalls: {
+  url: string;
+  opts: { body: string; headers: Record<string, string> };
+}[] = [];
 const originalFetch = globalThis.fetch;
 
 /** @param {{ ok?: boolean; json: unknown; status?: number }[]} responses */

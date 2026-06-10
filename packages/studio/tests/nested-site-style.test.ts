@@ -87,7 +87,11 @@ describe("buildNestedSiteCSS", () => {
 
   test("converts camelCase to kebab-case", () => {
     const style = {
-      table: { fontSize: "14px", textAlign: "left", borderCollapse: "collapse" },
+      table: {
+        fontSize: "14px",
+        textAlign: "left",
+        borderCollapse: "collapse",
+      },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
     expect(css).toContain("font-size: 14px");

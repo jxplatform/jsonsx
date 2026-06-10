@@ -72,7 +72,9 @@ export function createDesktopPlatform() {
         });
       } catch {
         try {
-          const content = await rpc.request.readFile({ path: `public/${path}` });
+          const content = await rpc.request.readFile({
+            path: `public/${path}`,
+          });
           const ext = path.split(".").pop() || "";
           const mime = ext === "json" ? "application/json" : "text/plain";
           return new Response(content as string, {
@@ -203,7 +205,11 @@ export function createDesktopPlatform() {
       } catch {
         return {
           meta: { root: ".", name: "project" },
-          info: { isSiteProject: false as const, projectConfig: null, directories: [] as string[] },
+          info: {
+            isSiteProject: false as const,
+            projectConfig: null,
+            directories: [] as string[],
+          },
         };
       }
     },
@@ -336,6 +342,17 @@ export function createDesktopPlatform() {
       return rpc.request.searchFiles({ query });
     },
 
+    async listFormats() {
+      return rpc.request.listFormats();
+    },
+
+    /** @param {Record<string, unknown>} payload */
+    async formatAction(payload: Record<string, unknown>) {
+      return rpc.request.formatAction(
+        payload as { format: string; action: string; source?: string },
+      );
+    },
+
     async addPackage(name: string) {
       return rpc.request.addPackage({ name });
     },
@@ -355,7 +372,10 @@ export function createDesktopPlatform() {
       adapter?: string;
       directory: string;
     }) {
-      return rpc.request.createProject(opts) as Promise<{ root: string; config: ProjectConfig }>;
+      return rpc.request.createProject(opts) as Promise<{
+        root: string;
+        config: ProjectConfig;
+      }>;
     },
 
     updater: {
@@ -377,7 +397,10 @@ export function createDesktopPlatform() {
 
     // AI Assistant
     async aiAuthStatus() {
-      return rpc.request.aiAuthStatus() as Promise<{ authenticated: boolean; error?: string }>;
+      return rpc.request.aiAuthStatus() as Promise<{
+        authenticated: boolean;
+        error?: string;
+      }>;
     },
     async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
       return rpc.request.aiCreateSession(opts) as Promise<{ id: string }>;

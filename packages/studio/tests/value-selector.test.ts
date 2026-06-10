@@ -37,7 +37,11 @@ const SAMPLE_OPTIONS: any[] = [
 const OPTIONS_WITH_DIVIDER: any[] = [
   { value: "--font-custom", label: "Custom", style: "font-family: Georgia" },
   { divider: true },
-  { value: "__preset__:System UI", label: "System UI", style: "font-family: system-ui" },
+  {
+    value: "__preset__:System UI",
+    label: "System UI",
+    style: "font-family: system-ui",
+  },
 ];
 
 // ─── Mode detection (isPicker) ─────────────────────────────────────────────

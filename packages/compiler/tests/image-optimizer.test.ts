@@ -129,8 +129,18 @@ describe("contentHash and configHash", () => {
 
   test("configHash changes with different settings", () => {
     const base = { optimize: true, sizes: "100vw", lazyLoad: true };
-    const hashA = configHash({ ...base, widths: [320], formats: ["webp"], quality: { webp: 80 } });
-    const hashB = configHash({ ...base, widths: [640], formats: ["webp"], quality: { webp: 80 } });
+    const hashA = configHash({
+      ...base,
+      widths: [320],
+      formats: ["webp"],
+      quality: { webp: 80 },
+    });
+    const hashB = configHash({
+      ...base,
+      widths: [640],
+      formats: ["webp"],
+      quality: { webp: 80 },
+    });
     expect(hashA).not.toBe(hashB);
   });
 });
@@ -227,7 +237,9 @@ describe("image-transform", () => {
       children: [
         {
           tagName: "img",
-          attributes: /** @type {Record<string, any>} */ ({ src: "/images/hero.jpg" }),
+          attributes: /** @type {Record<string, any>} */ {
+            src: "/images/hero.jpg",
+          },
         },
       ],
     };
@@ -295,7 +307,10 @@ describe("image-transform", () => {
     const doc = {
       tagName: "div",
       children: [
-        { tagName: "img", attributes: { src: "/images/hero.jpg", "data-no-optimize": "" } },
+        {
+          tagName: "img",
+          attributes: { src: "/images/hero.jpg", "data-no-optimize": "" },
+        },
       ],
     };
     const cache = { version: 1, entries: {} };
@@ -325,7 +340,10 @@ describe("image-transform", () => {
           tagName: "section",
           children: [
             { tagName: "p", textContent: "text" },
-            { tagName: "img", attributes: { src: "https://external.com/photo.jpg" } },
+            {
+              tagName: "img",
+              attributes: { src: "https://external.com/photo.jpg" },
+            },
           ],
         },
       ],
@@ -550,7 +568,11 @@ describe("getImageMetadata", () => {
 
   test("returns 0 for missing width/height and 'unknown' for missing format", async () => {
     mockMetadata.mockImplementationOnce(() =>
-      Promise.resolve({ width: undefined, height: undefined, format: undefined } as unknown as {
+      Promise.resolve({
+        width: undefined,
+        height: undefined,
+        format: undefined,
+      } as unknown as {
         width: number;
         height: number;
         format: string;
@@ -759,7 +781,12 @@ describe("site-loader images config", () => {
     expect(config.images.optimize).toBe(true);
     expect(config.images.widths).toEqual([320, 640, 960, 1280, 1920]);
     expect(config.images.formats).toEqual(["webp", "avif"]);
-    expect(config.images.quality).toEqual({ webp: 80, avif: 65, jpeg: 80, png: 80 });
+    expect(config.images.quality).toEqual({
+      webp: 80,
+      avif: 65,
+      jpeg: 80,
+      png: 80,
+    });
     expect(config.images.sizes).toBe("(max-width: 768px) 100vw, 50vw");
     expect(config.images.lazyLoad).toBe(true);
 

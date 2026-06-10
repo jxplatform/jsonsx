@@ -79,7 +79,12 @@ export function defaultDef(tag: string) {
     def.children = [
       {
         tagName: "thead",
-        children: [{ tagName: "tr", children: [{ tagName: "th", textContent: "Header" }] }],
+        children: [
+          {
+            tagName: "tr",
+            children: [{ tagName: "th", textContent: "Header" }],
+          },
+        ],
       },
       {
         tagName: "tbody",

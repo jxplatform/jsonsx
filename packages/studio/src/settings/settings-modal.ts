@@ -68,7 +68,10 @@ function renderModal() {
           ${sections.map(
             (s) => html`
               <button
-                class=${classMap({ "settings-nav-item": true, active: _activeSection === s.key })}
+                class=${classMap({
+                  "settings-nav-item": true,
+                  active: _activeSection === s.key,
+                })}
                 @click=${() => onNavClick(s.key)}
               >
                 ${s.label}

@@ -71,7 +71,11 @@ describe("isDynamic", () => {
     expect(isDynamic({ state: { $r: { $prototype: "Request" } } })).toBe(true);
   });
   test('$prototype: "Function" in state → true', () => {
-    expect(isDynamic({ state: { fn: { $prototype: "Function", body: "return 1;" } } })).toBe(true);
+    expect(
+      isDynamic({
+        state: { fn: { $prototype: "Function", body: "return 1;" } },
+      }),
+    ).toBe(true);
   });
 
   // Plain object in state → dynamic (Signal.State)
@@ -84,7 +88,11 @@ describe("isDynamic", () => {
     expect(isDynamic({ $switch: { $ref: "#/state/$x" } })).toBe(true);
   });
   test("children.$prototype Array → true", () => {
-    expect(isDynamic({ children: { $prototype: "Array" } } as unknown as JxMutableNode)).toBe(true);
+    expect(
+      isDynamic({
+        children: { $prototype: "Array" },
+      } as unknown as JxMutableNode),
+    ).toBe(true);
   });
   test("$ref in non-reserved property → true", () => {
     expect(
@@ -100,7 +108,12 @@ describe("isDynamic", () => {
     expect(isDynamic({ tagName: "span", textContent: "${$count.get()}" })).toBe(true);
   });
   test("${} template string in className property → true", () => {
-    expect(isDynamic({ tagName: "div", className: '${$active.get() ? "on" : "off"}' })).toBe(true);
+    expect(
+      isDynamic({
+        tagName: "div",
+        className: '${$active.get() ? "on" : "off"}',
+      }),
+    ).toBe(true);
   });
 
   // Static checks
@@ -223,22 +236,34 @@ describe("compile — static nodes", () => {
   });
 
   test("custom attributes block — string value", async () => {
-    const { html } = await compile({ tagName: "div", attributes: { "data-id": "abc" } });
+    const { html } = await compile({
+      tagName: "div",
+      attributes: { "data-id": "abc" },
+    });
     expect(html).toContain('data-id="abc"');
   });
 
   test("custom attributes block — number value", async () => {
-    const { html } = await compile({ tagName: "div", attributes: { "data-n": 42 } });
+    const { html } = await compile({
+      tagName: "div",
+      attributes: { "data-n": 42 },
+    });
     expect(html).toContain('data-n="42"');
   });
 
   test("custom attributes block — boolean value", async () => {
-    const { html } = await compile({ tagName: "div", attributes: { "data-flag": true } });
+    const { html } = await compile({
+      tagName: "div",
+      attributes: { "data-flag": true },
+    });
     expect(html).toContain('data-flag="true"');
   });
 
   test("textContent escaped", async () => {
-    const { html } = await compile({ tagName: "p", textContent: '<b>bold</b> & "quotes"' });
+    const { html } = await compile({
+      tagName: "p",
+      textContent: '<b>bold</b> & "quotes"',
+    });
     expect(html).toContain("&lt;b&gt;bold&lt;/b&gt; &amp; &quot;quotes&quot;");
   });
 
@@ -312,7 +337,10 @@ describe("compile — dynamic documents (standard tagName → client target)", (
   });
 
   test("fully static doc has no module files and no importmap", async () => {
-    const { html, files } = await compile({ tagName: "div", textContent: "static" });
+    const { html, files } = await compile({
+      tagName: "div",
+      textContent: "static",
+    });
     expect(files.length).toBe(0);
     expect(html).not.toContain("importmap");
     expect(html).not.toContain('type="module"');
@@ -358,7 +386,10 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 
 describe("compile — dynamic documents (custom element tagName → element target)", () => {
   test("hyphenated tagName routes to element target", async () => {
-    const { html, files } = await compile({ tagName: "my-counter", state: { count: 0 } });
+    const { html, files } = await compile({
+      tagName: "my-counter",
+      state: { count: 0 },
+    });
     expect(html).toContain("importmap");
     expect(html).toContain("@vue/reactivity");
     expect(html).toContain("lit-html");
@@ -439,7 +470,11 @@ describe("compile — CSS extraction", () => {
     const { html } = await compile({
       tagName: "div",
       children: [
-        { tagName: "p", id: "para", style: { ":hover": { textDecoration: "underline" } } },
+        {
+          tagName: "p",
+          id: "para",
+          style: { ":hover": { textDecoration: "underline" } },
+        },
       ],
     });
     expect(html).toContain("#para:hover");
@@ -478,7 +513,11 @@ describe("compile — Class route ($prototype: 'Class')", () => {
           },
         },
         methods: {
-          increment: { role: "method", identifier: "increment", body: "this.count++;" },
+          increment: {
+            role: "method",
+            identifier: "increment",
+            body: "this.count++;",
+          },
         },
       },
     };
@@ -555,7 +594,11 @@ describe("compile — markdown file input", () => {
     const filePath = join(fixDir, "page.md");
     writeFileSync(filePath, "# Hello World\n\nSome paragraph text.\n");
     try {
-      const { html } = await compile(filePath);
+      const { buildProjectFormatRegistry } = await import("../src/site/format-host");
+      const formats = await buildProjectFormatRegistry(fixDir, {
+        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+      });
+      const { html } = await compile(filePath, { formats });
       expect(html).toContain("Hello World");
     } finally {
       rmSync(fixDir, { recursive: true, force: true });
@@ -611,7 +654,11 @@ describe("runCli", () => {
     const outPath = join(fixDir, "index.html");
     writeFileSync(
       srcPath,
-      JSON.stringify({ tagName: "div", state: { $count: 0 }, textContent: "dynamic" }),
+      JSON.stringify({
+        tagName: "div",
+        state: { $count: 0 },
+        textContent: "dynamic",
+      }),
     );
     try {
       await runCli(srcPath, outPath);

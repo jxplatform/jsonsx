@@ -1,6 +1,46 @@
 import { describe, test, expect } from "bun:test";
-import { compileMarkdown } from "../src/targets/compile-markdown";
-import type { JxDocument } from "@jxsuite/schema/types";
+import { serializeJxMarkdown } from "../src/serialize";
+import type { JxDocument, JxElement, JxStateDefinition } from "@jxsuite/schema/types";
+
+// Test-local template hooks mirroring the compiler's shared.ts machinery — the
+// compiler injects its real implementations; these cover the same contract.
+function evaluateTemplate(str: string, scope: Record<string, unknown>) {
+  if (!str.includes("${")) return undefined;
+  try {
+    const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
+    if (singleExprMatch) {
+      const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`);
+      return fn(scope, scope?.$map) ?? str;
+    }
+    const fn = new Function("state", "$map", `return \`${str}\``);
+    return fn(scope, scope?.$map) ?? str;
+  } catch {
+    return str;
+  }
+}
+
+function buildScope(stateDefs: Record<string, JxStateDefinition>) {
+  const scope: Record<string, unknown> = {};
+  for (const [key, def] of Object.entries(stateDefs ?? {})) {
+    if (def && typeof def === "object" && !Array.isArray(def) && "default" in def) {
+      scope[key] = (def as { default: unknown }).default;
+    } else {
+      scope[key] = def;
+    }
+  }
+  return scope;
+}
+
+function compileMarkdown(doc: JxDocument, componentDefs?: Map<string, JxElement>) {
+  return {
+    content: serializeJxMarkdown(doc, {
+      mode: "export",
+      ...(componentDefs && { componentDefs }),
+      evaluateTemplate,
+      buildScope,
+    }),
+  };
+}
 
 // ─── compileMarkdown ────────────────────────────────────────────────────────
 
@@ -68,7 +108,11 @@ describe("compileMarkdown", () => {
         {
           tagName: "p",
           children: [
-            { tagName: "a", attributes: { href: "https://example.com" }, textContent: "Example" },
+            {
+              tagName: "a",
+              attributes: { href: "https://example.com" },
+              textContent: "Example",
+            },
           ],
         },
       ],
@@ -138,7 +182,11 @@ describe("compileMarkdown", () => {
         {
           tagName: "pre",
           children: [
-            { tagName: "code", className: "language-js", textContent: "console.log('hi')" },
+            {
+              tagName: "code",
+              className: "language-js",
+              textContent: "console.log('hi')",
+            },
           ],
         },
       ],
@@ -321,7 +369,12 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with links", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: '<p><a href="https://test.com">Test</a></p>' }],
+      children: [
+        {
+          tagName: "div",
+          innerHTML: '<p><a href="https://test.com">Test</a></p>',
+        },
+      ],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("[Test](https://test.com)");
@@ -329,7 +382,12 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with emphasis/strong", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p><em>italic</em> and <strong>bold</strong></p>" }],
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p><em>italic</em> and <strong>bold</strong></p>",
+        },
+      ],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("*italic*");
@@ -432,7 +490,12 @@ describe("compileMarkdown", () => {
 
   test("decodes HTML entities in innerHTML", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p>&lt;div&gt; &amp; &quot;test&quot;</p>" }],
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p>&lt;div&gt; &amp; &quot;test&quot;</p>",
+        },
+      ],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain('<div> & "test"');
@@ -448,7 +511,12 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with del/s (strikethrough)", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p><del>deleted</del> and <s>struck</s></p>" }],
+      children: [
+        {
+          tagName: "div",
+          innerHTML: "<p><del>deleted</del> and <s>struck</s></p>",
+        },
+      ],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("~~deleted~~");
@@ -466,7 +534,9 @@ describe("compileMarkdown", () => {
 
   test("expands $prototype Array with map template", () => {
     const doc = {
-      state: { items: [{ name: "Apple" }, { name: "Banana" }, { name: "Cherry" }] },
+      state: {
+        items: [{ name: "Apple" }, { name: "Banana" }, { name: "Cherry" }],
+      },
       children: [
         {
           tagName: "ul",
@@ -526,7 +596,12 @@ describe("compileMarkdown", () => {
 
   test("image with title attribute", () => {
     const doc = {
-      children: [{ tagName: "img", attributes: { src: "/img.png", alt: "Alt", title: "Title" } }],
+      children: [
+        {
+          tagName: "img",
+          attributes: { src: "/img.png", alt: "Alt", title: "Title" },
+        },
+      ],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain('![Alt](/img.png "Title")');
@@ -721,7 +796,13 @@ describe("compileMarkdown", () => {
       children: [
         {
           tagName: "pre",
-          children: [{ tagName: "code", className: "language-rust", textContent: "fn main() {}" }],
+          children: [
+            {
+              tagName: "code",
+              className: "language-rust",
+              textContent: "fn main() {}",
+            },
+          ],
         },
       ],
     };
@@ -814,7 +895,12 @@ describe("compileMarkdown", () => {
     ]);
 
     const doc = {
-      children: [{ tagName: "link-card", $props: { url: "https://example.org", label: "Visit" } }],
+      children: [
+        {
+          tagName: "link-card",
+          $props: { url: "https://example.org", label: "Visit" },
+        },
+      ],
     };
 
     const { content } = compileMarkdown(doc, componentDefs);
@@ -1320,7 +1406,10 @@ describe("compileMarkdown", () => {
             {
               tagName: "tr",
               children: [
-                { tagName: "td", children: [{ tagName: "em", textContent: "italic cell" }] },
+                {
+                  tagName: "td",
+                  children: [{ tagName: "em", textContent: "italic cell" }],
+                },
               ],
             },
           ],

@@ -16,8 +16,8 @@
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import { importImplementation } from "./format-host.ts";
 import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 
 /**
@@ -59,7 +59,10 @@ export async function resolvePrototypes(
   doc: JxMutableNode | JxDocument,
   route: { sourcePath?: string; _pathParams?: Record<string, string> },
   projectRoot: string,
-  projectContext: { config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> } = {},
+  projectContext: {
+    config?: Record<string, unknown>;
+    contentTypes?: Map<string, unknown[]>;
+  } = {},
 ) {
   const imports = doc.imports ?? {};
   const state = doc.state;
@@ -83,7 +86,7 @@ export async function resolvePrototypes(
       const resolved = await resolveClassPrototype(def, route, projectRoot, state, projectContext);
       // Preserve timing metadata on the resolved value so compilePage() can strip it
       if (def.timing && resolved && typeof resolved === "object" && !Array.isArray(resolved)) {
-        resolved.timing = def.timing;
+        (resolved as Record<string, unknown>).timing = def.timing;
       }
       state[key] = resolved;
     } catch (err) {
@@ -110,7 +113,10 @@ async function resolveClassPrototype(
   route: { sourcePath?: string; _pathParams?: Record<string, string> },
   projectRoot: string,
   state: Record<string, unknown>,
-  projectContext: { config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> },
+  projectContext: {
+    config?: Record<string, unknown>;
+    contentTypes?: Map<string, unknown[]>;
+  },
 ) {
   const src = def.$src;
 
@@ -136,15 +142,17 @@ async function resolveClassPrototype(
   }
 
   // 3. Resolve $implementation relative to .class.json location
-  const classJsonURL = pathToFileURL(classJsonPath).href;
-  const implURL = new URL(classDef.$implementation, classJsonURL).href;
+  const implPath = resolve(dirname(classJsonPath), classDef.$implementation);
 
-  // 4. Import the module
-  const mod = await import(implURL);
+  // 4. Import the module (tolerates src-vs-dist layouts and .js → .ts under Bun)
+  const mod = await importImplementation(implPath);
 
   // 5. Find the exported class
   const exportName = def.$export ?? classDef.title ?? def.$prototype;
-  const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
+  const ExportedClass = (mod[exportName] ??
+    (mod.default as Record<string, unknown> | undefined)?.[exportName]) as
+    | (new (config: Record<string, unknown>) => { resolve?: () => unknown })
+    | undefined;
   if (!ExportedClass) {
     throw new Error(`Module ${classDef.$implementation} does not export "${exportName}"`);
   }

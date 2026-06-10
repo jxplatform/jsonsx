@@ -25,7 +25,10 @@ import {
 import { test, expect, describe } from "bun:test";
 
 function makeTab(
-  doc: JxMutableNode = { tagName: "div", children: [{ tagName: "p", textContent: "Hello" }] },
+  doc: JxMutableNode = {
+    tagName: "div",
+    children: [{ tagName: "p", textContent: "Hello" }],
+  },
 ) {
   return createTab({ id: "test", document: doc });
 }
@@ -50,7 +53,9 @@ describe("transactDoc", () => {
   test("skipHistory does not push snapshot", () => {
     const tab = makeTab();
 
-    transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }), { skipHistory: true });
+    transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }), {
+      skipHistory: true,
+    });
 
     expect(tab.doc.dirty).toBe(true);
     expect(tab.history.index).toBe(0);

@@ -145,7 +145,10 @@ export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag: string = "div
   if (!node) return;
   const elemPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
-  const wrapper = { tagName: wrapperTag, children: [structuredClone(toRaw(node))] };
+  const wrapper = {
+    tagName: wrapperTag,
+    children: [structuredClone(toRaw(node))],
+  };
   (getNodeAtPath(tab.doc.document, elemPath).children as JxMutableNode[]).splice(idx, 1, wrapper);
   tab.session.selection = [...elemPath, "children", idx];
 }

@@ -44,7 +44,10 @@ describe("injectContext", () => {
 
   test("includes route path params", () => {
     const doc: Record<string, any> = {};
-    const route = { urlPattern: "/blog/:slug", _pathParams: { slug: "hello-world" } };
+    const route = {
+      urlPattern: "/blog/:slug",
+      _pathParams: { slug: "hello-world" },
+    };
     injectContext(doc, baseProject, route);
     expect(doc.state.$page.params).toEqual({ slug: "hello-world" });
   });
@@ -66,22 +69,34 @@ describe("injectContext", () => {
   });
 
   test("merges project $media into page $media", () => {
-    const doc: Record<string, any> = { $media: { "--sm": "(min-width: 640px)" } };
-    const project = { ...baseProject, $media: { "--lg": "(min-width: 1024px)" } };
+    const doc: Record<string, any> = {
+      $media: { "--sm": "(min-width: 640px)" },
+    };
+    const project = {
+      ...baseProject,
+      $media: { "--lg": "(min-width: 1024px)" },
+    };
     injectContext(doc, project, baseRoute);
     expect(doc.$media["--sm"]).toBe("(min-width: 640px)");
     expect(doc.$media["--lg"]).toBe("(min-width: 1024px)");
   });
 
   test("page $media overrides project $media on conflict", () => {
-    const doc: Record<string, any> = { $media: { "--md": "(min-width: 800px)" } };
-    const project = { ...baseProject, $media: { "--md": "(min-width: 768px)" } };
+    const doc: Record<string, any> = {
+      $media: { "--md": "(min-width: 800px)" },
+    };
+    const project = {
+      ...baseProject,
+      $media: { "--md": "(min-width: 768px)" },
+    };
     injectContext(doc, project, baseRoute);
     expect(doc.$media["--md"]).toBe("(min-width: 800px)");
   });
 
   test("merges project imports into page imports", () => {
-    const doc: Record<string, any> = { imports: { MyClass: "./local.class.json" } };
+    const doc: Record<string, any> = {
+      imports: { MyClass: "./local.class.json" },
+    };
     const project = {
       ...baseProject,
       imports: { Parser: "@jxsuite/parser/Parser.class.json" },
@@ -152,7 +167,10 @@ describe("injectContext", () => {
       ...baseProject,
       imports: { Utils: "./lib/utils.class.json" },
     };
-    const route = { urlPattern: "/blog/post", sourcePath: "/project/pages/blog/post.json" };
+    const route = {
+      urlPattern: "/blog/post",
+      sourcePath: "/project/pages/blog/post.json",
+    };
     injectContext(doc, project, route, new Map(), "/project");
     expect(doc.imports.Utils).toContain("utils.class.json");
     expect(doc.imports.Utils).toMatch(/^\.\//);
@@ -175,7 +193,11 @@ describe("injectContext", () => {
         ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
       },
       state: {
-        post: { $prototype: "ContentEntry", contentType: "nonexistent", id: "abc" },
+        post: {
+          $prototype: "ContentEntry",
+          contentType: "nonexistent",
+          id: "abc",
+        },
       },
     };
     const contentTypes = new Map([["posts", [{ id: "x", data: {} }]]]) as any;

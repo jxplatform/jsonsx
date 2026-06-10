@@ -261,8 +261,14 @@ describe("Font option grouping", () => {
 
   test("preset already added as local var is excluded from presets section", () => {
     const fontVars = [
-      { name: "--font-geometric-humanist", value: "Avenir, Montserrat, sans-serif" },
-      { name: "--font-classical-humanist", value: "Optima, Candara, sans-serif" },
+      {
+        name: "--font-geometric-humanist",
+        value: "Avenir, Montserrat, sans-serif",
+      },
+      {
+        name: "--font-classical-humanist",
+        value: "Optima, Candara, sans-serif",
+      },
     ];
     const { localVars, unaddedPresets } = simulateGrouping(fontVars, PRESETS);
     expect(localVars).toEqual(["--font-geometric-humanist", "--font-classical-humanist"]);

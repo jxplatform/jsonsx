@@ -48,7 +48,11 @@ export function showDialog<T>(
 export function showConfirmDialog(
   headline: string,
   message: string | import("lit-html").TemplateResult,
-  opts: { confirmLabel?: string; cancelLabel?: string; destructive?: boolean } = {},
+  opts: {
+    confirmLabel?: string;
+    cancelLabel?: string;
+    destructive?: boolean;
+  } = {},
 ) {
   const { confirmLabel = "Confirm", cancelLabel = "Cancel", destructive = false } = opts;
   return showDialog(

@@ -66,7 +66,12 @@ export function renderUnitSelector(
 
   return html`
     <div class="style-input-number-unit">
-      <div class=${classMap({ "input-group": true, "is-expression": isExpression })}>
+      <div
+        class=${classMap({
+          "input-group": true,
+          "is-expression": isExpression,
+        })}
+      >
         <sp-textfield
           size="s"
           placeholder=${numericPlaceholder}

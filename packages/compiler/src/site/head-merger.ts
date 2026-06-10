@@ -37,7 +37,10 @@ export function mergeHead(
     { tagName: "meta", attributes: { charset: context.charset ?? "utf-8" } },
     {
       tagName: "meta",
-      attributes: { name: "viewport", content: "width=device-width, initial-scale=1" },
+      attributes: {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1",
+      },
     },
   ];
 

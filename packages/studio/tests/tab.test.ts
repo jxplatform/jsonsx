@@ -1,7 +1,10 @@
 import "./with-dom.js";
 import { effect } from "../src/reactivity";
 import { createTab, disposeTab } from "../src/tabs/tab";
+import { seedMarkdownFormat } from "./format-fixture";
 import { test, expect, describe } from "bun:test";
+
+seedMarkdownFormat();
 
 describe("Tab primitive", () => {
   test("createTab returns reactive doc/session/history", () => {

@@ -51,10 +51,13 @@ beforeAll(() => {
     imports: {
       ContentCollection: "@jxsuite/parser/ContentCollection.class.json",
       ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
+      Markdown: "@jxsuite/parser/Markdown.class.json",
+      Csv: "@jxsuite/parser/Csv.class.json",
     },
     contentTypes: {
       blog: {
         source: "./content/blog/",
+        format: "Markdown",
         schema: {
           type: "object",
           properties: {
@@ -357,7 +360,7 @@ describe("$paths expansion", () => {
   it("expands content type-based $paths", async () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const blogRoutes = expanded.filter(
@@ -375,7 +378,7 @@ describe("$paths expansion", () => {
   it("expands explicit values $paths", async () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const langRoutes = expanded.filter((r) => ["/en", "/fr", "/de"].includes(r.urlPattern));
@@ -385,7 +388,7 @@ describe("$paths expansion", () => {
   it("preserves _pathParams on expanded routes", async () => {
     const contentTypes = await loadContentTypes(TMP, getProjectConfig());
     const pagesDir = resolve(TMP, "pages");
-    const routes = discoverPages(pagesDir);
+    const routes = await discoverPages(pagesDir);
     const expanded = await expandDynamicRoutes(routes, TMP, contentTypes);
 
     const hello = expanded.find((r) => r.urlPattern === "/blog/hello-world") as any;
@@ -415,7 +418,10 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/blog", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
-    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
+    await resolvePrototypes(doc, route, TMP, {
+      config: projectConfig,
+      contentTypes,
+    });
 
     expect(Array.isArray(doc.state.posts)).toBe(true);
     expect(doc.state.posts.length).toBe(2); // non-drafts
@@ -443,7 +449,10 @@ describe("$prototype resolution in context-injection", () => {
     };
 
     injectContext(doc, projectConfig, route, contentTypes);
-    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
+    await resolvePrototypes(doc, route, TMP, {
+      config: projectConfig,
+      contentTypes,
+    });
 
     expect(doc.state.post).not.toBeNull();
     expect(doc.state.post.id).toBe("hello-world");
@@ -469,7 +478,10 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/blog/nope", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
-    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
+    await resolvePrototypes(doc, route, TMP, {
+      config: projectConfig,
+      contentTypes,
+    });
 
     expect(doc.state.post).toBeNull();
   });
@@ -491,7 +503,10 @@ describe("$prototype resolution in context-injection", () => {
     const route = { urlPattern: "/", _pathParams: {} };
 
     injectContext(doc, projectConfig, route, contentTypes);
-    await resolvePrototypes(doc, route, TMP, { config: projectConfig, contentTypes });
+    await resolvePrototypes(doc, route, TMP, {
+      config: projectConfig,
+      contentTypes,
+    });
 
     expect(doc.state.items).toEqual([]);
   });
@@ -534,11 +549,16 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
+        imports: { Csv: "@jxsuite/parser/Csv.class.json" },
         contentTypes: {
           items: {
             source: "./content/items/data.csv",
+            format: "Csv",
             schema: {
-              properties: { name: { type: "string" }, desc: { type: "string" } },
+              properties: {
+                name: { type: "string" },
+                desc: { type: "string" },
+              },
               required: ["name"],
             },
           },
@@ -692,9 +712,11 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
+        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
         contentTypes: {
           docs: {
             source: "./content/docs/",
+            format: "Markdown",
             $elements: ["my-widget", { $ref: "./card.json" }],
             schema: { properties: { title: { type: "string" } } },
           },
@@ -730,7 +752,10 @@ describe("content-loader edge cases", () => {
             format: "json",
             schema: {
               required: ["name", "price"],
-              properties: { name: { type: "string" }, price: { type: "number" } },
+              properties: {
+                name: { type: "string" },
+                price: { type: "number" },
+              },
             },
           },
         },
@@ -763,10 +788,14 @@ describe("content-loader edge cases", () => {
       { id: "b", data: { score: 30 }, body: null },
       { id: "c", data: { score: 20 }, body: null },
     ];
-    const ascSorted = queryContentType(entries, { sort: { field: "score", order: "asc" } });
+    const ascSorted = queryContentType(entries, {
+      sort: { field: "score", order: "asc" },
+    });
     expect(ascSorted[0].data.score).toBe(10);
     expect(ascSorted[2].data.score).toBe(30);
-    const descSorted = queryContentType(entries, { sort: { field: "score", order: "desc" } });
+    const descSorted = queryContentType(entries, {
+      sort: { field: "score", order: "desc" },
+    });
     expect(descSorted[0].data.score).toBe(30);
     expect(descSorted[2].data.score).toBe(10);
   });
@@ -776,14 +805,31 @@ describe("content-loader edge cases", () => {
 
 describe("queryContentType — array filter with operators", () => {
   const entries: any[] = [
-    { id: "a", data: { title: "Alpha Guide", score: 10, draft: false, tags: ["web"] }, body: null },
-    { id: "b", data: { title: "Beta Post", score: 25, draft: true, tags: [] }, body: null },
     {
-      id: "c",
-      data: { title: "Gamma Tutorial", score: 15, draft: false, tags: ["api", "web"] },
+      id: "a",
+      data: { title: "Alpha Guide", score: 10, draft: false, tags: ["web"] },
       body: null,
     },
-    { id: "d", data: { title: "", score: 5, draft: false, tags: null }, body: null },
+    {
+      id: "b",
+      data: { title: "Beta Post", score: 25, draft: true, tags: [] },
+      body: null,
+    },
+    {
+      id: "c",
+      data: {
+        title: "Gamma Tutorial",
+        score: 15,
+        draft: false,
+        tags: ["api", "web"],
+      },
+      body: null,
+    },
+    {
+      id: "d",
+      data: { title: "", score: 5, draft: false, tags: null },
+      body: null,
+    },
   ];
 
   it("== operator matches exact values", () => {
@@ -819,43 +865,57 @@ describe("queryContentType — array filter with operators", () => {
   });
 
   it("> operator for numeric comparison", () => {
-    const result = queryContentType(entries, { filter: [{ field: "score", op: ">", value: 10 }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "score", op: ">", value: 10 }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
   });
 
   it("< operator for numeric comparison", () => {
-    const result = queryContentType(entries, { filter: [{ field: "score", op: "<", value: 15 }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "score", op: "<", value: 15 }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
   });
 
   it(">= operator", () => {
-    const result = queryContentType(entries, { filter: [{ field: "score", op: ">=", value: 15 }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "score", op: ">=", value: 15 }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
   });
 
   it("<= operator", () => {
-    const result = queryContentType(entries, { filter: [{ field: "score", op: "<=", value: 10 }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "score", op: "<=", value: 10 }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
   });
 
   it("empty operator detects null/empty string/empty array", () => {
-    const result = queryContentType(entries, { filter: [{ field: "tags", op: "empty" }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "tags", op: "empty" }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["b", "d"]);
   });
 
   it("not empty operator detects non-null/non-empty", () => {
-    const result = queryContentType(entries, { filter: [{ field: "tags", op: "not empty" }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "tags", op: "not empty" }],
+    });
     expect(result.length).toBe(2);
     expect(result.map((e) => e.id).sort()).toEqual(["a", "c"]);
   });
 
   it("empty operator on string field", () => {
-    const result = queryContentType(entries, { filter: [{ field: "title", op: "empty" }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "title", op: "empty" }],
+    });
     expect(result.length).toBe(1);
     expect(result[0].id).toBe("d");
   });
@@ -872,13 +932,17 @@ describe("queryContentType — array filter with operators", () => {
   });
 
   it("field 'id' matches entry.id", () => {
-    const result = queryContentType(entries, { filter: [{ field: "id", op: "==", value: "c" }] });
+    const result = queryContentType(entries, {
+      filter: [{ field: "id", op: "==", value: "c" }],
+    });
     expect(result.length).toBe(1);
     expect(result[0].data.title).toBe("Gamma Tutorial");
   });
 
   it("legacy plain-object filter still works", () => {
-    const result = queryContentType(entries, { filter: { draft: false, score: 10 } });
+    const result = queryContentType(entries, {
+      filter: { draft: false, score: 10 },
+    });
     expect(result.length).toBe(1);
     expect(result[0].id).toBe("a");
   });
@@ -913,13 +977,17 @@ describe("queryContentType — multi-field sort", () => {
   });
 
   it("legacy single-object sort still works", () => {
-    const result = queryContentType(entries, { sort: { field: "title", order: "asc" } });
+    const result = queryContentType(entries, {
+      sort: { field: "title", order: "asc" },
+    });
     expect(result[0].data.title).toBe("Apple");
     expect(result[3].data.title).toBe("Zebra");
   });
 
   it("sorts by id field", () => {
-    const result = queryContentType(entries, { sort: [{ field: "id", order: "desc" }] });
+    const result = queryContentType(entries, {
+      sort: [{ field: "id", order: "desc" }],
+    });
     expect(result.map((e) => e.id)).toEqual(["4", "3", "2", "1"]);
   });
 

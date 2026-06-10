@@ -4,14 +4,23 @@ import { computeDocumentDiff } from "../src/canvas/canvas-diff";
 
 describe("computeDocumentDiff", () => {
   test("identical documents produce empty diff map", () => {
-    const doc = { tagName: "div", children: [{ tagName: "p", textContent: "hello" }] };
+    const doc = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "hello" }],
+    };
     const { byPath } = computeDocumentDiff(doc, doc);
     expect(byPath.size).toBe(0);
   });
 
   test("identical deep documents produce empty diff map", () => {
-    const a = { tagName: "div", children: [{ tagName: "p", textContent: "hello" }] };
-    const b = { tagName: "div", children: [{ tagName: "p", textContent: "hello" }] };
+    const a = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "hello" }],
+    };
+    const b = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "hello" }],
+    };
     const { byPath } = computeDocumentDiff(a, b);
     expect(byPath.size).toBe(0);
   });
@@ -25,27 +34,42 @@ describe("computeDocumentDiff", () => {
 
   test("added child marks child as added", () => {
     const orig = { tagName: "div", children: [] };
-    const curr = { tagName: "div", children: [{ tagName: "p", textContent: "new" }] };
+    const curr = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "new" }],
+    };
     const { byPath } = computeDocumentDiff(orig, curr);
     expect(byPath.get("children/0")).toBe("added");
   });
 
   test("removed child marks child as removed", () => {
-    const orig = { tagName: "div", children: [{ tagName: "p", textContent: "gone" }] };
+    const orig = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "gone" }],
+    };
     const curr = { tagName: "div", children: [] };
     const { byPath } = computeDocumentDiff(orig, curr);
     expect(byPath.get("children/0")).toBe("removed");
   });
 
   test("modified child property marks child as modified", () => {
-    const orig = { tagName: "div", children: [{ tagName: "p", textContent: "old" }] };
-    const curr = { tagName: "div", children: [{ tagName: "p", textContent: "new" }] };
+    const orig = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "old" }],
+    };
+    const curr = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "new" }],
+    };
     const { byPath } = computeDocumentDiff(orig, curr);
     expect(byPath.get("children/0")).toBe("modified");
   });
 
   test("added child propagates modified to parent", () => {
-    const orig = { tagName: "div", children: [{ tagName: "p", textContent: "a" }] };
+    const orig = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "a" }],
+    };
     const curr = {
       tagName: "div",
       children: [
@@ -67,7 +91,10 @@ describe("computeDocumentDiff", () => {
         { tagName: "span", textContent: "b" },
       ],
     };
-    const curr = { tagName: "div", children: [{ tagName: "p", textContent: "a" }] };
+    const curr = {
+      tagName: "div",
+      children: [{ tagName: "p", textContent: "a" }],
+    };
     const { byPath } = computeDocumentDiff(orig, curr);
     expect(byPath.get("children/1")).toBe("removed");
     expect(byPath.get("/")).toBe("modified");
@@ -76,7 +103,12 @@ describe("computeDocumentDiff", () => {
   test("deeply nested change propagates modified upward", () => {
     const orig = {
       tagName: "div",
-      children: [{ tagName: "section", children: [{ tagName: "p", textContent: "old" }] }],
+      children: [
+        {
+          tagName: "section",
+          children: [{ tagName: "p", textContent: "old" }],
+        },
+      ],
     };
     const curr = {
       tagName: "div",

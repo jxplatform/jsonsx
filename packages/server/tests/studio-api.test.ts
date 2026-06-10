@@ -298,7 +298,11 @@ const siblingClassJson = {
   description: "Sibling auto-discovered schema",
   $defs: {
     parameters: {
-      input: { identifier: "input", type: { type: "string" }, description: "Input text" },
+      input: {
+        identifier: "input",
+        type: { type: "string" },
+        description: "Input text",
+      },
     },
   },
 };
@@ -462,7 +466,10 @@ writeFileSync(join(PLAIN_DIR, "readme.txt"), "hello", "utf8");
 // Component fixture inside site project
 writeFileSync(
   join(SITE_PROJECT, "components", "my-card.json"),
-  JSON.stringify({ tagName: "my-card", state: { title: { type: "string", default: "" } } }),
+  JSON.stringify({
+    tagName: "my-card",
+    state: { title: { type: "string", default: "" } },
+  }),
   "utf8",
 );
 
@@ -861,6 +868,16 @@ describe("components — markdown discovery", () => {
   const MD_DIR = join(FIXTURES, "md-components");
   mkdirSync(MD_DIR, { recursive: true });
 
+  // .md discovery requires the Markdown format class in the project imports map
+  writeFileSync(
+    join(MD_DIR, "project.json"),
+    JSON.stringify({
+      name: "MD Components",
+      imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+    }),
+    "utf8",
+  );
+
   // Valid Jx component markdown
   writeFileSync(join(MD_DIR, "my-widget.md"), `---\ntagName: my-widget\n---\n# Widget\n`, "utf8");
 
@@ -932,7 +949,13 @@ describe("components — CEM npm discovery", () => {
               customElement: true,
               tagName: "test-button",
               description: "A test button",
-              attributes: [{ name: "variant", type: { text: "string" }, default: "primary" }],
+              attributes: [
+                {
+                  name: "variant",
+                  type: { text: "string" },
+                  default: "primary",
+                },
+              ],
               members: [{ kind: "field", name: "disabled", privacy: "public" }],
               slots: [{ name: "", description: "Default slot" }],
               events: [{ name: "click" }],
@@ -1046,7 +1069,9 @@ describe("packages/add", () => {
     const req = new Request(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "@nonexistent-scope-xyz/nonexistent-pkg-404" }),
+      body: JSON.stringify({
+        name: "@nonexistent-scope-xyz/nonexistent-pkg-404",
+      }),
     });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(500);
@@ -1171,7 +1196,10 @@ describe("plugin-schema — base resolution", () => {
   });
 
   test("returns error for malformed base URL", async () => {
-    const params = new URLSearchParams({ src: "./Foo.class.json", base: "not-a-url" });
+    const params = new URLSearchParams({
+      src: "./Foo.class.json",
+      base: "not-a-url",
+    });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
     const res = await callApi(req, url, import.meta.dir);
@@ -1261,6 +1289,102 @@ describe("assertAccessible via activeProjectRoot", () => {
 });
 
 // Cleanup
+// ─── format registry endpoints ──────────────────────────────────────────────
+
+describe("format endpoints", () => {
+  const FMT_DIR = join(FIXTURES, "format-project");
+  mkdirSync(FMT_DIR, { recursive: true });
+  writeFileSync(
+    join(FMT_DIR, "project.json"),
+    JSON.stringify({
+      name: "Format Project",
+      imports: {
+        Markdown: "@jxsuite/parser/Markdown.class.json",
+        Csv: "@jxsuite/parser/Csv.class.json",
+      },
+    }),
+    "utf8",
+  );
+
+  test("GET /__studio/formats lists registered format classes", async () => {
+    const url = new URL(`http://localhost/__studio/formats?dir=${FMT_DIR}`);
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FMT_DIR);
+    const data = await res.json();
+    const names = data.formats.map((f: { name: string }) => f.name);
+    expect(names).toEqual(expect.arrayContaining(["Markdown", "Csv"]));
+    const md = data.formats.find((f: { name: string }) => f.name === "Markdown");
+    expect(md.extensions).toEqual([".md"]);
+    expect(md.studio.elements.block).toContain("h1");
+    expect(md.capabilities.parse.timing).toContain("client");
+  });
+
+  test("POST /__studio/format parse dispatches through the format class", async () => {
+    const url = new URL("http://localhost/__studio/format");
+    const req = new Request(url, {
+      method: "POST",
+      body: JSON.stringify({
+        dir: FMT_DIR,
+        format: "Markdown",
+        action: "parse",
+        source: "---\ntitle: Hi\n---\n\n# Hello\n",
+      }),
+    });
+    const res = await callApi(req, url, FMT_DIR);
+    const data = await res.json();
+    expect(data.result.title).toBe("Hi");
+    expect(data.result.children[0].tagName).toBe("h1");
+  });
+
+  test("POST /__studio/format serialize round-trips a document", async () => {
+    const url = new URL("http://localhost/__studio/format");
+    const req = new Request(url, {
+      method: "POST",
+      body: JSON.stringify({
+        dir: FMT_DIR,
+        format: "Markdown",
+        action: "serialize",
+        doc: {
+          title: "Hi",
+          children: [{ tagName: "h1", textContent: "Hello" }],
+        },
+        options: { mode: "roundtrip" },
+      }),
+    });
+    const res = await callApi(req, url, FMT_DIR);
+    const data = await res.json();
+    expect(data.result).toContain("title: Hi");
+    expect(data.result).toContain("# Hello");
+  });
+
+  test("POST /__studio/format rejects unknown formats", async () => {
+    const url = new URL("http://localhost/__studio/format");
+    const req = new Request(url, {
+      method: "POST",
+      body: JSON.stringify({
+        dir: FMT_DIR,
+        format: "Toml",
+        action: "parse",
+        source: "",
+      }),
+    });
+    const res = await callApi(req, url, FMT_DIR);
+    expect(res.status).toBe(404);
+  });
+
+  test("plugin-schema surfaces format, $studio, and capabilities", async () => {
+    const url = new URL(
+      "http://localhost/__studio/plugin-schema?src=@jxsuite/parser/Markdown.class.json&prototype=Markdown",
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FMT_DIR);
+    const data = await res.json();
+    expect(data.schema.format.extensions).toEqual([".md"]);
+    expect(data.schema.$studio.documentMode.default).toBe("content");
+    expect(data.schema.capabilities.serialize.identifier).toBe("serialize");
+  });
+});
+
 process.on("exit", () => {
   try {
     rmSync(FIXTURES, { recursive: true });

@@ -67,7 +67,11 @@ export function injectSSE(html: string) {
 export function createWatcher(
   root: string,
   builds: BuildEntry[],
-  opts: { ignore?: string[]; debounce?: number; reloadOnAnyChange?: boolean } = {},
+  opts: {
+    ignore?: string[];
+    debounce?: number;
+    reloadOnAnyChange?: boolean;
+  } = {},
 ) {
   const ignore = opts.ignore ?? DEFAULT_IGNORE;
   const debounceMs = opts.debounce ?? 50;

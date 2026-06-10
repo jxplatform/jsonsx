@@ -4,6 +4,7 @@
  * These are all side-effect-free functions used by style/properties/events panels.
  */
 
+import { formatByName, defaultContentFormat } from "../format/format-host";
 import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
 
 /**
@@ -155,7 +156,12 @@ export function findContentTypeSchema(
         return { name, schema: def.schema };
       }
     } else {
-      const ext = `.${def.format || "md"}`;
+      const ext =
+        def.format === "json"
+          ? ".json"
+          : (formatByName(def.format)?.extensions[0] ??
+            defaultContentFormat()?.extensions[0] ??
+            ".json");
       if (documentPath.startsWith(src + "/") && documentPath.endsWith(ext)) {
         return { name, schema: def.schema };
       }

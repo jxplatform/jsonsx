@@ -45,9 +45,15 @@ describe("resolveLayout", () => {
       writeLayout("base.json", {
         tagName: "div",
         children: [
-          { tagName: "header", children: [{ tagName: "h1", textContent: "Header" }] },
+          {
+            tagName: "header",
+            children: [{ tagName: "h1", textContent: "Header" }],
+          },
           { tagName: "main", children: [{ tagName: "slot" }] },
-          { tagName: "footer", children: [{ tagName: "p", textContent: "Footer" }] },
+          {
+            tagName: "footer",
+            children: [{ tagName: "p", textContent: "Footer" }],
+          },
         ],
       });
 
@@ -152,7 +158,12 @@ describe("resolveLayout", () => {
       const page = {
         $layout: "./layouts/meta.json",
         title: "About Us",
-        $head: [{ tagName: "meta", attributes: { name: "description", content: "About page" } }],
+        $head: [
+          {
+            tagName: "meta",
+            attributes: { name: "description", content: "About page" },
+          },
+        ],
       };
 
       const result = resolveLayout(page, {}, FIXTURES) as any;

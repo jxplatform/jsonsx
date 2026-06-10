@@ -25,7 +25,11 @@ const FIXTURES = join(import.meta.dir, "_fixtures_git");
 let defaultBranch: string;
 
 function run(args: string[]) {
-  const proc = Bun.spawnSync(args, { cwd: FIXTURES, stdout: "pipe", stderr: "pipe" });
+  const proc = Bun.spawnSync(args, {
+    cwd: FIXTURES,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   if (proc.exitCode !== 0) {
     throw new Error(`${args.join(" ")} failed: ${proc.stderr.toString()}`);
   }

@@ -87,6 +87,8 @@ import {
   classConstructorDefSchema,
   classMethodDefSchema,
   classDefSchema,
+  formatDefSchema,
+  studioHintsSchema,
 } from "../defs/class-def.schema";
 import { contentTypeDefSchema } from "../defs/content-type-def.schema";
 import { imageConfigSchema } from "../defs/image-config.schema";
@@ -305,6 +307,8 @@ export async function generateSchema() {
       ClassFieldDef: classFieldDefSchema,
       ClassConstructorDef: classConstructorDefSchema,
       ClassMethodDef: classMethodDefSchema,
+      FormatDef: formatDefSchema,
+      StudioHints: studioHintsSchema,
       ExternalClassDef: externalClassDefSchema,
       ExpressionPointer: expressionPointerSchema,
       ExpressionLiteral: expressionLiteralSchema,
@@ -431,6 +435,8 @@ export function generateClassSchema() {
         type: "string",
         examples: ["./md.js", "./lib/calculator.js"],
       },
+      format: { $ref: "#/$defs/FormatDef" },
+      $studio: { $ref: "#/$defs/StudioHints" },
       $defs: {
         description: "Class members: parameters, returnTypes, fields, constructor, methods.",
         type: "object",
@@ -465,6 +471,8 @@ export function generateClassSchema() {
       ClassFieldDef: classFieldDefSchema,
       ClassConstructorDef: classConstructorDefSchema,
       ClassMethodDef: classMethodDefSchema,
+      FormatDef: formatDefSchema,
+      StudioHints: studioHintsSchema,
     },
   };
 }
