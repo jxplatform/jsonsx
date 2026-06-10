@@ -129,9 +129,20 @@
         gap: 8px;
       }
       .window-controls.mac sp-action-button {
+        /* explicit min/max needed: as a flex item the button's auto min-width
+           is the inner shadow-DOM button's min-content size (~28px), which
+           would override width and squash the circle into an oval */
         --spectrum-actionbutton-min-width: 12px;
+        --mod-actionbutton-min-width: 12px;
+        --mod-actionbutton-height: 12px;
+        --mod-actionbutton-edge-to-text: 0px;
+        --mod-actionbutton-edge-to-visual-only: 0px;
         width: 12px;
+        min-width: 12px;
+        max-width: 12px;
         height: 12px;
+        min-height: 12px;
+        max-height: 12px;
         border-radius: 50%;
         overflow: hidden;
         border: none;
@@ -159,7 +170,8 @@
       .window-controls.mac:hover sp-action-button sp-icon-close {
         display: inline-flex;
         color: rgba(0, 0, 0, 0.5);
-        font-size: 8px;
+        width: 8px;
+        height: 8px;
       }
       /* Resize edge zones */
       .resize-edge {
