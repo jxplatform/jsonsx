@@ -205,10 +205,24 @@ function coerceCSVRows(
           }
         } else if (def.type === "boolean") {
           data[key] = data[key] === "true";
+        } else if (def.type === "array") {
+          const raw = String(data[key] ?? "").trim();
+          data[key] =
+            raw === ""
+              ? []
+              : raw
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
         }
       }
     }
-    const id = (data.id as string | undefined) ?? (data.sku as string | undefined) ?? String(i);
+    const id =
+      (data.id as string | undefined) ??
+      (data.sku as string | undefined) ??
+      (data.slug as string | undefined) ??
+      (data.Slug as string | undefined) ??
+      String(i);
     return { id, data, body: null };
   });
 }

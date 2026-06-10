@@ -246,9 +246,11 @@ function resolvePathEntries($paths: any, projectRoot: string, contentTypes: Map<
     }
     const param = $paths.param ?? "slug";
     const field = $paths.field ?? "id";
-    return entries.map((entry: ContentLoaderEntry) => ({
-      [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
-    }));
+    return entries
+      .map((entry: ContentLoaderEntry) => ({
+        [param]: field === "id" ? entry.id : (entry.data[field] ?? entry.id),
+      }))
+      .filter((p: Record<string, unknown>) => p[param]);
   }
 
   // Explicit values: { values: ["en", "fr"], param: "lang" }
