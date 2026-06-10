@@ -9,7 +9,6 @@
  */
 
 import {
-  readFileSync,
   writeFileSync,
   copyFileSync,
   mkdirSync,
@@ -20,7 +19,9 @@ import {
 } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { loadProjectConfig } from "./site-loader.ts";
-import { discoverPages, expandDynamicRoutes } from "./pages-discovery.ts";
+import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
+import { buildProjectFormatRegistry } from "./format-host.ts";
+import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
 import { injectContext } from "./context-injection.ts";
@@ -42,9 +43,11 @@ import {
 } from "../shared.ts";
 import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./content-loader.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
-import { compileMarkdown } from "../targets/compile-markdown.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { loadCache, saveCache, getImageCacheDir } from "./image-cache.ts";
+import { compilePagesImageFunction } from "../targets/compile-image-endpoint.ts";
+import type { ImageConfig } from "./image-optimizer.ts";
+import type { ImageMetaCache } from "./image-transform.ts";
 import type {
   JxElement,
   JxMutableNode,
@@ -85,6 +88,16 @@ export async function buildSite(
   const publicDir = resolve(projectRoot, "public");
   const trailingSlash = projectConfig.build.trailingSlash ?? "always";
 
+  // ── 1b. Build the format registry from project imports ─────────────────
+  const formatRegistry = await buildProjectFormatRegistry(projectRoot, projectConfig);
+  if (formatRegistry.entries.length > 0) {
+    log(
+      `  Registered ${formatRegistry.entries.length} format(s): ${formatRegistry.entries
+        .map((e) => e.name)
+        .join(", ")}`,
+    );
+  }
+
   // ── 2. Clean output directory ───────────────────────────────────────────
   if (clean && existsSync(outDir)) {
     rmSync(outDir, { recursive: true, force: true });
@@ -97,12 +110,12 @@ export async function buildSite(
   }
 
   log("Discovering pages...");
-  const staticRoutes = discoverPages(pagesDir);
+  const staticRoutes = await discoverPages(pagesDir, formatRegistry);
   log(`  Found ${staticRoutes.length} page(s)`);
 
   // ── 3b. Load content types ─────────────────────────────────────────────
   log("Loading content types...");
-  const contentTypes = await loadContentTypes(projectRoot, projectConfig);
+  const contentTypes = await loadContentTypes(projectRoot, projectConfig, formatRegistry);
   if (contentTypes.size > 0) {
     log(`  Loaded ${contentTypes.size} content type(s): ${[...contentTypes.keys()].join(", ")}`);
     // Resolve cross-content-type $ref references
@@ -113,7 +126,7 @@ export async function buildSite(
   }
 
   // ── 4. Expand dynamic routes ────────────────────────────────────────────
-  const routes = await expandDynamicRoutes(staticRoutes, projectRoot, contentTypes);
+  const routes = await expandDynamicRoutes(staticRoutes, projectRoot, contentTypes, formatRegistry);
   log(`  ${routes.length} route(s) after expansion`);
 
   let fileCount = 0;
@@ -125,8 +138,9 @@ export async function buildSite(
   const componentDefs: Map<string, JxElement> = new Map(); // tagName → parsed component definition
   if (existsSync(componentsDir)) {
     log("Compiling components...");
-    const componentFiles = readdirSync(componentsDir).filter(
-      (f: string) => f.endsWith(".json") || f.endsWith(".md"),
+    const componentExtensions = [".json", ...formatRegistry.documentExtensions("component")];
+    const componentFiles = readdirSync(componentsDir).filter((f: string) =>
+      componentExtensions.some((ext) => f.endsWith(ext)),
     );
     const componentOutDir = resolve(outDir, "components");
     mkdirSync(componentOutDir, { recursive: true });
@@ -134,7 +148,10 @@ export async function buildSite(
     for (const file of componentFiles) {
       try {
         const componentPath = resolve(componentsDir, file);
-        const result = await compileElement(componentPath, { $media: projectConfig.$media });
+        const result = await compileElement(componentPath, {
+          $media: projectConfig.$media,
+          formats: formatRegistry,
+        });
         for (const f of result.files) {
           const outName = f.path.includes("/") ? (f.path.split("/").pop() as string) : f.path;
           writeFileSync(resolve(componentOutDir, outName), f.content, "utf8");
@@ -143,11 +160,7 @@ export async function buildSite(
         }
 
         // Pre-render component HTML scaffold and CSS sidecar
-        const doc = componentPath.endsWith(".md")
-          ? (await import("@jxsuite/parser/transpile")).transpileJxMarkdown(
-              readFileSync(componentPath, "utf8"),
-            )
-          : JSON.parse(readFileSync(componentPath, "utf8"));
+        const doc = await readPageDocument(componentPath, formatRegistry);
         if (doc.tagName) {
           componentDefs.set(doc.tagName, doc);
           const css = buildComponentCSS(doc.tagName, doc.style, doc, projectConfig.$media ?? {});
@@ -176,14 +189,29 @@ export async function buildSite(
       const entries = collectServerEntries(doc);
       for (const entry of entries) {
         const resolvedSrc = "./components/" + entry.src.replace(/^\.\//, "");
-        siteServerEntries.push({ exportName: entry.exportName, src: resolvedSrc });
+        siteServerEntries.push({
+          exportName: entry.exportName,
+          src: resolvedSrc,
+        });
       }
     }
   }
 
   // ── 6. Compile each route ───────────────────────────────────────────────
 
-  const imageCache = projectConfig.images.optimize ? loadCache(projectRoot) : null;
+  const cfImages = projectConfig.images.optimize && projectConfig.images.service === "cloudflare";
+  const imageCache = projectConfig.images.optimize && !cfImages ? loadCache(projectRoot) : null;
+  /** @type {import("./image-transform.ts").ImageMetaCache | null} */
+  const imageMetaCache = cfImages ? new Map() : null;
+  if (cfImages) {
+    console.log(
+      `images.service is "cloudflare" — ensure your wrangler config declares the Images binding ` +
+        `("images": { "binding": "${projectConfig.images.binding ?? "IMAGES"}" })` +
+        (projectConfig.build.adapter === "cloudflare-workers"
+          ? ` and an assets binding ("assets": { "binding": "ASSETS" }).`
+          : `.`),
+    );
+  }
 
   for (const route of routes) {
     try {
@@ -195,6 +223,8 @@ export async function buildSite(
         contentTypes,
         imageCache,
         componentDefs,
+        imageMetaCache,
+        formatRegistry,
       );
 
       // Determine which component tags are fully static (for script omission)
@@ -219,17 +249,29 @@ export async function buildSite(
       writeFileSync(outPath, result.html, "utf8");
       fileCount++;
 
-      // Write markdown export alongside HTML
-      try {
-        const md = compileMarkdown(result.doc, componentDefs);
-        if (md.content) {
-          const mdPath = outPath.replace(/\.html$/, ".md");
-          writeFileSync(mdPath, md.content, "utf8");
-          fileCount++;
+      // Write serialized export sidecars alongside HTML (formats with exportTarget: true)
+      for (const fmt of formatRegistry.withCapability("serialize")) {
+        if (!fmt.exportTarget) continue;
+        try {
+          const content = (await fmt.call("serialize", result.doc, {
+            mode: "export",
+            componentDefs,
+            evaluateTemplate: (value: string, scope: Record<string, unknown>) => {
+              if (!isTemplateString(value)) return undefined;
+              return evaluateStaticTemplate(value, scope) ?? value;
+            },
+            buildScope: (state: Record<string, JxStateDefinition>) =>
+              buildInitialScope(state, null),
+          })) as string;
+          if (content) {
+            const sidecarPath = outPath.replace(/\.html$/, fmt.extensions[0]);
+            writeFileSync(sidecarPath, content, "utf8");
+            fileCount++;
+          }
+        } catch (e) {
+          const err = e as Error;
+          errors.push(`Error exporting ${fmt.name} for ${route.urlPattern}: ${err.message}`);
         }
-      } catch (e) {
-        const err = e as Error;
-        errors.push(`Error exporting markdown for ${route.urlPattern}: ${err.message}`);
       }
 
       // Write any additional files (island modules, etc.)
@@ -282,6 +324,13 @@ export async function buildSite(
     if (adapter === "cloudflare-pages") {
       const functions = compilePagesFunctions([...deduped.values()]);
 
+      if (cfImages) {
+        functions.set(
+          "functions/_jx/image.js",
+          compilePagesImageFunction(projectConfig.images as ImageConfig),
+        );
+      }
+
       for (const [filePath, source] of functions) {
         const fullPath = resolve(outDir, filePath);
         mkdirSync(resolve(fullPath, ".."), { recursive: true });
@@ -304,7 +353,13 @@ export async function buildSite(
         log(`  Generated ${functions.size} Pages function(s) in dist/functions/`);
       }
     } else {
-      const workerSource = compileSiteServer([...deduped.values()], { adapter });
+      const workerSource = compileSiteServer([...deduped.values()], {
+        adapter,
+        images:
+          cfImages && adapter === "cloudflare-workers"
+            ? (projectConfig.images as ImageConfig)
+            : null,
+      });
 
       if (workerSource) {
         const workerPath = resolve(outDir, "worker.js");
@@ -369,6 +424,7 @@ export async function buildSite(
  * @param {Map<string, ContentLoaderEntry[]>} [contentTypes]
  * @param {import("./image-cache.js").CacheManifest | null} [imageCache]
  * @param {Map<string, JxElement>} [componentDefs]
+ * @param {ImageMetaCache | null} [imageMetaCache] - Set when images.service is "cloudflare"
  * @returns {Promise<{
  *   html: string;
  *   files: { path: string; content: string; tagName?: string }[];
@@ -383,15 +439,11 @@ async function compilePage(
   contentTypes: Map<string, ContentLoaderEntry[]> = new Map(),
   imageCache: import("./image-cache.js").CacheManifest | null = null,
   componentDefs: Map<string, JxElement> = new Map(),
+  imageMetaCache: ImageMetaCache | null = null,
+  formatRegistry?: FormatRegistry,
 ) {
-  // Load the raw page document
-  let pageDoc;
-  if ((route.sourcePath as string).endsWith(".md")) {
-    const { transpileJxMarkdown } = await import("@jxsuite/parser/transpile");
-    pageDoc = transpileJxMarkdown(readFileSync(route.sourcePath as string, "utf8"));
-  } else {
-    pageDoc = JSON.parse(readFileSync(route.sourcePath as string, "utf8"));
-  }
+  // Load the raw page document (.json natively, other formats via the registry)
+  const pageDoc = await readPageDocument(route.sourcePath as string, formatRegistry);
 
   // Resolve layout (wraps page in layout with slot distribution)
   const layoutDoc = resolveLayout(pageDoc, projectConfig, projectRoot);
@@ -472,12 +524,13 @@ async function compilePage(
   }
 
   // Transform <img> nodes for responsive image optimization
-  if (imageCache && projectConfig.images?.optimize) {
+  if (projectConfig.images?.optimize && (imageCache || imageMetaCache)) {
     await transformImageNodes(
       layoutDoc,
-      projectConfig.images as import("./image-optimizer").ImageConfig,
+      projectConfig.images as ImageConfig,
       projectRoot,
       imageCache,
+      imageMetaCache ?? undefined,
     );
   }
 
@@ -496,7 +549,7 @@ async function compilePage(
     (e: JxElement | string) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
   );
   if (npmElements.length > 0) {
-    result.html = injectNpmElementScripts(result.html, /** @type {string[]} */ (npmElements));
+    result.html = injectNpmElementScripts(result.html, /** @type {string[]} */ npmElements);
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
@@ -512,7 +565,12 @@ async function compilePage(
     }
   }
 
-  return { html: result.html, files: result.files, serverHandler, doc: layoutDoc };
+  return {
+    html: result.html,
+    files: result.files,
+    serverHandler,
+    doc: layoutDoc,
+  };
 }
 
 /**
@@ -595,7 +653,7 @@ function expandMapTemplate(template: JxMutableNode, scope: Record<string, unknow
     if (k === "children" && Array.isArray(v)) {
       node.children = v.map((child) => {
         if (typeof child === "string") return child;
-        return expandMapTemplate(/** @type {JxMutableNode} */ (child), scope);
+        return expandMapTemplate(/** @type {JxMutableNode} */ child, scope);
       });
     } else if (k === "style" && v && typeof v === "object") {
       const style = { ...v } as Record<string, unknown>;

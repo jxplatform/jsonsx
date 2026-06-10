@@ -8,7 +8,13 @@
 
 import { existsSync } from "node:fs";
 import { resolve, extname, basename } from "node:path";
-import { processImage, buildSrcset, contentHash, configHash } from "./image-optimizer.ts";
+import {
+  processImage,
+  buildSrcset,
+  contentHash,
+  configHash,
+  getImageMetadata,
+} from "./image-optimizer.ts";
 import { getCached, setCached, getImageCacheDir } from "./image-cache.ts";
 
 import type { ImageConfig } from "./image-optimizer.ts";
@@ -19,6 +25,45 @@ import type { JxDocument } from "@jxsuite/schema/types";
 
 const SKIP_EXTENSIONS = new Set([".svg", ".gif"]);
 const EXTERNAL_PREFIXES = ["http://", "https://", "data:", "//"];
+
+/** Per-build memo of original image dimensions + content hash (cloudflare mode). */
+export type ImageMetaCache = Map<string, { width: number; height: number; hash: string }>;
+
+/**
+ * Resolve original image dimensions and content hash for cloudflare mode. Reads only the image
+ * header via Sharp — no variants are generated.
+ *
+ * @param {string} absoluteSrc
+ * @param {ImageMetaCache} metaCache
+ * @returns {Promise<{ width: number; height: number; hash: string }>}
+ */
+async function resolveCfMeta(absoluteSrc: string, metaCache: ImageMetaCache) {
+  let meta = metaCache.get(absoluteSrc);
+  if (!meta) {
+    const m = await getImageMetadata(absoluteSrc);
+    meta = { width: m.width, height: m.height, hash: contentHash(absoluteSrc) };
+    metaCache.set(absoluteSrc, meta);
+  }
+  return meta;
+}
+
+/**
+ * Build a srcset of `/_jx/image` endpoint URLs for the configured widths that fit within the
+ * original image width. The `v` param carries the content hash for cache busting.
+ *
+ * @param {string} src - Original site-relative src (e.g. "/images/hero.png")
+ * @param {number[]} widths
+ * @param {number} originalWidth
+ * @param {string} hash - 8-char content hash
+ * @returns {string}
+ */
+function buildCloudflareSrcset(src: string, widths: number[], originalWidth: number, hash: string) {
+  return widths
+    .filter((w) => w <= originalWidth)
+    .sort((a, b) => a - b)
+    .map((w) => `/_jx/image?src=${encodeURIComponent(src)}&w=${w}&v=${hash} ${w}w`)
+    .join(", ");
+}
 
 /**
  * @param {string} absoluteSrc
@@ -90,20 +135,23 @@ function resolveImagePath(src: string, projectRoot: string) {
  * @param {JxMutableNode | JxDocument} doc - The Jx document tree (mutated in place)
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {CacheManifest} cache
+ * @param {CacheManifest | null} cache - Variant cache (build mode); unused in cloudflare mode
+ * @param {ImageMetaCache} [metaCache] - Dimension/hash memo (cloudflare mode)
  * @returns {Promise<{ imageRefs: Map<string, ImageManifest> }>}
  */
 export async function transformImageNodes(
   doc: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  cache: CacheManifest,
+  cache: CacheManifest | null,
+  metaCache?: ImageMetaCache,
 ) {
   const imageRefs: Map<string, ImageManifest> = new Map();
 
   if (!config.optimize) return { imageRefs };
 
-  await walkAndTransform(doc, config, projectRoot, cache, imageRefs);
+  const meta = metaCache ?? new Map();
+  await walkAndTransform(doc, config, projectRoot, cache, meta, imageRefs);
 
   return { imageRefs };
 }
@@ -112,20 +160,22 @@ export async function transformImageNodes(
  * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {CacheManifest} cache
+ * @param {CacheManifest | null} cache
+ * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
  */
 async function walkAndTransform(
   node: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  cache: CacheManifest,
+  cache: CacheManifest | null,
+  metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
 ) {
   if (!node || typeof node !== "object") return;
 
   if (node.tagName === "img") {
-    await transformImgNode(node, config, projectRoot, cache, imageRefs);
+    await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs);
   }
 
   if (typeof node.innerHTML === "string" && node.innerHTML.includes("<img")) {
@@ -134,6 +184,7 @@ async function walkAndTransform(
       config,
       projectRoot,
       cache,
+      metaCache,
       imageRefs,
     );
   }
@@ -141,7 +192,7 @@ async function walkAndTransform(
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
       if (typeof child === "string") continue;
-      await walkAndTransform(child, config, projectRoot, cache, imageRefs);
+      await walkAndTransform(child, config, projectRoot, cache, metaCache, imageRefs);
     }
   }
 }
@@ -150,14 +201,16 @@ async function walkAndTransform(
  * @param {JxMutableNode | JxDocument} node
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {CacheManifest} cache
+ * @param {CacheManifest | null} cache
+ * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
  */
 async function transformImgNode(
   node: JxMutableNode | JxDocument,
   config: ImageConfig,
   projectRoot: string,
-  cache: CacheManifest,
+  cache: CacheManifest | null,
+  metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
 ) {
   if (!node.attributes) node.attributes = {};
@@ -169,26 +222,36 @@ async function transformImgNode(
   const absoluteSrc = resolveImagePath(src, projectRoot);
   if (!existsSync(absoluteSrc)) return;
 
-  let manifest = imageRefs.get(absoluteSrc);
+  let srcset;
+  let original: { width: number; height: number } | undefined;
 
-  if (!manifest) {
-    manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache);
-    imageRefs.set(absoluteSrc, manifest);
+  if (config.service === "cloudflare") {
+    const meta = await resolveCfMeta(absoluteSrc, metaCache);
+    srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
+    original = meta;
+  } else {
+    let manifest = imageRefs.get(absoluteSrc);
+
+    if (!manifest) {
+      manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
+      imageRefs.set(absoluteSrc, manifest);
+    }
+
+    const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
+    srcset = buildSrcset(manifest.variants, preferredFormat);
+    original = manifest.original;
   }
-
-  const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
-  const srcset = buildSrcset(manifest.variants, preferredFormat);
 
   if (srcset) {
     node.attributes.srcset = srcset;
     node.attributes.sizes = node.attributes.sizes ?? config.sizes;
   }
 
-  if (!node.attributes.width && manifest.original?.width) {
-    node.attributes.width = String(manifest.original.width);
+  if (!node.attributes.width && original?.width) {
+    node.attributes.width = String(original.width);
   }
-  if (!node.attributes.height && manifest.original?.height) {
-    node.attributes.height = String(manifest.original.height);
+  if (!node.attributes.height && original?.height) {
+    node.attributes.height = String(original.height);
   }
 
   if (config.lazyLoad && node.attributes.loading !== "eager") {
@@ -208,7 +271,8 @@ const DATA_NO_OPT_RE = /\bdata-no-optimize\b/;
  * @param {string} html
  * @param {ImageConfig} config
  * @param {string} projectRoot
- * @param {CacheManifest} cache
+ * @param {CacheManifest | null} cache
+ * @param {ImageMetaCache} metaCache
  * @param {Map<string, ImageManifest>} imageRefs
  * @returns {Promise<string>}
  */
@@ -216,7 +280,8 @@ async function transformInnerHtmlImages(
   html: string,
   config: ImageConfig,
   projectRoot: string,
-  cache: CacheManifest,
+  cache: CacheManifest | null,
+  metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
 ) {
   /** @type {{ match: string; replacement: string }[]} */
@@ -238,22 +303,32 @@ async function transformInnerHtmlImages(
     const absoluteSrc = resolveImagePath(src, projectRoot);
     if (!existsSync(absoluteSrc)) continue;
 
-    let manifest = imageRefs.get(absoluteSrc);
-    if (!manifest) {
-      manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache);
-      imageRefs.set(absoluteSrc, manifest);
-    }
+    let srcset;
+    let original: { width: number; height: number } | undefined;
 
-    const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
-    const srcset = buildSrcset(manifest.variants, preferredFormat);
+    if (config.service === "cloudflare") {
+      const meta = await resolveCfMeta(absoluteSrc, metaCache);
+      srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
+      original = meta;
+    } else {
+      let manifest = imageRefs.get(absoluteSrc);
+      if (!manifest) {
+        manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
+        imageRefs.set(absoluteSrc, manifest);
+      }
+
+      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
+      srcset = buildSrcset(manifest.variants, preferredFormat);
+      original = manifest.original;
+    }
     if (!srcset) continue;
 
     let extra = ` srcset="${srcset}" sizes="${config.sizes}"`;
-    if (!/\bwidth=/.test(attrs) && manifest.original?.width) {
-      extra += ` width="${manifest.original.width}"`;
+    if (!/\bwidth=/.test(attrs) && original?.width) {
+      extra += ` width="${original.width}"`;
     }
-    if (!/\bheight=/.test(attrs) && manifest.original?.height) {
-      extra += ` height="${manifest.original.height}"`;
+    if (!/\bheight=/.test(attrs) && original?.height) {
+      extra += ` height="${original.height}"`;
     }
     if (config.lazyLoad && !/\bloading="eager"/.test(attrs)) {
       if (!/\bloading=/.test(attrs)) extra += ` loading="lazy"`;

@@ -30,6 +30,8 @@ export interface ImageConfig {
   quality: { webp?: number; avif?: number; jpeg?: number; png?: number };
   sizes: string;
   lazyLoad: boolean;
+  service?: "build" | "cloudflare";
+  binding?: string;
 }
 
 let _sharp: typeof import("sharp") | null = null;

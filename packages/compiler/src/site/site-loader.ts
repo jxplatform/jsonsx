@@ -34,6 +34,8 @@ const DEFAULTS = {
     quality: { webp: 80, avif: 65, jpeg: 80, png: 80 },
     sizes: "(max-width: 768px) 100vw, 50vw",
     lazyLoad: true,
+    service: "build",
+    binding: "IMAGES",
   },
   build: {
     outDir: "./dist",
@@ -94,6 +96,23 @@ export function loadProjectConfig(projectRoot: string) {
       `Unknown build adapter "${config.build.adapter}" in project.json. ` +
         `Valid adapters: ${VALID_ADAPTERS.join(", ")}`,
     );
+  }
+
+  // Validate image service
+  const VALID_IMAGE_SERVICES = ["build", "cloudflare"];
+  if (!VALID_IMAGE_SERVICES.includes(config.images.service)) {
+    throw new Error(
+      `Unknown images.service "${config.images.service}" in project.json. ` +
+        `Valid services: ${VALID_IMAGE_SERVICES.join(", ")}`,
+    );
+  }
+  const CF_ADAPTERS = ["cloudflare-workers", "cloudflare-pages"];
+  if (config.images.service === "cloudflare" && !CF_ADAPTERS.includes(config.build.adapter)) {
+    console.warn(
+      `images.service "cloudflare" requires a Cloudflare adapter ` +
+        `(${CF_ADAPTERS.join(", ")}) — falling back to "build"`,
+    );
+    config.images.service = "build";
   }
 
   return {
