@@ -72,7 +72,6 @@ export interface ImageConfig {
   sizes?: string;
   lazyLoad?: boolean;
   service?: "build" | "cloudflare";
-  binding?: string;
   remoteDomains?: string[];
 }
 

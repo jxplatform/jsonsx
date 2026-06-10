@@ -7,7 +7,6 @@
  */
 
 import { existsSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { resolve, extname, basename } from "node:path";
 import {
   processImage,
@@ -49,20 +48,35 @@ async function resolveCfMeta(absoluteSrc: string, metaCache: ImageMetaCache) {
 }
 
 /**
- * Build a srcset of `/_jx/image` endpoint URLs for the configured widths that fit within the
- * original image width. The `v` param carries the content hash for cache busting.
+ * Build a srcset of Cloudflare `/cdn-cgi/image/` transform-via-URL entries for the configured
+ * widths that fit within the original image width. `format=auto` lets Cloudflare negotiate
+ * AVIF/WebP per browser; `fit=scale-down` guards against upscaling. Requires Image Transformations
+ * to be enabled on the serving zone (does not work on *.pages.dev).
  *
- * @param {string} src - Original site-relative src (e.g. "/images/hero.png")
- * @param {number[]} widths
+ * @param {string} src - Site-relative src (e.g. "/images/hero.png") or allowlisted https URL
+ * @param {ImageConfig} config
  * @param {number} originalWidth
- * @param {string} hash - 8-char content hash
+ * @param {string | null} hash - 8-char content hash for cache busting (null for remote sources,
+ *   whose bytes aren't available at build time)
  * @returns {string}
  */
-function buildCloudflareSrcset(src: string, widths: number[], originalWidth: number, hash: string) {
-  return widths
+function buildCloudflareSrcset(
+  src: string,
+  config: ImageConfig,
+  originalWidth: number,
+  hash: string | null,
+) {
+  const quality = config.quality?.webp ?? 80;
+  const separator = src.startsWith("/") ? "" : "/";
+  const suffix = hash ? `?v=${hash}` : "";
+  return config.widths
     .filter((w) => w <= originalWidth)
     .sort((a, b) => a - b)
-    .map((w) => `/_jx/image?src=${encodeURIComponent(src)}&w=${w}&v=${hash} ${w}w`)
+    .map(
+      (w) =>
+        `/cdn-cgi/image/width=${w},quality=${quality},fit=scale-down,format=auto` +
+        `${separator}${src}${suffix} ${w}w`,
+    )
     .join(", ");
 }
 
@@ -113,8 +127,9 @@ function shouldSkip(src: string) {
 /**
  * Check if a remote src is eligible for cloudflare-service optimization: an https URL whose
  * hostname is in the project's `images.remoteDomains` allowlist. Content data (e.g. CSV columns)
- * routinely references externally hosted images — allowlisted hosts flow through the /_jx/image
- * endpoint like local assets; everything else passes through untouched.
+ * routinely references externally hosted images — allowlisted hosts flow through the /cdn-cgi/image
+ * transform URL like local assets; everything else passes through untouched. The zone must permit
+ * resizing from the remote origin (Images → Transformations → Sources).
  *
  * @param {string} src
  * @param {ImageConfig} config
@@ -132,11 +147,6 @@ function isAllowedRemote(src: string, config: ImageConfig) {
   } catch {
     return false;
   }
-}
-
-/** 8-char cache-busting hash for a remote URL (original bytes aren't available at build time). */
-function urlHash(src: string) {
-  return createHash("sha256").update(src).digest("hex").slice(0, 8);
 }
 
 /**
@@ -258,11 +268,11 @@ async function transformImgNode(
 
   if (remote) {
     // Original dimensions are unknown without fetching — emit every configured width and let
-    // the endpoint's scale-down fit avoid upscaling past the source size.
-    srcset = buildCloudflareSrcset(src, config.widths, Infinity, urlHash(src));
+    // fit=scale-down avoid upscaling past the source size.
+    srcset = buildCloudflareSrcset(src, config, Infinity, null);
   } else if (config.service === "cloudflare") {
     const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-    srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
+    srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
     original = meta;
   } else {
     let manifest = imageRefs.get(absoluteSrc as string);
@@ -344,10 +354,10 @@ async function transformInnerHtmlImages(
     let original: { width: number; height: number } | undefined;
 
     if (remote) {
-      srcset = buildCloudflareSrcset(src, config.widths, Infinity, urlHash(src));
+      srcset = buildCloudflareSrcset(src, config, Infinity, null);
     } else if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-      srcset = buildCloudflareSrcset(src, config.widths, meta.width, meta.hash);
+      srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
       original = meta;
     } else {
       let manifest = imageRefs.get(absoluteSrc as string);

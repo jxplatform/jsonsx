@@ -35,7 +35,6 @@ const DEFAULTS = {
     sizes: "(max-width: 768px) 100vw, 50vw",
     lazyLoad: true,
     service: "build",
-    binding: "IMAGES",
   },
   build: {
     outDir: "./dist",
@@ -98,21 +97,14 @@ export function loadProjectConfig(projectRoot: string) {
     );
   }
 
-  // Validate image service
+  // Validate image service. The "cloudflare" service emits /cdn-cgi/image transform URLs,
+  // which work on any zone served through Cloudflare regardless of the build adapter.
   const VALID_IMAGE_SERVICES = ["build", "cloudflare"];
   if (!VALID_IMAGE_SERVICES.includes(config.images.service)) {
     throw new Error(
       `Unknown images.service "${config.images.service}" in project.json. ` +
         `Valid services: ${VALID_IMAGE_SERVICES.join(", ")}`,
     );
-  }
-  const CF_ADAPTERS = ["cloudflare-workers", "cloudflare-pages"];
-  if (config.images.service === "cloudflare" && !CF_ADAPTERS.includes(config.build.adapter)) {
-    console.warn(
-      `images.service "cloudflare" requires a Cloudflare adapter ` +
-        `(${CF_ADAPTERS.join(", ")}) — falling back to "build"`,
-    );
-    config.images.service = "build";
   }
 
   return {

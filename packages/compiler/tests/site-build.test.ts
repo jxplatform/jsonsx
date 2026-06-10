@@ -401,33 +401,27 @@ describe("buildSite — cloudflare-pages adapter", () => {
     rmSync(PAGES_TMP, { recursive: true, force: true });
   });
 
-  it("generates Pages function files instead of worker.js", async () => {
+  it("generates an advanced-mode _worker.js instead of worker.js", async () => {
     await buildSite(PAGES_TMP, { verbose: false });
 
-    const workerPath = resolve(PAGES_TMP, "dist/worker.js");
-    expect(existsSync(workerPath)).toBe(false);
+    expect(existsSync(resolve(PAGES_TMP, "dist/worker.js"))).toBe(false);
+    expect(existsSync(resolve(PAGES_TMP, "dist/functions"))).toBe(false);
 
-    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
-    expect(existsSync(fnPath)).toBe(true);
+    const workerPath = resolve(PAGES_TMP, "dist/_worker.js");
+    expect(existsSync(workerPath)).toBe(true);
+
+    const content = readFileSync(workerPath, "utf8");
+    expect(content).toContain("app.post('/_jx/server/sendMail'");
+    expect(content).toContain("sendMail(args, c.env)");
+    // Advanced mode intercepts all requests — unmatched paths fall through to assets
+    expect(content).toContain("c.env.ASSETS.fetch(c.req.raw)");
   });
 
-  it("generates valid Pages function with onRequestPost", async () => {
+  it("limits worker invocation to /_jx/* via _routes.json", async () => {
     await buildSite(PAGES_TMP, { verbose: false });
 
-    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
-    const content = readFileSync(fnPath, "utf8");
-    expect(content).toContain("export async function onRequestPost(context)");
-    expect(content).toContain("sendMail(args, context.env)");
-    expect(content).toContain("Response.json");
-  });
-
-  it("does not use Hono in Pages functions", async () => {
-    await buildSite(PAGES_TMP, { verbose: false });
-
-    const fnPath = resolve(PAGES_TMP, "dist/functions/_jx/server/sendMail.js");
-    const content = readFileSync(fnPath, "utf8");
-    expect(content).not.toContain("Hono");
-    expect(content).not.toContain("ASSETS.fetch");
+    const routes = JSON.parse(readFileSync(resolve(PAGES_TMP, "dist/_routes.json"), "utf8"));
+    expect(routes).toEqual({ version: 1, include: ["/_jx/*"], exclude: [] });
   });
 
   it("copies server source files into dist/components/", async () => {
@@ -488,36 +482,35 @@ describe("buildSite — cloudflare images service", () => {
     rmSync(CF_IMG_TMP, { recursive: true, force: true });
   });
 
-  it("rewrites img srcset to /_jx/image and emits the Pages function without Sharp variants", async () => {
+  it("rewrites img srcset to /cdn-cgi/image transform URLs without Sharp variants", async () => {
     await setupProject("cloudflare-pages");
     await buildSite(CF_IMG_TMP, { verbose: false });
 
     const html = readFileSync(resolve(CF_IMG_TMP, "dist/index.html"), "utf8");
-    expect(html).toContain("/_jx/image?src=%2Fimages%2Fhero.png&amp;w=640");
+    expect(html).toContain(
+      "/cdn-cgi/image/width=640,quality=80,fit=scale-down,format=auto/images/hero.png",
+    );
     expect(html).toContain('src="/images/hero.png"');
 
-    // Pages function emitted even with zero server entries
-    const fnPath = resolve(CF_IMG_TMP, "dist/functions/_jx/image.js");
-    expect(existsSync(fnPath)).toBe(true);
-    const fn = readFileSync(fnPath, "utf8");
-    expect(fn).toContain("export async function onRequestGet(context)");
-    expect(fn).toContain("IMAGES");
+    // No deployed code is needed — a static-only Pages site gets no worker or functions
+    expect(existsSync(resolve(CF_IMG_TMP, "dist/_worker.js"))).toBe(false);
+    expect(existsSync(resolve(CF_IMG_TMP, "dist/functions"))).toBe(false);
 
     // Sharp variant pipeline skipped entirely
     expect(existsSync(resolve(CF_IMG_TMP, "dist/images/_optimized"))).toBe(false);
     expect(existsSync(resolve(CF_IMG_TMP, ".cache/images/_optimized"))).toBe(false);
   });
 
-  it("embeds the image route in worker.js before the ASSETS catch-all", async () => {
+  it("works identically under the workers adapter", async () => {
     await setupProject("cloudflare-workers");
     await buildSite(CF_IMG_TMP, { verbose: false });
 
+    const html = readFileSync(resolve(CF_IMG_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain("/cdn-cgi/image/width=640,");
+
+    // The worker is still emitted (wrangler "main" requires it) but carries no image code
     const worker = readFileSync(resolve(CF_IMG_TMP, "dist/worker.js"), "utf8");
-    const imageRoute = worker.indexOf("app.get('/_jx/image'");
-    const catchAll = worker.indexOf("app.all('*'");
-    expect(imageRoute).toBeGreaterThan(-1);
-    expect(catchAll).toBeGreaterThan(-1);
-    expect(imageRoute).toBeLessThan(catchAll);
+    expect(worker).not.toContain("/_jx/image");
   });
 });
 

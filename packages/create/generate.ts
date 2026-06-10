@@ -58,8 +58,7 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
 }
 
 /**
- * Build a wrangler.jsonc for Cloudflare adapters. Includes the Images binding so `images.service:
- * "cloudflare"` works out of the box.
+ * Build a wrangler.jsonc for Cloudflare adapters.
  *
  * @param {{ slug: string; adapter: string }} opts
  */
@@ -73,13 +72,11 @@ function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }
           main: "./dist/worker.js",
           compatibility_date: compatibilityDate,
           assets: { directory: "./dist", binding: "ASSETS" },
-          images: { binding: "IMAGES" },
         }
       : {
           name: slug,
           compatibility_date: compatibilityDate,
           pages_build_output_dir: "./dist",
-          images: { binding: "IMAGES" },
         };
 
   return JSON.stringify(config, null, "\t") + "\n";

@@ -20,7 +20,7 @@ describe("generateProject — wrangler.jsonc", () => {
     expect(pkg.scripts.deploy).toBeUndefined();
   });
 
-  test("cloudflare-pages emits wrangler.jsonc with the Images binding", async () => {
+  test("cloudflare-pages emits wrangler.jsonc", async () => {
     await generateProject(TMP, {
       name: "My Site",
       adapter: "cloudflare-pages",
@@ -29,7 +29,6 @@ describe("generateProject — wrangler.jsonc", () => {
     const wrangler = JSON.parse(readFileSync(join(TMP, "wrangler.jsonc"), "utf8"));
     expect(wrangler.name).toBe("my-site");
     expect(wrangler.pages_build_output_dir).toBe("./dist");
-    expect(wrangler.images).toEqual({ binding: "IMAGES" });
     expect(wrangler.compatibility_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
@@ -37,7 +36,7 @@ describe("generateProject — wrangler.jsonc", () => {
     expect(pkg.scripts.deploy).toBe("wrangler pages deploy dist");
   });
 
-  test("cloudflare-workers emits wrangler.jsonc with assets and Images bindings", async () => {
+  test("cloudflare-workers emits wrangler.jsonc with an assets binding", async () => {
     await generateProject(TMP, {
       name: "My Site",
       adapter: "cloudflare-workers",
@@ -46,7 +45,6 @@ describe("generateProject — wrangler.jsonc", () => {
     const wrangler = JSON.parse(readFileSync(join(TMP, "wrangler.jsonc"), "utf8"));
     expect(wrangler.main).toBe("./dist/worker.js");
     expect(wrangler.assets).toEqual({ directory: "./dist", binding: "ASSETS" });
-    expect(wrangler.images).toEqual({ binding: "IMAGES" });
 
     const pkg = JSON.parse(readFileSync(join(TMP, "package.json"), "utf8"));
     expect(pkg.devDependencies.wrangler).toBe("^4");

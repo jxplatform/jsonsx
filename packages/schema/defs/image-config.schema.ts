@@ -16,13 +16,19 @@ export const imageConfigSchema = {
     },
     sizes: { type: "string" },
     lazyLoad: { type: "boolean" },
-    service: { type: "string", enum: ["build", "cloudflare"] },
-    binding: { type: "string" },
+    service: {
+      description:
+        'How images are optimized: "build" runs Sharp at build time; "cloudflare" emits ' +
+        "/cdn-cgi/image transform URLs served by Cloudflare Image Transformations (requires " +
+        "the feature to be enabled on the serving zone).",
+      type: "string",
+      enum: ["build", "cloudflare"],
+    },
     remoteDomains: {
       description:
-        "Hostnames whose remote (https) images are optimized through the /_jx/image endpoint " +
-        '(cloudflare service only), e.g. ["drive.usercontent.google.com"]. Remote sources from ' +
-        "other hosts are left untouched.",
+        "Hostnames whose remote (https) images are optimized through /cdn-cgi/image transform " +
+        'URLs (cloudflare service only), e.g. ["drive.usercontent.google.com"]. Remote sources ' +
+        "from other hosts are left untouched.",
       type: "array",
       items: { type: "string" },
     },

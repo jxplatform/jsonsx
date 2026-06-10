@@ -22,11 +22,7 @@ import {
   DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
 } from "./shared.ts";
-import {
-  compileServer,
-  compileSiteServer,
-  compilePagesFunctions,
-} from "./targets/compile-server.ts";
+import { compileServer, compileSiteServer } from "./targets/compile-server.ts";
 
 import {
   compileElement,
@@ -42,7 +38,6 @@ export {
   isDynamic,
   compileServer,
   compileSiteServer,
-  compilePagesFunctions,
   compileElement,
   compileElementPage,
   compileClient,

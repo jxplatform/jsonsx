@@ -31,11 +31,10 @@ export interface ImageConfig {
   sizes: string;
   lazyLoad: boolean;
   service?: "build" | "cloudflare";
-  binding?: string;
   /**
    * Hostnames whose remote (https) images are routed through the optimization pipeline. Cloudflare
-   * service only — the generated /_jx/image endpoint fetches and transforms allowlisted remote
-   * sources; everything else is rejected to prevent open-proxy use.
+   * service only — allowlisted remote sources get /cdn-cgi/image transform srcsets (the zone must
+   * permit resizing from the remote origin); everything else is left untouched.
    */
   remoteDomains?: string[];
 }

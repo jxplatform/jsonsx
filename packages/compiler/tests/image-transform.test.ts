@@ -489,7 +489,7 @@ describe("image-transform", () => {
       });
     });
 
-    test("builds srcset of /_jx/image endpoint URLs without calling processImage", async () => {
+    test("builds srcset of /cdn-cgi/image transform URLs without calling processImage", async () => {
       const doc: any = {
         tagName: "img",
         attributes: { src: "/images/hero.png" },
@@ -498,8 +498,8 @@ describe("image-transform", () => {
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
       expect(doc.attributes.srcset).toBe(
-        "/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=abcd1234 640w, " +
-          "/_jx/image?src=%2Fimages%2Fhero.png&w=1200&v=abcd1234 1200w",
+        "/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234 640w, " +
+          "/cdn-cgi/image/width=1200,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234 1200w",
       );
       expect(doc.attributes.src).toBe("/images/hero.png");
       expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
@@ -525,7 +525,7 @@ describe("image-transform", () => {
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
       expect(doc.attributes.srcset).toBe(
-        "/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=abcd1234 640w",
+        "/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234 640w",
       );
     });
 
@@ -562,8 +562,8 @@ describe("image-transform", () => {
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
       expect(getImageMetadata).toHaveBeenCalledTimes(1);
-      expect(doc.children[0].attributes.srcset).toContain("/_jx/image?src=");
-      expect(doc.children[1].attributes.srcset).toContain("/_jx/image?src=");
+      expect(doc.children[0].attributes.srcset).toContain("/cdn-cgi/image/width=");
+      expect(doc.children[1].attributes.srcset).toContain("/cdn-cgi/image/width=");
     });
 
     test("shares the metadata cache across calls when provided", async () => {
@@ -583,7 +583,7 @@ describe("image-transform", () => {
       expect(getImageMetadata).toHaveBeenCalledTimes(1);
     });
 
-    test("rewrites innerHTML img tags to endpoint URLs", async () => {
+    test("rewrites innerHTML img tags to transform URLs", async () => {
       const doc: any = {
         tagName: "div",
         innerHTML: '<img src="/images/hero.png" alt="Hero">',
@@ -591,7 +591,9 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
-      expect(doc.innerHTML).toContain('srcset="/_jx/image?src=%2Fimages%2Fhero.png&w=640');
+      expect(doc.innerHTML).toContain(
+        'srcset="/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234',
+      );
       expect(doc.innerHTML).toContain('src="/images/hero.png"');
       expect(doc.innerHTML).toContain('width="1200"');
       expect(doc.innerHTML).toContain('height="800"');
@@ -617,13 +619,12 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, config, TMP, null, new Map());
 
-      const encoded = encodeURIComponent(remoteSrc);
-      expect(doc.attributes.srcset).toMatch(
-        new RegExp(
-          `^/_jx/image\\?src=${encoded.replace(/[.*+?^$()[\\]{}|]/g, "\\$&")}&w=640&v=[0-9a-f]{8} 640w, `,
-        ),
+      // Remote sources go in as the full URL after the options segment, with no cache-busting
+      // hash (original bytes aren't available at build time)
+      expect(doc.attributes.srcset).toBe(
+        `/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/${remoteSrc} 640w, ` +
+          `/cdn-cgi/image/width=1200,quality=75,fit=scale-down,format=auto/${remoteSrc} 1200w`,
       );
-      expect(doc.attributes.srcset).toContain("&w=1200&v=");
       expect(doc.attributes.src).toBe(remoteSrc);
       expect(doc.attributes.sizes).toBe("(max-width: 768px) 100vw, 50vw");
       // Original dimensions are unknown for remote sources — no width/height injection
@@ -688,9 +689,11 @@ describe("image-transform", () => {
 
       await transformImageNodes(doc, config, TMP, null, new Map());
 
-      // The decoded URL is percent-encoded into the endpoint src param
-      expect(doc.innerHTML).toContain('srcset="/_jx/image?src=');
-      expect(doc.innerHTML).toContain(encodeURIComponent("id=abc&export=download"));
+      // The entity-decoded URL is appended after the transform options segment
+      expect(doc.innerHTML).toContain('srcset="/cdn-cgi/image/width=640,quality=75,');
+      expect(doc.innerHTML).toContain(
+        "format=auto/https://drive.usercontent.google.com/download?id=abc&export=download/p.jpg 640w",
+      );
       expect(doc.innerHTML).toContain('loading="lazy"');
     });
 

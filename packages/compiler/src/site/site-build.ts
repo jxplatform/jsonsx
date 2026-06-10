@@ -25,7 +25,7 @@ import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import { resolveLayout } from "./layout-resolver.ts";
 import { mergeHead, renderHead } from "./head-merger.ts";
 import { injectContext } from "./context-injection.ts";
-import { compile, compileServer, compileSiteServer, compilePagesFunctions } from "../compiler.ts";
+import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
 import {
   buildInitialScope,
@@ -45,7 +45,6 @@ import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./c
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
 import { loadCache, saveCache, getImageCacheDir } from "./image-cache.ts";
-import { compilePagesImageFunction } from "../targets/compile-image-endpoint.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageMetaCache } from "./image-transform.ts";
 import type {
@@ -205,11 +204,9 @@ export async function buildSite(
   const imageMetaCache = cfImages ? new Map() : null;
   if (cfImages) {
     console.log(
-      `images.service is "cloudflare" — ensure your wrangler config declares the Images binding ` +
-        `("images": { "binding": "${projectConfig.images.binding ?? "IMAGES"}" })` +
-        (projectConfig.build.adapter === "cloudflare-workers"
-          ? ` and an assets binding ("assets": { "binding": "ASSETS" }).`
-          : `.`),
+      `images.service is "cloudflare" — srcsets use /cdn-cgi/image transform URLs. ` +
+        `Ensure Image Transformations are enabled for your zone (Cloudflare dashboard → ` +
+        `Images → Transformations); these URLs do not work on *.pages.dev / *.workers.dev previews.`,
     );
   }
 
@@ -321,24 +318,29 @@ export async function buildSite(
       if (!deduped.has(entry.exportName)) deduped.set(entry.exportName, entry);
     }
 
-    if (adapter === "cloudflare-pages") {
-      const functions = compilePagesFunctions([...deduped.values()]);
+    // Cloudflare Pages uses advanced mode (_worker.js inside the build output) — the
+    // functions/ directory convention only works from the project root, not from dist/.
+    // A static-only Pages site needs no worker at all.
+    const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0;
+    const workerSource = skipWorker ? null : compileSiteServer([...deduped.values()], { adapter });
 
-      if (cfImages) {
-        functions.set(
-          "functions/_jx/image.js",
-          compilePagesImageFunction(projectConfig.images as ImageConfig),
+    if (workerSource) {
+      const workerName = adapter === "cloudflare-pages" ? "_worker.js" : "worker.js";
+      writeFileSync(resolve(outDir, workerName), workerSource, "utf8");
+      fileCount++;
+      log(`  Generated dist/${workerName} (${deduped.size} server function(s))`);
+
+      if (adapter === "cloudflare-pages") {
+        // Only invoke the worker for server routes; everything else stays static.
+        writeFileSync(
+          resolve(outDir, "_routes.json"),
+          JSON.stringify({ version: 1, include: ["/_jx/*"], exclude: [] }, null, 2) + "\n",
+          "utf8",
         );
-      }
-
-      for (const [filePath, source] of functions) {
-        const fullPath = resolve(outDir, filePath);
-        mkdirSync(resolve(fullPath, ".."), { recursive: true });
-        writeFileSync(fullPath, source, "utf8");
         fileCount++;
       }
 
-      // Copy server source files so function imports resolve
+      // Copy server source files into dist/components/ so worker imports resolve
       const distComponentsDir = resolve(outDir, "components");
       mkdirSync(distComponentsDir, { recursive: true });
       for (const { src } of deduped.values()) {
@@ -346,35 +348,6 @@ export async function buildSite(
         const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
         if (existsSync(srcFile)) {
           copyFileSync(srcFile, destFile);
-        }
-      }
-
-      if (functions.size > 0) {
-        log(`  Generated ${functions.size} Pages function(s) in dist/functions/`);
-      }
-    } else {
-      const workerSource = compileSiteServer([...deduped.values()], {
-        adapter,
-        images:
-          cfImages && adapter === "cloudflare-workers"
-            ? (projectConfig.images as ImageConfig)
-            : null,
-      });
-
-      if (workerSource) {
-        const workerPath = resolve(outDir, "worker.js");
-        writeFileSync(workerPath, workerSource, "utf8");
-        fileCount++;
-        log(`  Generated dist/worker.js (${deduped.size} server function(s))`);
-
-        // Copy server source files into dist/components/ so worker imports resolve
-        const distComponentsDir = resolve(outDir, "components");
-        for (const { src } of deduped.values()) {
-          const srcFile = resolve(projectRoot, src.replace(/^\.\//, ""));
-          const destFile = resolve(distComponentsDir, src.replace(/^\.\/components\//, ""));
-          if (existsSync(srcFile)) {
-            copyFileSync(srcFile, destFile);
-          }
         }
       }
     }
