@@ -978,22 +978,21 @@ Image optimization is configured in `project.json` under the `images` key. All p
     "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
     "sizes": "(max-width: 768px) 100vw, 50vw",
     "lazyLoad": true,
-    "service": "build",
-    "binding": "IMAGES"
+    "service": "build"
   }
 }
 ```
 
-| Property   | Type       | Default                                     | Description                                                                                                         |
-| ---------- | ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `optimize` | `boolean`  | `true`                                      | Master switch — set to `false` to disable all image processing                                                      |
-| `widths`   | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                                                                       |
-| `formats`  | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`)                                                                    |
-| `quality`  | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100)                                                                              |
-| `sizes`    | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints                                                                  |
-| `lazyLoad` | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                                                        |
-| `service`  | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = runtime transforms via the Cloudflare Images binding (see §9.2.6) |
-| `binding`  | `string`   | `"IMAGES"`                                  | Cloudflare Images binding name (only used when `service` is `"cloudflare"`)                                         |
+| Property        | Type       | Default                                     | Description                                                                                                         |
+| --------------- | ---------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `optimize`      | `boolean`  | `true`                                      | Master switch — set to `false` to disable all image processing                                                      |
+| `widths`        | `number[]` | `[320, 640, 960, 1280, 1920]`               | Pixel widths for responsive `srcset` variants                                                                       |
+| `formats`       | `string[]` | `["webp", "avif"]`                          | Output formats (also supports `"jpeg"`, `"png"`) — `"build"` service only                                           |
+| `quality`       | `object`   | `{ webp: 80, avif: 65, jpeg: 80, png: 80 }` | Per-format compression quality (0–100); the `"cloudflare"` service uses the `webp` value as its single quality      |
+| `sizes`         | `string`   | `"(max-width: 768px) 100vw, 50vw"`          | Default CSS `sizes` attribute for responsive hints                                                                  |
+| `lazyLoad`      | `boolean`  | `true`                                      | Adds `loading="lazy"` and `decoding="async"` to `<img>` tags                                                        |
+| `service`       | `string`   | `"build"`                                   | `"build"` = Sharp at build time; `"cloudflare"` = `/cdn-cgi/image` transform URLs served by Cloudflare (see §9.2.6) |
+| `remoteDomains` | `string[]` | `[]`                                        | Hostnames whose remote (https) images get transform srcsets — `"cloudflare"` service only (see §9.2.6)              |
 
 #### 9.2.2 Build-Time Behavior
 
