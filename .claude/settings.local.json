@@ -1,6 +1,19 @@
 {
-  "enableWorkflows": true,
   "permissions": {
-    "allow": ["Edit", "Write", "Bash(*)"]
-  }
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(*)",
+      "mcp__chrome-devtools-nixos__list_pages",
+      "mcp__chrome-devtools-nixos__new_page",
+      "mcp__chrome-devtools-nixos__take_screenshot",
+      "mcp__chrome-devtools-nixos__navigate_page",
+      "mcp__chrome-devtools-nixos__resize_page",
+      "mcp__chrome-devtools-nixos__evaluate_script",
+      "mcp__chrome-devtools-nixos__take_snapshot",
+      "mcp__chrome-devtools-nixos__drag",
+      "mcp__chrome-devtools-nixos__list_console_messages"
+    ]
+  },
+  "enableWorkflows": true
 }

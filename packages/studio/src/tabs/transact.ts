@@ -100,6 +100,7 @@ export function mutateInsertNode(
   nodeDef: JxMutableNode,
 ) {
   const parent = getNodeAtPath(tab.doc.document, parentPath);
+  if (!parent) return;
   if (!parent.children) parent.children = [];
   parent.children.splice(index, 0, structuredClone(nodeDef));
 }
@@ -159,9 +160,12 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
   const doc = tab.doc.document;
   const fromParentPath = parentElementPath(fromPath) as JxPath;
   const fromIdx = childIndex(fromPath) as number;
+  if (!fromParentPath || typeof fromIdx !== "number") return;
   const fromParent = getNodeAtPath(doc, fromParentPath);
-  const [node] = (fromParent.children as JxMutableNode[]).splice(fromIdx, 1);
   const toParent = getNodeAtPath(doc, toParentPath);
+  if (!fromParent || !Array.isArray(fromParent.children) || !toParent) return;
+  const [node] = (fromParent.children as JxMutableNode[]).splice(fromIdx, 1);
+  if (node === undefined) return;
   if (!toParent.children) toParent.children = [];
   let adjustedIndex = toIndex;
   if (fromParent === toParent && fromIdx < toIndex) adjustedIndex--;

@@ -197,6 +197,51 @@ describe("mutateMoveNode", () => {
     expect((tab.doc.document as any).children[0].children[0].textContent).toBe("move me");
     disposeTab(tab);
   });
+
+  test("out-of-range source index is a no-op (no undefined inserted)", () => {
+    const tab = makeTab();
+    transactDoc(tab, (t) => mutateMoveNode(t, ["children", 5], [], 0));
+    expect(tab.doc.document.children).toHaveLength(1);
+    expect((tab.doc.document as any).children[0]).toBeDefined();
+    expect((tab.doc.document as any).children[0].tagName).toBe("p");
+    disposeTab(tab);
+  });
+
+  test("non-numeric source index is a no-op", () => {
+    const tab = makeTab();
+    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    transactDoc(tab, (t) => mutateMoveNode(t, ["children"], [], 0));
+    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    disposeTab(tab);
+  });
+
+  test("missing source parent is a no-op", () => {
+    const tab = makeTab();
+    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    transactDoc(tab, (t) => mutateMoveNode(t, ["children", 3, "children", 0], [], 0));
+    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    disposeTab(tab);
+  });
+
+  test("move within same parent adjusts index", () => {
+    const doc = {
+      tagName: "div",
+      children: [
+        { tagName: "p", textContent: "a" },
+        { tagName: "p", textContent: "b" },
+        { tagName: "p", textContent: "c" },
+      ],
+    };
+    const tab = makeTab(doc);
+    // Move "a" below "c" (insert index 3, adjusted to 2 after removal)
+    transactDoc(tab, (t) => mutateMoveNode(t, ["children", 0], [], 3));
+    expect((tab.doc.document as any).children.map((c: any) => c.textContent)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+    disposeTab(tab);
+  });
 });
 
 describe("mutateUpdateProperty", () => {

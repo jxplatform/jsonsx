@@ -4,7 +4,7 @@
       "args": ["chrome-devtools-mcp"],
       "command": "bunx"
     },
-    "chrome-devtools-devenv": {
+    "chrome-devtools-nixos": {
       "args": ["chrome-devtools-mcp", "--browserUrl=http://127.0.0.1:9222"],
       "command": "bunx"
     },

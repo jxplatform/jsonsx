@@ -42,6 +42,21 @@ export function registerPanelDnD(panel: CanvasPanel) {
   const { canvas, dropLine } = panel;
   const allEls = canvas.querySelectorAll("*");
 
+  // Drop-target callbacks fire on EVERY target in the stack (innermost → outermost),
+  // and every canvas element is a drop target — so the indicator and the drop are
+  // driven from the monitor using only the innermost target.
+  /** Innermost drop target if it belongs to this panel's canvas, else null */
+  const innermostCanvasTarget = (location: {
+    current: { dropTargets: { data: Record<string | symbol, unknown>; element: Element }[] };
+  }) => {
+    const target = location.current.dropTargets[0];
+    if (!target) return null;
+    const tEl = target.element as HTMLElement;
+    const tPath = target.data.path;
+    if (!canvas.contains(tEl) || !Array.isArray(tPath)) return null;
+    return { el: tEl, path: tPath as JxPath, isLeaf: !!target.data._isVoid };
+  };
+
   const monitorCleanup = monitorForElements({
     onDragStart({ location }) {
       view.lastDragInput = location.current.input;
@@ -52,8 +67,34 @@ export function registerPanelDnD(panel: CanvasPanel) {
     },
     onDrag({ location }) {
       view.lastDragInput = location.current.input;
+      const target = innermostCanvasTarget(location);
+      if (target) {
+        if (_activeDropEl && _activeDropEl !== target.el) {
+          _activeDropEl.classList.remove("canvas-drop-target");
+        }
+        _activeDropEl = target.el;
+        showCanvasDropIndicator(target.el, target.path, target.isLeaf, panel);
+      } else if (location.current.dropTargets.length > 0) {
+        // Pointer is over a non-canvas target (e.g. a layer row) — hide this panel's
+        // indicator. When over dead space (no targets at all) keep the last indicator
+        // visible so it persists for the whole drag.
+        if (_activeDropEl && canvas.contains(_activeDropEl)) {
+          _activeDropEl.classList.remove("canvas-drop-target");
+          _activeDropEl = null;
+        }
+        dropLine.style.display = "none";
+      }
     },
-    onDrop() {
+    onDrop({ source, location }) {
+      const target = innermostCanvasTarget(location);
+      if (target) {
+        const { instruction, targetPath } = getCanvasDropResult(
+          target.el,
+          target.path,
+          target.isLeaf,
+        );
+        applyDropInstruction(instruction, source.data, targetPath);
+      }
       _activeDropEl?.classList.remove("canvas-drop-target");
       _activeDropEl = null;
       for (const p of canvasPanels) {
@@ -89,26 +130,6 @@ export function registerPanelDnD(panel: CanvasPanel) {
       },
       getData() {
         return { path: elPath, _isVoid: isLeaf };
-      },
-      onDragEnter({ location }) {
-        view.lastDragInput = location.current.input;
-        if (_activeDropEl && _activeDropEl !== el) {
-          _activeDropEl.classList.remove("canvas-drop-target");
-        }
-        _activeDropEl = el as HTMLElement;
-        showCanvasDropIndicator(el as HTMLElement, elPath, isLeaf, panel);
-      },
-      onDrag({ location }) {
-        view.lastDragInput = location.current.input;
-        showCanvasDropIndicator(el as HTMLElement, elPath, isLeaf, panel);
-      },
-      onDragLeave() {},
-      onDrop({ source }) {
-        dropLine.style.display = "none";
-        (el as HTMLElement).classList.remove("canvas-drop-target");
-        _activeDropEl = null;
-        const { instruction, targetPath } = getCanvasDropResult(el as HTMLElement, elPath, isLeaf);
-        applyDropInstruction(instruction, source.data, targetPath);
       },
     });
     view.canvasDndCleanups.push(cleanup);

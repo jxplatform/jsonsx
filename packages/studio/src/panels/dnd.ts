@@ -115,9 +115,8 @@ export function registerLayersDnD() {
           onDrag({ self }: DragSelfArgs) {
             showLayerDropGap(row, self.data, container);
           },
-          onDragLeave() {
-            clearLayerDropGap(container);
-          },
+          // No onDragLeave clear — the gap persists while the pointer crosses dead space
+          // between rows; the monitor clears it when the drag moves to a non-tree target.
           onDrop() {
             clearLayerDropGap(container);
           },
@@ -128,6 +127,12 @@ export function registerLayersDnD() {
 
     // Global monitor
     const monitorCleanup = monitorForElements({
+      onDropTargetChange({ location }: DragMonitorDropArgs) {
+        // Clear the layer gap when the drag moves onto a non-tree target (e.g. a canvas
+        // element). When there is no target at all, keep the gap so it persists.
+        const inner = location.current.dropTargets[0];
+        if (inner && !extractInstruction(inner.data)) clearLayerDropGap(container);
+      },
       onDrop({ source, location }: DragMonitorDropArgs) {
         clearLayerDropGap(container);
         const target = location.current.dropTargets[0];
@@ -321,6 +326,10 @@ export function applyDropInstruction(
     const fromPath = srcData.path as JxPath;
     const targetParent = parentElementPath(targetPath) as JxPath;
     const targetIdx = childIndex(targetPath) as number;
+    // Reordering requires a parent and a numeric index; root-level paths can't be
+    // reordered around.
+    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number"))
+      return;
 
     switch (instruction.type) {
       case "reorder-above":
@@ -341,6 +350,8 @@ export function applyDropInstruction(
   } else if (srcData.type === "block") {
     const targetParent = parentElementPath(targetPath) as JxPath;
     const targetIdx = childIndex(targetPath) as number;
+    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number"))
+      return;
 
     switch (instruction.type) {
       case "reorder-above":
