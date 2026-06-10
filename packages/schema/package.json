@@ -2,7 +2,7 @@
   "dependencies": {
     "@webref/css": "^8.5.8",
     "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.80.0"
+    "@webref/idl": "^3.81.0"
   },
   "description": "JSON Schema 2020-12 meta-schema generator for Jx documents",
   "exports": {
