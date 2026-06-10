@@ -1058,28 +1058,14 @@ The `.cache/` directory should be added to `.gitignore` but can optionally be co
 
 #### 9.2.6 Cloudflare Images Service
 
-Setting `"service": "cloudflare"` (requires `build.adapter` of `"cloudflare-workers"` or `"cloudflare-pages"`; otherwise the loader warns and falls back to `"build"`) replaces the build-time Sharp pipeline with on-demand transformation at the edge via the [Cloudflare Images binding](https://developers.cloudflare.com/images/transform-images/bindings/):
+Setting `"service": "cloudflare"` replaces the build-time Sharp pipeline with Cloudflare [transform-via-URL](https://developers.cloudflare.com/images/transform-images/transform-via-url/) markup — no code is deployed and no bindings are required, so it works with any adapter as long as the site is served through a Cloudflare zone:
 
 - **No variants are generated at build time** — Sharp is only used to read original image dimensions (for `width`/`height` attributes), and `.cache/images/` / `dist/images/_optimized/` are not used.
-- **srcset rewriting** — eligible `<img>` nodes (same skip rules as §9.2.3) get a `srcset` of endpoint URLs, one per configured width ≤ the original width:
-  `/_jx/image?src=%2Fimages%2Fhero.png&w=640&v=<hash8> 640w, ...`
-  The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
-- **Generated endpoint** — the build emits a `GET /_jx/image` handler: a Hono route inside `dist/worker.js` (cloudflare-workers) or a Pages Function at `dist/functions/_jx/image.js` (cloudflare-pages). The handler:
-  1. Validates `src` (same-origin paths only — never an open proxy) and `w` against the configured width whitelist (400 otherwise).
-  2. Negotiates the output format from the request's `Accept` header against the configured `formats` (AVIF preferred), falling back to original-asset passthrough when nothing matches.
-  3. Fetches the original via the `ASSETS` binding and pipes it through `env.<binding>.input(...).transform({ width }).output({ format, quality })`.
-  4. Caches the response at the edge (`caches.default`) and serves `Cache-Control: public, max-age=31536000, immutable` with `Vary: Accept`.
-- **Required wrangler config** — the deployment must declare the Images binding (and, for Workers, an assets binding):
-
-  ```jsonc
-  {
-    "images": { "binding": "IMAGES" },
-    // cloudflare-workers only:
-    "assets": { "directory": "./dist", "binding": "ASSETS" },
-  }
-  ```
-
-  Projects scaffolded with `bun create @jxsuite` and a Cloudflare adapter include this automatically; the build prints a reminder. If the binding is missing at runtime, the endpoint serves the original asset unchanged, and browsers always have the untouched `src` to fall back on.
+- **srcset rewriting** — eligible `<img>` nodes (same skip rules as §9.2.3) get a `srcset` of transform URLs, one per configured width ≤ the original width:
+  `/cdn-cgi/image/width=640,quality=80,fit=scale-down,format=auto/images/hero.png?v=<hash8> 640w, ...`
+  `format=auto` makes Cloudflare negotiate AVIF/WebP per browser; the single `quality` comes from `quality.webp`. The `v` param is an 8-char content hash for cache busting. The original `src` is left untouched as a fallback.
+- **Remote sources** — https URLs whose hostname is in `images.remoteDomains` get the same treatment with the full URL as the transform source (every configured width is emitted since original dimensions are unknown; `fit=scale-down` prevents upscaling). The zone must allow resizing from the remote origin (Images → Transformations → Sources).
+- **Zone requirement** — Image Transformations must be enabled for the zone (Cloudflare dashboard → Images → Transformations). The build prints a reminder. These URLs do **not** resolve on `*.pages.dev` / `*.workers.dev` preview hosts — only on the production custom domain; previews fall back to the untouched `src` originals.
 
 ### 9.3 Referencing Media
 
@@ -1297,10 +1283,11 @@ For each route:
     Resolve state       → inject content entries, site state
     Transform images    → generate responsive variants, inject srcset/sizes
                           (images.service "cloudflare": no variants — srcset
-                           points at the generated /_jx/image endpoint)
+                           uses /cdn-cgi/image transform URLs)
     Compile             → existing compiler routes (static/dynamic/custom-element)
     ↓
-Bundle server entries   → dist/worker.js (if adapter set, else per-route _server.js)
+Bundle server entries   → dist/worker.js, or dist/_worker.js + _routes.json for
+                          cloudflare-pages (if adapter set, else per-route _server.js)
     ↓
 Emit dist/
     ├── index.html
@@ -1419,12 +1406,12 @@ The collection config can specify locale awareness:
 
 The build output is standard static files deployable anywhere. When `build.adapter` is set, the compiler additionally generates platform-specific files:
 
-| Provider               | Extra Output                                                            |
-| ---------------------- | ----------------------------------------------------------------------- |
-| _(none)_               | Just `dist/` with HTML/CSS/JS/assets                                    |
-| `"cloudflare-workers"` | `dist/worker.js` (Hono server with asset fallback), `_redirects`        |
-| `"cloudflare-pages"`   | `dist/functions/` (Pages Functions, one per server entry), `_redirects` |
-| `"node"` / `"bun"`     | `dist/worker.js` (Hono server, no asset fallback)                       |
+| Provider               | Extra Output                                                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| _(none)_               | Just `dist/` with HTML/CSS/JS/assets                                                                              |
+| `"cloudflare-workers"` | `dist/worker.js` (Hono server with asset fallback), `_redirects`                                                  |
+| `"cloudflare-pages"`   | `dist/_worker.js` (advanced-mode Hono server) + `dist/_routes.json`, only when server entries exist; `_redirects` |
+| `"node"` / `"bun"`     | `dist/worker.js` (Hono server, no asset fallback)                                                                 |
 
 Configured in `project.json`:
 
@@ -1450,16 +1437,14 @@ When `adapter` is set and the site contains `timing: "server"` entries, the comp
 1. Collects all server entries from components and pages
 2. Deduplicates by export name
 3. Skips per-route `_server.js` generation
-4. Emits a single `dist/worker.js` via `compileSiteServer()` (or per-entry Pages Functions under `dist/functions/` for `"cloudflare-pages"`)
-5. Adds adapter-specific boilerplate (e.g., Cloudflare asset fallback via `c.env.ASSETS.fetch()`)
+4. Emits a single Hono worker via `compileSiteServer()` — `dist/worker.js`, or `dist/_worker.js` for `"cloudflare-pages"` ([advanced mode](https://developers.cloudflare.com/pages/functions/advanced-mode/), the only Functions convention that lives inside the build output; the root-level `functions/` directory convention is not used). For Pages, a `dist/_routes.json` limiting worker invocation to `/_jx/*` is emitted alongside, so static assets are served without invoking the worker.
+5. Adds the Cloudflare asset fallback (`app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))`) for both Cloudflare adapters
 
-The generated `dist/worker.js` is a build artifact inside `dist/` and is excluded by the standard `dist/` gitignore rule.
+For `"cloudflare-pages"` with no server entries, no worker is emitted at all — the deployment stays purely static. The generated worker is a build artifact inside `dist/` and is excluded by the standard `dist/` gitignore rule.
 
 #### 14.1.2 Cloudflare Image Transformation
 
-When `images.service` is `"cloudflare"` (§9.2.6), the adapter codegen additionally emits the `/_jx/image` endpoint — a Hono route inside `dist/worker.js` (registered before the asset catch-all) for `"cloudflare-workers"`, or `dist/functions/_jx/image.js` for `"cloudflare-pages"`. The endpoint is emitted even when the site has no `timing: "server"` entries.
-
-The deployment's wrangler config must declare the Images binding (name from `images.binding`, default `IMAGES`) and, for Workers, an `ASSETS` assets binding. Image transformations must be enabled for the account/zone. Scaffolded Cloudflare projects include a `wrangler.jsonc` with both bindings.
+When `images.service` is `"cloudflare"` (§9.2.6), no additional adapter output is generated — image optimization is pure markup (`/cdn-cgi/image` transform URLs) served by Cloudflare's zone-level Image Transformations feature, which must be enabled in the dashboard (Images → Transformations).
 
 ### 14.2 Build Artifacts
 
@@ -1490,7 +1475,8 @@ dist/
 ├── robots.txt                   # Copied from public/
 ├── favicon.svg                  # Copied from public/
 ├── _redirects                   # Platform-specific
-└── worker.js                    # Server worker (when adapter set + server entries exist)
+└── worker.js                    # Server worker (when adapter set + server entries exist;
+                                 # named _worker.js + paired with _routes.json on cloudflare-pages)
 ```
 
 ---
