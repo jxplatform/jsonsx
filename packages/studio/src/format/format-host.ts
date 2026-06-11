@@ -101,6 +101,15 @@ export function formatByName(name: string | null | undefined): StudioFormat | un
   return _formats.find((f) => f.name === name);
 }
 
+/** Error for opening a non-JSON file when no imported format class claims its extension. */
+export function noFormatError(path: string): Error {
+  return new Error(
+    `No format class imported for "${path}" — add one to project.json imports ` +
+      `(e.g. "Markdown": "@jxsuite/parser/Markdown.class.json") and make sure the ` +
+      `project's dependencies are installed`,
+  );
+}
+
 /** The format claiming a file path's extension, if any. */
 export function formatForPath(path: string | null | undefined): StudioFormat | undefined {
   if (!path) {

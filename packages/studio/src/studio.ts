@@ -584,7 +584,9 @@ if (_projectParam) {
           let frontmatter, parsedDoc, parsedMode;
           await loadFormats();
           const fileFormat = formatForPath(fileRelPath);
-          if (fileFormat) {
+          if (fileFormat || !fileRelPath.endsWith(".json")) {
+            // ParseSourceForPath throws a descriptive error when no format class claims the
+            // Extension (better than letting JSON.parse choke on non-JSON source).
             const result = await parseSourceForPath(fileRelPath, content);
             parsedDoc = result.document;
             ({ frontmatter } = result);

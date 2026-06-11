@@ -14,7 +14,8 @@
       "mcp__chrome-devtools-nixos__drag",
       "mcp__chrome-devtools-nixos__list_console_messages",
       "WebSearch",
-      "WebFetch(domain:developers.cloudflare.com)"
+      "WebFetch(*)",
+      "PowerShell(*)"
     ]
   },
   "enableWorkflows": true

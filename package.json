@@ -35,6 +35,7 @@
     "prepare": "husky",
     "release": "release-it",
     "test": "bun test --isolate",
+    "test:workspaces": "bun run --workspaces test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "typecheck": "tsgo",
     "typecheck:legacy": "tsc",

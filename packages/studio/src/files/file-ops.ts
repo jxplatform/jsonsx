@@ -21,6 +21,7 @@ import {
   formatSerialize,
   getFormats,
   loadFormats,
+  noFormatError,
   splitFormatDocument,
 } from "../format/format-host";
 import type { StudioFormat } from "../format/format-host";
@@ -50,10 +51,7 @@ export async function parseSourceForPath(path: string, source: string) {
   await loadFormats();
   const format = formatForPath(path);
   if (!format || !format.capabilities.parse) {
-    throw new Error(
-      `No format class imported for "${path}" — add one to project.json imports ` +
-        `(e.g. "Markdown": "@jxsuite/parser/Markdown.class.json")`,
-    );
+    throw noFormatError(path);
   }
   const result = await parseFormatSource(format, source);
   return { ...result, format };
@@ -95,9 +93,11 @@ export async function openFile() {
           id: name,
           sourceFormat: format.name,
         });
-      } else {
+      } else if (name.endsWith(".json")) {
         const document = JSON.parse(text);
         openTab({ document, documentPath, fileHandle: handle, id: name });
+      } else {
+        throw noFormatError(name);
       }
       statusMessage(`Opened ${name}`);
     };

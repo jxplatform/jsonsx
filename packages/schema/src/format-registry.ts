@@ -243,12 +243,13 @@ export async function buildFormatRegistry(
     if (typeof ref !== "string" || !ref.endsWith(".class.json")) {
       continue;
     }
-    const classPath = base ? io.resolvePath(base, ref) : ref;
+    let classPath: string;
     let classDef: ClassDefLike;
     try {
+      classPath = base ? io.resolvePath(base, ref) : ref;
       classDef = (await io.loadJson(classPath)) as ClassDefLike;
     } catch {
-      continue; // Unreadable imports are not format classes
+      continue; // Unresolvable or unreadable imports are not format classes
     }
     if (!classDef || typeof classDef !== "object") {
       continue;
