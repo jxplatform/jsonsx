@@ -59,8 +59,16 @@ export function createNodeFormatIO(projectRoot: string): FormatHostIO {
       if (isAbsolute(ref)) {
         return ref;
       }
-      const require = createRequire(resolve(projectRoot, "package.json"));
-      return require.resolve(ref);
+      // Bare specifier — prefer the project's own node_modules, then fall back to the host's
+      // Resolution (the desktop app and dev server ship @jxsuite/parser, so format classes work
+      // Even when the project's dependencies are not installed).
+      const projRequire = createRequire(resolve(projectRoot, "package.json"));
+      try {
+        return projRequire.resolve(ref);
+      } catch {
+        const selfRequire = createRequire(import.meta.url);
+        return selfRequire.resolve(ref);
+      }
     },
   };
 }

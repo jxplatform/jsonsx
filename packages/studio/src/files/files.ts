@@ -35,6 +35,7 @@ import {
   documentExtensions,
   formatForPath,
   loadFormats,
+  noFormatError,
   refreshFormats,
 } from "../format/format-host";
 import { view } from "../view";
@@ -956,12 +957,14 @@ export async function openFileFromTree(
       ctx.S.documentPath = path;
       ctx.S.dirty = false;
       ctx.commit(ctx.S);
-    } else {
+    } else if (path.endsWith(".json")) {
       const doc = JSON.parse(content);
       const newS = createState(doc);
       newS.documentPath = path;
       newS.dirty = false;
       ctx.commit(newS);
+    } else {
+      throw noFormatError(path);
     }
 
     // Update tree selection
@@ -1002,8 +1005,10 @@ export async function openFileInTab(path: string) {
       const result = await parseSourceForPath(path, content);
       ({ document } = result);
       ({ frontmatter } = result);
-    } else {
+    } else if (path.endsWith(".json")) {
       document = JSON.parse(content);
+    } else {
+      throw noFormatError(path);
     }
 
     const id = path;
@@ -1050,7 +1055,7 @@ export async function reloadFileInTab(path: string) {
           const { document, frontmatter } = await parseSourceForPath(path, content);
           tab.doc.document = document;
           tab.doc.content.frontmatter = frontmatter;
-        } else {
+        } else if (path.endsWith(".json")) {
           tab.doc.document = JSON.parse(content);
         }
         tab.doc.dirty = false;

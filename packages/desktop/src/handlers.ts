@@ -96,7 +96,8 @@ export async function listFormats() {
       remote: e.remote,
       studio: e.studio,
     }));
-  } catch {
+  } catch (error) {
+    console.error("[desktop] listFormats failed:", error);
     return [];
   }
 }
@@ -109,17 +110,23 @@ export async function formatAction(params: {
   doc?: Record<string, unknown>;
   options?: Record<string, unknown>;
 }) {
-  const registry = await getFormatRegistry();
-  const entry = registry.byName(params.format);
-  if (!entry) {
-    throw new Error(`Format "${params.format}" is not an imported format class`);
+  try {
+    const registry = await getFormatRegistry();
+    const entry = registry.byName(params.format);
+    if (!entry) {
+      throw new Error(`Format "${params.format}" is not an imported format class`);
+    }
+    if (params.action !== "parse" && params.action !== "serialize") {
+      throw new Error(`Unsupported action "${params.action}"`);
+    }
+    return params.action === "parse"
+      ? await entry.call("parse" as FormatCapability, params.source ?? "", params.options)
+      : await entry.call("serialize" as FormatCapability, params.doc ?? {}, params.options);
+  } catch (error) {
+    // Re-throw as a plain Error: non-Error rejection values (e.g. Bun's ResolveMessage) do not
+    // Survive the electrobun RPC bridge and crash the bun process as an unhandled rejection.
+    throw error instanceof Error ? error : new Error(String(error));
   }
-  if (params.action !== "parse" && params.action !== "serialize") {
-    throw new Error(`Unsupported action "${params.action}"`);
-  }
-  return params.action === "parse"
-    ? await entry.call("parse" as FormatCapability, params.source ?? "", params.options)
-    : await entry.call("serialize" as FormatCapability, params.doc ?? {}, params.options);
 }
 
 export function setFileDialog(fn: () => Promise<string | null>) {

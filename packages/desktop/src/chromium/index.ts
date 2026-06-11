@@ -5,6 +5,7 @@ import {
   codeService,
   discoverComponents,
   fetchPluginSchema,
+  formatAction,
   getProjectRoot,
   handleCreateDirectory,
   handleDeleteFile,
@@ -14,6 +15,7 @@ import {
   handleUploadFile,
   handleWriteFile,
   listDirectory,
+  listFormats,
   locateFile,
   openProject,
   setFileDialog,
@@ -56,6 +58,16 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   discoverComponents: (params) => discoverComponents(params as { dir?: string }),
   fetchPluginSchema: (params) =>
     fetchPluginSchema(params as { src: string; prototype?: string; base?: string }),
+  formatAction: (params) =>
+    formatAction(
+      params as {
+        format: string;
+        action: string;
+        source?: string;
+        doc?: Record<string, unknown>;
+        options?: Record<string, unknown>;
+      },
+    ),
   gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
   gitBranches: () => gitBranches(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
@@ -72,6 +84,7 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   gitStatus: () => gitStatus(),
   gitUnstage: (params) => gitUnstage(params as { files: string[] }),
   listDirectory: (params) => listDirectory(params as { dir: string }),
+  listFormats: () => listFormats(),
   listPackages: () => listPackages(),
   locateFile: (params) => locateFile(params as { name: string }),
   openProject: () => openProject(),

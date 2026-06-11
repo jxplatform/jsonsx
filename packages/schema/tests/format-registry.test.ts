@@ -111,6 +111,23 @@ describe("buildFormatRegistry", () => {
     expect(registry.entries.length).toBe(0);
   });
 
+  test("skips imports whose path resolution throws, keeping resolvable entries", async () => {
+    const io = makeIO({ "/proj/Markdown.class.json": MARKDOWN_CLASS });
+    io.resolvePath = (base, ref) => {
+      if (ref.startsWith("@missing/")) {
+        throw new Error(`Cannot find module '${ref}'`);
+      }
+      return new URL(ref, `file://${base}`).pathname;
+    };
+    const registry = await buildFormatRegistry(
+      { Broken: "@missing/pkg/Broken.class.json", Markdown: "./Markdown.class.json" },
+      io,
+      "/proj/project.json",
+    );
+    expect(registry.entries.length).toBe(1);
+    expect(registry.byName("Markdown")).toBeInstanceOf(FormatEntry);
+  });
+
   test("throws on ambiguous (extension, capability) claims", async () => {
     const other = structuredClone(MARKDOWN_CLASS);
     other.title = "OtherMd";
