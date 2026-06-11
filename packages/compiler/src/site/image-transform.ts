@@ -27,21 +27,40 @@ const SKIP_EXTENSIONS = new Set([".svg", ".gif"]);
 const EXTERNAL_PREFIXES = ["http://", "https://", "data:", "//"];
 
 /** Per-build memo of original image dimensions + content hash (cloudflare mode). */
-export type ImageMetaCache = Map<string, { width: number; height: number; hash: string }>;
+export type ImageMetaCache = Map<
+  string,
+  { width: number | null; height: number | null; hash: string }
+>;
+
+let sharpWarned = false;
 
 /**
  * Resolve original image dimensions and content hash for cloudflare mode. Reads only the image
- * header via Sharp — no variants are generated.
+ * header via Sharp — no variants are generated. Dimensions degrade to null when Sharp is
+ * unavailable (e.g. native binary won't load): srcsets are still emitted (fit=scale-down guards
+ * against upscaling), only the width/height attributes are skipped.
  *
  * @param {string} absoluteSrc
  * @param {ImageMetaCache} metaCache
- * @returns {Promise<{ width: number; height: number; hash: string }>}
+ * @returns {Promise<{ width: number | null; height: number | null; hash: string }>}
  */
 async function resolveCfMeta(absoluteSrc: string, metaCache: ImageMetaCache) {
   let meta = metaCache.get(absoluteSrc);
   if (!meta) {
-    const m = await getImageMetadata(absoluteSrc);
-    meta = { width: m.width, height: m.height, hash: contentHash(absoluteSrc) };
+    const hash = contentHash(absoluteSrc);
+    try {
+      const m = await getImageMetadata(absoluteSrc);
+      meta = { width: m.width, height: m.height, hash };
+    } catch (e) {
+      if (!sharpWarned) {
+        sharpWarned = true;
+        console.warn(
+          `Could not read image dimensions (${(e as Error).message}) — ` +
+            `emitting srcsets without width/height attributes.`,
+        );
+      }
+      meta = { width: null, height: null, hash };
+    }
     metaCache.set(absoluteSrc, meta);
   }
   return meta;
@@ -272,8 +291,10 @@ async function transformImgNode(
     srcset = buildCloudflareSrcset(src, config, Infinity, null);
   } else if (config.service === "cloudflare") {
     const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-    srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
-    original = meta;
+    srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+    if (meta.width != null && meta.height != null) {
+      original = { width: meta.width, height: meta.height };
+    }
   } else {
     let manifest = imageRefs.get(absoluteSrc as string);
 
@@ -357,8 +378,10 @@ async function transformInnerHtmlImages(
       srcset = buildCloudflareSrcset(src, config, Infinity, null);
     } else if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-      srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
-      original = meta;
+      srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+      if (meta.width != null && meta.height != null) {
+        original = { width: meta.width, height: meta.height };
+      }
     } else {
       let manifest = imageRefs.get(absoluteSrc as string);
       if (!manifest) {
