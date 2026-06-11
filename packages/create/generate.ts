@@ -65,17 +65,18 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
 function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }) {
   const compatibilityDate = new Date().toISOString().slice(0, 10);
 
+  // nodejs_compat: server functions routinely pull in Node-flavored npm packages
   const config =
     adapter === "cloudflare-workers"
       ? {
           assets: { binding: "ASSETS", directory: "./dist" },
           compatibility_date: compatibilityDate,
-          main: "./dist/worker.js",
-          name: slug,
+          compatibility_flags: ["nodejs_compat"],
+          assets: { directory: "./dist", binding: "ASSETS" },
         }
       : {
           compatibility_date: compatibilityDate,
-          name: slug,
+          compatibility_flags: ["nodejs_compat"],
           pages_build_output_dir: "./dist",
         };
 
@@ -148,6 +149,7 @@ function buildPackageJson({
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-|-$/g, "");
 
+  const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {
     "@jxsuite/compiler": "^0.19.0",
     "@jxsuite/runtime": "^0.19.0",
@@ -158,7 +160,12 @@ function buildPackageJson({
     dev: "jx dev",
   };
 
-  if (adapter && CF_ADAPTERS.has(adapter)) {
+  if (adapter && adapter !== "static") {
+    // The generated server worker imports hono; wrangler/node/bun resolve it from node_modules
+    dependencies["hono"] = "^4";
+  }
+
+  if (adapter && CF_ADAPTERS.includes(adapter)) {
     devDependencies["wrangler"] = "^4";
     scripts.deploy =
       adapter === "cloudflare-workers" ? "wrangler deploy" : "wrangler pages deploy dist";
@@ -171,5 +178,7 @@ function buildPackageJson({
     name: slug,
     private: true,
     scripts,
+    ...(Object.keys(dependencies).length > 0 && { dependencies }),
+    devDependencies,
   };
 }

@@ -568,6 +568,27 @@ describe("image-transform", () => {
       expect(doc.children[1].attributes.srcset).toContain("/cdn-cgi/image/width=");
     });
 
+    test("still emits an unclamped srcset when Sharp metadata is unavailable", async () => {
+      getImageMetadata.mockRejectedValue(new Error("Could not load the sharp module"));
+
+      const doc: any = {
+        tagName: "img",
+        attributes: { src: "/images/hero.png" },
+      };
+
+      await transformImageNodes(doc, cfConfig, TMP, null, new Map());
+
+      // All configured widths emitted (fit=scale-down guards against upscaling)
+      expect(doc.attributes.srcset).toBe(
+        "/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234 640w, " +
+          "/cdn-cgi/image/width=1200,quality=75,fit=scale-down,format=auto/images/hero.png?v=abcd1234 1200w",
+      );
+      // Dimensions unknown — width/height attributes skipped, page still compiles
+      expect(doc.attributes.width).toBeUndefined();
+      expect(doc.attributes.height).toBeUndefined();
+      expect(doc.attributes.loading).toBe("lazy");
+    });
+
     test("shares the metadata cache across calls when provided", async () => {
       const metaCache = new Map();
       const docA: any = {
