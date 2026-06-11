@@ -63,9 +63,15 @@ export function evaluateFilterRule(
       return actual != null && actual !== "" && !(Array.isArray(actual) && actual.length === 0);
     }
     case "contains": {
+      if (Array.isArray(actual)) {
+        return actual.includes(rule.value);
+      }
       return typeof actual === "string" && actual.includes(String(rule.value ?? ""));
     }
     case "not contains": {
+      if (Array.isArray(actual)) {
+        return !actual.includes(rule.value);
+      }
       return typeof actual === "string" && !actual.includes(String(rule.value ?? ""));
     }
     case ">": {

@@ -864,6 +864,22 @@ describe("queryContentType — array filter with operators", () => {
     expect(result.every((e) => !(e.data.title as string).includes("Post"))).toBe(true);
   });
 
+  it("contains operator matches array membership", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "tags", op: "contains", value: "api" }],
+    });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe("c");
+  });
+
+  it("not contains operator excludes array membership", () => {
+    const result = queryContentType(entries, {
+      filter: [{ field: "tags", op: "not contains", value: "web" }],
+    });
+    // Entry "d" has tags: null — non-array/non-string fields match neither op
+    expect(result.map((e) => e.id)).toEqual(["b"]);
+  });
+
   it("> operator for numeric comparison", () => {
     const result = queryContentType(entries, {
       filter: [{ field: "score", op: ">", value: 10 }],
