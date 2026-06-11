@@ -22,6 +22,7 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { view } from "../view";
+import { panelMediaToActiveMedia } from "../canvas/canvas-helpers";
 import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "./slash-menu";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
@@ -175,7 +176,7 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
 
     if (hitPath) {
       let hp = hitPath;
-      const media = hitMedia === "base" ? null : (hitMedia ?? null);
+      const media = panelMediaToActiveMedia(hitMedia);
       updateUi("pendingInlineEdit", { mediaName: hitMedia, path: hp });
       activeTab.value!.session.ui.activeMedia = media;
       if (isEmpty && pPath) {

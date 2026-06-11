@@ -15,7 +15,7 @@ import { canvasPanels, canvasWrap, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getLayerSlot } from "../ui/layers";
-import { findCanvasElement, getActivePanel } from "./canvas-helpers";
+import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import type { TemplateResult } from "lit-html";
 
 let _ctx: {
@@ -88,7 +88,7 @@ export function canvasPanelTemplate(
             <div
               class="canvas-panel-header"
               @click=${() => {
-                updateUi("activeMedia", mediaName === "base" ? null : mediaName);
+                updateUi("activeMedia", panelMediaToActiveMedia(mediaName));
               }}
             >
               ${label}
