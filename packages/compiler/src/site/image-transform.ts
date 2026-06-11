@@ -318,7 +318,6 @@ async function transformImgNode(
   }
 
   let srcset;
-  let original: { width: number; height: number } | undefined;
 
   if (remote) {
     // Original dimensions are unknown without fetching — emit every configured width and let
@@ -333,9 +332,6 @@ async function transformImgNode(
     if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc, metaCache);
       srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
-      if (meta.width != null && meta.height != null) {
-        original = { width: meta.width, height: meta.height };
-      }
     } else {
       let manifest = imageRefs.get(absoluteSrc);
 
@@ -346,20 +342,12 @@ async function transformImgNode(
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
       srcset = buildSrcset(manifest.variants, preferredFormat);
-      ({ original } = manifest);
     }
   }
 
   if (srcset) {
     node.attributes.srcset = srcset;
     node.attributes.sizes ??= config.sizes;
-  }
-
-  if (!node.attributes.width && original?.width) {
-    node.attributes.width = String(original.width);
-  }
-  if (!node.attributes.height && original?.height) {
-    node.attributes.height = String(original.height);
   }
 
   if (config.lazyLoad && node.attributes.loading !== "eager") {
@@ -424,16 +412,12 @@ async function transformInnerHtmlImages(
     }
 
     let srcset;
-    let original: { width: number; height: number } | undefined;
 
     if (remote) {
       srcset = buildCloudflareSrcset(src, config, Infinity, null);
     } else if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
       srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
-      if (meta.width != null && meta.height != null) {
-        original = { width: meta.width, height: meta.height };
-      }
     } else {
       let manifest = imageRefs.get(absoluteSrc as string);
       if (!manifest) {
@@ -443,19 +427,12 @@ async function transformInnerHtmlImages(
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
       srcset = buildSrcset(manifest.variants, preferredFormat);
-      ({ original } = manifest);
     }
     if (!srcset) {
       continue;
     }
 
     let extra = ` srcset="${srcset}" sizes="${config.sizes}"`;
-    if (!/\bwidth=/.test(attrs) && original?.width) {
-      extra += ` width="${original.width}"`;
-    }
-    if (!/\bheight=/.test(attrs) && original?.height) {
-      extra += ` height="${original.height}"`;
-    }
     if (config.lazyLoad && !/\bloading="eager"/.test(attrs)) {
       if (!/\bloading=/.test(attrs)) {
         extra += ` loading="lazy"`;
