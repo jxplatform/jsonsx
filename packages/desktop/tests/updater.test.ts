@@ -1,34 +1,34 @@
-import { describe, test, expect, mock, beforeEach, afterEach, jest } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
 
 const mockGetLocalInfo = mock(() => ({
-  version: "1.0.0",
-  hash: "abc123",
   baseUrl: "https://updates.example.com",
   channel: "stable",
-  name: "JSONsx Studio",
+  hash: "abc123",
   identifier: "com.jsonsx.studio",
+  name: "JSONsx Studio",
+  version: "1.0.0",
 }));
 
 const mockCheckForUpdate = mock(() => ({
-  version: "1.1.0",
+  error: null,
   updateAvailable: true,
   updateReady: false,
-  error: null,
+  version: "1.1.0",
 }));
 
 const mockDownloadUpdate = mock(() => {});
 const mockApplyUpdate = mock(() => {});
 
 mock.module("electrobun/bun", () => ({
-  Updater: {
-    getLocalInfo: mockGetLocalInfo,
-    checkForUpdate: mockCheckForUpdate,
-    downloadUpdate: mockDownloadUpdate,
-    applyUpdate: mockApplyUpdate,
-  },
-  Utils: { openFileDialog: async () => [] },
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
+  Updater: {
+    applyUpdate: mockApplyUpdate,
+    checkForUpdate: mockCheckForUpdate,
+    downloadUpdate: mockDownloadUpdate,
+    getLocalInfo: mockGetLocalInfo,
+  },
+  Utils: { openFileDialog: async () => [] },
 }));
 
 const {
@@ -89,10 +89,10 @@ describe("checkForUpdate", () => {
 describe("downloadUpdate", () => {
   test("downloads and re-checks status", async () => {
     mockCheckForUpdate.mockImplementationOnce(() => ({
-      version: "1.1.0",
+      error: null,
       updateAvailable: true,
       updateReady: true,
-      error: null,
+      version: "1.1.0",
     }));
 
     const status = await downloadUpdate();
@@ -158,10 +158,10 @@ describe("startBackgroundChecks", () => {
     mockDownloadUpdate.mockClear();
 
     mockCheckForUpdate.mockImplementation(() => ({
-      version: "2.0.0",
+      error: null,
       updateAvailable: true,
       updateReady: false,
-      error: null,
+      version: "2.0.0",
     }));
 
     startBackgroundChecks();
@@ -183,16 +183,16 @@ describe("startBackgroundChecks", () => {
 
     mockCheckForUpdate
       .mockImplementationOnce(() => ({
-        version: "2.0.0",
+        error: null,
         updateAvailable: true,
         updateReady: false,
-        error: null,
+        version: "2.0.0",
       }))
       .mockImplementationOnce(() => ({
-        version: "2.0.0",
+        error: null,
         updateAvailable: true,
         updateReady: true,
-        error: null,
+        version: "2.0.0",
       }));
 
     startBackgroundChecks();

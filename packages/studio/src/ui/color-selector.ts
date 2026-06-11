@@ -29,7 +29,9 @@ interface ColorVar {
 /** Extract --color-* CSS custom properties from the effective (site + document) style. */
 function getColorVars() {
   const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
-  if (!style) return [];
+  if (!style) {
+    return [];
+  }
   const vars = [];
   for (const [k, v] of Object.entries(style)) {
     if (k.startsWith("--color") && (typeof v === "string" || typeof v === "number")) {
@@ -49,27 +51,37 @@ function varToLabel(name: string) {
 
 /** Resolve a color value for display — if it's a var() reference, look up the actual color. */
 function resolveColorForDisplay(val: string | number | undefined) {
-  if (!val) return "transparent";
+  if (!val) {
+    return "transparent";
+  }
   const s = String(val);
   const m = s.match(/^var\((--[^)]+)\)$/);
   if (m) {
     const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
     const resolved = style?.[m[1]];
-    if (typeof resolved === "string") return resolved;
+    if (typeof resolved === "string") {
+      return resolved;
+    }
     return "transparent";
   }
   return s;
 }
 
 function safeColor(val: string | number | undefined) {
-  if (!val) return "transparent";
+  if (!val) {
+    return "transparent";
+  }
   return resolveColorForDisplay(val);
 }
 
 /** Normalize a color string to include # prefix for hex values. */
 function normalizeHex(c: string) {
-  if (!c) return c;
-  if (c.startsWith("var(") || c.startsWith("rgb") || c.startsWith("hsl")) return c;
+  if (!c) {
+    return c;
+  }
+  if (c.startsWith("var(") || c.startsWith("rgb") || c.startsWith("hsl")) {
+    return c;
+  }
   return c.replace(/^#?/, "#");
 }
 
@@ -83,9 +95,13 @@ function matchesColorVar(
   value: string | number | undefined,
   colorVars: { name: string; value: string }[],
 ) {
-  if (!value || typeof value !== "string") return null;
+  if (!value || typeof value !== "string") {
+    return null;
+  }
   const m = value.match(/^var\((--[^)]+)\)$/);
-  if (!m) return null;
+  if (!m) {
+    return null;
+  }
   return colorVars.find((cv) => cv.name === m[1]) || null;
 }
 
@@ -94,8 +110,8 @@ function matchesColorVar(
 export class JxColorPopover extends LitElement {
   static properties = {
     color: { type: String },
-    displayColor: { type: String, attribute: false },
     colorVars: { attribute: false },
+    displayColor: { attribute: false, type: String },
   };
 
   declare color: string;
@@ -132,29 +148,31 @@ export class JxColorPopover extends LitElement {
     const color = normalizeHex(String((e.target as HTMLElement & { color: string }).color));
     this.displayColor = color;
     this.color = color;
-    this.dispatchEvent(new CustomEvent("color-change", { detail: color, bubbles: true }));
+    this.dispatchEvent(new CustomEvent("color-change", { bubbles: true, detail: color }));
   }
 
   _handleSlider(e: Event) {
     const color = normalizeHex(String((e.target as HTMLElement & { color: string }).color));
     this.displayColor = color;
     this.color = color;
-    this.dispatchEvent(new CustomEvent("color-change", { detail: color, bubbles: true }));
+    this.dispatchEvent(new CustomEvent("color-change", { bubbles: true, detail: color }));
   }
 
   _handleText(e: Event) {
     const val = (e.target as HTMLInputElement).value.trim();
-    if (!val) return;
+    if (!val) {
+      return;
+    }
     this.displayColor = val;
     this.color = val;
-    this.dispatchEvent(new CustomEvent("color-change", { detail: val, bubbles: true }));
+    this.dispatchEvent(new CustomEvent("color-change", { bubbles: true, detail: val }));
   }
 
   _handleSwatch(e: Event, varName: string) {
     e.stopPropagation();
     const varRef = `var(${varName})`;
     this.color = varRef;
-    this.dispatchEvent(new CustomEvent("color-change", { detail: varRef, bubbles: true }));
+    this.dispatchEvent(new CustomEvent("color-change", { bubbles: true, detail: varRef }));
   }
 
   render() {
@@ -306,5 +324,5 @@ export function renderColorSelector(
 
 /** Whether any color popover is currently open. */
 export function isColorPopoverOpen() {
-  return !!document.querySelector(".style-input-color sp-overlay[open]");
+  return Boolean(document.querySelector(".style-input-color sp-overlay[open]"));
 }

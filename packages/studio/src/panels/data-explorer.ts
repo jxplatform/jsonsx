@@ -9,18 +9,27 @@ const expandedDataKeys = new Set();
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
 function unwrapSignal(value: unknown) {
-  if (value && typeof value === "object" && (value as Record<string, unknown>).__v_isRef)
+  if (value && typeof value === "object" && (value as Record<string, unknown>).__v_isRef) {
     return (value as Record<string, unknown>).value;
+  }
   return value;
 }
 
 /** Type label for a signal value in the data explorer. */
 function dataTypeLabel(value: unknown) {
   const v = unwrapSignal(value);
-  if (v === null) return "null";
-  if (v === undefined) return "pending";
-  if (Array.isArray(v)) return `Array(${v.length})`;
-  if (typeof v === "object") return `{${Object.keys(v).length}}`;
+  if (v === null) {
+    return "null";
+  }
+  if (v === undefined) {
+    return "pending";
+  }
+  if (Array.isArray(v)) {
+    return `Array(${v.length})`;
+  }
+  if (typeof v === "object") {
+    return `{${Object.keys(v).length}}`;
+  }
   return typeof v;
 }
 
@@ -82,8 +91,11 @@ export function renderDataExplorerTemplate(
                   expanded: isExpanded,
                 })}
                 @click=${() => {
-                  if (expandedDataKeys.has(name)) expandedDataKeys.delete(name);
-                  else expandedDataKeys.add(name);
+                  if (expandedDataKeys.has(name)) {
+                    expandedDataKeys.delete(name);
+                  } else {
+                    expandedDataKeys.add(name);
+                  }
                   renderLeftPanel();
                 }}
               >
@@ -91,8 +103,8 @@ export function renderDataExplorerTemplate(
                 <span class="data-name">${name}</span>
                 <span
                   class=${classMap({
-                    "data-type": true,
                     "data-pending": unwrapped === null,
+                    "data-type": true,
                   })}
                   >${dataTypeLabel(value)}</span
                 >

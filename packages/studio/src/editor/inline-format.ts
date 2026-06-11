@@ -32,15 +32,25 @@ const FORMAT_TAGS = new Set([
  * @returns {boolean}
  */
 export function isTagActiveInSelection(tag: string, editableRoot: HTMLElement | null) {
-  if (!editableRoot) return false;
-  if (editableRoot.contentEditable === "plaintext-only") return false;
+  if (!editableRoot) {
+    return false;
+  }
+  if (editableRoot.contentEditable === "plaintext-only") {
+    return false;
+  }
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return false;
+  if (!sel || !sel.rangeCount) {
+    return false;
+  }
 
   const anchor = sel.anchorNode;
   const focus = sel.focusNode;
-  if (!anchor || !focus) return false;
-  if (!editableRoot.contains(anchor) || !editableRoot.contains(focus)) return false;
+  if (!anchor || !focus) {
+    return false;
+  }
+  if (!editableRoot.contains(anchor) || !editableRoot.contains(focus)) {
+    return false;
+  }
 
   /**
    * @param {Node | null} node
@@ -48,8 +58,9 @@ export function isTagActiveInSelection(tag: string, editableRoot: HTMLElement | 
    */
   const hasTag = (node: Node | null) => {
     while (node && node !== editableRoot) {
-      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName.toLowerCase() === tag)
+      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName.toLowerCase() === tag) {
         return true;
+      }
       node = node.parentNode;
     }
     return false;
@@ -66,12 +77,20 @@ export function isTagActiveInSelection(tag: string, editableRoot: HTMLElement | 
  * @param {HTMLElement | null} editableRoot
  */
 export function toggleInlineFormat(tag: string, editableRoot: HTMLElement | null) {
-  if (!editableRoot) return;
+  if (!editableRoot) {
+    return;
+  }
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
+  if (!sel || !sel.rangeCount) {
+    return;
+  }
   const range = sel.getRangeAt(0);
-  if (range.collapsed) return;
-  if (!editableRoot.contains(range.commonAncestorContainer)) return;
+  if (range.collapsed) {
+    return;
+  }
+  if (!editableRoot.contains(range.commonAncestorContainer)) {
+    return;
+  }
 
   // Expand selection to fully include any partially-selected ${...} expressions
   expandRangeToTemplateExpressions(range);
@@ -145,10 +164,12 @@ function unwrapTagInRange(
  */
 function unwrapElement(el: Element) {
   const parent = el.parentNode;
-  if (!parent) return;
+  if (!parent) {
+    return;
+  }
   const frag = document.createDocumentFragment();
   while (el.firstChild) {
-    frag.appendChild(el.firstChild);
+    frag.append(el.firstChild);
   }
   parent.replaceChild(frag, el);
 }
@@ -171,7 +192,9 @@ function wrapRangeInTag(tag: string, range: Range, _editableRoot: HTMLElement) {
 
   // If nothing left after trimming, re-insert everything and bail
   if (!contents.hasChildNodes()) {
-    if (leadingWS) range.insertNode(document.createTextNode(leadingWS));
+    if (leadingWS) {
+      range.insertNode(document.createTextNode(leadingWS));
+    }
     if (trailingWS) {
       const t = document.createTextNode(trailingWS);
       range.collapse(false);
@@ -181,13 +204,17 @@ function wrapRangeInTag(tag: string, range: Range, _editableRoot: HTMLElement) {
   }
 
   const wrapper = document.createElement(tag);
-  wrapper.appendChild(contents);
+  wrapper.append(contents);
 
   // Build the insertion fragment: [leadingWS] [wrapper] [trailingWS]
   const frag = document.createDocumentFragment();
-  if (leadingWS) frag.appendChild(document.createTextNode(leadingWS));
-  frag.appendChild(wrapper);
-  if (trailingWS) frag.appendChild(document.createTextNode(trailingWS));
+  if (leadingWS) {
+    frag.append(document.createTextNode(leadingWS));
+  }
+  frag.append(wrapper);
+  if (trailingWS) {
+    frag.append(document.createTextNode(trailingWS));
+  }
 
   range.insertNode(frag);
 
@@ -210,10 +237,14 @@ function wrapRangeInTag(tag: string, range: Range, _editableRoot: HTMLElement) {
  */
 function trimLeadingWhitespace(frag: DocumentFragment) {
   const first = frag.firstChild;
-  if (!first || first.nodeType !== Node.TEXT_NODE) return null;
+  if (!first || first.nodeType !== Node.TEXT_NODE) {
+    return null;
+  }
   const text = first.textContent ?? "";
   const match = text.match(/^(\s+)/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const ws = match[1];
   if (text.length === ws.length) {
     // Entire node is whitespace — remove it
@@ -233,10 +264,14 @@ function trimLeadingWhitespace(frag: DocumentFragment) {
  */
 function trimTrailingWhitespace(frag: DocumentFragment) {
   const last = frag.lastChild;
-  if (!last || last.nodeType !== Node.TEXT_NODE) return null;
+  if (!last || last.nodeType !== Node.TEXT_NODE) {
+    return null;
+  }
   const text = last.textContent ?? "";
   const match = text.match(/(\s+)$/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
   const ws = match[1];
   if (text.length === ws.length) {
     frag.removeChild(last);
@@ -256,7 +291,9 @@ function trimTrailingWhitespace(frag: DocumentFragment) {
  * @param {HTMLElement | null} root
  */
 export function normalizeInlineContent(root: HTMLElement | null) {
-  if (!root) return;
+  if (!root) {
+    return;
+  }
   let changed = true;
   let iterations = 0;
   while (changed && iterations < 10) {
@@ -267,19 +304,29 @@ export function normalizeInlineContent(root: HTMLElement | null) {
     root.normalize();
 
     // 2. Merge adjacent same-tag siblings
-    if (mergeAdjacentSiblings(root)) changed = true;
+    if (mergeAdjacentSiblings(root)) {
+      changed = true;
+    }
 
     // 3. Collapse redundant nesting (strong > strong → strong)
-    if (collapseRedundantNesting(root)) changed = true;
+    if (collapseRedundantNesting(root)) {
+      changed = true;
+    }
 
     // 4. Remove empty inline elements
-    if (removeEmptyInlines(root)) changed = true;
+    if (removeEmptyInlines(root)) {
+      changed = true;
+    }
 
     // 5. Lift edge whitespace out of inline wrappers
-    if (liftEdgeWhitespace(root)) changed = true;
+    if (liftEdgeWhitespace(root)) {
+      changed = true;
+    }
 
     // 6. Unwrap bare <span> elements (no class, style, or attributes)
-    if (unwrapBareSpans(root)) changed = true;
+    if (unwrapBareSpans(root)) {
+      changed = true;
+    }
   }
 }
 
@@ -315,7 +362,7 @@ function mergeAdjacentSiblings(root: HTMLElement) {
     const [el, next] = toMerge[i];
     // Move all children from next into el
     while (next.firstChild) {
-      el.appendChild(next.firstChild);
+      el.append(next.firstChild);
     }
     next.remove();
     changed = true;
@@ -337,7 +384,9 @@ function collapseRedundantNesting(root: HTMLElement) {
 
   while (walker.nextNode()) {
     const el = walker.currentNode as Element;
-    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) continue;
+    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) {
+      continue;
+    }
     // Check if only child is an element with the same tag
     if (
       el.childNodes.length === 1 &&
@@ -374,7 +423,9 @@ function removeEmptyInlines(root: HTMLElement) {
 
   while (walker.nextNode()) {
     const el = walker.currentNode as Element;
-    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) continue;
+    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) {
+      continue;
+    }
     if (el.childNodes.length === 0 && !el.textContent) {
       toRemove.push(el);
     }
@@ -402,15 +453,19 @@ function liftEdgeWhitespace(root: HTMLElement) {
 
   while (walker.nextNode()) {
     const el = walker.currentNode as Element;
-    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) continue;
-    if (el === root) continue;
+    if (!FORMAT_TAGS.has(el.tagName.toLowerCase())) {
+      continue;
+    }
+    if (el === root) {
+      continue;
+    }
 
     const first = el.firstChild;
     if (first && first.nodeType === Node.TEXT_NODE) {
       const text = first.textContent ?? "";
       const m = text.match(/^(\s+)/);
       if (m && text.length > m[1].length) {
-        ops.push({ type: "lift-leading", el, ws: m[1] });
+        ops.push({ el, type: "lift-leading", ws: m[1] });
       }
     }
 
@@ -419,7 +474,7 @@ function liftEdgeWhitespace(root: HTMLElement) {
       const text = last.textContent ?? "";
       const m = text.match(/(\s+)$/);
       if (m && text.length > m[1].length) {
-        ops.push({ type: "lift-trailing", el, ws: m[1] });
+        ops.push({ el, type: "lift-trailing", ws: m[1] });
       }
     }
   }
@@ -454,10 +509,16 @@ function unwrapBareSpans(root: HTMLElement) {
 
   while (walker.nextNode()) {
     const el = walker.currentNode as Element;
-    if (el.tagName.toLowerCase() !== "span") continue;
-    if (el === root) continue;
+    if (el.tagName.toLowerCase() !== "span") {
+      continue;
+    }
+    if (el === root) {
+      continue;
+    }
     // Keep spans with class, style, or any attributes
-    if (el.attributes.length > 0) continue;
+    if (el.attributes.length > 0) {
+      continue;
+    }
     toUnwrap.push(el);
   }
 
@@ -498,8 +559,8 @@ function attributesMatch(a: Element, b: Element) {
  * @param {Range} range
  */
 export function expandRangeToTemplateExpressions(range: Range) {
-  expandBoundary(range, true); // start
-  expandBoundary(range, false); // end
+  expandBoundary(range, true); // Start
+  expandBoundary(range, false); // End
 }
 
 /**
@@ -512,14 +573,16 @@ export function expandRangeToTemplateExpressions(range: Range) {
 function expandBoundary(range: Range, isStart: boolean) {
   const node = isStart ? range.startContainer : range.endContainer;
   const offset = isStart ? range.startOffset : range.endOffset;
-  if (node.nodeType !== Node.TEXT_NODE) return;
+  if (node.nodeType !== Node.TEXT_NODE) {
+    return;
+  }
 
   const text = node.textContent ?? "";
 
   // Find all ${...} expression spans in this text node (supporting nested braces)
   const exprs = findTemplateExpressions(text);
   for (const expr of exprs) {
-    // expr = { start, end } — character indices of "$" and the closing "}" + 1
+    // Expr = { start, end } — character indices of "$" and the closing "}" + 1
     if (isStart) {
       // If the range starts inside this expression, move it to include the whole expr
       if (offset > expr.start && offset < expr.end) {
@@ -551,12 +614,15 @@ export function findTemplateExpressions(text: string) {
       let depth = 1;
       let j = i + 2;
       while (j < text.length && depth > 0) {
-        if (text[j] === "{") depth++;
-        else if (text[j] === "}") depth--;
+        if (text[j] === "{") {
+          depth++;
+        } else if (text[j] === "}") {
+          depth--;
+        }
         j++;
       }
       if (depth === 0) {
-        results.push({ start, end: j });
+        results.push({ end: j, start });
         i = j;
         continue;
       }

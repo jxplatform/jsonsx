@@ -4,9 +4,9 @@ import remarkFrontmatter from "remark-frontmatter";
 import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkRehype from "remark-rehype";
 import rehypeStringify from "rehype-stringify";
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 
-const src = readFileSync("examples/markdown/content/posts/getting-started.md", "utf-8");
+const src = readFileSync("examples/markdown/content/posts/getting-started.md", "utf8");
 
 // Full pipeline
 const result = await unified()

@@ -1,13 +1,15 @@
 import { getProjectRoot } from "./handlers";
-import type { GitStatusResult, GitBranchesResult, GitLogEntry } from "./rpc-schema";
+import type { GitBranchesResult, GitLogEntry, GitStatusResult } from "./rpc-schema";
 
 async function git(...args: string[]): Promise<string> {
   const root = getProjectRoot();
-  if (!root) throw new Error("No project open");
+  if (!root) {
+    throw new Error("No project open");
+  }
   const proc = Bun.spawn(["git", ...args], {
     cwd: root,
-    stdout: "pipe",
     stderr: "pipe",
+    stdout: "pipe",
   });
   const exitCode = await proc.exited;
   const stdout = await new Response(proc.stdout).text();
@@ -20,16 +22,18 @@ async function git(...args: string[]): Promise<string> {
 
 export async function gitStatus(): Promise<GitStatusResult> {
   const root = getProjectRoot();
-  if (!root) throw new Error("No project open");
+  if (!root) {
+    throw new Error("No project open");
+  }
 
   try {
     await git("rev-parse", "--is-inside-work-tree");
   } catch {
     return {
-      branch: "",
-      files: [],
       ahead: 0,
       behind: 0,
+      branch: "",
+      files: [],
       isRepo: false,
       remotes: [],
     };
@@ -42,17 +46,17 @@ export async function gitStatus(): Promise<GitStatusResult> {
     .split("\n")
     .filter(Boolean)
     .map((line) => ({
-      status: line.slice(0, 2).trim(),
       path: line.slice(3),
+      status: line.slice(0, 2).trim(),
     }));
 
   let ahead = 0;
   let behind = 0;
   try {
-    ahead = parseInt(await git("rev-list", "--count", "@{u}..HEAD")) || 0;
-    behind = parseInt(await git("rev-list", "--count", "HEAD..@{u}")) || 0;
+    ahead = Number.parseInt(await git("rev-list", "--count", "@{u}..HEAD")) || 0;
+    behind = Number.parseInt(await git("rev-list", "--count", "HEAD..@{u}")) || 0;
   } catch {
-    // no upstream configured
+    // No upstream configured
   }
 
   let remotes: string[] = [];
@@ -60,17 +64,17 @@ export async function gitStatus(): Promise<GitStatusResult> {
     const remotesOut = await git("remote");
     remotes = remotesOut.trim().split("\n").filter(Boolean);
   } catch {
-    // no remotes
+    // No remotes
   }
 
-  return { branch, files, ahead, behind, isRepo: true, remotes };
+  return { ahead, behind, branch, files, isRepo: true, remotes };
 }
 
 export async function gitBranches(): Promise<GitBranchesResult> {
   const current = (await git("branch", "--show-current")).trim();
   const output = await git("branch", "-a", "--format=%(refname:short)");
   const branches = output.trim().split("\n").filter(Boolean);
-  return { current, branches };
+  return { branches, current };
 }
 
 export async function gitLog(params: { limit?: number }): Promise<GitLogEntry[]> {
@@ -81,7 +85,7 @@ export async function gitLog(params: { limit?: number }): Promise<GitLogEntry[]>
   for (const chunk of chunks) {
     const [hash, message, author, date] = chunk.split("\n");
     if (hash && message && author && date) {
-      entries.push({ hash, message, author, date });
+      entries.push({ author, date, hash, message });
     }
   }
   return entries;

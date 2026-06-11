@@ -4,7 +4,7 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
-import { loadFormats, documentExtensions, formatByExtension } from "../format/format-host";
+import { documentExtensions, formatByExtension, loadFormats } from "../format/format-host";
 import { openFileInTab } from "../files/files";
 import { getRecentFiles, trackRecentFile } from "../recent-projects";
 import { getLayerSlot } from "../ui/layers";
@@ -67,45 +67,55 @@ function onInput(e: Event) {
 function onKeydown(e: KeyboardEvent) {
   const items = _query.trim() ? _results : getRecentFiles();
   switch (e.key) {
-    case "ArrowDown":
+    case "ArrowDown": {
       e.preventDefault();
       _selectedIndex = Math.min(_selectedIndex + 1, items.length - 1);
       renderOverlay();
       break;
-    case "ArrowUp":
+    }
+    case "ArrowUp": {
       e.preventDefault();
       _selectedIndex = Math.max(_selectedIndex - 1, 0);
       renderOverlay();
       break;
-    case "Enter":
+    }
+    case "Enter": {
       e.preventDefault();
-      if (items[_selectedIndex]) selectItem(items[_selectedIndex]);
+      if (items[_selectedIndex]) {
+        selectItem(items[_selectedIndex]);
+      }
       break;
-    case "Escape":
+    }
+    case "Escape": {
       e.preventDefault();
       closeQuickSearch();
       break;
+    }
   }
 }
 
 function selectItem(item: { path: string; name?: string }) {
   closeQuickSearch();
-  const path = item.path;
-  trackRecentFile({ path, name: path.split("/").pop() || "" });
+  const { path } = item;
+  trackRecentFile({ name: path.split("/").pop() || "", path });
   openFileInTab(path);
 }
 
 function fileIcon(name: string) {
   const ext = name.split(".").pop()?.toLowerCase();
-  if (ext === "json") return html`<sp-icon-file-code size="s"></sp-icon-file-code>`;
-  if (ext && formatByExtension(ext)) return html`<sp-icon-file-txt size="s"></sp-icon-file-txt>`;
+  if (ext === "json") {
+    return html`<sp-icon-file-code size="s"></sp-icon-file-code>`;
+  }
+  if (ext && formatByExtension(ext)) {
+    return html`<sp-icon-file-txt size="s"></sp-icon-file-txt>`;
+  }
   return html`<sp-icon-document size="s"></sp-icon-document>`;
 }
 
 function dirPart(path: string) {
   const parts = path.split("/");
   parts.pop();
-  return parts.length ? parts.join("/") : "";
+  return parts.length > 0 ? parts.join("/") : "";
 }
 
 function renderOverlay() {
@@ -130,7 +140,9 @@ function renderOverlay() {
           @input=${onInput}
           @keydown=${onKeydown}
           ${ref((el) => {
-            if (el) requestAnimationFrame(() => (el as HTMLInputElement).focus());
+            if (el) {
+              requestAnimationFrame(() => (el as HTMLInputElement).focus());
+            }
           })}
         />
         <div class="quick-search-results">
@@ -140,7 +152,7 @@ function renderOverlay() {
           ${items.length === 0 && !_query.trim() && recentFiles.length === 0
             ? html`<div class="quick-search-empty">Type to search project files</div>`
             : nothing}
-          ${showRecent && recentFiles.length
+          ${showRecent && recentFiles.length > 0
             ? html`<div class="quick-search-section-label">Recently opened</div>`
             : nothing}
           ${items.map(

@@ -34,7 +34,7 @@ export interface ComponentMeta {
   tagName: string;
   $id?: string | null;
   path: string;
-  props?: { name: string; type?: string; default?: unknown }[];
+  props?: { name: string; type?: string; default?: JsonValue; [k: string]: unknown }[];
   hasElements?: boolean;
 }
 
@@ -167,8 +167,8 @@ export interface GitDiffState {
   originalContent: string;
   currentContent: string;
   fileStatus: string;
-  originalDoc?: unknown;
-  currentDoc?: unknown;
+  originalDoc?: import("@jxsuite/schema/types").JxMutableNode;
+  currentDoc?: import("@jxsuite/schema/types").JxMutableNode;
   original?: unknown;
 }
 
@@ -191,4 +191,8 @@ export interface ProjectState {
   [key: string]: unknown;
 }
 
-export type JsonValue = string | number | boolean | object | null | undefined;
+/**
+ * A JSON document value, or `undefined` to signal property removal in the mutators. Re-uses the
+ * schema's precise recursive JSON model.
+ */
+export type JsonValue = import("@jxsuite/schema/types").JsonValue | undefined;

@@ -16,14 +16,15 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item";
 
 import {
-  leftPanel,
-  getNodeAtPath,
-  parentElementPath,
   childIndex,
+  childList,
+  getNodeAtPath,
   isAncestor,
+  leftPanel,
+  parentElementPath,
   renderOnly,
 } from "../store";
-import { transact, transactDoc, mutateMoveNode, mutateInsertNode } from "../tabs/transact";
+import { mutateInsertNode, mutateMoveNode, transact, transactDoc } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { componentRegistry, computeRelativePath } from "../files/components";
@@ -54,26 +55,30 @@ interface DragMonitorDropArgs {
 export function registerLayersDnD() {
   requestAnimationFrame(() => {
     const container = leftPanel?.querySelector(".layers-container") as HTMLElement | null;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     (container.querySelectorAll("[data-dnd-row]") as NodeListOf<HTMLElement>).forEach((row) => {
       const rowPath = (row.dataset.path as string)
         .split("/")
-        .map((s: string) => (/^\d+$/.test(s) ? parseInt(s) : s)) as JxPath;
-      const rowDepth = parseInt(row.dataset.dndDepth as string) || 0;
-      const isVoid = row.hasAttribute("data-dnd-void");
-      const isExpanded = row.hasAttribute("data-dnd-expanded");
+        .map((s: string) => (/^\d+$/.test(s) ? Number.parseInt(s) : s)) as JxPath;
+      const rowDepth = Number.parseInt(row.dataset.dndDepth as string) || 0;
+      const isVoid = Object.hasOwn(row.dataset, "dndVoid");
+      const isExpanded = Object.hasOwn(row.dataset, "dndExpanded");
 
       const cleanup = combine(
         draggable({
-          element: row,
           canDrag({ element: _el, input }: DragCanDragArgs) {
             const target = document.elementFromPoint(input.clientX, input.clientY) as HTMLElement;
-            if (target?.closest(".layer-actions")) return false;
+            if (target?.closest(".layer-actions")) {
+              return false;
+            }
             return true;
           },
+          element: row,
           getInitialData() {
-            return { type: "tree-node", path: rowPath };
+            return { path: rowPath, type: "tree-node" };
           },
           onDragStart() {
             row.classList.add("dragging");
@@ -93,19 +98,27 @@ export function registerLayersDnD() {
           element: row,
           canDrop({ source }: DragDropSourceArgs) {
             const srcPath = source.data.path as JxPath | undefined;
-            if (srcPath && isAncestor(srcPath, rowPath)) return false;
+            if (srcPath && isAncestor(srcPath, rowPath)) {
+              return false;
+            }
             return true;
           },
-          getData({ input, element }: any) {
+          getData({
+            input,
+            element,
+          }: {
+            input: Parameters<typeof attachInstruction>[1]["input"];
+            element: Element;
+          }) {
             return attachInstruction(
               { path: rowPath },
               {
-                input,
-                element,
-                currentLevel: rowDepth,
-                indentPerLevel: 16,
-                mode: isExpanded ? "expanded" : "standard",
                 block: isVoid ? ["make-child"] : [],
+                currentLevel: rowDepth,
+                element,
+                indentPerLevel: 16,
+                input,
+                mode: isExpanded ? "expanded" : "standard",
               },
             ) as Record<string | symbol, unknown>;
           },
@@ -116,7 +129,7 @@ export function registerLayersDnD() {
             showLayerDropGap(row, self.data, container);
           },
           // No onDragLeave clear — the gap persists while the pointer crosses dead space
-          // between rows; the monitor clears it when the drag moves to a non-tree target.
+          // Between rows; the monitor clears it when the drag moves to a non-tree target.
           onDrop() {
             clearLayerDropGap(container);
           },
@@ -127,24 +140,22 @@ export function registerLayersDnD() {
 
     // Global monitor
     const monitorCleanup = monitorForElements({
-      onDropTargetChange({ location }: DragMonitorDropArgs) {
-        // Clear the layer gap when the drag moves onto a non-tree target (e.g. a canvas
-        // element). When there is no target at all, keep the gap so it persists.
-        const inner = location.current.dropTargets[0];
-        if (inner && !extractInstruction(inner.data)) clearLayerDropGap(container);
-      },
       onDrop({ source, location }: DragMonitorDropArgs) {
         clearLayerDropGap(container);
         const target = location.current.dropTargets[0];
-        if (!target) return;
+        if (!target) {
+          return;
+        }
         const instruction = extractInstruction(target.data);
-        if (!instruction || instruction.type === "instruction-blocked") return;
+        if (!instruction || instruction.type === "instruction-blocked") {
+          return;
+        }
         const srcData = source.data;
         const targetPath = target.data.path as JxPath;
 
         // If the source had children, persist collapse at the new location
         const srcRow = srcData.type === "tree-node" && source.element;
-        const wasExpanded = srcRow && srcRow.hasAttribute("data-dnd-expanded");
+        const wasExpanded = srcRow && Object.hasOwn(srcRow.dataset, "dndExpanded");
 
         applyDropInstruction(instruction, srcData, targetPath);
 
@@ -157,6 +168,14 @@ export function registerLayersDnD() {
           }
         }
       },
+      onDropTargetChange({ location }: DragMonitorDropArgs) {
+        // Clear the layer gap when the drag moves onto a non-tree target (e.g. a canvas
+        // Element). When there is no target at all, keep the gap so it persists.
+        const inner = location.current.dropTargets[0];
+        if (inner && !extractInstruction(inner.data)) {
+          clearLayerDropGap(container);
+        }
+      },
     });
     view.dndCleanups.push(monitorCleanup);
   });
@@ -166,28 +185,33 @@ export function registerLayersDnD() {
 export function registerComponentsDnD() {
   requestAnimationFrame(() => {
     const container = leftPanel?.querySelector(".components-section") as HTMLElement | null;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
 
     (container.querySelectorAll("[data-component-tag]") as NodeListOf<HTMLElement>).forEach(
       (row) => {
         const tagName = row.dataset.componentTag;
-        if (!tagName) return;
+        if (!tagName) {
+          return;
+        }
         const comp = componentRegistry.find(
           (c: import("../files/components.js").ComponentEntry) => c.tagName === tagName,
         );
-        if (!comp) return;
+        if (!comp) {
+          return;
+        }
 
         // Fill preview with live rendered component
         const preview = row.querySelector(".element-card-preview");
         if (preview && !preview.querySelector(tagName)) {
           renderComponentPreview(comp).then((el: HTMLElement) => {
             preview.textContent = "";
-            preview.appendChild(el);
+            preview.append(el);
           });
         }
 
         const instanceDef = {
-          tagName: comp.tagName,
           $props: comp.props
             ? Object.fromEntries(
                 comp.props.map(
@@ -198,11 +222,12 @@ export function registerComponentsDnD() {
                 ),
               )
             : {},
+          tagName: comp.tagName,
         };
         const cleanup = draggable({
           element: row,
           getInitialData() {
-            return { type: "block", fragment: structuredClone(instanceDef) };
+            return { fragment: structuredClone(instanceDef), type: "block" };
           },
         });
         view.dndCleanups.push(cleanup);
@@ -215,20 +240,22 @@ export function registerComponentsDnD() {
 export function registerElementsDnD() {
   requestAnimationFrame(() => {
     const container = leftPanel?.querySelector(".panel-body") as HTMLElement | null;
-    if (!container) return;
+    if (!container) {
+      return;
+    }
     (container.querySelectorAll("[data-block-tag]") as NodeListOf<HTMLElement>).forEach((row) => {
       const tag = row.dataset.blockTag as string;
       const preview = row.querySelector(".element-card-preview");
       if (preview && !preview.firstChild) {
         const el = document.createElement(unsafeTags.has(tag) ? "span" : tag);
         el.textContent = tag;
-        preview.appendChild(el);
+        preview.append(el);
       }
       const def = defaultDef(tag);
       const cleanup = draggable({
         element: row,
         getInitialData() {
-          return { type: "block", fragment: structuredClone(def) };
+          return { fragment: structuredClone(def), type: "block" };
         },
       });
       view.dndCleanups.push(cleanup);
@@ -243,7 +270,7 @@ export function registerElementsDnD() {
  * @param {HTMLElement} container
  */
 function hideDescendantRows(parentRow: HTMLElement, container: HTMLElement) {
-  const prefix = parentRow.dataset.path + "/";
+  const prefix = `${parentRow.dataset.path}/`;
   const rows = container.querySelectorAll(".layers-tree .layer-row");
   for (const r of rows) {
     if ((r as HTMLElement).dataset.path?.startsWith(prefix)) {
@@ -285,12 +312,14 @@ export function showLayerDropGap(
   view._currentDropTargetRow = rowEl;
 
   // Shift rows to create gap
-  const rows = Array.from(container.querySelectorAll(".layers-tree .layer-row"));
+  const rows = [...container.querySelectorAll(".layers-tree .layer-row")];
   const targetIdx = rows.indexOf(rowEl);
   const gap = view.layerDragSourceHeight;
 
   for (let i = 0; i < rows.length; i++) {
-    if ((rows[i] as HTMLElement).classList.contains("dragging")) continue;
+    if ((rows[i] as HTMLElement).classList.contains("dragging")) {
+      continue;
+    }
     if (instruction.type === "reorder-above") {
       (rows[i] as HTMLElement).style.transform = i >= targetIdx ? `translateY(${gap}px)` : "";
     } else {
@@ -306,7 +335,9 @@ export function clearLayerDropGap(container: HTMLElement) {
     view._currentDropTargetRow = null;
   }
   const rows = container.querySelectorAll(".layers-tree .layer-row");
-  for (const r of rows) (r as HTMLElement).style.transform = "";
+  for (const r of rows) {
+    (r as HTMLElement).style.transform = "";
+  }
 }
 
 /**
@@ -327,22 +358,25 @@ export function applyDropInstruction(
     const targetParent = parentElementPath(targetPath) as JxPath;
     const targetIdx = childIndex(targetPath) as number;
     // Reordering requires a parent and a numeric index; root-level paths can't be
-    // reordered around.
-    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number"))
+    // Reordered around.
+    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number")) {
       return;
+    }
 
     switch (instruction.type) {
-      case "reorder-above":
+      case "reorder-above": {
         transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetParent, targetIdx));
         break;
-      case "reorder-below":
+      }
+      case "reorder-below": {
         transactDoc(activeTab.value, (t) =>
           mutateMoveNode(t, fromPath, targetParent, targetIdx + 1),
         );
         break;
+      }
       case "make-child": {
         const target = getNodeAtPath(doc, targetPath);
-        const len = target?.children?.length || 0;
+        const len = childList(target).length;
         transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetPath, len));
         break;
       }
@@ -350,11 +384,12 @@ export function applyDropInstruction(
   } else if (srcData.type === "block") {
     const targetParent = parentElementPath(targetPath) as JxPath;
     const targetIdx = childIndex(targetPath) as number;
-    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number"))
+    if (instruction.type !== "make-child" && (!targetParent || typeof targetIdx !== "number")) {
       return;
+    }
 
     switch (instruction.type) {
-      case "reorder-above":
+      case "reorder-above": {
         transactDoc(activeTab.value, (t) =>
           mutateInsertNode(
             t,
@@ -364,7 +399,8 @@ export function applyDropInstruction(
           ),
         );
         break;
-      case "reorder-below":
+      }
+      case "reorder-below": {
         transactDoc(activeTab.value, (t) =>
           mutateInsertNode(
             t,
@@ -374,9 +410,10 @@ export function applyDropInstruction(
           ),
         );
         break;
+      }
       case "make-child": {
         const target = getNodeAtPath(doc, targetPath);
-        const len = target?.children?.length || 0;
+        const len = childList(target).length;
         transactDoc(activeTab.value, (t) =>
           mutateInsertNode(t, targetPath, len, structuredClone(srcData.fragment as JxMutableNode)),
         );
@@ -396,28 +433,36 @@ export function applyDropInstruction(
         const elements = tab?.doc.document?.$elements || [];
         if (comp.source === "npm") {
           const specifier = comp.modulePath ? `${comp.package}/${comp.modulePath}` : comp.package;
-          if (!specifier) return;
+          if (!specifier) {
+            return;
+          }
           const alreadyImported = elements.some(
             (e: JxMutableNode | string | { $ref: string }) => e === specifier || e === comp.package,
           );
           if (!alreadyImported) {
             transact(activeTab.value, (doc: JxMutableNode) => {
-              if (!doc.$elements) doc.$elements = [];
+              if (!doc.$elements) {
+                doc.$elements = [];
+              }
               doc.$elements.push(specifier);
             });
           }
         } else {
           const alreadyImported = elements.some((e: JxMutableNode | string | { $ref: string }) => {
             const ref = typeof e === "object" && e !== null ? e.$ref : undefined;
+            const compPath = comp.path;
             return (
               ref &&
-              (ref === `./${comp.path}` || ref.endsWith(comp.path.split("/").pop() as string))
+              compPath &&
+              (ref === `./${compPath}` || ref.endsWith(compPath.split("/").pop() as string))
             );
           });
-          if (!alreadyImported) {
+          if (!alreadyImported && comp.path) {
             const relPath = computeRelativePath(tab?.documentPath ?? null, comp.path);
             transact(activeTab.value, (doc: JxMutableNode) => {
-              if (!doc.$elements) doc.$elements = [];
+              if (!doc.$elements) {
+                doc.$elements = [];
+              }
               doc.$elements.push({ $ref: relPath });
             });
           }

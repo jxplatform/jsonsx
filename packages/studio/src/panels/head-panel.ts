@@ -9,12 +9,12 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { renderFieldRow } from "../ui/field-row";
-import { spTextField, spTextArea, spNumberField } from "../ui/field-input";
+import { spNumberField, spTextArea, spTextField } from "../ui/field-input";
 import { renderMediaPicker } from "../ui/media-picker";
-import { renderOnly, projectState } from "../store";
-import type { JsonValue, DirEntry } from "../types";
+import { projectState, renderOnly } from "../store";
+import type { DirEntry, JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateUpdateFrontmatter } from "../tabs/transact";
+import { mutateUpdateFrontmatter, transactDoc } from "../tabs/transact";
 import { findContentTypeSchema } from "../utils/studio-utils";
 import { isGoogleFontEntry, isGoogleFontPreconnect } from "../utils/google-fonts";
 import { invalidateLayoutCache } from "../site-context";
@@ -51,8 +51,8 @@ async function loadLayoutEntries() {
       .map((f: DirEntry) => ({
         name: f.name
           .replace(/\.json$/, "")
-          .replace(/[-_]+/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase()),
+          .replaceAll(/[-_]+/g, " ")
+          .replaceAll(/\b\w/g, (c) => c.toUpperCase()),
         path: `./layouts/${f.name}`,
       }));
   } catch {
@@ -68,20 +68,20 @@ export function invalidateLayoutPickerCache() {
 // ─── Field definitions ───────────────────────────────────────────────────
 
 const PAGE_FIELDS: MetaField[] = [
-  { label: "Description", attr: "name", key: "description" },
-  { label: "Viewport", attr: "name", key: "viewport" },
+  { attr: "name", key: "description", label: "Description" },
+  { attr: "name", key: "viewport", label: "Viewport" },
 ];
 
 const OG_FIELDS: MetaField[] = [
-  { label: "Title", attr: "property", key: "og:title" },
+  { attr: "property", key: "og:title", label: "Title" },
   {
-    label: "Description",
     attr: "property",
     key: "og:description",
+    label: "Description",
     multiline: true,
   },
-  { label: "Image", attr: "property", key: "og:image", media: true },
-  { label: "Type", attr: "property", key: "og:type" },
+  { attr: "property", key: "og:image", label: "Image", media: true },
+  { attr: "property", key: "og:type", label: "Type" },
 ];
 
 /** Set of `name`/`property` values managed by the structured forms. */
@@ -101,7 +101,9 @@ const RESERVED_FM_KEYS = new Set(["title"]);
  * @returns {JxHeadEntry | undefined}
  */
 function findMetaEntry(head: JxHeadEntry[], attr: "name" | "property", key: string) {
-  if (!head) return undefined;
+  if (!head) {
+    return;
+  }
   return head.find((e: JxHeadEntry) => e?.tagName === "meta" && e?.attributes?.[attr] === key);
 }
 
@@ -113,7 +115,9 @@ function findMetaEntry(head: JxHeadEntry[], attr: "name" | "property", key: stri
  * @returns {JxHeadEntry | undefined}
  */
 function findLinkEntry(head: JxHeadEntry[], rel: string) {
-  if (!head) return undefined;
+  if (!head) {
+    return;
+  }
   return head.find((e: JxHeadEntry) => e?.tagName === "link" && e?.attributes?.rel === rel);
 }
 
@@ -124,15 +128,21 @@ function findLinkEntry(head: JxHeadEntry[], rel: string) {
  * @returns {boolean}
  */
 function isManagedEntry(entry: JxHeadEntry) {
-  if (!entry?.tagName) return false;
+  if (!entry?.tagName) {
+    return false;
+  }
   // Managed meta tags
   if (entry.tagName === "meta") {
     const name = String(entry?.attributes?.name ?? "");
     const prop = String(entry?.attributes?.property ?? "");
-    return !!(name && MANAGED_META_KEYS.has(name)) || !!(prop && MANAGED_META_KEYS.has(prop));
+    return (
+      Boolean(name && MANAGED_META_KEYS.has(name)) || Boolean(prop && MANAGED_META_KEYS.has(prop))
+    );
   }
   // Managed link: favicon
-  if (entry.tagName === "link" && entry?.attributes?.rel === "icon") return true;
+  if (entry.tagName === "link" && entry?.attributes?.rel === "icon") {
+    return true;
+  }
   return false;
 }
 
@@ -145,18 +155,20 @@ function isManagedEntry(entry: JxHeadEntry) {
  * @param {string} content
  */
 function upsertMeta(doc: JxMutableNode, attr: "name" | "property", key: string, content: string) {
-  if (!doc.$head) doc.$head = [];
+  if (!doc.$head) {
+    doc.$head = [];
+  }
   const idx = doc.$head.findIndex(
     (e: JxHeadEntry) => e?.tagName === "meta" && e?.attributes?.[attr] === key,
   );
   if (content) {
-    const entry = { tagName: "meta", attributes: { [attr]: key, content } };
-    if (idx >= 0) {
+    const entry = { attributes: { [attr]: key, content }, tagName: "meta" };
+    if (idx !== -1) {
       doc.$head[idx] = entry;
     } else {
       doc.$head.push(entry);
     }
-  } else if (idx >= 0) {
+  } else if (idx !== -1) {
     doc.$head.splice(idx, 1);
   }
 }
@@ -169,18 +181,20 @@ function upsertMeta(doc: JxMutableNode, attr: "name" | "property", key: string, 
  * @param {string} href
  */
 function upsertLink(doc: JxMutableNode, rel: string, href: string) {
-  if (!doc.$head) doc.$head = [];
+  if (!doc.$head) {
+    doc.$head = [];
+  }
   const idx = doc.$head.findIndex(
     (e: JxHeadEntry) => e?.tagName === "link" && e?.attributes?.rel === rel,
   );
   if (href) {
-    const entry = { tagName: "link", attributes: { rel, href } };
-    if (idx >= 0) {
+    const entry = { attributes: { href, rel }, tagName: "link" };
+    if (idx !== -1) {
       doc.$head[idx] = entry;
     } else {
       doc.$head.push(entry);
     }
-  } else if (idx >= 0) {
+  } else if (idx !== -1) {
     doc.$head.splice(idx, 1);
   }
 }
@@ -192,13 +206,25 @@ function upsertLink(doc: JxMutableNode, rel: string, href: string) {
  * @returns {string}
  */
 function entryLabel(entry: JxHeadEntry) {
-  if (!entry?.tagName) return "unknown";
+  if (!entry?.tagName) {
+    return "unknown";
+  }
   const a = entry.attributes ?? {};
-  if (a.name) return `<meta name="${String(a.name)}">`;
-  if (a.property) return `<meta property="${String(a.property)}">`;
-  if (a.rel && a.href) return `<link rel="${String(a.rel)}">`;
-  if (a.src) return `<script src="${String(a.src)}">`;
-  if (a.charset) return `<meta charset="${String(a.charset)}">`;
+  if (a.name) {
+    return `<meta name="${String(a.name)}">`;
+  }
+  if (a.property) {
+    return `<meta property="${String(a.property)}">`;
+  }
+  if (a.rel && a.href) {
+    return `<link rel="${String(a.rel)}">`;
+  }
+  if (a.src) {
+    return `<script src="${String(a.src)}">`;
+  }
+  if (a.charset) {
+    return `<meta charset="${String(a.charset)}">`;
+  }
   return `<${entry.tagName}>`;
 }
 
@@ -233,10 +259,10 @@ function renderMetaFieldRow(
 
   if (field.media) {
     return renderFieldRow({
-      prop: field.key,
+      hasValue: Boolean(val),
       label: field.label,
-      hasValue: !!val,
       onClear: () => applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, "")),
+      prop: field.key,
       widget: renderMediaPicker(field.key, val, (v: string) => {
         applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, v || ""));
       }),
@@ -254,10 +280,10 @@ function renderMetaFieldRow(
     : spTextField(`head:${field.key}`, val, commit, { placeholder });
 
   return renderFieldRow({
-    prop: field.key,
+    hasValue: Boolean(val),
     label: field.label,
-    hasValue: !!val,
     onClear: () => applyMutation((d: JxMutableNode) => upsertMeta(d, field.attr, field.key, "")),
+    prop: field.key,
     widget,
   });
 }
@@ -317,8 +343,8 @@ export function renderHeadTemplate({
         ? defaultLayout
             .replace(/^\.\/layouts\//, "")
             .replace(/\.json$/, "")
-            .replace(/[-_]+/g, " ")
-            .replace(/\b\w/g, (c: string) => c.toUpperCase())
+            .replaceAll(/[-_]+/g, " ")
+            .replaceAll(/\b\w/g, (c: string) => c.toUpperCase())
         : "";
 
       layoutSection = html`
@@ -328,13 +354,13 @@ export function renderHeadTemplate({
           </div>
           <div class="head-section-body">
             ${renderFieldRow({
-              prop: "layout",
-              label: "Layout",
               hasValue: currentLayout !== undefined,
+              label: "Layout",
               onClear: () =>
                 applyMutation((d: JxMutableNode) => {
                   delete d.$layout;
                 }),
+              prop: "layout",
               widget: html`
                 <sp-picker
                   size="s"
@@ -342,9 +368,13 @@ export function renderHeadTemplate({
                   @change=${(e: Event) => {
                     const val = (e.target as HTMLInputElement).value;
                     applyMutation((d: JxMutableNode) => {
-                      if (val === "__default__") delete d.$layout;
-                      else if (val === "__none__") d.$layout = false;
-                      else d.$layout = val;
+                      if (val === "__default__") {
+                        delete d.$layout;
+                      } else if (val === "__none__") {
+                        d.$layout = false;
+                      } else {
+                        d.$layout = val;
+                      }
                     });
                     invalidateLayoutCache();
                   }}
@@ -378,31 +408,34 @@ export function renderHeadTemplate({
         </div>
         <div class="head-section-body">
           ${renderFieldRow({
-            prop: "title",
+            hasValue: Boolean(title),
             label: "Title",
-            hasValue: !!title,
             onClear: () =>
               applyMutation((d: JxMutableNode) => {
                 delete d.title;
               }),
+            prop: "title",
             widget: spTextField(
               "head:title",
               title,
               (v: string) =>
                 applyMutation((d: JxMutableNode) => {
                   const val = v.trim();
-                  if (val) d.title = val;
-                  else delete d.title;
+                  if (val) {
+                    d.title = val;
+                  } else {
+                    delete d.title;
+                  }
                 }),
               { placeholder: "Page title…" },
             ),
           })}
           ${PAGE_FIELDS.map((field) => renderMetaFieldRow(field, head, applyMutation))}
           ${renderFieldRow({
-            prop: "icon",
+            hasValue: Boolean(iconHref),
             label: "Icon",
-            hasValue: !!iconHref,
             onClear: () => applyMutation((d: JxMutableNode) => upsertLink(d, "icon", "")),
+            prop: "icon",
             widget: renderMediaPicker("icon", iconHref, (v: string) => {
               applyMutation((d: JxMutableNode) => upsertLink(d, "icon", v || ""));
             }),
@@ -442,9 +475,13 @@ export function renderHeadTemplate({
                         title="Remove"
                         @click=${() => {
                           applyMutation((d: JxMutableNode) => {
-                            if (!d.$head) return;
+                            if (!d.$head) {
+                              return;
+                            }
                             const idx = d.$head.indexOf(entry);
-                            if (idx >= 0) d.$head.splice(idx, 1);
+                            if (idx !== -1) {
+                              d.$head.splice(idx, 1);
+                            }
                           });
                           renderLeftPanel();
                         }}
@@ -483,21 +520,29 @@ export function renderHeadTemplate({
               const tagName = tagPicker?.value || "meta";
               const attrKey = attrField?.value?.trim();
               const attrVal = valField?.value?.trim();
-              if (!attrKey || !attrVal) return;
-              if (attrField) attrField.value = "";
-              if (valField) valField.value = "";
+              if (!attrKey || !attrVal) {
+                return;
+              }
+              if (attrField) {
+                attrField.value = "";
+              }
+              if (valField) {
+                valField.value = "";
+              }
 
-              const entry: JxHeadEntry = { tagName, attributes: {} };
+              const entry: JxHeadEntry = { attributes: {}, tagName };
               if (tagName === "meta") {
-                entry.attributes = { name: attrKey, content: attrVal };
+                entry.attributes = { content: attrVal, name: attrKey };
               } else if (tagName === "link") {
-                entry.attributes = { rel: attrKey, href: attrVal };
+                entry.attributes = { href: attrVal, rel: attrKey };
               } else if (tagName === "script") {
                 entry.attributes = { [attrKey]: attrVal };
               }
 
               applyMutation((d: JxMutableNode) => {
-                if (!d.$head) d.$head = [];
+                if (!d.$head) {
+                  d.$head = [];
+                }
                 d.$head.push(entry);
               });
               renderLeftPanel();
@@ -515,7 +560,9 @@ export function renderHeadTemplate({
 
 function renderFrontmatterSection() {
   const tab = activeTab.value;
-  if (!tab) return nothing;
+  if (!tab) {
+    return nothing;
+  }
 
   const fm = tab.doc.content?.frontmatter || {};
   const col = findContentTypeSchema(tab.documentPath, projectState?.projectConfig);
@@ -531,29 +578,37 @@ function renderFrontmatterSection() {
     for (const [field, fieldSchema] of Object.entries(
       /** @type {Record<string, FmSchemaEntry>} */ schemaProps,
     )) {
-      if (RESERVED_FM_KEYS.has(field)) continue;
-      fields.push({ field, entry: fieldSchema, value: fm[field] as JsonValue });
+      if (RESERVED_FM_KEYS.has(field)) {
+        continue;
+      }
+      fields.push({ entry: fieldSchema, field, value: fm[field] as JsonValue });
     }
     for (const [field, value] of Object.entries(fm)) {
-      if (schemaProps[field] || field.startsWith("$") || RESERVED_FM_KEYS.has(field)) continue;
+      if (schemaProps[field] || field.startsWith("$") || RESERVED_FM_KEYS.has(field)) {
+        continue;
+      }
       fields.push({
-        field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+        field,
         value: /** @type {JsonValue} */ value,
       });
     }
   } else {
     for (const [field, value] of Object.entries(fm)) {
-      if (field.startsWith("$") || RESERVED_FM_KEYS.has(field)) continue;
+      if (field.startsWith("$") || RESERVED_FM_KEYS.has(field)) {
+        continue;
+      }
       fields.push({
-        field,
         entry: { type: typeof value === "boolean" ? "boolean" : "string" },
+        field,
         value: /** @type {JsonValue} */ value,
       });
     }
   }
 
-  if (fields.length === 0 && !schemaProps) return nothing;
+  if (fields.length === 0 && !schemaProps) {
+    return nothing;
+  }
 
   return html`
     <div class="imports-section">
@@ -576,22 +631,21 @@ function renderFmField(
   requiredFields: Set<string>,
 ) {
   const isRequired = requiredFields.has(field);
-  const label = field.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+  const label = field.replaceAll(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
   const displayLabel = label + (isRequired ? " *" : "");
   const hasVal = value !== undefined && value !== "" && value !== false;
-  const onClear = () =>
-    transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, undefined));
+  const onClear = () => transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field));
 
   if (entry.type === "boolean") {
     return renderFieldRow({
-      prop: field,
-      label: displayLabel,
       hasValue: hasVal,
+      label: displayLabel,
       onClear,
+      prop: field,
       widget: html`
         <sp-checkbox
           size="s"
-          .checked=${live(!!value)}
+          .checked=${live(Boolean(value))}
           @change=${(e: Event) =>
             transactDoc(activeTab.value, (t) =>
               mutateUpdateFrontmatter(
@@ -608,10 +662,10 @@ function renderFmField(
   if (entry.type === "array") {
     const display = Array.isArray(value) ? value.join(", ") : (value as string) || "";
     return renderFieldRow({
-      prop: field,
-      label: displayLabel,
       hasValue: hasVal,
+      label: displayLabel,
       onClear,
+      prop: field,
       widget: spTextField(
         `fm:${field}`,
         display,
@@ -631,10 +685,10 @@ function renderFmField(
 
   if (Array.isArray(entry.enum)) {
     return renderFieldRow({
-      prop: field,
-      label: displayLabel,
       hasValue: hasVal,
+      label: displayLabel,
       onClear,
+      prop: field,
       widget: html`
         <sp-picker
           size="s"
@@ -652,10 +706,10 @@ function renderFmField(
 
   if (entry.format === "image") {
     return renderFieldRow({
-      prop: field,
-      label: displayLabel,
       hasValue: hasVal,
+      label: displayLabel,
       onClear,
+      prop: field,
       widget: renderMediaPicker(field, value as string, (v: string) =>
         transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, v || undefined)),
       ),
@@ -664,10 +718,10 @@ function renderFmField(
 
   if (entry.type === "number") {
     return renderFieldRow({
-      prop: field,
-      label: displayLabel,
       hasValue: hasVal,
+      label: displayLabel,
       onClear,
+      prop: field,
       widget: spNumberField(value !== undefined ? Number(value) : undefined, (n) =>
         transactDoc(activeTab.value, (t) => mutateUpdateFrontmatter(t, field, n)),
       ),
@@ -675,10 +729,10 @@ function renderFmField(
   }
 
   return renderFieldRow({
-    prop: field,
-    label: displayLabel,
     hasValue: hasVal,
+    label: displayLabel,
     onClear,
+    prop: field,
     widget: spTextField(
       `fm:${field}`,
       (value as string) || "",

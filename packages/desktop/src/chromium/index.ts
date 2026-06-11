@@ -1,41 +1,41 @@
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import {
-  setProjectRoot,
-  setFileDialog,
-  getProjectRoot,
-  openProject,
-  listDirectory,
-  handleReadFile,
-  handleWriteFile,
-  handleDeleteFile,
-  handleRenameFile,
-  handleCreateDirectory,
-  handleUploadFile,
-  handleResolveSiteContext,
-  discoverComponents,
   codeService,
-  locateFile,
+  discoverComponents,
   fetchPluginSchema,
+  getProjectRoot,
+  handleCreateDirectory,
+  handleDeleteFile,
+  handleReadFile,
+  handleRenameFile,
+  handleResolveSiteContext,
+  handleUploadFile,
+  handleWriteFile,
+  listDirectory,
+  locateFile,
+  openProject,
+  setFileDialog,
+  setProjectRoot,
 } from "../handlers";
 import {
-  gitStatus,
+  gitAddRemote,
   gitBranches,
-  gitLog,
-  gitStage,
-  gitUnstage,
-  gitCommit,
-  gitPush,
-  gitPull,
-  gitFetch,
   gitCheckout,
+  gitCommit,
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitFetch,
   gitInit,
-  gitAddRemote,
+  gitLog,
+  gitPull,
+  gitPush,
+  gitStage,
+  gitStatus,
+  gitUnstage,
 } from "../git";
-import { addPackage, removePackage, listPackages } from "../packages";
+import { addPackage, listPackages, removePackage } from "../packages";
 import { openFileDialog } from "./utils";
 import { handleAiRoute } from "../ai";
 
@@ -48,38 +48,38 @@ setFileDialog(openFileDialog);
 // ─── RPC handler dispatch map ────────────────────────────────────────────────
 
 const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
-  openProject: () => openProject(),
-  listDirectory: (params) => listDirectory(params as { dir: string }),
-  readFile: (params) => handleReadFile(params as { path: string }),
-  writeFile: (params) => handleWriteFile(params as { path: string; content: string }),
-  deleteFile: (params) => handleDeleteFile(params as { path: string }),
-  renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
-  createDirectory: (params) => handleCreateDirectory(params as { path: string }),
-  uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
-  resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
-  discoverComponents: (params) => discoverComponents(params as { dir?: string }),
+  addPackage: (params) => addPackage(params as { name: string }),
   codeService: (params) => codeService(params),
-  locateFile: (params) => locateFile(params as { name: string }),
+  createDirectory: (params) => handleCreateDirectory(params as { path: string }),
+  deleteFile: (params) => handleDeleteFile(params as { path: string }),
+  discoverComponents: (params) => discoverComponents(params as { dir?: string }),
   fetchPluginSchema: (params) =>
     fetchPluginSchema(params as { src: string; prototype?: string; base?: string }),
-  gitStatus: () => gitStatus(),
+  gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
   gitBranches: () => gitBranches(),
-  gitLog: (params) => gitLog(params as { limit?: number }),
-  gitStage: (params) => gitStage(params as { files: string[] }),
-  gitUnstage: (params) => gitUnstage(params as { files: string[] }),
-  gitCommit: (params) => gitCommit(params as { message: string }),
-  gitPush: (params) => gitPush(params as { setUpstream?: boolean }),
-  gitPull: () => gitPull(),
-  gitFetch: () => gitFetch(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
+  gitCommit: (params) => gitCommit(params as { message: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),
   gitDiff: (params) => gitDiff(params as { path?: string }),
   gitDiscard: (params) => gitDiscard(params as { files: string[] }),
+  gitFetch: () => gitFetch(),
   gitInit: () => gitInit(),
-  gitAddRemote: (params) => gitAddRemote(params as { name: string; url: string }),
-  addPackage: (params) => addPackage(params as { name: string }),
-  removePackage: (params) => removePackage(params as { name: string }),
+  gitLog: (params) => gitLog(params as { limit?: number }),
+  gitPull: () => gitPull(),
+  gitPush: (params) => gitPush(params as { setUpstream?: boolean }),
+  gitStage: (params) => gitStage(params as { files: string[] }),
+  gitStatus: () => gitStatus(),
+  gitUnstage: (params) => gitUnstage(params as { files: string[] }),
+  listDirectory: (params) => listDirectory(params as { dir: string }),
   listPackages: () => listPackages(),
+  locateFile: (params) => locateFile(params as { name: string }),
+  openProject: () => openProject(),
+  readFile: (params) => handleReadFile(params as { path: string }),
+  removePackage: (params) => removePackage(params as { name: string }),
+  renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
+  resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
+  uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
+  writeFile: (params) => handleWriteFile(params as { path: string; content: string }),
 };
 
 // ─── Static file serving + WebSocket RPC server ──────────────────────────────
@@ -87,9 +87,10 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
 const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../../assets/studio");
 
 const server = Bun.serve({
-  port: 0,
   async fetch(req, server) {
-    if (server.upgrade(req)) return;
+    if (server.upgrade(req)) {
+      return;
+    }
 
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/{2,}/, "/");
@@ -97,13 +98,17 @@ const server = Bun.serve({
     // AI routes (SSE streaming + REST)
     if (path.startsWith("/studio/ai/")) {
       const aiResponse = await handleAiRoute(req, path, projectRoot);
-      if (aiResponse) return aiResponse;
+      if (aiResponse) {
+        return aiResponse;
+      }
     }
 
     if (path.startsWith("/studio/")) {
-      const assetPath = resolve(studioDir, "." + path.replace("/studio/", "/"));
+      const assetPath = resolve(studioDir, `.${path.replace("/studio/", "/")}`);
       const file = Bun.file(assetPath);
-      if (await file.exists()) return new Response(file);
+      if (await file.exists()) {
+        return new Response(file);
+      }
     }
 
     const root = getProjectRoot();
@@ -111,27 +116,34 @@ const server = Bun.serve({
       // Serve absolute paths that fall under the project root
       if (path.startsWith(root)) {
         const file = Bun.file(path);
-        if (await file.exists()) return new Response(file);
+        if (await file.exists()) {
+          return new Response(file);
+        }
       }
 
       // Serve relative paths from project root
-      const projectFile = Bun.file(resolve(root, "." + path));
-      if (await projectFile.exists()) return new Response(projectFile);
+      const projectFile = Bun.file(resolve(root, `.${path}`));
+      if (await projectFile.exists()) {
+        return new Response(projectFile);
+      }
 
       // Serve from public/ subdirectory
-      const publicFile = Bun.file(resolve(root, "public", "." + path));
-      if (await publicFile.exists()) return new Response(publicFile);
+      const publicFile = Bun.file(resolve(root, "public", `.${path}`));
+      if (await publicFile.exists()) {
+        return new Response(publicFile);
+      }
     }
 
     return new Response("Not Found", { status: 404 });
   },
+  port: 0,
   websocket: {
     async message(ws, raw) {
       let msg: { id: number; method: string; params?: unknown };
       try {
         msg = JSON.parse(raw as string);
       } catch {
-        ws.send(JSON.stringify({ id: 0, error: "Invalid JSON" }));
+        ws.send(JSON.stringify({ error: "Invalid JSON", id: 0 }));
         return;
       }
 
@@ -139,8 +151,8 @@ const server = Bun.serve({
       if (!handler) {
         ws.send(
           JSON.stringify({
-            id: msg.id,
             error: `Unknown method: ${msg.method}`,
+            id: msg.id,
           }),
         );
         return;
@@ -149,11 +161,11 @@ const server = Bun.serve({
       try {
         const result = await handler(msg.params);
         ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
-      } catch (err: unknown) {
+      } catch (error: unknown) {
         ws.send(
           JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
             id: msg.id,
-            error: err instanceof Error ? err.message : String(err),
           }),
         );
       }
@@ -180,7 +192,9 @@ function findChromium(): string | null {
   for (const bin of candidates) {
     try {
       const result = Bun.spawnSync(["which", bin]);
-      if (result.exitCode === 0) return result.stdout.toString().trim();
+      if (result.exitCode === 0) {
+        return result.stdout.toString().trim();
+      }
     } catch {}
   }
   return null;
@@ -207,8 +221,8 @@ if (process.env.WAYLAND_DISPLAY) {
 }
 
 const chrome = spawn(chromiumBin, chromiumArgs, {
-  stdio: "inherit",
   detached: false,
+  stdio: "inherit",
 });
 
 chrome.on("close", (code) => {

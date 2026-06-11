@@ -5,23 +5,19 @@
  */
 
 import { html, nothing } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
+import type { GitBranchesResult, GitDiffState, GitFileStatus, GitStatusResult } from "../types";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
 import { formatForPath } from "../format/format-host";
-import { updateUi, renderOnly, projectState } from "../store";
+import { projectState, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { showDialog, showConfirmDialog } from "../ui/layers";
+import { showConfirmDialog, showDialog } from "../ui/layers";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
 import type { StudioPlatform } from "../types";
-
-interface GitFileEntry {
-  path: string;
-  status: string;
-  staged: boolean;
-}
 
 interface GitLogEntry {
   hash: string;
@@ -30,25 +26,21 @@ interface GitLogEntry {
   date: string;
 }
 
+type GitFileEntry = GitFileStatus;
+
 interface GitUiState {
-  gitStatus?: {
-    files?: GitFileEntry[];
-    branch?: string;
-    ahead?: number;
-    behind?: number;
-    isRepo?: boolean;
-    remotes?: string[];
-  } | null;
-  gitBranches?: { current?: string; branches?: string[] } | null;
+  gitStatus?: Partial<GitStatusResult> | null;
+  gitBranches?: Partial<GitBranchesResult> | null;
   gitLoading?: boolean;
   gitError?: string | null;
   gitCommitMessage?: string;
   gitLogEntries?: GitLogEntry[] | null;
-  [key: string]: unknown;
 }
 
 export async function refreshGitStatus() {
-  if (!projectState) return;
+  if (!projectState) {
+    return;
+  }
   const plat = getPlatform();
   updateUi("gitLoading", true);
   updateUi("gitError", null);
@@ -57,8 +49,8 @@ export async function refreshGitStatus() {
     updateUi("gitStatus", status);
     updateUi("gitBranches", branches);
     _lastUpdated = new Date();
-  } catch (e) {
-    updateUi("gitError", (e as Error).message);
+  } catch (error) {
+    updateUi("gitError", errorMessage(error));
   } finally {
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
@@ -104,7 +96,9 @@ export async function cloneRepository(ctx: { openRecentProject: (root: string) =
     `,
   );
 
-  if (!url) return;
+  if (!url) {
+    return;
+  }
 
   try {
     statusMessage("Cloning repository...");
@@ -113,14 +107,14 @@ export async function cloneRepository(ctx: { openRecentProject: (root: string) =
       statusMessage("Clone complete");
       await ctx.openRecentProject(result.root);
     }
-  } catch (e) {
-    statusMessage(`Clone failed: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Clone failed: ${errorMessage(error)}`);
   }
 }
 
 /** @returns {boolean} */
 export function platformSupportsClone() {
-  return !!getPlatform().gitClone;
+  return Boolean(getPlatform().gitClone);
 }
 
 /**
@@ -134,8 +128,8 @@ async function gitAction(action: string, body?: unknown) {
   try {
     await plat[action](body);
     await refreshGitStatus();
-  } catch (e) {
-    updateUi("gitError", (e as Error).message);
+  } catch (error) {
+    updateUi("gitError", errorMessage(error));
     updateUi("gitLoading", false);
     renderOnly("leftPanel");
   }
@@ -151,8 +145,8 @@ async function fetchGitLog() {
     const entries = await plat.gitLog(30);
     updateUi("gitLogEntries", entries);
     renderOnly("leftPanel");
-  } catch (e) {
-    updateUi("gitError", (e as Error).message);
+  } catch (error) {
+    updateUi("gitError", errorMessage(error));
     renderOnly("leftPanel");
   }
 }
@@ -161,7 +155,7 @@ async function fetchGitLog() {
  * @param {{ ui: GitUiState }} S
  * @param {{
  *   setCanvasMode?: (mode: string) => void;
- *   setGitDiffState?: (state: unknown) => void;
+ *   setGitDiffState?: (state: GitDiffState | null) => void;
  *   cloneRepository?: () => void;
  * }} ctx
  */
@@ -169,7 +163,7 @@ export function renderGitPanel(
   S: { ui: GitUiState },
   ctx: {
     setCanvasMode?: (mode: string) => void;
-    setGitDiffState?: (state: unknown) => void;
+    setGitDiffState?: (state: GitDiffState | null) => void;
     cloneRepository?: () => void;
   },
 ) {
@@ -231,8 +225,10 @@ export function renderGitPanel(
 
   if (!_pollTimer) {
     _pollTimer = setInterval(() => {
-      if (view.leftTab === "git" && !S.ui.gitLoading) refreshGitStatus();
-    }, 30000);
+      if (view.leftTab === "git" && !S.ui.gitLoading) {
+        refreshGitStatus();
+      }
+    }, 30_000);
   }
 
   const stagedFiles = status?.files?.filter((f: GitFileEntry) => f.staged) || [];
@@ -242,7 +238,9 @@ export function renderGitPanel(
   const doCommit = async () => {
     const tab = activeTab.value;
     const msg = tab?.session.ui.gitCommitMessage?.trim();
-    if (!msg) return;
+    if (!msg) {
+      return;
+    }
     updateUi("gitCommitMessage", "");
     await gitAction("gitCommit", msg);
   };
@@ -250,7 +248,9 @@ export function renderGitPanel(
   const doCommitAndSync = async () => {
     const tab = activeTab.value;
     const msg = tab?.session.ui.gitCommitMessage?.trim();
-    if (!msg) return;
+    if (!msg) {
+      return;
+    }
     updateUi("gitCommitMessage", "");
     updateUi("gitLoading", true);
     updateUi("gitError", null);
@@ -259,8 +259,8 @@ export function renderGitPanel(
       await plat.gitCommit(msg);
       await plat.gitPush();
       await refreshGitStatus();
-    } catch (e) {
-      updateUi("gitError", (e as Error).message);
+    } catch (error) {
+      updateUi("gitError", errorMessage(error));
       updateUi("gitLoading", false);
       renderOnly("leftPanel");
     }
@@ -387,10 +387,14 @@ export function renderGitPanel(
           if (val === "__new__") {
             (e.target as HTMLInputElement).value = branches?.current || "";
             const name = prompt("New branch name:");
-            if (name?.trim()) await gitAction("gitCreateBranch", name.trim());
+            if (name?.trim()) {
+              await gitAction("gitCreateBranch", name.trim());
+            }
             return;
           }
-          if (val !== branches?.current) await gitAction("gitCheckout", val);
+          if (val !== branches?.current) {
+            await gitAction("gitCheckout", val);
+          }
         }}
       >
         ${(branches?.branches || []).map(
@@ -405,7 +409,9 @@ export function renderGitPanel(
   // ─── 3. Tabs: Local Changes / History ────────────────────────────────────
   const switchTab = (tab: string) => {
     _gitSubTab = tab;
-    if (tab === "history" && !S.ui.gitLogEntries) fetchGitLog();
+    if (tab === "history" && !S.ui.gitLogEntries) {
+      fetchGitLog();
+    }
     renderOnly("leftPanel");
   };
 
@@ -461,7 +467,9 @@ export function renderGitPanel(
               const menu = (
                 (e.currentTarget as HTMLElement).parentElement as HTMLElement
               ).querySelector(".git-split-menu");
-              if (menu) menu.toggleAttribute("hidden");
+              if (menu) {
+                menu.toggleAttribute("hidden");
+              }
             }}
           >
             <sp-icon-chevron-down slot="icon" size="xs"></sp-icon-chevron-down>
@@ -492,8 +500,12 @@ export function renderGitPanel(
     const dir = parts.join("/");
 
     const onFileClick = async () => {
-      if (file.status !== "M" && file.status !== "A") return;
-      if (!file.path.endsWith(".json") && !formatForPath(file.path)) return;
+      if (file.status !== "M" && file.status !== "A") {
+        return;
+      }
+      if (!file.path.endsWith(".json") && !formatForPath(file.path)) {
+        return;
+      }
 
       try {
         const plat = getPlatform();
@@ -507,20 +519,22 @@ export function renderGitPanel(
         ]);
 
         const diffState = {
-          filePath: file.path,
-          originalContent,
           currentContent,
+          filePath: file.path,
           fileStatus: file.status,
+          originalContent,
         };
 
         updateUi("gitDiffState", diffState);
 
         if (ctx?.setCanvasMode) {
-          if (ctx.setGitDiffState) ctx.setGitDiffState(diffState);
+          if (ctx.setGitDiffState) {
+            ctx.setGitDiffState(diffState);
+          }
           ctx.setCanvasMode("git-diff");
         }
-      } catch (e) {
-        updateUi("gitError", `Failed to load diff: ${(e as Error).message}`);
+      } catch (error) {
+        updateUi("gitError", `Failed to load diff: ${errorMessage(error)}`);
       } finally {
         updateUi("gitLoading", false);
       }
@@ -555,13 +569,17 @@ export function renderGitPanel(
                   quiet
                   title="Discard changes"
                   @click=${async () => {
-                    if (file.status === "U") return;
+                    if (file.status === "U") {
+                      return;
+                    }
                     const confirmed = await showConfirmDialog(
                       "Discard Changes",
                       `Discard changes to ${file.path}?`,
                       { confirmLabel: "Discard", destructive: true },
                     );
-                    if (!confirmed) return;
+                    if (!confirmed) {
+                      return;
+                    }
                     await gitAction("gitDiscard", [file.path]);
                   }}
                   ?disabled=${file.status === "U"}
@@ -585,16 +603,18 @@ export function renderGitPanel(
 
   /** Group files by component (parent directory for .json/.class.json, or "Other") */
   const groupFilesByComponent = (files: GitFileEntry[]) => {
-    const groups: Map<string, GitFileEntry[]> = new Map();
+    const groups = new Map<string, GitFileEntry[]>();
     for (const f of files) {
       const parts = f.path.split("/");
       let component;
       if (f.path.endsWith(".json") || f.path.endsWith(".class.json") || formatForPath(f.path)) {
-        component = parts.length > 1 ? `/${parts[parts.length - 2]}` : `/${parts[0]}`;
+        component = parts.length > 1 ? `/${parts.at(-2)}` : `/${parts[0]}`;
       } else {
         component = "Other";
       }
-      if (!groups.has(component)) groups.set(component, []);
+      if (!groups.has(component)) {
+        groups.set(component, []);
+      }
       (groups.get(component) as GitFileEntry[]).push(f);
     }
     return groups;
@@ -708,13 +728,21 @@ function _relativeDate(iso: string) {
   const d = new Date(iso);
   const now = Date.now();
   const diff = now - d.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) {
+    return "just now";
+  }
+  if (mins < 60) {
+    return `${mins}m ago`;
+  }
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) {
+    return `${days}d ago`;
+  }
   return d.toLocaleDateString();
 }
 

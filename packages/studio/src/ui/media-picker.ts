@@ -64,9 +64,9 @@ async function collectMedia(
         const ext = dot > 0 ? entry.name.slice(dot).toLowerCase() : "";
         if (MEDIA_EXTENSIONS.has(ext)) {
           results.push({
-            path: `/${entry.path}`,
-            name: entry.name,
             isImage: IMAGE_EXTENSIONS.has(ext),
+            name: entry.name,
+            path: `/${entry.path}`,
           });
         }
       }
@@ -78,7 +78,9 @@ async function collectMedia(
 }
 
 async function loadMediaCache() {
-  if (mediaCacheLoaded) return;
+  if (mediaCacheLoaded) {
+    return;
+  }
   const platform = getPlatform();
   mediaCache = await collectMedia("public", platform);
   // Strip "public/" prefix so paths match production (public/ contents served at root)
@@ -137,7 +139,9 @@ function onPopoverOutsideClick(e: MouseEvent) {
 function renderMediaPickerPopover() {
   const host = getLayerSlot("popover", "media-picker");
   const rect = _popoverAnchorEl?.getBoundingClientRect();
-  if (!rect) return;
+  if (!rect) {
+    return;
+  }
 
   const query = _popoverFilter.toLowerCase();
   const filtered = query
@@ -148,7 +152,7 @@ function renderMediaPickerPopover() {
   const options = filtered.slice(0, 50);
 
   // Compute initial position below the anchor
-  let left = rect.left;
+  let { left } = rect;
   let top = rect.bottom + 4;
 
   // Estimate popover dimensions for viewport clamping before first paint
@@ -195,7 +199,7 @@ function renderMediaPickerPopover() {
             dismissMediaPickerPopover();
           }}
         >
-          ${options.length
+          ${options.length > 0
             ? options.map(
                 (m) => html`
                   <sp-menu-item value=${m.path}>
@@ -252,7 +256,9 @@ function renderMediaPickerPopover() {
       }
     }
 
-    if (_popoverFilterEl) _popoverFilterEl.focus();
+    if (_popoverFilterEl) {
+      _popoverFilterEl.focus();
+    }
   });
 }
 

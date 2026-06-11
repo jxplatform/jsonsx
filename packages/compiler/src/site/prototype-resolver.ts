@@ -18,7 +18,15 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { importImplementation } from "./format-host.ts";
-import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
+import { isPrototypeDef } from "@jxsuite/schema/guards";
+import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
+import type {
+  JsonObject,
+  JsonValue,
+  JxDocument,
+  JxMutableNode,
+  JxPrototypeDef,
+} from "@jxsuite/schema/types";
 
 /**
  * Prototype names handled elsewhere (builtins + legacy content system). These are skipped by the
@@ -65,20 +73,30 @@ export async function resolvePrototypes(
   } = {},
 ) {
   const imports = doc.imports ?? {};
-  const state = doc.state;
-  if (!state) return;
+  const { state } = doc;
+  if (!state) {
+    return;
+  }
 
   for (const [key, def] of Object.entries(state)) {
-    if (!def || typeof def !== "object" || !def.$prototype) continue;
-    if (SKIP_PROTOTYPES.has(def.$prototype)) continue;
+    if (!isPrototypeDef(def)) {
+      continue;
+    }
+    if (SKIP_PROTOTYPES.has(def.$prototype)) {
+      continue;
+    }
     // Only resolve timing: "compiler" (or unset timing with a .class.json mapping).
     // Leave timing: "server" and timing: "client" for their respective pipelines.
-    if (def.timing && def.timing !== "compiler") continue;
+    if (def.timing && def.timing !== "compiler") {
+      continue;
+    }
 
     // Look up in imports if no $src already set
     if (!def.$src) {
       const mapped = imports[def.$prototype];
-      if (!mapped) continue;
+      if (!mapped) {
+        continue;
+      }
       def.$src = mapped;
     }
 
@@ -86,13 +104,13 @@ export async function resolvePrototypes(
       const resolved = await resolveClassPrototype(def, route, projectRoot, state, projectContext);
       // Preserve timing metadata on the resolved value so compilePage() can strip it
       if (def.timing && resolved && typeof resolved === "object" && !Array.isArray(resolved)) {
-        (resolved as Record<string, unknown>).timing = def.timing;
+        (resolved as JsonObject).timing = def.timing;
       }
       state[key] = resolved;
-    } catch (err) {
+    } catch (error) {
       console.warn(
         `prototype-resolver: failed to resolve "${key}" ($prototype: "${def.$prototype}"):`,
-        (err as Error).message,
+        errorMessage(error),
       );
     }
   }
@@ -101,15 +119,15 @@ export async function resolvePrototypes(
 /**
  * Resolve a single $prototype entry via its .class.json.
  *
- * @param {Record<string, any>} def - The state entry definition
+ * @param {JxPrototypeDef} def - The state entry definition
  * @param {{ sourcePath?: string; _pathParams?: Record<string, string> }} route
  * @param {string} projectRoot
  * @param {Record<string, unknown>} state - The full page state object
  * @param {{ config?: Record<string, unknown>; contentTypes?: Map<string, unknown[]> }} projectContext
- * @returns {Promise<any>} The resolved value
+ * @returns {Promise<JsonValue>} The resolved value
  */
 async function resolveClassPrototype(
-  def: Record<string, any>,
+  def: JxPrototypeDef,
   route: { sourcePath?: string; _pathParams?: Record<string, string> },
   projectRoot: string,
   state: Record<string, unknown>,
@@ -119,6 +137,9 @@ async function resolveClassPrototype(
   },
 ) {
   const src = def.$src;
+  if (!src) {
+    throw new Error(`$prototype "${def.$prototype}" has no $src to resolve`);
+  }
 
   // 1. Resolve .class.json path — handles both npm specifiers and relative paths
   let classJsonPath;
@@ -128,14 +149,14 @@ async function resolveClassPrototype(
       ? resolve(dirname(route.sourcePath), src)
       : resolve(projectRoot, src);
   } else {
-    // npm/bare specifier — use createRequire from the project root to walk node_modules
+    // Npm/bare specifier — use createRequire from the project root to walk node_modules
     const require = createRequire(resolve(projectRoot, "package.json"));
     classJsonPath = require.resolve(src);
   }
 
   // 2. Read and parse .class.json
-  const classJsonText = readFileSync(classJsonPath, "utf-8");
-  const classDef = JSON.parse(classJsonText);
+  const classJsonText = readFileSync(classJsonPath, "utf8");
+  const classDef = parseClassDef(classJsonText, classJsonPath);
 
   if (!classDef.$implementation) {
     throw new Error(`${src} has no $implementation field`);
@@ -158,9 +179,11 @@ async function resolveClassPrototype(
   }
 
   // 6. Build config — filter out reserved keys
-  const config: Record<string, any> = {};
+  const config: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(def)) {
-    if (!RESERVED_KEYS.has(k)) config[k] = v;
+    if (!RESERVED_KEYS.has(k)) {
+      config[k] = v;
+    }
   }
 
   // Auto-set basePath from the page's directory if the config has `src` but no `basePath`
@@ -176,10 +199,11 @@ async function resolveClassPrototype(
   };
   config._document = { route, state };
 
-  // 7. Instantiate and resolve
+  // 7. Instantiate and resolve. Trust boundary: external classes contractually
+  // Return JSON-serializable data (the result is baked into the compiled page).
   const instance = new ExportedClass(config);
   if (typeof instance.resolve === "function") {
-    return await instance.resolve();
+    return (await instance.resolve()) as JsonValue;
   }
-  return instance;
+  return instance as unknown as JsonValue;
 }

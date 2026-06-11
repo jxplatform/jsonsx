@@ -8,6 +8,7 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
@@ -17,16 +18,16 @@ import { invalidateMediaCache } from "../ui/media-picker";
 import { statusMessage } from "../panels/statusbar";
 import { componentRegistry } from "../files/components";
 
-import { showDialog, renderPopover } from "../ui/layers";
+import { renderPopover, showDialog } from "../ui/layers";
 import { renderComponentPreview } from "../panels/stylebook-panel";
-import { renderNode, buildScope, setSkipServerFunctions } from "@jxsuite/runtime";
+import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
 import { parseSourceForPath } from "../files/file-ops";
 import {
-  loadFormats,
-  formatForPath,
-  formatByName,
-  documentExtensions,
   defaultContentFormat,
+  documentExtensions,
+  formatByName,
+  formatForPath,
+  loadFormats,
 } from "../format/format-host";
 
 import type { ComponentEntry } from "../files/components";
@@ -36,11 +37,11 @@ import type { ContentTypeDef } from "@jxsuite/schema/types";
 
 const CATEGORIES = [
   { key: "all", label: "All" },
-  { key: "pages", label: "Pages", dir: "pages" },
-  { key: "layouts", label: "Layouts", dir: "layouts" },
-  { key: "components", label: "Components", dir: "components" },
-  { key: "content", label: "Content", dir: "content" },
-  { key: "media", label: "Media", dir: "public" },
+  { dir: "pages", key: "pages", label: "Pages" },
+  { dir: "layouts", key: "layouts", label: "Layouts" },
+  { dir: "components", key: "components", label: "Components" },
+  { dir: "content", key: "content", label: "Content" },
+  { dir: "public", key: "media", label: "Media" },
 ];
 
 const MEDIA_EXTENSIONS = new Set([
@@ -106,14 +107,30 @@ function isImage(ext: string) {
 
 /** Map a file path to a display category. Media files override by extension. */
 function categoryFor(dir: string, ext: string) {
-  if (ext && MEDIA_EXTENSIONS.has(ext)) return "Media";
-  if (dir.startsWith("pages")) return "Pages";
-  if (dir.startsWith("layouts")) return "Layouts";
-  if (dir.startsWith("components")) return "Components";
-  if (dir.startsWith("content")) return "Content";
-  if (dir.startsWith("public")) return "Media";
-  if (dir.startsWith("data")) return "Content";
-  if (dir.startsWith("styles")) return "Components";
+  if (ext && MEDIA_EXTENSIONS.has(ext)) {
+    return "Media";
+  }
+  if (dir.startsWith("pages")) {
+    return "Pages";
+  }
+  if (dir.startsWith("layouts")) {
+    return "Layouts";
+  }
+  if (dir.startsWith("components")) {
+    return "Components";
+  }
+  if (dir.startsWith("content")) {
+    return "Content";
+  }
+  if (dir.startsWith("public")) {
+    return "Media";
+  }
+  if (dir.startsWith("data")) {
+    return "Content";
+  }
+  if (dir.startsWith("styles")) {
+    return "Components";
+  }
   return "Other";
 }
 
@@ -149,11 +166,11 @@ async function collectFiles(
         const type =
           category === "Content" ? contentTypeFor(entry.path) || ext || "file" : ext || "file";
         results.push({
+          category,
+          ext,
           name: entry.name,
           path: entry.path,
           type,
-          category,
-          ext,
         });
       }
     }
@@ -172,12 +189,16 @@ async function collectFiles(
  */
 function contentTypeFor(filePath: string) {
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes) return null;
+  if (!config?.contentTypes) {
+    return null;
+  }
   for (const [name, def] of Object.entries(config.contentTypes)) {
     const d = def as ContentTypeDef;
-    if (!d.source) continue;
+    if (!d.source) {
+      continue;
+    }
     const prefix = d.source.replace(/^\.\//, "").replace(/\/$/, "");
-    if (filePath.startsWith(prefix + "/") || filePath === prefix) {
+    if (filePath.startsWith(`${prefix}/`) || filePath === prefix) {
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
   }
@@ -187,7 +208,9 @@ function contentTypeFor(filePath: string) {
 // ─── Data loading ────────────────────────────────────────────────────────────
 
 async function loadFiles() {
-  if (!projectState) return;
+  if (!projectState) {
+    return;
+  }
   loading = true;
   const platform = getPlatform();
   const dirs = projectState.projectDirs || [];
@@ -223,10 +246,10 @@ function getEntityTypes() {
   const pageExt = documentExtensions("page")[0] ?? ".json";
   const contentExt = defaultContentFormat()?.extensions[0] ?? ".json";
   return [
-    { key: "page", label: "Page", dir: "pages", ext: pageExt },
-    { key: "layout", label: "Layout", dir: "layouts", ext: ".json" },
-    { key: "component", label: "Component", dir: "components", ext: ".json" },
-    { key: "content", label: "Content", dir: "content", ext: contentExt },
+    { dir: "pages", ext: pageExt, key: "page", label: "Page" },
+    { dir: "layouts", ext: ".json", key: "layout", label: "Layout" },
+    { dir: "components", ext: ".json", key: "component", label: "Component" },
+    { dir: "content", ext: contentExt, key: "content", label: "Content" },
   ];
 }
 
@@ -239,7 +262,9 @@ function getEntityTypes() {
 function buildFrontmatterYaml(contentTypeName: string) {
   const config = projectState?.projectConfig;
   const col = config?.contentTypes?.[contentTypeName];
-  if (!col?.schema?.properties) return "title: Untitled\n";
+  if (!col?.schema?.properties) {
+    return "title: Untitled\n";
+  }
 
   let yaml = "";
   for (const [field, def] of Object.entries(col.schema.properties)) {
@@ -256,13 +281,14 @@ function buildFrontmatterYaml(contentTypeName: string) {
  */
 function getContentTypeTypes() {
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes) return [];
+  if (!config?.contentTypes) {
+    return [];
+  }
   return Object.entries(config.contentTypes).map(([name, def]) => {
     const d = def as ContentTypeDef;
     const dir = d.source ? d.source.replace(/^\.\//, "").replace(/\/$/, "") : name;
     return {
-      key: `contentType:${name}`,
-      label: name.charAt(0).toUpperCase() + name.slice(1),
+      contentTypeName: name,
       dir,
       ext:
         d.format === "json"
@@ -270,7 +296,8 @@ function getContentTypeTypes() {
           : (formatByName(d.format)?.extensions[0] ??
             defaultContentFormat()?.extensions[0] ??
             ".json"),
-      contentTypeName: name,
+      key: `contentType:${name}`,
+      label: name.charAt(0).toUpperCase() + name.slice(1),
     };
   });
 }
@@ -292,15 +319,19 @@ async function handleNewEntity(
   await loadFormats();
   const allTypes = [...getEntityTypes(), ...getContentTypeTypes()];
   const typeInfo = allTypes.find((t) => t.key === typeKey);
-  if (!typeInfo) return;
+  if (!typeInfo) {
+    return;
+  }
 
   const name = prompt(`${typeInfo.label} name:`, "untitled");
-  if (!name) return;
+  if (!name) {
+    return;
+  }
 
   const slug = name
     .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/[^a-z0-9-]/g, "");
   const filePath = `${typeInfo.dir}/${slug}${typeInfo.ext}`;
 
   let content;
@@ -312,7 +343,7 @@ async function handleNewEntity(
       content = entityFormat.studio?.newFileTemplate ?? "";
     }
   } else {
-    content = JSON.stringify({ tagName: "div", children: [] }, null, "\t");
+    content = JSON.stringify({ children: [], tagName: "div" }, null, "\t");
   }
 
   const platform = getPlatform();
@@ -386,21 +417,21 @@ function showBrowseContextMenu(
 
   /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
   const items = [
-    { label: "Open", action: () => ctx.openFile(file.path) },
+    { action: () => ctx.openFile(file.path), label: "Open" },
     { label: "\u2014" },
     {
-      label: "Rename\u2026",
       action: () => browseRenameFile(file, container, ctx),
+      label: "Rename\u2026",
     },
     {
-      label: "Duplicate",
       action: () => browseDuplicateFile(file, container, ctx),
+      label: "Duplicate",
     },
     { label: "\u2014" },
     {
-      label: "Delete",
       action: () => browseDeleteFile(file, container, ctx),
       danger: true,
+      label: "Delete",
     },
   ];
 
@@ -412,13 +443,18 @@ function showBrowseContextMenu(
       open
       style="position:fixed;left:${x}px;top:${y}px"
       ${ref((el) => {
-        if (!el) return;
+        if (!el) {
+          return;
+        }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
           const menuRect = popover.getBoundingClientRect();
-          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-          if (y + menuRect.height > window.innerHeight)
+          if (x + menuRect.width > window.innerWidth) {
+            x = window.innerWidth - menuRect.width - 4;
+          }
+          if (y + menuRect.height > window.innerHeight) {
             y = window.innerHeight - menuRect.height - 4;
+          }
           popover.style.left = `${x}px`;
           popover.style.top = `${y}px`;
         });
@@ -441,10 +477,10 @@ function showBrowseContextMenu(
     </sp-popover>`,
     {
       dismissOnOutsideClick: true,
+      layer: "dialog",
       onDismiss: () => {
         _browseCtxHandle = null;
       },
-      layer: "dialog",
     },
   );
 }
@@ -460,7 +496,9 @@ async function browseRenameFile(
   ctx: { openFile: (path: string) => void },
 ) {
   const newName = await showRenameDialog(file.name);
-  if (!newName || newName === file.name) return;
+  if (!newName || newName === file.name) {
+    return;
+  }
   const filePath = file.path.replaceAll("\\", "/");
   const parentDir = filePath.includes("/") ? filePath.substring(0, filePath.lastIndexOf("/")) : ".";
   const newPath = parentDir === "." ? newName : `${parentDir}/${newName}`;
@@ -470,8 +508,8 @@ async function browseRenameFile(
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Renamed to ${newName}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -498,8 +536,8 @@ async function browseDuplicateFile(
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Duplicated as ${copyName}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -514,15 +552,17 @@ async function browseDeleteFile(
   ctx: { openFile: (path: string) => void },
 ) {
   const confirmed = await showDeleteDialog(file.name);
-  if (!confirmed) return;
+  if (!confirmed) {
+    return;
+  }
   try {
     const platform = getPlatform();
     await platform.deleteFile(file.path);
     invalidateBrowseCache();
     renderBrowse(container, ctx);
     statusMessage(`Deleted ${file.name}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -538,7 +578,9 @@ function showRenameDialog(currentName: string): Promise<string | null> {
   return showDialog<string | null>((done) => {
     function confirm() {
       const trimmed = value.trim();
-      if (!trimmed) return;
+      if (!trimmed) {
+        return;
+      }
       done(trimmed);
     }
 
@@ -561,19 +603,23 @@ function showRenameDialog(currentName: string): Promise<string | null> {
             value = (e.target as HTMLInputElement).value || "";
           }}
           @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter") confirm();
+            if (e.key === "Enter") {
+              confirm();
+            }
           }}
         ></sp-textfield>
       </sp-dialog-wrapper>
     `;
 
     requestAnimationFrame(() => {
-      const layer = document.getElementById("layer-dialog");
+      const layer = document.querySelector("#layer-dialog");
       const tf = layer?.querySelector("sp-textfield") as HTMLElement | null;
       if (tf) {
         tf.focus();
         const input = tf.shadowRoot?.querySelector("input");
-        if (input) input.select();
+        if (input) {
+          input.select();
+        }
       }
     });
 
@@ -607,7 +653,7 @@ function showDeleteDialog(fileName: string) {
 
 // ─── Grid view helpers ──────────────────────────────────────────────────────
 
-const _previewCache: Map<string, HTMLElement> = new Map();
+const _previewCache = new Map<string, HTMLElement>();
 
 /**
  * Render a live preview for a page or layout file (JSON or Markdown).
@@ -628,9 +674,9 @@ async function renderDocPreview(filePath: string) {
     } else {
       doc = JSON.parse(content);
     }
-    const scope = buildScope(doc.state || {});
+    const scope = await buildScope(doc, {}, location.href);
     const el = renderNode(doc, scope);
-    return el as HTMLElement | null;
+    return el instanceof HTMLElement ? el : null;
   } catch {
     return null;
   }
@@ -644,7 +690,9 @@ async function renderDocPreview(filePath: string) {
  */
 async function loadPreview(el: Element, file: { path: string; category: string }) {
   // Already populated
-  if (el.firstElementChild) return;
+  if (el.firstElementChild) {
+    return;
+  }
 
   let preview: HTMLElement | undefined = _previewCache.get(file.path);
   if (!preview) {
@@ -655,12 +703,16 @@ async function loadPreview(el: Element, file: { path: string; category: string }
       } else {
         preview = ((await renderDocPreview(file.path)) as HTMLElement | undefined) || undefined;
       }
-      if (preview) _previewCache.set(file.path, /** @type {HTMLElement} */ preview);
+      if (preview) {
+        _previewCache.set(file.path, /** @type {HTMLElement} */ preview);
+      }
     } catch {
       return;
     }
   }
-  if (preview) el.appendChild(preview);
+  if (preview) {
+    el.append(preview);
+  }
 }
 
 /**
@@ -698,7 +750,9 @@ function renderCard(
         class="element-card-preview"
         ${needsPreview
           ? ref((el: Element | undefined) => {
-              if (el) loadPreview(el, file);
+              if (el) {
+                loadPreview(el, file);
+              }
             })
           : nothing}
       >
@@ -730,7 +784,7 @@ export async function renderBrowse(
 ) {
   // Re-load when projectDirs changed (e.g. project opened after initial render)
   const currentKey = (projectState?.projectDirs || []).join(",");
-  if ((!fileCache.length && !loading) || currentKey !== lastProjectDirsKey) {
+  if ((fileCache.length === 0 && !loading) || currentKey !== lastProjectDirsKey) {
     await loadFiles();
   }
 
@@ -777,7 +831,7 @@ export async function renderBrowse(
           ${getEntityTypes().map(
             (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
           )}
-          ${contentTypeTypes.length
+          ${contentTypeTypes.length > 0
             ? html`<sp-menu-divider></sp-menu-divider> ${contentTypeTypes.map(
                   (t) => html`<sp-menu-item value=${t.key}>${t.label}</sp-menu-item>`,
                 )}`
@@ -789,7 +843,9 @@ export async function renderBrowse(
       size="s"
       @click=${() => {
         const input = container.querySelector(".browse-upload-input") as HTMLInputElement;
-        if (input) input.click();
+        if (input) {
+          input.click();
+        }
       }}
     >
       <sp-icon-upload slot="icon"></sp-icon-upload> Upload
@@ -802,7 +858,9 @@ export async function renderBrowse(
       style="display:none"
       @change=${(e: Event) => {
         const input = e.target as HTMLInputElement;
-        if (input.files?.length) handleUpload(input.files, container, ctx);
+        if (input.files?.length) {
+          handleUpload(input.files, container, ctx);
+        }
         input.value = "";
       }}
     />
@@ -900,7 +958,9 @@ export async function renderBrowse(
         e.preventDefault();
         (e.currentTarget as HTMLElement).classList.remove("browse-drop-active");
         const droppedFiles = e.dataTransfer?.files;
-        if (droppedFiles?.length) handleUpload(droppedFiles, container, ctx);
+        if (droppedFiles?.length) {
+          handleUpload(droppedFiles, container, ctx);
+        }
       }}
     >
       <div class="browse-filter-bar">${filterBar}</div>

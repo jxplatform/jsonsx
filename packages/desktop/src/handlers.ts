@@ -1,10 +1,10 @@
-import { readdir, readFile, writeFile, rename, stat, mkdir, rm } from "node:fs/promises";
-import { resolve, relative, join, basename, dirname } from "node:path";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
-import type { FormatRegistry, FormatCapability } from "@jxsuite/schema/format-registry";
-import type { DirEntry, ComponentMeta, OpenProjectResult, CodeServiceResult } from "./rpc-schema";
+import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
+import type { CodeServiceResult, ComponentMeta, DirEntry, OpenProjectResult } from "./rpc-schema";
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
 
@@ -68,7 +68,9 @@ let _formatRegistry: { root: string; registry: FormatRegistry } | null = null;
 
 async function getFormatRegistry(): Promise<FormatRegistry> {
   const root = requireRoot();
-  if (_formatRegistry?.root === root) return _formatRegistry.registry;
+  if (_formatRegistry?.root === root) {
+    return _formatRegistry.registry;
+  }
   let projectConfig;
   try {
     projectConfig = JSON.parse(readFileSync(resolve(root, "project.json"), "utf8"));
@@ -76,7 +78,7 @@ async function getFormatRegistry(): Promise<FormatRegistry> {
     projectConfig = undefined;
   }
   const registry = await buildProjectFormatRegistry(root, projectConfig);
-  _formatRegistry = { root, registry };
+  _formatRegistry = { registry, root };
   return registry;
 }
 
@@ -85,14 +87,14 @@ export async function listFormats() {
   try {
     const registry = await getFormatRegistry();
     return registry.entries.map((e) => ({
-      name: e.name,
-      extensions: e.extensions,
-      mediaType: e.mediaType,
+      capabilities: e.capabilities,
       documentKinds: e.documentKinds,
       exportTarget: e.exportTarget,
+      extensions: e.extensions,
+      mediaType: e.mediaType,
+      name: e.name,
       remote: e.remote,
       studio: e.studio,
-      capabilities: e.capabilities,
     }));
   } catch {
     return [];
@@ -109,7 +111,9 @@ export async function formatAction(params: {
 }) {
   const registry = await getFormatRegistry();
   const entry = registry.byName(params.format);
-  if (!entry) throw new Error(`Format "${params.format}" is not an imported format class`);
+  if (!entry) {
+    throw new Error(`Format "${params.format}" is not an imported format class`);
+  }
   if (params.action !== "parse" && params.action !== "serialize") {
     throw new Error(`Unsupported action "${params.action}"`);
   }
@@ -125,7 +129,9 @@ export function setFileDialog(fn: () => Promise<string | null>) {
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
 function requireRoot(): string {
-  if (!projectRoot) throw new Error("No project open");
+  if (!projectRoot) {
+    throw new Error("No project open");
+  }
   return projectRoot;
 }
 
@@ -139,9 +145,13 @@ function assertUnderRoot(absPath: string, root: string) {
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 export async function openProject(): Promise<OpenProjectResult | null> {
-  if (!fileDialogFn) throw new Error("No file dialog configured");
+  if (!fileDialogFn) {
+    throw new Error("No file dialog configured");
+  }
   const selectedPath = await fileDialogFn();
-  if (!selectedPath) return null;
+  if (!selectedPath) {
+    return null;
+  }
 
   const filePath = resolve(selectedPath);
   if (!existsSync(filePath) || basename(filePath) !== "project.json") {
@@ -155,9 +165,9 @@ export async function openProject(): Promise<OpenProjectResult | null> {
   return {
     config,
     handle: {
-      root: ".",
       name: config.name || basename(projectRoot),
       projectConfig: config,
+      root: ".",
     },
   };
 }
@@ -171,16 +181,18 @@ export async function listDirectory(params: { dir: string }): Promise<DirEntry[]
   const result: DirEntry[] = [];
 
   for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue;
+    if (entry.name.startsWith(".")) {
+      continue;
+    }
     const absPath = join(absDir, entry.name);
     try {
       const s = await stat(absPath);
       result.push({
+        modified: s.mtime.toISOString(),
         name: entry.name,
         path: relative(root, absPath),
-        type: entry.isDirectory() ? "directory" : "file",
         size: s.size,
-        modified: s.mtime.toISOString(),
+        type: entry.isDirectory() ? "directory" : "file",
       });
     } catch {}
   }
@@ -213,14 +225,14 @@ export async function handleReadFileAsDataUrl(params: { path: string }): Promise
   const base64 = Buffer.from(buffer).toString("base64");
   const ext = params.path.split(".").pop()?.toLowerCase() || "";
   const mimeMap: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
+    avif: "image/avif",
     gif: "image/gif",
+    ico: "image/x-icon",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
     svg: "image/svg+xml",
     webp: "image/webp",
-    ico: "image/x-icon",
-    avif: "image/avif",
   };
   const mime = mimeMap[ext] || "application/octet-stream";
   return `data:${mime};base64,${base64}`;
@@ -275,7 +287,9 @@ export async function handleResolveSiteContext(params: {
 
   while (true) {
     const rel = relative(root, dir);
-    if (rel.startsWith("..") || rel.startsWith("/")) break;
+    if (rel.startsWith("..") || rel.startsWith("/")) {
+      break;
+    }
 
     const candidate = join(dir, "project.json");
     if (existsSync(candidate)) {
@@ -283,7 +297,9 @@ export async function handleResolveSiteContext(params: {
     }
 
     const parent = dirname(dir);
-    if (parent === dir) break;
+    if (parent === dir) {
+      break;
+    }
     dir = parent;
   }
 
@@ -293,32 +309,39 @@ export async function handleResolveSiteContext(params: {
 export async function discoverComponents(params: { dir?: string }): Promise<ComponentMeta[]> {
   const root = requireRoot();
   const scanRoot = params.dir ? resolve(root, params.dir) : root;
-  if (params.dir) assertUnderRoot(scanRoot, root);
+  if (params.dir) {
+    assertUnderRoot(scanRoot, root);
+  }
 
   const glob = new Bun.Glob("**/*.json");
   const components: ComponentMeta[] = [];
 
   for await (const match of glob.scan({ cwd: scanRoot, dot: false })) {
-    if (match.includes("node_modules") || match.includes("dist/") || match.includes(".claude/"))
+    if (match.includes("node_modules") || match.includes("dist/") || match.includes(".claude/")) {
       continue;
+    }
     const fp = resolve(scanRoot, match);
     try {
       const content = JSON.parse(await readFile(fp, "utf8"));
       if (content.tagName && content.tagName.includes("-")) {
         components.push({
-          tagName: content.tagName,
           $id: content.$id || null,
+          hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
           path: match,
           props: Object.entries(content.state || {})
             .filter(([, d]) => {
-              if (d == null) return false;
-              if (typeof d !== "object") return true;
+              if (d == null) {
+                return false;
+              }
+              if (typeof d !== "object") {
+                return true;
+              }
               const entry = d as Record<string, unknown>;
               return !entry.$prototype && !entry.$handler && !entry.$compute;
             })
             .map(([name, d]) => {
               if (typeof d !== "object") {
-                return { name, type: typeof d, default: d };
+                return { default: d, name, type: typeof d };
               }
               const entry = d as Record<string, unknown>;
               const result: {
@@ -327,14 +350,18 @@ export async function discoverComponents(params: { dir?: string }): Promise<Comp
                 default?: unknown;
                 format?: string;
               } = {
-                name,
                 default: entry.default,
+                name,
               };
-              if (entry.type != null) result.type = entry.type as string;
-              if (entry.format != null) result.format = entry.format as string;
+              if (entry.type != null) {
+                result.type = entry.type as string;
+              }
+              if (entry.format != null) {
+                result.format = entry.format as string;
+              }
               return result;
             }),
-          hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
+          tagName: content.tagName,
         });
       }
     } catch {}
@@ -353,7 +380,9 @@ export async function locateFile(params: { name: string }): Promise<string | nul
   const matches: string[] = [];
 
   for await (const match of glob.scan({ cwd: root, dot: false })) {
-    if (match.includes("node_modules") || match.includes("dist/")) continue;
+    if (match.includes("node_modules") || match.includes("dist/")) {
+      continue;
+    }
     matches.push(match.split("\\").join("/"));
   }
 
@@ -374,13 +403,13 @@ export async function fetchPluginSchema(params: {
       if (params.base) {
         const docUrlPath = new URL(params.base).pathname;
         const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-        moduleAbsPath = resolve(resolve(root, "." + docDir), params.src);
+        moduleAbsPath = resolve(resolve(root, `.${docDir}`), params.src);
       } else {
         moduleAbsPath = resolve(root, params.src);
       }
     } else {
-      // npm/bare specifier (e.g. "@jxsuite/parser/ContentCollection.class.json") — resolve
-      // through the project's node_modules, falling back to the desktop package's own require.
+      // Npm/bare specifier (e.g. "@jxsuite/parser/ContentCollection.class.json") — resolve
+      // Through the project's node_modules, falling back to the desktop package's own require.
       const { createRequire } = await import("node:module");
       const projRequire = createRequire(resolve(root, "package.json"));
       try {
@@ -417,7 +446,9 @@ export async function fetchPluginSchema(params: {
   try {
     const mod = await import(moduleAbsPath);
     const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
-    if (typeof ExportedClass !== "function") return null;
+    if (typeof ExportedClass !== "function") {
+      return null;
+    }
     return ExportedClass.schema ?? null;
   } catch {
     return null;
@@ -439,24 +470,24 @@ export interface ProxyResult {
 export async function jxResolve(params: { body: string }): Promise<ProxyResult> {
   const root = requireRoot();
   const req = new Request("http://localhost/__jx_resolve__", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: params.body,
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   });
   const res = await handleResolve(req, root, null);
-  return { status: res.status, body: await res.text() };
+  return { body: await res.text(), status: res.status };
 }
 
 /** Proxy a timing: "server" function call. Mirrors the dev server's POST /**jx_server**. */
 export async function jxServerFunction(params: { body: string }): Promise<ProxyResult> {
   const root = requireRoot();
   const req = new Request("http://localhost/__jx_server__", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: params.body,
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   });
   const res = await handleServerFunction(req, root);
-  return { status: res.status, body: await res.text() };
+  return { body: await res.text(), status: res.status };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -477,30 +508,55 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
   const properties: Record<string, Record<string, unknown>> = {};
   const required: string[] = [];
 
-  if (parentSchema?.properties) Object.assign(properties, parentSchema.properties);
-  if (parentSchema?.required) required.push(...parentSchema.required);
+  if (parentSchema?.properties) {
+    Object.assign(properties, parentSchema.properties);
+  }
+  if (parentSchema?.required) {
+    required.push(...parentSchema.required);
+  }
 
   for (const [key, param] of Object.entries(params)) {
     const id = param.identifier ?? key;
     const prop: Record<string, unknown> = {};
-    if (param.type && typeof param.type === "object") Object.assign(prop, param.type);
-    if (param.description) prop.description = param.description;
-    if (param.examples) prop.examples = param.examples;
-    if (param.format) prop.format = param.format;
+    if (param.type && typeof param.type === "object") {
+      Object.assign(prop, param.type);
+    }
+    if (param.description) {
+      prop.description = param.description;
+    }
+    if (param.examples) {
+      prop.examples = param.examples;
+    }
+    if (param.format) {
+      prop.format = param.format;
+    }
     properties[id] = prop;
   }
 
   for (const [key, field] of Object.entries(fields)) {
-    if (field.role !== "field") continue;
-    if (field.access === "private") continue;
+    if (field.role !== "field") {
+      continue;
+    }
+    if (field.access === "private") {
+      continue;
+    }
     const id = field.identifier ?? key;
     const prop: Record<string, unknown> = {};
-    if (field.type && typeof field.type === "object") Object.assign(prop, field.type);
-    if (field.description) prop.description = field.description;
-    if (field.default !== undefined) prop.default = field.default;
-    if (field.initializer !== undefined && prop.default === undefined)
+    if (field.type && typeof field.type === "object") {
+      Object.assign(prop, field.type);
+    }
+    if (field.description) {
+      prop.description = field.description;
+    }
+    if (field.default !== undefined) {
+      prop.default = field.default;
+    }
+    if (field.initializer !== undefined && prop.default === undefined) {
       prop.default = field.initializer;
-    if (field.examples) prop.examples = field.examples;
+    }
+    if (field.examples) {
+      prop.examples = field.examples;
+    }
     properties[id] = prop;
   }
 
@@ -518,12 +574,18 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
     required: [...requiredSet],
   };
   const desc = classDef.description ?? classDef.title;
-  if (desc != null) result.description = desc;
+  if (desc != null) {
+    result.description = desc;
+  }
 
   // Surface format-extension metadata (format block, studio hints, capability summary)
   const def = classDef as Record<string, unknown>;
-  if (def.format) result.format = def.format as Record<string, unknown>;
-  if (def.$studio) result.$studio = def.$studio as Record<string, unknown>;
+  if (def.format) {
+    result.format = def.format as Record<string, unknown>;
+  }
+  if (def.$studio) {
+    result.$studio = def.$studio as Record<string, unknown>;
+  }
   const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
   const methods = (classDef.$defs?.methods ?? {}) as Record<
     string,
@@ -538,6 +600,8 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string): Stu
       };
     }
   }
-  if (Object.keys(capabilities).length > 0) result.capabilities = capabilities;
+  if (Object.keys(capabilities).length > 0) {
+    result.capabilities = capabilities;
+  }
   return result;
 }

@@ -10,15 +10,19 @@
 import { html, render as litRender } from "lit-html";
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
-import { fieldCardTpl, addFieldFormTpl, schemaForType, detectFieldFormat } from "./schema-field-ui";
+import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 
-import type { ProjectConfig, ContentTypeSchema } from "@jxsuite/schema/types";
+import type {
+  ContentTypeSchema,
+  ContentTypeSchemaField,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 let selectedDef: string | null = null;
 let showAddField = false;
-let newFieldState = { name: "", type: "string", format: "", required: false };
+let newFieldState = { format: "", name: "", required: false, type: "string" };
 let showNewDef = false;
 let newDefName = "";
 
@@ -43,17 +47,25 @@ function getSelectedDef(): ContentTypeSchema | undefined {
 /** @param {() => void} rerender */
 function handleNewDef(rerender: () => void) {
   const name = newDefName.trim();
-  if (!name) return;
+  if (!name) {
+    return;
+  }
 
   const config = projectState?.projectConfig;
-  if (!config) return;
-  if (!config.$defs) config.$defs = {};
-  if (config.$defs[name]) return; // already exists
+  if (!config) {
+    return;
+  }
+  if (!config.$defs) {
+    config.$defs = {};
+  }
+  if (config.$defs[name]) {
+    return;
+  } // Already exists
 
   config.$defs[name] = {
-    type: "object",
     properties: {},
     required: [],
+    type: "object",
   };
 
   selectedDef = name;
@@ -66,21 +78,31 @@ function handleNewDef(rerender: () => void) {
 /** @param {() => void} rerender */
 function handleAddField(rerender: () => void) {
   const name = newFieldState.name.trim();
-  if (!name || !selectedDef) return;
+  if (!name || !selectedDef) {
+    return;
+  }
 
   const def = getSelectedDef();
-  if (!def) return;
+  if (!def) {
+    return;
+  }
 
-  if (!def.properties) def.properties = {};
+  if (!def.properties) {
+    def.properties = {};
+  }
   def.properties[name] = schemaForType(newFieldState.type, newFieldState.format || undefined);
 
   if (newFieldState.required) {
-    if (!def.required) def.required = [];
-    if (!def.required.includes(name)) def.required.push(name);
+    if (!def.required) {
+      def.required = [];
+    }
+    if (!def.required.includes(name)) {
+      def.required.push(name);
+    }
   }
 
   showAddField = false;
-  newFieldState = { name: "", type: "string", format: "", required: false };
+  newFieldState = { format: "", name: "", required: false, type: "string" };
   rerender();
   saveProjectConfig();
 }
@@ -91,7 +113,9 @@ function handleAddField(rerender: () => void) {
  */
 function handleDeleteField(fieldName: string, rerender: () => void) {
   const def = getSelectedDef();
-  if (!def?.properties) return;
+  if (!def?.properties) {
+    return;
+  }
 
   delete def.properties[fieldName];
   if (def.required) {
@@ -108,12 +132,19 @@ function handleDeleteField(fieldName: string, rerender: () => void) {
  */
 function handleToggleRequired(fieldName: string, rerender: () => void) {
   const def = getSelectedDef();
-  if (!def) return;
-  if (!def.required) def.required = [];
+  if (!def) {
+    return;
+  }
+  if (!def.required) {
+    def.required = [];
+  }
 
   const idx = def.required.indexOf(fieldName);
-  if (idx >= 0) def.required.splice(idx, 1);
-  else def.required.push(fieldName);
+  if (idx !== -1) {
+    def.required.splice(idx, 1);
+  } else {
+    def.required.push(fieldName);
+  }
 
   rerender();
   saveProjectConfig();
@@ -126,9 +157,11 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
  */
 function handleRenameField(oldName: string, newName: string, rerender: () => void) {
   const def = getSelectedDef();
-  if (!def?.properties || !newName || def.properties[newName]) return;
+  if (!def?.properties || !newName || def.properties[newName]) {
+    return;
+  }
 
-  const newProps: Record<string, unknown> = {};
+  const newProps: Record<string, ContentTypeSchemaField> = {};
   for (const [key, val] of Object.entries(def.properties)) {
     newProps[key === oldName ? newName : key] = val;
   }
@@ -149,7 +182,9 @@ function handleRenameField(oldName: string, newName: string, rerender: () => voi
  */
 function handleChangeType(fieldName: string, newType: string, rerender: () => void) {
   const def = getSelectedDef();
-  if (!def?.properties?.[fieldName]) return;
+  if (!def?.properties?.[fieldName]) {
+    return;
+  }
 
   const oldFormat =
     newType === "string" || newType === "array"
@@ -167,7 +202,9 @@ function handleChangeType(fieldName: string, newType: string, rerender: () => vo
  */
 function handleChangeFormat(fieldName: string, format: string, rerender: () => void) {
   const def = getSelectedDef();
-  if (!def?.properties?.[fieldName]) return;
+  if (!def?.properties?.[fieldName]) {
+    return;
+  }
 
   const prop = def.properties[fieldName];
   const type = prop.type || "string";
@@ -190,14 +227,22 @@ function handleAddNestedField(
 ) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent) return;
+  if (!parent) {
+    return;
+  }
 
-  if (!parent.properties) parent.properties = {};
+  if (!parent.properties) {
+    parent.properties = {};
+  }
   parent.properties[fieldState.name] = schemaForType(fieldState.type);
 
   if (fieldState.required) {
-    if (!parent.required) parent.required = [];
-    if (!parent.required.includes(fieldState.name)) parent.required.push(fieldState.name);
+    if (!parent.required) {
+      parent.required = [];
+    }
+    if (!parent.required.includes(fieldState.name)) {
+      parent.required.push(fieldState.name);
+    }
   }
 
   rerender();
@@ -212,7 +257,9 @@ function handleAddNestedField(
 function handleDeleteNested(parentName: string, childName: string, rerender: () => void) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent?.properties) return;
+  if (!parent?.properties) {
+    return;
+  }
 
   delete parent.properties[childName];
   if (parent.required) {
@@ -231,12 +278,19 @@ function handleDeleteNested(parentName: string, childName: string, rerender: () 
 function handleToggleNestedRequired(parentName: string, childName: string, rerender: () => void) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent) return;
-  if (!parent.required) parent.required = [];
+  if (!parent) {
+    return;
+  }
+  if (!parent.required) {
+    parent.required = [];
+  }
 
   const idx = parent.required.indexOf(childName);
-  if (idx >= 0) parent.required.splice(idx, 1);
-  else parent.required.push(childName);
+  if (idx !== -1) {
+    parent.required.splice(idx, 1);
+  } else {
+    parent.required.push(childName);
+  }
 
   rerender();
   saveProjectConfig();
@@ -256,9 +310,11 @@ function handleRenameNested(
 ) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent?.properties || !newChild || parent.properties[newChild]) return;
+  if (!parent?.properties || !newChild || parent.properties[newChild]) {
+    return;
+  }
 
-  const newProps: Record<string, unknown> = {};
+  const newProps: Record<string, ContentTypeSchemaField> = {};
   for (const [key, val] of Object.entries(parent.properties)) {
     newProps[key === oldChild ? newChild : key] = val;
   }
@@ -286,7 +342,9 @@ function handleChangeNestedType(
 ) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent?.properties?.[childName]) return;
+  if (!parent?.properties?.[childName]) {
+    return;
+  }
 
   const oldFormat =
     newType === "string" || newType === "array"
@@ -311,7 +369,9 @@ function handleChangeNestedFormat(
 ) {
   const def = getSelectedDef();
   const parent = def?.properties?.[parentName];
-  if (!parent?.properties?.[childName]) return;
+  if (!parent?.properties?.[childName]) {
+    return;
+  }
 
   const prop = parent.properties[childName];
   const type = prop.type || "string";
@@ -322,9 +382,13 @@ function handleChangeNestedFormat(
 
 /** @param {() => void} rerender */
 function handleDeleteDef(rerender: () => void) {
-  if (!selectedDef) return;
+  if (!selectedDef) {
+    return;
+  }
   const config = projectState?.projectConfig;
-  if (!config?.$defs?.[selectedDef]) return;
+  if (!config?.$defs?.[selectedDef]) {
+    return;
+  }
 
   delete config.$defs[selectedDef];
   selectedDef = null;
@@ -375,7 +439,9 @@ export function renderDefsEditor(container: HTMLElement) {
                   newDefName = (e.target as HTMLInputElement).value;
                 }}
                 @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter") handleNewDef(rerender);
+                  if (e.key === "Enter") {
+                    handleNewDef(rerender);
+                  }
                   if (e.key === "Escape") {
                     showNewDef = false;
                     rerender();
@@ -412,20 +478,20 @@ export function renderDefsEditor(container: HTMLElement) {
     const required = def.required || [];
 
     const handlers: import("./schema-field-ui.js").FieldHandlers = {
-      onDelete: (n: string) => handleDeleteField(n, rerender),
-      onToggleRequired: (n: string) => handleToggleRequired(n, rerender),
-      onRename: (oldN: string, newN: string) => handleRenameField(oldN, newN, rerender),
-      onChangeType: (n: string, t: string) => handleChangeType(n, t, rerender),
-      onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),
       onAddNestedField: (p: string, s: { name: string; type: string; required: boolean }) =>
         handleAddNestedField(p, s, rerender),
-      onDeleteNested: (p: string, c: string) => handleDeleteNested(p, c, rerender),
-      onToggleNestedRequired: (p: string, c: string) => handleToggleNestedRequired(p, c, rerender),
-      onRenameNested: (p: string, o: string, n: string) => handleRenameNested(p, o, n, rerender),
-      onChangeNestedType: (p: string, c: string, t: string) =>
-        handleChangeNestedType(p, c, t, rerender),
+      onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),
       onChangeNestedFormat: (p: string, c: string, f: string) =>
         handleChangeNestedFormat(p, c, f, rerender),
+      onChangeNestedType: (p: string, c: string, t: string) =>
+        handleChangeNestedType(p, c, t, rerender),
+      onChangeType: (n: string, t: string) => handleChangeType(n, t, rerender),
+      onDelete: (n: string) => handleDeleteField(n, rerender),
+      onDeleteNested: (p: string, c: string) => handleDeleteNested(p, c, rerender),
+      onRename: (oldN: string, newN: string) => handleRenameField(oldN, newN, rerender),
+      onRenameNested: (p: string, o: string, n: string) => handleRenameNested(p, o, n, rerender),
+      onToggleNestedRequired: (p: string, c: string) => handleToggleNestedRequired(p, c, rerender),
+      onToggleRequired: (n: string) => handleToggleRequired(n, rerender),
     };
 
     const fieldCards = Object.entries(properties).map(([name, fieldDef]) =>
@@ -453,19 +519,19 @@ export function renderDefsEditor(container: HTMLElement) {
         <div class="schema-field-list">${fieldCards}</div>
         ${showAddField
           ? addFieldFormTpl(newFieldState, {
-              onInput: (field, value) => {
-                newFieldState = { ...newFieldState, [field]: value };
-                rerender();
-              },
-              onConfirm: () => handleAddField(rerender),
               onCancel: () => {
                 showAddField = false;
                 newFieldState = {
-                  name: "",
-                  type: "string",
                   format: "",
+                  name: "",
                   required: false,
+                  type: "string",
                 };
+                rerender();
+              },
+              onConfirm: () => handleAddField(rerender),
+              onInput: (field, value) => {
+                newFieldState = { ...newFieldState, [field]: value };
                 rerender();
               },
             })

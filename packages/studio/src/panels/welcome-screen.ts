@@ -113,7 +113,7 @@ export function renderWelcome(host: HTMLElement) {
 function shortenPath(path: string) {
   if (path.startsWith("/home/")) {
     const parts = path.split("/");
-    return "~/" + parts.slice(3).join("/");
+    return `~/${parts.slice(3).join("/")}`;
   }
   return path;
 }

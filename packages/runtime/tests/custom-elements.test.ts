@@ -1,9 +1,10 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
 try {
   GlobalRegistrator.register();
 } catch {
-  /* already registered */
+  /* Already registered */
 }
 
 import {
@@ -28,15 +29,15 @@ describe("Custom Elements", () => {
   test("defineElement registers a custom element", async () => {
     const tag = uniqueTag();
     await defineElement({
-      tagName: tag,
-      state: { greeting: "Hello" },
       children: [{ tagName: "span", textContent: "${state.greeting}" }],
+      state: { greeting: "Hello" },
+      tagName: tag,
     });
 
     expect(customElements.get(tag)).toBeDefined();
 
     const el = document.createElement(tag);
-    document.body.appendChild(el);
+    document.body.append(el);
     await new Promise((r) => setTimeout(r, 100));
 
     const span = el.querySelector("span");
@@ -48,14 +49,14 @@ describe("Custom Elements", () => {
   test("$props override state defaults", async () => {
     const tag = uniqueTag();
     await defineElement({
-      tagName: tag,
-      state: { label: "default" },
       children: [{ tagName: "span", textContent: "${state.label}" }],
+      state: { label: "default" },
+      tagName: tag,
     });
 
     const el = document.createElement(tag);
     (el as any).label = "overridden";
-    document.body.appendChild(el);
+    document.body.append(el);
     await new Promise((r) => setTimeout(r, 100));
 
     expect((el.querySelector("span") as HTMLElement).textContent).toBe("overridden");
@@ -65,16 +66,16 @@ describe("Custom Elements", () => {
   test("lifecycle hooks (onMount)", async () => {
     const tag = uniqueTag();
     await defineElement({
-      tagName: tag,
+      children: [{ tagName: "div", textContent: "lifecycle" }],
       state: {
         mountCalled: false,
         onMount: { $prototype: "Function", body: "state.mountCalled = true" },
       },
-      children: [{ tagName: "div", textContent: "lifecycle" }],
+      tagName: tag,
     });
 
     const el = document.createElement(tag);
-    document.body.appendChild(el);
+    document.body.append(el);
     await new Promise((r) => setTimeout(r, 200));
 
     expect(el.querySelector("div")).not.toBeNull();
@@ -84,44 +85,44 @@ describe("Custom Elements", () => {
 
   test("throws for non-hyphenated tagName", async () => {
     try {
-      await defineElement({ tagName: "nohyphen", state: {} });
+      await defineElement({ state: {}, tagName: "nohyphen" });
       expect(true).toBe(false);
-    } catch (e) {
-      expect((e as Error).message).toContain("must contain a hyphen");
+    } catch (error) {
+      expect((error as Error).message).toContain("must contain a hyphen");
     }
   });
 
   test("skips already-registered elements", async () => {
     const tag = uniqueTag();
-    await defineElement({ tagName: tag, state: { x: 1 }, children: [] });
+    await defineElement({ children: [], state: { x: 1 }, tagName: tag });
     // Second call should not throw
-    await defineElement({ tagName: tag, state: { x: 2 }, children: [] });
+    await defineElement({ children: [], state: { x: 2 }, tagName: tag });
     expect(customElements.get(tag)).toBeDefined();
   });
 
   test("renderNode creates custom element with $props via renderCustomElementWithProps", async () => {
     const tag = uniqueTag();
     await defineElement({
-      tagName: tag,
-      state: { value: 0, name: "none" },
       children: [
-        { tagName: "span", className: "val", textContent: "${state.value}" },
-        { tagName: "span", className: "name", textContent: "${state.name}" },
+        { className: "val", tagName: "span", textContent: "${state.value}" },
+        { className: "name", tagName: "span", textContent: "${state.name}" },
       ],
+      state: { name: "none", value: 0 },
+      tagName: tag,
     });
 
     const parentDef = {
-      tagName: "div",
       children: [
         {
+          $props: { name: "test", value: 42 },
           tagName: tag,
-          $props: { value: 42, name: "test" },
         },
       ],
+      tagName: "div",
     };
     const scope = await buildScope({ state: {} });
     const el = renderNode(parentDef, scope);
-    document.body.appendChild(el);
+    document.body.append(el);
     await new Promise((r) => setTimeout(r, 150));
 
     const child = el.querySelector(tag);
@@ -134,14 +135,14 @@ describe("Custom Elements", () => {
   test("observed attributes sync to state", async () => {
     const tag = uniqueTag();
     await defineElement({
-      tagName: tag,
+      children: [{ tagName: "span", textContent: "${state.myLabel}" }],
       observedAttributes: ["my-label"],
       state: { myLabel: "initial" },
-      children: [{ tagName: "span", textContent: "${state.myLabel}" }],
+      tagName: tag,
     });
 
     const el = document.createElement(tag);
-    document.body.appendChild(el);
+    document.body.append(el);
     await new Promise((r) => setTimeout(r, 100));
     expect((el.querySelector("span") as HTMLElement).textContent).toBe("initial");
 

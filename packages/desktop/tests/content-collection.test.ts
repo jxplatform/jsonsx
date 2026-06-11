@@ -8,14 +8,14 @@
  * 2. The data sidebar — the runtime resolves the class by POSTing to /**jx_resolve**, which the
  *    desktop now serves via the jxResolve handler (loading content types + injecting _project).
  */
-import { describe, test, expect, mock } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import type { StudioSchema } from "../src/handlers";
 
 mock.module("electrobun/bun", () => ({
-  Utils: { openFileDialog: async () => [] },
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
+  Utils: { openFileDialog: async () => [] },
 }));
 
 const { setProjectRoot, fetchPluginSchema, jxResolve } = await import("../src/handlers");
@@ -26,8 +26,8 @@ describe("ContentCollection desktop integration", () => {
   test("fetchPluginSchema resolves a bare-specifier .class.json (drives the config form)", async () => {
     setProjectRoot(PROJECT);
     const schema = (await fetchPluginSchema({
-      src: "@jxsuite/parser/ContentCollection.class.json",
       prototype: "ContentCollection",
+      src: "@jxsuite/parser/ContentCollection.class.json",
     })) as StudioSchema | null;
 
     expect(schema).not.toBeNull();
@@ -42,8 +42,8 @@ describe("ContentCollection desktop integration", () => {
     setProjectRoot(PROJECT);
     const { status, body } = await jxResolve({
       body: JSON.stringify({
-        $src: "@jxsuite/parser/ContentCollection.class.json",
         $prototype: "ContentCollection",
+        $src: "@jxsuite/parser/ContentCollection.class.json",
         contentType: "docs",
         sort: { field: "order", order: "asc" },
       }),
@@ -63,8 +63,8 @@ describe("ContentCollection desktop integration", () => {
     setProjectRoot(PROJECT);
     const { status, body } = await jxResolve({
       body: JSON.stringify({
-        $src: "@jxsuite/parser/ContentCollection.class.json",
         $prototype: "ContentCollection",
+        $src: "@jxsuite/parser/ContentCollection.class.json",
         contentType: "docs",
         filter: [{ field: "title", op: "==", value: "Advanced" }],
       }),

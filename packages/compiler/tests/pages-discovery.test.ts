@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { discoverPages, expandDynamicRoutes } from "../src/site/pages-discovery";
 import { buildProjectFormatRegistry } from "../src/site/format-host";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_pages");
@@ -12,12 +12,12 @@ const mdRegistry = await buildProjectFormatRegistry(FIXTURES, {
 });
 
 function setup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
   mkdirSync(FIXTURES, { recursive: true });
 }
 
 function cleanup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 }
 
 // ─── discoverPages ──────────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ describe("discoverPages", () => {
     setup();
     writeFileSync(
       join(FIXTURES, "index.json"),
-      JSON.stringify({ tagName: "div", $layout: "blog" }),
+      JSON.stringify({ $layout: "blog", tagName: "div" }),
     );
     const routes = await discoverPages(FIXTURES);
     expect(routes[0].$layout).toBe("blog");
@@ -119,13 +119,13 @@ describe("expandDynamicRoutes", () => {
   test("passes static routes through unchanged", async () => {
     const routes = [
       {
-        urlPattern: "/",
-        sourcePath: "/x",
-        isDynamic: false,
-        isCatchAll: false,
-        params: [],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: false,
+        params: [],
         relativePath: "",
+        sourcePath: "/x",
+        urlPattern: "/",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -138,19 +138,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
-        tagName: "div",
         $paths: [{ slug: "hello" }, { slug: "world" }],
+        tagName: "div",
       }),
     );
     const routes = [
       {
-        urlPattern: "/blog/:slug",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["slug"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["slug"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/blog/:slug",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -167,19 +167,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
+        $paths: { param: "lang", values: ["en", "fr", "de"] },
         tagName: "div",
-        $paths: { values: ["en", "fr", "de"], param: "lang" },
       }),
     );
     const routes = [
       {
-        urlPattern: "/:lang",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["lang"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["lang"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/:lang",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -196,28 +196,28 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
+        $paths: { contentType: "blog", field: "slug", param: "slug" },
         tagName: "div",
-        $paths: { contentType: "blog", param: "slug", field: "slug" },
       }),
     );
     const contentTypes = new Map([
       [
         "blog",
         [
-          { id: "1", data: { slug: "hello-world", title: "Hello" } },
-          { id: "2", data: { slug: "second-post", title: "Second" } },
+          { body: null, data: { slug: "hello-world", title: "Hello" }, id: "1" },
+          { body: null, data: { slug: "second-post", title: "Second" }, id: "2" },
         ],
       ],
     ]);
     const routes = [
       {
-        urlPattern: "/blog/:slug",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["slug"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["slug"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/blog/:slug",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES, contentTypes);
@@ -232,27 +232,27 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       join(FIXTURES, "products.json"),
       JSON.stringify([
-        { sku: "ABC123", name: "Widget" },
-        { sku: "DEF456", name: "Gadget" },
+        { name: "Widget", sku: "ABC123" },
+        { name: "Gadget", sku: "DEF456" },
       ]),
     );
     const pagePath = join(FIXTURES, "product.json");
     writeFileSync(
       pagePath,
       JSON.stringify({
+        $paths: { $ref: "./products.json", field: "sku", param: "id" },
         tagName: "div",
-        $paths: { $ref: "./products.json", param: "id", field: "sku" },
       }),
     );
     const routes = [
       {
-        urlPattern: "/products/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/products/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -268,19 +268,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
-        tagName: "div",
         $paths: { contentType: "nonexistent", param: "id" },
+        tagName: "div",
       }),
     );
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -294,19 +294,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
-        tagName: "div",
         $paths: { $ref: "./no-such-file.json", param: "id" },
+        tagName: "div",
       }),
     );
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -321,19 +321,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
-        tagName: "div",
         $paths: { $ref: "./obj-data.json", param: "id" },
+        tagName: "div",
       }),
     );
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -347,13 +347,13 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(pagePath, JSON.stringify({ tagName: "div" }));
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -367,19 +367,19 @@ describe("expandDynamicRoutes", () => {
     writeFileSync(
       pagePath,
       JSON.stringify({
-        tagName: "div",
         $paths: { something: "weird" },
+        tagName: "div",
       }),
     );
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: pagePath,
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: pagePath,
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
@@ -390,13 +390,13 @@ describe("expandDynamicRoutes", () => {
   test("passes through dynamic route with unreadable file", async () => {
     const routes = [
       {
-        urlPattern: "/x/:id",
-        sourcePath: "/nonexistent/page.json",
-        isDynamic: true,
-        isCatchAll: false,
-        params: ["id"],
         $layout: null,
+        isCatchAll: false,
+        isDynamic: true,
+        params: ["id"],
         relativePath: "",
+        sourcePath: "/nonexistent/page.json",
+        urlPattern: "/x/:id",
       },
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);

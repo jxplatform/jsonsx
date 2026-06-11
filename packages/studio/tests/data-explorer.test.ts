@@ -1,21 +1,21 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { renderDataExplorerTemplate } from "../src/panels/data-explorer";
 
 const noop = () => {};
 const callbacks = {
+  defBadgeLabel: () => "Request",
+  defCategory: () => "data",
   renderCanvas: noop,
   renderLeftPanel: noop,
-  defCategory: () => "data",
-  defBadgeLabel: () => "Request",
 };
 
 describe("renderDataExplorerTemplate", () => {
   test("renders state entries when liveScope is null (design mode)", () => {
     const state = {
       allPosts: { $prototype: "Request", url: "https://api.example.com/posts" },
-      searchTerm: { type: "string", default: "" },
+      searchTerm: { default: "", type: "string" },
     };
     const result = renderDataExplorerTemplate(state, null, callbacks);
     expect(result).toBeDefined();

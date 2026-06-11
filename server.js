@@ -8,22 +8,22 @@ import { resolve } from "node:path";
 import { createDevServer } from "@jxsuite/server";
 
 await createDevServer({
-  root: resolve(import.meta.dir, "."),
-  port: 3000,
   builds: [
     {
       entrypoints: ["./packages/runtime/src/runtime.js"],
-      outdir: "./packages/runtime/dist",
-      match: /runtime\.js/,
       label: "runtime",
+      match: /runtime\.js/,
+      outdir: "./packages/runtime/dist",
     },
     {
       entrypoints: ["./packages/studio/src/studio.js"],
-      outdir: "./packages/studio/dist",
-      match: /studio/,
       label: "studio",
+      match: /studio/,
+      outdir: "./packages/studio/dist",
     },
   ],
+  port: 3000,
+  root: resolve(import.meta.dir, "."),
 });
 
 console.log("  /packages/studio/index.html     ← Jx Studio");

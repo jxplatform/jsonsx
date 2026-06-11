@@ -3,34 +3,34 @@ import { effect } from "../src/reactivity";
 import { createTab, disposeTab } from "../src/tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
-  transactDoc,
-  undo,
-  redo,
-  mutateInsertNode,
-  mutateRemoveNode,
+  mutateAddDef,
   mutateDuplicateNode,
-  mutateWrapNode,
+  mutateInsertNode,
   mutateMoveNode,
+  mutateRemoveDef,
+  mutateRemoveNode,
+  mutateRenameDef,
+  mutateUpdateAttribute,
+  mutateUpdateDef,
+  mutateUpdateFrontmatter,
+  mutateUpdateMediaStyle,
+  mutateUpdateProp,
   mutateUpdateProperty,
   mutateUpdateStyle,
-  mutateUpdateAttribute,
-  mutateUpdateMediaStyle,
-  mutateAddDef,
-  mutateRemoveDef,
-  mutateUpdateDef,
-  mutateRenameDef,
-  mutateUpdateProp,
-  mutateUpdateFrontmatter,
+  mutateWrapNode,
+  redo,
+  transactDoc,
+  undo,
 } from "../src/tabs/transact";
-import { test, expect, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 function makeTab(
   doc: JxMutableNode = {
-    tagName: "div",
     children: [{ tagName: "p", textContent: "Hello" }],
+    tagName: "div",
   },
 ) {
-  return createTab({ id: "test", document: doc });
+  return createTab({ document: doc, id: "test" });
 }
 
 describe("transactDoc", () => {
@@ -68,7 +68,8 @@ describe("transactDoc", () => {
     const tab = makeTab();
     let childCount = 0;
     const stop = effect(() => {
-      childCount = tab.doc.document.children?.length ?? 0;
+      const kids = tab.doc.document.children;
+      childCount = Array.isArray(kids) ? kids.length : 0;
     });
 
     expect(childCount).toBe(1);
@@ -120,14 +121,14 @@ describe("undo/redo", () => {
     const tab = makeTab();
     tab.session.selection = ["children", 0];
     transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
-    // snapshot 1 captured selection as ["children", 0]
+    // Snapshot 1 captured selection as ["children", 0]
     tab.session.selection = ["children", 1];
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 1], "textContent", "world"));
-    // snapshot 2 captured selection as ["children", 1]
+    // Snapshot 2 captured selection as ["children", 1]
 
-    undo(tab); // restores snapshot 1 → selection ["children", 0]
+    undo(tab); // Restores snapshot 1 → selection ["children", 0]
     expect(tab.session.selection).toEqual(["children", 0]);
-    undo(tab); // restores snapshot 0 → selection null
+    undo(tab); // Restores snapshot 0 → selection null
     expect(tab.session.selection).toBeNull();
   });
 });
@@ -190,11 +191,11 @@ describe("mutateWrapNode", () => {
 describe("mutateMoveNode", () => {
   test("moves node between parents", () => {
     const doc = {
-      tagName: "div",
       children: [
-        { tagName: "section", children: [] },
+        { children: [], tagName: "section" },
         { tagName: "p", textContent: "move me" },
       ],
+      tagName: "div",
     };
     const tab = makeTab(doc);
     transactDoc(tab, (t) => mutateMoveNode(t, ["children", 1], ["children", 0], 0));
@@ -230,12 +231,12 @@ describe("mutateMoveNode", () => {
 
   test("move within same parent adjusts index", () => {
     const doc = {
-      tagName: "div",
       children: [
         { tagName: "p", textContent: "a" },
         { tagName: "p", textContent: "b" },
         { tagName: "p", textContent: "c" },
       ],
+      tagName: "div",
     };
     const tab = makeTab(doc);
     // Move "a" below "c" (insert index 3, adjusted to 2 after removal)
@@ -329,7 +330,7 @@ describe("state definitions", () => {
 
 describe("mutateUpdateProp", () => {
   test("sets and removes $props", () => {
-    const doc = { tagName: "my-button", $props: { label: "Click" } };
+    const doc = { $props: { label: "Click" }, tagName: "my-button" };
     const tab = makeTab(doc);
     transactDoc(tab, (t) => mutateUpdateProp(t, [], "label", "Submit"));
     expect((tab.doc.document as any).$props.label).toBe("Submit");
@@ -343,10 +344,10 @@ describe("mutateUpdateProp", () => {
 describe("mutateUpdateFrontmatter", () => {
   test("sets and removes frontmatter field", () => {
     const tab = createTab({
-      id: "fm-test",
-      documentPath: "pages/index.md",
       document: { tagName: "main" },
+      documentPath: "pages/index.md",
       frontmatter: { title: "Home" },
+      id: "fm-test",
     });
 
     mutateUpdateFrontmatter(tab, "title", "New Title");

@@ -50,28 +50,39 @@ export function evaluateFilterRule(
 ) {
   const actual = rule.field === "id" ? entry.id : entry.data[rule.field];
   switch (rule.op) {
-    case "==":
+    case "==": {
       return actual === rule.value;
-    case "!=":
+    }
+    case "!=": {
       return actual !== rule.value;
-    case "empty":
+    }
+    case "empty": {
       return actual == null || actual === "" || (Array.isArray(actual) && actual.length === 0);
-    case "not empty":
+    }
+    case "not empty": {
       return actual != null && actual !== "" && !(Array.isArray(actual) && actual.length === 0);
-    case "contains":
+    }
+    case "contains": {
       return typeof actual === "string" && actual.includes(String(rule.value ?? ""));
-    case "not contains":
+    }
+    case "not contains": {
       return typeof actual === "string" && !actual.includes(String(rule.value ?? ""));
-    case ">":
+    }
+    case ">": {
       return Number(actual) > Number(rule.value);
-    case "<":
+    }
+    case "<": {
       return Number(actual) < Number(rule.value);
-    case ">=":
+    }
+    case ">=": {
       return Number(actual) >= Number(rule.value);
-    case "<=":
+    }
+    case "<=": {
       return Number(actual) <= Number(rule.value);
-    default:
+    }
+    default: {
       return true;
+    }
   }
 }
 
@@ -89,8 +100,8 @@ export function evaluateFilterRule(
 export function queryContentType(
   entries: ContentLoaderEntry[],
   query: {
-    filter?: Record<string, unknown> | Array<{ field: string; op: string; value?: unknown }>;
-    sort?: { field: string; order?: string } | Array<{ field: string; order?: string }>;
+    filter?: Record<string, unknown> | { field: string; op: string; value?: unknown }[];
+    sort?: { field: string; order?: string } | { field: string; order?: string }[];
     limit?: number;
   } = {},
 ) {
@@ -120,8 +131,12 @@ export function queryContentType(
       for (const { field, order = "asc" } of sortRules) {
         const aVal = field === "id" ? a.id : ((a.data[field] ?? "") as string | number);
         const bVal = field === "id" ? b.id : ((b.data[field] ?? "") as string | number);
-        if (aVal < bVal) return order === "asc" ? -1 : 1;
-        if (aVal > bVal) return order === "asc" ? 1 : -1;
+        if (aVal < bVal) {
+          return order === "asc" ? -1 : 1;
+        }
+        if (aVal > bVal) {
+          return order === "asc" ? 1 : -1;
+        }
       }
       return 0;
     });
@@ -158,15 +173,17 @@ export class ContentCollection {
   resolve() {
     const { contentType, filter, sort, limit, _project } = this.config;
     const entries = _project?.contentTypes?.get(contentType ?? "");
-    if (!entries) return [];
+    if (!entries) {
+      return [];
+    }
     return queryContentType(entries, {
       ...(filter != null && {
         filter: filter as
           | Record<string, unknown>
-          | Array<{ field: string; op: string; value?: unknown }>,
+          | { field: string; op: string; value?: unknown }[],
       }),
       ...(sort != null && {
-        sort: sort as { field: string; order?: string } | Array<{ field: string; order?: string }>,
+        sort: sort as { field: string; order?: string } | { field: string; order?: string }[],
       }),
       ...(limit != null && { limit }),
     });
@@ -183,7 +200,9 @@ export class ContentEntry {
   resolve() {
     const { contentType, id, field, _project, _document } = this.config;
     const entries = _project?.contentTypes?.get(contentType ?? "");
-    if (!entries) return null;
+    if (!entries) {
+      return null;
+    }
 
     let resolvedId = id;
     if (
@@ -194,7 +213,9 @@ export class ContentEntry {
       const paramName = (resolvedId as { $ref: string }).$ref.replace("#/$params/", "");
       resolvedId = _document?.route?._pathParams?.[paramName];
     }
-    if (!resolvedId) return null;
+    if (!resolvedId) {
+      return null;
+    }
 
     if (field && field !== "id") {
       return entries.find((e: ContentLoaderEntry) => e.data[field] === resolvedId) ?? null;

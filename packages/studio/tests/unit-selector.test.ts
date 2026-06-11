@@ -1,17 +1,17 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { html } from "lit-html";
-import { renderUnitSelector, UNIT_RE } from "../src/ui/unit-selector";
+import { UNIT_RE, renderUnitSelector } from "../src/ui/unit-selector";
 import { cancelStyleDebounce } from "../src/store";
 
 // Minimal css-meta entry for a size property (height-like)
 const SIZE_ENTRY = {
-  $units: ["px", "rem", "em", "%"],
   $keywords: ["auto", "max-content"],
+  $units: ["px", "rem", "em", "%"],
 };
 // Entry with no units (unitless property)
-const UNITLESS_ENTRY = { $units: [], $keywords: [] };
+const UNITLESS_ENTRY = { $keywords: [], $units: [] };
 
 function mount(
   value: string | number | undefined,
@@ -28,11 +28,13 @@ function mount(
   const tf = container.querySelector("sp-textfield") as HTMLElement & {
     value: string;
   };
-  return { tf, commits, container };
+  return { commits, container, tf };
 }
 
 function dispatch(el: HTMLElement, type: string, value?: string) {
-  if (value !== undefined) (el as unknown as { value: string }).value = value;
+  if (value !== undefined) {
+    (el as unknown as { value: string }).value = value;
+  }
   el.dispatchEvent(new Event(type, { bubbles: false }));
 }
 
@@ -107,9 +109,9 @@ describe("renderUnitSelector — placeholder display", () => {
 
   test("set value '500px' shows parsed numeric value '500', not the placeholder", () => {
     const { tf } = mount("500px", "auto");
-    // live() sets the value property
+    // Live() sets the value property
     expect(tf.value).toBe("500");
-    // placeholder is still 'auto' (overridden by presence of value)
+    // Placeholder is still 'auto' (overridden by presence of value)
     expect(tf.getAttribute("placeholder")).toBe("auto");
   });
 });
@@ -138,7 +140,7 @@ describe("renderUnitSelector — value display", () => {
   });
 
   test("undefined value → textfield shows ''", () => {
-    const { tf } = mount(undefined);
+    const { tf } = mount();
     expect(tf.value).toBe("");
   });
 });
@@ -211,7 +213,7 @@ describe("renderUnitSelector — @change cancels pending @input debounce", () =>
     // Direct test of the underlying mechanism used by the @change handler
     const fired: number[] = [];
     const { debouncedStyleCommit } = await import("../src/store");
-    const handler = debouncedStyleCommit("manual-cancel-test", 50, () => fired.push(1));
+    const handler = debouncedStyleCommit("manual-cancel-test", 50, (_e: Event) => fired.push(1));
     // Simulate input event (start debounce)
     handler(new Event("input"));
     // Immediately cancel

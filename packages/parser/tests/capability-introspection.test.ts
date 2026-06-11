@@ -3,7 +3,7 @@
  * static method on the implementation class, and the $studio element metadata must stay in sync
  * with the serializer's element sets (the source of truth).
  */
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Markdown } from "../src/markdown";
@@ -16,7 +16,7 @@ const CLASSES: [string, string, Record<string, unknown>][] = [
 ];
 
 function loadClassDef(file: string) {
-  return JSON.parse(readFileSync(resolve(import.meta.dir, "../src", file), "utf-8"));
+  return JSON.parse(readFileSync(resolve(import.meta.dir, "../src", file), "utf8"));
 }
 
 describe.each(CLASSES)("%s capability contract", (file, title, Impl) => {
@@ -26,13 +26,15 @@ describe.each(CLASSES)("%s capability contract", (file, title, Impl) => {
     expect(def.title).toBe(title);
     expect(Array.isArray(def.format.extensions)).toBe(true);
     expect(def.format.extensions.length).toBeGreaterThan(0);
-    for (const ext of def.format.extensions) expect(ext.startsWith(".")).toBe(true);
+    for (const ext of def.format.extensions) {
+      expect(ext.startsWith(".")).toBe(true);
+    }
   });
 
   test("every declared capability is a static method on the implementation", () => {
     const methods = def.$defs?.methods ?? {};
-    const capabilityRoles = ["parse", "serialize", "discover", "load"];
-    const declared = Object.values(methods).filter((m: any) => capabilityRoles.includes(m.role));
+    const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
+    const declared = Object.values(methods).filter((m: any) => capabilityRoles.has(m.role));
     expect(declared.length).toBeGreaterThan(0);
     for (const method of declared as {
       role: string;
@@ -91,7 +93,7 @@ describe("Markdown capability behavior", () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-load__");
-    rmSync(TMP, { recursive: true, force: true });
+    rmSync(TMP, { force: true, recursive: true });
     mkdirSync(TMP, { recursive: true });
     writeFileSync(
       resolve(TMP, "hello-world.md"),
@@ -106,7 +108,7 @@ describe("Markdown capability behavior", () => {
       expect(entries[0]._meta?.excerpt).toBe("First paragraph.");
       expect(entries[0]._meta?.toc?.[0]?.text).toBe("Section");
     } finally {
-      rmSync(TMP, { recursive: true, force: true });
+      rmSync(TMP, { force: true, recursive: true });
     }
   });
 
@@ -114,7 +116,7 @@ describe("Markdown capability behavior", () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-discover__");
-    rmSync(TMP, { recursive: true, force: true });
+    rmSync(TMP, { force: true, recursive: true });
     mkdirSync(resolve(TMP, "posts"), { recursive: true });
     writeFileSync(resolve(TMP, "posts/a.md"), "# A");
     writeFileSync(resolve(TMP, "posts/b.md"), "# B");
@@ -124,7 +126,7 @@ describe("Markdown capability behavior", () => {
       expect(files.length).toBe(2);
       expect(files.every((f) => f.endsWith(".md"))).toBe(true);
     } finally {
-      rmSync(TMP, { recursive: true, force: true });
+      rmSync(TMP, { force: true, recursive: true });
     }
   });
 
@@ -132,16 +134,16 @@ describe("Markdown capability behavior", () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
     const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-resolve__");
-    rmSync(TMP, { recursive: true, force: true });
+    rmSync(TMP, { force: true, recursive: true });
     mkdirSync(TMP, { recursive: true });
     writeFileSync(resolve(TMP, "post.md"), "---\ntitle: T\n---\n\nBody.\n");
     try {
-      const md = new Markdown({ src: "./post.md", basePath: TMP });
+      const md = new Markdown({ basePath: TMP, src: "./post.md" });
       const result = await md.resolve();
       expect(result.slug).toBe("post");
       expect(result.frontmatter.title).toBe("T");
     } finally {
-      rmSync(TMP, { recursive: true, force: true });
+      rmSync(TMP, { force: true, recursive: true });
     }
   });
 });

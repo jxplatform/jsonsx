@@ -10,12 +10,14 @@
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
 import { activeTab } from "./workspace/workspace";
+import { isEventBinding } from "@jxsuite/schema/guards";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export {
   createState,
   getNodeAtPath,
+  childList,
   flattenTree,
   nodeLabel,
   pathKey,
@@ -49,7 +51,7 @@ export function initShellRefs() {
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────
 
-export const elToPath: WeakMap<Element, JxPath> = new WeakMap();
+export const elToPath = new WeakMap<Element, JxPath>();
 
 export const canvasPanels: import("./panels/canvas-dnd.js").CanvasPanel[] = [];
 
@@ -101,8 +103,12 @@ const _styleDebounceTimers = new Map();
  * @param {number} ms
  * @param {(...args: unknown[]) => void} fn
  */
-export function debouncedStyleCommit(prop: string, ms: number, fn: (...args: any[]) => void) {
-  return (...args: unknown[]) => {
+export function debouncedStyleCommit<A extends unknown[]>(
+  prop: string,
+  ms: number,
+  fn: (...args: A) => void,
+) {
+  return (...args: A) => {
     clearTimeout(_styleDebounceTimers.get(prop));
     _styleDebounceTimers.set(
       prop,
@@ -127,30 +133,34 @@ export function cancelStyleDebounce(prop: string) {
  * @returns {JxMutableNode}
  */
 export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
-  if (!node || typeof node !== "object") return node;
-  if (Array.isArray(node)) return node.map(stripEventHandlers);
+  if (!node || typeof node !== "object") {
+    return node;
+  }
+  if (Array.isArray(node)) {
+    // Arrays of nodes round-trip element-wise; the array itself is not a node.
+    return node.map(stripEventHandlers) as unknown as JxMutableNode;
+  }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(node)) {
-    if (
-      k.startsWith("on") &&
-      typeof v === "object" &&
-      (v?.$ref || v?.$prototype === "Function" || v?.$expression)
-    )
+    if (k.startsWith("on") && isEventBinding(v)) {
       continue;
+    }
     if (k === "children") {
       out.children = Array.isArray(v)
         ? v.map(stripEventHandlers)
         : stripEventHandlers(v as JxMutableNode);
     } else if (k === "cases" && typeof v === "object") {
       const cases: Record<string, unknown> = {};
-      for (const [ck, cv] of Object.entries(v as Record<string, unknown>))
+      for (const [ck, cv] of Object.entries(v as Record<string, unknown>)) {
         cases[ck] = stripEventHandlers(cv as JxMutableNode);
+      }
       out.cases = cases;
     } else if (k === "state" && typeof v === "object" && v !== null) {
       const state: Record<string, unknown> = {};
       for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
-        if (sv && typeof sv === "object" && (sv as Record<string, unknown>).timing === "server")
+        if (sv && typeof sv === "object" && (sv as Record<string, unknown>).timing === "server") {
           continue;
+        }
         state[sk] = sv;
       }
       out.state = state;
@@ -165,7 +175,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
 
 // ─── Render orchestration ────────────────────────────────────────────────────
 
-const _renderers: Map<string, Function> = new Map();
+const _renderers = new Map<string, Function>();
 
 /**
  * Register a named renderer. Called at module import time by each module.
@@ -182,8 +192,8 @@ export function render() {
   for (const [name, fn] of _renderers.entries()) {
     try {
       fn();
-    } catch (e) {
-      console.error(`Renderer "${name}" failed:`, e);
+    } catch (error) {
+      console.error(`Renderer "${name}" failed:`, error);
     }
   }
 }
@@ -196,11 +206,13 @@ export function render() {
 export function renderOnly(...names: string[]) {
   for (const name of names) {
     const fn = _renderers.get(name);
-    if (!fn) continue;
+    if (!fn) {
+      continue;
+    }
     try {
       fn();
-    } catch (e) {
-      console.error(`Renderer "${name}" failed:`, e);
+    } catch (error) {
+      console.error(`Renderer "${name}" failed:`, error);
     }
   }
 }
@@ -221,9 +233,15 @@ export function updateSession(patch: {
 }) {
   const tab = activeTab.value;
   if (tab) {
-    if (patch.selection !== undefined) tab.session.selection = patch.selection as JxPath | null;
-    if (patch.hover !== undefined) tab.session.hover = patch.hover as JxPath | null;
-    if (patch.clipboard !== undefined) tab.session.clipboard = patch.clipboard!;
+    if (patch.selection !== undefined) {
+      tab.session.selection = patch.selection as JxPath | null;
+    }
+    if (patch.hover !== undefined) {
+      tab.session.hover = patch.hover as JxPath | null;
+    }
+    if (patch.clipboard !== undefined) {
+      tab.session.clipboard = patch.clipboard!;
+    }
     if (patch.ui) {
       for (const [k, v] of Object.entries(patch.ui)) {
         (tab.session.ui as unknown as Record<string, unknown>)[k] = v;

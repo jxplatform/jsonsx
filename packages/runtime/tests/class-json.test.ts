@@ -1,8 +1,9 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
 try {
   GlobalRegistrator.register();
 } catch {
-  /* already registered */
+  /* Already registered */
 }
 
 import { describe, test, expect, mock, spyOn } from "bun:test";
@@ -10,159 +11,159 @@ import { buildScope, resolvePrototype, isSignal } from "@jxsuite/runtime";
 import { resolve as resolvePath, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = import.meta.filename;
 const __dirname = join(__filename, "..");
 const BASE = "http://localhost/";
 
 // ─── .class.json self-contained class schema ────────────────────────────────
 
 const selfContainedClassDef = {
-  $prototype: "Class",
-  title: "Adder",
   $defs: {
     fields: {
       a: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "a",
         default: 0,
+        identifier: "a",
+        role: "field",
+        scope: "instance",
       },
       b: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "b",
         default: 0,
+        identifier: "b",
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       resolve: {
-        role: "method",
-        identifier: "resolve",
         body: "return this.a + this.b;",
+        identifier: "resolve",
+        role: "method",
       },
     },
   },
+  $prototype: "Class",
+  title: "Adder",
 };
 
 const privateFieldsClassDef = {
-  $prototype: "Class",
-  title: "Secret",
   $defs: {
     fields: {
       data: {
-        role: "field",
         access: "private",
-        scope: "instance",
-        identifier: "data",
         default: "hidden",
+        identifier: "data",
+        role: "field",
+        scope: "instance",
       },
       pub: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "pub",
         default: "visible",
+        identifier: "pub",
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       resolve: {
-        role: "method",
-        identifier: "resolve",
         body: "return { priv: this._data, pub: this.pub };",
+        identifier: "resolve",
+        role: "method",
       },
     },
   },
+  $prototype: "Class",
+  title: "Secret",
 };
 
 const classWithValueProp = {
-  $prototype: "Class",
-  title: "Greeter",
   $defs: {
     fields: {
       greeting: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "greeting",
         default: "world",
+        identifier: "greeting",
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       val: {
-        role: "accessor",
-        identifier: "value",
         getter: { body: 'return "Hello " + this.greeting;' },
+        identifier: "value",
+        role: "accessor",
       },
     },
   },
+  $prototype: "Class",
+  title: "Greeter",
 };
 
 const classWithStaticMethod = {
-  $prototype: "Class",
-  title: "Utils",
   $defs: {
     methods: {
-      double: {
-        role: "method",
-        scope: "static",
-        identifier: "double",
-        parameters: [{ identifier: "x" }],
-        body: "return x * 2;",
-      },
       add: {
-        role: "method",
+        body: "return a + b;",
         identifier: "add",
         parameters: [{ identifier: "a" }, { identifier: "b" }],
-        body: "return a + b;",
+        role: "method",
+      },
+      double: {
+        body: "return x * 2;",
+        identifier: "double",
+        parameters: [{ identifier: "x" }],
+        role: "method",
+        scope: "static",
       },
     },
   },
+  $prototype: "Class",
+  title: "Utils",
 };
 
 const classWithConstructorBody = {
-  $prototype: "Class",
-  title: "Tagged",
   $defs: {
-    fields: {
-      tag: {
-        role: "field",
-        access: "public",
-        scope: "instance",
-        identifier: "tag",
-        default: "",
-      },
-    },
     constructor: {
-      role: "constructor",
       $prototype: "Function",
       body: 'this.tag = (config.prefix || "") + "-tagged";',
+      role: "constructor",
+    },
+    fields: {
+      tag: {
+        access: "public",
+        default: "",
+        identifier: "tag",
+        role: "field",
+        scope: "instance",
+      },
     },
   },
+  $prototype: "Class",
+  title: "Tagged",
 };
 
 const classWithInitializer = {
-  $prototype: "Class",
-  title: "Initer",
   $defs: {
     fields: {
       items: {
-        role: "field",
         access: "public",
-        scope: "instance",
         identifier: "items",
         initializer: [],
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       resolve: {
-        role: "method",
-        identifier: "resolve",
         body: "return this.items;",
+        identifier: "resolve",
+        role: "method",
       },
     },
   },
+  $prototype: "Class",
+  title: "Initer",
 };
 
 // Mock fetch to serve .class.json content based on URL
@@ -173,8 +174,8 @@ function setupFetchMock(classDefMap: any) {
     for (const [pattern, def] of Object.entries(classDefMap)) {
       if (urlStr.includes(pattern)) {
         return Promise.resolve({
-          ok: true,
           json: () => Promise.resolve(def),
+          ok: true,
         });
       }
     }
@@ -307,7 +308,7 @@ describe("classFromSchema — via resolvePrototype", () => {
     });
     try {
       // Static methods aren't directly testable via resolve since resolve()
-      // returns instance, but instance methods work
+      // Returns instance, but instance methods work
       const val = (await resolvePrototype(
         { $prototype: "Utils", $src: "./Utils.class.json" },
         {},
@@ -364,7 +365,7 @@ describe("classFromSchema — via resolvePrototype", () => {
         {},
         "$a",
       )) as any;
-      // resolve() returns a number, not the instance, so we can't check class name directly
+      // Resolve() returns a number, not the instance, so we can't check class name directly
       expect(val.value).toBe(2);
     } finally {
       restore();
@@ -378,11 +379,11 @@ describe("resolveClassJson — hybrid $implementation", () => {
   test("follows $implementation to JS module via resolveExternalPrototype", async () => {
     const parserDir = resolvePath(__dirname, "..", "..", "parser", "src");
     const hybridDef = {
+      $implementation: "./markdown.js",
       $prototype: "Class",
       title: "Markdown",
-      $implementation: "./markdown.js",
     };
-    const schemaSrc = "file://" + join(parserDir, "MdFile.class.json");
+    const schemaSrc = `file://${join(parserDir, "MdFile.class.json")}`;
     const restore = setupFetchMock({ "MdFile.class.json": hybridDef });
     try {
       const fixtureDir = resolvePath(__dirname, "..", "..", "..", "examples", "content", "posts");
@@ -419,8 +420,8 @@ describe("resolveClassJson — fallback", () => {
       if (urlStr.includes("__jx_resolve__")) {
         proxyCalled = true;
         return Promise.resolve({
-          ok: true,
           json: () => Promise.resolve(42),
+          ok: true,
         });
       }
       return originalFetch(url);
@@ -607,8 +608,8 @@ describe("buildScope — import map", () => {
           Greeter: "http://localhost/Greeter.class.json",
         },
         state: {
-          $sum: { $prototype: "Adder", a: 10, b: 20 },
           $greeting: { $prototype: "Greeter", greeting: "World" },
+          $sum: { $prototype: "Adder", a: 10, b: 20 },
         },
       };
       const scope = await buildScope(doc, {}, BASE);

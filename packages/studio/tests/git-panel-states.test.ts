@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, mock } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { render as litRender } from "lit-html";
 import type { StudioPlatform } from "../src/types";
 
@@ -12,8 +12,8 @@ mock.module("../src/platform.js", () => ({
 
 mock.module("../src/workspace/workspace.js", () => ({
   activeTab: { value: null },
-  openTab: () => {},
   closeTab: () => {},
+  openTab: () => {},
   renameTab: () => {},
 }));
 
@@ -22,8 +22,8 @@ mock.module("../src/view.js", () => ({
 }));
 
 mock.module("../src/ui/layers.js", () => ({
-  showDialog: async () => null,
   showConfirmDialog: async () => true,
+  showDialog: async () => null,
 }));
 
 mock.module("../src/panels/statusbar.js", () => ({
@@ -44,16 +44,16 @@ describe("renderGitPanel — state rendering", () => {
   beforeEach(() => {
     setProjectState(null);
     mockPlatform = {
+      gitBranches: async () => ({ branches: ["main"], current: "main" }),
+      gitLog: async () => [],
       gitStatus: async () => ({
-        branch: "main",
-        files: [],
         ahead: 0,
         behind: 0,
+        branch: "main",
+        files: [],
         isRepo: true,
         remotes: ["origin"],
       }),
-      gitBranches: async () => ({ current: "main", branches: ["main"] }),
-      gitLog: async () => [],
     };
   });
 
@@ -87,10 +87,10 @@ describe("renderGitPanel — state rendering", () => {
     setProjectState({ name: "test-project" });
     const ui = {
       gitStatus: {
-        branch: "",
-        files: [],
         ahead: 0,
         behind: 0,
+        branch: "",
+        files: [],
         isRepo: false,
         remotes: [],
       },
@@ -105,15 +105,15 @@ describe("renderGitPanel — state rendering", () => {
   test("git repo with no remotes — shows 'Local only' sync bar with publish", () => {
     setProjectState({ name: "test-project" });
     const ui = {
+      gitBranches: { branches: ["main"], current: "main" },
       gitStatus: {
-        branch: "main",
-        files: [],
         ahead: 0,
         behind: 0,
+        branch: "main",
+        files: [],
         isRepo: true,
         remotes: [],
       },
-      gitBranches: { current: "main", branches: ["main"] },
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
@@ -125,15 +125,15 @@ describe("renderGitPanel — state rendering", () => {
   test("git repo with remote — shows normal sync bar without publish", () => {
     setProjectState({ name: "test-project" });
     const ui = {
+      gitBranches: { branches: ["main"], current: "main" },
       gitStatus: {
-        branch: "main",
-        files: [],
         ahead: 0,
         behind: 0,
+        branch: "main",
+        files: [],
         isRepo: true,
         remotes: ["origin"],
       },
-      gitBranches: { current: "main", branches: ["main"] },
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
@@ -145,15 +145,15 @@ describe("renderGitPanel — state rendering", () => {
   test("git repo with ahead/behind — shows sync counts", () => {
     setProjectState({ name: "test-project" });
     const ui = {
+      gitBranches: { branches: ["main"], current: "main" },
       gitStatus: {
-        branch: "main",
-        files: [],
         ahead: 3,
         behind: 1,
+        branch: "main",
+        files: [],
         isRepo: true,
         remotes: ["origin"],
       },
-      gitBranches: { current: "main", branches: ["main"] },
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
@@ -164,18 +164,18 @@ describe("renderGitPanel — state rendering", () => {
   test("git repo with changed files — shows file list", () => {
     setProjectState({ name: "test-project" });
     const ui = {
+      gitBranches: { branches: ["main"], current: "main" },
       gitStatus: {
-        branch: "main",
-        files: [
-          { path: "src/index.js", status: "M", staged: false },
-          { path: "src/util.js", status: "A", staged: true },
-        ],
         ahead: 0,
         behind: 0,
+        branch: "main",
+        files: [
+          { path: "src/index.js", staged: false, status: "M" },
+          { path: "src/util.js", staged: true, status: "A" },
+        ],
         isRepo: true,
         remotes: ["origin"],
       },
-      gitBranches: { current: "main", branches: ["main"] },
     };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
@@ -186,7 +186,7 @@ describe("renderGitPanel — state rendering", () => {
 
   test("loading state with no status yet — shows loading indicator", () => {
     setProjectState({ name: "test-project" });
-    const ui = { gitStatus: null, gitLoading: true };
+    const ui = { gitLoading: true, gitStatus: null };
     const result = renderGitPanel({ ui }, {});
     const output = renderToString(result);
     expect(output).toContain("Loading");

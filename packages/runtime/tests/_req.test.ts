@@ -1,4 +1,5 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
 try {
   GlobalRegistrator.register();
 } catch {}
@@ -13,8 +14,8 @@ describe("resolvePrototype", () => {
   test("Request: returns ref", async () => {
     global.fetch = mock(() =>
       Promise.resolve({
-        ok: true,
         json: () => Promise.resolve({ id: 1 }),
+        ok: true,
       }),
     ) as any;
     const state: Record<string, unknown> = reactive({});

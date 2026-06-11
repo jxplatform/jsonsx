@@ -6,9 +6,10 @@
  */
 
 import { html, render as litRender } from "lit-html";
-import { updateUi, rightPanel } from "../store";
+import { rightPanel, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { createPanelScheduler, type PanelScheduler } from "./panel-scheduler";
+import { createPanelScheduler } from "./panel-scheduler";
+import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
 import { tabIcon } from "./activity-bar";
 import { eventsSidebarTemplate } from "./events-panel";
@@ -17,6 +18,7 @@ import { isCustomElementDoc } from "./signals-panel";
 import { isColorPopoverOpen } from "../ui/color-selector";
 import { renderStylePanelTemplate } from "./style-panel";
 import { renderPropertiesPanelTemplate } from "./properties-panel";
+
 interface RightPanelCtx {
   navigateToComponent: (path: string) => void;
   getCanvasMode: () => string;
@@ -47,16 +49,18 @@ export function mount(ctx: RightPanelCtx) {
   mountAiPanel();
   registerRightPanelRender(render);
   _scheduler = createPanelScheduler({
-    root: rightPanel,
-    render: _doRender,
     blockWhile: isColorPopoverOpen,
+    render: _doRender,
+    root: rightPanel,
   });
   _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
       // Track properties the right panel reads
       void tab.doc.document;
       void tab.session.selection;
@@ -102,7 +106,9 @@ let _assistantContainer: HTMLElement | null = null;
 let _lastTab: string | null = null;
 
 function _ensureContainers() {
-  if (_propsContainer) return;
+  if (_propsContainer) {
+    return;
+  }
   _propsContainer = document.createElement("div");
   _propsContainer.className = "panel-body";
   _eventsContainer = document.createElement("div");
@@ -115,7 +121,9 @@ function _ensureContainers() {
 }
 
 function _doRender() {
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
   try {
     const ctx = _ctx as RightPanelCtx;
     const aTab = activeTab.value;
@@ -124,19 +132,19 @@ function _doRender() {
       return;
     }
     const S = {
-      ui: aTab.session.ui,
       document: aTab.doc.document,
       mode: aTab.doc.mode,
       selection: aTab.session.selection,
+      ui: aTab.session.ui,
     };
     const tab = S.ui.rightTab;
 
     // Render tabs header
     const panelTabs = [
-      { value: "properties", icon: "sp-icon-properties", label: "Properties" },
-      { value: "events", icon: "sp-icon-event", label: "Events" },
-      { value: "style", icon: "sp-icon-brush", label: "Style" },
-      { value: "assistant", icon: "sp-icon-chat", label: "Assistant" },
+      { icon: "sp-icon-properties", label: "Properties", value: "properties" },
+      { icon: "sp-icon-event", label: "Events", value: "events" },
+      { icon: "sp-icon-brush", label: "Style", value: "style" },
+      { icon: "sp-icon-chat", label: "Assistant", value: "assistant" },
     ];
     const tabsT = html`
       <div class="panel-tabs">
@@ -183,7 +191,9 @@ function _doRender() {
     // Render tabs into the right panel, append containers
     litRender(tabsT, rightPanel);
     for (const c of containers) {
-      if (!c.parentNode) rightPanel.appendChild(c);
+      if (!c.parentNode) {
+        rightPanel.append(c);
+      }
     }
 
     // Only render the active panel's content
@@ -204,16 +214,16 @@ function _doRender() {
     } else if (tab === "style") {
       try {
         litRender(renderStylePanelTemplate({ getCanvasMode: ctx.getCanvasMode }), _styleContainer!);
-      } catch (e) {
-        console.error("[renderStylePanelTemplate]", e);
+      } catch (error) {
+        console.error("[renderStylePanelTemplate]", error);
       }
     } else if (tab === "assistant") {
       litRender(renderAiPanelTemplate(), _assistantContainer!);
     }
 
     _lastTab = tab;
-  } catch (e) {
-    console.error("right-panel render error:", e);
+  } catch (error) {
+    console.error("right-panel render error:", error);
   }
   requestAnimationFrame(() => mountQuikChat());
   _ctx.updateForcedPseudoPreview();

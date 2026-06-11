@@ -1,14 +1,14 @@
 /// <reference lib="dom" />
-import { render as litRender, nothing, html } from "lit-html";
+import { html, render as litRender, nothing } from "lit-html";
 
 let _popoverLayer: HTMLElement;
 let _modalLayer: HTMLElement;
 let _dialogLayer: HTMLElement;
 
 export function initLayers() {
-  _popoverLayer = document.getElementById("layer-popover") as HTMLElement;
-  _modalLayer = document.getElementById("layer-modal") as HTMLElement;
-  _dialogLayer = document.getElementById("layer-dialog") as HTMLElement;
+  _popoverLayer = document.querySelector("#layer-popover") as HTMLElement;
+  _modalLayer = document.querySelector("#layer-modal") as HTMLElement;
+  _dialogLayer = document.querySelector("#layer-dialog") as HTMLElement;
 }
 
 /**
@@ -24,10 +24,12 @@ export function showDialog<T>(
   return new Promise((resolve) => {
     const slot = document.createElement("div");
     slot.style.pointerEvents = "auto";
-    _dialogLayer.appendChild(slot);
+    _dialogLayer.append(slot);
     let resolved = false;
     const done = (value: T) => {
-      if (resolved) return;
+      if (resolved) {
+        return;
+      }
       resolved = true;
       litRender(nothing, slot);
       slot.remove();
@@ -83,17 +85,17 @@ export function showConfirmDialog(
 export function openModal(template: import("lit-html").TemplateResult) {
   const slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
-  _modalLayer.appendChild(slot);
+  _modalLayer.append(slot);
   litRender(template, slot);
   return {
+    close() {
+      litRender(nothing, slot);
+      slot.remove();
+    },
     host: slot,
     /** @param {import("lit-html").TemplateResult} tpl */
     update(tpl: import("lit-html").TemplateResult) {
       litRender(tpl, slot);
-    },
-    close() {
-      litRender(nothing, slot);
-      slot.remove();
     },
   };
 }
@@ -120,7 +122,7 @@ export function renderPopover(
   slot.style.pointerEvents = "auto";
   const target =
     opts.layer === "modal" ? _modalLayer : opts.layer === "dialog" ? _dialogLayer : _popoverLayer;
-  target.appendChild(slot);
+  target.append(slot);
   litRender(template, slot);
 
   let outsideClickHandler: ((e: MouseEvent) => void) | null = null;
@@ -132,16 +134,13 @@ export function renderPopover(
       }
     };
     requestAnimationFrame(() => {
-      if (outsideClickHandler) document.addEventListener("mousedown", outsideClickHandler, true);
+      if (outsideClickHandler) {
+        document.addEventListener("mousedown", outsideClickHandler, true);
+      }
     });
   }
 
   const handle = {
-    host: slot,
-    /** @param {import("lit-html").TemplateResult} tpl */
-    update(tpl: import("lit-html").TemplateResult) {
-      litRender(tpl, slot);
-    },
     dismiss() {
       if (outsideClickHandler) {
         document.removeEventListener("mousedown", outsideClickHandler, true);
@@ -149,11 +148,16 @@ export function renderPopover(
       litRender(nothing, slot);
       slot.remove();
     },
+    host: slot,
+    /** @param {import("lit-html").TemplateResult} tpl */
+    update(tpl: import("lit-html").TemplateResult) {
+      litRender(tpl, slot);
+    },
   };
   return handle;
 }
 
-const _namedSlots: Map<string, HTMLElement> = new Map();
+const _namedSlots = new Map<string, HTMLElement>();
 
 /**
  * Get or create a named slot in a layer. Useful for persistent popovers like zoom indicator.
@@ -165,14 +169,16 @@ const _namedSlots: Map<string, HTMLElement> = new Map();
 export function getLayerSlot(layer: "popover" | "modal" | "dialog", id: string) {
   const key = `${layer}:${id}`;
   let slot = _namedSlots.get(key);
-  if (slot && slot.parentElement) return slot;
+  if (slot && slot.parentElement) {
+    return slot;
+  }
 
   slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
   const target =
     (layer === "popover" ? _popoverLayer : layer === "modal" ? _modalLayer : _dialogLayer) ||
     document.body;
-  target.appendChild(slot);
+  target.append(slot);
   _namedSlots.set(key, slot);
   return slot;
 }

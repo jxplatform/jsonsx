@@ -7,15 +7,15 @@
  */
 
 import { existsSync } from "node:fs";
-import { resolve, extname, basename } from "node:path";
+import { basename, extname, resolve } from "node:path";
 import {
-  processImage,
   buildSrcset,
-  contentHash,
   configHash,
+  contentHash,
   getImageMetadata,
+  processImage,
 } from "./image-optimizer.ts";
-import { getCached, setCached, getImageCacheDir } from "./image-cache.ts";
+import { getCached, getImageCacheDir, setCached } from "./image-cache.ts";
 
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageManifest } from "./image-optimizer.ts";
@@ -41,7 +41,7 @@ async function resolveCfMeta(absoluteSrc: string, metaCache: ImageMetaCache) {
   let meta = metaCache.get(absoluteSrc);
   if (!meta) {
     const m = await getImageMetadata(absoluteSrc);
-    meta = { width: m.width, height: m.height, hash: contentHash(absoluteSrc) };
+    meta = { hash: contentHash(absoluteSrc), height: m.height, width: m.width };
     metaCache.set(absoluteSrc, meta);
   }
   return meta;
@@ -71,7 +71,7 @@ function buildCloudflareSrcset(
   const suffix = hash ? `?v=${hash}` : "";
   return config.widths
     .filter((w) => w <= originalWidth)
-    .sort((a, b) => a - b)
+    .toSorted((a, b) => a - b)
     .map(
       (w) =>
         `/cdn-cgi/image/width=${w},quality=${quality},fit=scale-down,format=auto` +
@@ -100,10 +100,14 @@ async function resolveManifest(
 
   if (cached) {
     const allExist = cached.variants.every((v) => existsSync(v.absolutePath));
-    if (allExist) return cached;
+    if (allExist) {
+      return cached;
+    }
   }
 
-  if (!cached) console.log(`    Optimizing ${basename(absoluteSrc)}...`);
+  if (!cached) {
+    console.log(`    Optimizing ${basename(absoluteSrc)}...`);
+  }
   const manifest = await processImage(absoluteSrc, getImageCacheDir(projectRoot), config);
   setCached(cache, key, src, manifest);
   return manifest;
@@ -116,11 +120,21 @@ async function resolveManifest(
  * @returns {boolean}
  */
 function shouldSkip(src: string) {
-  if (typeof src !== "string") return true;
-  if (!src) return true;
-  if (src.includes("${")) return true;
-  if (EXTERNAL_PREFIXES.some((p) => src.startsWith(p))) return true;
-  if (SKIP_EXTENSIONS.has(extname(src).toLowerCase())) return true;
+  if (typeof src !== "string") {
+    return true;
+  }
+  if (!src) {
+    return true;
+  }
+  if (src.includes("${")) {
+    return true;
+  }
+  if (EXTERNAL_PREFIXES.some((p) => src.startsWith(p))) {
+    return true;
+  }
+  if (SKIP_EXTENSIONS.has(extname(src).toLowerCase())) {
+    return true;
+  }
   return false;
 }
 
@@ -136,13 +150,23 @@ function shouldSkip(src: string) {
  * @returns {boolean}
  */
 function isAllowedRemote(src: string, config: ImageConfig) {
-  if (config.service !== "cloudflare") return false;
-  if (!config.remoteDomains?.length) return false;
-  if (typeof src !== "string" || !src.startsWith("https://")) return false;
-  if (src.includes("${")) return false;
+  if (config.service !== "cloudflare") {
+    return false;
+  }
+  if (!config.remoteDomains?.length) {
+    return false;
+  }
+  if (typeof src !== "string" || !src.startsWith("https://")) {
+    return false;
+  }
+  if (src.includes("${")) {
+    return false;
+  }
   try {
     const url = new URL(src);
-    if (SKIP_EXTENSIONS.has(extname(url.pathname).toLowerCase())) return false;
+    if (SKIP_EXTENSIONS.has(extname(url.pathname).toLowerCase())) {
+      return false;
+    }
     return config.remoteDomains.includes(url.hostname);
   } catch {
     return false;
@@ -186,9 +210,11 @@ export async function transformImageNodes(
   cache: CacheManifest | null,
   metaCache?: ImageMetaCache,
 ) {
-  const imageRefs: Map<string, ImageManifest> = new Map();
+  const imageRefs = new Map<string, ImageManifest>();
 
-  if (!config.optimize) return { imageRefs };
+  if (!config.optimize) {
+    return { imageRefs };
+  }
 
   const meta = metaCache ?? new Map();
   await walkAndTransform(doc, config, projectRoot, cache, meta, imageRefs);
@@ -212,7 +238,9 @@ async function walkAndTransform(
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
 ) {
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
 
   if (node.tagName === "img") {
     await transformImgNode(node, config, projectRoot, cache, metaCache, imageRefs);
@@ -231,7 +259,9 @@ async function walkAndTransform(
 
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      if (typeof child === "string") continue;
+      if (typeof child === "string") {
+        continue;
+      }
       await walkAndTransform(child, config, projectRoot, cache, metaCache, imageRefs);
     }
   }
@@ -253,38 +283,52 @@ async function transformImgNode(
   metaCache: ImageMetaCache,
   imageRefs: Map<string, ImageManifest>,
 ) {
-  if (!node.attributes) node.attributes = {};
+  if (!node.attributes) {
+    node.attributes = {};
+  }
 
   const src = node.attributes.src ?? node.src;
+  // Bound ($ref) or missing srcs cannot be optimized at build time.
+  if (typeof src !== "string") {
+    return;
+  }
   const remote = isAllowedRemote(src, config);
-  if (!remote && shouldSkip(src)) return;
-  if (node.attributes["data-no-optimize"] !== undefined) return;
-
-  const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot);
-  if (absoluteSrc && !existsSync(absoluteSrc)) return;
+  if (!remote && shouldSkip(src)) {
+    return;
+  }
+  if (node.attributes["data-no-optimize"] !== undefined) {
+    return;
+  }
 
   let srcset;
   let original: { width: number; height: number } | undefined;
 
   if (remote) {
     // Original dimensions are unknown without fetching — emit every configured width and let
-    // fit=scale-down avoid upscaling past the source size.
+    // Fit=scale-down avoid upscaling past the source size.
     srcset = buildCloudflareSrcset(src, config, Infinity, null);
-  } else if (config.service === "cloudflare") {
-    const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-    srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
-    original = meta;
   } else {
-    let manifest = imageRefs.get(absoluteSrc as string);
-
-    if (!manifest) {
-      manifest = await resolveManifest(absoluteSrc as string, src, config, projectRoot, cache!);
-      imageRefs.set(absoluteSrc as string, manifest);
+    const absoluteSrc = resolveImagePath(src, projectRoot);
+    if (!existsSync(absoluteSrc)) {
+      return;
     }
 
-    const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
-    srcset = buildSrcset(manifest.variants, preferredFormat);
-    original = manifest.original;
+    if (config.service === "cloudflare") {
+      const meta = await resolveCfMeta(absoluteSrc, metaCache);
+      srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
+      original = meta;
+    } else {
+      let manifest = imageRefs.get(absoluteSrc);
+
+      if (!manifest) {
+        manifest = await resolveManifest(absoluteSrc, src, config, projectRoot, cache!);
+        imageRefs.set(absoluteSrc, manifest);
+      }
+
+      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
+      srcset = buildSrcset(manifest.variants, preferredFormat);
+      ({ original } = manifest);
+    }
   }
 
   if (srcset) {
@@ -336,19 +380,29 @@ async function transformInnerHtmlImages(
     const tag = m[0];
     const attrs = m[1];
 
-    if (SRCSET_ATTR_RE.test(attrs)) continue;
-    if (DATA_NO_OPT_RE.test(attrs)) continue;
+    if (SRCSET_ATTR_RE.test(attrs)) {
+      continue;
+    }
+    if (DATA_NO_OPT_RE.test(attrs)) {
+      continue;
+    }
 
     const srcMatch = attrs.match(SRC_ATTR_RE);
-    if (!srcMatch) continue;
+    if (!srcMatch) {
+      continue;
+    }
 
     // Attribute values in pre-rendered innerHTML are entity-escaped — decode for processing
     const src = srcMatch[1].replaceAll("&amp;", "&");
     const remote = isAllowedRemote(src, config);
-    if (!remote && shouldSkip(src)) continue;
+    if (!remote && shouldSkip(src)) {
+      continue;
+    }
 
     const absoluteSrc = remote ? null : resolveImagePath(src, projectRoot);
-    if (absoluteSrc && !existsSync(absoluteSrc)) continue;
+    if (absoluteSrc && !existsSync(absoluteSrc)) {
+      continue;
+    }
 
     let srcset;
     let original: { width: number; height: number } | undefined;
@@ -368,9 +422,11 @@ async function transformInnerHtmlImages(
 
       const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
       srcset = buildSrcset(manifest.variants, preferredFormat);
-      original = manifest.original;
+      ({ original } = manifest);
     }
-    if (!srcset) continue;
+    if (!srcset) {
+      continue;
+    }
 
     let extra = ` srcset="${srcset}" sizes="${config.sizes}"`;
     if (!/\bwidth=/.test(attrs) && original?.width) {
@@ -380,8 +436,12 @@ async function transformInnerHtmlImages(
       extra += ` height="${original.height}"`;
     }
     if (config.lazyLoad && !/\bloading="eager"/.test(attrs)) {
-      if (!/\bloading=/.test(attrs)) extra += ` loading="lazy"`;
-      if (!/\bdecoding=/.test(attrs)) extra += ` decoding="async"`;
+      if (!/\bloading=/.test(attrs)) {
+        extra += ` loading="lazy"`;
+      }
+      if (!/\bdecoding=/.test(attrs)) {
+        extra += ` decoding="async"`;
+      }
     }
 
     replacements.push({ match: tag, replacement: `<img${attrs}${extra}>` });

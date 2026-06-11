@@ -1,13 +1,13 @@
 /// <reference lib="dom" />
-import { reactive, effectScope } from "../reactivity";
+import { effectScope, reactive } from "../reactivity";
 import { formatByName, formatForPath } from "../format/format-host";
 import type {
-  GitDiffState,
-  InlineEditDef,
-  FunctionEditDef,
   DocumentStackEntry,
-  GitStatusResult,
+  FunctionEditDef,
   GitBranchesResult,
+  GitDiffState,
+  GitStatusResult,
+  InlineEditDef,
 } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -83,30 +83,30 @@ export interface Tab {
 /** @returns {TabUi} */
 function createDefaultUi() {
   return {
-    rightTab: "properties",
-    canvasMode: "edit",
-    zoom: 1,
     activeMedia: null,
     activeSelector: null,
+    canvasMode: "edit",
     editingFunction: null,
     featureToggles: {},
-    styleSections: {},
-    inspectorSections: {},
-    styleShorthands: {},
-    styleFilter: "",
-    styleFilterActive: false,
-    stylebookSelection: null,
-    stylebookTab: "elements",
-    stylebookFilter: "",
-    stylebookCustomizedOnly: false,
-    settingsTab: "stylebook",
-    gitStatus: null,
     gitBranches: null,
     gitCommitMessage: "",
-    gitLoading: false,
-    gitError: null,
     gitDiffState: null,
+    gitError: null,
+    gitLoading: false,
+    gitStatus: null,
+    inspectorSections: {},
     pendingInlineEdit: null,
+    rightTab: "properties",
+    settingsTab: "stylebook",
+    styleFilter: "",
+    styleFilterActive: false,
+    styleSections: {},
+    styleShorthands: {},
+    stylebookCustomizedOnly: false,
+    stylebookFilter: "",
+    stylebookSelection: null,
+    stylebookTab: "elements",
+    zoom: 1,
   };
 }
 
@@ -148,35 +148,35 @@ export function createTab({
   const resolvedModes = capabilities?.modes ?? inferModes(documentPath, sourceFormat);
 
   const tab = scope.run(() => ({
-    id,
+    capabilities: { modes: resolvedModes },
+    doc: reactive({
+      content: { frontmatter: frontmatter || {} },
+      dirty: false,
+      document,
+      handlersSource: null,
+      mode: inferDocumentMode(documentPath, sourceFormat),
+      sourceFormat,
+    }),
     documentPath,
     fileHandle,
-    capabilities: { modes: resolvedModes },
-    scope,
-    doc: reactive({
-      document,
-      sourceFormat,
-      content: { frontmatter: frontmatter || {} },
-      mode: inferDocumentMode(documentPath, sourceFormat),
-      handlersSource: null,
-      dirty: false,
+    history: reactive({
+      index: 0,
+      snapshots: [{ document: structuredClone(document), selection: null }],
     }),
+    id,
+    scope,
     session: reactive({
-      selection: null,
-      hover: null,
-      clipboard: null,
-      documentStack: [],
-      ui: createDefaultUi(),
       canvas: {
-        status: "idle",
-        scope: null,
         error: null,
         pendingInlineEdit: null,
+        scope: null,
+        status: "idle",
       },
-    }),
-    history: reactive({
-      snapshots: [{ document: structuredClone(document), selection: null }],
-      index: 0,
+      clipboard: null,
+      documentStack: [],
+      hover: null,
+      selection: null,
+      ui: createDefaultUi(),
     }),
   })) as unknown as Tab;
 
@@ -189,9 +189,13 @@ export function createTab({
  * @returns {string[]}
  */
 function inferModes(documentPath: string | null | undefined, sourceFormat: string | null) {
-  if (documentPath === "project.json") return ["stylebook", "source"];
+  if (documentPath === "project.json") {
+    return ["stylebook", "source"];
+  }
   const format = formatByName(sourceFormat) ?? formatForPath(documentPath);
-  if (format) return format.studio?.modes ?? ["edit", "design", "preview", "source"];
+  if (format) {
+    return format.studio?.modes ?? ["edit", "design", "preview", "source"];
+  }
   return ALL_MODES;
 }
 
@@ -205,7 +209,9 @@ function inferModes(documentPath: string | null | undefined, sourceFormat: strin
  */
 function inferDocumentMode(documentPath: string | null | undefined, sourceFormat: string | null) {
   const format = formatByName(sourceFormat) ?? formatForPath(documentPath);
-  if (format) return format.studio?.documentMode?.default ?? "content";
+  if (format) {
+    return format.studio?.documentMode?.default ?? "content";
+  }
   return "component";
 }
 

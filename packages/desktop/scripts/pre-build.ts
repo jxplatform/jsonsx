@@ -1,6 +1,6 @@
 import { $ } from "bun";
-import { resolve, join } from "node:path";
-import { mkdir, copyFile, readFile, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const desktopDir = resolve(import.meta.dir, "..");
 const studioDir = resolve(desktopDir, "../studio");

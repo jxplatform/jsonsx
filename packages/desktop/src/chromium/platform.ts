@@ -2,13 +2,13 @@
 import type { StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
-  DirEntry,
-  ComponentMeta,
-  PackageInfo,
   CodeServiceResult,
-  GitStatusResult,
+  ComponentMeta,
+  DirEntry,
   GitBranchesResult,
   GitLogEntry,
+  GitStatusResult,
+  PackageInfo,
 } from "../rpc-schema";
 
 export function createDesktopPlatform(): StudioPlatform {
@@ -19,7 +19,9 @@ export function createDesktopPlatform(): StudioPlatform {
   ws.addEventListener("message", (event) => {
     const msg = JSON.parse(event.data);
     const p = pending.get(msg.id);
-    if (!p) return;
+    if (!p) {
+      return;
+    }
     pending.delete(msg.id);
     if (msg.error) {
       p.reject(new Error(msg.error));
@@ -37,7 +39,7 @@ export function createDesktopPlatform(): StudioPlatform {
       () =>
         new Promise((resolve, reject) => {
           const id = nextId++;
-          pending.set(id, { resolve, reject });
+          pending.set(id, { reject, resolve });
           ws.send(JSON.stringify({ id, method, params }));
         }),
     );
@@ -62,21 +64,21 @@ export function createDesktopPlatform(): StudioPlatform {
         const content = await request("readFile", { path: "project.json" });
         const config = JSON.parse(content as string) as { name?: string };
         return {
-          meta: { root: ".", name: config.name || "project" },
           info: {
+            directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config as ProjectConfig,
-            directories: [] as string[],
           },
+          meta: { name: config.name || "project", root: "." },
         };
       } catch {
         return {
-          meta: { root: ".", name: "project" },
           info: {
+            directories: [] as string[],
             isSiteProject: false as const,
             projectConfig: null,
-            directories: [] as string[],
           },
+          meta: { name: "project", root: "." },
         };
       }
     },
@@ -98,11 +100,11 @@ export function createDesktopPlatform(): StudioPlatform {
     },
 
     async writeFile(path: string, content: string) {
-      return request("writeFile", { path, content }) as Promise<void>;
+      return request("writeFile", { content, path }) as Promise<void>;
     },
 
     async uploadFile(path: string, data: string) {
-      return request("uploadFile", { path, data }) as Promise<unknown>;
+      return request("uploadFile", { data, path }) as Promise<unknown>;
     },
 
     async deleteFile(path: string) {
@@ -134,9 +136,9 @@ export function createDesktopPlatform(): StudioPlatform {
 
     async fetchPluginSchema(src: string, prototype?: string, base?: string) {
       return request("fetchPluginSchema", {
-        src,
-        prototype,
         base,
+        prototype,
+        src,
       }) as Promise<unknown>;
     },
 
@@ -249,17 +251,17 @@ export function createDesktopPlatform(): StudioPlatform {
     },
     async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
       const res = await fetch("/studio/ai/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(opts),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
       return res.json() as Promise<{ id: string }>;
     },
     async aiSendMessage(id: string, message: string) {
       await fetch(`/studio/ai/session/${id}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
     },
     aiStreamUrl(id: string) {

@@ -5,17 +5,18 @@
  */
 
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+import { isJsonObject } from "@jxsuite/schema/guards";
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 
-import { renderOnly, canvasWrap, canvasPanels, getNodeAtPath } from "../store";
+import { canvasPanels, canvasWrap, getNodeAtPath, renderOnly } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "../tabs/transact";
+import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
-import { codeService, setLintMarkers, getFunctionArgs } from "../services/code-services";
+import { codeService, getFunctionArgs, setLintMarkers } from "../services/code-services";
 
 import type { OxLintDiagnostic } from "../services/code-services";
-import type { JxPrototypeDef, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, JxPrototypeDef } from "@jxsuite/schema/types";
 import type { JxPath } from "../state";
 
 type EditingTarget =
@@ -25,11 +26,14 @@ type EditingTarget =
 /** @param {EditingTarget | null | undefined} editing */
 function getFunctionBody(editing: EditingTarget | null | undefined) {
   const document = activeTab.value?.doc.document;
+  // Read body off any object-shaped def (covers legacy entries without $prototype).
+  const bodyOf = (def: unknown) =>
+    isJsonObject(def) && typeof def.body === "string" ? def.body : "";
   if (editing?.type === "def") {
-    return document?.state?.[editing.defName]?.body || "";
+    return bodyOf(document?.state?.[editing.defName]);
   } else if (editing?.type === "event") {
     const node = getNodeAtPath(document!, editing.path);
-    return node?.[editing.eventKey]?.body || "";
+    return node ? bodyOf(node[editing.eventKey]) : "";
   }
   return "";
 }
@@ -60,9 +64,13 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
   }
 
   // Clean up canvas DnD and event handlers
-  for (const fn of view.canvasDndCleanups) fn();
+  for (const fn of view.canvasDndCleanups) {
+    fn();
+  }
   view.canvasDndCleanups = [];
-  for (const fn of view.canvasEventCleanups) fn();
+  for (const fn of view.canvasEventCleanups) {
+    fn();
+  }
   view.canvasEventCleanups = [];
   canvasPanels.length = 0;
 
@@ -95,7 +103,9 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
       <div
         class="source-editor"
         ${ref((el) => {
-          if (el) editorContainer = el as HTMLDivElement;
+          if (el) {
+            editorContainer = el as HTMLDivElement;
+          }
         })}
       ></div>
     </div>`,
@@ -109,31 +119,32 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
   );
 
   view.functionEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
-    value: body,
-    language: "javascript",
-    theme: "vs-dark",
     automaticLayout: true,
-    minimap: { enabled: false },
-    fontSize: 12,
     fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+    fontSize: 12,
+    language: "javascript",
     lineNumbers: "on",
+    minimap: { enabled: false },
     scrollBeyondLastLine: false,
-    wordWrap: "on",
     tabSize: 2,
+    theme: "vs-dark",
+    value: body,
+    wordWrap: "on",
   });
   view.functionEditor._editingTarget = JSON.stringify(editing);
   const editor = view.functionEditor;
 
   // Format on open — show pretty-printed code, then run initial lint
-  codeService("format", { code: body, args }).then((result) => {
+  codeService("format", { args, code: body }).then((result) => {
     if (result?.code != null && view.functionEditor) {
       view.functionEditor._ignoreNextChange = true;
       view.functionEditor.setValue(result.code);
     }
   });
-  codeService("lint", { code: body, args }).then((result) => {
-    if (result?.diagnostics && view.functionEditor)
+  codeService("lint", { args, code: body }).then((result) => {
+    if (result?.diagnostics && view.functionEditor) {
       setLintMarkers(view.functionEditor, result.diagnostics as OxLintDiagnostic[]);
+    }
   });
 
   // Debounced sync back to state + lint on edit
@@ -172,10 +183,13 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
     lintDebounce = setTimeout(() => {
       const gen = ++lintGen;
       const currentCode = editor.getValue();
-      codeService("lint", { code: currentCode, args }).then((result) => {
-        if (gen !== lintGen) return;
-        if (result?.diagnostics && view.functionEditor)
+      codeService("lint", { args, code: currentCode }).then((result) => {
+        if (gen !== lintGen) {
+          return;
+        }
+        if (result?.diagnostics && view.functionEditor) {
           setLintMarkers(view.functionEditor, result.diagnostics as OxLintDiagnostic[]);
+        }
       });
     }, 750);
   });
@@ -183,18 +197,19 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
 
 // Register Monaco JS completion provider for state scope variables (once)
 export function registerFunctionCompletions() {
-  if (view._completionRegistered) return;
+  if (view._completionRegistered) {
+    return;
+  }
   view._completionRegistered = true;
   monaco.languages.registerCompletionItemProvider("javascript", {
-    triggerCharacters: ["."],
     provideCompletionItems(model, position) {
       const defs = activeTab.value?.doc.document?.state || {};
       const word = model.getWordUntilPosition(position);
       const range = {
-        startLineNumber: position.lineNumber,
+        endColumn: word.endColumn,
         endLineNumber: position.lineNumber,
         startColumn: word.startColumn,
-        endColumn: word.endColumn,
+        startLineNumber: position.lineNumber,
       };
 
       const suggestions = Object.entries(defs).map(([key, def]) => {
@@ -202,18 +217,20 @@ export function registerFunctionCompletions() {
         if (
           (def as JxPrototypeDef)?.$prototype === "Function" ||
           (def as Record<string, unknown>)?.$handler
-        )
+        ) {
           kind = monaco.languages.CompletionItemKind.Function;
-        else if ((def as JxPrototypeDef)?.$prototype)
+        } else if ((def as JxPrototypeDef)?.$prototype) {
           kind = monaco.languages.CompletionItemKind.Property;
+        }
         return {
-          label: `state.${key}`,
-          kind,
           insertText: `state.${key}`,
+          kind,
+          label: `state.${key}`,
           range,
         };
       });
       return { suggestions };
     },
+    triggerCharacters: ["."],
   });
 }

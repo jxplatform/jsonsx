@@ -1,5 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { compileClassJson } from "../src/targets/compile-class";
+import type { JxClassDef } from "@jxsuite/schema/types";
 
 // ─── compileClassJson — Basic class generation ──────────────────────────────
 
@@ -22,9 +23,9 @@ describe("compileClassJson — basic", () => {
 
   test("includes $id as source comment", () => {
     const result = compileClassJson({
+      $id: "https://example.com/Bar.class.json",
       $prototype: "Class",
       title: "Bar",
-      $id: "https://example.com/Bar.class.json",
     });
     expect(result).toContain("// Source: https://example.com/Bar.class.json");
   });
@@ -47,8 +48,8 @@ describe("compileClassJson — extends", () => {
   test("string extends generates extends clause", () => {
     const result = compileClassJson({
       $prototype: "Class",
-      title: "Foo",
       extends: "HTMLElement",
+      title: "Foo",
     });
     expect(result).toContain("class Foo extends HTMLElement {");
   });
@@ -56,8 +57,8 @@ describe("compileClassJson — extends", () => {
   test("extends Object is treated as no extends", () => {
     const result = compileClassJson({
       $prototype: "Class",
-      title: "Foo",
       extends: "Object",
+      title: "Foo",
     });
     expect(result).toContain("class Foo {");
     expect(result).not.toContain("extends Object");
@@ -66,8 +67,8 @@ describe("compileClassJson — extends", () => {
   test("$ref extends extracts class name from filename", () => {
     const result = compileClassJson({
       $prototype: "Class",
-      title: "Child",
       extends: { $ref: "./Parent.class.json" },
+      title: "Child",
     });
     expect(result).toContain("class Child extends Parent {");
   });
@@ -75,8 +76,8 @@ describe("compileClassJson — extends", () => {
   test("$ref with unrecognized pattern falls back to Object", () => {
     const result = compileClassJson({
       $prototype: "Class",
-      title: "Child",
       extends: { $ref: "./weird" },
+      title: "Child",
     });
     expect(result).toContain("class Child {");
     expect(result).not.toContain("extends");
@@ -85,8 +86,8 @@ describe("compileClassJson — extends", () => {
   test("extends as unknown object type falls back to Object", () => {
     const result = compileClassJson({
       $prototype: "Class",
+      extends: { something: "else" } as unknown as string,
       title: "Child",
-      extends: { something: "else" },
     });
     expect(result).toContain("class Child {");
   });
@@ -94,24 +95,24 @@ describe("compileClassJson — extends", () => {
   test("super() call emitted for non-Object base", () => {
     const result = compileClassJson({
       $prototype: "Class",
-      title: "Foo",
       extends: "HTMLElement",
+      title: "Foo",
     });
     expect(result).toContain("super();");
   });
 
   test("super() with arguments from superCall", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
-      extends: "Base",
       $defs: {
         constructor: {
-          role: "constructor",
           $prototype: "Function",
+          role: "constructor",
           superCall: { arguments: ["config.a", "config.b"] },
         },
       },
+      $prototype: "Class",
+      extends: "Base",
+      title: "Foo",
     });
     expect(result).toContain("super(config.a, config.b);");
   });
@@ -122,38 +123,38 @@ describe("compileClassJson — extends", () => {
 describe("compileClassJson — fields", () => {
   test("public instance field with default", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           name: {
-            role: "field",
             access: "public",
-            scope: "instance",
-            identifier: "name",
             default: "untitled",
+            identifier: "name",
+            role: "field",
+            scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain('this.name = config.name !== undefined ? config.name : "untitled"');
   });
 
   test("private instance field with # prefix", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           secret: {
-            role: "field",
             access: "private",
-            scope: "instance",
             identifier: "secret",
             initializer: 42,
+            role: "field",
+            scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("#secret;");
     expect(result).toContain("this.#secret = config.secret !== undefined ? config.secret : 42");
@@ -161,93 +162,93 @@ describe("compileClassJson — fields", () => {
 
   test("static field", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           count: {
-            role: "field",
             access: "public",
-            scope: "static",
             identifier: "count",
             initializer: 0,
+            role: "field",
+            scope: "static",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("static count = 0;");
   });
 
   test("static private field", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           instances: {
-            role: "field",
             access: "private",
-            scope: "static",
-            identifier: "instances",
             default: [],
+            identifier: "instances",
+            role: "field",
+            scope: "static",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("static #instances = [];");
   });
 
   test("field uses key as identifier fallback", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           myField: {
-            role: "field",
             access: "public",
+            role: "field",
             scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("this.myField = config.myField");
   });
 
   test("field with no initializer or default uses null", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           val: {
-            role: "field",
             access: "public",
-            scope: "instance",
             identifier: "val",
+            role: "field",
+            scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("config.val !== undefined ? config.val : null");
   });
 
   test("initializer takes precedence over default for static fields", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         fields: {
           x: {
-            role: "field",
-            scope: "static",
             access: "public",
+            default: 5,
             identifier: "x",
             initializer: 10,
-            default: 5,
+            role: "field",
+            scope: "static",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("static x = 10;");
   });
@@ -258,30 +259,30 @@ describe("compileClassJson — fields", () => {
 describe("compileClassJson — constructor", () => {
   test("constructor body as string", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         constructor: {
-          role: "constructor",
           $prototype: "Function",
           body: "this.ready = true;",
+          role: "constructor",
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("this.ready = true;");
   });
 
   test("constructor body as array", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         constructor: {
-          role: "constructor",
           $prototype: "Function",
           body: ["this.a = 1;", "this.b = 2;"],
+          role: "constructor",
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("this.a = 1;");
     expect(result).toContain("this.b = 2;");
@@ -293,20 +294,20 @@ describe("compileClassJson — constructor", () => {
 describe("compileClassJson — methods", () => {
   test("instance method with body", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           greet: {
-            role: "method",
             access: "public",
-            scope: "instance",
+            body: 'return "Hello " + name;',
             identifier: "greet",
             parameters: [{ identifier: "name" }],
-            body: 'return "Hello " + name;',
+            role: "method",
+            scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("greet(name) {");
     expect(result).toContain('return "Hello " + name;');
@@ -314,90 +315,90 @@ describe("compileClassJson — methods", () => {
 
   test("static method", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           create: {
-            role: "method",
             access: "public",
-            scope: "static",
-            identifier: "create",
             body: "return new Foo();",
+            identifier: "create",
+            role: "method",
+            scope: "static",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("static create() {");
   });
 
   test("private method", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           internal: {
-            role: "method",
             access: "private",
-            scope: "instance",
-            identifier: "internal",
             body: "return this.#data;",
+            identifier: "internal",
+            role: "method",
+            scope: "instance",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("#internal() {");
   });
 
   test("async method detected from await keyword", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           fetch: {
-            role: "method",
-            identifier: "fetch",
             body: "const r = await fetch(this.url); return r.json();",
+            identifier: "fetch",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("async fetch() {");
   });
 
   test("async method detected from returnType containing Promise", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           load: {
-            role: "method",
+            body: "return this.data;",
             identifier: "load",
             returnType: { $ref: "#/$defs/returnTypes/Promise" },
-            body: "return this.data;",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("async load() {");
   });
 
   test("method body as array of lines", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           multi: {
-            role: "method",
-            identifier: "multi",
             body: ["const a = 1;", "return a + 2;"],
+            identifier: "multi",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("const a = 1;");
     expect(result).toContain("return a + 2;");
@@ -405,89 +406,89 @@ describe("compileClassJson — methods", () => {
 
   test("method with no body generates empty body", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           noop: {
-            role: "method",
             identifier: "noop",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("noop() {");
   });
 
   test("method uses key as identifier fallback", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           doStuff: {
-            role: "method",
             body: "return true;",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("doStuff() {");
   });
 
   test("parameters resolved from $ref", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           process: {
-            role: "method",
+            body: "return input;",
             identifier: "process",
             parameters: [
               { $ref: "#/$defs/parameters/input" },
               { $ref: "#/$defs/parameters/options" },
             ],
-            body: "return input;",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("process(input, options) {");
   });
 
   test("parameters resolved from name fallback", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           go: {
-            role: "method",
+            body: "return x;",
             identifier: "go",
             parameters: [{ name: "x" }],
-            body: "return x;",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("go(x) {");
   });
 
   test("parameter fallback to 'arg'", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           go: {
-            role: "method",
+            body: "return arg;",
             identifier: "go",
             parameters: [{}],
-            body: "return arg;",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("go(arg) {");
   });
@@ -498,17 +499,17 @@ describe("compileClassJson — methods", () => {
 describe("compileClassJson — accessors", () => {
   test("getter accessor", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           fullName: {
-            role: "accessor",
-            identifier: "fullName",
             getter: { body: "return this.first + ' ' + this.last;" },
+            identifier: "fullName",
+            role: "accessor",
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("get fullName() {");
     expect(result).toContain("return this.first + ' ' + this.last;");
@@ -516,20 +517,20 @@ describe("compileClassJson — accessors", () => {
 
   test("setter accessor", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           value: {
-            role: "accessor",
             identifier: "value",
+            role: "accessor",
             setter: {
-              parameters: [{ identifier: "v" }],
               body: "this._value = v;",
+              parameters: [{ identifier: "v" }],
             },
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("set value(v) {");
     expect(result).toContain("this._value = v;");
@@ -537,21 +538,21 @@ describe("compileClassJson — accessors", () => {
 
   test("getter + setter accessor", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           count: {
-            role: "accessor",
-            identifier: "count",
             getter: { body: "return this._count;" },
+            identifier: "count",
+            role: "accessor",
             setter: {
-              parameters: [{ identifier: "v" }],
               body: "this._count = v;",
+              parameters: [{ identifier: "v" }],
             },
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("get count() {");
     expect(result).toContain("set count(v) {");
@@ -559,55 +560,55 @@ describe("compileClassJson — accessors", () => {
 
   test("static accessor", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           instance: {
+            getter: { body: "return Foo._inst;" },
+            identifier: "instance",
             role: "accessor",
             scope: "static",
-            identifier: "instance",
-            getter: { body: "return Foo._inst;" },
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("static get instance() {");
   });
 
   test("setter with $ref parameters", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           val: {
-            role: "accessor",
             identifier: "val",
+            role: "accessor",
             setter: {
-              parameters: [{ $ref: "#/$defs/parameters/newVal" }],
               body: "this._val = newVal;",
+              parameters: [{ $ref: "#/$defs/parameters/newVal" }],
             },
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     expect(result).toContain("set val(newVal) {");
   });
 
   test("setter with no parameters defaults to 'v'", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Foo",
       $defs: {
         methods: {
           val: {
-            role: "accessor",
             identifier: "val",
+            role: "accessor",
             setter: { body: "this._val = v;" },
           },
         },
       },
+      $prototype: "Class",
+      title: "Foo",
     });
     // No parameters array → resolveParams returns empty string
     expect(result).toContain("set val() {");
@@ -618,43 +619,43 @@ describe("compileClassJson — accessors", () => {
 
 describe("compileClassJson — full integration", () => {
   test("compiles MarkdownFile-style class", () => {
-    const classDef = {
-      $prototype: "Class",
-      title: "MarkdownFile",
-      $implementation: "./md.js",
+    const classDef: JxClassDef = {
       $defs: {
-        parameters: {
-          src: { identifier: "src", type: { type: "string" } },
-          directives: {
-            identifier: "directives",
-            type: { type: "boolean", default: false },
-          },
+        constructor: {
+          $prototype: "Function",
+          body: ["this.config = config;"],
+          parameters: [{ $ref: "#/$defs/parameters/src" }],
+          role: "constructor",
         },
         fields: {
           config: {
-            role: "field",
             access: "private",
-            scope: "instance",
             identifier: "config",
+            role: "field",
+            scope: "instance",
             type: { type: "object" },
           },
         },
-        constructor: {
-          role: "constructor",
-          $prototype: "Function",
-          parameters: [{ $ref: "#/$defs/parameters/src" }],
-          body: ["this.config = config;"],
-        },
         methods: {
           resolve: {
-            role: "method",
             access: "public",
-            scope: "instance",
-            identifier: "resolve",
             body: "return this.config;",
+            identifier: "resolve",
+            role: "method",
+            scope: "instance",
           },
         },
+        parameters: {
+          directives: {
+            identifier: "directives",
+            type: { default: false, type: "boolean" },
+          },
+          src: { identifier: "src", type: { type: "string" } },
+        },
       },
+      $implementation: "./md.js",
+      $prototype: "Class",
+      title: "MarkdownFile",
     };
 
     const result = compileClassJson(classDef);
@@ -669,52 +670,52 @@ describe("compileClassJson — full integration", () => {
 
   test("compiles class with static + private + async + accessor", () => {
     const result = compileClassJson({
-      $prototype: "Class",
-      title: "Complex",
-      extends: "Base",
-      $id: "https://example.com/Complex.class.json",
       $defs: {
+        constructor: {
+          $prototype: "Function",
+          body: "Complex.count++;",
+          role: "constructor",
+          superCall: { arguments: [] },
+        },
         fields: {
           count: {
-            role: "field",
             access: "public",
-            scope: "static",
             initializer: 0,
+            role: "field",
+            scope: "static",
           },
           data: {
-            role: "field",
             access: "private",
-            scope: "instance",
             default: [],
+            role: "field",
+            scope: "instance",
           },
-        },
-        constructor: {
-          role: "constructor",
-          $prototype: "Function",
-          superCall: { arguments: [] },
-          body: "Complex.count++;",
         },
         methods: {
-          load: {
-            role: "method",
-            identifier: "load",
-            body: "const r = await fetch('/api'); this._data = r;",
-          },
-          size: {
-            role: "accessor",
-            identifier: "size",
-            getter: { body: "return this._data.length;" },
-          },
           helper: {
-            role: "method",
             access: "private",
-            scope: "static",
+            body: "return x * 2;",
             identifier: "helper",
             parameters: [{ identifier: "x" }],
-            body: "return x * 2;",
+            role: "method",
+            scope: "static",
+          },
+          load: {
+            body: "const r = await fetch('/api'); this._data = r;",
+            identifier: "load",
+            role: "method",
+          },
+          size: {
+            getter: { body: "return this._data.length;" },
+            identifier: "size",
+            role: "accessor",
           },
         },
       },
+      $id: "https://example.com/Complex.class.json",
+      $prototype: "Class",
+      extends: "Base",
+      title: "Complex",
     });
 
     expect(result).toContain("class Complex extends Base {");

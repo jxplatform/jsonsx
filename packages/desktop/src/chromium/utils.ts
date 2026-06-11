@@ -5,7 +5,7 @@ interface DbusFileChooserPortal {
   OpenFile(
     parent: string,
     title: string,
-    options: Array<[string, [string, unknown]]>,
+    options: [string, [string, unknown]][],
   ): Promise<[string, ...unknown[]]>;
 }
 
@@ -23,7 +23,7 @@ export async function openFileDialog(): Promise<string | null> {
       "org.freedesktop.portal.FileChooser",
     )) as unknown as DbusFileChooserPortal;
 
-    const handleToken = `bun_${Math.random().toString(36).substring(2, 11)}`;
+    const handleToken = `bun_${Math.random().toString(36).slice(2, 11)}`;
 
     const options = [
       ["directory", ["b", false]],
@@ -35,7 +35,7 @@ export async function openFileDialog(): Promise<string | null> {
     const [handle] = await portal.OpenFile(
       "",
       "Open project.json",
-      options as Array<[string, [string, unknown]]>,
+      options as [string, [string, unknown]][],
     );
 
     const result = await new Promise<string | null>((resolve) => {
@@ -51,7 +51,7 @@ export async function openFileDialog(): Promise<string | null> {
               return;
             }
             // D-Bus portal response: nested array format [key, [type, value[]]] or {uris: string[]}
-            const r = results as Record<string, unknown> & Array<[string, [string, string[]]]>;
+            const r = results as Record<string, unknown> & [string, [string, string[]]][];
             const uris: string[] = r[0]?.[1]?.[1] ?? (r.uris as string[] | undefined) ?? [];
             if (uris.length === 0) {
               resolve(null);

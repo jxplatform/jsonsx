@@ -1,13 +1,13 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
-if (typeof globalThis.localStorage === "undefined") {
+if (globalThis.localStorage === undefined) {
   const store = new Map();
   globalThis.localStorage = {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => store.set(k, v),
-    removeItem: (k: string) => store.delete(k),
     clear: () => store.clear(),
+    getItem: (k: string) => store.get(k) ?? null,
+    removeItem: (k: string) => store.delete(k),
+    setItem: (k: string, v: string) => store.set(k, v),
   } as any;
 }
 
@@ -24,14 +24,16 @@ const originalFetch = globalThis.fetch;
 function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[]) {
   mockFetchResponses = [...responses];
   mockFetchCalls = [];
-  // @ts-ignore
+  // @ts-expect-error
   globalThis.fetch = async (url: any, opts: any) => {
-    mockFetchCalls.push({ url: String(url), opts });
+    mockFetchCalls.push({ opts, url: String(url) });
     const next = mockFetchResponses.shift();
-    if (!next) throw new Error(`Unexpected fetch to ${url}`);
+    if (!next) {
+      throw new Error(`Unexpected fetch to ${url}`);
+    }
     return {
-      ok: next.ok ?? true,
       json: async () => next.json,
+      ok: next.ok ?? true,
       status: next.status ?? 200,
     };
   };
@@ -40,13 +42,12 @@ function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[
 let _dialogDoneFn = null;
 
 mock.module("../src/ui/layers.js", () => ({
-  showDialog: (fn: any) => {
-    return new Promise((resolve) => {
+  showConfirmDialog: async () => true,
+  showDialog: (fn: any) =>
+    new Promise((resolve) => {
       _dialogDoneFn = resolve;
       fn((val: any) => resolve(val));
-    });
-  },
-  showConfirmDialog: async () => true,
+    }),
 }));
 
 const { getGithubToken, clearGithubToken, authenticateGithub } =
@@ -86,7 +87,7 @@ describe("authenticateGithub", () => {
   });
 
   test("throws when device code request fails", async () => {
-    setupFetch([{ ok: false, status: 500, json: { error: "server_error" } }]);
+    setupFetch([{ json: { error: "server_error" }, ok: false, status: 500 }]);
     await expect(authenticateGithub()).rejects.toThrow("Failed to initiate GitHub device flow");
   });
 
@@ -95,9 +96,9 @@ describe("authenticateGithub", () => {
       {
         json: {
           device_code: "dc_123",
+          interval: 1,
           user_code: "ABCD-1234",
           verification_uri: "https://github.com/login/device",
-          interval: 1,
         },
       },
       { json: { access_token: "ghp_new_token" } },
@@ -121,9 +122,9 @@ describe("authenticateGithub", () => {
       {
         json: {
           device_code: "dc_456",
+          interval: 1,
           user_code: "WXYZ-9999",
           verification_uri: "https://github.com/login/device",
-          interval: 1,
         },
       },
       { json: { error: "authorization_pending" } },
@@ -151,9 +152,9 @@ describe("authenticateGithub", () => {
       {
         json: {
           device_code: "dc_789",
+          interval: 1,
           user_code: "SLOW-DOWN",
           verification_uri: "https://github.com/login/device",
-          interval: 1,
         },
       },
       { json: { error: "slow_down" } },
@@ -167,16 +168,16 @@ describe("authenticateGithub", () => {
 
     expect(result).toBe("ghp_slow");
     expect(mockFetchCalls.length).toBe(3);
-  }, 10000);
+  }, 10_000);
 
   test("resolves null on expired_token error", async () => {
     setupFetch([
       {
         json: {
           device_code: "dc_exp",
+          interval: 1,
           user_code: "EXPIRED",
           verification_uri: "https://github.com/login/device",
-          interval: 1,
         },
       },
       { json: { error: "expired_token" } },

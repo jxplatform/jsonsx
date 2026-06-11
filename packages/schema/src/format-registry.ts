@@ -149,7 +149,7 @@ export class FormatEntry {
       | undefined;
     const fn = Cls?.[cap.identifier];
     if (typeof fn !== "function") {
-      throw new Error(
+      throw new TypeError(
         `Format class "${this.name}": implementation export "${title}" has no static "${cap.identifier}" method`,
       );
     }
@@ -167,7 +167,9 @@ export class FormatRegistry {
     for (const cap of FORMAT_CAPABILITIES) {
       const seen = new Map<string, FormatEntry>();
       for (const entry of entries) {
-        if (!entry.capabilities[cap]) continue;
+        if (!entry.capabilities[cap]) {
+          continue;
+        }
         for (const ext of entry.extensions) {
           const prior = seen.get(ext);
           if (prior) {
@@ -208,8 +210,12 @@ export class FormatRegistry {
   documentExtensions(kind?: FormatDocumentKind): string[] {
     const exts = new Set<string>();
     for (const entry of this.#entries) {
-      if (kind && !entry.documentKinds.includes(kind)) continue;
-      for (const ext of entry.extensions) exts.add(ext);
+      if (kind && !entry.documentKinds.includes(kind)) {
+        continue;
+      }
+      for (const ext of entry.extensions) {
+        exts.add(ext);
+      }
     }
     exts.delete(".json");
     return [...exts];
@@ -234,16 +240,22 @@ export async function buildFormatRegistry(
 ): Promise<FormatRegistry> {
   const entries: FormatEntry[] = [];
   for (const [name, ref] of Object.entries(imports ?? {})) {
-    if (typeof ref !== "string" || !ref.endsWith(".class.json")) continue;
+    if (typeof ref !== "string" || !ref.endsWith(".class.json")) {
+      continue;
+    }
     const classPath = base ? io.resolvePath(base, ref) : ref;
     let classDef: ClassDefLike;
     try {
       classDef = (await io.loadJson(classPath)) as ClassDefLike;
     } catch {
-      continue; // unreadable imports are not format classes
+      continue; // Unreadable imports are not format classes
     }
-    if (!classDef || typeof classDef !== "object") continue;
-    if (!classDef.format || !Array.isArray(classDef.format.extensions)) continue;
+    if (!classDef || typeof classDef !== "object") {
+      continue;
+    }
+    if (!classDef.format || !Array.isArray(classDef.format.extensions)) {
+      continue;
+    }
     entries.push(new FormatEntry(name, classPath, classDef, io));
   }
   return new FormatRegistry(entries);
@@ -256,7 +268,9 @@ function extractCapabilities(
   const methods = classDef.$defs?.methods ?? {};
   for (const [key, method] of Object.entries(methods)) {
     const role = method.role as FormatCapability | undefined;
-    if (!role || !FORMAT_CAPABILITIES.includes(role)) continue;
+    if (!role || !FORMAT_CAPABILITIES.includes(role)) {
+      continue;
+    }
     out[role] = {
       identifier: method.identifier ?? key,
       timing: (method.timing as FormatTiming[] | undefined) ?? DEFAULT_TIMING,

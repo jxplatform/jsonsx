@@ -10,16 +10,20 @@ import { html, render as litRender } from "lit-html";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
-import { fieldCardTpl, addFieldFormTpl, schemaForType, detectFieldFormat } from "./schema-field-ui";
+import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 import { toCamelCase } from "../utils/studio-utils";
 
-import type { ProjectConfig, ContentTypeSchema } from "@jxsuite/schema/types";
+import type {
+  ContentTypeSchema,
+  ContentTypeSchemaField,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 // ─── Module state ─────────────────────────────────────────────────────────────
 
 let selectedContentType: string | null = null;
 let showAddField = false;
-let newFieldState = { name: "", type: "string", format: "", required: false };
+let newFieldState = { format: "", name: "", required: false, type: "string" };
 let showNewContentType = false;
 let newContentTypeName = "";
 
@@ -47,18 +51,26 @@ function getSelectedSchema(): ContentTypeSchema | undefined {
 function handleNewContentType(rerender: () => void) {
   const slug = newContentTypeName
     .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
-  if (!slug) return;
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/[^a-z0-9-]/g, "");
+  if (!slug) {
+    return;
+  }
 
   const config = projectState?.projectConfig;
-  if (!config) return;
-  if (!config.contentTypes) config.contentTypes = {};
-  if (config.contentTypes[slug]) return; // already exists
+  if (!config) {
+    return;
+  }
+  if (!config.contentTypes) {
+    config.contentTypes = {};
+  }
+  if (config.contentTypes[slug]) {
+    return;
+  } // Already exists
 
   config.contentTypes[slug] = {
+    schema: { properties: {}, required: [], type: "object" },
     source: `./content/${slug}/`,
-    schema: { type: "object", properties: {}, required: [] },
   };
 
   selectedContentType = slug;
@@ -76,22 +88,32 @@ function handleNewContentType(rerender: () => void) {
 /** @param {() => void} rerender */
 function handleAddField(rerender: () => void) {
   const raw = newFieldState.name.trim();
-  if (!raw || !selectedContentType) return;
+  if (!raw || !selectedContentType) {
+    return;
+  }
   const name = toCamelCase(raw);
 
   const schema = getSelectedSchema();
-  if (!schema) return;
+  if (!schema) {
+    return;
+  }
 
-  if (!schema.properties) schema.properties = {};
+  if (!schema.properties) {
+    schema.properties = {};
+  }
   schema.properties[name] = schemaForType(newFieldState.type, newFieldState.format || undefined);
 
   if (newFieldState.required) {
-    if (!schema.required) schema.required = [];
-    if (!schema.required.includes(name)) schema.required.push(name);
+    if (!schema.required) {
+      schema.required = [];
+    }
+    if (!schema.required.includes(name)) {
+      schema.required.push(name);
+    }
   }
 
   showAddField = false;
-  newFieldState = { name: "", type: "string", format: "", required: false };
+  newFieldState = { format: "", name: "", required: false, type: "string" };
   rerender();
   saveProjectConfig();
 }
@@ -102,7 +124,9 @@ function handleAddField(rerender: () => void) {
  */
 function handleDeleteField(fieldName: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema?.properties) return;
+  if (!schema?.properties) {
+    return;
+  }
 
   delete schema.properties[fieldName];
   if (schema.required) {
@@ -119,12 +143,19 @@ function handleDeleteField(fieldName: string, rerender: () => void) {
  */
 function handleToggleRequired(fieldName: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema) return;
-  if (!schema.required) schema.required = [];
+  if (!schema) {
+    return;
+  }
+  if (!schema.required) {
+    schema.required = [];
+  }
 
   const idx = schema.required.indexOf(fieldName);
-  if (idx >= 0) schema.required.splice(idx, 1);
-  else schema.required.push(fieldName);
+  if (idx !== -1) {
+    schema.required.splice(idx, 1);
+  } else {
+    schema.required.push(fieldName);
+  }
 
   rerender();
   saveProjectConfig();
@@ -138,9 +169,11 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
 function handleRenameField(oldName: string, newName: string, rerender: () => void) {
   const schema = getSelectedSchema();
   const normalized = toCamelCase(newName);
-  if (!schema?.properties || !normalized || schema.properties[normalized]) return;
+  if (!schema?.properties || !normalized || schema.properties[normalized]) {
+    return;
+  }
 
-  const newProps: Record<string, unknown> = {};
+  const newProps: Record<string, ContentTypeSchemaField> = {};
   for (const [key, val] of Object.entries(schema.properties)) {
     newProps[key === oldName ? normalized : key] = val;
   }
@@ -161,7 +194,9 @@ function handleRenameField(oldName: string, newName: string, rerender: () => voi
  */
 function handleChangeType(fieldName: string, newType: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema?.properties?.[fieldName]) return;
+  if (!schema?.properties?.[fieldName]) {
+    return;
+  }
 
   const oldFormat =
     newType === "string" || newType === "array"
@@ -179,7 +214,9 @@ function handleChangeType(fieldName: string, newType: string, rerender: () => vo
  */
 function handleChangeFormat(fieldName: string, format: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema?.properties?.[fieldName]) return;
+  if (!schema?.properties?.[fieldName]) {
+    return;
+  }
 
   const prop = schema.properties[fieldName];
   const type = prop.type || "string";
@@ -195,7 +232,9 @@ function handleChangeFormat(fieldName: string, format: string, rerender: () => v
  */
 function handleChangeRefTarget(fieldName: string, target: string, rerender: () => void) {
   const schema = getSelectedSchema();
-  if (!schema?.properties) return;
+  if (!schema?.properties) {
+    return;
+  }
 
   schema.properties[fieldName] = { $ref: `#/contentTypes/${target}` };
   rerender();
@@ -216,17 +255,27 @@ function handleAddNestedField(
 ) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent) return;
+  if (!parent) {
+    return;
+  }
 
   const name = toCamelCase(fieldState.name);
-  if (!name) return;
+  if (!name) {
+    return;
+  }
 
-  if (!parent.properties) parent.properties = {};
+  if (!parent.properties) {
+    parent.properties = {};
+  }
   parent.properties[name] = schemaForType(fieldState.type);
 
   if (fieldState.required) {
-    if (!parent.required) parent.required = [];
-    if (!parent.required.includes(name)) parent.required.push(name);
+    if (!parent.required) {
+      parent.required = [];
+    }
+    if (!parent.required.includes(name)) {
+      parent.required.push(name);
+    }
   }
 
   rerender();
@@ -241,7 +290,9 @@ function handleAddNestedField(
 function handleDeleteNested(parentName: string, childName: string, rerender: () => void) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent?.properties) return;
+  if (!parent?.properties) {
+    return;
+  }
 
   delete parent.properties[childName];
   if (parent.required) {
@@ -260,12 +311,19 @@ function handleDeleteNested(parentName: string, childName: string, rerender: () 
 function handleToggleNestedRequired(parentName: string, childName: string, rerender: () => void) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent) return;
-  if (!parent.required) parent.required = [];
+  if (!parent) {
+    return;
+  }
+  if (!parent.required) {
+    parent.required = [];
+  }
 
   const idx = parent.required.indexOf(childName);
-  if (idx >= 0) parent.required.splice(idx, 1);
-  else parent.required.push(childName);
+  if (idx !== -1) {
+    parent.required.splice(idx, 1);
+  } else {
+    parent.required.push(childName);
+  }
 
   rerender();
   saveProjectConfig();
@@ -286,9 +344,11 @@ function handleRenameNested(
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
   const normalized = toCamelCase(newChild);
-  if (!parent?.properties || !normalized || parent.properties[normalized]) return;
+  if (!parent?.properties || !normalized || parent.properties[normalized]) {
+    return;
+  }
 
-  const newProps: Record<string, unknown> = {};
+  const newProps: Record<string, ContentTypeSchemaField> = {};
   for (const [key, val] of Object.entries(parent.properties)) {
     newProps[key === oldChild ? normalized : key] = val;
   }
@@ -316,7 +376,9 @@ function handleChangeNestedType(
 ) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent?.properties?.[childName]) return;
+  if (!parent?.properties?.[childName]) {
+    return;
+  }
 
   const oldFormat =
     newType === "string" || newType === "array"
@@ -341,7 +403,9 @@ function handleChangeNestedFormat(
 ) {
   const schema = getSelectedSchema();
   const parent = schema?.properties?.[parentName];
-  if (!parent?.properties?.[childName]) return;
+  if (!parent?.properties?.[childName]) {
+    return;
+  }
 
   const prop = parent.properties[childName];
   const type = prop.type || "string";
@@ -352,9 +416,13 @@ function handleChangeNestedFormat(
 
 /** @param {() => void} rerender */
 function handleDeleteContentType(rerender: () => void) {
-  if (!selectedContentType) return;
+  if (!selectedContentType) {
+    return;
+  }
   const config = projectState?.projectConfig;
-  if (!config?.contentTypes?.[selectedContentType]) return;
+  if (!config?.contentTypes?.[selectedContentType]) {
+    return;
+  }
 
   delete config.contentTypes[selectedContentType];
   selectedContentType = null;
@@ -405,7 +473,9 @@ export function renderContentTypesEditor(container: HTMLElement) {
                   newContentTypeName = (e.target as HTMLInputElement).value;
                 }}
                 @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter") handleNewContentType(rerender);
+                  if (e.key === "Enter") {
+                    handleNewContentType(rerender);
+                  }
                   if (e.key === "Escape") {
                     showNewContentType = false;
                     rerender();
@@ -443,21 +513,21 @@ export function renderContentTypesEditor(container: HTMLElement) {
     const required = schema.required || [];
 
     const handlers: import("./schema-field-ui.js").FieldHandlers = {
-      onDelete: (n: string) => handleDeleteField(n, rerender),
-      onToggleRequired: (n: string) => handleToggleRequired(n, rerender),
-      onRename: (oldN: string, newN: string) => handleRenameField(oldN, newN, rerender),
-      onChangeType: (n: string, t: string) => handleChangeType(n, t, rerender),
-      onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),
-      onChangeRefTarget: (n: string, target: string) => handleChangeRefTarget(n, target, rerender),
       onAddNestedField: (p: string, s: { name: string; type: string; required: boolean }) =>
         handleAddNestedField(p, s, rerender),
-      onDeleteNested: (p: string, c: string) => handleDeleteNested(p, c, rerender),
-      onToggleNestedRequired: (p: string, c: string) => handleToggleNestedRequired(p, c, rerender),
-      onRenameNested: (p: string, o: string, n: string) => handleRenameNested(p, o, n, rerender),
-      onChangeNestedType: (p: string, c: string, t: string) =>
-        handleChangeNestedType(p, c, t, rerender),
+      onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),
       onChangeNestedFormat: (p: string, c: string, f: string) =>
         handleChangeNestedFormat(p, c, f, rerender),
+      onChangeNestedType: (p: string, c: string, t: string) =>
+        handleChangeNestedType(p, c, t, rerender),
+      onChangeRefTarget: (n: string, target: string) => handleChangeRefTarget(n, target, rerender),
+      onChangeType: (n: string, t: string) => handleChangeType(n, t, rerender),
+      onDelete: (n: string) => handleDeleteField(n, rerender),
+      onDeleteNested: (p: string, c: string) => handleDeleteNested(p, c, rerender),
+      onRename: (oldN: string, newN: string) => handleRenameField(oldN, newN, rerender),
+      onRenameNested: (p: string, o: string, n: string) => handleRenameNested(p, o, n, rerender),
+      onToggleNestedRequired: (p: string, c: string) => handleToggleNestedRequired(p, c, rerender),
+      onToggleRequired: (n: string) => handleToggleRequired(n, rerender),
     };
 
     const fieldCards = repeat(
@@ -490,19 +560,19 @@ export function renderContentTypesEditor(container: HTMLElement) {
         <div class="schema-field-list">${fieldCards}</div>
         ${showAddField
           ? addFieldFormTpl(newFieldState, {
-              onInput: (field, value) => {
-                newFieldState = { ...newFieldState, [field]: value };
-                rerender();
-              },
-              onConfirm: () => handleAddField(rerender),
               onCancel: () => {
                 showAddField = false;
                 newFieldState = {
-                  name: "",
-                  type: "string",
                   format: "",
+                  name: "",
                   required: false,
+                  type: "string",
                 };
+                rerender();
+              },
+              onConfirm: () => handleAddField(rerender),
+              onInput: (field, value) => {
+                newFieldState = { ...newFieldState, [field]: value };
                 rerender();
               },
             })

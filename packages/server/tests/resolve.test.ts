@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { handleResolve, handleServerFunction } from "../src/resolve";
 import { join, resolve } from "node:path";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 const FIXTURES = resolve(import.meta.dir, "_fixtures");
 
@@ -10,88 +10,88 @@ mkdirSync(FIXTURES, { recursive: true });
 
 // Self-contained .class.json with resolve() method
 const selfContainedClass = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  title: "Adder",
-  $prototype: "Class",
   $defs: {
+    constructor: {
+      $prototype: "Function",
+      role: "constructor",
+    },
     fields: {
       a: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "a",
         default: 0,
+        identifier: "a",
+        role: "field",
+        scope: "instance",
       },
       b: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "b",
         default: 0,
+        identifier: "b",
+        role: "field",
+        scope: "instance",
       },
-    },
-    constructor: {
-      role: "constructor",
-      $prototype: "Function",
     },
     methods: {
       resolve: {
-        role: "method",
-        identifier: "resolve",
         body: "return this.a + this.b;",
+        identifier: "resolve",
+        role: "method",
       },
     },
   },
+  $prototype: "Class",
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  title: "Adder",
 };
 writeFileSync(join(FIXTURES, "Adder.class.json"), JSON.stringify(selfContainedClass), "utf8");
 
 // Self-contained .class.json with value property (no resolve)
 const valueClass = {
-  title: "Greeter",
-  $prototype: "Class",
   $defs: {
     fields: {
       name: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "name",
         default: "world",
+        identifier: "name",
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       greeting: {
-        role: "accessor",
-        identifier: "value",
         getter: { body: 'return "Hello " + this.name;' },
+        identifier: "value",
+        role: "accessor",
       },
     },
   },
+  $prototype: "Class",
+  title: "Greeter",
 };
 writeFileSync(join(FIXTURES, "Greeter.class.json"), JSON.stringify(valueClass), "utf8");
 
 // Self-contained .class.json with neither resolve nor value
 const plainClass = {
-  title: "Point",
-  $prototype: "Class",
   $defs: {
     fields: {
       x: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "x",
         default: 0,
+        identifier: "x",
+        role: "field",
+        scope: "instance",
       },
       y: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "y",
         default: 0,
+        identifier: "y",
+        role: "field",
+        scope: "instance",
       },
     },
   },
+  $prototype: "Class",
+  title: "Point",
 };
 writeFileSync(join(FIXTURES, "Point.class.json"), JSON.stringify(plainClass), "utf8");
 
@@ -105,57 +105,57 @@ export class Calculator {
 writeFileSync(join(FIXTURES, "calc.js"), hybridImpl, "utf8");
 
 const hybridClass = {
-  title: "Calculator",
-  $prototype: "Class",
-  $implementation: "./calc.js",
   $defs: {
     parameters: {
       a: { identifier: "a", type: { type: "number" } },
       b: { identifier: "b", type: { type: "number" } },
     },
   },
+  $implementation: "./calc.js",
+  $prototype: "Class",
+  title: "Calculator",
 };
 writeFileSync(join(FIXTURES, "Calculator.class.json"), JSON.stringify(hybridClass), "utf8");
 
 // Hybrid with missing export
 const badHybridClass = {
-  title: "Missing",
-  $prototype: "Class",
   $implementation: "./calc.js",
+  $prototype: "Class",
+  title: "Missing",
 };
 writeFileSync(join(FIXTURES, "Missing.class.json"), JSON.stringify(badHybridClass), "utf8");
 
 // Private fields .class.json
 const privateFieldsClass = {
-  title: "Secret",
-  $prototype: "Class",
   $defs: {
     fields: {
       data: {
-        role: "field",
         access: "private",
-        scope: "instance",
-        identifier: "data",
         default: "hidden",
+        identifier: "data",
+        role: "field",
+        scope: "instance",
       },
     },
     methods: {
       resolve: {
-        role: "method",
-        identifier: "resolve",
         body: "return this.data;",
+        identifier: "resolve",
+        role: "method",
       },
     },
   },
+  $prototype: "Class",
+  title: "Secret",
 };
 writeFileSync(join(FIXTURES, "Secret.class.json"), JSON.stringify(privateFieldsClass), "utf8");
 
 // Helper: create a mock Request
 function mockRequest(body: unknown) {
   return new Request("http://localhost/__jx_resolve__", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
   });
 }
 
@@ -164,8 +164,8 @@ function mockRequest(body: unknown) {
 describe("handleResolve — self-contained .class.json", () => {
   test("resolves class with resolve() method", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Adder.class.json",
       $prototype: "Adder",
+      $src: "./_fixtures/Adder.class.json",
       a: 3,
       b: 7,
     });
@@ -177,8 +177,8 @@ describe("handleResolve — self-contained .class.json", () => {
 
   test("resolves class with value property", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Greeter.class.json",
       $prototype: "Greeter",
+      $src: "./_fixtures/Greeter.class.json",
       name: "Alice",
     });
     const res = await handleResolve(req, import.meta.dir);
@@ -189,8 +189,8 @@ describe("handleResolve — self-contained .class.json", () => {
 
   test("resolves class with neither resolve nor value (returns instance)", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Point.class.json",
       $prototype: "Point",
+      $src: "./_fixtures/Point.class.json",
       x: 5,
       y: 10,
     });
@@ -203,8 +203,8 @@ describe("handleResolve — self-contained .class.json", () => {
 
   test("private fields map to _-prefixed public properties", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Secret.class.json",
       $prototype: "Secret",
+      $src: "./_fixtures/Secret.class.json",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(200);
@@ -214,8 +214,8 @@ describe("handleResolve — self-contained .class.json", () => {
 
   test("uses default values when config omitted", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Adder.class.json",
       $prototype: "Adder",
+      $src: "./_fixtures/Adder.class.json",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(200);
@@ -229,8 +229,8 @@ describe("handleResolve — self-contained .class.json", () => {
 describe("handleResolve — hybrid .class.json", () => {
   test("follows $implementation to JS module", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Calculator.class.json",
       $prototype: "Calculator",
+      $src: "./_fixtures/Calculator.class.json",
       a: 6,
       b: 7,
     });
@@ -242,8 +242,8 @@ describe("handleResolve — hybrid .class.json", () => {
 
   test("returns 500 when export not found in $implementation", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/Missing.class.json",
       $prototype: "Missing",
+      $src: "./_fixtures/Missing.class.json",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(500);
@@ -255,8 +255,8 @@ describe("handleResolve — hybrid .class.json", () => {
 describe("handleResolve — errors", () => {
   test("returns 400 for invalid JSON body", async () => {
     const req = new Request("http://localhost/__jx_resolve__", {
-      method: "POST",
       body: "not json",
+      method: "POST",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(400);
@@ -270,8 +270,8 @@ describe("handleResolve — errors", () => {
 
   test("returns 400 when non-Function $src points to .js", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/calc.js",
       $prototype: "Calculator",
+      $src: "./_fixtures/calc.js",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(400);
@@ -287,48 +287,48 @@ describe("handleResolve — $base URL resolution", () => {
     const subDir = join(FIXTURES, "sub");
     mkdirSync(subDir, { recursive: true });
     const subClass = {
-      title: "SubAdder",
-      $prototype: "Class",
       $defs: {
         fields: {
           x: {
-            role: "field",
             access: "public",
-            scope: "instance",
-            identifier: "x",
             default: 1,
+            identifier: "x",
+            role: "field",
+            scope: "instance",
           },
         },
         methods: {
           resolve: {
-            role: "method",
-            identifier: "resolve",
             body: "return this.x * 2;",
+            identifier: "resolve",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "SubAdder",
     };
     writeFileSync(join(subDir, "SubAdder.class.json"), JSON.stringify(subClass), "utf8");
     try {
       const req = mockRequest({
-        $src: "./SubAdder.class.json",
-        $prototype: "SubAdder",
         $base: "http://localhost/_fixtures/sub/page.json",
+        $prototype: "SubAdder",
+        $src: "./SubAdder.class.json",
         x: 7,
       });
       const res = await handleResolve(req, import.meta.dir);
       expect(res.status).toBe(200);
       expect(await res.json()).toBe(14);
     } finally {
-      rmSync(subDir, { recursive: true, force: true });
+      rmSync(subDir, { force: true, recursive: true });
     }
   });
 
   test("returns 400 when $base is a malformed URL", async () => {
     const req = mockRequest({
-      $src: "./anything.class.json",
-      $prototype: "Foo",
       $base: "not-a-url",
+      $prototype: "Foo",
+      $src: "./anything.class.json",
     });
     const res = await handleResolve(req, import.meta.dir);
     expect(res.status).toBe(400);
@@ -340,33 +340,33 @@ describe("handleResolve — $base URL resolution", () => {
     const subDir = join(FIXTURES, "sub");
     mkdirSync(subDir, { recursive: true });
     const rebaserClass = {
-      title: "Rebaser",
-      $prototype: "Class",
       $defs: {
         fields: {
           src: {
-            role: "field",
             access: "public",
-            scope: "instance",
-            identifier: "src",
             default: "",
+            identifier: "src",
+            role: "field",
+            scope: "instance",
           },
         },
         methods: {
           resolve: {
-            role: "method",
-            identifier: "resolve",
             body: "return this.src;",
+            identifier: "resolve",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Rebaser",
     };
     writeFileSync(join(subDir, "Rebaser.class.json"), JSON.stringify(rebaserClass), "utf8");
     try {
       const req = mockRequest({
-        $src: "./Rebaser.class.json",
-        $prototype: "Rebaser",
         $base: "http://localhost/_fixtures/sub/page.json",
+        $prototype: "Rebaser",
+        $src: "./Rebaser.class.json",
         src: "./data.json",
       });
       const res = await handleResolve(req, import.meta.dir);
@@ -377,7 +377,7 @@ describe("handleResolve — $base URL resolution", () => {
       expect(value.startsWith("./")).toBe(true);
       expect(value).toContain("_fixtures/sub/data.json");
     } finally {
-      rmSync(subDir, { recursive: true, force: true });
+      rmSync(subDir, { force: true, recursive: true });
     }
   });
 });
@@ -390,8 +390,8 @@ describe("handleResolve — malformed .class.json", () => {
     writeFileSync(badFile, "{ this is not valid json }", "utf8");
     try {
       const req = mockRequest({
-        $src: "./_fixtures/BadJson.class.json",
         $prototype: "BadJson",
+        $src: "./_fixtures/BadJson.class.json",
       });
       const res = await handleResolve(req, import.meta.dir);
       expect(res.status).toBe(500);
@@ -408,42 +408,42 @@ describe("handleResolve — malformed .class.json", () => {
 describe("handleResolve — accessor with getter and setter", () => {
   test("accessor role generates get/set descriptor on prototype", async () => {
     const counterClass = {
-      title: "Counter",
-      $prototype: "Class",
       $defs: {
         fields: {
           _count: {
-            role: "field",
             access: "public",
-            scope: "instance",
-            identifier: "_count",
             default: 0,
+            identifier: "_count",
+            role: "field",
+            scope: "instance",
           },
         },
         methods: {
           count: {
-            role: "accessor",
-            identifier: "count",
             getter: { body: "return this._count;" },
+            identifier: "count",
+            role: "accessor",
             setter: {
-              parameters: [{ $ref: "#/$defs/parameters/val" }],
               body: "this._count = val;",
+              parameters: [{ $ref: "#/$defs/parameters/val" }],
             },
           },
           resolve: {
-            role: "method",
-            identifier: "resolve",
             body: "this.count = 5; return this.count;",
+            identifier: "resolve",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Counter",
     };
     const counterFile = join(FIXTURES, "Counter.class.json");
     writeFileSync(counterFile, JSON.stringify(counterClass), "utf8");
     try {
       const req = mockRequest({
-        $src: "./_fixtures/Counter.class.json",
         $prototype: "Counter",
+        $src: "./_fixtures/Counter.class.json",
       });
       const res = await handleResolve(req, import.meta.dir);
       expect(res.status).toBe(200);
@@ -459,30 +459,30 @@ describe("handleResolve — accessor with getter and setter", () => {
 describe("handleResolve — static method", () => {
   test("static scope attaches method to class constructor", async () => {
     const factoryClass = {
-      title: "Factory",
-      $prototype: "Class",
       $defs: {
         methods: {
           create: {
+            body: "return 42;",
+            identifier: "create",
             role: "method",
             scope: "static",
-            identifier: "create",
-            body: "return 42;",
           },
           resolve: {
-            role: "method",
-            identifier: "resolve",
             body: "return this.constructor.create();",
+            identifier: "resolve",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Factory",
     };
     const factoryFile = join(FIXTURES, "Factory.class.json");
     writeFileSync(factoryFile, JSON.stringify(factoryClass), "utf8");
     try {
       const req = mockRequest({
-        $src: "./_fixtures/Factory.class.json",
         $prototype: "Factory",
+        $src: "./_fixtures/Factory.class.json",
       });
       const res = await handleResolve(req, import.meta.dir);
       expect(res.status).toBe(200);
@@ -508,15 +508,15 @@ describe("handleResolve — hybrid .value instance", () => {
       "utf8",
     );
     const hybridValueClass = {
-      title: "HybridValue",
-      $prototype: "Class",
       $implementation: "./value-holder.js",
+      $prototype: "Class",
+      title: "HybridValue",
     };
     writeFileSync(classFile, JSON.stringify(hybridValueClass), "utf8");
     try {
       const req = mockRequest({
-        $src: "./_fixtures/HybridValue.class.json",
         $prototype: "HybridValue",
+        $src: "./_fixtures/HybridValue.class.json",
         data: "test",
       });
       const res = await handleResolve(req, import.meta.dir);
@@ -534,9 +534,9 @@ describe("handleResolve — hybrid .value instance", () => {
 describe("handleServerFunction — malformed $base", () => {
   test("returns 400 when $base is not a valid URL", async () => {
     const req = mockRequest({
-      $src: "./foo.js",
-      $export: "fn",
       $base: "not-a-url",
+      $export: "fn",
+      $src: "./foo.js",
     });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(400);
@@ -557,8 +557,8 @@ process.on("exit", () => {
 describe("handleServerFunction", () => {
   test("returns 400 for invalid JSON body", async () => {
     const req = new Request("http://localhost/__jx_server", {
-      method: "POST",
       body: "bad",
+      method: "POST",
     });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(400);
@@ -583,8 +583,8 @@ describe("handleServerFunction", () => {
     );
     try {
       const req = mockRequest({
-        $src: "./_fixtures/server-fn.js",
         $export: "add",
+        $src: "./_fixtures/server-fn.js",
         arguments: { a: 10, b: 20 },
       });
       const res = await handleServerFunction(req, import.meta.dir);
@@ -598,7 +598,7 @@ describe("handleServerFunction", () => {
   test("returns null for void function", async () => {
     writeFileSync(join(FIXTURES, "noop.js"), "export function noop() {}");
     try {
-      const req = mockRequest({ $src: "./_fixtures/noop.js", $export: "noop" });
+      const req = mockRequest({ $export: "noop", $src: "./_fixtures/noop.js" });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(200);
       expect(await res.json()).toBeNull();
@@ -609,8 +609,8 @@ describe("handleServerFunction", () => {
 
   test("returns 500 when module not found", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/nonexistent.js",
       $export: "fn",
+      $src: "./_fixtures/nonexistent.js",
     });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(500);
@@ -619,8 +619,8 @@ describe("handleServerFunction", () => {
 
   test("returns 500 when export not found in module", async () => {
     const req = mockRequest({
-      $src: "./_fixtures/calc.js",
       $export: "nonExistent",
+      $src: "./_fixtures/calc.js",
     });
     const res = await handleServerFunction(req, import.meta.dir);
     expect(res.status).toBe(500);
@@ -634,8 +634,8 @@ describe("handleServerFunction", () => {
     );
     try {
       const req = mockRequest({
-        $src: "./_fixtures/throws.js",
         $export: "boom",
+        $src: "./_fixtures/throws.js",
       });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(500);
@@ -654,16 +654,16 @@ describe("handleServerFunction", () => {
     );
     try {
       const req = mockRequest({
-        $src: "./greet.js",
-        $export: "greet",
         $base: `http://localhost/_fixtures/api/page.json`,
+        $export: "greet",
+        $src: "./greet.js",
         arguments: { name: "world" },
       });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(200);
       expect(await res.json()).toBe("hello world");
     } finally {
-      rmSync(join(FIXTURES, "api"), { recursive: true, force: true });
+      rmSync(join(FIXTURES, "api"), { force: true, recursive: true });
     }
   });
 
@@ -674,8 +674,8 @@ describe("handleServerFunction", () => {
     );
     try {
       const req = mockRequest({
-        $src: "./_fixtures/keys.js",
         $export: "getKeys",
+        $src: "./_fixtures/keys.js",
       });
       const res = await handleServerFunction(req, import.meta.dir);
       expect(res.status).toBe(200);

@@ -39,7 +39,7 @@ function buildSdkEnv() {
   return env;
 }
 
-const sessions: Map<string, Session> = new Map();
+const sessions = new Map<string, Session>();
 
 let idCounter = 0;
 
@@ -71,15 +71,17 @@ async function processStream(session: Session, stream: AsyncGenerator<SDKMessage
   session.status = "active";
   try {
     for await (const message of stream) {
-      if ((session.status as string) === "stopped") break;
+      if ((session.status as string) === "stopped") {
+        break;
+      }
       if (message.session_id && !session.sessionId) {
         session.sessionId = message.session_id;
       }
       broadcast(session, message.type, message);
     }
-  } catch (err) {
-    if (err instanceof Error && err.name !== "AbortError") {
-      broadcast(session, "error", { type: "error", error: String(err) });
+  } catch (error) {
+    if (error instanceof Error && error.name !== "AbortError") {
+      broadcast(session, "error", { error: String(error), type: "error" });
     }
   } finally {
     session.status = "idle";
@@ -106,34 +108,34 @@ export function createSession(
   const abortController = new AbortController();
 
   const session: Session = {
+    abortController,
     id,
-    sessionId: null,
-    projectRoot,
     messages: [],
+    projectRoot,
+    query: null,
+    sessionId: null,
     sseClients: new Set(),
     status: "active",
-    abortController,
-    query: null,
   };
 
   sessions.set(id, session);
 
   const queryOpts: AgentOptions = {
-    cwd: projectRoot,
     abortController,
-    permissionMode: "acceptEdits",
     allowedTools: ["Read", "Edit", "Write", "Bash", "Glob", "Grep"],
-    maxTurns: 30,
-    includePartialMessages: true,
-    persistSession: true,
+    cwd: projectRoot,
     env: buildSdkEnv(),
+    includePartialMessages: true,
+    maxTurns: 30,
+    permissionMode: "acceptEdits",
+    persistSession: true,
   };
 
   if (opts.systemPrompt) {
     queryOpts.systemPrompt = opts.systemPrompt;
   }
 
-  const stream = query({ prompt: message, options: queryOpts });
+  const stream = query({ options: queryOpts, prompt: message });
   session.query = stream;
   processStream(session, stream);
 
@@ -148,21 +150,25 @@ export function createSession(
  */
 export function sendMessage(id: string, message: string) {
   const session = sessions.get(id);
-  if (!session) throw new Error(`Session not found: ${id}`);
-  if (session.status === "active") throw new Error("Session is still processing");
+  if (!session) {
+    throw new Error(`Session not found: ${id}`);
+  }
+  if (session.status === "active") {
+    throw new Error("Session is still processing");
+  }
 
   const abortController = new AbortController();
   session.abortController = abortController;
 
   const queryOpts: AgentOptions = {
-    cwd: session.projectRoot,
     abortController,
-    permissionMode: "acceptEdits",
     allowedTools: ["Read", "Edit", "Write", "Bash", "Glob", "Grep"],
-    maxTurns: 30,
-    includePartialMessages: true,
     continue: true,
+    cwd: session.projectRoot,
     env: buildSdkEnv(),
+    includePartialMessages: true,
+    maxTurns: 30,
+    permissionMode: "acceptEdits",
   };
 
   if (session.sessionId) {
@@ -170,7 +176,7 @@ export function sendMessage(id: string, message: string) {
     delete queryOpts.continue;
   }
 
-  const stream = query({ prompt: message, options: queryOpts });
+  const stream = query({ options: queryOpts, prompt: message });
   session.query = stream;
   processStream(session, stream);
 }
@@ -182,7 +188,9 @@ export function sendMessage(id: string, message: string) {
  */
 export function stopSession(id: string) {
   const session = sessions.get(id);
-  if (!session) return;
+  if (!session) {
+    return;
+  }
   session.status = "stopped";
   if (session.abortController) {
     session.abortController.abort();
@@ -214,6 +222,9 @@ export function streamSession(id: string) {
   const encoder = new TextEncoder();
   let sendRef: (event: string, data: unknown) => void = () => {};
   const stream = new ReadableStream({
+    cancel() {
+      session.sseClients.delete(sendRef);
+    },
     start(controller) {
       /** @param {string} event @param {unknown} data */
       sendRef = (event: string, data: unknown) => {
@@ -237,18 +248,15 @@ export function streamSession(id: string) {
           clearInterval(heartbeat);
           session.sseClients.delete(sendRef);
         }
-      }, 15000);
-    },
-    cancel() {
-      session.sseClients.delete(sendRef);
+      }, 15_000);
     },
   });
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      "Content-Type": "text/event-stream",
     },
   });
 }
@@ -261,16 +269,16 @@ export function streamSession(id: string) {
 export async function getAuthStatus() {
   try {
     const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), 15000);
+    const timeout = setTimeout(() => ctrl.abort(), 15_000);
     const testStream = query({
-      prompt: "Say OK",
       options: {
         abortController: ctrl,
+        env: buildSdkEnv(),
+        includePartialMessages: true,
         maxTurns: 1,
         persistSession: false,
-        includePartialMessages: true,
-        env: buildSdkEnv(),
       },
+      prompt: "Say OK",
     });
 
     for await (const msg of testStream) {
@@ -279,9 +287,9 @@ export async function getAuthStatus() {
           | { content?: unknown[] }
           | undefined;
         if (Array.isArray(content?.content)) {
-          const text = content.content.find((b: any) => b.type === "text") as
-            | { text?: string }
-            | undefined;
+          const text = content.content.find(
+            (b: unknown) => (b as { type?: string }).type === "text",
+          ) as { text?: string } | undefined;
           if (text?.text?.toLowerCase().includes("error")) {
             clearTimeout(timeout);
             ctrl.abort();
@@ -308,8 +316,8 @@ export async function getAuthStatus() {
 
     clearTimeout(timeout);
     return { authenticated: true };
-  } catch (err) {
-    return { authenticated: false, error: String(err) };
+  } catch (error) {
+    return { authenticated: false, error: String(error) };
   }
 }
 
@@ -320,10 +328,12 @@ export async function getAuthStatus() {
  */
 export function getSession(id: string) {
   const session = sessions.get(id);
-  if (!session) return null;
+  if (!session) {
+    return null;
+  }
   return {
     id: session.id,
-    status: session.status,
     messageCount: session.messages.length,
+    status: session.status,
   };
 }

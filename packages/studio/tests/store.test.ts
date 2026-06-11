@@ -1,16 +1,16 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
-  isNestedSelector,
-  stripEventHandlers,
-  VOID_ELEMENTS,
   COMMON_SELECTORS,
+  VOID_ELEMENTS,
+  cancelStyleDebounce,
+  debouncedStyleCommit,
+  isNestedSelector,
   registerRenderer,
   render,
   renderOnly,
-  debouncedStyleCommit,
-  cancelStyleDebounce,
+  stripEventHandlers,
 } from "../src/store";
 
 // ─── isNestedSelector ───────────────────────────────────────────────────────
@@ -50,8 +50,8 @@ describe("isNestedSelector", () => {
 describe("stripEventHandlers", () => {
   test("strips on* $ref handlers", () => {
     const node = {
-      tagName: "button",
       onclick: { $ref: "#/state/handleClick" },
+      tagName: "button",
       textContent: "Click me",
     };
     const result = stripEventHandlers(node) as any;
@@ -62,11 +62,11 @@ describe("stripEventHandlers", () => {
 
   test("strips on* Function $prototype handlers", () => {
     const node = {
-      tagName: "input",
       onchange: {
         $prototype: "Function",
         body: "state.value = event.target.value",
       },
+      tagName: "input",
       type: "text",
     };
     const result = stripEventHandlers(node) as any;
@@ -76,9 +76,9 @@ describe("stripEventHandlers", () => {
 
   test("preserves non-event on* properties", () => {
     const node = {
+      style: { color: "red" },
       tagName: "div",
       textContent: "hello",
-      style: { color: "red" },
     };
     const result = stripEventHandlers(node) as any;
     expect(result.textContent).toBe("hello");
@@ -87,14 +87,14 @@ describe("stripEventHandlers", () => {
 
   test("recurses into children", () => {
     const node = {
-      tagName: "div",
       children: [
         {
-          tagName: "button",
           onclick: { $ref: "#/state/fn" },
+          tagName: "button",
           textContent: "Click",
         },
       ],
+      tagName: "div",
     };
     const result = stripEventHandlers(node) as any;
     expect(result.children[0].onclick).toBeUndefined();
@@ -103,11 +103,11 @@ describe("stripEventHandlers", () => {
 
   test("recurses into cases", () => {
     const node = {
-      tagName: "div",
       cases: {
-        a: { tagName: "span", onclick: { $ref: "#/state/fn" } },
+        a: { onclick: { $ref: "#/state/fn" }, tagName: "span" },
         b: { tagName: "p", textContent: "hello" },
       },
+      tagName: "div",
     };
     const result = stripEventHandlers(node) as any;
     expect(result.cases.a.onclick).toBeUndefined();
@@ -116,10 +116,10 @@ describe("stripEventHandlers", () => {
 
   test("handles arrays", () => {
     const nodes = [
-      { tagName: "a", onclick: { $ref: "#/state/nav" } },
+      { onclick: { $ref: "#/state/nav" }, tagName: "a" },
       { tagName: "span", textContent: "hi" },
     ];
-    const result = stripEventHandlers(nodes) as any;
+    const result = stripEventHandlers(nodes as unknown as JxMutableNode) as any;
     expect(result[0].onclick).toBeUndefined();
     expect(result[1].textContent).toBe("hi");
   });
@@ -132,11 +132,11 @@ describe("stripEventHandlers", () => {
 
   test("preserves state, style, attributes, $media", () => {
     const node = {
-      tagName: "div",
+      $media: { "--md": "(min-width: 768px)" },
+      attributes: { "data-x": "1" },
       state: { count: 0 },
       style: { color: "red" },
-      attributes: { "data-x": "1" },
-      $media: { "--md": "(min-width: 768px)" },
+      tagName: "div",
     };
     const result = stripEventHandlers(node) as any;
     expect(result.state).toEqual({ count: 0 });

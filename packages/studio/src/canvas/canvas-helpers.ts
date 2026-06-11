@@ -5,7 +5,7 @@
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.
  */
 
-import { canvasPanels, elToPath, pathsEqual, getNodeAtPath, parentElementPath } from "../store";
+import { canvasPanels, elToPath, getNodeAtPath, parentElementPath, pathsEqual } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { JxPath } from "../state";
@@ -32,12 +32,20 @@ export function effectiveZoom() {
 
 /** Return the active canvas panel based on the current activeMedia setting. */
 export function getActivePanel() {
-  if (canvasPanels.length === 0) return null;
-  if (canvasPanels.length === 1) return canvasPanels[0];
+  if (canvasPanels.length === 0) {
+    return null;
+  }
+  if (canvasPanels.length === 1) {
+    return canvasPanels[0];
+  }
   const activeMedia = activeTab.value?.session.ui.activeMedia ?? null;
   for (const p of canvasPanels) {
-    if (activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) return p;
-    if (p.mediaName === activeMedia) return p;
+    if (activeMedia === null && (p.mediaName === "base" || p.mediaName === null)) {
+      return p;
+    }
+    if (p.mediaName === activeMedia) {
+      return p;
+    }
   }
   return canvasPanels[0];
 }
@@ -50,16 +58,22 @@ export function getActivePanel() {
  * @param {JxPath} path
  */
 export function bubbleInlinePath(doc: JxMutableNode | undefined, path: JxPath) {
-  if (!doc) return path;
+  if (!doc) {
+    return path;
+  }
   let currentPath = path;
   while (currentPath.length >= 2) {
     const node = getNodeAtPath(doc, currentPath);
     const pPath = parentElementPath(currentPath);
     const parentNode = pPath ? getNodeAtPath(doc, pPath) : null;
-    if (!node || !parentNode) break;
+    if (!node || !parentNode) {
+      break;
+    }
     const childTag = (node.tagName ?? "div").toLowerCase();
     const parentTag = (parentNode.tagName ?? "div").toLowerCase();
-    if (!isInlineInContext(childTag, parentTag)) break;
+    if (!isInlineInContext(childTag, parentTag)) {
+      break;
+    }
     currentPath = pPath as JxPath;
   }
   return currentPath;
@@ -74,11 +88,17 @@ export function bubbleInlinePath(doc: JxMutableNode | undefined, path: JxPath) {
  */
 export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
   let el: HTMLElement | null | undefined = canvasEl.firstElementChild as HTMLElement | null;
-  if (!el) return null;
-  if (path.length === 0) return el;
+  if (!el) {
+    return null;
+  }
+  if (path.length === 0) {
+    return el;
+  }
 
   for (let i = 0; i < path.length; i += 2) {
-    if (path[i] !== "children" && path[i] !== "cases") return null;
+    if (path[i] !== "children" && path[i] !== "cases") {
+      return null;
+    }
     const idx = path[i + 1];
     if (idx === undefined) {
       el = el.children[0] as HTMLElement | undefined;
@@ -87,17 +107,23 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
     } else {
       el = el.children[idx as number] as HTMLElement | undefined;
     }
-    if (!el) break;
+    if (!el) {
+      break;
+    }
   }
 
   if (el) {
     const elPath = elToPath.get(el);
-    if (elPath && pathsEqual(elPath, path)) return el;
+    if (elPath && pathsEqual(elPath, path)) {
+      return el;
+    }
   }
 
   for (const candidate of canvasEl.querySelectorAll("*")) {
     const p = elToPath.get(candidate);
-    if (p && pathsEqual(p, path)) return candidate as HTMLElement;
+    if (p && pathsEqual(p, path)) {
+      return candidate as HTMLElement;
+    }
   }
   return null;
 }
@@ -120,9 +146,9 @@ export function overlayBoxDescriptor(
   const scale = effectiveZoom();
   return {
     cls: `overlay-box overlay-${type}`,
-    top: `${(elRect.top - vpRect.top + viewport.scrollTop) / scale}px`,
-    left: `${(elRect.left - vpRect.left + viewport.scrollLeft) / scale}px`,
-    width: `${elRect.width / scale}px`,
     height: `${elRect.height / scale}px`,
+    left: `${(elRect.left - vpRect.left + viewport.scrollLeft) / scale}px`,
+    top: `${(elRect.top - vpRect.top + viewport.scrollTop) / scale}px`,
+    width: `${elRect.width / scale}px`,
   };
 }

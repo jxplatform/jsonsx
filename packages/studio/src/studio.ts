@@ -7,61 +7,62 @@
  */
 
 import "./services/monaco-setup.js";
+import { errorMessage } from "@jxsuite/schema/parse";
 
 import {
-  getNodeAtPath,
   canvasWrap,
-  toolbarEl,
+  getNodeAtPath,
+  initShellRefs,
+  projectState,
   registerRenderer,
   render,
-  projectState,
-  setProjectState,
   requireProjectState,
+  setProjectState,
+  toolbarEl,
   updateUi,
-  initShellRefs,
 } from "./store";
 
-import { activeTab, openTab, closeAllTabs } from "./workspace/workspace";
-import { transactDoc, mutateUpdateDef, mutateUpdateProperty } from "./tabs/transact";
+import { activeTab, closeAllTabs, openTab } from "./workspace/workspace";
+import { mutateUpdateDef, mutateUpdateProperty, transactDoc } from "./tabs/transact";
 import { effect } from "./reactivity";
 
 import { view } from "./view";
 
-import { isEditing, isEditableBlock } from "./editor/inline-edit";
+import { isEditableBlock, isEditing } from "./editor/inline-edit";
 import { initComponentInlineEdit } from "./editor/component-inline-edit";
 import { enterInlineEdit } from "./editor/content-inline-edit";
-import { initCanvasUtils, applyTransform, positionZoomIndicator } from "./canvas/canvas-utils";
-import { initCanvasHelpers, getActivePanel, findCanvasElement } from "./canvas/canvas-helpers";
+import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
+import { findCanvasElement, getActivePanel, initCanvasHelpers } from "./canvas/canvas-helpers";
 import { initCanvasRender, renderCanvas } from "./canvas/canvas-render";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
-  renderStatusbar,
-  statusMessage,
-  setStatusbarRenderer,
   mountStatusbar,
+  renderStatusbar,
+  setStatusbarRenderer,
+  statusMessage,
 } from "./panels/statusbar";
-import { parseSourceForPath, saveFile, exportFile, serializeDocument } from "./files/file-ops";
-import { loadFormats, formatForPath, documentExtensions } from "./format/format-host";
+import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
+import { documentExtensions, formatForPath, loadFormats } from "./format/format-host";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
   renderFilesTemplate as _renderFilesTemplate,
+  loadDirectory,
   openFileInTab,
   openHomePage,
-  setupTreeKeyboard,
   registerFileTreeDnD,
-  loadDirectory,
+  setupTreeKeyboard,
 } from "./files/files";
 import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 
-import { registerPlatform, getPlatform, hasPlatform } from "./platform";
+import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
 import { createDevServerPlatform } from "./platforms/devserver";
 import { mountResizeEdges } from "./resize-edges";
 import { codeService } from "./services/code-services";
-import { defCategory, defBadgeLabel, renderSignalsTemplate } from "./panels/signals-panel";
+import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/signals-panel";
 import { loadComponentRegistry } from "./files/components";
 
 import { html, render as litRender } from "lit-html";
@@ -72,8 +73,9 @@ import { renderGitPanel } from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
 // Explicit class imports + registration — bare side-effect imports are tree-shaken
-// by Bun's bundler despite sideEffects declarations in Spectrum's package.json.
+// By Bun's bundler despite sideEffects declarations in Spectrum's package.json.
 import { components as _swc } from "./ui/spectrum";
+
 void _swc;
 import "./ui/panel-resize.js";
 import { initLayers } from "./ui/layers";
@@ -103,7 +105,7 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
-// into their own modules, they will migrate to ctx in store.js.
+// Into their own modules, they will migrate to ctx in store.js.
 
 function getCanvasMode() {
   return activeTab.value?.session.ui.canvasMode ?? "design";
@@ -115,7 +117,9 @@ function setCanvasMode(mode: string) {
     gitDiffState = null;
   }
   const tab = activeTab.value;
-  if (tab) tab.session.ui.canvasMode = mode;
+  if (tab) {
+    tab.session.ui.canvasMode = mode;
+  }
 }
 
 let gitDiffState: GitDiffState | null = null;
@@ -127,21 +131,27 @@ async function navigateToComponent(componentPath: string) {
   try {
     const platform = getPlatform();
     const content = await platform.readFile(componentPath);
-    if (!content) return;
+    if (!content) {
+      return;
+    }
     const parsed = JSON.parse(content);
     const tab = activeTab.value;
-    if (!tab) return;
+    if (!tab) {
+      return;
+    }
 
     // Push current state onto the document stack
     const frame = {
-      document: tab.doc.document,
-      selection: tab.session.selection,
-      documentPath: tab.documentPath,
       dirty: tab.doc.dirty,
+      document: tab.doc.document,
+      documentPath: tab.documentPath,
       mode: tab.doc.mode,
+      selection: tab.session.selection,
       sourceFormat: tab.doc.sourceFormat,
     };
-    if (!tab.session.documentStack) tab.session.documentStack = [];
+    if (!tab.session.documentStack) {
+      tab.session.documentStack = [];
+    }
     tab.session.documentStack.push(frame);
 
     // Load the component
@@ -157,28 +167,32 @@ async function navigateToComponent(componentPath: string) {
 
     render();
     statusMessage(`Editing component: ${parsed.tagName || componentPath}`);
-  } catch (e) {
-    const err = e as Error;
+  } catch (error) {
+    const err = error as Error;
     statusMessage(`Error: ${err.message}`);
   }
 }
 
 async function navigateBack() {
   const tab = activeTab.value;
-  if (!tab?.session.documentStack || tab.session.documentStack.length === 0) return;
+  if (!tab?.session.documentStack || tab.session.documentStack.length === 0) {
+    return;
+  }
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
       await platform.writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (e) {
-      const err = e as Error;
+    } catch (error) {
+      const err = error as Error;
       statusMessage(`Save error: ${err.message}`);
     }
   }
 
   // Pop the stack
   const frame = tab.session.documentStack.pop() as Record<string, unknown> | undefined;
-  if (!frame) return;
+  if (!frame) {
+    return;
+  }
   tab.doc.document = frame.document as JxMutableNode;
   tab.doc.dirty = frame.dirty as boolean;
   tab.doc.mode = frame.mode as string;
@@ -195,13 +209,15 @@ async function navigateBack() {
 async function navigateToLevel(targetIndex: number) {
   const tab = activeTab.value;
   const stack = tab?.session.documentStack;
-  if (!stack || targetIndex < 0 || targetIndex >= stack.length) return;
+  if (!stack || targetIndex < 0 || targetIndex >= stack.length) {
+    return;
+  }
   if (tab.doc.dirty && tab.documentPath) {
     try {
       const platform = getPlatform();
       await platform.writeFile(tab.documentPath, await serializeDocument(tab));
-    } catch (e) {
-      const err = e as Error;
+    } catch (error) {
+      const err = error as Error;
       statusMessage(`Save error: ${err.message}`);
     }
   }
@@ -225,7 +241,9 @@ async function closeFunctionEditor() {
   const editing =
     /** @type {{ type: string; defName?: string; path?: JxPath; eventKey?: string } | null} */ tab
       ?.session.ui.editingFunction;
-  if (!editing || !tab) return;
+  if (!editing || !tab) {
+    return;
+  }
   if (view.functionEditor) {
     const currentCode = view.functionEditor.getValue();
     const minResult = await codeService("minify", { code: currentCode });
@@ -253,7 +271,7 @@ async function closeFunctionEditor() {
 
 const datalistHost = document.createElement("div");
 datalistHost.style.display = "contents";
-document.body.appendChild(datalistHost);
+document.body.append(datalistHost);
 litRender(
   html`
     <datalist id="tag-names">
@@ -265,15 +283,17 @@ litRender(
 );
 
 requestIdleCallback(() => {
-  const dl = document.getElementById("css-props");
-  if (!dl) return;
+  const dl = document.querySelector("#css-props");
+  if (!dl) {
+    return;
+  }
   const frag = document.createDocumentFragment();
   for (const [name] of webdata.cssProps) {
     const opt = document.createElement("option");
     opt.value = name;
-    frag.appendChild(opt);
+    frag.append(opt);
   }
-  dl.appendChild(frag);
+  dl.append(frag);
 });
 
 initCssData(webdata);
@@ -295,17 +315,17 @@ initShellRefs();
 
 // Mount extracted panel modules
 toolbarPanel.mount(toolbarEl, {
+  closeFunctionEditor: () => closeFunctionEditor(),
+  getCanvasMode,
   navigateBack: () => navigateBack(),
   navigateToLevel: (i: number) => navigateToLevel(i),
-  closeFunctionEditor: () => closeFunctionEditor(),
   openProject: () => openProject(),
   openRecentProject: (root: string) => openRecentProject(root),
-  saveFile: () => saveFile(),
   parseMediaEntries,
-  getCanvasMode,
-  setCanvasMode,
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
+  saveFile: () => saveFile(),
+  setCanvasMode,
 });
 
 initLayers();
@@ -332,41 +352,45 @@ initCanvasHelpers({
 initCanvasUtils({
   getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-  setZoomDirect: (zoom) => {
-    if (activeTab.value) activeTab.value.session.ui.zoom = zoom;
-  },
   renderStylebookOverlays,
+  setZoomDirect: (zoom) => {
+    if (activeTab.value) {
+      activeTab.value.session.ui.zoom = zoom;
+    }
+  },
 });
 initPanelEvents({
-  getCanvasMode,
   enterInlineEdit,
+  getCanvasMode,
   navigateToComponent,
 });
 initCanvasLiveRender({
   getCanvasMode,
 });
 initCanvasRender({
-  getCanvasMode,
-  setCanvasMode,
-  openFileFromTree,
-  exportFile,
   closeFunctionEditor: () => closeFunctionEditor(),
+  exportFile,
+  getCanvasMode,
   get gitDiffState() {
     return gitDiffState;
   },
+  openFileFromTree,
+  setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
     gitDiffState = state;
   },
 });
 
 initWelcome({
-  openProject: () => openProject(),
-  openRecentProject: (root: string) => openRecentProject(root),
+  cloneRepository: () => cloneRepository({ openRecentProject }),
   openNewProject: async () => {
     const result = await openNewProjectModal();
-    if (result) openRecentProject(result.root);
+    if (result) {
+      openRecentProject(result.root);
+    }
   },
-  cloneRepository: () => cloneRepository({ openRecentProject }),
+  openProject: () => openProject(),
+  openRecentProject: (root: string) => openRecentProject(root),
 });
 
 // Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change.
@@ -391,8 +415,8 @@ effect(() => {
         _canvasRafId = 0;
         try {
           renderCanvas();
-        } catch (e) {
-          console.error("renderCanvas error:", e);
+        } catch (error) {
+          console.error("renderCanvas error:", error);
         }
       });
     });
@@ -400,36 +424,36 @@ effect(() => {
 });
 
 rightPanelMod.mount({
-  navigateToComponent,
   getCanvasMode,
+  navigateToComponent,
   renderCanvas: () => renderCanvas(),
   updateForcedPseudoPreview,
 });
 
 leftPanelMod.mount({
-  getCanvasMode,
-  setCanvasMode,
-  renderImportsTemplate,
-  renderFilesTemplate,
-  renderSignalsTemplate,
-  renderDataExplorerTemplate,
-  renderHeadTemplate,
-  renderGitPanel,
-  renderCanvas: () => renderCanvas(),
-  defCategory,
-  defBadgeLabel,
-  navigateToComponent,
-  webdata,
-  defaultDef,
-  registerLayersDnD,
-  registerElementsDnD,
-  registerComponentsDnD,
-  setupTreeKeyboard,
-  registerFileTreeDnD,
   cloneRepository: () => cloneRepository({ openRecentProject }),
+  defBadgeLabel,
+  defCategory,
+  defaultDef,
+  getCanvasMode,
+  navigateToComponent,
+  registerComponentsDnD,
+  registerElementsDnD,
+  registerFileTreeDnD,
+  registerLayersDnD,
+  renderCanvas: () => renderCanvas(),
+  renderDataExplorerTemplate,
+  renderFilesTemplate,
+  renderGitPanel,
+  renderHeadTemplate,
+  renderImportsTemplate,
+  renderSignalsTemplate,
+  setCanvasMode,
   setGitDiffState: (state: GitDiffState | null) => {
     gitDiffState = state;
   },
+  setupTreeKeyboard,
+  webdata,
 });
 
 // Register all renderers with the store so render()/renderOnly() work
@@ -444,8 +468,12 @@ mountActivityBar();
 
 // Clicking on the canvas-wrap background (outside any canvas panel) deselects the current element
 canvasWrap.addEventListener("click", (e: MouseEvent) => {
-  if (e.target !== canvasWrap && e.target !== view.panzoomWrap) return;
-  if (!activeTab.value?.session.selection) return;
+  if (e.target !== canvasWrap && e.target !== view.panzoomWrap) {
+    return;
+  }
+  if (!activeTab.value?.session.selection) {
+    return;
+  }
   activeTab.value.session.selection = null;
 });
 
@@ -482,26 +510,28 @@ if (_projectParam) {
           if (siteCtx.sitePath) {
             platform.projectRoot = siteCtx.sitePath;
             // Await activation so the server resolves project-relative static files
-            if (platform.activate) await platform.activate();
+            if (platform.activate) {
+              await platform.activate();
+            }
           }
 
           setProjectState({
-            root: siteCtx.sitePath,
-            name: siteCtx.projectConfig?.name || "Project",
-            projectRoot: siteCtx.sitePath,
-            isSiteProject: true,
-            projectConfig: siteCtx.projectConfig || null,
-            projectDirs: [],
             dirs: new Map(),
             expanded: new Set(),
-            selectedPath: siteCtx.fileRelPath || null,
+            isSiteProject: true,
+            name: siteCtx.projectConfig?.name || "Project",
+            projectConfig: siteCtx.projectConfig || null,
+            projectDirs: [],
+            projectRoot: siteCtx.sitePath,
+            root: siteCtx.sitePath,
             searchQuery: "",
+            selectedPath: siteCtx.fileRelPath || null,
           });
 
           await loadComponentRegistry();
 
           // Load directory tree and populate projectDirs from conventional dirs found
-          const conventionalDirs = [
+          const conventionalDirs = new Set([
             "pages",
             "layouts",
             "components",
@@ -509,12 +539,12 @@ if (_projectParam) {
             "data",
             "public",
             "styles",
-          ];
+          ]);
           const dirEntries = await platform.listDirectory(".");
           requireProjectState().dirs.set(".", dirEntries);
           const foundDirs = [];
           for (const e of dirEntries) {
-            if (e.type === "directory" && conventionalDirs.includes(e.name)) {
+            if (e.type === "directory" && conventionalDirs.has(e.name)) {
               foundDirs.push(e.name);
               requireProjectState().expanded.add(e.path || e.name);
               const sub = await platform.listDirectory(e.path || e.name);
@@ -544,7 +574,9 @@ if (_projectParam) {
               break;
             } catch {}
           }
-          if (!opened) fileRelPath = "project.json";
+          if (!opened) {
+            fileRelPath = "project.json";
+          }
         }
 
         const content = await platform.readFile(fileRelPath);
@@ -555,7 +587,7 @@ if (_projectParam) {
           if (fileFormat) {
             const result = await parseSourceForPath(fileRelPath, content);
             parsedDoc = result.document;
-            frontmatter = result.frontmatter;
+            ({ frontmatter } = result);
             parsedMode = result.mode;
           } else {
             parsedDoc = JSON.parse(content);
@@ -570,7 +602,9 @@ if (_projectParam) {
             sourceFormat: fileFormat?.name ?? null,
           });
 
-          if (parsedMode === "content" && activeTab.value) activeTab.value.doc.mode = "content";
+          if (parsedMode === "content" && activeTab.value) {
+            activeTab.value.doc.mode = "content";
+          }
           if (fileRelPath === "project.json" && activeTab.value) {
             activeTab.value.session.ui.canvasMode = "stylebook";
           }
@@ -578,8 +612,8 @@ if (_projectParam) {
           render();
           statusMessage(`Opened ${fileRelPath}`);
         }
-      } catch (e) {
-        statusMessage(`Error: ${(e as Error).message}`);
+      } catch (error) {
+        statusMessage(`Error: ${errorMessage(error)}`);
       }
     })();
   }
@@ -594,27 +628,6 @@ if (_projectParam) {
 function renderLeftPanel() {
   leftPanelMod.render();
 }
-
-// ─── DnD registration: delegated to panels/dnd.js ───────────────────────────
-
-// ─── Stylebook ───────────────────────────────────────────────────────────────
-// Extracted to panels/stylebook-panel.js
-
-// ─── Inspector ────────────────────────────────────────────────────────────────
-// Extracted to panels/properties-panel.js
-
-// ─── Style Sidebar (metadata-driven) ───────────────────────────────────────────
-
-// UNIT_RE — imported from ui/unit-selector.js
-
-// inferInputType — imported from studio-utils.js
-
-// ─── Style panel ────────────────────────────────────────────────────────────
-// Extracted to panels/style-utils.js, panels/style-inputs.js, panels/style-panel.js
-
-// ─── Source/Function editors: delegated to panels/editors.js ─────────────────
-
-// ─── File tree (delegated to files.js) ───────────────────────────────────────
 
 function loadProject() {
   return _loadProject();
@@ -636,20 +649,20 @@ async function openRecentProject(root: string) {
 
     setProjectState({
       ...projectState,
-      projectRoot: root,
-      isSiteProject: true,
-      projectConfig: config,
-      name: config.name || root.split("/").pop(),
       dirs: new Map(),
       expanded: new Set(),
-      selectedPath: null,
+      isSiteProject: true,
+      name: config.name || root.split("/").pop(),
+      projectConfig: config,
+      projectRoot: root,
       searchQuery: "",
+      selectedPath: null,
     });
 
     await loadDirectory(".");
     await loadComponentRegistry();
 
-    const conventionalDirs = [
+    const conventionalDirs = new Set([
       "pages",
       "layouts",
       "components",
@@ -657,10 +670,10 @@ async function openRecentProject(root: string) {
       "data",
       "public",
       "styles",
-    ];
+    ]);
     const entries = requireProjectState().dirs.get(".") || [];
     for (const e of entries) {
-      if (e.type === "directory" && conventionalDirs.includes(e.name)) {
+      if (e.type === "directory" && conventionalDirs.has(e.name)) {
         requireProjectState().expanded.add(e.path || e.name);
         await loadDirectory(e.path || e.name);
       }
@@ -673,14 +686,14 @@ async function openRecentProject(root: string) {
     statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 function renderFilesTemplate() {
   return _renderFilesTemplate({
-    openProject,
     openFileFromTree,
+    openProject,
     renderLeftPanel,
   });
 }
@@ -690,19 +703,9 @@ function openFileFromTree(path: string) {
 
 // ─── Keyboard shortcuts ───────────────────────────────────────────────────────
 initShortcuts(() => ({
-  canvasMode: getCanvasMode(),
-  panX: view.panX,
-  panY: view.panY,
-  setPan: (x, y) => {
-    view.panX = x;
-    view.panY = y;
-    view.needsCenter = false;
-  },
   applyTransform,
-  positionZoomIndicator,
+  canvasMode: getCanvasMode(),
   componentInlineEdit: view.componentInlineEdit,
-  saveFile,
-  openProject,
   enterEditOnPath(path) {
     requestAnimationFrame(() => {
       const activePanel = getActivePanel();
@@ -714,6 +717,16 @@ initShortcuts(() => ({
       }
     });
   },
+  openProject,
+  panX: view.panX,
+  panY: view.panY,
+  positionZoomIndicator,
+  saveFile,
+  setPan: (x, y) => {
+    view.panX = x;
+    view.panY = y;
+    view.needsCenter = false;
+  },
 }));
 
 // ─── Autosave (registered as update middleware) ──────────────────────────────
@@ -722,8 +735,12 @@ const AUTO_SAVE_DELAY: number = 2000;
 
 function scheduleAutosave() {
   const tab = activeTab.value;
-  if (!tab?.fileHandle || !tab.doc.dirty) return;
-  if (view.autosaveTimer) clearTimeout(view.autosaveTimer);
+  if (!tab?.fileHandle || !tab.doc.dirty) {
+    return;
+  }
+  if (view.autosaveTimer) {
+    clearTimeout(view.autosaveTimer);
+  }
   view.autosaveTimer = setTimeout(async () => {
     const t = activeTab.value;
     if (t?.fileHandle && t.doc.dirty && "createWritable" in t.fileHandle) {
@@ -739,5 +756,7 @@ function scheduleAutosave() {
 }
 
 effect(() => {
-  if (activeTab.value?.doc.dirty) scheduleAutosave();
+  if (activeTab.value?.doc.dirty) {
+    scheduleAutosave();
+  }
 });

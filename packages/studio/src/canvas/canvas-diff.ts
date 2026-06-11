@@ -23,13 +23,21 @@ interface DiffResult {
  * @returns {boolean}
  */
 function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a !== "object" || typeof b !== "object" || !a || !b) return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== "object" || typeof b !== "object" || !a || !b) {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
 
   if (Array.isArray(a)) {
     const bArr = b as unknown[];
-    if (a.length !== bArr.length) return false;
+    if (a.length !== bArr.length) {
+      return false;
+    }
     return a.every((v: unknown, i: number) => valuesEqual(v, bArr[i]));
   }
 
@@ -39,8 +47,12 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   const keysA = Object.keys(aObj).filter((k: string) => !k.startsWith("on") && k !== "$ref");
   const keysB = Object.keys(bObj).filter((k: string) => !k.startsWith("on") && k !== "$ref");
 
-  if (keysA.length !== keysB.length) return false;
-  if (!keysA.every((k: string) => keysB.includes(k))) return false;
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+  if (!keysA.every((k: string) => keysB.includes(k))) {
+    return false;
+  }
 
   return keysA.every((k: string) => valuesEqual(aObj[k], bObj[k]));
 }
@@ -52,7 +64,9 @@ function valuesEqual(a: unknown, b: unknown): boolean {
  * @returns {JxMutableNode[]}
  */
 function elementChildren(node: JxMutableNode | undefined) {
-  if (!node?.children || !Array.isArray(node.children)) return [];
+  if (!node?.children || !Array.isArray(node.children)) {
+    return [];
+  }
   return node.children.filter(
     (c: JxMutableNode | string) => c != null && typeof c === "object",
   ) as JxMutableNode[];
@@ -94,8 +108,8 @@ export function computeDocumentDiff(
   originalDoc: JxMutableNode | undefined,
   currentDoc: JxMutableNode | undefined,
 ): DiffResult {
-  const diffMap: Map<string, DiffStatus> = new Map();
-  const allPaths: Set<string> = new Set();
+  const diffMap = new Map<string, DiffStatus>();
+  const allPaths = new Set<string>();
 
   /**
    * Walk both trees in parallel and mark differences.
@@ -182,7 +196,7 @@ export function computeDocumentDiff(
   // Propagate upwards until no more changes
   while (propagateModified()) {}
 
-  return { byPath: diffMap, allPaths };
+  return { allPaths, byPath: diffMap };
 }
 
 /**

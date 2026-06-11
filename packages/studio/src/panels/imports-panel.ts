@@ -46,14 +46,22 @@ function componentSpecifier(comp: ComponentEntry) {
  * @returns {boolean}
  */
 function isComponentEnabled(comp: ComponentEntry, elements: ElementsEntry[]) {
-  if (!elements?.length) return false;
+  if (!elements?.length) {
+    return false;
+  }
   const specifier = componentSpecifier(comp);
   for (const entry of elements) {
-    if (typeof entry !== "string") continue;
+    if (typeof entry !== "string") {
+      continue;
+    }
     // Cherry-picked subpath match
-    if (entry === specifier) return true;
+    if (entry === specifier) {
+      return true;
+    }
     // Legacy full-package match
-    if (entry === comp.package) return true;
+    if (entry === comp.package) {
+      return true;
+    }
   }
   return false;
 }
@@ -64,10 +72,14 @@ function isComponentEnabled(comp: ComponentEntry, elements: ElementsEntry[]) {
  * @returns {Map<string, ComponentEntry[]>}
  */
 function groupByPackage() {
-  const groups: Map<string, ComponentEntry[]> = new Map();
+  const groups = new Map<string, ComponentEntry[]>();
   for (const comp of componentRegistry) {
-    if (comp.source !== "npm" || !comp.package || !comp.modulePath) continue;
-    if (!groups.has(comp.package)) groups.set(comp.package, []);
+    if (comp.source !== "npm" || !comp.package || !comp.modulePath) {
+      continue;
+    }
+    if (!groups.has(comp.package)) {
+      groups.set(comp.package, []);
+    }
     groups.get(comp.package)?.push(comp);
   }
   return groups;
@@ -90,10 +102,10 @@ export function renderImportsTemplate({
   }
 
   return renderDocumentLevelImports({
-    renderLeftPanel,
-    documentPath,
-    documentElements,
     applyMutation,
+    documentElements,
+    documentPath,
+    renderLeftPanel,
   });
 }
 
@@ -155,7 +167,9 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
               const pathField = form?.querySelector(".import-add-path") as HTMLInputElement;
               const name = nameField?.value?.trim();
               const path = pathField?.value?.trim();
-              if (!name || !path) return;
+              if (!name || !path) {
+                return;
+              }
               nameField.value = "";
               pathField.value = "";
               const updated = { ...siteImports, [name]: path };
@@ -183,13 +197,15 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                     confirmLabel: "Remove",
                     destructive: true,
                   });
-                  if (!confirmed) return;
+                  if (!confirmed) {
+                    return;
+                  }
                   try {
                     const platform = getPlatform();
                     await platform.removePackage(pkg);
                     // Also remove all cherry-picked elements for this package
                     const updatedElements = siteElements.filter(
-                      (e: ElementsEntry) => typeof e !== "string" || !e.startsWith(pkg + "/"),
+                      (e: ElementsEntry) => typeof e !== "string" || !e.startsWith(`${pkg}/`),
                     );
                     const { loadComponentRegistry } = await import("../files/components.js");
                     await loadComponentRegistry();
@@ -197,8 +213,8 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                       $elements: updatedElements as (string | JxElement)[],
                     });
                     renderLeftPanel();
-                  } catch (e) {
-                    console.error("Failed to remove package:", e);
+                  } catch (error) {
+                    console.error("Failed to remove package:", error);
                   }
                 }}
               >
@@ -219,7 +235,9 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                         // Remove legacy full-package import if present
                         updated = updated.filter((el: ElementsEntry) => el !== pkg);
                         if ((e.target as HTMLInputElement).checked) {
-                          if (!updated.includes(specifier)) updated.push(specifier);
+                          if (!updated.includes(specifier)) {
+                            updated.push(specifier);
+                          }
                         } else {
                           updated = updated.filter((el: ElementsEntry) => el !== specifier);
                         }
@@ -250,9 +268,13 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
             size="s"
             style="flex:1"
             @keydown=${async (e: KeyboardEvent) => {
-              if (e.key !== "Enter") return;
+              if (e.key !== "Enter") {
+                return;
+              }
               const name = (e.target as HTMLInputElement).value?.trim();
-              if (!name) return;
+              if (!name) {
+                return;
+              }
               (e.target as HTMLInputElement).value = "";
               try {
                 const platform = getPlatform();
@@ -260,8 +282,8 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                 const { loadComponentRegistry } = await import("../files/components.js");
                 await loadComponentRegistry();
                 renderLeftPanel();
-              } catch (err) {
-                console.error("Failed to add package:", err);
+              } catch (error) {
+                console.error("Failed to add package:", error);
               }
             }}
           ></sp-textfield>
@@ -274,7 +296,9 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                 .closest(".import-add-form")
                 ?.querySelector("sp-textfield");
               const name = (input as HTMLInputElement | null)?.value?.trim();
-              if (!name) return;
+              if (!name) {
+                return;
+              }
               (input as HTMLInputElement).value = "";
               try {
                 const platform = getPlatform();
@@ -282,8 +306,8 @@ function renderSiteLevelImports(renderLeftPanel: () => void) {
                 const { loadComponentRegistry } = await import("../files/components.js");
                 await loadComponentRegistry();
                 renderLeftPanel();
-              } catch (err) {
-                console.error("Failed to add package:", err);
+              } catch (error) {
+                console.error("Failed to add package:", error);
               }
             }}
           >
@@ -313,7 +337,10 @@ function renderDocumentLevelImports({
   const importedRefs = new Set(refEntries.map((e: ElementsEntry) => (e as { $ref: string }).$ref));
   const availableComponents = componentRegistry.filter(
     (c: ComponentEntry) =>
-      c.source !== "npm" && !importedRefs.has(`./${c.path}`) && !importedRefs.has(c.path),
+      c.source !== "npm" &&
+      Boolean(c.path) &&
+      !importedRefs.has(`./${c.path}`) &&
+      !importedRefs.has(c.path),
   );
 
   const packageGroups = groupByPackage();
@@ -368,13 +395,19 @@ function renderDocumentLevelImports({
                   class="import-picker"
                   @change=${(e: Event) => {
                     const tag = (e.target as HTMLInputElement).value;
-                    if (!tag) return;
+                    if (!tag) {
+                      return;
+                    }
                     (e.target as HTMLInputElement).value = "";
                     const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
-                    if (!comp) return;
+                    if (!comp?.path) {
+                      return;
+                    }
                     const relPath = computeRelativePath(documentPath, comp.path);
                     applyMutation((doc: JxMutableNode) => {
-                      if (!doc.$elements) doc.$elements = [];
+                      if (!doc.$elements) {
+                        doc.$elements = [];
+                      }
                       doc.$elements.push({ $ref: relPath });
                     });
                     renderLeftPanel();
@@ -408,11 +441,15 @@ function renderDocumentLevelImports({
                       .checked=${enabled}
                       @change=${(e: Event) => {
                         applyMutation((doc: JxMutableNode) => {
-                          if (!doc.$elements) doc.$elements = [];
+                          if (!doc.$elements) {
+                            doc.$elements = [];
+                          }
                           // Remove legacy full-package import if present
                           doc.$elements = doc.$elements.filter((el: ElementsEntry) => el !== pkg);
                           if ((e.target as HTMLInputElement).checked) {
-                            if (!doc.$elements.includes(specifier)) doc.$elements.push(specifier);
+                            if (!doc.$elements.includes(specifier)) {
+                              doc.$elements.push(specifier);
+                            }
                           } else {
                             doc.$elements = doc.$elements.filter(
                               (el: ElementsEntry) => el !== specifier,

@@ -1,17 +1,17 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import {
   buildStylebookElement,
-  renderStylebookElementsIntoCanvas,
   renderComponentPreview,
+  renderStylebookElementsIntoCanvas,
 } from "../src/panels/stylebook-panel";
 import { setProjectState } from "../src/store";
 import type { ProjectState } from "../src/types";
 
 beforeEach(() => {
   setProjectState({
-    projectConfig: null,
     expanded: new Set(),
+    projectConfig: null,
   } as unknown as ProjectState);
 });
 
@@ -40,9 +40,9 @@ describe("buildStylebookElement", () => {
   test("applies media-specific overrides when breakpoint is active", () => {
     const rootStyle = {
       h1: {
-        fontSize: "3rem",
         "@md": { fontSize: "2rem" },
         "@sm": { fontSize: "1.5rem" },
+        fontSize: "3rem",
       },
     };
     const active = new Set(["md"]);
@@ -53,8 +53,8 @@ describe("buildStylebookElement", () => {
   test("does not apply media overrides for inactive breakpoints", () => {
     const rootStyle = {
       h1: {
-        fontSize: "3rem",
         "@lg": { fontSize: "2.5rem" },
+        fontSize: "3rem",
       },
     };
     const active = new Set(["md"]);
@@ -64,7 +64,7 @@ describe("buildStylebookElement", () => {
 
   test("applies attributes from entry", () => {
     const el = buildStylebookElement(
-      { tag: "a", text: "Link", attributes: { href: "#", target: "_blank" } },
+      { attributes: { href: "#", target: "_blank" }, tag: "a", text: "Link" },
       {},
       null,
     );
@@ -74,11 +74,11 @@ describe("buildStylebookElement", () => {
 
   test("builds nested children recursively", () => {
     const entry = {
-      tag: "ul",
       children: [
         { tag: "li", text: "Item 1" },
         { tag: "li", text: "Item 2" },
       ],
+      tag: "ul",
     };
     const rootStyle = { li: { color: "blue" } };
     const el = buildStylebookElement(entry, rootStyle, null);
@@ -114,12 +114,12 @@ describe("buildStylebookElement compound selectors", () => {
 
   test("recursive children receive parent entry.tag as parentTag", () => {
     const rootStyle = {
-      ul: { li: { listStyleType: "disc" } },
       li: { listStyleType: "none" },
+      ul: { li: { listStyleType: "disc" } },
     };
     const entry = {
-      tag: "ul",
       children: [{ tag: "li", text: "Item" }],
+      tag: "ul",
     };
     const el = buildStylebookElement(entry, rootStyle, null);
     expect((el.children[0] as HTMLElement).style.listStyleType).toBe("disc");
@@ -127,16 +127,16 @@ describe("buildStylebookElement compound selectors", () => {
 
   test("differentiates ul li from ol li", () => {
     const rootStyle = {
-      ul: { li: { color: "blue" } },
       ol: { li: { color: "red" } },
+      ul: { li: { color: "blue" } },
     };
     const ul = buildStylebookElement(
-      { tag: "ul", children: [{ tag: "li", text: "UL item" }] },
+      { children: [{ tag: "li", text: "UL item" }], tag: "ul" },
       rootStyle,
       null,
     );
     const ol = buildStylebookElement(
-      { tag: "ol", children: [{ tag: "li", text: "OL item" }] },
+      { children: [{ tag: "li", text: "OL item" }], tag: "ol" },
       rootStyle,
       null,
     );
@@ -148,8 +148,8 @@ describe("buildStylebookElement compound selectors", () => {
     const rootStyle = {
       blockquote: {
         p: {
-          fontSize: "1.2rem",
           "@sm": { fontSize: "1rem" },
+          fontSize: "1.2rem",
         },
       },
     };
@@ -221,7 +221,7 @@ describe("renderStylebookElementsIntoCanvas CSS variables", () => {
 describe("renderComponentPreview", () => {
   test("npm component not registered → returns fallback div", async () => {
     const el = await renderComponentPreview(
-      /** @type {any} */ { tagName: "sl-button", source: "npm" },
+      /** @type {any} */ { source: "npm", tagName: "sl-button" },
     );
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<sl-button>");
@@ -229,15 +229,15 @@ describe("renderComponentPreview", () => {
 
   test("npm component not registered → does not throw", async () => {
     await expect(
-      renderComponentPreview(/** @type {any} */ { tagName: "sl-nonexistent", source: "npm" }),
+      renderComponentPreview(/** @type {any} */ { source: "npm", tagName: "sl-nonexistent" }),
     ).resolves.toBeDefined();
   });
 
   test("markdown component → returns fallback div without fetch", async () => {
     const el = await renderComponentPreview({
-      tagName: "todo-app",
-      source: "local",
       path: "components/todo-app.md",
+      source: "local",
+      tagName: "todo-app",
     });
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<todo-app>");
@@ -245,9 +245,9 @@ describe("renderComponentPreview", () => {
 
   test("markdown component with .MD extension → returns fallback", async () => {
     const el = await renderComponentPreview({
-      tagName: "my-comp",
-      source: "local",
       path: "components/my-comp.MD",
+      source: "local",
+      tagName: "my-comp",
     });
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<my-comp>");
@@ -255,14 +255,14 @@ describe("renderComponentPreview", () => {
 
   test("local component with invalid path → returns fallback (no unhandled error)", async () => {
     setProjectState({
-      projectRoot: "test-project",
-      projectConfig: null,
       expanded: new Set(),
+      projectConfig: null,
+      projectRoot: "test-project",
     } as any);
     const el = await renderComponentPreview({
-      tagName: "missing-comp",
-      source: "local",
       path: "components/nonexistent.json",
+      source: "local",
+      tagName: "missing-comp",
     });
     expect(el.tagName).toBe("DIV");
     expect(el.textContent).toBe("<missing-comp>");

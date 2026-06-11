@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { handleCodeApi } from "../src/code-api";
 
 /**
@@ -9,9 +9,9 @@ function codeRequest(action: string, body: unknown) {
   const url = new URL(`http://localhost/__studio/code/${action}`);
   return {
     req: new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     }),
     url,
   };
@@ -34,7 +34,7 @@ describe("code-api", () => {
 
   test("returns 400 for invalid JSON body", async () => {
     const url = new URL("http://localhost/__studio/code/format");
-    const req = new Request(url, { method: "POST", body: "not json" });
+    const req = new Request(url, { body: "not json", method: "POST" });
     const res = await handleCodeApi(req, url);
     expect((res as Response).status).toBe(400);
   });
@@ -73,8 +73,8 @@ describe("code-api", () => {
 
     test("accepts custom args", async () => {
       const { req, url } = codeRequest("format", {
-        code: "return a + b;",
         args: ["a", "b"],
+        code: "return a + b;",
       });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
@@ -85,7 +85,7 @@ describe("code-api", () => {
       const { req, url } = codeRequest("format", { code: "const x = ;" });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
-      // oxfmt may return errors or the original code
+      // Oxfmt may return errors or the original code
       expect(data.code).toBeDefined();
     });
   });
@@ -128,7 +128,7 @@ describe("code-api", () => {
       const { req, url } = codeRequest("lint", { code: "debugger;" });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();
-      // oxlint should flag `debugger` statement
+      // Oxlint should flag `debugger` statement
       expect(Array.isArray(data.diagnostics)).toBe(true);
     });
 
@@ -143,8 +143,8 @@ describe("code-api", () => {
 
     test("accepts custom args for lint", async () => {
       const { req, url } = codeRequest("lint", {
-        code: "return a;",
         args: ["a"],
+        code: "return a;",
       });
       const res = await handleCodeApi(req, url);
       const data = await (res as Response).json();

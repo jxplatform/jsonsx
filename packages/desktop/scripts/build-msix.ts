@@ -1,7 +1,7 @@
 import { $ } from "bun";
-import { cp, mkdir, readFile, writeFile, rm, copyFile } from "fs/promises";
-import { join, resolve } from "path";
-import { existsSync, readdirSync, unlinkSync } from "fs";
+import { copyFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { existsSync, readdirSync, unlinkSync } from "node:fs";
 
 if (process.platform !== "win32") {
   console.log("[build-msix] Skipping MSIX build (not Windows)");
@@ -63,7 +63,9 @@ const runtimeFiles = [
 ];
 for (const file of runtimeFiles) {
   const src = join(electrobunDist, file);
-  if (existsSync(src)) await copyFile(src, join(binDir, file));
+  if (existsSync(src)) {
+    await copyFile(src, join(binDir, file));
+  }
 }
 
 // Copy CEF files if present (bundleCEF: true)
@@ -76,7 +78,7 @@ if (existsSync(cefSrcDir)) {
 // --- Step 3: Patch main.js and compile into standalone exe ---
 // MSIX Workers get EPERM reading files from C:\Program Files\WindowsApps.
 // We patch the flat-files branch to copy the app entrypoint to %TEMP% before
-// spawning the Worker, then compile the patched main.js into bun.exe.
+// Spawning the Worker, then compile the patched main.js into bun.exe.
 const mainJsPath = join(buildDir, "Resources", "main.js");
 let mainJsSrc = await readFile(mainJsPath, "utf8");
 
@@ -109,7 +111,9 @@ console.log("[build-msix] Compiled main.js → bun.exe (standalone)");
 
 // --- Step 4: Stage flat directory for MSIX ---
 const msixStageDir = join(distDir, "msix-stage");
-if (existsSync(msixStageDir)) await rm(msixStageDir, { recursive: true });
+if (existsSync(msixStageDir)) {
+  await rm(msixStageDir, { recursive: true });
+}
 await cp(buildDir, msixStageDir, { recursive: true });
 
 // Remove build tools, cross-platform artifacts, and unused libs
@@ -117,11 +121,15 @@ const junkFiles = ["zig-zstd.exe", "bspatch.exe", "Info.plist", "libasar.dll", "
 for (const name of junkFiles) {
   for (const dir of [join(msixStageDir, "bin"), msixStageDir]) {
     const p = join(dir, name);
-    if (existsSync(p)) unlinkSync(p);
+    if (existsSync(p)) {
+      unlinkSync(p);
+    }
   }
 }
 const extensionlessLauncher = join(msixStageDir, "bin", "launcher");
-if (existsSync(extensionlessLauncher)) unlinkSync(extensionlessLauncher);
+if (existsSync(extensionlessLauncher)) {
+  unlinkSync(extensionlessLauncher);
+}
 
 // --- Step 5: Copy pre-generated asset PNGs ---
 const assetsDir = join(msixStageDir, "Assets");
@@ -132,7 +140,7 @@ for (const file of readdirSync(join(desktopDir, "msix-assets"))) {
 
 // --- Step 6: Generate AppxManifest.xml ---
 const pkg = JSON.parse(await readFile(join(desktopDir, "package.json"), "utf8"));
-const version = pkg.version;
+const { version } = pkg;
 const quadVersion = version.split(".").length === 3 ? `${version}.0` : version;
 
 const manifest = `<?xml version="1.0" encoding="utf-8"?>
@@ -184,15 +192,17 @@ console.log("[build-msix] Generated AppxManifest.xml");
 
 // --- Step 7: Run makeappx ---
 function findSdkTool(name: string): string {
-  const kitsDir = "C:\\Program Files (x86)\\Windows Kits\\10\\bin";
+  const kitsDir = String.raw`C:\Program Files (x86)\Windows Kits\10\bin`;
   if (existsSync(kitsDir)) {
     const versions = readdirSync(kitsDir)
       .filter((d) => d.startsWith("10."))
-      .sort()
-      .reverse();
+      .toSorted()
+      .toReversed();
     for (const ver of versions) {
       const p = join(kitsDir, ver, "x64", `${name}.exe`);
-      if (existsSync(p)) return p;
+      if (existsSync(p)) {
+        return p;
+      }
     }
   }
   return name;

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { htmlToJx } from "../src/html-to-jx";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -7,8 +7,8 @@ describe("htmlToJx", () => {
     const result = htmlToJx('<div class="foo" id="bar">Hello</div>');
     expect(result).toEqual([
       {
-        tagName: "div",
         attributes: { class: "foo", id: "bar" },
+        tagName: "div",
         textContent: "Hello",
       },
     ]);
@@ -17,24 +17,24 @@ describe("htmlToJx", () => {
   test("void elements", () => {
     expect(htmlToJx("<br>")).toEqual([{ tagName: "br" }]);
     expect(htmlToJx('<img src="/photo.jpg" alt="Photo">')).toEqual([
-      { tagName: "img", attributes: { src: "/photo.jpg", alt: "Photo" } },
+      { attributes: { alt: "Photo", src: "/photo.jpg" }, tagName: "img" },
     ]);
     expect(htmlToJx('<input type="text" name="q">')).toEqual([
-      { tagName: "input", attributes: { type: "text", name: "q" } },
+      { attributes: { name: "q", type: "text" }, tagName: "input" },
     ]);
   });
 
   test("nested elements", () => {
     const result = htmlToJx("<div><p>Text</p></div>");
-    expect(result).toEqual([{ tagName: "div", children: [{ tagName: "p", textContent: "Text" }] }]);
+    expect(result).toEqual([{ children: [{ tagName: "p", textContent: "Text" }], tagName: "div" }]);
   });
 
   test("script with src attribute", () => {
     const result = htmlToJx('<script src="https://example.com/embed.js"></script>');
     expect(result).toEqual([
       {
-        tagName: "script",
         attributes: { src: "https://example.com/embed.js" },
+        tagName: "script",
       },
     ]);
   });
@@ -55,12 +55,12 @@ describe("htmlToJx", () => {
     );
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
-      tagName: "iframe",
       attributes: { src: "https://example.com/form", title: "Form" },
+      tagName: "iframe",
     });
     expect(result[1]).toEqual({
-      tagName: "script",
       attributes: { src: "https://example.com/embed.js" },
+      tagName: "script",
     });
   });
 
@@ -68,15 +68,15 @@ describe("htmlToJx", () => {
     const result = htmlToJx("<p>Hello <strong>world</strong> foo</p>");
     expect(result).toEqual([
       {
-        tagName: "p",
         children: ["Hello ", { tagName: "strong", textContent: "world" }, " foo"],
+        tagName: "p",
       },
     ]);
   });
 
   test("boolean attributes", () => {
     const result = htmlToJx("<input disabled>");
-    expect(result).toEqual([{ tagName: "input", attributes: { disabled: "" } }]);
+    expect(result).toEqual([{ attributes: { disabled: "" }, tagName: "input" }]);
   });
 
   test("className maps to class", () => {
@@ -86,7 +86,7 @@ describe("htmlToJx", () => {
 
   test("skips whitespace-only text nodes", () => {
     const result = htmlToJx("<div>\n  <p>Text</p>\n</div>");
-    expect(result).toEqual([{ tagName: "div", children: [{ tagName: "p", textContent: "Text" }] }]);
+    expect(result).toEqual([{ children: [{ tagName: "p", textContent: "Text" }], tagName: "div" }]);
   });
 
   test("empty string returns empty array", () => {
@@ -104,14 +104,14 @@ describe("htmlToJx", () => {
     );
     expect(result).toEqual([
       {
-        tagName: "iframe",
         attributes: { src: "https://example.com" },
         style: {
-          width: "100%",
-          height: "100%",
           border: "none",
           "border-radius": "8px",
+          height: "100%",
+          width: "100%",
         },
+        tagName: "iframe",
       },
     ]);
   });

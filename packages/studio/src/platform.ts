@@ -23,8 +23,9 @@ export function registerPlatform(platform: StudioPlatform) {
 
 /** @returns {StudioPlatform} */
 export function getPlatform() {
-  if (!g.__jxPlatform)
+  if (!g.__jxPlatform) {
     throw new Error("No platform registered. Call registerPlatform() before starting Studio.");
+  }
   return g.__jxPlatform;
 }
 

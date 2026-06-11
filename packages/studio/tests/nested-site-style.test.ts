@@ -1,28 +1,28 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { buildNestedSiteCSS } from "../src/canvas/nested-site-style";
 
 describe("buildNestedSiteCSS", () => {
   test("returns empty string when no nested objects exist", () => {
-    const style = { color: "red", fontSize: "14px", "--accent": "#3b82f6" };
+    const style = { "--accent": "#3b82f6", color: "red", fontSize: "14px" };
     expect(buildNestedSiteCSS(style, "[data-jx-site]")).toBe("");
   });
 
   test("generates CSS for a single nested selector", () => {
     const style = {
-      table: { width: "100%", borderCollapse: "collapse" },
+      table: { borderCollapse: "collapse", width: "100%" },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
-    expect(css).toContain("[data-jx-site] table { width: 100%; border-collapse: collapse }");
+    expect(css).toContain("[data-jx-site] table { border-collapse: collapse; width: 100% }");
   });
 
   test("generates deeply nested selectors (table > tbody > tr)", () => {
     const style = {
       table: {
-        width: "100%",
         tbody: {
           tr: { borderBottom: "1px solid #222" },
         },
+        width: "100%",
       },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
@@ -35,9 +35,9 @@ describe("buildNestedSiteCSS", () => {
       table: {
         tbody: {
           tr: {
-            borderBottom: "1px solid #ccc",
-            ":hover": { backgroundColor: "blue" },
             ":first-child": { fontWeight: "700" },
+            ":hover": { backgroundColor: "blue" },
+            borderBottom: "1px solid #ccc",
           },
         },
       },
@@ -73,9 +73,9 @@ describe("buildNestedSiteCSS", () => {
 
   test("skips flat properties (non-objects)", () => {
     const style = {
+      "--custom": "blue",
       color: "red",
       margin: "0",
-      "--custom": "blue",
       table: { width: "100%" },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
@@ -88,9 +88,9 @@ describe("buildNestedSiteCSS", () => {
   test("converts camelCase to kebab-case", () => {
     const style = {
       table: {
+        borderCollapse: "collapse",
         fontSize: "14px",
         textAlign: "left",
-        borderCollapse: "collapse",
       },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
@@ -104,33 +104,35 @@ describe("buildNestedSiteCSS", () => {
       "--color-border": "#222222",
       fontFamily: "system-ui",
       table: {
-        width: "100%",
         borderCollapse: "collapse",
         fontSize: "0.9375rem",
-        thead: {
-          padding: "1rem 1.25rem",
-          fontWeight: "600",
-          borderBottom: "1px solid var(--color-border)",
-        },
         tbody: {
-          tr: {
-            borderBottom: "1px solid var(--color-border)",
-            ":hover": { backgroundColor: "var(--color-bg-surface)" },
-          },
           td: {
-            padding: "1rem 1.25rem",
-            ":first-child": { fontWeight: "600", borderLeft: "none" },
+            ":first-child": { borderLeft: "none", fontWeight: "600" },
             ":last-child": { backgroundColor: "rgba(255, 255, 255, 0.97)" },
+            padding: "1rem 1.25rem",
+          },
+          tr: {
+            ":hover": { backgroundColor: "var(--color-bg-surface)" },
+            borderBottom: "1px solid var(--color-border)",
           },
         },
+        thead: {
+          borderBottom: "1px solid var(--color-border)",
+          fontWeight: "600",
+          padding: "1rem 1.25rem",
+        },
+        width: "100%",
       },
     };
     const css = buildNestedSiteCSS(style, "[data-jx-site]");
 
     expect(css).toContain(
-      "[data-jx-site] table { width: 100%; border-collapse: collapse; font-size: 0.9375rem }",
+      "[data-jx-site] table { border-collapse: collapse; font-size: 0.9375rem; width: 100% }",
     );
-    expect(css).toContain("[data-jx-site] table thead { padding: 1rem 1.25rem; font-weight: 600");
+    expect(css).toContain(
+      "table thead { border-bottom: 1px solid var(--color-border); font-weight: 600; padding: 1rem 1.25rem }",
+    );
     expect(css).toContain(
       "[data-jx-site] table tbody tr { border-bottom: 1px solid var(--color-border) }",
     );
@@ -139,7 +141,7 @@ describe("buildNestedSiteCSS", () => {
     );
     expect(css).toContain("[data-jx-site] table tbody td { padding: 1rem 1.25rem }");
     expect(css).toContain(
-      "[data-jx-site] table tbody td:first-child { font-weight: 600; border-left: none }",
+      "[data-jx-site] table tbody td:first-child { border-left: none; font-weight: 600 }",
     );
     expect(css).toContain(
       "[data-jx-site] table tbody td:last-child { background-color: rgba(255, 255, 255, 0.97) }",

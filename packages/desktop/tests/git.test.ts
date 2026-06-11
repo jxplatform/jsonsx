@@ -1,23 +1,23 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { setProjectRoot } from "../src/handlers";
 import {
-  gitStatus,
   gitBranches,
-  gitLog,
-  gitStage,
-  gitUnstage,
-  gitCommit,
-  gitPush,
-  gitPull,
-  gitFetch,
   gitCheckout,
+  gitCommit,
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitFetch,
+  gitLog,
+  gitPull,
+  gitPush,
   gitShow,
+  gitStage,
+  gitStatus,
+  gitUnstage,
 } from "../src/git";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_git");
@@ -27,8 +27,8 @@ let defaultBranch: string;
 function run(args: string[]) {
   const proc = Bun.spawnSync(args, {
     cwd: FIXTURES,
-    stdout: "pipe",
     stderr: "pipe",
+    stdout: "pipe",
   });
   if (proc.exitCode !== 0) {
     throw new Error(`${args.join(" ")} failed: ${proc.stderr.toString()}`);
@@ -50,7 +50,7 @@ beforeAll(() => {
 
 afterAll(() => {
   setProjectRoot(null);
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 });
 
 // ─── gitStatus ──────────────────────────────────────────────────────────────

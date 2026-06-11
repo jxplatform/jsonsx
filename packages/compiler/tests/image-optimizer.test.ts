@@ -1,13 +1,13 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 // Mock sharp module before any imports that use it
 const mockToFile = mock(() => Promise.resolve());
 const mockToFormat = mock(() => ({ toFile: mockToFile }));
 const mockResize = mock(() => ({ toFormat: mockToFormat }));
-const mockMetadata = mock(() => Promise.resolve({ width: 800, height: 600, format: "jpeg" }));
+const mockMetadata = mock(() => Promise.resolve({ format: "jpeg", height: 600, width: 800 }));
 const mockSharpInstance = { metadata: mockMetadata, resize: mockResize };
 const mockSharp = mock(() => mockSharpInstance);
 mock.module("sharp", () => ({ default: mockSharp }));
@@ -23,17 +23,17 @@ import {
 import { loadCache, saveCache, getCached, setCached } from "../src/site/image-cache";
 import { transformImageNodes } from "../src/site/image-transform";
 
-const TMP = resolve(tmpdir(), "jx-image-test-" + Date.now());
+const TMP = resolve(tmpdir(), `jx-image-test-${Date.now()}`);
 
 function setup() {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
   mkdirSync(TMP, { recursive: true });
   mkdirSync(join(TMP, "public/images"), { recursive: true });
   return TMP;
 }
 
 function teardown() {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 }
 
 // ─── Pure utility tests (no Sharp needed) ────────────────────────────────────
@@ -47,28 +47,28 @@ describe("image-optimizer utilities", () => {
   test("buildSrcset filters by format", () => {
     const variants = [
       {
-        width: 320,
+        absolutePath: "",
         format: "webp",
         outputPath: "/images/_optimized/hero-320-abc.webp",
-        absolutePath: "",
+        width: 320,
       },
       {
-        width: 640,
+        absolutePath: "",
         format: "webp",
         outputPath: "/images/_optimized/hero-640-abc.webp",
-        absolutePath: "",
+        width: 640,
       },
       {
-        width: 320,
+        absolutePath: "",
         format: "avif",
         outputPath: "/images/_optimized/hero-320-abc.avif",
-        absolutePath: "",
+        width: 320,
       },
       {
-        width: 640,
+        absolutePath: "",
         format: "avif",
         outputPath: "/images/_optimized/hero-640-abc.avif",
-        absolutePath: "",
+        width: 640,
       },
     ];
 
@@ -116,30 +116,30 @@ describe("contentHash and configHash", () => {
 
   test("configHash returns 8-char hex string", () => {
     const hash = configHash({
-      optimize: true,
-      widths: [320, 640],
       formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
       quality: { webp: 80 },
       sizes: "100vw",
-      lazyLoad: true,
+      widths: [320, 640],
     });
     expect(hash).toHaveLength(8);
     expect(hash).toMatch(/^[0-9a-f]{8}$/);
   });
 
   test("configHash changes with different settings", () => {
-    const base = { optimize: true, sizes: "100vw", lazyLoad: true };
+    const base = { lazyLoad: true, optimize: true, sizes: "100vw" };
     const hashA = configHash({
       ...base,
-      widths: [320],
       formats: ["webp"],
       quality: { webp: 80 },
+      widths: [320],
     });
     const hashB = configHash({
       ...base,
-      widths: [640],
       formats: ["webp"],
       quality: { webp: 80 },
+      widths: [640],
     });
     expect(hashA).not.toBe(hashB);
   });
@@ -150,24 +150,24 @@ describe("contentHash and configHash", () => {
 describe("image-cache", () => {
   test("loadCache returns empty manifest when no cache exists", () => {
     const cache = loadCache("/nonexistent/path");
-    expect(cache).toEqual({ version: 1, entries: {} });
+    expect(cache).toEqual({ entries: {}, version: 1 });
   });
 
   test("saveCache and loadCache round-trip", () => {
     const root = setup();
     const cache = {
-      version: 1,
       entries: {
         "abc:def": {
-          source: "test.jpg",
           manifest: {
-            original: { width: 100, height: 100, format: "jpeg" },
-            variants: [],
             contentHash: "abc",
+            original: { format: "jpeg", height: 100, width: 100 },
+            variants: [],
           },
+          source: "test.jpg",
           timestamp: 1000,
         },
       },
+      version: 1,
     };
 
     saveCache(root, cache);
@@ -177,28 +177,28 @@ describe("image-cache", () => {
   });
 
   test("getCached returns null for missing key", () => {
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     expect(getCached(cache, "missing")).toBeNull();
   });
 
   test("getCached returns manifest regardless of output file existence", () => {
     const manifest = {
-      original: { width: 800, height: 600, format: "jpeg" },
+      contentHash: "abc",
+      original: { format: "jpeg", height: 600, width: 800 },
       variants: [
         {
-          width: 320,
+          absolutePath: "/nonexistent/dist/images/_optimized/hero-320-abc.avif",
           format: "avif",
           outputPath: "/images/_optimized/hero-320-abc.avif",
-          absolutePath: "/nonexistent/dist/images/_optimized/hero-320-abc.avif",
+          width: 320,
         },
       ],
-      contentHash: "abc",
     };
     const cache = {
-      version: 1,
       entries: {
-        "abc:def": { source: "hero.jpg", manifest, timestamp: 1000 },
+        "abc:def": { manifest, source: "hero.jpg", timestamp: 1000 },
       },
+      version: 1,
     };
     const result = getCached(cache, "abc:def");
     expect(result).not.toBeNull();
@@ -207,11 +207,11 @@ describe("image-cache", () => {
   });
 
   test("setCached stores entry", () => {
-    const cache = { version: 1, entries: {} as Record<string, any> };
+    const cache = { entries: {} as Record<string, any>, version: 1 };
     const manifest = {
-      original: { width: 800, height: 600, format: "jpeg" },
-      variants: [],
       contentHash: "abc",
+      original: { format: "jpeg", height: 600, width: 800 },
+      variants: [],
     };
     setCached(cache, "key1", "test.jpg", manifest);
     expect(cache.entries["key1"]).toBeDefined();
@@ -223,27 +223,27 @@ describe("image-cache", () => {
 
 describe("image-transform", () => {
   const defaultConfig = {
-    optimize: true,
-    widths: [320, 640],
     formats: ["webp", "avif"],
-    quality: { webp: 80, avif: 65 },
-    sizes: "(max-width: 768px) 100vw, 50vw",
     lazyLoad: true,
+    optimize: true,
+    quality: { avif: 65, webp: 80 },
+    sizes: "(max-width: 768px) 100vw, 50vw",
+    widths: [320, 640],
   };
 
   test("skips when optimize is false", async () => {
     const doc = {
-      tagName: "div",
       children: [
         {
-          tagName: "img",
           attributes: /** @type {Record<string, any>} */ {
             src: "/images/hero.jpg",
           },
+          tagName: "img",
         },
       ],
+      tagName: "div",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(
       doc,
       { ...defaultConfig, optimize: false },
@@ -257,10 +257,10 @@ describe("image-transform", () => {
   test("skips template string src", async () => {
     const root = setup();
     const doc = {
+      children: [{ attributes: { src: "${state.image}" }, tagName: "img" }],
       tagName: "div",
-      children: [{ tagName: "img", attributes: { src: "${state.image}" } }],
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -269,14 +269,14 @@ describe("image-transform", () => {
   test("skips external URLs", async () => {
     const root = setup();
     const doc = {
-      tagName: "div",
       children: [
-        { tagName: "img", attributes: { src: "https://example.com/img.jpg" } },
-        { tagName: "img", attributes: { src: "data:image/png;base64,abc" } },
-        { tagName: "img", attributes: { src: "//cdn.example.com/img.jpg" } },
+        { attributes: { src: "https://example.com/img.jpg" }, tagName: "img" },
+        { attributes: { src: "data:image/png;base64,abc" }, tagName: "img" },
+        { attributes: { src: "//cdn.example.com/img.jpg" }, tagName: "img" },
       ],
+      tagName: "div",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -288,13 +288,13 @@ describe("image-transform", () => {
     writeFileSync(join(root, "public/images/anim.gif"), "GIF89a");
 
     const doc = {
-      tagName: "div",
       children: [
-        { tagName: "img", attributes: { src: "/images/icon.svg" } },
-        { tagName: "img", attributes: { src: "/images/anim.gif" } },
+        { attributes: { src: "/images/icon.svg" }, tagName: "img" },
+        { attributes: { src: "/images/anim.gif" }, tagName: "img" },
       ],
+      tagName: "div",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -305,15 +305,15 @@ describe("image-transform", () => {
     writeFileSync(join(root, "public/images/hero.jpg"), "fake jpg data");
 
     const doc = {
-      tagName: "div",
       children: [
         {
+          attributes: { "data-no-optimize": "", src: "/images/hero.jpg" },
           tagName: "img",
-          attributes: { src: "/images/hero.jpg", "data-no-optimize": "" },
         },
       ],
+      tagName: "div",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -322,10 +322,10 @@ describe("image-transform", () => {
   test("skips when source file does not exist", async () => {
     const root = setup();
     const doc = {
+      children: [{ attributes: { src: "/images/nonexistent.jpg" }, tagName: "img" }],
       tagName: "div",
-      children: [{ tagName: "img", attributes: { src: "/images/nonexistent.jpg" } }],
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -334,21 +334,21 @@ describe("image-transform", () => {
   test("walks nested children", async () => {
     const root = setup();
     const doc = {
-      tagName: "div",
       children: [
         {
-          tagName: "section",
           children: [
             { tagName: "p", textContent: "text" },
             {
-              tagName: "img",
               attributes: { src: "https://external.com/photo.jpg" },
+              tagName: "img",
             },
           ],
+          tagName: "section",
         },
       ],
+      tagName: "div",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
     const result = await transformImageNodes(doc, defaultConfig, root, cache);
     expect(result.imageRefs.size).toBe(0);
     teardown();
@@ -362,27 +362,29 @@ describe("image-transform", () => {
     mkdirSync(cacheOptDir, { recursive: true });
 
     const manifest = {
-      original: { width: 1200, height: 800, format: "jpeg" },
+      contentHash: "abc12345",
+      original: { format: "jpeg", height: 800, width: 1200 },
       variants: [
         {
-          width: 320,
+          absolutePath: join(cacheOptDir, "photo-320-abc.avif"),
           format: "avif",
           outputPath: "/images/_optimized/photo-320-abc.avif",
-          absolutePath: join(cacheOptDir, "photo-320-abc.avif"),
+          width: 320,
         },
         {
-          width: 640,
+          absolutePath: join(cacheOptDir, "photo-640-abc.avif"),
           format: "avif",
           outputPath: "/images/_optimized/photo-640-abc.avif",
-          absolutePath: join(cacheOptDir, "photo-640-abc.avif"),
+          width: 640,
         },
       ],
-      contentHash: "abc12345",
     };
 
-    for (const v of manifest.variants) writeFileSync(v.absolutePath, "");
+    for (const v of manifest.variants) {
+      writeFileSync(v.absolutePath, "");
+    }
 
-    const cache = { version: 1, entries: {} as Record<string, any> };
+    const cache = { entries: {} as Record<string, any>, version: 1 };
     setCached(
       cache,
       `${contentHash(join(root, "public/images/photo.jpg"))}:${configHash(defaultConfig)}`,
@@ -391,8 +393,8 @@ describe("image-transform", () => {
     );
 
     const doc = {
-      tagName: "my-component",
       innerHTML: '<img class="hero" src="/images/photo.jpg" alt="Photo">',
+      tagName: "my-component",
     };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
@@ -412,10 +414,10 @@ describe("image-transform", () => {
     writeFileSync(join(root, "public/images/photo.jpg"), "fake jpg data");
 
     const doc = {
-      tagName: "my-component",
       innerHTML: '<img src="/images/photo.jpg" srcset="already-set" alt="Photo">',
+      tagName: "my-component",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
     expect(doc.innerHTML).toBe('<img src="/images/photo.jpg" srcset="already-set" alt="Photo">');
@@ -427,10 +429,10 @@ describe("image-transform", () => {
     writeFileSync(join(root, "public/images/photo.jpg"), "fake jpg data");
 
     const doc = {
-      tagName: "my-component",
       innerHTML: '<img src="/images/photo.jpg" data-no-optimize alt="Photo">',
+      tagName: "my-component",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
     expect(doc.innerHTML).not.toContain("srcset=");
@@ -440,11 +442,11 @@ describe("image-transform", () => {
   test("innerHTML: skips template strings and external URLs", async () => {
     const root = setup();
     const doc = {
-      tagName: "my-component",
       innerHTML:
         '<img src="${state.image}" alt="Dynamic"><img src="https://cdn.example.com/img.jpg" alt="External">',
+      tagName: "my-component",
     };
-    const cache = { version: 1, entries: {} };
+    const cache = { entries: {}, version: 1 };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
     expect(doc.innerHTML).not.toContain("srcset=");
@@ -459,20 +461,22 @@ describe("image-transform", () => {
     mkdirSync(cacheOptDir, { recursive: true });
 
     const manifest = {
-      original: { width: 800, height: 600, format: "jpeg" },
+      contentHash: "abc12345",
+      original: { format: "jpeg", height: 600, width: 800 },
       variants: [
         {
-          width: 320,
+          absolutePath: join(cacheOptDir, "hero-320-abc.avif"),
           format: "avif",
           outputPath: "/images/_optimized/hero-320-abc.avif",
-          absolutePath: join(cacheOptDir, "hero-320-abc.avif"),
+          width: 320,
         },
       ],
-      contentHash: "abc12345",
     };
-    for (const v of manifest.variants) writeFileSync(v.absolutePath, "");
+    for (const v of manifest.variants) {
+      writeFileSync(v.absolutePath, "");
+    }
 
-    const cache = { version: 1, entries: {} as Record<string, any> };
+    const cache = { entries: {} as Record<string, any>, version: 1 };
     setCached(
       cache,
       `${contentHash(join(root, "public/images/hero.jpg"))}:${configHash(defaultConfig)}`,
@@ -481,8 +485,8 @@ describe("image-transform", () => {
     );
 
     const doc = {
-      tagName: "my-component",
       innerHTML: '<img src="/images/hero.jpg" loading="eager" decoding="sync">',
+      tagName: "my-component",
     };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
@@ -502,22 +506,24 @@ describe("image-transform", () => {
 
     const makeManifest = (name: string) => {
       const m = {
-        original: { width: 640, height: 480, format: "jpeg" },
+        contentHash: "abc12345",
+        original: { format: "jpeg", height: 480, width: 640 },
         variants: [
           {
-            width: 320,
+            absolutePath: join(cacheOptDir, `${name}-320-abc.avif`),
             format: "avif",
             outputPath: `/images/_optimized/${name}-320-abc.avif`,
-            absolutePath: join(cacheOptDir, `${name}-320-abc.avif`),
+            width: 320,
           },
         ],
-        contentHash: "abc12345",
       };
-      for (const v of m.variants) writeFileSync(v.absolutePath, "");
+      for (const v of m.variants) {
+        writeFileSync(v.absolutePath, "");
+      }
       return m;
     };
 
-    const cache = { version: 1, entries: {} as Record<string, any> };
+    const cache = { entries: {} as Record<string, any>, version: 1 };
     setCached(
       cache,
       `${contentHash(join(root, "public/images/a.jpg"))}:${configHash(defaultConfig)}`,
@@ -532,9 +538,9 @@ describe("image-transform", () => {
     );
 
     const doc = {
-      tagName: "my-component",
       innerHTML:
         '<div><img src="/images/a.jpg" alt="A"><p>text</p><img src="/images/b.jpg" alt="B"></div>',
+      tagName: "my-component",
     };
 
     await transformImageNodes(doc, defaultConfig, root, cache);
@@ -569,9 +575,9 @@ describe("getImageMetadata", () => {
   test("returns 0 for missing width/height and 'unknown' for missing format", async () => {
     mockMetadata.mockImplementationOnce(() =>
       Promise.resolve({
-        width: undefined,
-        height: undefined,
         format: undefined,
+        height: undefined,
+        width: undefined,
       } as unknown as {
         width: number;
         height: number;
@@ -598,7 +604,7 @@ describe("processImage", () => {
     mockToFormat.mockClear();
     mockToFile.mockClear();
     mockMetadata.mockImplementation(() =>
-      Promise.resolve({ width: 800, height: 600, format: "jpeg" }),
+      Promise.resolve({ format: "jpeg", height: 600, width: 800 }),
     );
   });
 
@@ -610,12 +616,12 @@ describe("processImage", () => {
     writeFileSync(imgPath, "fake jpeg data");
 
     const config: any = {
-      optimize: true,
-      widths: [320, 640],
       formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
       quality: { webp: 80 },
       sizes: "100vw",
-      lazyLoad: true,
+      widths: [320, 640],
     };
 
     const manifest = await processImage(imgPath, cacheImgDir, config);
@@ -630,7 +636,7 @@ describe("processImage", () => {
     const widths = manifest.variants.map((v) => v.width);
     expect(widths).toContain(320);
     expect(widths).toContain(640);
-    expect(widths).toContain(800); // original width added
+    expect(widths).toContain(800); // Original width added
 
     for (const v of manifest.variants) {
       expect(v.format).toBe("webp");
@@ -647,19 +653,19 @@ describe("processImage", () => {
 
     // Image is only 50px wide
     mockMetadata.mockImplementationOnce(() =>
-      Promise.resolve({ width: 50, height: 50, format: "png" }),
+      Promise.resolve({ format: "png", height: 50, width: 50 }),
     );
 
     const imgPath = join(root, "small.png");
     writeFileSync(imgPath, "small png");
 
     const config: any = {
-      optimize: true,
-      widths: [800, 1200, 1920],
       formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
       quality: { webp: 80 },
       sizes: "100vw",
-      lazyLoad: true,
+      widths: [800, 1200, 1920],
     };
 
     const manifest = await processImage(imgPath, cacheImgDir, config);
@@ -678,7 +684,7 @@ describe("processImage", () => {
 
     // Image is 320px wide so only one width variant
     mockMetadata.mockImplementationOnce(() =>
-      Promise.resolve({ width: 320, height: 240, format: "png" }),
+      Promise.resolve({ format: "png", height: 240, width: 320 }),
     );
 
     const imgPath = join(root, "cached.png");
@@ -690,12 +696,12 @@ describe("processImage", () => {
     writeFileSync(join(optimizedDir, filename), "existing");
 
     const config: any = {
-      optimize: true,
-      widths: [320],
       formats: ["webp"],
+      lazyLoad: true,
+      optimize: true,
       quality: { webp: 80 },
       sizes: "100vw",
-      lazyLoad: true,
+      widths: [320],
     };
 
     // Clear mock call count before this specific test
@@ -703,7 +709,7 @@ describe("processImage", () => {
 
     const manifest = await processImage(imgPath, cacheImgDir, config);
     expect(manifest.variants).toHaveLength(1);
-    // toFile should NOT have been called since file already exists
+    // ToFile should NOT have been called since file already exists
     expect(mockToFile).not.toHaveBeenCalled();
 
     teardown();
@@ -715,19 +721,19 @@ describe("processImage", () => {
 
     // 80px wide so configured width matches original
     mockMetadata.mockImplementationOnce(() =>
-      Promise.resolve({ width: 80, height: 60, format: "png" }),
+      Promise.resolve({ format: "png", height: 60, width: 80 }),
     );
 
     const imgPath = join(root, "multi.png");
     writeFileSync(imgPath, "multi png");
 
     const config: any = {
-      optimize: true,
-      widths: [80],
       formats: ["webp", "avif"],
-      quality: { webp: 80, avif: 65 },
-      sizes: "100vw",
       lazyLoad: true,
+      optimize: true,
+      quality: { avif: 65, webp: 80 },
+      sizes: "100vw",
+      widths: [80],
     };
 
     const manifest = await processImage(imgPath, cacheImgDir, config);
@@ -744,19 +750,19 @@ describe("processImage", () => {
     const cacheImgDir = join(root, ".cache/images");
 
     mockMetadata.mockImplementationOnce(() =>
-      Promise.resolve({ width: 100, height: 100, format: "png" }),
+      Promise.resolve({ format: "png", height: 100, width: 100 }),
     );
 
     const imgPath = join(root, "noqual.png");
     writeFileSync(imgPath, "no qual");
 
     const config: any = {
-      optimize: true,
-      widths: [100],
       formats: ["jpeg"],
-      quality: {}, // no jpeg quality specified
-      sizes: "100vw",
       lazyLoad: true,
+      optimize: true,
+      quality: {}, // No jpeg quality specified
+      sizes: "100vw",
+      widths: [100],
     };
 
     mockToFormat.mockClear();
@@ -782,10 +788,10 @@ describe("site-loader images config", () => {
     expect(config.images.widths).toEqual([320, 640, 960, 1280, 1920]);
     expect(config.images.formats).toEqual(["webp", "avif"]);
     expect(config.images.quality).toEqual({
-      webp: 80,
       avif: 65,
       jpeg: 80,
       png: 80,
+      webp: 80,
     });
     expect(config.images.sizes).toBe("(max-width: 768px) 100vw, 50vw");
     expect(config.images.lazyLoad).toBe(true);
@@ -799,8 +805,8 @@ describe("site-loader images config", () => {
     writeFileSync(
       join(root, "project.json"),
       JSON.stringify({
+        images: { optimize: false, widths: [400, 800] },
         name: "Test",
-        images: { widths: [400, 800], optimize: false },
       }),
     );
 

@@ -1,17 +1,17 @@
 export const headEntrySchema = {
+  additionalProperties: true,
   description: "A page-level <head> entry. Defines meta tags, link tags, script tags, etc.",
-  type: "object",
-  required: ["tagName"],
   properties: {
-    tagName: { type: "string" },
     attributes: {
-      type: "object",
       additionalProperties: {
         oneOf: [{ type: "string" }, { type: "boolean" }],
       },
+      type: "object",
     },
+    children: { items: { $ref: "#/$defs/HeadEntry" }, type: "array" },
+    tagName: { type: "string" },
     textContent: { type: "string" },
-    children: { type: "array", items: { $ref: "#/$defs/HeadEntry" } },
   },
-  additionalProperties: true,
+  required: ["tagName"],
+  type: "object",
 } as const;

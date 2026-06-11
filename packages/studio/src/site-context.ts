@@ -6,14 +6,14 @@
  * definitions merge on top (file wins on conflict).
  */
 
-import { projectState, setProjectState, requireProjectState } from "./store";
+import { projectState, requireProjectState, setProjectState } from "./store";
 import { getPlatform } from "./platform";
 
 import type {
   JxElement,
+  JxHeadEntry,
   JxMutableNode,
   JxStyle,
-  JxHeadEntry,
   ProjectConfig,
 } from "@jxsuite/schema/types";
 
@@ -26,8 +26,12 @@ import type {
  */
 export function getEffectiveMedia(docMedia: Record<string, string> | undefined) {
   const siteMedia = projectState?.projectConfig?.$media;
-  if (!siteMedia) return docMedia || {};
-  if (!docMedia) return { ...siteMedia };
+  if (!siteMedia) {
+    return docMedia || {};
+  }
+  if (!docMedia) {
+    return { ...siteMedia };
+  }
   return { ...siteMedia, ...docMedia };
 }
 
@@ -40,8 +44,12 @@ export function getEffectiveMedia(docMedia: Record<string, string> | undefined) 
  */
 export function getEffectiveStyle(docStyle: JxStyle | undefined) {
   const siteStyle = projectState?.projectConfig?.style;
-  if (!siteStyle) return docStyle || {};
-  if (!docStyle) return { ...siteStyle };
+  if (!siteStyle) {
+    return docStyle || {};
+  }
+  if (!docStyle) {
+    return { ...siteStyle };
+  }
   const merged = { ...siteStyle };
   for (const [k, v] of Object.entries(docStyle)) {
     if (
@@ -67,8 +75,12 @@ export function getEffectiveStyle(docStyle: JxStyle | undefined) {
  */
 export function getEffectiveImports(docImports: Record<string, string> | undefined) {
   const siteImports = projectState?.projectConfig?.imports;
-  if (!siteImports) return docImports || {};
-  if (!docImports) return { ...siteImports };
+  if (!siteImports) {
+    return docImports || {};
+  }
+  if (!docImports) {
+    return { ...siteImports };
+  }
   return { ...siteImports, ...docImports };
 }
 
@@ -81,9 +93,13 @@ export function getEffectiveImports(docImports: Record<string, string> | undefin
  */
 export function getEffectiveElements(docElements?: (JxElement | string)[]) {
   const siteElements = projectState?.projectConfig?.$elements;
-  if (!siteElements?.length) return docElements || [];
-  if (!docElements?.length) return [...siteElements];
-  const seen: Set<string> = new Set();
+  if (!siteElements?.length) {
+    return docElements || [];
+  }
+  if (!docElements?.length) {
+    return [...siteElements];
+  }
+  const seen = new Set<string>();
   const merged: (JxElement | string)[] = [];
   for (const entry of [...siteElements, ...docElements]) {
     const key = typeof entry === "string" ? entry : entry?.$ref;
@@ -103,9 +119,13 @@ export function getEffectiveElements(docElements?: (JxElement | string)[]) {
  */
 export function getEffectiveHead(docHead?: JxHeadEntry[]) {
   const siteHead = projectState?.projectConfig?.$head;
-  if (!siteHead?.length) return docHead || [];
-  if (!docHead?.length) return [...siteHead];
-  const seen: Set<string> = new Set();
+  if (!siteHead?.length) {
+    return docHead || [];
+  }
+  if (!docHead?.length) {
+    return [...siteHead];
+  }
+  const seen = new Set<string>();
   const merged: JxHeadEntry[] = [];
   for (const entry of [...siteHead, ...docHead]) {
     const key =
@@ -120,7 +140,7 @@ export function getEffectiveHead(docHead?: JxHeadEntry[]) {
 
 // ─── Layout resolution ──────────────────────────────────────────────────────
 
-const layoutCache: Map<string, JxMutableNode> = new Map();
+const layoutCache = new Map<string, JxMutableNode>();
 
 export function invalidateLayoutCache() {
   layoutCache.clear();
@@ -134,7 +154,9 @@ export function invalidateLayoutCache() {
  * @returns {string | null} The layout path, or null if no layout applies
  */
 export function getEffectiveLayoutPath(docLayout: string | false | undefined) {
-  if (docLayout === false) return null;
+  if (docLayout === false) {
+    return null;
+  }
   const defaultLayout = projectState?.projectConfig?.defaults?.layout;
   return docLayout || defaultLayout || null;
 }
@@ -147,8 +169,9 @@ export function getEffectiveLayoutPath(docLayout: string | false | undefined) {
  */
 export async function resolveLayoutDoc(layoutPath: string) {
   const normalized = layoutPath.replace(/^\.\//, "");
-  if (layoutCache.has(normalized))
+  if (layoutCache.has(normalized)) {
     return structuredClone(layoutCache.get(normalized) as JxMutableNode);
+  }
 
   try {
     const platform = getPlatform();
@@ -171,16 +194,18 @@ export async function resolveLayoutDoc(layoutPath: string) {
  */
 export function distributePageIntoLayout(layoutDoc: JxMutableNode, pageDoc: JxMutableNode) {
   const pageChildren = pageDoc.children ?? [];
-  const children = typeof pageChildren === "string" ? [pageChildren] : pageChildren;
+  const children = Array.isArray(pageChildren) ? pageChildren : [];
 
-  const named = new Map();
-  const defaults = [];
+  const named = new Map<string, JxMutableNode[]>();
+  const defaults: (JxMutableNode | string)[] = [];
 
   for (const child of children) {
-    if (child && typeof child === "object" && child.attributes?.slot) {
-      const slotName = child.attributes.slot;
-      if (!named.has(slotName)) named.set(slotName, []);
-      named.get(slotName).push(child);
+    const slotName = typeof child === "object" ? child.attributes?.slot : undefined;
+    if (typeof child === "object" && typeof slotName === "string" && slotName) {
+      if (!named.has(slotName)) {
+        named.set(slotName, []);
+      }
+      named.get(slotName)!.push(child);
     } else {
       defaults.push(child);
     }
@@ -188,10 +213,18 @@ export function distributePageIntoLayout(layoutDoc: JxMutableNode, pageDoc: JxMu
 
   fillSlots(layoutDoc, named, defaults);
 
-  if (pageDoc.state) layoutDoc.state = { ...layoutDoc.state, ...pageDoc.state };
-  if (pageDoc.$media) layoutDoc.$media = { ...layoutDoc.$media, ...pageDoc.$media };
-  if (pageDoc.style) layoutDoc.style = { ...layoutDoc.style, ...pageDoc.style };
-  if (pageDoc.attributes) layoutDoc.attributes = { ...layoutDoc.attributes, ...pageDoc.attributes };
+  if (pageDoc.state) {
+    layoutDoc.state = { ...layoutDoc.state, ...pageDoc.state };
+  }
+  if (pageDoc.$media) {
+    layoutDoc.$media = { ...layoutDoc.$media, ...pageDoc.$media };
+  }
+  if (pageDoc.style) {
+    layoutDoc.style = { ...layoutDoc.style, ...pageDoc.style };
+  }
+  if (pageDoc.attributes) {
+    layoutDoc.attributes = { ...layoutDoc.attributes, ...pageDoc.attributes };
+  }
 
   return layoutDoc;
 }
@@ -201,23 +234,29 @@ function fillSlots(
   named: Map<string, JxMutableNode[]>,
   defaults: (JxMutableNode | string)[],
 ) {
-  if (!node || typeof node !== "object") return;
-  if (!Array.isArray(node.children)) return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (!Array.isArray(node.children)) {
+    return;
+  }
 
   const newChildren: (JxMutableNode | string)[] = [];
   for (const child of node.children) {
     if (child && typeof child === "object" && child.tagName === "slot") {
       const slotName = child.attributes?.name;
-      if (slotName && named.has(slotName)) {
-        newChildren.push(...(named.get(slotName) as JxMutableNode[]));
+      if (typeof slotName === "string" && slotName && named.has(slotName)) {
+        newChildren.push(...named.get(slotName)!);
         named.delete(slotName);
       } else if (!slotName && defaults.length > 0) {
         newChildren.push(...defaults);
-      } else if (child.children) {
+      } else if (Array.isArray(child.children)) {
         newChildren.push(...child.children);
       }
     } else {
-      if (typeof child !== "string") fillSlots(child, named, defaults);
+      if (typeof child !== "string") {
+        fillSlots(child, named, defaults);
+      }
       newChildren.push(child);
     }
   }

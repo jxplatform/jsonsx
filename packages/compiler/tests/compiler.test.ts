@@ -1,4 +1,4 @@
-import { describe, test, expect, spyOn } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { compile, isDynamic, runCli } from "../src/compiler";
 import { isClassJsonSrc } from "../src/shared";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -20,7 +20,7 @@ describe("isClassJsonSrc", () => {
   });
   test("returns false for non-string", () => {
     expect(isClassJsonSrc(null)).toBe(false);
-    expect(isClassJsonSrc(undefined)).toBe(false);
+    expect(isClassJsonSrc()).toBe(false);
     expect(isClassJsonSrc(42)).toBe(false);
   });
 });
@@ -53,12 +53,12 @@ describe("isDynamic", () => {
 
   // Shape 2: Expanded signal with default → dynamic
   test("object with default in state → true", () => {
-    expect(isDynamic({ state: { $count: { type: "integer", default: 0 } } })).toBe(true);
+    expect(isDynamic({ state: { $count: { default: 0, type: "integer" } } })).toBe(true);
   });
 
   // Shape 2b: Pure type def → static
   test("object with only schema keywords (no default) → false", () => {
-    expect(isDynamic({ state: { email: { type: "string", format: "email" } } })).toBe(false);
+    expect(isDynamic({ state: { email: { format: "email", type: "string" } } })).toBe(false);
   });
 
   // Shape 3: Template string in state → dynamic (it's a naked string with ${})
@@ -110,32 +110,32 @@ describe("isDynamic", () => {
   test("${} template string in className property → true", () => {
     expect(
       isDynamic({
-        tagName: "div",
         className: '${$active.get() ? "on" : "off"}',
+        tagName: "div",
       }),
     ).toBe(true);
   });
 
   // Static checks
   test("static property object without $ref → false", () => {
-    expect(isDynamic({ tagName: "div", style: { color: "red" } })).toBe(false);
+    expect(isDynamic({ style: { color: "red" }, tagName: "div" })).toBe(false);
   });
   test("dynamic child in children array → true", () => {
     expect(
       isDynamic({
-        tagName: "div",
         children: [{ tagName: "span" }, { tagName: "p", textContent: { $ref: "#/state/$x" } }],
+        tagName: "div",
       } as any),
     ).toBe(true);
   });
   test("all-static children array → false", () => {
     expect(
       isDynamic({
-        tagName: "ul",
         children: [
           { tagName: "li", textContent: "A" },
           { tagName: "li", textContent: "B" },
         ],
+        tagName: "ul",
       }),
     ).toBe(false);
   });
@@ -181,22 +181,22 @@ describe("compile — static nodes", () => {
   });
 
   test("id attribute", async () => {
-    const { html } = await compile({ tagName: "div", id: "main" });
+    const { html } = await compile({ id: "main", tagName: "div" });
     expect(html).toContain('id="main"');
   });
 
   test("className → class attribute", async () => {
-    const { html } = await compile({ tagName: "div", className: "box card" });
+    const { html } = await compile({ className: "box card", tagName: "div" });
     expect(html).toContain('class="box card"');
   });
 
   test("hidden attribute", async () => {
-    const { html } = await compile({ tagName: "div", hidden: true });
+    const { html } = await compile({ hidden: true, tagName: "div" });
     expect(html).toContain(" hidden");
   });
 
   test("tabIndex → tabindex attribute", async () => {
-    const { html } = await compile({ tagName: "div", tabIndex: 0 });
+    const { html } = await compile({ tabIndex: 0, tagName: "div" });
     expect(html).toContain('tabindex="0"');
   });
 
@@ -206,19 +206,19 @@ describe("compile — static nodes", () => {
   });
 
   test("lang attribute", async () => {
-    const { html } = await compile({ tagName: "div", lang: "fr" });
+    const { html } = await compile({ lang: "fr", tagName: "div" });
     expect(html).toContain('lang="fr"');
   });
 
   test("dir attribute", async () => {
-    const { html } = await compile({ tagName: "div", dir: "rtl" });
+    const { html } = await compile({ dir: "rtl", tagName: "div" });
     expect(html).toContain('dir="rtl"');
   });
 
   test("inline style from style object", async () => {
     const { html } = await compile({
-      tagName: "div",
       style: { backgroundColor: "red", fontSize: "16px" },
+      tagName: "div",
     });
     expect(html).toContain("background-color: red");
     expect(html).toContain("font-size: 16px");
@@ -226,8 +226,8 @@ describe("compile — static nodes", () => {
 
   test("style with nested selector excluded from inline", async () => {
     const { html } = await compile({
+      style: { ":hover": { color: "red" }, color: "blue" },
       tagName: "div",
-      style: { color: "blue", ":hover": { color: "red" } },
     });
     const inlineMatch = html.match(/style="([^"]*)"/);
     if (inlineMatch) {
@@ -237,24 +237,24 @@ describe("compile — static nodes", () => {
 
   test("custom attributes block — string value", async () => {
     const { html } = await compile({
-      tagName: "div",
       attributes: { "data-id": "abc" },
+      tagName: "div",
     });
     expect(html).toContain('data-id="abc"');
   });
 
   test("custom attributes block — number value", async () => {
     const { html } = await compile({
-      tagName: "div",
       attributes: { "data-n": 42 },
+      tagName: "div",
     });
     expect(html).toContain('data-n="42"');
   });
 
   test("custom attributes block — boolean value", async () => {
     const { html } = await compile({
-      tagName: "div",
       attributes: { "data-flag": true },
+      tagName: "div",
     });
     expect(html).toContain('data-flag="true"');
   });
@@ -268,17 +268,17 @@ describe("compile — static nodes", () => {
   });
 
   test("innerHTML emitted as trusted raw HTML", async () => {
-    const { html } = await compile({ tagName: "div", innerHTML: "<b>raw</b>" });
+    const { html } = await compile({ innerHTML: "<b>raw</b>", tagName: "div" });
     expect(html).toContain("<b>raw</b>");
   });
 
   test("static children rendered recursively", async () => {
     const { html } = await compile({
-      tagName: "ul",
       children: [
         { tagName: "li", textContent: "first" },
         { tagName: "li", textContent: "second" },
       ],
+      tagName: "ul",
     });
     expect(html).toContain("<li>first</li>");
     expect(html).toContain("<li>second</li>");
@@ -296,8 +296,8 @@ describe("compile — static nodes", () => {
 
   test("pure type def state → static output (no custom element)", async () => {
     const { html, files } = await compile({
+      state: { email: { format: "email", type: "string" } },
       tagName: "div",
-      state: { email: { type: "string", format: "email" } },
       textContent: "hello",
     });
     expect(files.length).toBe(0);
@@ -311,7 +311,7 @@ describe("compile — static nodes", () => {
 describe("compile — dynamic documents (standard tagName → client target)", () => {
   test("dynamic root with standard tag emits pre-rendered HTML + JS module", async () => {
     const { html, files } = await compile(
-      { tagName: "div", state: { $count: 0 } },
+      { state: { $count: 0 }, tagName: "div" },
       { title: "My Counter" },
     );
     expect(html).toContain("importmap");
@@ -326,7 +326,7 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 
   test("dynamic root with expanded signal uses client target", async () => {
     const { html, files } = await compile(
-      { tagName: "div", state: { $x: { type: "integer", default: 1 } } },
+      { state: { $x: { default: 1, type: "integer" } }, tagName: "div" },
       { title: "My Widget" },
     );
     expect(files.length).toBe(1);
@@ -348,13 +348,13 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 
   test("static parent with dynamic child: routes to client target", async () => {
     const { html, files } = await compile({
-      tagName: "main",
       children: [
         { tagName: "p", textContent: "static" },
-        { tagName: "span", state: { $v: 0 } },
+        { state: { $v: 0 }, tagName: "span" },
       ],
+      tagName: "main",
     });
-    // isDynamic detects the dynamic child → client target
+    // IsDynamic detects the dynamic child → client target
     expect(files.length).toBe(1);
     expect(html).toContain("importmap");
     expect(html).not.toContain("<jx-app>");
@@ -362,11 +362,11 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 
   test("${} template string in property makes node dynamic → client target", async () => {
     const { html, files } = await compile({
-      tagName: "main",
       children: [
         { tagName: "p", textContent: "static" },
         { tagName: "span", textContent: "${$count.get()}" },
       ],
+      tagName: "main",
     });
     // Dynamic child → client target
     expect(files.length).toBe(1);
@@ -376,8 +376,8 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 
   test("no hydration island markers in output", async () => {
     const { html } = await compile({
-      tagName: "div",
       state: { $count: 0 },
+      tagName: "div",
     });
     expect(html).not.toContain("data-jx-island");
     expect(html).not.toContain("application/jx+json");
@@ -387,8 +387,8 @@ describe("compile — dynamic documents (standard tagName → client target)", (
 describe("compile — dynamic documents (custom element tagName → element target)", () => {
   test("hyphenated tagName routes to element target", async () => {
     const { html, files } = await compile({
-      tagName: "my-counter",
       state: { count: 0 },
+      tagName: "my-counter",
     });
     expect(html).toContain("importmap");
     expect(html).toContain("@vue/reactivity");
@@ -401,8 +401,8 @@ describe("compile — dynamic documents (custom element tagName → element targ
 
   test("custom element module contains class definition", async () => {
     const { files } = await compile({
+      state: { x: { default: 1, type: "integer" } },
       tagName: "my-widget",
-      state: { x: { type: "integer", default: 1 } },
     });
     expect(files.length).toBe(1);
     expect(files[0].content).toContain("class MyWidget extends HTMLElement");
@@ -415,9 +415,9 @@ describe("compile — dynamic documents (custom element tagName → element targ
 describe("compile — CSS extraction", () => {
   test("nested :selector extracted to <style> block", async () => {
     const { html } = await compile({
-      tagName: "button",
       id: "btn",
-      style: { color: "blue", ":hover": { color: "red" } },
+      style: { ":hover": { color: "red" }, color: "blue" },
+      tagName: "button",
     });
     expect(html).toContain("<style>");
     expect(html).toContain("#btn:hover");
@@ -426,56 +426,56 @@ describe("compile — CSS extraction", () => {
 
   test(".class selector in style", async () => {
     const { html } = await compile({
-      tagName: "div",
       className: "card hero",
       style: { ".inner": { padding: "1rem" } },
+      tagName: "div",
     });
     expect(html).toContain(".card.inner");
   });
 
   test("&.compound selector in style", async () => {
     const { html } = await compile({
-      tagName: "div",
       id: "root",
       style: { "&.active": { outline: "2px solid blue" } },
+      tagName: "div",
     });
     expect(html).toContain("#root.active");
   });
 
   test("[attr] selector in style", async () => {
     const { html } = await compile({
-      tagName: "input",
       id: "inp",
       style: { "[disabled]": { opacity: "0.5" } },
+      tagName: "input",
     });
     expect(html).toContain("#inp[disabled]");
   });
 
   test("node with no id or className gets auto-scoped class", async () => {
     const { html } = await compile({
-      tagName: "nav",
       style: { ":first-child": { fontWeight: "bold" } },
+      tagName: "nav",
     });
     expect(html).toContain('class="jx-0"');
     expect(html).toContain(".jx-0:first-child");
   });
 
   test("flat styles emitted as CSS rules in <style> block", async () => {
-    const { html } = await compile({ tagName: "div", style: { color: "red" } });
+    const { html } = await compile({ style: { color: "red" }, tagName: "div" });
     expect(html).toContain("<style>");
     expect(html).toContain("color: red");
   });
 
   test("nested styles in child nodes collected", async () => {
     const { html } = await compile({
-      tagName: "div",
       children: [
         {
-          tagName: "p",
           id: "para",
           style: { ":hover": { textDecoration: "underline" } },
+          tagName: "p",
         },
       ],
+      tagName: "div",
     });
     expect(html).toContain("#para:hover");
     expect(html).toContain("text-decoration: underline");
@@ -483,12 +483,12 @@ describe("compile — CSS extraction", () => {
 
   test("nested selector inside media block", async () => {
     const { html } = await compile({
-      tagName: "div",
-      id: "box",
       $media: { "--md": "(min-width: 768px)" },
+      id: "box",
       style: {
-        "@--md": { fontSize: "2rem", ":hover": { color: "blue" } },
+        "@--md": { ":hover": { color: "blue" }, fontSize: "2rem" },
       },
+      tagName: "div",
     });
     expect(html).toContain("@media (min-width: 768px)");
     expect(html).toContain("font-size: 2rem");
@@ -500,26 +500,26 @@ describe("compile — CSS extraction", () => {
 describe("compile — Class route ($prototype: 'Class')", () => {
   test("routes $prototype: Class to compileClassJson", async () => {
     const classDef = {
-      $prototype: "Class",
-      title: "Counter",
       $defs: {
         fields: {
           count: {
-            role: "field",
             access: "public",
-            scope: "instance",
-            identifier: "count",
             default: 0,
+            identifier: "count",
+            role: "field",
+            scope: "instance",
           },
         },
         methods: {
           increment: {
-            role: "method",
-            identifier: "increment",
             body: "this.count++;",
+            identifier: "increment",
+            role: "method",
           },
         },
       },
+      $prototype: "Class",
+      title: "Counter",
     };
     const { html, files } = await compile(classDef);
     expect(html).toBe("");
@@ -538,19 +538,19 @@ describe("compile — Class route ($prototype: 'Class')", () => {
     writeFileSync(
       classPath,
       JSON.stringify({
-        $prototype: "Class",
-        title: "Widget",
         $defs: {
           fields: {
             active: {
-              role: "field",
               access: "public",
-              scope: "instance",
-              identifier: "active",
               default: false,
+              identifier: "active",
+              role: "field",
+              scope: "instance",
             },
           },
         },
+        $prototype: "Class",
+        title: "Widget",
       }),
     );
     try {
@@ -559,7 +559,7 @@ describe("compile — Class route ($prototype: 'Class')", () => {
       expect(files[0].path).toContain("Widget.js");
       expect(files[0].content).toContain("class Widget");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 });
@@ -578,7 +578,7 @@ describe("compile — file-based input", () => {
       const { html } = await compile(filePath);
       expect(html).toContain("from file");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 });
@@ -601,7 +601,7 @@ describe("compile — markdown file input", () => {
       const { html } = await compile(filePath, { formats });
       expect(html).toContain("Hello World");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 });
@@ -623,7 +623,7 @@ describe("runCli", () => {
       const content = readFileSync(outPath, "utf8");
       expect(content).toContain("cli test");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 
@@ -641,7 +641,7 @@ describe("runCli", () => {
       expect(output).toContain("stdout output");
     } finally {
       writeSpy.mockRestore();
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 
@@ -655,8 +655,8 @@ describe("runCli", () => {
     writeFileSync(
       srcPath,
       JSON.stringify({
-        tagName: "div",
         state: { $count: 0 },
+        tagName: "div",
         textContent: "dynamic",
       }),
     );
@@ -667,7 +667,7 @@ describe("runCli", () => {
       const moduleContent = readFileSync(join(fixDir, "app.js"), "utf8");
       expect(moduleContent).toContain("reactive");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 
@@ -686,14 +686,14 @@ describe("runCli", () => {
     writeFileSync(
       srcPath,
       JSON.stringify({
-        tagName: "div",
         state: {
           $save: {
-            timing: "server",
-            $src: "./handler.js",
             $export: "saveData",
+            $src: "./handler.js",
+            timing: "server",
           },
         },
+        tagName: "div",
       }),
     );
     try {
@@ -703,7 +703,7 @@ describe("runCli", () => {
       const serverContent = readFileSync(serverPath, "utf8");
       expect(serverContent).toContain("saveData");
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 
@@ -717,7 +717,7 @@ describe("runCli", () => {
     try {
       await expect(runCli(srcPath)).rejects.toThrow();
     } finally {
-      rmSync(fixDir, { recursive: true, force: true });
+      rmSync(fixDir, { force: true, recursive: true });
     }
   });
 });

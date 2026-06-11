@@ -5,6 +5,7 @@
  */
 
 import { elToPath } from "../store";
+import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { activeTab } from "../workspace/workspace";
 import { applyCanvasStyle } from "../utils/canvas-media";
 import { resolveDefaultForCanvas } from "../panels/signals-panel";
@@ -29,10 +30,12 @@ export function renderCanvasNode(
   featureToggles: Record<string, boolean>,
 ) {
   if (typeof node === "string" || typeof node === "number" || typeof node === "boolean") {
-    parent.appendChild(document.createTextNode(String(node)));
+    parent.append(document.createTextNode(String(node)));
     return;
   }
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
 
   const tag = node.tagName || "div";
   const el = document.createElement(tag);
@@ -41,30 +44,32 @@ export function renderCanvasNode(
 
   if (typeof node.textContent === "string") {
     el.textContent = node.textContent;
-  } else if (typeof node.textContent === "object" && node.textContent !== null) {
-    const tc = node.textContent as Record<string, unknown>;
-    if (tc.$ref) {
-      const resolved = resolveDefaultForCanvas(tc, activeTab.value?.doc.document?.state);
-      el.textContent = resolved as string | null;
-      el.style.opacity = "0.7";
-      el.style.fontStyle = "italic";
-      el.title = `Bound: ${tc.$ref}`;
-    }
+  } else if (isRef(node.textContent)) {
+    const tc = node.textContent;
+    const resolved = resolveDefaultForCanvas(tc, activeTab.value?.doc.document?.state);
+    el.textContent = typeof resolved === "string" ? resolved : null;
+    el.style.opacity = "0.7";
+    el.style.fontStyle = "italic";
+    el.title = `Bound: ${tc.$ref}`;
   }
 
-  if (node.id) el.id = node.id;
-  if (node.className) el.className = node.className;
+  if (node.id) {
+    el.id = node.id;
+  }
+  if (node.className) {
+    el.className = node.className;
+  }
 
   applyCanvasStyle(el, node.style, activeBreakpoints, featureToggles);
 
   if (node.attributes && typeof node.attributes === "object") {
     for (const [attr, val] of Object.entries(node.attributes)) {
       try {
-        if (typeof val === "object" && val !== null && (val as Record<string, unknown>).$ref) {
+        if (isRef(val)) {
           const resolved = resolveDefaultForCanvas(val, activeTab.value?.doc.document?.state);
-          el.setAttribute(attr, resolved as string);
+          el.setAttribute(attr, String(resolved ?? ""));
         } else {
-          el.setAttribute(attr, val);
+          el.setAttribute(attr, String(val));
         }
       } catch {}
     }
@@ -80,13 +85,8 @@ export function renderCanvasNode(
         featureToggles,
       );
     }
-  } else if (
-    node.children &&
-    typeof node.children === "object" &&
-    (node.children as Record<string, unknown>).$prototype === "Array"
-  ) {
-    const childrenObj = node.children as Record<string, unknown>;
-    const template = childrenObj.map;
+  } else if (isMappedArray(node.children)) {
+    const template = node.children.map;
     if (template && typeof template === "object") {
       const wrapper = document.createElement("div");
       wrapper.className = "repeater-perimeter";
@@ -98,7 +98,7 @@ export function renderCanvasNode(
         activeBreakpoints,
         featureToggles,
       );
-      el.appendChild(wrapper);
+      el.append(wrapper);
     }
   }
 
@@ -108,10 +108,10 @@ export function renderCanvasNode(
     placeholder.textContent = `[$switch: ${keys.join(" | ")}]`;
     placeholder.style.cssText =
       "font-family:monospace;font-size:11px;padding:6px 10px;background:color-mix(in srgb, var(--danger) 8%, transparent);border:1px dashed color-mix(in srgb, var(--danger) 40%, transparent);border-radius:4px;color:var(--danger);font-style:italic";
-    el.appendChild(placeholder);
+    el.append(placeholder);
   }
 
   el.style.pointerEvents = "none";
-  parent.appendChild(el);
+  parent.append(el);
   return el;
 }

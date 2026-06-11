@@ -16,7 +16,8 @@
  */
 
 import { transpileJxMarkdown } from "./transpile.ts";
-import { serializeJxMarkdown, type SerializeOptions } from "./serialize.ts";
+import { serializeJxMarkdown } from "./serialize.ts";
+import type { SerializeOptions } from "./serialize.ts";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry, MarkdownFileResult } from "./types.ts";
 
@@ -76,7 +77,7 @@ export class Markdown {
   ): Promise<ContentLoaderEntry[]> {
     const { processMarkdown } = await import("./md.ts");
     const { readFileSync } = await import("node:fs");
-    const source = readFileSync(path, "utf-8");
+    const source = readFileSync(path, "utf8");
     const result = processMarkdown(source, path, {
       ...(options.directives !== undefined && { directives: options.directives }),
       ...(options.directiveOptions !== undefined && {
@@ -84,17 +85,25 @@ export class Markdown {
       }),
     });
     const _meta: ContentLoaderEntry["_meta"] = {};
-    if (result.$excerpt != null) _meta.excerpt = result.$excerpt;
-    if (result.$toc != null) _meta.toc = result.$toc;
-    if (result.$readingTime != null) _meta.readingTime = result.$readingTime;
-    if (result.$wordCount != null) _meta.wordCount = result.$wordCount;
+    if (result.$excerpt != null) {
+      _meta.excerpt = result.$excerpt;
+    }
+    if (result.$toc != null) {
+      _meta.toc = result.$toc;
+    }
+    if (result.$readingTime != null) {
+      _meta.readingTime = result.$readingTime;
+    }
+    if (result.$wordCount != null) {
+      _meta.wordCount = result.$wordCount;
+    }
     return [
       {
-        id: result.slug,
-        data: result.frontmatter,
-        body: source,
         $children: result.$children,
         _meta,
+        body: source,
+        data: result.frontmatter,
+        id: result.slug,
       },
     ];
   }
@@ -106,7 +115,7 @@ export class Markdown {
     const { resolve } = await import("node:path");
     const { src, basePath, ...processorConfig } = this.config;
     const filePath = basePath ? resolve(basePath, src) : resolve(src);
-    const source = readFileSync(filePath, "utf-8");
+    const source = readFileSync(filePath, "utf8");
     return processMarkdown(source, filePath, processorConfig);
   }
 }

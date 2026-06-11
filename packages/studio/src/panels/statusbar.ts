@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 /** Statusbar — status message display for Jx Studio */
 
-import { statusbarEl, getNodeAtPath, nodeLabel, updateSession, renderOnly } from "../store";
+import { getNodeAtPath, nodeLabel, renderOnly, statusbarEl, updateSession } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
@@ -29,7 +29,9 @@ export function mountStatusbar() {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
       // Track relevant reactive properties
       void tab.doc.document;
       void tab.doc.mode;
@@ -52,14 +54,16 @@ export function unmountStatusbar() {
 
 /** @param {string} text */
 function esc(text: string) {
-  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(text).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 /** Render the statusbar content. */
 export function renderStatusbar() {
   const tab = activeTab.value;
   const parts = [];
-  if (tab?.doc.mode === "content") parts.push("Content Mode");
+  if (tab?.doc.mode === "content") {
+    parts.push("Content Mode");
+  }
   if (tab?.session.selection?.length) {
     const sel = tab.session.selection as JxPath;
     const node = getNodeAtPath(tab.doc.document, sel);
@@ -69,7 +73,11 @@ export function renderStatusbar() {
     for (let i = 0; i < sel.length; i += 2) {
       const subPath = sel.slice(0, i + 2);
       const childNode = getNodeAtPath(tab.doc.document, subPath);
-      const label = childNode?.tagName || childNode?.tag || `[${sel[i + 1]}]`;
+      const fallbackTag = childNode?.tag;
+      const label =
+        childNode?.tagName ||
+        (typeof fallbackTag === "string" ? fallbackTag : "") ||
+        `[${sel[i + 1]}]`;
       const dataPath = JSON.stringify(subPath);
       pathSegments.push(
         `<span class="sb-path-seg" data-path='${esc(dataPath)}'>${esc(label)}</span>`,
@@ -78,24 +86,30 @@ export function renderStatusbar() {
     parts.push(`Path: ${pathSegments.join(' <span class="sb-path-sep">&gt;</span> ')}`);
   } else if (tab?.session.ui.stylebookSelection) {
     const sel = tab.session.ui.stylebookSelection;
-    parts.push(`Style: ${esc(sel.replace(/ /g, " > "))}`);
+    parts.push(`Style: ${esc(sel.replaceAll(" ", " > "))}`);
   }
-  if (statusMsg) parts.push(esc(statusMsg));
+  if (statusMsg) {
+    parts.push(esc(statusMsg));
+  }
   statusbarEl.innerHTML = parts.join("  |  ") || "Jx Studio";
 }
 
 /** @param {Event} e */
 function _onStatusbarClick(e: Event) {
   const target = e.target as HTMLElement;
-  if (!target.classList.contains("sb-path-seg")) return;
+  if (!target.classList.contains("sb-path-seg")) {
+    return;
+  }
   const pathStr = target.dataset.path;
-  if (!pathStr) return;
+  if (!pathStr) {
+    return;
+  }
   try {
     const path = JSON.parse(pathStr);
     updateSession({ selection: path });
     renderOnly("leftPanel", "rightPanel", "canvas");
   } catch {
-    // ignore
+    // Ignore
   }
 }
 

@@ -1,6 +1,4 @@
 export const attributesObjectSchema = {
-  description: "HTML attributes and ARIA attributes set via element.setAttribute().",
-  type: "object",
   additionalProperties: {
     oneOf: [
       { type: "string" },
@@ -9,11 +7,11 @@ export const attributesObjectSchema = {
       { $ref: "#/$defs/RefObject" },
     ],
   },
+  description: "HTML attributes and ARIA attributes set via element.setAttribute().",
+  type: "object",
 } as const;
 
 export const propsObjectSchema = {
-  description: "Explicit prop passing at a component boundary.",
-  type: "object",
   additionalProperties: {
     oneOf: [
       { type: "string" },
@@ -24,6 +22,8 @@ export const propsObjectSchema = {
       { $ref: "#/$defs/RefObject" },
     ],
   },
+  description: "Explicit prop passing at a component boundary.",
+  type: "object",
 } as const;
 
 export const elementPropertyValueSchema = {
@@ -37,62 +37,62 @@ export const elementPropertyValueSchema = {
 } as const;
 
 export const switchDefSchema = {
-  description: "Reactive $ref that drives which case to render.",
-  type: "object",
-  required: ["$ref"],
-  properties: { $ref: { $ref: "#/$defs/InternalRef" } },
   additionalProperties: false,
+  description: "Reactive $ref that drives which case to render.",
+  properties: { $ref: { $ref: "#/$defs/InternalRef" } },
+  required: ["$ref"],
+  type: "object",
 } as const;
 
 export const switchNodeSchema = {
-  type: "object",
-  required: ["$switch", "cases"],
   properties: {
-    tagName: { $ref: "#/$defs/TagName" },
     $switch: { $ref: "#/$defs/SwitchDef" },
     cases: {
-      type: "object",
       additionalProperties: {
         oneOf: [{ $ref: "#/$defs/ElementDef" }, { $ref: "#/$defs/ExternalComponentRef" }],
       },
+      type: "object",
     },
+    tagName: { $ref: "#/$defs/TagName" },
   },
+  required: ["$switch", "cases"],
+  type: "object",
 } as const;
 
 export const elementDefSchema = {
+  additionalProperties: { $ref: "#/$defs/ElementPropertyValue" },
   description: "A Jx element definition. Maps directly to a DOM element.",
-  type: "object",
-  required: ["tagName"],
   properties: {
-    tagName: { $ref: "#/$defs/TagName" },
-    id: { type: "string" },
+    "$map/index": { $ref: "#/$defs/RefObject" },
+    "$map/item": { $ref: "#/$defs/RefObject" },
+    $props: { $ref: "#/$defs/PropsObject" },
+    $ref: { $ref: "#/$defs/ExternalRef" },
+    $switch: { $ref: "#/$defs/SwitchDef" },
+    alt: { $ref: "#/$defs/StringOrRef" },
+    attributes: { $ref: "#/$defs/AttributesObject" },
+    checked: { $ref: "#/$defs/BoolOrRef" },
+    children: { $ref: "#/$defs/ChildrenValue" },
     className: { $ref: "#/$defs/StringOrRef" },
-    textContent: { $ref: "#/$defs/StringOrRef" },
+    dir: { enum: ["ltr", "rtl", "auto"], type: "string" },
+    disabled: { $ref: "#/$defs/BoolOrRef" },
+    hidden: { $ref: "#/$defs/BoolOrRef" },
+    href: { $ref: "#/$defs/StringOrRef" },
+    id: { type: "string" },
     innerHTML: { $ref: "#/$defs/StringOrRef" },
     innerText: { $ref: "#/$defs/StringOrRef" },
-    hidden: { $ref: "#/$defs/BoolOrRef" },
-    tabIndex: { $ref: "#/$defs/NumberOrRef" },
-    title: { $ref: "#/$defs/StringOrRef" },
     lang: { $ref: "#/$defs/StringOrRef" },
-    dir: { type: "string", enum: ["ltr", "rtl", "auto"] },
-    value: { $ref: "#/$defs/StringOrRef" },
-    checked: { $ref: "#/$defs/BoolOrRef" },
-    disabled: { $ref: "#/$defs/BoolOrRef" },
-    selected: { $ref: "#/$defs/BoolOrRef" },
-    src: { $ref: "#/$defs/StringOrRef" },
-    href: { $ref: "#/$defs/StringOrRef" },
-    alt: { $ref: "#/$defs/StringOrRef" },
-    type: { $ref: "#/$defs/StringOrRef" },
     name: { $ref: "#/$defs/StringOrRef" },
     placeholder: { $ref: "#/$defs/StringOrRef" },
-    children: { $ref: "#/$defs/ChildrenValue" },
+    selected: { $ref: "#/$defs/BoolOrRef" },
+    src: { $ref: "#/$defs/StringOrRef" },
     style: { $ref: "#/$defs/StyleObject" },
-    attributes: { $ref: "#/$defs/AttributesObject" },
-    $switch: { $ref: "#/$defs/SwitchDef" },
-    $ref: { $ref: "#/$defs/ExternalRef" },
-    $props: { $ref: "#/$defs/PropsObject" },
-    "$map/item": { $ref: "#/$defs/RefObject" },
-    "$map/index": { $ref: "#/$defs/RefObject" },
+    tabIndex: { $ref: "#/$defs/NumberOrRef" },
+    tagName: { $ref: "#/$defs/TagName" },
+    textContent: { $ref: "#/$defs/StringOrRef" },
+    title: { $ref: "#/$defs/StringOrRef" },
+    type: { $ref: "#/$defs/StringOrRef" },
+    value: { $ref: "#/$defs/StringOrRef" },
   },
-  additionalProperties: { $ref: "#/$defs/ElementPropertyValue" },
+  required: ["tagName"],
+  type: "object",
 } as const;

@@ -1,5 +1,5 @@
 /**
- * jx-compiler.js — Compiler orchestrator
+ * Jx-compiler.js — Compiler orchestrator
  * @version 3.0.0
  * @license MIT
  *
@@ -15,12 +15,12 @@
 
 import { readFileSync } from "node:fs";
 import {
-  isDynamic,
+  DEFAULT_LIT_HTML_SRC,
+  DEFAULT_REACTIVITY_SRC,
   compileStyles,
   escapeHtml,
+  isDynamic,
   tagNameToClassName,
-  DEFAULT_REACTIVITY_SRC,
-  DEFAULT_LIT_HTML_SRC,
 } from "./shared.ts";
 import { compileServer, compileSiteServer } from "./targets/compile-server.ts";
 
@@ -31,7 +31,9 @@ import {
 } from "./targets/compile-element.ts";
 import { compileStaticPage } from "./targets/compile-static.ts";
 import { compileClient } from "./targets/compile-client.ts";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import { isClassDef } from "@jxsuite/schema/guards";
+import { parseJxDocument } from "@jxsuite/schema/parse";
+import type { JxDocument, JxStyle } from "@jxsuite/schema/types";
 
 // Re-exports for consumers
 export {
@@ -45,77 +47,85 @@ export {
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
 
+export interface CompileOptions {
+  title?: string;
+  reactivitySrc?: string;
+  litHtmlSrc?: string;
+  projectStyle?: JxStyle | null;
+  formats?: import("@jxsuite/schema/format-registry").FormatRegistry;
+  [key: string]: unknown;
+}
+
 /**
  * Compile a Jx document to HTML (+ optional JS module files).
  *
  * Routing: 1. Not dynamic → static HTML/CSS, zero JS 2. tagName contains hyphen → custom element
  * (lit-html) 3. Otherwise → pre-rendered HTML with reactive bindings
  *
- * @param {string | any} sourcePath - Path to .json file, URL, or raw object
- * @param {Record<string, unknown>} [opts]
+ * @param {string | JxDocument} sourcePath - Path to .json file, URL, or raw document object
+ * @param {CompileOptions} [opts]
  * @returns {Promise<{
  *   html: string;
  *   files: { path: string; content: string; tagName?: string }[];
  * }>}
  */
-export async function compile(sourcePath: string | any, opts: Record<string, unknown> = {}) {
+export async function compile(sourcePath: string | JxDocument, opts: CompileOptions = {}) {
   const {
     title = "Jx App",
     reactivitySrc = DEFAULT_REACTIVITY_SRC,
     litHtmlSrc = DEFAULT_LIT_HTML_SRC,
     projectStyle = null,
-  } = opts as JxMutableNode;
+  } = opts;
 
-  let raw;
+  let raw: JxDocument;
   if (typeof sourcePath === "string") {
     const source = readFileSync(sourcePath, "utf8");
     if (sourcePath.endsWith(".json")) {
-      raw = JSON.parse(source);
+      raw = parseJxDocument(source, sourcePath);
     } else {
       const { extname } = await import("node:path");
       const ext = extname(sourcePath).toLowerCase();
-      const registry = (opts as JxMutableNode)
-        .formats as import("@jxsuite/schema/format-registry").FormatRegistry;
-      const entry = registry?.byExtension?.(ext, "parse");
+      const entry = opts.formats?.byExtension?.(ext, "parse");
       if (!entry) {
         const { unknownFormatError } = await import("./site/format-host.ts");
         throw unknownFormatError(sourcePath, ext);
       }
-      raw = await entry.call("parse", source);
+      // Format plugins contractually parse source text into a Jx document.
+      raw = (await entry.call("parse", source)) as JxDocument;
     }
   } else {
     raw = sourcePath;
   }
 
   // Route 0: .class.json schema-defined class → JS class module
-  if (raw.$prototype === "Class") {
+  if (isClassDef(raw)) {
     const { compileClassJson } = await import("./targets/compile-class.js");
     const jsContent = compileClassJson(raw, opts);
     const outputPath =
       typeof sourcePath === "string"
         ? sourcePath.replace(/\.class\.json$/, ".js")
         : `${raw.title}.js`;
-    return { html: "", files: [{ path: outputPath, content: jsContent }] };
+    return { files: [{ content: jsContent, path: outputPath }], html: "" };
   }
 
   // Route 1: Fully static → plain HTML/CSS
   if (!isDynamic(raw)) {
     return compileStaticPage(raw, {
-      title,
-      reactivitySrc,
       litHtmlSrc,
       projectStyle,
+      reactivitySrc,
+      title,
     });
   }
 
   // Route 2: Custom element tagName (contains hyphen) → lit-html web component
   if (raw.tagName && raw.tagName.includes("-")) {
-    const tagName = raw.tagName;
+    const { tagName } = raw;
     const className = tagNameToClassName(tagName);
     const moduleContent = emitElementModule(raw, className, []);
     const moduleFile = {
-      path: `${tagName}.js`,
       content: moduleContent,
+      path: `${tagName}.js`,
       tagName,
     };
     const styleBlock = compileStyles(raw, raw.$media ?? {});
@@ -142,11 +152,11 @@ export async function compile(sourcePath: string | any, opts: Record<string, unk
 </body>
 </html>`;
 
-    return { html, files: [moduleFile] };
+    return { files: [moduleFile], html };
   }
 
   // Route 3: Dynamic with standard tagName → pre-rendered HTML + reactive bindings
-  return compileClient(raw, { title, reactivitySrc, litHtmlSrc, projectStyle });
+  return compileClient(raw, { litHtmlSrc, projectStyle, reactivitySrc, title });
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────

@@ -24,7 +24,9 @@ function convertHastChildren(children: HastNode[]) {
   const result: (JxElement | string)[] = [];
   for (const child of children) {
     const converted = convertHastNode(child);
-    if (converted != null) result.push(converted);
+    if (converted != null) {
+      result.push(converted);
+    }
   }
   return result;
 }
@@ -35,7 +37,9 @@ function convertHastChildren(children: HastNode[]) {
  */
 function convertHastNode(node: HastNode) {
   if (node.type === "text") {
-    if (whitespace(node as unknown as HastNode)) return null;
+    if (whitespace(node as unknown as HastNode)) {
+      return null;
+    }
     return node.value ?? null;
   }
 
@@ -44,8 +48,12 @@ function convertHastNode(node: HastNode) {
 
     if (node.properties && Object.keys(node.properties).length > 0) {
       const { style, attrs } = hastPropsToJx(node.properties);
-      if (Object.keys(attrs).length > 0) el.attributes = attrs;
-      if (Object.keys(style).length > 0) el.style = style;
+      if (Object.keys(attrs).length > 0) {
+        el.attributes = attrs;
+      }
+      if (Object.keys(style).length > 0) {
+        el.style = style;
+      }
     }
 
     const kids = node.children ? convertHastChildren(node.children) : [];
@@ -71,7 +79,9 @@ function hastPropsToJx(properties: Record<string, unknown>) {
   const style: Record<string, string> = {};
 
   for (const [key, value] of Object.entries(properties)) {
-    if (value === false || value === undefined || value === null) continue;
+    if (value === false || value === undefined || value === null) {
+      continue;
+    }
 
     const info = find(htmlInfo, key);
     const name = info.attribute;
@@ -89,7 +99,7 @@ function hastPropsToJx(properties: Record<string, unknown>) {
       attrs[name] = String(value);
     }
   }
-  return { style, attrs };
+  return { attrs, style };
 }
 
 /**
@@ -99,9 +109,13 @@ function hastPropsToJx(properties: Record<string, unknown>) {
 function parseInlineStyle(styleStr: string, out: Record<string, string>) {
   for (const decl of styleStr.split(";")) {
     const colon = decl.indexOf(":");
-    if (colon === -1) continue;
+    if (colon === -1) {
+      continue;
+    }
     const prop = decl.slice(0, colon).trim();
     const val = decl.slice(colon + 1).trim();
-    if (prop && val) out[prop] = val;
+    if (prop && val) {
+      out[prop] = val;
+    }
   }
 }

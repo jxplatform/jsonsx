@@ -7,7 +7,7 @@
 
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { resolve, basename } from "node:path";
+import { basename, resolve } from "node:path";
 import { generateProject } from "./generate";
 
 const dest = process.argv[2];
@@ -45,7 +45,7 @@ const adapterMap = {
 };
 const adapter = adapterMap[adapterChoice] || "static";
 
-await generateProject(destPath, { name, description, url, adapter });
+await generateProject(destPath, { adapter, description, name, url });
 
 console.log(`
 Project created at ${destPath}

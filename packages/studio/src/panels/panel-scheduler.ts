@@ -17,11 +17,19 @@
  * @returns {boolean}
  */
 export function isTextInput(el: Element | null): boolean {
-  if (!el) return false;
+  if (!el) {
+    return false;
+  }
   const tag = el.tagName.toLowerCase();
-  if (tag === "input" || tag === "textarea") return true;
-  if (tag === "sp-textfield" || tag === "sp-number-field" || tag === "sp-search") return true;
-  if (el.shadowRoot?.activeElement) return isTextInput(el.shadowRoot.activeElement);
+  if (tag === "input" || tag === "textarea") {
+    return true;
+  }
+  if (tag === "sp-textfield" || tag === "sp-number-field" || tag === "sp-search") {
+    return true;
+  }
+  if (el.shadowRoot?.activeElement) {
+    return isTextInput(el.shadowRoot.activeElement);
+  }
   return false;
 }
 
@@ -67,7 +75,9 @@ export function createPanelScheduler(opts: {
   function flush() {
     scheduled = false;
     rafId = 0;
-    if (rendering) return;
+    if (rendering) {
+      return;
+    }
     // Defer while a field is focused — flushed later by focusout (or the next schedule()).
     if (blocked()) {
       pending = true;
@@ -83,7 +93,9 @@ export function createPanelScheduler(opts: {
   }
 
   function schedule() {
-    if (scheduled) return;
+    if (scheduled) {
+      return;
+    }
     scheduled = true;
     rafId = requestAnimationFrame(flush);
   }
@@ -94,33 +106,39 @@ export function createPanelScheduler(opts: {
 
   function onFocusOut() {
     // Clear the editing flag and schedule a flush. If focus is merely moving to another field in
-    // the same panel, the synchronous focusin that follows re-sets `editing` before the rAF runs,
-    // so the deferred render keeps waiting (no mid-edit clobber).
+    // The same panel, the synchronous focusin that follows re-sets `editing` before the rAF runs,
+    // So the deferred render keeps waiting (no mid-edit clobber).
     editing = false;
-    if (pending) schedule();
+    if (pending) {
+      schedule();
+    }
   }
 
   return {
-    schedule,
-    isEditing: () => blocked(),
     bindFocus() {
       root.addEventListener("focusin", onFocusIn);
       root.addEventListener("focusout", onFocusOut);
     },
+    flushNow() {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      rafId = 0;
+      scheduled = false;
+      flush();
+    },
+    isEditing: () => blocked(),
+    schedule,
     unbind() {
       root.removeEventListener("focusin", onFocusIn);
       root.removeEventListener("focusout", onFocusOut);
-      if (rafId) cancelAnimationFrame(rafId);
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
       scheduled = false;
       pending = false;
       editing = false;
       rendering = false;
-    },
-    flushNow() {
-      if (rafId) cancelAnimationFrame(rafId);
-      rafId = 0;
-      scheduled = false;
-      flush();
     },
   };
 }

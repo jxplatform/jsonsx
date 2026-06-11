@@ -1,10 +1,10 @@
 import "./with-dom.js";
-import { expect, test, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
-  findTemplateExpressions,
-  normalizeInlineContent,
   expandRangeToTemplateExpressions,
+  findTemplateExpressions,
   isTagActiveInSelection,
+  normalizeInlineContent,
   toggleInlineFormat,
 } from "../src/editor/inline-format";
 
@@ -14,37 +14,37 @@ describe("findTemplateExpressions", () => {
   });
 
   test("single expression", () => {
-    expect(findTemplateExpressions("hello ${name} world")).toEqual([{ start: 6, end: 13 }]);
+    expect(findTemplateExpressions("hello ${name} world")).toEqual([{ end: 13, start: 6 }]);
   });
 
   test("expression at start", () => {
-    expect(findTemplateExpressions("${x} rest")).toEqual([{ start: 0, end: 4 }]);
+    expect(findTemplateExpressions("${x} rest")).toEqual([{ end: 4, start: 0 }]);
   });
 
   test("expression at end", () => {
-    expect(findTemplateExpressions("rest ${x}")).toEqual([{ start: 5, end: 9 }]);
+    expect(findTemplateExpressions("rest ${x}")).toEqual([{ end: 9, start: 5 }]);
   });
 
   test("multiple expressions", () => {
     expect(findTemplateExpressions("a ${b} c ${d} e")).toEqual([
-      { start: 2, end: 6 },
-      { start: 9, end: 13 },
+      { end: 6, start: 2 },
+      { end: 13, start: 9 },
     ]);
   });
 
   test("nested braces", () => {
-    expect(findTemplateExpressions("${obj.map(x => {x})}")).toEqual([{ start: 0, end: 20 }]);
+    expect(findTemplateExpressions("${obj.map(x => {x})}")).toEqual([{ end: 20, start: 0 }]);
   });
 
   test("adjacent expressions", () => {
     expect(findTemplateExpressions("${a}${b}")).toEqual([
-      { start: 0, end: 4 },
-      { start: 4, end: 8 },
+      { end: 4, start: 0 },
+      { end: 8, start: 4 },
     ]);
   });
 
   test("dollar without brace is not an expression", () => {
-    expect(findTemplateExpressions("$100 and ${x}")).toEqual([{ start: 9, end: 13 }]);
+    expect(findTemplateExpressions("$100 and ${x}")).toEqual([{ end: 13, start: 9 }]);
   });
 
   test("unclosed expression is ignored", () => {
@@ -58,11 +58,11 @@ describe("expandRangeToTemplateExpressions", () => {
   test("expands start boundary into template expression", () => {
     const textNode = document.createTextNode("Hello ${name} world");
     const container = document.createElement("div");
-    container.appendChild(textNode);
-    document.body.appendChild(container);
+    container.append(textNode);
+    document.body.append(container);
 
     const range = document.createRange();
-    range.setStart(textNode, 8); // inside ${name}
+    range.setStart(textNode, 8); // Inside ${name}
     range.setEnd(textNode, 19);
 
     expandRangeToTemplateExpressions(range);
@@ -74,12 +74,12 @@ describe("expandRangeToTemplateExpressions", () => {
   test("expands end boundary into template expression", () => {
     const textNode = document.createTextNode("Hello ${name} world");
     const container = document.createElement("div");
-    container.appendChild(textNode);
-    document.body.appendChild(container);
+    container.append(textNode);
+    document.body.append(container);
 
     const range = document.createRange();
     range.setStart(textNode, 0);
-    range.setEnd(textNode, 10); // inside ${name}
+    range.setEnd(textNode, 10); // Inside ${name}
 
     expandRangeToTemplateExpressions(range);
     expect(range.endOffset).toBe(13);
@@ -90,8 +90,8 @@ describe("expandRangeToTemplateExpressions", () => {
   test("does nothing when range is outside expressions", () => {
     const textNode = document.createTextNode("Hello ${name} world");
     const container = document.createElement("div");
-    container.appendChild(textNode);
-    document.body.appendChild(container);
+    container.append(textNode);
+    document.body.append(container);
 
     const range = document.createRange();
     range.setStart(textNode, 0);
@@ -107,8 +107,8 @@ describe("expandRangeToTemplateExpressions", () => {
   test("handles non-text node containers", () => {
     const el = document.createElement("div");
     const child = document.createElement("span");
-    el.appendChild(child);
-    document.body.appendChild(el);
+    el.append(child);
+    document.body.append(el);
 
     const range = document.createRange();
     range.setStart(el, 0);
@@ -134,8 +134,8 @@ describe("normalizeInlineContent", () => {
     s1.textContent = "hello";
     const s2 = document.createElement("strong");
     s2.textContent = " world";
-    root.appendChild(s1);
-    root.appendChild(s2);
+    root.append(s1);
+    root.append(s2);
 
     normalizeInlineContent(root);
     expect(root.querySelectorAll("strong").length).toBe(1);
@@ -147,8 +147,8 @@ describe("normalizeInlineContent", () => {
     const outer = document.createElement("em");
     const inner = document.createElement("em");
     inner.textContent = "italic";
-    outer.appendChild(inner);
-    root.appendChild(outer);
+    outer.append(inner);
+    root.append(outer);
 
     normalizeInlineContent(root);
     const ems = root.querySelectorAll("em");
@@ -159,8 +159,8 @@ describe("normalizeInlineContent", () => {
   test("removes empty inline elements", () => {
     const root = document.createElement("div");
     const empty = document.createElement("strong");
-    root.appendChild(empty);
-    root.appendChild(document.createTextNode("text"));
+    root.append(empty);
+    root.append(document.createTextNode("text"));
 
     normalizeInlineContent(root);
     expect(root.querySelectorAll("strong").length).toBe(0);
@@ -171,7 +171,7 @@ describe("normalizeInlineContent", () => {
     const root = document.createElement("div");
     const strong = document.createElement("strong");
     strong.textContent = " bold";
-    root.appendChild(strong);
+    root.append(strong);
 
     normalizeInlineContent(root);
     const s = root.querySelector("strong");
@@ -184,7 +184,7 @@ describe("normalizeInlineContent", () => {
     const root = document.createElement("div");
     const span = document.createElement("span");
     span.textContent = "plain";
-    root.appendChild(span);
+    root.append(span);
 
     normalizeInlineContent(root);
     expect(root.querySelectorAll("span").length).toBe(0);
@@ -196,7 +196,7 @@ describe("normalizeInlineContent", () => {
     const span = document.createElement("span");
     span.className = "highlight";
     span.textContent = "styled";
-    root.appendChild(span);
+    root.append(span);
 
     normalizeInlineContent(root);
     expect(root.querySelectorAll("span").length).toBe(1);
@@ -208,8 +208,8 @@ describe("normalizeInlineContent", () => {
     em.textContent = "italic";
     const strong = document.createElement("strong");
     strong.textContent = "bold";
-    root.appendChild(em);
-    root.appendChild(strong);
+    root.append(em);
+    root.append(strong);
 
     normalizeInlineContent(root);
     expect(root.querySelectorAll("em").length).toBe(1);
@@ -233,7 +233,7 @@ describe("isTagActiveInSelection", () => {
   test("returns false when no selection exists", () => {
     const el = document.createElement("div");
     el.contentEditable = "true";
-    document.body.appendChild(el);
+    document.body.append(el);
     const sel = window.getSelection();
     sel?.removeAllRanges();
     const result = isTagActiveInSelection("strong", el);
@@ -253,7 +253,7 @@ describe("toggleInlineFormat", () => {
     const root = document.createElement("div");
     root.contentEditable = "true";
     root.textContent = "hello";
-    document.body.appendChild(root);
+    document.body.append(root);
 
     const range = document.createRange();
     range.setStart(root.firstChild as Node, 2);
@@ -272,7 +272,7 @@ describe("toggleInlineFormat", () => {
     const root = document.createElement("div");
     root.contentEditable = "true";
     root.textContent = "hello world";
-    document.body.appendChild(root);
+    document.body.append(root);
 
     const range = document.createRange();
     range.setStart(root.firstChild as Node, 6);
@@ -294,8 +294,8 @@ describe("toggleInlineFormat", () => {
     root.contentEditable = "true";
     const strong = document.createElement("strong");
     strong.textContent = "bold text";
-    root.appendChild(strong);
-    document.body.appendChild(root);
+    root.append(strong);
+    document.body.append(root);
 
     const range = document.createRange();
     range.selectNodeContents(strong);
@@ -317,8 +317,8 @@ describe("toggleInlineFormat", () => {
     root.textContent = "inside";
     const outside = document.createElement("div");
     outside.textContent = "outside";
-    document.body.appendChild(root);
-    document.body.appendChild(outside);
+    document.body.append(root);
+    document.body.append(outside);
 
     const range = document.createRange();
     range.selectNodeContents(outside);

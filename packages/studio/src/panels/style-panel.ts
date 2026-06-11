@@ -5,19 +5,20 @@
  */
 
 import { html, nothing } from "lit-html";
+import { getNestedStyle } from "@jxsuite/schema/guards";
 import { live } from "lit-html/directives/live.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
-import { getNodeAtPath, COMMON_SELECTORS, isNestedSelector, debouncedStyleCommit } from "../store";
+import { COMMON_SELECTORS, debouncedStyleCommit, getNodeAtPath, isNestedSelector } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { selectStylebookTag } from "./stylebook-panel";
 import {
-  transactDoc,
-  mutateUpdateStyle,
+  mutateUpdateMediaNestedStyle,
+  mutateUpdateMediaNestedStylePath,
   mutateUpdateMediaStyle,
   mutateUpdateNestedStyle,
-  mutateUpdateMediaNestedStyle,
   mutateUpdateNestedStylePath,
-  mutateUpdateMediaNestedStylePath,
+  mutateUpdateStyle,
+  transactDoc,
 } from "../tabs/transact";
 import { inferInputType, propLabel } from "../utils/studio-utils";
 import { renderFieldRow } from "../ui/field-row";
@@ -26,21 +27,21 @@ import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { computeInheritedStyle } from "../utils/inherited-style";
 import { mediaDisplayName } from "./shared";
 import {
-  cssMeta,
-  getCssInitialMap,
   allConditionsPass,
   autoOpenSections,
-  getLonghands,
-  expandShorthand,
-  compressShorthand,
-  expandBorderSide,
   compressBorderSide,
+  compressShorthand,
+  cssMeta,
+  expandBorderSide,
+  expandShorthand,
+  getCssInitialMap,
+  getLonghands,
 } from "./style-utils";
 import { widgetForType } from "./style-inputs";
 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 interface CssLonghand {
   name: string;
@@ -69,18 +70,19 @@ function isTagPath(selector: string) {
 /**
  * Resolve a style object by traversing a nested tag path. e.g., "table th" → style["table"]["th"]
  *
- * @param {Record<string, unknown>} style
+ * @param {JxStyle} style
  * @param {string} tagPath
- * @returns {Record<string, unknown>}
+ * @returns {JxStyle}
  */
-function resolveNestedTagStyle(style: Record<string, unknown>, tagPath: string) {
-  const parts = tagPath.split(" ");
-  let obj: unknown = style;
-  for (const part of parts) {
-    if (!obj || typeof obj !== "object") return {};
-    obj = (obj as Record<string, unknown>)[part];
+function resolveNestedTagStyle(style: JxStyle, tagPath: string): JxStyle {
+  let obj: JxStyle | undefined = style;
+  for (const part of tagPath.split(" ")) {
+    obj = getNestedStyle(obj, part);
+    if (!obj) {
+      return {};
+    }
   }
-  return obj && typeof obj === "object" ? (obj as Record<string, unknown>) : {};
+  return obj;
 }
 
 // ─── Row renderers ──────────────────────────────────────────────────────────
@@ -144,9 +146,13 @@ function renderShorthandRow(
               @click=${(e: Event) => {
                 e.stopPropagation();
                 transactDoc(activeTab.value, (t) => {
-                  if (shortVal !== undefined) mutateFn(t, shortProp, undefined);
+                  if (shortVal !== undefined) {
+                    mutateFn(t, shortProp);
+                  }
                   for (const l of longhands) {
-                    if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                    if (style[l.name] !== undefined) {
+                      mutateFn(t, l.name);
+                    }
                   }
                 });
               }}
@@ -168,7 +174,9 @@ function renderShorthandRow(
           @input=${debouncedStyleCommit(`short:${shortProp}`, 400, (e: Event) => {
             transactDoc(activeTab.value, (t) => {
               for (const l of longhands) {
-                if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                if (style[l.name] !== undefined) {
+                  mutateFn(t, l.name);
+                }
               }
               mutateFn(t, shortProp, (e.target as HTMLInputElement).value || undefined);
             });
@@ -219,7 +227,9 @@ function renderShorthandRow(
                           );
                           transactDoc(activeTab.value, (t) => {
                             for (const l of longhands) {
-                              if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                              if (style[l.name] !== undefined) {
+                                mutateFn(t, l.name);
+                              }
                             }
                             mutateFn(t, shortProp, compress(vals as string[]));
                           });
@@ -241,7 +251,9 @@ function renderShorthandRow(
                     );
                     transactDoc(activeTab.value, (t) => {
                       for (const l of longhands) {
-                        if (style[l.name] !== undefined) mutateFn(t, l.name, undefined);
+                        if (style[l.name] !== undefined) {
+                          mutateFn(t, l.name);
+                        }
                       }
                       mutateFn(t, shortProp, compress(vals as string[]));
                     });
@@ -264,13 +276,13 @@ function renderShorthandRow(
  * @param {JxMutableNode} node
  * @param {string | null} activeMediaTab
  * @param {string | null} activeSelector
- * @param {Record<string, unknown>} [effectiveStyle]
+ * @param {JxStyle} [effectiveStyle]
  */
 function styleSidebarTemplate(
   node: JxMutableNode,
   activeMediaTab: string | null,
   activeSelector: string | null,
-  effectiveStyle?: Record<string, unknown>,
+  effectiveStyle?: JxStyle,
 ) {
   const tab = activeTab.value!;
   const sel = tab.session.selection as JxPath;
@@ -332,11 +344,13 @@ function styleSidebarTemplate(
           inp.type = "text";
           inp.className = "selector-custom-input";
           inp.placeholder = ":hover, .child, &.active, [attr]";
-          bar.appendChild(inp);
+          bar.append(inp);
           inp.focus();
           let done = false;
           const finish = (accept: boolean) => {
-            if (done) return;
+            if (done) {
+              return;
+            }
             done = true;
             const v = inp.value.trim();
             inp.remove();
@@ -346,8 +360,11 @@ function styleSidebarTemplate(
             }
           };
           inp.addEventListener("keydown", (ev) => {
-            if (ev.key === "Enter") finish(true);
-            else if (ev.key === "Escape") finish(false);
+            if (ev.key === "Enter") {
+              finish(true);
+            } else if (ev.key === "Escape") {
+              finish(false);
+            }
           });
           inp.addEventListener("blur", () => finish(inp.value.trim().length > 0));
           return;
@@ -409,11 +426,11 @@ function styleSidebarTemplate(
   `;
 
   // ── Determine the active style object ──────────────────────────────────────
-  let activeStyle: Record<string, unknown>;
+  let activeStyle: JxStyle;
   let commitStyle: (prop: string, val: string | Record<string, unknown> | undefined) => void;
   let commitMutate: StyleMutateFn;
   if (activeSelector && isTagPath(activeSelector) && mediaTab && mediaNames.length > 0) {
-    const mediaObj = (style[`@${mediaTab}`] as Record<string, unknown>) || {};
+    const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
     activeStyle = resolveNestedTagStyle(mediaObj, activeSelector);
     const stylePath = activeSelector.split(" ");
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
@@ -435,8 +452,8 @@ function styleSidebarTemplate(
     commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
       transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && mediaTab && mediaNames.length > 0) {
-    const mediaObj = (style[`@${mediaTab}`] || {}) as Record<string, unknown>;
-    activeStyle = (mediaObj[activeSelector] as Record<string, unknown>) || {};
+    const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
+    activeStyle = getNestedStyle(mediaObj, activeSelector) ?? {};
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateMediaNestedStyle(
         t,
@@ -449,15 +466,17 @@ function styleSidebarTemplate(
     commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
       transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector) {
-    activeStyle = (style[activeSelector] as Record<string, unknown>) || {};
+    activeStyle = getNestedStyle(style, activeSelector) ?? {};
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateNestedStyle(t, sel, activeSelector, prop, val as string | undefined);
     commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
       transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (mediaTab !== null && mediaNames.length > 0) {
     activeStyle = {};
-    for (const [p, v] of Object.entries((style[`@${mediaTab}`] as Record<string, unknown>) || {})) {
-      if (typeof v !== "object") activeStyle[p] = v;
+    for (const [p, v] of Object.entries(getNestedStyle(style, `@${mediaTab}`) ?? {})) {
+      if (typeof v !== "object") {
+        activeStyle[p] = v;
+      }
     }
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateMediaStyle(t, sel, mediaTab, prop, val as string | undefined);
@@ -466,7 +485,9 @@ function styleSidebarTemplate(
   } else {
     activeStyle = {};
     for (const [p, v] of Object.entries(style)) {
-      if (typeof v !== "object") activeStyle[p] = v;
+      if (typeof v !== "object") {
+        activeStyle[p] = v;
+      }
     }
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateStyle(t, sel, prop, val as string | undefined);
@@ -490,12 +511,16 @@ function styleSidebarTemplate(
 
   // Partition properties into sections
   const sectionProps: Record<string, { prop: string; entry: CssPropertyEntry }[]> = {};
-  for (const sec of cssMeta.$sections) sectionProps[sec.key] = [];
+  for (const sec of cssMeta.$sections) {
+    sectionProps[sec.key] = [];
+  }
 
   for (const [prop, entry] of Object.entries(cssMeta.$defs) as [string, CssPropertyEntry][]) {
-    if (typeof (entry as Record<string, unknown>).$shorthand === "string") continue;
+    if (typeof (entry as Record<string, unknown>).$shorthand === "string") {
+      continue;
+    }
     const sec = ((entry as Record<string, unknown>).$section as string) || "other";
-    sectionProps[sec].push({ prop, entry });
+    sectionProps[sec].push({ entry, prop });
   }
   for (const sec of cssMeta.$sections) {
     sectionProps[sec.key].sort(
@@ -512,7 +537,9 @@ function styleSidebarTemplate(
   for (const prop of Object.keys(activeStyle)) {
     if (!(cssMeta.$defs as Record<string, unknown>)[prop]) {
       const val = activeStyle[prop];
-      if (val !== null && typeof val === "object") continue;
+      if (val !== null && typeof val === "object") {
+        continue;
+      }
       otherProps.push(prop);
     }
   }
@@ -537,7 +564,9 @@ function styleSidebarTemplate(
 
       const sectionActiveProps = entries.filter(
         ({ prop, entry }: { prop: string; entry: CssPropertyEntry }) => {
-          if (activeStyle[prop] !== undefined) return true;
+          if (activeStyle[prop] !== undefined) {
+            return true;
+          }
           if (inferInputType(entry) === "shorthand") {
             return (getLonghands(prop) as CssLonghand[]).some(
               (l: CssLonghand) => activeStyle[l.name] !== undefined,
@@ -573,11 +602,14 @@ function styleSidebarTemplate(
                         e.preventDefault();
                         transactDoc(activeTab.value, (t) => {
                           for (const { prop, entry } of sectionActiveProps) {
-                            if (activeStyle[prop] !== undefined) commitMutate(t, prop, undefined);
+                            if (activeStyle[prop] !== undefined) {
+                              commitMutate(t, prop);
+                            }
                             if (inferInputType(entry) === "shorthand") {
                               for (const l of getLonghands(prop) as CssLonghand[]) {
-                                if (activeStyle[l.name] !== undefined)
-                                  commitMutate(t, l.name, undefined);
+                                if (activeStyle[l.name] !== undefined) {
+                                  commitMutate(t, l.name);
+                                }
                               }
                             }
                           }
@@ -597,26 +629,36 @@ function styleSidebarTemplate(
         const hasVal = val !== undefined;
         const condMet = allConditionsPass(entry, activeStyle);
         const type = inferInputType(entry);
-        if (!hasVal && !condMet) continue;
+        if (!hasVal && !condMet) {
+          continue;
+        }
 
         if (filterText) {
           const label = propLabel(entry, prop).toLowerCase();
-          if (!prop.includes(filterText) && !label.includes(filterText)) continue;
+          if (!prop.includes(filterText) && !label.includes(filterText)) {
+            continue;
+          }
         }
         if (filterActive) {
           if (type === "shorthand") {
             const longhands = getLonghands(prop) as CssLonghand[];
             const hasAnySet =
               hasVal || longhands.some((l: CssLonghand) => activeStyle[l.name] !== undefined);
-            if (!hasAnySet) continue;
-          } else if (!hasVal) continue;
+            if (!hasAnySet) {
+              continue;
+            }
+          } else if (!hasVal) {
+            continue;
+          }
         }
 
         if (type === "shorthand") {
           const longhands = getLonghands(prop) as CssLonghand[];
           const hasAny =
             hasVal || longhands.some((l: CssLonghand) => activeStyle[l.name] !== undefined);
-          if (!hasAny && !condMet) continue;
+          if (!hasAny && !condMet) {
+            continue;
+          }
           rows.push(
             renderShorthandRow(prop, entry, activeStyle, commitMutate, () => {}, inheritedStyle),
           );
@@ -629,7 +671,7 @@ function styleSidebarTemplate(
                 prop,
                 (val as string) ?? "",
                 (newVal: string | undefined) => commitStyle(prop, newVal || undefined),
-                () => commitStyle(prop, undefined),
+                () => commitStyle(prop),
                 isWarning,
                 sec.$layout === "grid",
                 inheritedStyle[prop] as string | undefined,
@@ -639,7 +681,9 @@ function styleSidebarTemplate(
         }
       }
 
-      if (isFiltering && rows.length === 0) return nothing;
+      if (isFiltering && rows.length === 0) {
+        return nothing;
+      }
 
       return html`
         <sp-accordion-item
@@ -664,11 +708,14 @@ function styleSidebarTemplate(
                       e.preventDefault();
                       transactDoc(activeTab.value, (t) => {
                         for (const { prop, entry } of sectionActiveProps) {
-                          if (activeStyle[prop] !== undefined) commitMutate(t, prop, undefined);
+                          if (activeStyle[prop] !== undefined) {
+                            commitMutate(t, prop);
+                          }
                           if (inferInputType(entry) === "shorthand") {
                             for (const l of getLonghands(prop) as CssLonghand[]) {
-                              if (activeStyle[l.name] !== undefined)
-                                commitMutate(t, l.name, undefined);
+                              if (activeStyle[l.name] !== undefined) {
+                                commitMutate(t, l.name);
+                              }
                             }
                           }
                         }
@@ -709,7 +756,7 @@ function styleSidebarTemplate(
                   const newProp = (e.target as HTMLInputElement).value.trim();
                   if (newProp && newProp !== prop) {
                     transactDoc(activeTab.value, (t) => {
-                      commitMutate(t, prop, undefined);
+                      commitMutate(t, prop);
                       commitMutate(t, newProp, String(activeStyle[prop]));
                     });
                   }
@@ -724,7 +771,7 @@ function styleSidebarTemplate(
                   commitStyle(prop, (e.target as HTMLInputElement).value);
                 })}
               ></sp-textfield>
-              <sp-action-button size="xs" quiet @click=${() => commitStyle(prop, undefined)}>
+              <sp-action-button size="xs" quiet @click=${() => commitStyle(prop)}>
                 <sp-icon-close slot="icon"></sp-icon-close>
               </sp-action-button>
             </div>
@@ -782,7 +829,7 @@ function styleSidebarTemplate(
                     >
                       ${rule}
                     </button>
-                    <sp-action-button size="xs" quiet @click=${() => commitStyle(rule, undefined)}>
+                    <sp-action-button size="xs" quiet @click=${() => commitStyle(rule)}>
                       <sp-icon-delete slot="icon"></sp-icon-delete>
                     </sp-action-button>
                   </div>
@@ -824,10 +871,14 @@ function styleSidebarTemplate(
  */
 export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
   const tab = activeTab.value;
-  if (!tab) return html`<div class="empty-state">No document loaded</div>`;
+  if (!tab) {
+    return html`<div class="empty-state">No document loaded</div>`;
+  }
   if (ctx.getCanvasMode() === "stylebook" && tab.session.ui.stylebookSelection) {
     const node = tab.doc.document;
-    if (!node) return html`<div class="empty-state">No document loaded</div>`;
+    if (!node) {
+      return html`<div class="empty-state">No document loaded</div>`;
+    }
     return html`
       <div class="stylebook-style-header">
         Styling: &lt;${tab.session.ui.stylebookSelection}&gt;
@@ -840,10 +891,13 @@ export function renderStylePanelTemplate(ctx: { getCanvasMode: () => string }) {
       )}
     `;
   }
-  if (!tab.session.selection)
+  if (!tab.session.selection) {
     return html`<div class="empty-state">Select an element to style</div>`;
+  }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node) return html`<div class="empty-state">Select an element to style</div>`;
+  if (!node) {
+    return html`<div class="empty-state">Select an element to style</div>`;
+  }
   return styleSidebarTemplate(node, tab.session.ui.activeMedia, tab.session.ui.activeSelector);
 }
 
@@ -870,7 +924,7 @@ export function _fieldRow(
         ></sp-textfield>`
       : type === "checkbox"
         ? html`<sp-checkbox
-            ?checked=${!!value}
+            ?checked=${Boolean(value)}
             @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
           ></sp-checkbox>`
         : html`<sp-textfield

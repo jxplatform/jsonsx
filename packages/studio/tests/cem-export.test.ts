@@ -1,16 +1,16 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { collectSlots, exportCemManifest } from "../src/services/cem-export";
 
 // ─── collectSlots ───────────────────────────────────────────────────────────
 
 describe("collectSlots", () => {
   test("returns empty array for non-slot nodes", () => {
-    expect(collectSlots({ tagName: "div", children: [] })).toEqual([]);
+    expect(collectSlots({ children: [], tagName: "div" })).toEqual([]);
   });
 
   test("collects named slot", () => {
-    const node = { tagName: "slot", attributes: { name: "header" } };
+    const node = { attributes: { name: "header" }, tagName: "slot" };
     expect(collectSlots(node)).toEqual(["header"]);
   });
 
@@ -21,18 +21,18 @@ describe("collectSlots", () => {
 
   test("collects slots from children recursively", () => {
     const node = {
-      tagName: "div",
       children: [
         {
+          children: [{ attributes: { name: "header" }, tagName: "slot" }],
           tagName: "header",
-          children: [{ tagName: "slot", attributes: { name: "header" } }],
         },
-        { tagName: "main", children: [{ tagName: "slot" }] },
+        { children: [{ tagName: "slot" }], tagName: "main" },
         {
+          children: [{ attributes: { name: "footer" }, tagName: "slot" }],
           tagName: "footer",
-          children: [{ tagName: "slot", attributes: { name: "footer" } }],
         },
       ],
+      tagName: "div",
     };
     const result = collectSlots(node);
     expect(result).toEqual(["header", "", "footer"]);
@@ -40,25 +40,25 @@ describe("collectSlots", () => {
 
   test("handles deeply nested slots", () => {
     const node = {
-      tagName: "div",
       children: [
         {
-          tagName: "div",
           children: [
             {
+              children: [{ attributes: { name: "deep" }, tagName: "slot" }],
               tagName: "div",
-              children: [{ tagName: "slot", attributes: { name: "deep" } }],
             },
           ],
+          tagName: "div",
         },
       ],
+      tagName: "div",
     };
     expect(collectSlots(node)).toEqual(["deep"]);
   });
 
   test("returns empty for null/undefined node", () => {
     expect(collectSlots(null)).toEqual([]);
-    expect(collectSlots(undefined)).toEqual([]);
+    expect(collectSlots()).toEqual([]);
   });
 
   test("handles node without children", () => {
@@ -67,7 +67,7 @@ describe("collectSlots", () => {
 
   test("uses provided slots array", () => {
     const existing = ["existing"];
-    const node = { tagName: "slot", attributes: { name: "new" } };
+    const node = { attributes: { name: "new" }, tagName: "slot" };
     const result = collectSlots(node, existing);
     expect(result).toEqual(["existing", "new"]);
     expect(result).toBe(existing);
@@ -78,17 +78,21 @@ describe("collectSlots", () => {
 
 describe("exportCemManifest", () => {
   const helpers = {
+    collectCssParts: () => [],
     defCategory: (d: any) => {
-      if (!d || typeof d !== "object") return "unknown";
-      if (d.$prototype === "Function" || d.body || d.src) return "function";
+      if (!d || typeof d !== "object") {
+        return "unknown";
+      }
+      if (d.$prototype === "Function" || d.body || d.src) {
+        return "function";
+      }
       return "state";
     },
     normParam: (p: any) => ({ name: p.name, type: p.type }),
-    collectCssParts: () => [],
   };
 
   test("does nothing for non-custom-element tagName", () => {
-    const S = { document: { tagName: "div", state: {} } };
+    const S = { document: { state: {}, tagName: "div" } };
     const result = exportCemManifest(S, helpers);
     expect(result).toBeUndefined();
   });
@@ -102,16 +106,16 @@ describe("exportCemManifest", () => {
   test("generates manifest with members from state", () => {
     const S = {
       document: {
-        tagName: "my-counter",
+        children: [],
         state: {
-          count: { type: "number", default: 0, description: "Current count" },
+          count: { default: 0, description: "Current count", type: "number" },
           increment: {
             $prototype: "Function",
             body: "state.count++",
             description: "Add one",
           },
         },
-        children: [],
+        tagName: "my-counter",
       },
     };
 
@@ -123,21 +127,21 @@ describe("exportCemManifest", () => {
   test("collects events from function emits", () => {
     const S = {
       document: {
-        tagName: "my-input",
+        children: [],
         state: {
           handleChange: {
             $prototype: "Function",
             body: "",
             emits: [
               {
+                description: "Value changed",
                 name: "change",
                 type: "CustomEvent",
-                description: "Value changed",
               },
             ],
           },
         },
-        children: [],
+        tagName: "my-input",
       },
     };
 
@@ -148,9 +152,9 @@ describe("exportCemManifest", () => {
   test("collects slots from document tree", () => {
     const S = {
       document: {
-        tagName: "my-layout",
+        children: [{ attributes: { name: "header" }, tagName: "slot" }, { tagName: "slot" }],
         state: {},
-        children: [{ tagName: "slot", attributes: { name: "header" } }, { tagName: "slot" }],
+        tagName: "my-layout",
       },
     };
 
@@ -160,14 +164,14 @@ describe("exportCemManifest", () => {
   test("collects CSS custom properties from style", () => {
     const S = {
       document: {
-        tagName: "my-themed",
+        children: [],
         state: {},
         style: {
           "--primary": "#007bff",
           "--secondary": "#6c757d",
           color: "inherit",
         },
-        children: [],
+        tagName: "my-themed",
       },
     };
 
@@ -177,16 +181,16 @@ describe("exportCemManifest", () => {
   test("handles attributes and reflects", () => {
     const S = {
       document: {
-        tagName: "my-toggle",
+        children: [],
         state: {
           checked: {
-            type: "boolean",
-            default: false,
             attribute: "checked",
+            default: false,
             reflects: true,
+            type: "boolean",
           },
         },
-        children: [],
+        tagName: "my-toggle",
       },
     };
 
@@ -196,12 +200,12 @@ describe("exportCemManifest", () => {
   test("skips private state (# prefix)", () => {
     const S = {
       document: {
-        tagName: "my-comp",
+        children: [],
         state: {
           "#internal": { type: "string" },
-          visible: { type: "boolean", default: true },
+          visible: { default: true, type: "boolean" },
         },
-        children: [],
+        tagName: "my-comp",
       },
     };
 
@@ -211,12 +215,12 @@ describe("exportCemManifest", () => {
   test("handles deprecated fields", () => {
     const S = {
       document: {
-        tagName: "my-old",
+        children: [],
         state: {
-          legacyProp: { type: "string", deprecated: "Use newProp instead" },
+          legacyProp: { deprecated: "Use newProp instead", type: "string" },
           oldMethod: { $prototype: "Function", body: "", deprecated: true },
         },
-        children: [],
+        tagName: "my-old",
       },
     };
 

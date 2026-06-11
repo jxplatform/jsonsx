@@ -8,10 +8,10 @@ export interface UpdateStatus {
 }
 
 let cachedStatus: UpdateStatus = {
-  version: null,
+  error: null,
   updateAvailable: false,
   updateReady: false,
-  error: null,
+  version: null,
 };
 
 let notifyWebview: ((version: string) => void) | null = null;
@@ -28,15 +28,15 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
   try {
     const info = await Updater.checkForUpdate();
     cachedStatus = {
-      version: info.version,
+      error: info.error || null,
       updateAvailable: info.updateAvailable,
       updateReady: info.updateReady,
-      error: info.error || null,
+      version: info.version,
     };
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     cachedStatus = {
       ...cachedStatus,
-      error: e instanceof Error ? e.message : String(e),
+      error: error instanceof Error ? error.message : String(error),
     };
   }
   return cachedStatus;
@@ -47,15 +47,15 @@ export async function downloadUpdate(): Promise<UpdateStatus> {
     await Updater.downloadUpdate();
     const info = await Updater.checkForUpdate();
     cachedStatus = {
-      version: info.version,
+      error: info.error || null,
       updateAvailable: info.updateAvailable,
       updateReady: info.updateReady,
-      error: info.error || null,
+      version: info.version,
     };
-  } catch (e: unknown) {
+  } catch (error: unknown) {
     cachedStatus = {
       ...cachedStatus,
-      error: e instanceof Error ? e.message : String(e),
+      error: error instanceof Error ? error.message : String(error),
     };
   }
   return cachedStatus;

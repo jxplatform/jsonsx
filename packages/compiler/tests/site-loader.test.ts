@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { loadProjectConfig } from "../src/site/site-loader";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_siteloader");
@@ -10,7 +10,7 @@ function setup() {
 }
 
 function cleanup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 }
 
 describe("loadProjectConfig", () => {
@@ -18,7 +18,7 @@ describe("loadProjectConfig", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "project.json"), "{ invalid json }", "utf8");
-      expect(() => loadProjectConfig(FIXTURES)).toThrow("Invalid JSON in");
+      expect(() => loadProjectConfig(FIXTURES)).toThrow("Failed to parse project config");
     } finally {
       cleanup();
     }
@@ -37,7 +37,7 @@ describe("loadProjectConfig", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "project.json"), '"a string"', "utf8");
-      expect(() => loadProjectConfig(FIXTURES)).toThrow("must be a JSON object");
+      expect(() => loadProjectConfig(FIXTURES)).toThrow("expected a JSON object");
     } finally {
       cleanup();
     }
@@ -72,7 +72,7 @@ describe("loadProjectConfig", () => {
     try {
       writeFileSync(
         join(FIXTURES, "project.json"),
-        JSON.stringify({ name: "Test", images: { service: "imgix" } }),
+        JSON.stringify({ images: { service: "imgix" }, name: "Test" }),
         "utf8",
       );
       expect(() => loadProjectConfig(FIXTURES)).toThrow('Unknown images.service "imgix"');
@@ -87,9 +87,9 @@ describe("loadProjectConfig", () => {
       writeFileSync(
         join(FIXTURES, "project.json"),
         JSON.stringify({
-          name: "Test",
-          images: { service: "cloudflare" },
           build: { adapter: "node" },
+          images: { service: "cloudflare" },
+          name: "Test",
         }),
         "utf8",
       );

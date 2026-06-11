@@ -1,9 +1,9 @@
-import { reactive, computed } from "../reactivity";
+import { computed, reactive } from "../reactivity";
 import { createTab, disposeTab } from "../tabs/tab";
 import type { Tab } from "../tabs/tab";
 
 import type { ComponentEntry } from "../files/components";
-import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 interface FileEntry {
   name: string;
@@ -11,36 +11,45 @@ interface FileEntry {
   type: string;
 }
 
-export const workspace = reactive({
-  /** @type {string | null} */
-  projectRoot: null as string | null,
-  /** @type {object | null} */
-  projectConfig: null as object | null,
-  /** @type {ComponentEntry[]} */
-  componentRegistry: [] as ComponentEntry[],
-  /** @type {JxMutableNode | null} */
-  clipboard: null as JxMutableNode | null,
-  /** @type {JxStyle | null} */
-  styleClipboard: null as JxStyle | null,
+export interface Workspace {
+  projectRoot: string | null;
+  projectConfig: object | null;
+  componentRegistry: ComponentEntry[];
+  clipboard: JxMutableNode | null;
+  styleClipboard: JxStyle | null;
   fileTree: {
-    /** @type {Map<string, FileEntry[]>} */
-    dirs: new Map<string, FileEntry[]>(),
-    /** @type {Set<string>} */
-    expanded: new Set<string>(),
-    /** @type {string | null} */
-    selectedPath: null as string | null,
-    searchQuery: "",
-  },
-  /** @type {Map<string, Tab>} */
-  tabs: new Map<string, Tab>(),
-  /** @type {string[]} */
-  tabOrder: [] as string[],
-  /** @type {string | null} */
+    dirs: Map<string, FileEntry[]>;
+    expanded: Set<string>;
+    selectedPath: string | null;
+    searchQuery: string;
+  };
+  tabs: Map<string, Tab>;
+  tabOrder: string[];
+  activeTabId: string | null;
+  ui: { activityBar: string };
+}
+
+// Annotated as Workspace: Vue's UnwrapNestedRefs cannot terminate on the
+// Recursive document types, and reactive() does not unwrap refs we never use.
+export const workspace: Workspace = reactive({
   activeTabId: null as string | null,
+  clipboard: null as JxMutableNode | null,
+  componentRegistry: [] as ComponentEntry[],
+  fileTree: {
+    dirs: new Map<string, FileEntry[]>(),
+    expanded: new Set<string>(),
+    searchQuery: "",
+    selectedPath: null as string | null,
+  },
+  projectConfig: null as object | null,
+  projectRoot: null as string | null,
+  styleClipboard: null as JxStyle | null,
+  tabOrder: [] as string[],
+  tabs: new Map<string, Tab>(),
   ui: {
     activityBar: "files",
   },
-});
+}) as unknown as Workspace;
 
 export const activeTab = computed(() =>
   workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
@@ -83,12 +92,14 @@ export function openTab(opts: {
  */
 export function closeTab(tabId: string) {
   const tab = workspace.tabs.get(tabId);
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   disposeTab(tab);
   workspace.tabs.delete(tabId);
   workspace.tabOrder = workspace.tabOrder.filter((id) => id !== tabId);
   if (workspace.activeTabId === tabId) {
-    workspace.activeTabId = workspace.tabOrder[workspace.tabOrder.length - 1] || null;
+    workspace.activeTabId = workspace.tabOrder.at(-1) || null;
   }
 }
 
@@ -132,7 +143,9 @@ export function replaceAllTabs(newTabOpts: {
   workspace.tabOrder = [newTab.id];
 
   for (const id of oldIds) {
-    if (id === newTab.id) continue;
+    if (id === newTab.id) {
+      continue;
+    }
     workspace.tabs.delete(id);
   }
   for (const tab of oldTabs) {
@@ -148,7 +161,9 @@ export function replaceAllTabs(newTabOpts: {
  * @param {string} tabId
  */
 export function activateTab(tabId: string) {
-  if (workspace.tabs.has(tabId)) workspace.activeTabId = tabId;
+  if (workspace.tabs.has(tabId)) {
+    workspace.activeTabId = tabId;
+  }
 }
 
 /**
@@ -161,11 +176,15 @@ export function activateTab(tabId: string) {
  */
 export function renameTab(oldId: string, newId: string, newDocumentPath: string) {
   const tab = workspace.tabs.get(oldId);
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   tab.id = newId;
   tab.documentPath = newDocumentPath;
   workspace.tabs.delete(oldId);
   workspace.tabs.set(newId, tab);
   workspace.tabOrder = workspace.tabOrder.map((id) => (id === oldId ? newId : id));
-  if (workspace.activeTabId === oldId) workspace.activeTabId = newId;
+  if (workspace.activeTabId === oldId) {
+    workspace.activeTabId = newId;
+  }
 }

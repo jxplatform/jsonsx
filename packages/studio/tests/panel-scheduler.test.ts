@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createPanelScheduler, isTextInput } from "../src/panels/panel-scheduler";
 
 describe("isTextInput", () => {
@@ -17,7 +17,7 @@ describe("panel scheduler", () => {
   test("flushNow renders when not editing", () => {
     const root = document.createElement("div");
     let renders = 0;
-    const s = createPanelScheduler({ root, render: () => renders++ });
+    const s = createPanelScheduler({ render: () => renders++, root });
     s.flushNow();
     expect(renders).toBe(1);
   });
@@ -25,20 +25,20 @@ describe("panel scheduler", () => {
   test("defers render while a text input is focused, then flushes on blur", async () => {
     const root = document.createElement("div");
     const input = document.createElement("input");
-    root.appendChild(input);
-    document.body.appendChild(root);
+    root.append(input);
+    document.body.append(root);
     let renders = 0;
-    const s = createPanelScheduler({ root, render: () => renders++ });
+    const s = createPanelScheduler({ render: () => renders++, root });
     s.bindFocus();
 
     input.dispatchEvent(new Event("focusin", { bubbles: true }));
     expect(s.isEditing()).toBe(true);
 
-    s.flushNow(); // deferred because a field is focused
+    s.flushNow(); // Deferred because a field is focused
     expect(renders).toBe(0);
 
     input.dispatchEvent(new Event("focusout", { bubbles: true }));
-    // focusout schedules a flush via rAF — wait two frames.
+    // Focusout schedules a flush via rAF — wait two frames.
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
@@ -52,9 +52,9 @@ describe("panel scheduler", () => {
     let blocked = true;
     let renders = 0;
     const s = createPanelScheduler({
-      root,
-      render: () => renders++,
       blockWhile: () => blocked,
+      render: () => renders++,
+      root,
     });
     s.flushNow();
     expect(renders).toBe(0);

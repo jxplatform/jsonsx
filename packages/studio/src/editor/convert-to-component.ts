@@ -1,11 +1,12 @@
 /// <reference lib="dom" />
 // ─── Convert to Component ─────────────────────────────────────────────────────
 import { html, render as litRender } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
-import { getNodeAtPath, parentElementPath, childIndex } from "../store";
+import { childIndex, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { transact } from "../tabs/transact";
-import { computeRelativePath, loadComponentRegistry, componentRegistry } from "../files/components";
+import { componentRegistry, computeRelativePath, loadComponentRegistry } from "../files/components";
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 import { showDialog } from "../ui/layers";
@@ -17,21 +18,27 @@ const VALID_NAME = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
 /** Convert the currently selected element into a reusable component. */
 export async function convertToComponent() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
 
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node || !node.tagName) return;
+  if (!node || !node.tagName) {
+    return;
+  }
 
   const defaultName = deriveDefaultName(node);
   const name = await promptComponentName(defaultName);
-  if (!name) return;
+  if (!name) {
+    return;
+  }
 
   // Extract component definition
   const componentDef = extractComponentDef(node);
   componentDef.tagName = name;
 
   // Compute paths
-  const componentFile = "components/" + name + ".json";
+  const componentFile = `components/${name}.json`;
   const refPath = computeRelativePath(tab.documentPath, componentFile);
 
   // Single atomic mutation: replace node + add $elements ref
@@ -41,12 +48,19 @@ export async function convertToComponent() {
     const pp = parentElementPath(selectionPath) ?? [];
     const idx = childIndex(selectionPath) as number;
     let parent = doc;
-    for (const seg of pp) parent = parent[seg];
-    if (!parent.children) parent.children = [];
+    // Paths address nodes by construction (same contract as getNodeAtPath).
+    for (const seg of pp) {
+      parent = parent[seg] as JxMutableNode;
+    }
+    if (!Array.isArray(parent.children)) {
+      parent.children = [];
+    }
     parent.children[idx] = { tagName: name };
 
     // Ensure $elements exists and add the $ref
-    if (!doc.$elements) doc.$elements = [];
+    if (!doc.$elements) {
+      doc.$elements = [];
+    }
     const alreadyReferenced = doc.$elements.some(
       (/** @type {JxMutableNode | string | { $ref: string }} */ el) =>
         el && typeof el === "object" && "$ref" in el && el.$ref === refPath,
@@ -62,8 +76,8 @@ export async function convertToComponent() {
     await platform.writeFile(componentFile, JSON.stringify(componentDef, null, 2));
     await loadComponentRegistry();
     statusMessage(`Converted to <${name}>`);
-  } catch (err) {
-    statusMessage(`Error saving component: ${(err as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error saving component: ${errorMessage(error)}`);
   }
 }
 
@@ -74,9 +88,11 @@ export async function convertToComponent() {
  * @returns {string}
  */
 function deriveDefaultName(node: JxMutableNode) {
-  if (node.$id && node.$id.includes("-")) return node.$id.toLowerCase();
+  if (node.$id && node.$id.includes("-")) {
+    return node.$id.toLowerCase();
+  }
   const tag = (node.tagName ?? "div").toLowerCase();
-  return tag.includes("-") ? tag : "jx-" + tag;
+  return tag.includes("-") ? tag : `jx-${tag}`;
 }
 
 /**
@@ -103,21 +119,21 @@ function validateName(val: string) {
   val = val.trim().toLowerCase();
   if (!val.includes("-")) {
     return {
-      valid: false,
       error: "Name must contain a hyphen (e.g. my-component)",
+      valid: false,
     };
   }
   if (!VALID_NAME.test(val)) {
     return {
-      valid: false,
       error: "Lowercase letters, digits, and hyphens only",
+      valid: false,
     };
   }
-  const exists = componentRegistry.some((c: JxMutableNode) => c.tagName === val);
+  const exists = componentRegistry.some((c) => c.tagName === val);
   if (exists) {
-    return { valid: false, error: `Component <${val}> already exists` };
+    return { error: `Component <${val}> already exists`, valid: false };
   }
-  return { valid: true, error: "" };
+  return { error: "", valid: true };
 }
 
 /**
@@ -134,7 +150,7 @@ function promptComponentName(defaultName: string) {
     function confirm() {
       const result = validateName(value);
       if (!result.valid) {
-        error = result.error;
+        ({ error } = result);
         rerender();
         return;
       }
@@ -149,13 +165,17 @@ function promptComponentName(defaultName: string) {
     }
 
     function onKeydown(e: KeyboardEvent) {
-      if (e.key === "Enter") confirm();
+      if (e.key === "Enter") {
+        confirm();
+      }
     }
 
     function rerender() {
-      const layer = document.getElementById("layer-dialog");
+      const layer = document.querySelector("#layer-dialog");
       const slot = layer?.lastElementChild;
-      if (slot) litRender(buildTpl(), slot as HTMLElement);
+      if (slot) {
+        litRender(buildTpl(), slot as HTMLElement);
+      }
     }
 
     function buildTpl() {
@@ -175,16 +195,19 @@ function promptComponentName(defaultName: string) {
           <sp-textfield
             placeholder="my-component"
             value=${value}
-            ?negative=${!!error}
+            ?negative=${Boolean(error)}
             @input=${onInput}
             @keydown=${onKeydown}
             ${ref((el) => {
-              if (el)
+              if (el) {
                 requestAnimationFrame(() => {
                   (el as HTMLElement).focus();
                   const input = (el as HTMLElement).shadowRoot?.querySelector("input");
-                  if (input) input.select();
+                  if (input) {
+                    input.select();
+                  }
                 });
+              }
             })}
           >
             <sp-help-text slot="negative-help-text">${error}</sp-help-text>

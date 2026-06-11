@@ -2,7 +2,7 @@
 // ─── Convert to Repeater ──────────────────────────────────────────────────────
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
-import { getNodeAtPath, parentElementPath, childIndex } from "../store";
+import { childIndex, childList, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { transactDoc } from "../tabs/transact";
 import { showDialog } from "../ui/layers";
@@ -21,40 +21,56 @@ interface RepeaterConfig {
 /** Convert the currently selected element into a repeater template. */
 export async function convertToRepeater() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
 
   const path = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
 
   const defs = tab.doc.document.state || {};
   const config = await promptRepeaterConfig(defs);
-  if (!config) return;
+  if (!config) {
+    return;
+  }
 
   transactDoc(tab, (t) => {
     const doc = t.doc.document;
     if (config.newDef) {
-      if (!doc.state) doc.state = {};
-      doc.state[config.newDef.name] = { type: "array", default: [] };
+      if (!doc.state) {
+        doc.state = {};
+      }
+      doc.state[config.newDef.name] = { default: [], type: "array" };
     }
     const pp = parentElementPath(path);
-    if (!pp) return;
+    if (!pp) {
+      return;
+    }
     const idx = childIndex(path) as number;
     const parent = getNodeAtPath(doc, pp);
-    if (!parent?.children) return;
-    const element = parent.children[idx];
+    if (!parent?.children) {
+      return;
+    }
+    const element = childList(parent)[idx];
 
     const repeater: Record<string, unknown> = {
       $prototype: "Array",
       items: config.items,
       map: element,
     };
-    if (config.filter) repeater.filter = config.filter;
-    if (config.sort) repeater.sort = config.sort;
+    if (config.filter) {
+      repeater.filter = config.filter;
+    }
+    if (config.sort) {
+      repeater.sort = config.sort;
+    }
 
     (parent.children as (string | JxMutableNode)[])[idx] = {
-      tagName: "div",
       children: repeater as unknown as (string | JxMutableNode)[],
+      tagName: "div",
     };
   });
 }
@@ -75,8 +91,12 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
   const docPath = tab?.documentPath;
   for (const [name, d] of Object.entries(defs)) {
     const def = d as Record<string, unknown> | null;
-    if (!def?.$prototype || def.$prototype === "Function" || def.$prototype === "Array") continue;
-    if (arrayDefs.some(([n]) => n === name)) continue;
+    if (!def?.$prototype || def.$prototype === "Function" || def.$prototype === "Array") {
+      continue;
+    }
+    if (arrayDefs.some(([n]) => n === name)) {
+      continue;
+    }
     const schema = await fetchPluginSchema(
       {
         ...(def.$src != null && { $src: def.$src as string }),
@@ -132,9 +152,11 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
     }
 
     function rerender() {
-      const layer = document.getElementById("layer-dialog");
+      const layer = document.querySelector("#layer-dialog");
       const slot = layer?.lastElementChild;
-      if (slot) litRender(buildTpl(), slot as HTMLElement);
+      if (slot) {
+        litRender(buildTpl(), slot as HTMLElement);
+      }
     }
 
     function buildTpl() {
@@ -179,18 +201,21 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
                       size="s"
                       placeholder="myItems"
                       .value=${newDefName}
-                      ?negative=${!!error}
+                      ?negative=${Boolean(error)}
                       @input=${(e: Event) => {
                         newDefName = (e.target as HTMLInputElement).value || "";
                         error = "";
                         rerender();
                       }}
                       @keydown=${(e: KeyboardEvent) => {
-                        if (e.key === "Enter") confirm();
+                        if (e.key === "Enter") {
+                          confirm();
+                        }
                       }}
                       ${ref((el) => {
-                        if (el && source === "__new__")
+                        if (el && source === "__new__") {
                           requestAnimationFrame(() => (el as HTMLElement).focus());
+                        }
                       })}
                     >
                       <sp-help-text slot="negative-help-text">${error}</sp-help-text>

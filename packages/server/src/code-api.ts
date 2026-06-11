@@ -6,6 +6,7 @@
  */
 
 import { tmpdir } from "node:os";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { join, resolve } from "node:path";
 import { unlink } from "node:fs/promises";
 import { format } from "oxfmt";
@@ -42,8 +43,12 @@ function unwrapFormatted(formatted: string) {
   const lines = formatted.split("\n");
   // Remove first line (function header) and last non-empty line (closing brace)
   let end = lines.length - 1;
-  while (end > 0 && lines[end].trim() === "") end--;
-  if (lines[end].trim() === "}") end--;
+  while (end > 0 && lines[end].trim() === "") {
+    end--;
+  }
+  if (lines[end].trim() === "}") {
+    end--;
+  }
   const bodyLines = lines.slice(1, end + 1);
   // Dedent by one tab (oxfmt uses the project's indentStyle)
   return bodyLines.map((l) => (l.startsWith("\t") ? l.slice(1) : l)).join("\n");
@@ -65,8 +70,8 @@ function adjustDiagnostics(diagnostics: OxcDiagnostic[], headerLen: number) {
         ...label,
         span: {
           ...label.span,
-          offset: label.span.offset - headerLen,
           line: label.span.line - 1,
+          offset: label.span.offset - headerLen,
         },
       })),
     }));
@@ -84,7 +89,9 @@ const minifier = new Bun.Transpiler({ minifyWhitespace: true });
  */
 export async function handleCodeApi(req: Request, url: URL) {
   const path = url.pathname;
-  if (!path.startsWith("/__studio/code/") || req.method !== "POST") return null;
+  if (!path.startsWith("/__studio/code/") || req.method !== "POST") {
+    return null;
+  }
 
   let body;
   try {
@@ -99,7 +106,9 @@ export async function handleCodeApi(req: Request, url: URL) {
 
   if (action === "format") {
     const { code, args } = body;
-    if (!code?.trim()) return Response.json({ code: "", errors: [] });
+    if (!code?.trim()) {
+      return Response.json({ code: "", errors: [] });
+    }
 
     try {
       const wrapped = wrapBody(code, args);
@@ -108,10 +117,10 @@ export async function handleCodeApi(req: Request, url: URL) {
         code: unwrapFormatted(result.code),
         errors: result.errors,
       });
-    } catch (e) {
+    } catch (error) {
       return Response.json({
         code,
-        errors: [{ message: (e as Error).message }],
+        errors: [{ message: errorMessage(error) }],
       });
     }
   }
@@ -120,13 +129,15 @@ export async function handleCodeApi(req: Request, url: URL) {
 
   if (action === "minify") {
     const { code } = body;
-    if (!code?.trim()) return Response.json({ code: "" });
+    if (!code?.trim()) {
+      return Response.json({ code: "" });
+    }
 
     try {
       const minified = minifier.transformSync(code).trim();
       return Response.json({ code: minified });
-    } catch (e) {
-      return Response.json({ code, error: (e as Error).message });
+    } catch (error) {
+      return Response.json({ code, error: errorMessage(error) });
     }
   }
 
@@ -134,7 +145,9 @@ export async function handleCodeApi(req: Request, url: URL) {
 
   if (action === "lint") {
     const { code, args } = body;
-    if (!code?.trim()) return Response.json({ diagnostics: [] });
+    if (!code?.trim()) {
+      return Response.json({ diagnostics: [] });
+    }
 
     const wrapped = wrapBody(code, args);
     const headerLen = wrapped.indexOf("\n") + 1;
@@ -146,8 +159,8 @@ export async function handleCodeApi(req: Request, url: URL) {
     try {
       await Bun.write(tmpFile, wrapped);
       const proc = Bun.spawn([OXLINT_BIN, "--format=json", "-A", "no-unused-vars", tmpFile], {
-        stdout: "pipe",
         stderr: "pipe",
+        stdout: "pipe",
       });
       const output = await new Response(proc.stdout).text();
       await proc.exited;
@@ -155,10 +168,10 @@ export async function handleCodeApi(req: Request, url: URL) {
       const parsed = JSON.parse(output);
       const adjusted = adjustDiagnostics(parsed.diagnostics || [], headerLen);
       return Response.json({ diagnostics: adjusted });
-    } catch (e) {
+    } catch (error) {
       return Response.json({
         diagnostics: [],
-        error: (e as Error).message,
+        error: errorMessage(error),
       });
     } finally {
       try {

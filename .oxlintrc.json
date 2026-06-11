@@ -1,16 +1,90 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "categories": {
-    "correctness": "error"
+    "correctness": "off",
+    "nursery": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "restriction": "off",
+    "style": "off",
+    "suspicious": "off"
   },
-  "env": {
-    "builtin": true
-  },
-  "plugins": ["jsdoc", "oxc", "typescript", "unicorn"],
+  "ignorePatterns": ["dist", "**/*.map"],
+  "overrides": [
+    {
+      "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*"],
+      "rules": {
+        "typescript/no-explicit-any": "off"
+      }
+    }
+  ],
+  "plugins": ["jsdoc", "import", "unicorn", "oxc", "typescript"],
   "rules": {
-    // "@typescript-eslint/no-explicit-any": "error"
+    "curly": "off",
+    "eqeqeq": "off",
+    "eslint/no-undef": "off",
+    "eslint/no-undefined": "off",
+    "eslint/no-unused-vars": "off",
+    "eslint/no-use-before-define": "off",
+    "eslint/no-void": "off",
+    "eslint/prefer-named-capture-group": "off",
+    "eslint/require-unicode-regexp": "off",
+    "eslint/sort-imports": "off",
+    "eslint/sort-keys": "off",
+    "eslint/require-await": "off",
+    "func-style": "off",
+    "id-length": "off",
+    "import/exports-last": "off",
+    "import/group-exports": "off",
+    "import/max-dependencies": "off",
+    "import/no-duplicates": "off",
+    "import/no-named-export": "off",
+    "import/no-namespace": "off",
+    "import/no-nodejs-modules": "off",
+    "import/no-unassigned-import": "off",
+    "import/prefer-default-export": "off",
+    "import/no-relative-parent-imports": "off",
+    "init-declarations": "off",
+    "jsdoc/require-param-description": "off",
+    "jsdoc/require-returns": "off",
+    "jsdoc/require-returns-description": "off",
+    "jsdoc/require-returns-type": "off",
+    "max-classes-per-file": "off",
+    "max-depth": "off",
+    "max-lines": "off",
+    "max-lines-per-function": "off",
+    "max-params": "off",
+    "max-statements": "off",
+    "no-await-in-loop": "off",
+    "no-console": "off",
+    "no-continue": "off",
+    "no-duplicate-imports": "off",
+    "no-inline-comments": "off",
+    "no-magic-numbers": "off",
+    "no-negated-condition": "off",
+    "no-nested-ternary": "off",
+    "no-shadow": "off",
+    "no-ternary": "off",
+    "oxc/no-async-await": "off",
+    "oxc/no-optional-chaining": "off",
+    "oxc/no-rest-spread-properties": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-module-boundary-types": "off",
+    "typescript/no-explicit-any": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/filename-case": "off",
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-nested-ternary": "off",
+    "unicorn/no-null": "off",
+    "unicorn/prefer-global-this": "off",
+    "unicorn/prefer-top-level-await": "off"
   },
   "settings": {
+    "eslint": {
+      "sort-imports": false
+    },
     "jsdoc": {
       "check-access": true,
       "check-property-names": true,
@@ -19,16 +93,16 @@
       "implements-on-classes": true,
       "no-defaults": true,
       "require-param": true,
-      "require-param-description": true,
+      "require-param-description": false,
       "require-param-name": true,
       "require-param-type": true,
       "require-property": true,
       "require-property-description": true,
       "require-property-name": true,
       "require-property-type": true,
-      "require-returns": true,
-      "require-returns-description": true,
-      "require-returns-type": true,
+      "require-returns": false,
+      "require-returns-description": false,
+      "require-returns-type": false,
       "require-yields": true
     }
   }

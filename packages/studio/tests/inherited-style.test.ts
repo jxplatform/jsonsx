@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { computeInheritedStyle } from "../src/utils/inherited-style";
 
 // ─── Desktop-first cascade (max-width: Base → lg → md → sm) ─────────────────
@@ -8,12 +8,12 @@ describe("computeInheritedStyle — desktop-first", () => {
   const mediaNames = ["--lg", "--md", "--sm"];
 
   const style = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "2rem",
     "@--lg": { gap: "1.5rem" },
     "@--md": { gridTemplateColumns: "1fr" },
     "@--sm": { gap: "1rem" },
+    display: "grid",
+    gap: "2rem",
+    gridTemplateColumns: "1fr 1fr",
   };
 
   test("returns empty when activeTab is null (base view)", () => {
@@ -28,8 +28,8 @@ describe("computeInheritedStyle — desktop-first", () => {
     const result = computeInheritedStyle(style, mediaNames, "--lg");
     expect(result).toEqual({
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
       gap: "2rem",
+      gridTemplateColumns: "1fr 1fr",
     });
   });
 
@@ -37,8 +37,8 @@ describe("computeInheritedStyle — desktop-first", () => {
     const result = computeInheritedStyle(style, mediaNames, "--md");
     expect(result).toEqual({
       display: "grid",
+      gap: "1.5rem", // Overridden by --lg
       gridTemplateColumns: "1fr 1fr",
-      gap: "1.5rem", // overridden by --lg
     });
   });
 
@@ -46,16 +46,16 @@ describe("computeInheritedStyle — desktop-first", () => {
     const result = computeInheritedStyle(style, mediaNames, "--sm");
     expect(result).toEqual({
       display: "grid",
-      gridTemplateColumns: "1fr", // overridden by --md
-      gap: "1.5rem", // overridden by --lg (--sm's own value not included)
+      gap: "1.5rem", // Overridden by --lg (--sm's own value not included)
+      gridTemplateColumns: "1fr", // Overridden by --md
     });
   });
 
   test("skips object-valued properties (nested selectors/media blocks)", () => {
     const styleWithNested = {
-      color: "red",
-      "@--md": { color: "blue" },
       ":hover": { color: "green" },
+      "@--md": { color: "blue" },
+      color: "red",
     };
     const result = computeInheritedStyle(styleWithNested, mediaNames, "--md");
     expect(result).toEqual({ color: "red" });
@@ -69,12 +69,12 @@ describe("computeInheritedStyle — mobile-first", () => {
   const mediaNames = ["--sm", "--md", "--lg"];
 
   const style = {
+    "@--lg": { gap: "3rem" },
+    "@--md": { flexDirection: "row", gap: "2rem" },
+    "@--sm": { gap: "1.5rem" },
     display: "flex",
     flexDirection: "column",
     gap: "1rem",
-    "@--sm": { gap: "1.5rem" },
-    "@--md": { flexDirection: "row", gap: "2rem" },
-    "@--lg": { gap: "3rem" },
   };
 
   test("--sm inherits only base", () => {
@@ -91,7 +91,7 @@ describe("computeInheritedStyle — mobile-first", () => {
     expect(result).toEqual({
       display: "flex",
       flexDirection: "column",
-      gap: "1.5rem", // from --sm
+      gap: "1.5rem", // From --sm
     });
   });
 
@@ -99,8 +99,8 @@ describe("computeInheritedStyle — mobile-first", () => {
     const result = computeInheritedStyle(style, mediaNames, "--lg");
     expect(result).toEqual({
       display: "flex",
-      flexDirection: "row", // from --md
-      gap: "2rem", // from --md
+      flexDirection: "row", // From --md
+      gap: "2rem", // From --md
     });
   });
 });
@@ -111,7 +111,6 @@ describe("computeInheritedStyle — with activeSelector", () => {
   const mediaNames = ["--lg", "--md", "--sm"];
 
   const style = {
-    color: "black",
     ":hover": { color: "blue", opacity: "0.8" },
     "@--lg": {
       ":hover": { opacity: "0.9" },
@@ -120,6 +119,7 @@ describe("computeInheritedStyle — with activeSelector", () => {
       ":hover": { color: "red" },
     },
     "@--sm": {},
+    color: "black",
   };
 
   test("--lg with :hover inherits base :hover values", () => {
@@ -134,23 +134,23 @@ describe("computeInheritedStyle — with activeSelector", () => {
     const result = computeInheritedStyle(style, mediaNames, "--md", ":hover");
     expect(result).toEqual({
       color: "blue",
-      opacity: "0.9", // from --lg
+      opacity: "0.9", // From --lg
     });
   });
 
   test("--sm with :hover inherits base + --lg + --md :hover overrides", () => {
     const result = computeInheritedStyle(style, mediaNames, "--sm", ":hover");
     expect(result).toEqual({
-      color: "red", // from --md
-      opacity: "0.9", // from --lg
+      color: "red", // From --md
+      opacity: "0.9", // From --lg
     });
   });
 
   test("selector that doesn't exist in base returns empty for first tab", () => {
     const sparseStyle = {
-      color: "black",
       "@--lg": { "::before": { content: "'→'" } },
       "@--md": {},
+      color: "black",
     };
     const result = computeInheritedStyle(sparseStyle, mediaNames, "--lg", "::before");
     expect(result).toEqual({});
@@ -181,11 +181,11 @@ describe("computeInheritedStyle — edge cases", () => {
 
   test("media block with object values (nested selectors) are excluded", () => {
     const style = {
-      padding: "1rem",
       "@--md": {
+        ":hover": { padding: "3rem" }, // Nested object
         padding: "2rem",
-        ":hover": { padding: "3rem" }, // nested object
       },
+      padding: "1rem",
     };
     // Viewing a hypothetical tab after --md
     const names = ["--md", "--sm"];
@@ -195,7 +195,7 @@ describe("computeInheritedStyle — edge cases", () => {
   });
 
   test("activeTab not in mediaNames returns only base values", () => {
-    const style = { color: "red", "@--md": { color: "blue" } };
+    const style = { "@--md": { color: "blue" }, color: "red" };
     const result = computeInheritedStyle(style, ["--md"], "--xl");
     // --xl not found in iteration, so all media blocks are layered
     expect(result).toEqual({ color: "blue" });

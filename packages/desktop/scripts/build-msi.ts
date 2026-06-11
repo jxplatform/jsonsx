@@ -1,8 +1,8 @@
 import { $ } from "bun";
-import { cp, mkdir, readFile, writeFile } from "fs/promises";
-import { join, resolve } from "path";
-import { existsSync, readdirSync, unlinkSync, mkdirSync, copyFileSync } from "fs";
-import { createHash } from "crypto";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 if (process.platform !== "win32") {
   console.log("[build-msi] Skipping MSI build (not Windows)");
@@ -49,7 +49,9 @@ if (existsSync(resourcesDir) && !existsSync(join(resourcesDir, "app"))) {
 
 // --- Step 2: Place runtime executables and DLLs ---
 const binDir = join(buildDir, "bin");
-if (!existsSync(binDir)) mkdirSync(binDir, { recursive: true });
+if (!existsSync(binDir)) {
+  mkdirSync(binDir, { recursive: true });
+}
 
 const filesToCopy = [
   "launcher.exe",
@@ -77,11 +79,15 @@ if (existsSync(cefSrcDir) && !existsSync(join(binDir, "cef"))) {
 
 // Remove extensionless launcher (Linux artifact) and other cross-platform junk
 const extensionlessLauncher = join(binDir, "launcher");
-if (existsSync(extensionlessLauncher)) unlinkSync(extensionlessLauncher);
+if (existsSync(extensionlessLauncher)) {
+  unlinkSync(extensionlessLauncher);
+}
 const junkFiles = ["Info.plist"];
 for (const name of junkFiles) {
   const p = join(buildDir, name);
-  if (existsSync(p)) unlinkSync(p);
+  if (existsSync(p)) {
+    unlinkSync(p);
+  }
 }
 
 // --- Step 3: Apply icon to launcher.exe ---
@@ -92,8 +98,8 @@ if (existsSync(iconPath)) {
     const { rcedit } = await import("rcedit");
     await rcedit(launcherExe, { icon: iconPath });
     console.log("[build-msi] Applied icon to launcher.exe");
-  } catch (e) {
-    console.warn(`[build-msi] rcedit failed: ${e}. Continuing without icon.`);
+  } catch (error) {
+    console.warn(`[build-msi] rcedit failed: ${error}. Continuing without icon.`);
   }
 }
 
@@ -115,10 +121,10 @@ const msiBuffer = await Bun.file(msiOutput).arrayBuffer();
 const sha256 = createHash("sha256").update(Buffer.from(msiBuffer)).digest("hex");
 const baseUrl = "https://github.com/jxsuite/jx/releases/download/";
 const updateMetadata = {
-  version: pkg.version,
-  url: `${baseUrl}v${pkg.version}/JxStudio.msi`,
-  sha256,
   date: new Date().toISOString(),
+  sha256,
+  url: `${baseUrl}v${pkg.version}/JxStudio.msi`,
+  version: pkg.version,
 };
 await writeFile(join(distDir, "latest.json"), JSON.stringify(updateMetadata, null, 2));
 

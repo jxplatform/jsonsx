@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { setProjectRoot } from "../src/handlers";
-import { addPackage, removePackage, listPackages } from "../src/packages";
+import { addPackage, listPackages, removePackage } from "../src/packages";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_packages");
 
@@ -14,7 +14,7 @@ function setup() {
 
 function cleanup() {
   setProjectRoot(null);
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 }
 
 beforeEach(setup);
@@ -38,11 +38,11 @@ describe("listPackages", () => {
     writeFileSync(
       join(FIXTURES, "package.json"),
       JSON.stringify({
-        name: "test",
         dependencies: {
-          lodash: "^4.17.21",
           express: "^4.18.0",
+          lodash: "^4.17.21",
         },
+        name: "test",
       }),
     );
 
@@ -70,17 +70,19 @@ describe("addPackage", () => {
   test("runs bun add in project root", async () => {
     writeFileSync(
       join(FIXTURES, "package.json"),
-      JSON.stringify({ name: "test", dependencies: {} }),
+      JSON.stringify({ dependencies: {}, name: "test" }),
     );
     // This will actually run bun add — it may fail in CI without network
-    // but validates the code path runs correctly
+    // But validates the code path runs correctly
     try {
       await addPackage({ name: "is-number" });
       const pkgJson = JSON.parse(await Bun.file(join(FIXTURES, "package.json")).text());
       expect(pkgJson.dependencies["is-number"]).toBeDefined();
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       // Accept network failures in CI
-      expect(e instanceof Error ? e.message : String(e)).toContain("Failed to add package");
+      expect(error instanceof Error ? error.message : String(error)).toContain(
+        "Failed to add package",
+      );
     }
   });
 
@@ -101,15 +103,17 @@ describe("removePackage", () => {
   test("runs bun remove in project root", async () => {
     writeFileSync(
       join(FIXTURES, "package.json"),
-      JSON.stringify({ name: "test", dependencies: { "is-number": "^7.0.0" } }),
+      JSON.stringify({ dependencies: { "is-number": "^7.0.0" }, name: "test" }),
     );
     try {
       await removePackage({ name: "is-number" });
       const pkgJson = JSON.parse(await Bun.file(join(FIXTURES, "package.json")).text());
       const deps = pkgJson.dependencies || {};
       expect(deps["is-number"]).toBeUndefined();
-    } catch (e: unknown) {
-      expect(e instanceof Error ? e.message : String(e)).toContain("Failed to remove package");
+    } catch (error: unknown) {
+      expect(error instanceof Error ? error.message : String(error)).toContain(
+        "Failed to remove package",
+      );
     }
   });
 

@@ -1,14 +1,37 @@
 /// <reference lib="dom" />
 import { toRaw } from "../reactivity";
-import { getNodeAtPath, parentElementPath, childIndex, pathsEqual, isAncestor } from "../state";
+import { childIndex, getNodeAtPath, isAncestor, parentElementPath, pathsEqual } from "../state";
 
 import type { Tab } from "../tabs/tab";
 import type { JxPath } from "../state";
 
 import type { JsonValue } from "../types";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxEventBinding, JxMutableNode, JxStateObject, JxStyle } from "@jxsuite/schema/types";
+import { ensureNestedStyle, getNestedStyle } from "@jxsuite/schema/guards";
 
 const HISTORY_LIMIT = 100;
+
+/** Any value that can sit at a document node key (undefined/null/"" deletes it). */
+export type JxNodeValue =
+  | JsonValue
+  | JxMutableNode
+  | (JxMutableNode | string)[]
+  | JxEventBinding
+  | undefined;
+
+/**
+ * The editable children array of a node, created when absent. Mapped-array children (`$prototype:
+ * "Array"`) cannot be index-mutated — fail loudly instead of corrupting.
+ */
+function childArray(node: JxMutableNode): (JxMutableNode | string)[] {
+  if (!node.children) {
+    node.children = [];
+  }
+  if (!Array.isArray(node.children)) {
+    throw new TypeError("Cannot insert into mapped-array children; edit the map template instead");
+  }
+  return node.children;
+}
 
 // ─── Transactional layer ─────────────────────────────────────────────────────
 
@@ -25,7 +48,9 @@ export function transactDoc(
   mutationFn: (tab: Tab) => void,
   { skipHistory = false }: { skipHistory?: boolean } = {},
 ) {
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   mutationFn(tab);
 
   // Replace the document root reference so effects tracking tab.doc.document re-trigger.
@@ -40,7 +65,9 @@ export function transactDoc(
     };
     const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
     truncated.push(snapshot);
-    if (truncated.length > HISTORY_LIMIT) truncated.shift();
+    if (truncated.length > HISTORY_LIMIT) {
+      truncated.shift();
+    }
     tab.history.snapshots = truncated;
     tab.history.index = truncated.length - 1;
   }
@@ -67,7 +94,9 @@ export function transact(
 
 /** @param {Tab} tab */
 export function undo(tab: Tab) {
-  if (tab.history.index <= 0) return;
+  if (tab.history.index <= 0) {
+    return;
+  }
   tab.history.index--;
   const snap = tab.history.snapshots[tab.history.index];
   tab.doc.document = structuredClone(toRaw(snap.document));
@@ -77,7 +106,9 @@ export function undo(tab: Tab) {
 
 /** @param {Tab} tab */
 export function redo(tab: Tab) {
-  if (tab.history.index >= tab.history.snapshots.length - 1) return;
+  if (tab.history.index >= tab.history.snapshots.length - 1) {
+    return;
+  }
   tab.history.index++;
   const snap = tab.history.snapshots[tab.history.index];
   tab.doc.document = structuredClone(toRaw(snap.document));
@@ -100,9 +131,10 @@ export function mutateInsertNode(
   nodeDef: JxMutableNode,
 ) {
   const parent = getNodeAtPath(tab.doc.document, parentPath);
-  if (!parent) return;
-  if (!parent.children) parent.children = [];
-  parent.children.splice(index, 0, structuredClone(nodeDef));
+  if (!parent) {
+    return;
+  }
+  childArray(parent).splice(index, 0, structuredClone(nodeDef));
 }
 
 /**
@@ -110,7 +142,9 @@ export function mutateInsertNode(
  * @param {JxPath} path
  */
 export function mutateRemoveNode(tab: Tab, path: JxPath) {
-  if (!path || path.length < 2) return;
+  if (!path || path.length < 2) {
+    return;
+  }
   const elemPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
   (getNodeAtPath(tab.doc.document, elemPath).children as JxMutableNode[]).splice(idx, 1);
@@ -124,9 +158,13 @@ export function mutateRemoveNode(tab: Tab, path: JxPath) {
  * @param {JxPath} path
  */
 export function mutateDuplicateNode(tab: Tab, path: JxPath) {
-  if (!path || path.length < 2) return;
+  if (!path || path.length < 2) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
   const elemPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
   const clone = structuredClone(toRaw(node));
@@ -140,14 +178,18 @@ export function mutateDuplicateNode(tab: Tab, path: JxPath) {
  * @param {string} wrapperTag
  */
 export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag: string = "div") {
-  if (!path || path.length < 2) return;
+  if (!path || path.length < 2) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
   const elemPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
   const wrapper = {
-    tagName: wrapperTag,
     children: [structuredClone(toRaw(node))],
+    tagName: wrapperTag,
   };
   (getNodeAtPath(tab.doc.document, elemPath).children as JxMutableNode[]).splice(idx, 1, wrapper);
   tab.session.selection = [...elemPath, "children", idx];
@@ -163,16 +205,23 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
   const doc = tab.doc.document;
   const fromParentPath = parentElementPath(fromPath) as JxPath;
   const fromIdx = childIndex(fromPath) as number;
-  if (!fromParentPath || typeof fromIdx !== "number") return;
+  if (!fromParentPath || typeof fromIdx !== "number") {
+    return;
+  }
   const fromParent = getNodeAtPath(doc, fromParentPath);
   const toParent = getNodeAtPath(doc, toParentPath);
-  if (!fromParent || !Array.isArray(fromParent.children) || !toParent) return;
-  const [node] = (fromParent.children as JxMutableNode[]).splice(fromIdx, 1);
-  if (node === undefined) return;
-  if (!toParent.children) toParent.children = [];
+  if (!fromParent || !Array.isArray(fromParent.children) || !toParent) {
+    return;
+  }
+  const [node] = fromParent.children.splice(fromIdx, 1);
+  if (node === undefined) {
+    return;
+  }
   let adjustedIndex = toIndex;
-  if (fromParent === toParent && fromIdx < toIndex) adjustedIndex--;
-  toParent.children.splice(adjustedIndex, 0, node);
+  if (fromParent === toParent && fromIdx < toIndex) {
+    adjustedIndex--;
+  }
+  childArray(toParent).splice(adjustedIndex, 0, node);
 
   if (pathsEqual(tab.session.selection, fromPath)) {
     let idx = toIndex;
@@ -191,12 +240,15 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
  * @param {Tab} tab
  * @param {JxPath} path
  * @param {string} key
- * @param {JsonValue} value
+ * @param {JxNodeValue} value
  */
-export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value: JsonValue) {
+export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value: JxNodeValue) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (value === undefined || value === null || value === "") delete node[key];
-  else node[key] = value;
+  if (value === undefined || value === null || value === "") {
+    delete node[key];
+  } else {
+    node[key] = value;
+  }
 }
 
 /**
@@ -207,10 +259,17 @@ export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value:
  */
 export function mutateUpdateStyle(tab: Tab, path: JxPath, prop: string, value: string | undefined) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
-  if (value === undefined || value === "") delete node.style[prop];
-  else node.style[prop] = value;
-  if (Object.keys(node.style).length === 0) delete node.style;
+  if (!node.style) {
+    node.style = {};
+  }
+  if (value === undefined || value === "") {
+    delete node.style[prop];
+  } else {
+    node.style[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -226,10 +285,17 @@ export function mutateUpdateAttribute(
   value: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.attributes) node.attributes = {};
-  if (value === undefined || value === "") delete node.attributes[attr];
-  else node.attributes[attr] = value;
-  if (Object.keys(node.attributes).length === 0) delete node.attributes;
+  if (!node.attributes) {
+    node.attributes = {};
+  }
+  if (value === undefined || value === "") {
+    delete node.attributes[attr];
+  } else {
+    node.attributes[attr] = value;
+  }
+  if (Object.keys(node.attributes).length === 0) {
+    delete node.attributes;
+  }
 }
 
 /**
@@ -246,18 +312,26 @@ export function mutateUpdateMediaStyle(
   prop: string,
   value: string | undefined,
 ) {
-  if (!mediaName) return mutateUpdateStyle(tab, path, prop, value);
-  const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
-  const key = `@${mediaName}`;
-  if (!node.style[key]) node.style[key] = {};
-  if (value === undefined || value === "") {
-    delete node.style[key][prop];
-    if (Object.keys(node.style[key]).length === 0) delete node.style[key];
-  } else {
-    node.style[key][prop] = value;
+  if (!mediaName) {
+    return mutateUpdateStyle(tab, path, prop, value);
   }
-  if (Object.keys(node.style).length === 0) delete node.style;
+  const node = getNodeAtPath(tab.doc.document, path);
+  if (!node.style) {
+    node.style = {};
+  }
+  const key = `@${mediaName}`;
+  const media = ensureNestedStyle(node.style, key);
+  if (value === undefined || value === "") {
+    delete media[prop];
+    if (Object.keys(media).length === 0) {
+      delete node.style[key];
+    }
+  } else {
+    media[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -275,15 +349,21 @@ export function mutateUpdateNestedStyle(
   value: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
-  if (!node.style[selector]) node.style[selector] = {};
-  if (value === undefined || value === "") {
-    delete node.style[selector][prop];
-    if (Object.keys(node.style[selector]).length === 0) delete node.style[selector];
-  } else {
-    node.style[selector][prop] = value;
+  if (!node.style) {
+    node.style = {};
   }
-  if (Object.keys(node.style).length === 0) delete node.style;
+  const block = ensureNestedStyle(node.style, selector);
+  if (value === undefined || value === "") {
+    delete block[prop];
+    if (Object.keys(block).length === 0) {
+      delete node.style[selector];
+    }
+  } else {
+    block[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -303,18 +383,26 @@ export function mutateUpdateMediaNestedStyle(
   value: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
-  const key = `@${mediaName}`;
-  if (!node.style[key]) node.style[key] = {};
-  if (!node.style[key][selector]) node.style[key][selector] = {};
-  if (value === undefined || value === "") {
-    delete node.style[key][selector][prop];
-    if (Object.keys(node.style[key][selector]).length === 0) delete node.style[key][selector];
-    if (Object.keys(node.style[key]).length === 0) delete node.style[key];
-  } else {
-    node.style[key][selector][prop] = value;
+  if (!node.style) {
+    node.style = {};
   }
-  if (Object.keys(node.style).length === 0) delete node.style;
+  const key = `@${mediaName}`;
+  const media = ensureNestedStyle(node.style, key);
+  const block = ensureNestedStyle(media, selector);
+  if (value === undefined || value === "") {
+    delete block[prop];
+    if (Object.keys(block).length === 0) {
+      delete media[selector];
+    }
+    if (Object.keys(media).length === 0) {
+      delete node.style[key];
+    }
+  } else {
+    block[prop] = value;
+  }
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -335,19 +423,20 @@ export function mutateUpdateNestedStylePath(
   value: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
+  if (!node.style) {
+    node.style = {};
+  }
   let obj = node.style;
   for (const seg of stylePath) {
-    if (!obj[seg] || typeof obj[seg] !== "object") obj[seg] = {};
-    obj = obj[seg];
+    obj = ensureNestedStyle(obj, seg);
   }
   if (value === undefined || value === "") {
     delete obj[prop];
     // Clean up empty parent objects
-    let cur = node.style;
-    for (let i = 0; i < stylePath.length; i++) {
-      const child = cur[stylePath[i]];
-      if (child && typeof child === "object" && Object.keys(child).length === 0) {
+    let cur: JxStyle | undefined = node.style;
+    for (let i = 0; i < stylePath.length && cur; i++) {
+      const child = getNestedStyle(cur, stylePath[i]);
+      if (child && Object.keys(child).length === 0) {
         delete cur[stylePath[i]];
         break;
       }
@@ -356,7 +445,9 @@ export function mutateUpdateNestedStylePath(
   } else {
     obj[prop] = value;
   }
-  if (Object.keys(node.style).length === 0) delete node.style;
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -378,30 +469,35 @@ export function mutateUpdateMediaNestedStylePath(
   value: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.style) node.style = {};
+  if (!node.style) {
+    node.style = {};
+  }
   const key = `@${mediaName}`;
-  if (!node.style[key]) node.style[key] = {};
-  let obj = node.style[key];
+  const media = ensureNestedStyle(node.style, key);
+  let obj = media;
   for (const seg of stylePath) {
-    if (!obj[seg] || typeof obj[seg] !== "object") obj[seg] = {};
-    obj = obj[seg];
+    obj = ensureNestedStyle(obj, seg);
   }
   if (value === undefined || value === "") {
     delete obj[prop];
-    let cur = node.style[key];
-    for (let i = 0; i < stylePath.length; i++) {
-      const child = cur[stylePath[i]];
-      if (child && typeof child === "object" && Object.keys(child).length === 0) {
+    let cur: JxStyle | undefined = media;
+    for (let i = 0; i < stylePath.length && cur; i++) {
+      const child = getNestedStyle(cur, stylePath[i]);
+      if (child && Object.keys(child).length === 0) {
         delete cur[stylePath[i]];
         break;
       }
       cur = child;
     }
-    if (Object.keys(node.style[key]).length === 0) delete node.style[key];
+    if (Object.keys(media).length === 0) {
+      delete node.style[key];
+    }
   } else {
     obj[prop] = value;
   }
-  if (Object.keys(node.style).length === 0) delete node.style;
+  if (Object.keys(node.style).length === 0) {
+    delete node.style;
+  }
 }
 
 /**
@@ -429,7 +525,9 @@ export function mutateReplaceStyle(
  */
 export function mutateAddDef(tab: Tab, name: string, def: Record<string, JsonValue>) {
   const doc = tab.doc.document;
-  if (!doc.state) doc.state = {};
+  if (!doc.state) {
+    doc.state = {};
+  }
   doc.state[name] = def;
 }
 
@@ -441,7 +539,9 @@ export function mutateRemoveDef(tab: Tab, name: string) {
   const doc = tab.doc.document;
   if (doc.state) {
     delete doc.state[name];
-    if (Object.keys(doc.state).length === 0) delete doc.state;
+    if (Object.keys(doc.state).length === 0) {
+      delete doc.state;
+    }
   }
 }
 
@@ -452,16 +552,21 @@ export function mutateRemoveDef(tab: Tab, name: string) {
  */
 export function mutateUpdateDef(tab: Tab, name: string, updates: Record<string, JsonValue>) {
   const doc = tab.doc.document;
-  if (!doc.state) doc.state = {};
-  if (doc.state[name] == null) {
-    doc.state[name] = {};
-  } else if (typeof doc.state[name] !== "object") {
-    doc.state[name] = { default: doc.state[name] };
+  if (!doc.state) {
+    doc.state = {};
   }
-  Object.assign(doc.state[name], updates);
-  for (const k of Object.keys(doc.state[name])) {
-    if (doc.state[name][k] === undefined || doc.state[name][k] === null) {
-      delete doc.state[name][k];
+  const existing = doc.state[name];
+  const entry: JxStateObject =
+    existing == null
+      ? {}
+      : typeof existing !== "object" || Array.isArray(existing)
+        ? { default: existing }
+        : (existing as JxStateObject);
+  doc.state[name] = entry;
+  Object.assign(entry, updates);
+  for (const k of Object.keys(entry)) {
+    if (entry[k] === undefined || entry[k] === null) {
+      delete entry[k];
     }
   }
 }
@@ -473,7 +578,9 @@ export function mutateUpdateDef(tab: Tab, name: string, updates: Record<string, 
  */
 export function mutateRenameDef(tab: Tab, oldName: string, newName: string) {
   const doc = tab.doc.document;
-  if (!doc.state || !doc.state[oldName]) return;
+  if (!doc.state || !doc.state[oldName]) {
+    return;
+  }
   doc.state[newName] = doc.state[oldName];
   delete doc.state[oldName];
 }
@@ -485,10 +592,14 @@ export function mutateRenameDef(tab: Tab, oldName: string, newName: string) {
  */
 export function mutateUpdateMedia(tab: Tab, name: string, query: string | undefined) {
   const doc = tab.doc.document;
-  if (!doc.$media) doc.$media = {};
+  if (!doc.$media) {
+    doc.$media = {};
+  }
   if (query === undefined || query === "") {
     delete doc.$media[name];
-    if (Object.keys(doc.$media).length === 0) delete doc.$media;
+    if (Object.keys(doc.$media).length === 0) {
+      delete doc.$media;
+    }
   } else {
     doc.$media[name] = query;
   }
@@ -502,10 +613,17 @@ export function mutateUpdateMedia(tab: Tab, name: string, query: string | undefi
  */
 export function mutateUpdateProp(tab: Tab, path: JxPath, propName: string, value: JsonValue) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.$props) node.$props = {};
-  if (value === undefined || value === null || value === "") delete node.$props[propName];
-  else node.$props[propName] = value;
-  if (Object.keys(node.$props).length === 0) delete node.$props;
+  if (!node.$props) {
+    node.$props = {};
+  }
+  if (value === undefined || value === null || value === "") {
+    delete node.$props[propName];
+  } else {
+    node.$props[propName] = value;
+  }
+  if (Object.keys(node.$props).length === 0) {
+    delete node.$props;
+  }
 }
 
 /**
@@ -521,7 +639,9 @@ export function mutateAddSwitchCase(
   caseDef?: JxMutableNode,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.cases) node.cases = {};
+  if (!node.cases) {
+    node.cases = {};
+  }
   node.cases[caseName] = caseDef || { tagName: "div", textContent: caseName };
 }
 
@@ -532,7 +652,9 @@ export function mutateAddSwitchCase(
  */
 export function mutateRemoveSwitchCase(tab: Tab, path: JxPath, caseName: string) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (node.cases) delete node.cases[caseName];
+  if (node.cases) {
+    delete node.cases[caseName];
+  }
 }
 
 /**
@@ -543,7 +665,9 @@ export function mutateRemoveSwitchCase(tab: Tab, path: JxPath, caseName: string)
  */
 export function mutateRenameSwitchCase(tab: Tab, path: JxPath, oldName: string, newName: string) {
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node.cases || !node.cases[oldName]) return;
+  if (!node.cases || !node.cases[oldName]) {
+    return;
+  }
   node.cases[newName] = node.cases[oldName];
   delete node.cases[oldName];
 }

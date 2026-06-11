@@ -5,50 +5,68 @@
  * defaults for all project-level properties.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import type { ImageConfig, ProjectConfig } from "@jxsuite/schema/types";
+import { errorMessage, parseProjectConfig } from "@jxsuite/schema/parse";
 import { resolve } from "node:path";
 
 /**
  * Default project configuration. All properties are optional in project.json; these defaults fill
  * in anything the author omits.
  */
-const DEFAULTS = {
-  name: "Jx Site",
-  url: "",
-  defaults: {
-    layout: null,
-    lang: "en",
-    charset: "utf-8",
-  },
-  $head: [],
-  imports: {},
-  $media: {},
-  style: {},
-  state: {},
-  contentTypes: {},
-  redirects: {},
-  images: {
-    optimize: true,
-    widths: [320, 640, 960, 1280, 1920],
-    formats: ["webp", "avif"],
-    quality: { webp: 80, avif: 65, jpeg: 80, png: 80 },
-    sizes: "(max-width: 768px) 100vw, 50vw",
-    lazyLoad: true,
-    service: "build",
-  },
+/** A project config after merging with DEFAULTS — the option groups are always present. */
+export interface ResolvedProjectConfig extends ProjectConfig {
+  name: string;
+  url: string;
+  defaults: NonNullable<ProjectConfig["defaults"]>;
+  images: ImageConfig & { service: "build" | "cloudflare" };
   build: {
-    outDir: "./dist",
+    adapter?: string;
+    outDir: string;
+    format: string;
+    trailingSlash: string;
+    provider?: string | null;
+    [key: string]: unknown;
+  };
+}
+
+const DEFAULTS = {
+  $head: [],
+  $media: {},
+  build: {
     format: "directory",
-    trailingSlash: "always",
+    outDir: "./dist",
     provider: null,
+    trailingSlash: "always",
   },
-};
+  contentTypes: {},
+  defaults: {
+    charset: "utf8",
+    lang: "en",
+    layout: null,
+  },
+  images: {
+    formats: ["webp", "avif"],
+    lazyLoad: true,
+    optimize: true,
+    quality: { avif: 65, jpeg: 80, png: 80, webp: 80 },
+    service: "build",
+    sizes: "(max-width: 768px) 100vw, 50vw",
+    widths: [320, 640, 960, 1280, 1920],
+  },
+  imports: {},
+  name: "Jx Site",
+  redirects: {},
+  state: {},
+  style: {},
+  url: "",
+} satisfies Partial<ResolvedProjectConfig>;
 
 /**
  * Load and validate project.json from a project root.
  *
  * @param {string} projectRoot - Absolute path to the project directory
- * @returns {{ config: Record<string, any>; configPath: string; projectRoot: string }}
+ * @returns {{ config: ProjectConfig; configPath: string; projectRoot: string }}
  * @throws {Error} If project.json is missing or invalid JSON
  */
 export function loadProjectConfig(projectRoot: string) {
@@ -58,35 +76,44 @@ export function loadProjectConfig(projectRoot: string) {
     throw new Error(`project.json not found in ${projectRoot}`);
   }
 
-  let raw;
+  let raw: ProjectConfig;
   try {
-    raw = JSON.parse(readFileSync(configPath, "utf8"));
-  } catch (e) {
-    const err = e as Error;
-    throw new Error(`Invalid JSON in ${configPath}: ${err.message}`);
-  }
-
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error(`project.json must be a JSON object, got ${typeof raw}`);
+    raw = parseProjectConfig(readFileSync(configPath, "utf8"), configPath);
+  } catch (error) {
+    throw new Error(`Invalid project.json: ${errorMessage(error)}`, { cause: error });
   }
 
   // Deep merge with defaults
-  const config = {
+  const config: ResolvedProjectConfig = {
     ...DEFAULTS,
     ...raw,
+    build: { ...DEFAULTS.build, ...raw.build },
     defaults: { ...DEFAULTS.defaults, ...raw.defaults },
     images: { ...DEFAULTS.images, ...raw.images },
-    build: { ...DEFAULTS.build, ...raw.build },
   };
 
   // Preserve arrays and objects that shouldn't be shallow-merged
-  if (raw.$head) config.$head = raw.$head;
-  if (raw.$media) config.$media = raw.$media;
-  if (raw.style) config.style = raw.style;
-  if (raw.state) config.state = raw.state;
-  if (raw.redirects) config.redirects = raw.redirects;
-  if (raw.imports) config.imports = raw.imports;
-  if (raw.contentTypes) config.contentTypes = raw.contentTypes;
+  if (raw.$head) {
+    config.$head = raw.$head;
+  }
+  if (raw.$media) {
+    config.$media = raw.$media;
+  }
+  if (raw.style) {
+    config.style = raw.style;
+  }
+  if (raw.state) {
+    config.state = raw.state;
+  }
+  if (raw.redirects) {
+    config.redirects = raw.redirects;
+  }
+  if (raw.imports) {
+    config.imports = raw.imports;
+  }
+  if (raw.contentTypes) {
+    config.contentTypes = raw.contentTypes;
+  }
 
   // Validate adapter
   const VALID_ADAPTERS = ["cloudflare-workers", "cloudflare-pages", "node", "bun"];
@@ -98,7 +125,7 @@ export function loadProjectConfig(projectRoot: string) {
   }
 
   // Validate image service. The "cloudflare" service emits /cdn-cgi/image transform URLs,
-  // which work on any zone served through Cloudflare regardless of the build adapter.
+  // Which work on any zone served through Cloudflare regardless of the build adapter.
   const VALID_IMAGE_SERVICES = ["build", "cloudflare"];
   if (!VALID_IMAGE_SERVICES.includes(config.images.service)) {
     throw new Error(

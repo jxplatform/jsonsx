@@ -1,6 +1,6 @@
 import { $ } from "bun";
-import { join, resolve } from "path";
-import { existsSync, mkdirSync } from "fs";
+import { join, resolve } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
 import { loadConfig } from "electrobun-builder-for-windows/dist/config.js";
 
 const desktopDir = resolve(import.meta.dir, "..");

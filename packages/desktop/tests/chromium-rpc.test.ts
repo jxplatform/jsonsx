@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Subprocess } from "bun";
-import type { DirEntry, ComponentMeta } from "../src/rpc-schema";
+import type { ComponentMeta, DirEntry } from "../src/rpc-schema";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_chromium_rpc");
 
@@ -11,13 +11,18 @@ let serverPort: number;
 
 function rpc(ws: WebSocket, method: string, params?: Record<string, unknown>): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const id = Math.floor(Math.random() * 100000);
+    const id = Math.floor(Math.random() * 100_000);
     const handler = (event: MessageEvent) => {
       const msg = JSON.parse(event.data);
-      if (msg.id !== id) return;
+      if (msg.id !== id) {
+        return;
+      }
       ws.removeEventListener("message", handler);
-      if (msg.error) reject(new Error(msg.error));
-      else resolve(msg.result);
+      if (msg.error) {
+        reject(new Error(msg.error));
+      } else {
+        resolve(msg.result);
+      }
     };
     ws.addEventListener("message", handler);
     ws.send(JSON.stringify({ id, method, params }));
@@ -32,8 +37,8 @@ beforeAll(async () => {
   writeFileSync(join(FIXTURES, "subdir", "nested.json"), '{"key": "value"}');
 
   server = Bun.spawn(["bun", "run", join(import.meta.dir, "_rpc-server.ts"), FIXTURES], {
-    stdout: "pipe",
     stderr: "inherit",
+    stdout: "pipe",
   });
 
   // Read stdout to find the port
@@ -44,11 +49,13 @@ beforeAll(async () => {
 
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      break;
+    }
     output += decoder.decode(value, { stream: true });
     const portMatch = output.match(/port=(\d+)/);
     if (portMatch) {
-      serverPort = parseInt(portMatch[1]);
+      serverPort = Number.parseInt(portMatch[1]);
       break;
     }
   }
@@ -60,7 +67,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   server?.kill();
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 });
 
 function connect(): Promise<WebSocket> {
@@ -99,7 +106,7 @@ describe("chromium RPC server", () => {
 
   test("writeFile creates a file", async () => {
     const ws = await connect();
-    await rpc(ws, "writeFile", { path: "new-file.txt", content: "created" });
+    await rpc(ws, "writeFile", { content: "created", path: "new-file.txt" });
     const content = await rpc(ws, "readFile", { path: "new-file.txt" });
     expect(content).toBe("created");
     ws.close();
@@ -107,7 +114,7 @@ describe("chromium RPC server", () => {
 
   test("deleteFile removes a file", async () => {
     const ws = await connect();
-    await rpc(ws, "writeFile", { path: "to-delete.txt", content: "temp" });
+    await rpc(ws, "writeFile", { content: "temp", path: "to-delete.txt" });
     await rpc(ws, "deleteFile", { path: "to-delete.txt" });
     const entries = await rpc(ws, "listDirectory", { dir: "." });
     const names = (entries as DirEntry[]).map((e) => e.name);
@@ -117,7 +124,7 @@ describe("chromium RPC server", () => {
 
   test("renameFile moves a file", async () => {
     const ws = await connect();
-    await rpc(ws, "writeFile", { path: "old-name.txt", content: "moving" });
+    await rpc(ws, "writeFile", { content: "moving", path: "old-name.txt" });
     await rpc(ws, "renameFile", { from: "old-name.txt", to: "new-name.txt" });
     const content = await rpc(ws, "readFile", { path: "new-name.txt" });
     expect(content).toBe("moving");
@@ -135,7 +142,7 @@ describe("chromium RPC server", () => {
   test("uploadFile writes base64 data", async () => {
     const ws = await connect();
     const data = Buffer.from("binary content").toString("base64");
-    await rpc(ws, "uploadFile", { path: "uploaded.bin", data });
+    await rpc(ws, "uploadFile", { data, path: "uploaded.bin" });
     const content = await rpc(ws, "readFile", { path: "uploaded.bin" });
     expect(content).toBe("binary content");
     ws.close();
@@ -153,8 +160,8 @@ describe("chromium RPC server", () => {
   test("discoverComponents finds custom elements", async () => {
     const ws = await connect();
     await rpc(ws, "writeFile", {
+      content: JSON.stringify({ children: [], tagName: "my-widget" }),
       path: "my-widget.json",
-      content: JSON.stringify({ tagName: "my-widget", children: [] }),
     });
     const components = await rpc(ws, "discoverComponents", { dir: "." });
     const widget = (components as ComponentMeta[]).find((c) => c.tagName === "my-widget");
@@ -176,7 +183,7 @@ describe("chromium RPC server", () => {
       error?: string;
       result?: unknown;
     }>((resolve, reject) => {
-      const id = Math.floor(Math.random() * 100000);
+      const id = Math.floor(Math.random() * 100_000);
       const timeout = setTimeout(() => {
         ws.removeEventListener("message", handler);
         reject(new Error("timeout"));
@@ -187,16 +194,18 @@ describe("chromium RPC server", () => {
           error?: string;
           result?: unknown;
         };
-        if (msg.id !== id) return;
+        if (msg.id !== id) {
+          return;
+        }
         clearTimeout(timeout);
         ws.removeEventListener("message", handler);
         resolve(msg);
       };
       ws.addEventListener("message", handler);
       ws.send(JSON.stringify({ id, method: "nonexistentMethod", params: {} }));
-    }).catch((e: unknown) => e);
+    }).catch((error: unknown) => error);
     // On some platforms (Windows/Bun) error responses may not deliver;
-    // verify either we got the error response or the connection stays healthy
+    // Verify either we got the error response or the connection stays healthy
     if (result instanceof Error) {
       // Didn't get response — verify server is still alive
       const content = await rpc(ws, "readFile", { path: "hello.txt" });
@@ -214,7 +223,7 @@ describe("chromium RPC server", () => {
       error?: string;
       result?: unknown;
     }>((resolve, reject) => {
-      const id = Math.floor(Math.random() * 100000);
+      const id = Math.floor(Math.random() * 100_000);
       const timeout = setTimeout(() => {
         ws.removeEventListener("message", handler);
         reject(new Error("timeout"));
@@ -225,7 +234,9 @@ describe("chromium RPC server", () => {
           error?: string;
           result?: unknown;
         };
-        if (msg.id !== id) return;
+        if (msg.id !== id) {
+          return;
+        }
         clearTimeout(timeout);
         ws.removeEventListener("message", handler);
         resolve(msg);
@@ -238,7 +249,7 @@ describe("chromium RPC server", () => {
           params: { path: "../../etc/passwd" },
         }),
       );
-    }).catch((e: unknown) => e);
+    }).catch((error: unknown) => error);
     if (result instanceof Error) {
       const content = await rpc(ws, "readFile", { path: "hello.txt" });
       expect(content).toBe("Hello World");

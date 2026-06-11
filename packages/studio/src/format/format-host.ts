@@ -95,15 +95,21 @@ export function formatByExtension(ext: string, capability?: string): StudioForma
 
 /** Look up a format by its import name. */
 export function formatByName(name: string | null | undefined): StudioFormat | undefined {
-  if (!name) return undefined;
+  if (!name) {
+    return undefined;
+  }
   return _formats.find((f) => f.name === name);
 }
 
 /** The format claiming a file path's extension, if any. */
 export function formatForPath(path: string | null | undefined): StudioFormat | undefined {
-  if (!path) return undefined;
+  if (!path) {
+    return undefined;
+  }
   const dot = path.lastIndexOf(".");
-  if (dot === -1) return undefined;
+  if (dot === -1) {
+    return undefined;
+  }
   return formatByExtension(path.slice(dot));
 }
 
@@ -111,8 +117,12 @@ export function formatForPath(path: string | null | undefined): StudioFormat | u
 export function documentExtensions(kind?: string): string[] {
   const exts = new Set<string>();
   for (const f of _formats) {
-    if (kind && !f.documentKinds.includes(kind)) continue;
-    for (const e of f.extensions) exts.add(e);
+    if (kind && !f.documentKinds.includes(kind)) {
+      continue;
+    }
+    for (const e of f.extensions) {
+      exts.add(e);
+    }
   }
   exts.delete(".json");
   return [...exts];
@@ -140,10 +150,10 @@ export async function formatParse(
   options?: Record<string, unknown>,
 ): Promise<JxMutableNode> {
   return (await formatAction({
-    format: name,
     action: "parse",
-    source,
+    format: name,
     options,
+    source,
   })) as JxMutableNode;
 }
 
@@ -154,9 +164,9 @@ export async function formatSerialize(
   options?: Record<string, unknown>,
 ): Promise<string> {
   return (await formatAction({
-    format: name,
     action: "serialize",
     doc,
+    format: name,
     options,
   })) as string;
 }
@@ -190,13 +200,17 @@ export function splitFormatDocument(format: StudioFormat | undefined, doc: JxMut
 
   // Content document — children form the root-level body; other keys are frontmatter
   const children = (doc.children as unknown[]) ?? [];
-  if (children.length === 0) children.push({ tagName: "p", children: [] });
+  if (children.length === 0) {
+    children.push({ children: [], tagName: "p" });
+  }
 
   const documentKeys = new Set(["state", "imports"]);
   const contentDoc: Record<string, unknown> = { children };
   const frontmatter: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(doc)) {
-    if (key === "children") continue;
+    if (key === "children") {
+      continue;
+    }
     if (documentKeys.has(key)) {
       contentDoc[key] = value;
     } else {

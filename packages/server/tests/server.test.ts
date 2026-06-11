@@ -1,12 +1,12 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { resolveNpmPath } from "../src/server";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const TMP = resolve(import.meta.dir, "_server_fixtures");
 
 function setup() {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
   mkdirSync(TMP, { recursive: true });
 
   // Unscoped package with module field and exports
@@ -14,9 +14,9 @@ function setup() {
   writeFileSync(
     join(TMP, "node_modules/lit/package.json"),
     JSON.stringify({
-      name: "lit",
-      module: "./lit.js",
       exports: { ".": { import: "./lit.js" }, "./html.js": "./html.js" },
+      module: "./lit.js",
+      name: "lit",
     }),
   );
   writeFileSync(join(TMP, "node_modules/lit/lit.js"), "export const html = () => {};");
@@ -27,11 +27,11 @@ function setup() {
   writeFileSync(
     join(TMP, "node_modules/@jxsuite/parser/package.json"),
     JSON.stringify({
-      name: "@jxsuite/parser",
       exports: {
         ".": { import: "./index.js" },
         "./transpile": "./transpile.js",
       },
+      name: "@jxsuite/parser",
     }),
   );
   writeFileSync(join(TMP, "node_modules/@jxsuite/parser/index.js"), "export default {};");
@@ -81,8 +81,8 @@ describe("resolveNpmPath", () => {
     writeFileSync(
       join(TMP, "sub/node_modules/@jxsuite/parser/package.json"),
       JSON.stringify({
-        name: "@jxsuite/parser",
         exports: { ".": { import: "./index.js" } },
+        name: "@jxsuite/parser",
       }),
     );
     writeFileSync(join(TMP, "sub/node_modules/@jxsuite/parser/index.js"), "export default {};");

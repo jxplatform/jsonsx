@@ -34,18 +34,18 @@ export function mergeHead(
 ) {
   // Start with auto-injected defaults
   const defaults: JxHeadEntry[] = [
-    { tagName: "meta", attributes: { charset: context.charset ?? "utf-8" } },
+    { attributes: { charset: context.charset ?? "utf8" }, tagName: "meta" },
     {
-      tagName: "meta",
       attributes: {
-        name: "viewport",
         content: "width=device-width, initial-scale=1",
+        name: "viewport",
       },
+      tagName: "meta",
     },
   ];
 
   // Merge layers: site → layout → page (later wins)
-  const merged: Map<string, JxHeadEntry> = new Map();
+  const merged = new Map<string, JxHeadEntry>();
 
   for (const entry of [...defaults, ...siteHead, ...layoutHead, ...pageHead]) {
     const key = headEntryKey(entry);
@@ -54,18 +54,18 @@ export function mergeHead(
 
   // Insert <title> if present
   const title = context.title ?? context.siteName ?? "Jx Site";
-  merged.set("title", { tagName: "title", children: [title] });
+  merged.set("title", { children: [title], tagName: "title" });
 
   // Add canonical URL if provided
   if (context.pageUrl && context.siteUrl) {
     const canonical = new URL(context.pageUrl, context.siteUrl).href;
     merged.set("link:canonical", {
+      attributes: { href: canonical, rel: "canonical" },
       tagName: "link",
-      attributes: { rel: "canonical", href: canonical },
     });
   }
 
-  return Array.from(merged.values());
+  return [...merged.values()];
 }
 
 /**
@@ -76,22 +76,32 @@ export function mergeHead(
  * @returns {string}
  */
 function headEntryKey(entry: JxHeadEntry) {
-  if (!entry || typeof entry !== "object") return String(entry);
+  if (!entry || typeof entry !== "object") {
+    return String(entry);
+  }
 
   const tag = entry.tagName ?? "unknown";
   const attrs = entry.attributes ?? {};
 
   // <title> — singleton
-  if (tag === "title") return "title";
+  if (tag === "title") {
+    return "title";
+  }
 
   // <meta charset> — singleton
-  if (attrs.charset) return "meta:charset";
+  if (attrs.charset) {
+    return "meta:charset";
+  }
 
   // <meta name="...""> — keyed by name
-  if (tag === "meta" && attrs.name) return `meta:${attrs.name}`;
+  if (tag === "meta" && attrs.name) {
+    return `meta:${attrs.name}`;
+  }
 
   // <meta property="..."> — keyed by property (Open Graph)
-  if (tag === "meta" && attrs.property) return `meta:${attrs.property}`;
+  if (tag === "meta" && attrs.property) {
+    return `meta:${attrs.property}`;
+  }
 
   // <link rel="..." href="..."> — keyed by rel+href
   if (tag === "link" && attrs.rel) {
@@ -99,7 +109,9 @@ function headEntryKey(entry: JxHeadEntry) {
   }
 
   // <script src="..."> — keyed by src
-  if (tag === "script" && attrs.src) return `script:${attrs.src}`;
+  if (tag === "script" && attrs.src) {
+    return `script:${attrs.src}`;
+  }
 
   // <style> — unique per content hash
   if (tag === "style") {
@@ -122,7 +134,7 @@ function headEntryKey(entry: JxHeadEntry) {
 function simpleHash(str: string) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0;
+    hash = ((hash << 5) - hash + str.codePointAt(i)) | 0;
   }
   return hash.toString(36);
 }
@@ -144,8 +156,12 @@ export function renderHead(headEntries: JxHeadEntry[]) {
  * @returns {string}
  */
 function renderHeadEntry(entry: JxHeadEntry) {
-  if (typeof entry === "string") return entry;
-  if (!entry || typeof entry !== "object") return "";
+  if (typeof entry === "string") {
+    return entry;
+  }
+  if (!entry || typeof entry !== "object") {
+    return "";
+  }
 
   const tag = entry.tagName;
   const attrs = entry.attributes ?? {};
@@ -157,7 +173,9 @@ function renderHeadEntry(entry: JxHeadEntry) {
 
   // Void elements (no closing tag)
   const VOID = new Set(["meta", "link", "base", "br", "hr", "img", "input"]);
-  if (VOID.has(tag)) return open;
+  if (VOID.has(tag)) {
+    return open;
+  }
 
   // Elements with content
   const content = Array.isArray(entry.children)
@@ -171,5 +189,5 @@ function renderHeadEntry(entry: JxHeadEntry) {
  * @returns {string}
  */
 function escapeAttr(val: unknown) {
-  return String(val).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return String(val).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }

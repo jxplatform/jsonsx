@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { resolveLayout } from "../src/site/layout-resolver";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -11,7 +11,7 @@ function setup() {
 }
 
 function cleanup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 }
 
 /** @param {string} name @param {unknown} content */
@@ -23,7 +23,7 @@ function writeLayout(name: string, content: unknown) {
 
 describe("resolveLayout", () => {
   test("returns page as-is when no layout specified", () => {
-    const page = { tagName: "div", children: [{ tagName: "p" }] };
+    const page = { children: [{ tagName: "p" }], tagName: "div" };
     const result = resolveLayout(page, {}, "/tmp");
     expect(result).toBe(page);
   });
@@ -43,18 +43,18 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("base.json", {
-        tagName: "div",
         children: [
           {
-            tagName: "header",
             children: [{ tagName: "h1", textContent: "Header" }],
+            tagName: "header",
           },
-          { tagName: "main", children: [{ tagName: "slot" }] },
+          { children: [{ tagName: "slot" }], tagName: "main" },
           {
-            tagName: "footer",
             children: [{ tagName: "p", textContent: "Footer" }],
+            tagName: "footer",
           },
         ],
+        tagName: "div",
       });
 
       const page = {
@@ -74,20 +74,20 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("slots.json", {
-        tagName: "div",
         children: [
           {
+            children: [{ attributes: { name: "nav" }, tagName: "slot" }],
             tagName: "nav",
-            children: [{ tagName: "slot", attributes: { name: "nav" } }],
           },
-          { tagName: "main", children: [{ tagName: "slot" }] },
+          { children: [{ tagName: "slot" }], tagName: "main" },
         ],
+        tagName: "div",
       });
 
       const page = {
         $layout: "./layouts/slots.json",
         children: [
-          { tagName: "a", attributes: { slot: "nav" }, textContent: "Link" },
+          { attributes: { slot: "nav" }, tagName: "a", textContent: "Link" },
           { tagName: "p", textContent: "Main content" },
         ],
       };
@@ -108,9 +108,9 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("with-state.json", {
-        tagName: "div",
-        state: { layoutVar: "from-layout" },
         children: [],
+        state: { layoutVar: "from-layout" },
+        tagName: "div",
       });
 
       const page = {
@@ -130,9 +130,9 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("override.json", {
-        tagName: "div",
-        state: { shared: "layout-value" },
         children: [],
+        state: { shared: "layout-value" },
+        tagName: "div",
       });
 
       const page = {
@@ -151,19 +151,19 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("meta.json", {
-        tagName: "div",
         children: [],
+        tagName: "div",
       });
 
       const page = {
-        $layout: "./layouts/meta.json",
-        title: "About Us",
         $head: [
           {
+            attributes: { content: "About page", name: "description" },
             tagName: "meta",
-            attributes: { name: "description", content: "About page" },
           },
         ],
+        $layout: "./layouts/meta.json",
+        title: "About Us",
       };
 
       const result = resolveLayout(page, {}, FIXTURES) as any;
@@ -177,7 +177,7 @@ describe("resolveLayout", () => {
   test("removes $layout from resolved document", () => {
     setup();
     try {
-      writeLayout("clean.json", { tagName: "div", children: [] });
+      writeLayout("clean.json", { children: [], tagName: "div" });
       const page = { $layout: "./layouts/clean.json" };
       const result = resolveLayout(page, {}, FIXTURES) as any;
       expect(result.$layout).toBeUndefined();
@@ -190,9 +190,9 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("default.json", {
-        tagName: "div",
-        className: "default-layout",
         children: [{ tagName: "slot" }],
+        className: "default-layout",
+        tagName: "div",
       });
 
       const page = {
@@ -211,20 +211,20 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("fallback.json", {
-        tagName: "div",
         children: [
           {
-            tagName: "aside",
             children: [
               {
-                tagName: "slot",
                 attributes: { name: "sidebar" },
                 children: [{ tagName: "p", textContent: "Default sidebar" }],
+                tagName: "slot",
               },
             ],
+            tagName: "aside",
           },
-          { tagName: "main", children: [{ tagName: "slot" }] },
+          { children: [{ tagName: "slot" }], tagName: "main" },
         ],
+        tagName: "div",
       });
 
       const page = {
@@ -255,14 +255,14 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("outer.json", {
+        children: [{ children: [{ tagName: "slot" }], tagName: "body" }],
         tagName: "html",
-        children: [{ tagName: "body", children: [{ tagName: "slot" }] }],
       });
       writeLayout("inner.json", {
         $layout: "./layouts/outer.json",
-        tagName: "div",
-        className: "inner-wrapper",
         children: [{ tagName: "slot" }],
+        className: "inner-wrapper",
+        tagName: "div",
       });
 
       const page = {
@@ -283,9 +283,9 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("media.json", {
-        tagName: "div",
         $media: { "--md": "(min-width: 768px)" },
         children: [{ tagName: "slot" }],
+        tagName: "div",
       });
 
       const page = {
@@ -306,15 +306,15 @@ describe("resolveLayout", () => {
     setup();
     try {
       writeLayout("styled.json", {
-        tagName: "div",
-        style: { color: "red" },
         children: [{ tagName: "slot" }],
+        style: { color: "red" },
+        tagName: "div",
       });
 
       const page = {
         $layout: "./layouts/styled.json",
-        style: { fontSize: "16px" },
         children: [{ tagName: "p" }],
+        style: { fontSize: "16px" },
       };
 
       const result = resolveLayout(page, {}, FIXTURES) as any;

@@ -18,9 +18,7 @@ export interface TocEntry {
   id: string;
 }
 
-export interface ContentEntry extends MarkdownFileResult {
-  [key: string]: unknown;
-}
+export type ContentEntry = MarkdownFileResult & Record<string, unknown>;
 
 export interface ContentLoaderEntry {
   id: string;

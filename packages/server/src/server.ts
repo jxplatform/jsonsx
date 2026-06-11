@@ -13,7 +13,7 @@
  *   proxying, and studio filesystem integration as a single createDevServer() call.
  */
 
-import { resolve, join } from "node:path";
+import { join, resolve } from "node:path";
 import { buildAll } from "./build.ts";
 import { createWatcher, injectSSE } from "./watch.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
@@ -34,11 +34,13 @@ function resolveNpmPath(root: string, urlPath: string) {
   let segments = urlPath.split("/").filter(Boolean);
 
   // If "node_modules" appears in the path, use everything before it as a subdirectory
-  // prefix and everything after as the package specifier.
-  // e.g. /examples/demo/node_modules/@scope/pkg → root=root/examples/demo, pkg=@scope/pkg
+  // Prefix and everything after as the package specifier.
+  // E.g. /examples/demo/node_modules/@scope/pkg → root=root/examples/demo, pkg=@scope/pkg
   const nmIdx = segments.indexOf("node_modules");
-  if (nmIdx >= 0) {
-    if (nmIdx > 0) root = join(root, ...segments.slice(0, nmIdx));
+  if (nmIdx !== -1) {
+    if (nmIdx > 0) {
+      root = join(root, ...segments.slice(0, nmIdx));
+    }
     segments = segments.slice(nmIdx + 1);
   }
 
@@ -57,7 +59,9 @@ function resolveNpmPath(root: string, urlPath: string) {
   let subpath: string = "";
 
   if (isScoped) {
-    if (start < 0 || start + 1 >= segments.length) return null;
+    if (start < 0 || start + 1 >= segments.length) {
+      return null;
+    }
     const scope = segments[start];
     const pkg = segments[start + 1];
     subpath = segments.slice(start + 2).join("/");
@@ -73,11 +77,15 @@ function resolveNpmPath(root: string, urlPath: string) {
         break;
       }
     }
-    if (start < 0) return null;
+    if (start < 0) {
+      return null;
+    }
   }
 
   const pkgJsonPath = join(pkgDir, "package.json");
-  if (!existsSync(pkgJsonPath)) return null;
+  if (!existsSync(pkgJsonPath)) {
+    return null;
+  }
 
   // If there's a subpath, check package.json exports first
   if (subpath) {
@@ -86,19 +94,25 @@ function resolveNpmPath(root: string, urlPath: string) {
       const exportKey = `./${subpath}`;
       if (pkgJson.exports && pkgJson.exports[exportKey]) {
         const mapped = join(pkgDir, pkgJson.exports[exportKey]);
-        if (existsSync(mapped)) return mapped;
+        if (existsSync(mapped)) {
+          return mapped;
+        }
       }
     } catch {}
     // Fall back to direct path
     const direct = join(pkgDir, subpath);
-    if (existsSync(direct)) return direct;
+    if (existsSync(direct)) {
+      return direct;
+    }
     // CEM-relative: subpath may be relative to the custom elements manifest directory
     try {
       const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
       if (pkgJson.customElements) {
         const cemDir = pkgJson.customElements.replace(/\/[^/]+$/, "");
         const cemRelative = join(pkgDir, cemDir, subpath);
-        if (existsSync(cemRelative)) return cemRelative;
+        if (existsSync(cemRelative)) {
+          return cemRelative;
+        }
       }
     } catch {}
   }
@@ -113,7 +127,9 @@ function resolveNpmPath(root: string, urlPath: string) {
       pkgJson.main;
     if (entry && typeof entry === "string") {
       const resolved = join(pkgDir, entry);
-      if (existsSync(resolved)) return resolved;
+      if (existsSync(resolved)) {
+        return resolved;
+      }
     }
   } catch {}
 
@@ -162,7 +178,9 @@ export async function createDevServer(options: {
     middleware,
   } = options;
 
-  if (!root) throw new Error("@jxsuite/server: root is required");
+  if (!root) {
+    throw new Error("@jxsuite/server: root is required");
+  }
   const absRoot = resolve(root);
 
   // ─── Build pipeline ─────────────────────────────────────────────────────────
@@ -177,11 +195,11 @@ export async function createDevServer(options: {
   if (watch !== false) {
     const watchOpts = typeof watch === "object" ? watch : {};
     const watcher = createWatcher(absRoot, builds, watchOpts);
-    handleSSE = watcher.handleSSE;
+    ({ handleSSE } = watcher);
   }
 
   // Bundle cache for npm packages (bare specifier → bundled JS)
-  const bundleCache: Map<string, string> = new Map();
+  const bundleCache = new Map<string, string>();
 
   // Active studio project root (set via /__studio/activate, used for static file fallback)
   let activeProjectRoot: string | null = null;
@@ -189,13 +207,14 @@ export async function createDevServer(options: {
   // ─── HTTP server ────────────────────────────────────────────────────────────
 
   const server = Bun.serve({
-    port,
-
     async fetch(req) {
       const url = new URL(req.url);
       let path = decodeURIComponent(url.pathname);
-      if (path.endsWith("/")) path += "index.html";
-      else if (path === "") path = "/index.html";
+      if (path.endsWith("/")) {
+        path += "index.html";
+      } else if (path === "") {
+        path = "/index.html";
+      }
 
       // SSE live reload
       if (handleSSE && path === "/__reload") {
@@ -207,7 +226,7 @@ export async function createDevServer(options: {
         return handleResolve(req, absRoot, activeProjectRoot);
       }
 
-      // timing: "server" function proxy
+      // Timing: "server" function proxy
       if (path === "/__jx_server__" && req.method === "POST") {
         return handleServerFunction(req, absRoot);
       }
@@ -224,16 +243,22 @@ export async function createDevServer(options: {
         }
 
         const codeRes = await handleCodeApi(req, url);
-        if (codeRes) return codeRes;
+        if (codeRes) {
+          return codeRes;
+        }
 
         const res = await handleStudioApi(req, url, absRoot, activeProjectRoot);
-        if (res) return res;
+        if (res) {
+          return res;
+        }
       }
 
       // Custom middleware
       if (middleware) {
         const res = await middleware(req, url);
-        if (res) return res;
+        if (res) {
+          return res;
+        }
       }
 
       // Static files
@@ -248,16 +273,16 @@ export async function createDevServer(options: {
         }
       }
 
-      const file = Bun.file(resolve(absRoot, "." + path));
+      const file = Bun.file(resolve(absRoot, `.${path}`));
       if (!(await file.exists())) {
         // Try resolving relative to active studio project root
         if (activeProjectRoot) {
-          const projectFile = Bun.file(resolve(activeProjectRoot, "." + path));
+          const projectFile = Bun.file(resolve(activeProjectRoot, `.${path}`));
           if (await projectFile.exists()) {
             return new Response(projectFile);
           }
           // Mirror production: public/ contents are served at root
-          const publicFile = Bun.file(resolve(activeProjectRoot, "public", "." + path));
+          const publicFile = Bun.file(resolve(activeProjectRoot, "public", `.${path}`));
           if (await publicFile.exists()) {
             return new Response(publicFile);
           }
@@ -278,8 +303,8 @@ export async function createDevServer(options: {
               if (result.success && result.outputs.length > 0) {
                 bundleCache.set(cacheKey, await result.outputs[0].text());
               }
-            } catch (e) {
-              console.error("Bundle failed for", resolved, e);
+            } catch (error) {
+              console.error("Bundle failed for", resolved, error);
             }
           }
           const bundled = bundleCache.get(cacheKey);
@@ -303,6 +328,8 @@ export async function createDevServer(options: {
 
       return new Response(file);
     },
+
+    port,
   });
 
   console.log(`\n@jxsuite/server listening on http://localhost:${server.port}`);

@@ -1,199 +1,199 @@
 export const projectConfigSchema = {
+  additionalProperties: false,
   description:
     "Schema for Jx project.json files. " +
     "A project.json file is the root anchor file for a Jx project, " +
     "declaring site metadata, default settings, global styles, content types, " +
     "and build configuration.",
-  type: "object",
   properties: {
-    name: {
-      description: "Human-readable project name.",
-      type: "string",
-      default: "Jx Site",
-      examples: ["My Portfolio", "Jx Example Site"],
-    },
-    url: {
-      description: "Production URL of the deployed site.",
-      type: "string",
-      examples: ["https://example.com", "https://jxsuite.com"],
-    },
-    defaults: {
-      description: "Default settings applied to all pages unless overridden.",
+    $defs: {
+      description: "Global type definitions available to all pages.",
       type: "object",
-      properties: {
-        layout: {
-          description:
-            "Default layout file path applied to all pages. " +
-            "Set to null to render pages without a layout.",
-          oneOf: [{ type: "string" }, { type: "null" }],
-          default: null,
-          examples: ["./layouts/base.json"],
-        },
-        lang: {
-          description: "Default lang attribute for the <html> element.",
-          type: "string",
-          default: "en",
-        },
-        charset: {
-          description: "Default charset for the page.",
-          type: "string",
-          default: "utf-8",
-        },
-      },
-    },
-    $head: {
-      description:
-        "Global <head> entries applied to all pages. " +
-        "Array of element definitions for meta tags, link tags, script tags, etc.",
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          tagName: { type: "string" },
-          attributes: {
-            type: "object",
-            additionalProperties: { type: "string" },
-          },
-        },
-      },
-      examples: [
-        [
-          { tagName: "link", attributes: { rel: "icon", href: "/favicon.svg" } },
-          { tagName: "meta", attributes: { name: "generator", content: "Jx" } },
-        ],
-      ],
     },
     $elements: {
       description:
         "Global custom element dependencies available to all pages. " +
         "Items are $ref objects or npm package specifier strings.",
-      type: "array",
       items: {
         oneOf: [
           {
-            type: "object",
-            required: ["$ref"],
-            properties: { $ref: { type: "string" } },
             additionalProperties: false,
+            properties: { $ref: { type: "string" } },
+            required: ["$ref"],
+            type: "object",
           },
           { type: "string" },
         ],
       },
+      type: "array",
     },
+    $head: {
+      description:
+        "Global <head> entries applied to all pages. " +
+        "Array of element definitions for meta tags, link tags, script tags, etc.",
+      examples: [
+        [
+          { attributes: { href: "/favicon.svg", rel: "icon" }, tagName: "link" },
+          { attributes: { content: "Jx", name: "generator" }, tagName: "meta" },
+        ],
+      ],
+      items: {
+        properties: {
+          attributes: {
+            additionalProperties: { type: "string" },
+            type: "object",
+          },
+          tagName: { type: "string" },
+        },
+        type: "object",
+      },
+      type: "array",
+    },
+    $media: {
+      additionalProperties: { type: "string" },
+      description:
+        "Named media breakpoints following CSS @custom-media convention. " +
+        "Available in all component style objects.",
+      examples: [
+        {
+          "--lg": "(min-width: 1024px)",
+          "--md": "(min-width: 768px)",
+          "--sm": "(min-width: 640px)",
+        },
+      ],
+      type: "object",
+    },
+    build: {
+      description: "Build configuration.",
+      properties: {
+        adapter: {
+          description: "Platform adapter for deployment-specific output.",
+          enum: ["netlify", "vercel", "cloudflare"],
+          type: "string",
+        },
+        format: {
+          default: "directory",
+          description: "Output format.",
+          enum: ["directory", "single"],
+          type: "string",
+        },
+        outDir: {
+          default: "./dist",
+          description: "Output directory for compiled site.",
+          type: "string",
+        },
+        trailingSlash: {
+          default: "always",
+          description: "Trailing slash behavior for generated URLs.",
+          enum: ["always", "never", "ignore"],
+          type: "string",
+        },
+      },
+      type: "object",
+    },
+    contentTypes: {
+      additionalProperties: { $ref: "#/$defs/ContentTypeDef" },
+      description:
+        "Content type definitions. Each key is a content type name; " +
+        "the value defines the source directory, frontmatter schema, and element dependencies.",
+      type: "object",
+    },
+    copy: {
+      additionalProperties: { type: "string" },
+      description:
+        "Declarative file copy map. Keys are source paths (relative to project root), values are destination paths (relative to outDir).",
+      type: "object",
+    },
+    defaults: {
+      description: "Default settings applied to all pages unless overridden.",
+      properties: {
+        charset: {
+          default: "utf8",
+          description: "Default charset for the page.",
+          type: "string",
+        },
+        lang: {
+          default: "en",
+          description: "Default lang attribute for the <html> element.",
+          type: "string",
+        },
+        layout: {
+          default: null,
+          description:
+            "Default layout file path applied to all pages. " +
+            "Set to null to render pages without a layout.",
+          examples: ["./layouts/base.json"],
+          oneOf: [{ type: "string" }, { type: "null" }],
+        },
+      },
+      type: "object",
+    },
+    i18n: {
+      description: "Internationalization configuration.",
+      properties: {
+        defaultLocale: {
+          description: "Default locale code.",
+          examples: ["en"],
+          type: "string",
+        },
+        locales: {
+          description: "Available locale codes.",
+          examples: [["en", "fr", "de"]],
+          items: { type: "string" },
+          type: "array",
+        },
+        routing: {
+          description: "Locale routing strategy.",
+          enum: ["prefix-except-default", "prefix-always"],
+          type: "string",
+        },
+      },
+      type: "object",
+    },
+    images: { $ref: "#/$defs/ImageConfig" },
     imports: {
+      additionalProperties: { type: "string" },
       description:
         "Global import map: $prototype names to .class.json file paths. " +
         "Makes external classes available by name in all pages.",
-      type: "object",
-      additionalProperties: { type: "string" },
       examples: [
         {
           Markdown: "@jxsuite/parser/Markdown.class.json",
           MarkdownCollection: "@jxsuite/parser/MarkdownCollection.class.json",
         },
       ],
-    },
-    $media: {
-      description:
-        "Named media breakpoints following CSS @custom-media convention. " +
-        "Available in all component style objects.",
       type: "object",
+    },
+    name: {
+      default: "Jx Site",
+      description: "Human-readable project name.",
+      examples: ["My Portfolio", "Jx Example Site"],
+      type: "string",
+    },
+    redirects: {
       additionalProperties: { type: "string" },
-      examples: [
-        {
-          "--sm": "(min-width: 640px)",
-          "--md": "(min-width: 768px)",
-          "--lg": "(min-width: 1024px)",
-        },
-      ],
-    },
-    style: {
-      description:
-        "Global CSS styles applied to the <body> element. " +
-        "Uses the same camelCase CSSOM convention as component styles.",
+      description: "Static redirect rules. Maps source paths to destination paths.",
+      examples: [{ "/old-about": "/about" }],
       type: "object",
-      additionalProperties: {
-        oneOf: [{ type: "string" }, { type: "number" }, { type: "object" }],
-      },
     },
     state: {
       description: "Site-wide reactive state available to all pages.",
       type: "object",
     },
-    $defs: {
-      description: "Global type definitions available to all pages.",
-      type: "object",
-    },
-    contentTypes: {
-      description:
-        "Content type definitions. Each key is a content type name; " +
-        "the value defines the source directory, frontmatter schema, and element dependencies.",
-      type: "object",
-      additionalProperties: { $ref: "#/$defs/ContentTypeDef" },
-    },
-    redirects: {
-      description: "Static redirect rules. Maps source paths to destination paths.",
-      type: "object",
-      additionalProperties: { type: "string" },
-      examples: [{ "/old-about": "/about" }],
-    },
-    copy: {
-      description:
-        "Declarative file copy map. Keys are source paths (relative to project root), values are destination paths (relative to outDir).",
-      type: "object",
-      additionalProperties: { type: "string" },
-    },
-    build: {
-      description: "Build configuration.",
-      type: "object",
-      properties: {
-        outDir: {
-          description: "Output directory for compiled site.",
-          type: "string",
-          default: "./dist",
-        },
-        format: {
-          description: "Output format.",
-          type: "string",
-          enum: ["directory", "single"],
-          default: "directory",
-        },
-        trailingSlash: {
-          description: "Trailing slash behavior for generated URLs.",
-          type: "string",
-          enum: ["always", "never", "ignore"],
-          default: "always",
-        },
-        adapter: {
-          description: "Platform adapter for deployment-specific output.",
-          type: "string",
-          enum: ["netlify", "vercel", "cloudflare"],
-        },
+    style: {
+      additionalProperties: {
+        oneOf: [{ type: "string" }, { type: "number" }, { type: "object" }],
       },
-    },
-    images: { $ref: "#/$defs/ImageConfig" },
-    i18n: {
-      description: "Internationalization configuration.",
+      description:
+        "Global CSS styles applied to the <body> element. " +
+        "Uses the same camelCase CSSOM convention as component styles.",
       type: "object",
-      properties: {
-        defaultLocale: {
-          description: "Default locale code.",
-          type: "string",
-          examples: ["en"],
-        },
-        locales: {
-          description: "Available locale codes.",
-          type: "array",
-          items: { type: "string" },
-          examples: [["en", "fr", "de"]],
-        },
-        routing: {
-          description: "Locale routing strategy.",
-          type: "string",
-          enum: ["prefix-except-default", "prefix-always"],
-        },
-      },
+    },
+    url: {
+      description: "Production URL of the deployed site.",
+      examples: ["https://example.com", "https://jxsuite.com"],
+      type: "string",
     },
   },
-  additionalProperties: false,
+  type: "object",
 } as const;

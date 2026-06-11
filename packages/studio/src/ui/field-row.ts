@@ -42,7 +42,7 @@ export function renderFieldRow({
 }) {
   return html`
     <div
-      class=${classMap({ "style-row": true, "style-row--warning": !!warning })}
+      class=${classMap({ "style-row": true, "style-row--warning": Boolean(warning) })}
       data-prop=${prop}
       style=${span === 2 ? "grid-column: 1 / -1" : ""}
     >

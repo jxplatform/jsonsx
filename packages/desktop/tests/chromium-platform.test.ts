@@ -1,60 +1,62 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 // ─── Embedded mock RPC server ──────────────────────────────────────────────
 
 const responses: Record<string, unknown> = {
-  openProject: {
-    config: { name: "Test" },
-    handle: { root: ".", name: "Test", projectConfig: { name: "Test" } },
-  },
-  listDirectory: [
-    {
-      name: "file.json",
-      path: "file.json",
-      type: "file",
-      size: 42,
-      modified: "2025-01-01",
-    },
-  ],
-  resolveSiteContext: { sitePath: "." },
-  discoverComponents: [{ tagName: "my-btn", path: "btn.json", props: [] }],
+  addPackage: null,
   codeService: null,
-  locateFile: "found/file.json",
-  fetchPluginSchema: { type: "object", properties: {} },
-  gitStatus: { branch: "main", files: [], ahead: 0, behind: 0 },
-  gitBranches: { current: "main", branches: ["main", "dev"] },
-  gitLog: [{ hash: "abc123", message: "init", author: "Test", date: "2025-01-01" }],
-  gitStage: null,
-  gitUnstage: null,
-  gitCommit: null,
-  gitPush: null,
-  gitPull: null,
-  gitFetch: null,
+  createDirectory: null,
+  deleteFile: null,
+  discoverComponents: [{ path: "btn.json", props: [], tagName: "my-btn" }],
+  fetchPluginSchema: { properties: {}, type: "object" },
+  gitBranches: { branches: ["main", "dev"], current: "main" },
   gitCheckout: null,
+  gitCommit: null,
   gitCreateBranch: null,
   gitDiff: "diff --git a/file",
   gitDiscard: null,
+  gitFetch: null,
+  gitLog: [{ author: "Test", date: "2025-01-01", hash: "abc123", message: "init" }],
+  gitPull: null,
+  gitPush: null,
   gitShow: "file at ref",
-  searchFiles: [{ name: "match.json", path: "match.json", type: "file" }],
-  addPackage: null,
-  removePackage: null,
+  gitStage: null,
+  gitStatus: { ahead: 0, behind: 0, branch: "main", files: [] },
+  gitUnstage: null,
+  listDirectory: [
+    {
+      modified: "2025-01-01",
+      name: "file.json",
+      path: "file.json",
+      size: 42,
+      type: "file",
+    },
+  ],
   listPackages: [{ name: "lodash", version: "^4.0.0" }],
-  writeFile: null,
-  deleteFile: null,
+  locateFile: "found/file.json",
+  openProject: {
+    config: { name: "Test" },
+    handle: { name: "Test", projectConfig: { name: "Test" }, root: "." },
+  },
+  removePackage: null,
   renameFile: null,
-  createDirectory: null,
+  resolveSiteContext: { sitePath: "." },
+  searchFiles: [{ name: "match.json", path: "match.json", type: "file" }],
   uploadFile: null,
+  writeFile: null,
 };
 
 // Track forced errors for specific methods
-let forcedErrors: Map<string, string> = new Map();
+const forcedErrors = new Map<string, string>();
 
 const server = Bun.serve({
-  port: 0,
   fetch(req, server) {
-    if (server.upgrade(req)) return;
+    if (server.upgrade(req)) {
+      return;
+    }
     return new Response("Not Found", { status: 404 });
   },
+  port: 0,
   websocket: {
     message(ws, raw) {
       const msg = JSON.parse(raw as string) as {
@@ -66,7 +68,7 @@ const server = Bun.serve({
       const forcedError = forcedErrors.get(msg.method);
       if (forcedError) {
         forcedErrors.delete(msg.method);
-        ws.send(JSON.stringify({ id: msg.id, error: forcedError }));
+        ws.send(JSON.stringify({ error: forcedError, id: msg.id }));
         return;
       }
 
@@ -91,8 +93,8 @@ const server = Bun.serve({
       } else {
         ws.send(
           JSON.stringify({
-            id: msg.id,
             error: `Unknown method: ${msg.method}`,
+            id: msg.id,
           }),
         );
       }
@@ -105,20 +107,20 @@ const TEST_HOST = `localhost:${server.port}`;
 // Override location.host for the platform to connect to our mock server.
 // Use Object.defineProperty to survive happy-dom's GlobalRegistrator.
 Object.defineProperty(globalThis, "location", {
+  configurable: true,
   value: { host: TEST_HOST, href: `http://${TEST_HOST}/` },
   writable: true,
-  configurable: true,
 });
 
 // Happy-dom (loaded by studio test preload) replaces globalThis.WebSocket with
-// a version that cannot connect to real servers. Detect and fix this by falling
-// back to a thin wrapper around Bun's native TCP WebSocket upgrade.
+// A version that cannot connect to real servers. Detect and fix this by falling
+// Back to a thin wrapper around Bun's native TCP WebSocket upgrade.
 const wsStr = globalThis.WebSocket?.toString() ?? "";
 if (wsStr.includes("WebSocketImplementation") || wsStr.includes("DOMException")) {
   const saved = globalThis.WebSocket;
   // Bun supports native WebSocket via its internal implementation.
   // We can get a working one by deleting happy-dom's override — Bun re-exposes the built-in.
-  // @ts-ignore
+  // @ts-expect-error
   delete globalThis.WebSocket;
   if (!globalThis.WebSocket) {
     // Fallback: re-assign — shouldn't happen in Bun but just in case
@@ -137,9 +139,9 @@ describe("chromium desktop platform", () => {
 
   beforeAll(() => {
     Object.defineProperty(globalThis, "location", {
+      configurable: true,
       value: { host: TEST_HOST, href: `http://${TEST_HOST}/` },
       writable: true,
-      configurable: true,
     });
     platform = createDesktopPlatform();
   });
@@ -241,7 +243,7 @@ describe("chromium desktop platform", () => {
 
   test("fetchPluginSchema returns schema", async () => {
     const schema = await platform.fetchPluginSchema("./Plugin.ts", "Plugin");
-    expect(schema).toEqual({ type: "object", properties: {} });
+    expect(schema).toEqual({ properties: {}, type: "object" });
   });
 
   // ─── Git operations ────────────────────────────────────────────────────

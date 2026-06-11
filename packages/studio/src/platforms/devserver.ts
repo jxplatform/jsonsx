@@ -26,8 +26,12 @@ export function createDevServerPlatform() {
    */
   function serverPath(rel: string) {
     const r = rel.replaceAll("\\", "/");
-    if (!_projectRoot) return r;
-    if (r === ".") return _projectRoot;
+    if (!_projectRoot) {
+      return r;
+    }
+    if (r === ".") {
+      return _projectRoot;
+    }
     return `${_projectRoot}/${r}`;
   }
 
@@ -38,8 +42,10 @@ export function createDevServerPlatform() {
    */
   function stripRoot(path: string) {
     const p = path.replaceAll("\\", "/");
-    if (!_projectRoot) return p;
-    return p.startsWith(_projectRoot + "/") ? p.slice(_projectRoot.length + 1) : p;
+    if (!_projectRoot) {
+      return p;
+    }
+    return p.startsWith(`${_projectRoot}/`) ? p.slice(_projectRoot.length + 1) : p;
   }
 
   return {
@@ -51,7 +57,9 @@ export function createDevServerPlatform() {
     },
     set projectRoot(v) {
       _projectRoot = v || "";
-      if (_projectRoot) this.activate(_projectRoot);
+      if (_projectRoot) {
+        this.activate(_projectRoot);
+      }
     },
 
     /**
@@ -63,9 +71,9 @@ export function createDevServerPlatform() {
     async activate(root?: string) {
       const r = root ?? _projectRoot;
       await fetch("/__studio/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ root: r }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
     },
 
@@ -84,10 +92,12 @@ export function createDevServerPlatform() {
             showDirectoryPicker(opts: { mode: string }): Promise<FileSystemDirectoryHandle>;
           }
         ).showDirectoryPicker({ mode: "readwrite" });
-      } catch (e) {
+      } catch (error) {
         // User cancelled the picker
-        if ((e as Error).name === "AbortError") return null;
-        throw e;
+        if (error instanceof Error && error.name === "AbortError") {
+          return null;
+        }
+        throw error;
       }
 
       // Read project.json from the chosen directory
@@ -103,7 +113,9 @@ export function createDevServerPlatform() {
 
       // Resolve server-relative path by matching against known sites
       const sitesRes = await fetch("/__studio/sites");
-      if (!sitesRes.ok) throw new Error("Failed to fetch site list from server");
+      if (!sitesRes.ok) {
+        throw new Error("Failed to fetch site list from server");
+      }
       const sites = await sitesRes.json();
       const match = sites.find(
         /** @param {{ config: unknown; path: string }} s */ (s: {
@@ -117,9 +129,13 @@ export function createDevServerPlatform() {
         const findRes = await fetch(
           `/__studio/find-project?name=${encodeURIComponent(dirHandle.name)}`,
         );
-        if (!findRes.ok) throw new Error("Could not locate project on disk");
+        if (!findRes.ok) {
+          throw new Error("Could not locate project on disk");
+        }
         const found = await findRes.json();
-        if (!found.path) throw new Error(`Could not find project directory "${dirHandle.name}"`);
+        if (!found.path) {
+          throw new Error(`Could not find project directory "${dirHandle.name}"`);
+        }
         _projectRoot = found.path;
       } else {
         _projectRoot = match.path;
@@ -131,9 +147,9 @@ export function createDevServerPlatform() {
       return {
         config,
         handle: {
-          root: _projectRoot,
           name: config.name || _projectRoot.split("/").pop(),
           projectConfig: config,
+          root: _projectRoot,
         },
       };
     },
@@ -148,9 +164,9 @@ export function createDevServerPlatform() {
           fetch("/__studio/project"),
           fetch("/__studio/project-info?dir=."),
         ]);
-        const meta = projectRes.ok ? await projectRes.json() : { root: ".", name: "project" };
+        const meta = projectRes.ok ? await projectRes.json() : { name: "project", root: "." };
         const info = infoRes.ok ? await infoRes.json() : { isSiteProject: false };
-        return { meta, info };
+        return { info, meta };
       } catch {
         return null;
       }
@@ -175,9 +191,9 @@ export function createDevServerPlatform() {
       directory: string;
     }) {
       const res = await fetch("/__studio/create-project", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(opts),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
       if (!res.ok) {
         const data = await res.json();
@@ -191,16 +207,22 @@ export function createDevServerPlatform() {
     /** @param {string} dir */
     async listDirectory(dir: string) {
       const res = await fetch(`/__studio/files?dir=${encodeURIComponent(serverPath(dir))}`);
-      if (!res.ok) throw new Error(`Failed to list directory: ${dir}`);
+      if (!res.ok) {
+        throw new Error(`Failed to list directory: ${dir}`);
+      }
       const entries = await res.json();
-      for (const e of entries) e.path = stripRoot(e.path);
+      for (const e of entries) {
+        e.path = stripRoot(e.path);
+      }
       return entries;
     },
 
     /** @param {string} path */
     async readFile(path: string) {
       const res = await fetch(`/__studio/file?path=${encodeURIComponent(serverPath(path))}`);
-      if (!res.ok) throw new Error(`Failed to read file: ${path}`);
+      if (!res.ok) {
+        throw new Error(`Failed to read file: ${path}`);
+      }
       const data = await res.json();
       return data.content;
     },
@@ -211,10 +233,12 @@ export function createDevServerPlatform() {
      */
     async writeFile(path: string, content: string) {
       const res = await fetch(`/__studio/file?path=${encodeURIComponent(serverPath(path))}`, {
-        method: "PUT",
         body: content,
+        method: "PUT",
       });
-      if (!res.ok) throw new Error(`Failed to write file: ${path}`);
+      if (!res.ok) {
+        throw new Error(`Failed to write file: ${path}`);
+      }
     },
 
     /**
@@ -226,9 +250,11 @@ export function createDevServerPlatform() {
     async uploadFile(path: string, data: File | Blob | ArrayBuffer) {
       const res = await fetch(
         `/__studio/file/upload?path=${encodeURIComponent(serverPath(path))}`,
-        { method: "POST", body: data },
+        { body: data, method: "POST" },
       );
-      if (!res.ok) throw new Error(`Upload failed: ${path}`);
+      if (!res.ok) {
+        throw new Error(`Upload failed: ${path}`);
+      }
       return await res.json();
     },
 
@@ -237,7 +263,9 @@ export function createDevServerPlatform() {
       const res = await fetch(`/__studio/file?path=${encodeURIComponent(serverPath(path))}`, {
         method: "DELETE",
       });
-      if (!res.ok && res.status !== 404) throw new Error(`Failed to delete file: ${path}`);
+      if (!res.ok && res.status !== 404) {
+        throw new Error(`Failed to delete file: ${path}`);
+      }
     },
 
     /**
@@ -246,11 +274,13 @@ export function createDevServerPlatform() {
      */
     async renameFile(from: string, to: string) {
       const res = await fetch("/__studio/file/rename", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ from: serverPath(from), to: serverPath(to) }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error(`Failed to rename: ${from} → ${to}`);
+      if (!res.ok) {
+        throw new Error(`Failed to rename: ${from} → ${to}`);
+      }
     },
 
     /** @param {string} _path */
@@ -258,7 +288,7 @@ export function createDevServerPlatform() {
       // The server creates directories implicitly when writing files.
       // Write a placeholder and delete it, or rely on mkdir behavior.
       // For now, use the writeFile + delete approach if directory creation
-      // is explicitly needed. The server's writeFile already calls mkdir().
+      // Is explicitly needed. The server's writeFile already calls mkdir().
     },
 
     // ─── Component discovery ──────────────────────────────────────────────
@@ -266,10 +296,14 @@ export function createDevServerPlatform() {
     /** @param {string} dir */
     async discoverComponents(dir: string) {
       const scanDir = dir || _projectRoot;
-      if (!scanDir) return [];
+      if (!scanDir) {
+        return [];
+      }
       const url = `/__studio/components?dir=${encodeURIComponent(scanDir)}`;
       const res = await fetch(url);
-      if (!res.ok) return [];
+      if (!res.ok) {
+        return [];
+      }
       return await res.json();
     },
 
@@ -278,28 +312,34 @@ export function createDevServerPlatform() {
     /** @param {string} name */
     async addPackage(name: string) {
       const res = await fetch("/__studio/packages/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
     /** @param {string} name */
     async removePackage(name: string) {
       const res = await fetch("/__studio/packages/remove", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
     async listPackages() {
       const res = await fetch("/__studio/packages");
-      if (!res.ok) return [];
+      if (!res.ok) {
+        return [];
+      }
       return await res.json();
     },
 
@@ -312,11 +352,13 @@ export function createDevServerPlatform() {
     async codeService(action: string, payload: unknown) {
       try {
         const res = await fetch(`/__studio/code/${action}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          return null;
+        }
         return await res.json();
       } catch {
         return null;
@@ -333,7 +375,9 @@ export function createDevServerPlatform() {
      */
     async resolveSiteContext(filePath: string) {
       const res = await fetch(`/__studio/resolve-site?path=${encodeURIComponent(filePath)}`);
-      if (!res.ok) return { sitePath: null };
+      if (!res.ok) {
+        return { sitePath: null };
+      }
       return await res.json();
     },
 
@@ -343,11 +387,13 @@ export function createDevServerPlatform() {
     async locateFile(name: string) {
       try {
         const res = await fetch("/__studio/locate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
         });
-        if (res.ok) return (await res.json()).path || null;
+        if (res.ok) {
+          return (await res.json()).path || null;
+        }
       } catch {}
       return null;
     },
@@ -362,9 +408,13 @@ export function createDevServerPlatform() {
       const res = await fetch(
         `/__studio/files?dir=${encodeURIComponent(serverPath("."))}&glob=${encodeURIComponent(glob)}`,
       );
-      if (!res.ok) return [];
+      if (!res.ok) {
+        return [];
+      }
       const entries = await res.json();
-      for (const e of entries) e.path = stripRoot(e.path);
+      for (const e of entries) {
+        e.path = stripRoot(e.path);
+      }
       return entries;
     },
 
@@ -373,7 +423,9 @@ export function createDevServerPlatform() {
     /** List the project's registered format classes (auto-discovered from imports). */
     async listFormats() {
       const res = await fetch(`/__studio/formats?dir=${encodeURIComponent(serverPath("."))}`);
-      if (!res.ok) return [];
+      if (!res.ok) {
+        return [];
+      }
       return (await res.json()).formats ?? [];
     },
 
@@ -384,12 +436,14 @@ export function createDevServerPlatform() {
      */
     async formatAction(payload: Record<string, unknown>) {
       const res = await fetch("/__studio/format", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, dir: serverPath(".") }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Format action failed");
+      if (!res.ok) {
+        throw new Error(data.error || "Format action failed");
+      }
       return data.result;
     },
 
@@ -402,10 +456,16 @@ export function createDevServerPlatform() {
      */
     async fetchPluginSchema(src: string, prototype: string, base: string) {
       const params = new URLSearchParams({ src });
-      if (prototype) params.set("prototype", prototype);
-      if (base) params.set("base", base);
+      if (prototype) {
+        params.set("prototype", prototype);
+      }
+      if (base) {
+        params.set("base", base);
+      }
       const res = await fetch(`/__studio/plugin-schema?${params}`);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        return null;
+      }
       const { schema } = await res.json();
       return schema;
     },
@@ -414,13 +474,17 @@ export function createDevServerPlatform() {
 
     async gitStatus() {
       const res = await fetch("/__studio/git/status");
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
     async gitBranches() {
       const res = await fetch("/__studio/git/branches");
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
@@ -428,101 +492,125 @@ export function createDevServerPlatform() {
     async gitLog(limit?: number) {
       const q = limit ? `?limit=${limit}` : "";
       const res = await fetch(`/__studio/git/log${q}`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
     /** @param {string[]} files */
     async gitStage(files: string[]) {
       const res = await fetch("/__studio/git/stage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string[]} files */
     async gitUnstage(files: string[]) {
       const res = await fetch("/__studio/git/unstage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} message */
     async gitCommit(message: string) {
       const res = await fetch("/__studio/git/commit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {{ setUpstream?: boolean }} [opts] */
     async gitPush(opts?: { setUpstream?: boolean }) {
       const res = await fetch("/__studio/git/push", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(opts || {}),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     async gitPull() {
       const res = await fetch("/__studio/git/pull", { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     async gitFetch() {
       const res = await fetch("/__studio/git/fetch", { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} branch */
     async gitCheckout(branch: string) {
       const res = await fetch("/__studio/git/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ branch }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} name */
     async gitCreateBranch(name: string) {
       const res = await fetch("/__studio/git/create-branch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} path */
     async gitDiff(path: string) {
       const res = await fetch(`/__studio/git/diff?path=${encodeURIComponent(path)}`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       return await res.json();
     },
 
     /** @param {{ path: string; ref?: string }} opts */
     async gitShow(opts: { path: string; ref?: string }) {
       const params = new URLSearchParams({ path: opts.path });
-      if (opts.ref) params.set("ref", opts.ref);
+      if (opts.ref) {
+        params.set("ref", opts.ref);
+      }
       const res = await fetch(`/__studio/git/show?${params}`);
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
       const data = await res.json();
       return data.content;
     },
@@ -530,28 +618,34 @@ export function createDevServerPlatform() {
     /** @param {string[]} files */
     async gitDiscard(files: string[]) {
       const res = await fetch("/__studio/git/discard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} url */
     async gitClone(url: string) {
       const res = await fetch("/__studio/git/clone", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     async gitInit() {
       const res = await fetch("/__studio/git/init", { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
     },
 
     /**
@@ -560,11 +654,13 @@ export function createDevServerPlatform() {
      */
     async gitAddRemote(name: string, url: string) {
       const res = await fetch("/__studio/git/add-remote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, url }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
     },
 
     // ─── AI Assistant ───────────────────────────────────
@@ -577,22 +673,26 @@ export function createDevServerPlatform() {
     /** @param {{ message: string; systemPrompt?: string }} opts */
     async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
       const res = await fetch("/__studio/ai/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(opts),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 
     /** @param {string} id @param {string} message */
     async aiSendMessage(id: string, message: string) {
       const res = await fetch(`/__studio/ai/session/${id}/message`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
-      if (!res.ok) throw new Error((await res.json()).error);
+      if (!res.ok) {
+        throw new Error((await res.json()).error);
+      }
       return await res.json();
     },
 

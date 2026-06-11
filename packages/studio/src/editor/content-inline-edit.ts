@@ -1,9 +1,9 @@
 /// <reference lib="dom" />
-import { renderOnly, getNodeAtPath, parentElementPath, childIndex, canvasPanels } from "../store";
+import { canvasPanels, childIndex, getNodeAtPath, parentElementPath, renderOnly } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateInsertNode, mutateUpdateProperty } from "../tabs/transact";
+import { mutateInsertNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
-import { startEditing, isEditableBlock } from "./inline-edit";
+import { isEditableBlock, startEditing } from "./inline-edit";
 import { restoreTemplateExpressions } from "../utils/edit-display";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
@@ -22,8 +22,8 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
  */
 export function enterInlineEdit(el: HTMLElement, path: JxPath) {
   // Restore raw template expressions before editing.
-  // prepareForEditMode renders ${expr} as ❪ expr ❫ for display;
-  // revert so the user edits the real syntax and commits it back intact.
+  // PrepareForEditMode renders ${expr} as ❪ expr ❫ for display;
+  // Revert so the user edits the real syntax and commits it back intact.
   restoreTemplateExpressions(el);
 
   // Hide overlays while editing
@@ -40,66 +40,34 @@ export function enterInlineEdit(el: HTMLElement, path: JxPath) {
     ) {
       const node = getNodeAtPath(activeTab.value!.doc.document, commitPath);
       if (children) {
-        if (node && JSON.stringify(node.children) === JSON.stringify(children)) return;
+        if (node && JSON.stringify(node.children) === JSON.stringify(children)) {
+          return;
+        }
         transactDoc(activeTab.value, (t) => {
-          mutateUpdateProperty(t, commitPath, "textContent", undefined);
+          mutateUpdateProperty(t, commitPath, "textContent");
           mutateUpdateProperty(t, commitPath, "children", children);
         });
       } else if (textContent != null) {
-        if (node && node.textContent === textContent && !node.children) return;
+        if (node && node.textContent === textContent && !node.children) {
+          return;
+        }
         transactDoc(activeTab.value, (t) => {
-          mutateUpdateProperty(t, commitPath, "children", undefined);
+          mutateUpdateProperty(t, commitPath, "children");
           mutateUpdateProperty(t, commitPath, "textContent", textContent);
         });
       }
     },
 
-    onSplit(splitPath: JxPath, before: JxContentResult, after: JxContentResult) {
-      const tag = "p";
-
-      // Insert new element after with "after" content
-      const parentPath = parentElementPath(splitPath) as JxPath;
-      const idx = childIndex(splitPath) as number;
-      const newNode: JxMutableNode = { tagName: tag };
-      if (after.textContent != null) {
-        newNode.textContent = after.textContent;
-      } else if (after.children) {
-        newNode.children = after.children;
-      } else {
-        newNode.textContent = "";
+    onEnd() {
+      if (view.inlineEditCleanup) {
+        view.inlineEditCleanup();
+        view.inlineEditCleanup = null;
       }
-
-      const newPath = [...parentPath, "children", idx + 1];
-
-      transactDoc(activeTab.value, (t) => {
-        if (before.textContent != null) {
-          mutateUpdateProperty(t, splitPath, "children", undefined);
-          mutateUpdateProperty(t, splitPath, "textContent", before.textContent);
-        } else if (before.children) {
-          mutateUpdateProperty(t, splitPath, "textContent", undefined);
-          mutateUpdateProperty(t, splitPath, "children", before.children);
-        }
-        mutateInsertNode(t, parentPath, idx + 1, newNode);
-        t.session.selection = newPath;
-      });
-
-      // Re-enter editing on the new element after render
-      requestAnimationFrame(() => {
-        const activePanel = getActivePanel();
-        if (activePanel) {
-          const newEl = findCanvasElement(newPath, activePanel.canvas);
-          if (newEl && isEditableBlock(newEl)) {
-            enterInlineEdit(newEl, newPath);
-            // Place cursor at start of new element
-            const sel = window.getSelection();
-            const range = document.createRange();
-            range.selectNodeContents(newEl);
-            range.collapse(true);
-            sel?.removeAllRanges();
-            sel?.addRange(range);
-          }
-        }
-      });
+      for (const p of canvasPanels) {
+        p.overlay.style.display = "";
+        p.overlayClk.style.pointerEvents = "";
+      }
+      renderOnly("overlays");
     },
 
     onInsert(afterPath: JxPath, cmd: SlashCommand, commitData: JxContentResult | undefined) {
@@ -119,12 +87,12 @@ export function enterInlineEdit(el: HTMLElement, path: JxPath) {
       if (isEmpty) {
         transactDoc(activeTab.value, (t) => {
           mutateUpdateProperty(t, afterPath, "tagName", cmd.tag);
-          mutateUpdateProperty(t, afterPath, "children", undefined);
+          mutateUpdateProperty(t, afterPath, "children");
           const def = defaultDef(cmd.tag);
           if (def.textContent && def.textContent !== "Paragraph text") {
             mutateUpdateProperty(t, afterPath, "textContent", def.textContent);
           } else {
-            mutateUpdateProperty(t, afterPath, "textContent", undefined);
+            mutateUpdateProperty(t, afterPath, "textContent");
           }
           t.session.selection = afterPath;
         });
@@ -150,10 +118,10 @@ export function enterInlineEdit(el: HTMLElement, path: JxPath) {
       transactDoc(activeTab.value, (t) => {
         if (commitData) {
           if (commitData.children) {
-            mutateUpdateProperty(t, afterPath, "textContent", undefined);
+            mutateUpdateProperty(t, afterPath, "textContent");
             mutateUpdateProperty(t, afterPath, "children", commitData.children);
           } else if (commitData.textContent != null) {
-            mutateUpdateProperty(t, afterPath, "children", undefined);
+            mutateUpdateProperty(t, afterPath, "children");
             mutateUpdateProperty(t, afterPath, "textContent", commitData.textContent);
           }
         }
@@ -173,16 +141,52 @@ export function enterInlineEdit(el: HTMLElement, path: JxPath) {
       });
     },
 
-    onEnd() {
-      if (view.inlineEditCleanup) {
-        view.inlineEditCleanup();
-        view.inlineEditCleanup = null;
+    onSplit(splitPath: JxPath, before: JxContentResult, after: JxContentResult) {
+      const tag = "p";
+
+      // Insert new element after with "after" content
+      const parentPath = parentElementPath(splitPath) as JxPath;
+      const idx = childIndex(splitPath) as number;
+      const newNode: JxMutableNode = { tagName: tag };
+      if (after.textContent != null) {
+        newNode.textContent = after.textContent;
+      } else if (after.children) {
+        newNode.children = after.children;
+      } else {
+        newNode.textContent = "";
       }
-      for (const p of canvasPanels) {
-        p.overlay.style.display = "";
-        p.overlayClk.style.pointerEvents = "";
-      }
-      renderOnly("overlays");
+
+      const newPath = [...parentPath, "children", idx + 1];
+
+      transactDoc(activeTab.value, (t) => {
+        if (before.textContent != null) {
+          mutateUpdateProperty(t, splitPath, "children");
+          mutateUpdateProperty(t, splitPath, "textContent", before.textContent);
+        } else if (before.children) {
+          mutateUpdateProperty(t, splitPath, "textContent");
+          mutateUpdateProperty(t, splitPath, "children", before.children);
+        }
+        mutateInsertNode(t, parentPath, idx + 1, newNode);
+        t.session.selection = newPath;
+      });
+
+      // Re-enter editing on the new element after render
+      requestAnimationFrame(() => {
+        const activePanel = getActivePanel();
+        if (activePanel) {
+          const newEl = findCanvasElement(newPath, activePanel.canvas);
+          if (newEl && isEditableBlock(newEl)) {
+            enterInlineEdit(newEl, newPath);
+            // Place cursor at start of new element
+            const sel = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(newEl);
+            range.collapse(true);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+          }
+        }
+      });
     },
   });
 

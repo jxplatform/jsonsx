@@ -20,6 +20,7 @@ import remarkDirective from "remark-directive";
 import { htmlToJx } from "./html-to-jx.ts";
 import type { MdastNode } from "./types.ts";
 import type { JxDocument, JxElement } from "@jxsuite/schema/types";
+
 export { htmlToJx };
 
 // ─── Dot-path expansion ─────────────────────────────────────────────────────
@@ -43,8 +44,12 @@ const JX_ANNOTATION_KEYS = new Set(["title", "description"]);
  * @returns {string}
  */
 export function jxKey(key: string) {
-  if (JX_DOLLAR_KEYS.has(key)) return `$${key}`;
-  if (key.startsWith("--") && JX_ANNOTATION_KEYS.has(key.slice(2))) return `$${key.slice(2)}`;
+  if (JX_DOLLAR_KEYS.has(key)) {
+    return `$${key}`;
+  }
+  if (key.startsWith("--") && JX_ANNOTATION_KEYS.has(key.slice(2))) {
+    return `$${key.slice(2)}`;
+  }
   return key;
 }
 
@@ -89,7 +94,7 @@ export function expandDotPaths(attrs: Record<string, string>) {
       }
       target = target[seg] as Record<string, unknown>;
     }
-    target[jxKey(segments[segments.length - 1])] = value;
+    target[jxKey(segments.at(-1))] = value;
   }
 
   return result;
@@ -214,7 +219,9 @@ export function collapseStylePaths(styleObj: Record<string, unknown>) {
  */
 export function isJxMarkdown(source: string) {
   const fmMatch = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fmMatch) return false;
+  if (!fmMatch) {
+    return false;
+  }
   return /^tagName:\s*.+-.+/m.test(fmMatch[1]);
 }
 
@@ -290,7 +297,7 @@ function routeAttributes(attrs: Record<string, string>) {
     }
   }
 
-  return { props, attributes };
+  return { attributes, props };
 }
 
 /**
@@ -299,23 +306,23 @@ function routeAttributes(attrs: Record<string, string>) {
  * @type {Record<string, (n: MdastNode) => string>}
  */
 const JX_TAG_MAP: Record<string, (n: MdastNode) => string> = {
-  heading: (n: MdastNode) => `h${n.depth}`,
-  paragraph: () => "p",
-  emphasis: () => "em",
-  strong: () => "strong",
+  blockquote: () => "blockquote",
+  break: () => "br",
+  code: () => "pre",
   delete: () => "del",
+  emphasis: () => "em",
+  heading: (n: MdastNode) => `h${n.depth}`,
+  image: () => "img",
   inlineCode: () => "code",
   link: () => "a",
-  image: () => "img",
-  blockquote: () => "blockquote",
   list: (n: MdastNode) => (n.ordered ? "ol" : "ul"),
   listItem: () => "li",
-  code: () => "pre",
-  thematicBreak: () => "hr",
-  break: () => "br",
+  paragraph: () => "p",
+  strong: () => "strong",
   table: () => "table",
-  tableRow: () => "tr",
   tableCell: (n: MdastNode) => (n.isHeader ? "th" : "td"),
+  tableRow: () => "tr",
+  thematicBreak: () => "hr",
 };
 
 /**
@@ -325,9 +332,13 @@ const JX_TAG_MAP: Record<string, (n: MdastNode) => string> = {
  * @returns {JxElement | string | (JxElement | string)[] | null} Jx element or null
  */
 export function mdastNodeToJx(node: MdastNode) {
-  if (!node || typeof node !== "object") return null;
+  if (!node || typeof node !== "object") {
+    return null;
+  }
 
-  if (node.type === "yaml" || node.type === "toml") return null;
+  if (node.type === "yaml" || node.type === "toml") {
+    return null;
+  }
 
   if (
     node.type === "containerDirective" ||
@@ -342,12 +353,16 @@ export function mdastNodeToJx(node: MdastNode) {
   }
 
   if (node.type === "html") {
-    if (node.value) return htmlToJx(node.value);
+    if (node.value) {
+      return htmlToJx(node.value);
+    }
     return null;
   }
 
   const tagFn = JX_TAG_MAP[node.type];
-  if (!tagFn) return null;
+  if (!tagFn) {
+    return null;
+  }
 
   const tag = tagFn(node);
   const el: JxElement = { tagName: tag };
@@ -371,13 +386,21 @@ export function mdastNodeToJx(node: MdastNode) {
       break;
     }
 
-    case "inlineCode":
+    case "inlineCode": {
       el.textContent = node.value ?? null;
       break;
+    }
 
-    case "link":
-      el.attributes = { href: node.url };
-      if (node.title) el.attributes.title = node.title;
+    case "link": {
+      {
+        const linkAttrs: Record<string, import("@jxsuite/schema/types").JxAttributeValue> = {
+          href: node.url ?? "",
+        };
+        if (node.title) {
+          linkAttrs.title = node.title;
+        }
+        el.attributes = linkAttrs;
+      }
       {
         const children = convertChildren(node.children ?? []);
         if (children.length === 1 && typeof children[0] === "string") {
@@ -387,13 +410,21 @@ export function mdastNodeToJx(node: MdastNode) {
         }
       }
       break;
+    }
 
-    case "image":
-      el.attributes = { src: node.url, alt: node.alt ?? "" };
-      if (node.title) el.attributes.title = node.title;
+    case "image": {
+      const imageAttrs: Record<string, import("@jxsuite/schema/types").JxAttributeValue> = {
+        alt: node.alt ?? "",
+        src: node.url ?? "",
+      };
+      if (node.title) {
+        imageAttrs.title = node.title;
+      }
+      el.attributes = imageAttrs;
       break;
+    }
 
-    case "list":
+    case "list": {
       if (node.children && node.children.length > 0) {
         el.children = convertChildren(node.children);
       }
@@ -401,8 +432,9 @@ export function mdastNodeToJx(node: MdastNode) {
         el.attributes = { start: String(node.start) };
       }
       break;
+    }
 
-    case "code":
+    case "code": {
       el.children = [
         {
           tagName: "code",
@@ -411,15 +443,17 @@ export function mdastNodeToJx(node: MdastNode) {
         },
       ];
       break;
+    }
 
     case "thematicBreak":
-    case "break":
+    case "break": {
       break;
+    }
 
     case "table": {
       const rows = convertChildren(node.children ?? []);
-      const thead = rows.length > 0 ? { tagName: "thead", children: [rows[0]] } : null;
-      const tbody = rows.length > 1 ? { tagName: "tbody", children: rows.slice(1) } : null;
+      const thead = rows.length > 0 ? { children: [rows[0]], tagName: "thead" } : null;
+      const tbody = rows.length > 1 ? { children: rows.slice(1), tagName: "tbody" } : null;
       el.children = [thead, tbody].filter(Boolean) as JxElement[];
       break;
     }
@@ -455,10 +489,12 @@ function directiveToJx(node: MdastNode) {
         ) {
           el[key] = value;
         } else if (key === "props") {
-          el.$props = value as Record<string, unknown>;
+          el.$props = value as Record<string, import("@jxsuite/schema/types").JsonValue>;
         } else {
-          if (!el.attributes) el.attributes = {};
-          el.attributes[key] = value;
+          if (!el.attributes) {
+            el.attributes = {};
+          }
+          el.attributes[key] = value as import("@jxsuite/schema/types").JxAttributeValue;
         }
       }
     } else {
@@ -483,8 +519,10 @@ function directiveToJx(node: MdastNode) {
         ) {
           el[key] = value;
         } else {
-          if (!el.attributes) el.attributes = {};
-          el.attributes[key] = value;
+          if (!el.attributes) {
+            el.attributes = {};
+          }
+          el.attributes[key] = value as import("@jxsuite/schema/types").JxAttributeValue;
         }
       }
     }
@@ -518,22 +556,32 @@ function directiveToJx(node: MdastNode) {
         // Unwrap: promote paragraph's inline children directly
         for (const inline of child.children ?? []) {
           const converted = mdastNodeToJx(inline);
-          if (converted == null) continue;
-          if (Array.isArray(converted)) jxChildren.push(...converted);
-          else jxChildren.push(converted);
+          if (converted == null) {
+            continue;
+          }
+          if (Array.isArray(converted)) {
+            jxChildren.push(...converted);
+          } else {
+            jxChildren.push(converted);
+          }
         }
       } else {
         const converted = mdastNodeToJx(child);
-        if (converted == null) continue;
-        if (Array.isArray(converted)) jxChildren.push(...converted);
-        else jxChildren.push(converted);
+        if (converted == null) {
+          continue;
+        }
+        if (Array.isArray(converted)) {
+          jxChildren.push(...converted);
+        } else {
+          jxChildren.push(converted);
+        }
       }
     }
 
     // Don't overwrite children if already set as an object by dot-path attributes
     // (e.g. children.prototype="Array" children.items.ref="...")
     if (el.children && typeof el.children === "object" && !Array.isArray(el.children)) {
-      // children was set to a descriptor object by dot-path expansion — keep it
+      // Children was set to a descriptor object by dot-path expansion — keep it
     } else if (jxChildren.length === 1 && typeof jxChildren[0] === "string") {
       el.textContent = jxChildren[0];
     } else if (jxChildren.length > 0) {
@@ -551,7 +599,9 @@ function directiveToJx(node: MdastNode) {
  * @returns {(JxElement | string)[]}
  */
 export function convertChildren(children: MdastNode[]) {
-  if (!children) return [];
+  if (!children) {
+    return [];
+  }
   return children.flatMap(mdastNodeToJx).filter((c) => c != null) as (JxElement | string)[];
 }
 
@@ -592,9 +642,14 @@ export function transpileJxMarkdown(source: string) {
 
   for (const node of bodyNodes) {
     const converted = mdastNodeToJx(node);
-    if (converted == null) continue;
-    if (Array.isArray(converted)) children.push(...converted);
-    else children.push(converted);
+    if (converted == null) {
+      continue;
+    }
+    if (Array.isArray(converted)) {
+      children.push(...converted);
+    } else {
+      children.push(converted);
+    }
   }
 
   if (children.length > 0) {

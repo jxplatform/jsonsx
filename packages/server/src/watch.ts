@@ -48,7 +48,7 @@ export const SSE_SCRIPT = `\n<script>new EventSource('/__reload').onmessage=()=>
 /** @param {string} html */
 export function injectSSE(html: string) {
   return html.includes("</body>")
-    ? html.replace("</body>", SSE_SCRIPT + "\n</body>")
+    ? html.replace("</body>", `${SSE_SCRIPT}\n</body>`)
     : html + SSE_SCRIPT;
 }
 
@@ -77,17 +77,24 @@ export function createWatcher(
   const debounceMs = opts.debounce ?? 50;
   const reloadOnAnyChange = opts.reloadOnAnyChange ?? false;
 
-  const clients: Set<(msg: string) => void> = new Set();
+  const clients = new Set<(msg: string) => void>();
   const encoder = new TextEncoder();
 
   function broadcast() {
-    for (const send of clients) send("data: reload\n\n");
+    for (const send of clients) {
+      send("data: reload\n\n");
+    }
   }
 
   function handleSSE() {
     /** @type {((msg: string) => void) | undefined} */
     let send: ((msg: string) => void) | undefined;
     const stream = new ReadableStream({
+      cancel() {
+        if (send) {
+          clients.delete(send);
+        }
+      },
       start(c) {
         send = (msg: string) => {
           try {
@@ -103,45 +110,48 @@ export function createWatcher(
           }
         }, 15_000);
       },
-      cancel() {
-        if (send) clients.delete(send);
-      },
     });
     return new Response(stream, {
       headers: {
-        "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
+        "Content-Type": "text/event-stream",
       },
     });
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   const watcher = chokidar.watch(root, {
-    ignored: (watchedPath) => shouldIgnore(watchedPath, ignore),
+    awaitWriteFinish: {
+      pollInterval: 10,
+      stabilityThreshold: debounceMs,
+    },
     ignoreInitial: true,
     ignorePermissionErrors: true,
-    awaitWriteFinish: {
-      stabilityThreshold: debounceMs,
-      pollInterval: 10,
-    },
+    ignored: (watchedPath) => shouldIgnore(watchedPath, ignore),
   });
 
   watcher.on("all", (_, changedPath) => {
     const filename = relative(root, changedPath);
-    if (!filename || filename.startsWith("..")) return;
+    if (!filename || filename.startsWith("..")) {
+      return;
+    }
     clearTimeout(timer ?? undefined);
     timer = setTimeout(async () => {
       if (builds.length > 0) {
         const result = await rebuild(builds, filename);
-        if (!result.success) return;
+        if (!result.success) {
+          return;
+        }
         if (result.rebuilt.length > 0) {
           broadcast();
           return;
         }
       }
       console.log(`Changed  → ${filename}`);
-      if (reloadOnAnyChange) broadcast();
+      if (reloadOnAnyChange) {
+        broadcast();
+      }
     }, debounceMs);
   });
 

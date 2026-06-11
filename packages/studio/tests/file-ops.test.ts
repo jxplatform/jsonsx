@@ -1,9 +1,9 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, beforeAll } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { registerPlatform } from "../src/platform";
-import { parseSourceForPath, openFile, saveFile, exportFile } from "../src/files/file-ops";
-import { activeTab, openTab, closeTab } from "../src/workspace/workspace";
-import { seedMarkdownFormat, mockFormatAction } from "./format-fixture";
+import { exportFile, openFile, parseSourceForPath, saveFile } from "../src/files/file-ops";
+import { activeTab, closeTab, openTab } from "../src/workspace/workspace";
+import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioPlatform } from "../src/types";
 
@@ -73,10 +73,10 @@ describe("openFile", () => {
 
   test("opens JSON file via showOpenFilePicker", async () => {
     const mockHandle = {
-      name: "component.json",
       getFile: async () => ({
-        text: async () => JSON.stringify({ tagName: "div", children: [] }),
+        text: async () => JSON.stringify({ children: [], tagName: "div" }),
       }),
+      name: "component.json",
     };
     (window as any).showOpenFilePicker = async () => [mockHandle];
 
@@ -90,10 +90,10 @@ describe("openFile", () => {
 
   test("opens markdown file via showOpenFilePicker", async () => {
     const mockHandle = {
-      name: "post.md",
       getFile: async () => ({
         text: async () => "# Hello\n\nContent here",
       }),
+      name: "post.md",
     };
     (window as any).showOpenFilePicker = async () => [mockHandle];
 
@@ -132,14 +132,14 @@ describe("saveFile", () => {
     registerPlatform({
       ...formatPlatform,
       writeFile: (path: any, content: any) => {
-        written = { path, content };
+        written = { content, path };
       },
     } as any);
 
     openTab({
-      id: "test-save",
+      document: { children: [], tagName: "div" },
       documentPath: "pages/index.json",
-      document: { tagName: "div", children: [] },
+      id: "test-save",
     });
     activeTab.value!.doc.dirty = true;
 
@@ -154,18 +154,18 @@ describe("saveFile", () => {
     let writtenContent = null;
     const mockHandle = {
       createWritable: async () => ({
+        close: async () => {},
         write: async (content: any) => {
           writtenContent = content;
         },
-        close: async () => {},
       }),
     };
 
     registerPlatform(formatPlatform as unknown as StudioPlatform);
     openTab({
-      id: "test-save-fs",
+      document: { children: [], tagName: "div" },
       fileHandle: mockHandle as unknown as FileSystemFileHandle,
-      document: { tagName: "div", children: [] },
+      id: "test-save-fs",
     });
     activeTab.value!.doc.dirty = true;
 
@@ -178,8 +178,8 @@ describe("saveFile", () => {
   test("shows message when no save target", async () => {
     registerPlatform(formatPlatform as unknown as StudioPlatform);
     openTab({
-      id: "test-no-target",
       document: { tagName: "div" },
+      id: "test-no-target",
     });
 
     // Should not throw
@@ -196,12 +196,12 @@ describe("saveFile", () => {
     } as any);
 
     openTab({
-      id: "test-md-save",
-      documentPath: "pages/post.md",
       document: {
-        tagName: "div",
         children: [{ tagName: "p", textContent: "Hello" }],
+        tagName: "div",
       },
+      documentPath: "pages/post.md",
+      id: "test-md-save",
       sourceFormat: "Markdown",
     });
     activeTab.value!.doc.dirty = true;
@@ -221,9 +221,9 @@ describe("saveFile", () => {
     } as any);
 
     openTab({
-      id: "test-error",
-      documentPath: "pages/index.json",
       document: { tagName: "div" },
+      documentPath: "pages/index.json",
+      id: "test-error",
     });
 
     // Should not throw
@@ -244,19 +244,19 @@ describe("exportFile", () => {
   test("exports via showSaveFilePicker when available", async () => {
     let writtenContent = null;
     const mockHandle = {
-      name: "export.json",
       createWritable: async () => ({
+        close: async () => {},
         write: async (content: any) => {
           writtenContent = content;
         },
-        close: async () => {},
       }),
+      name: "export.json",
     };
     (window as any).showSaveFilePicker = async () => mockHandle;
 
     openTab({
+      document: { children: [], tagName: "div" },
       id: "test-export",
-      document: { tagName: "div", children: [] },
     });
 
     await exportFile();
@@ -279,8 +279,8 @@ describe("exportFile", () => {
     };
 
     openTab({
+      document: { children: [], tagName: "div" },
       id: "test-download",
-      document: { tagName: "div", children: [] },
     });
 
     await exportFile();
@@ -304,8 +304,8 @@ describe("exportFile", () => {
     };
 
     openTab({
-      id: "test-md-export",
       document: { children: [{ tagName: "p", textContent: "Hello" }] },
+      id: "test-md-export",
       sourceFormat: "Markdown",
     });
     // Content mode is set by sourceFormat being "md" in createTab
@@ -326,8 +326,8 @@ describe("exportFile", () => {
     };
 
     openTab({
-      id: "test-abort",
       document: { tagName: "div" },
+      id: "test-abort",
     });
 
     await exportFile();

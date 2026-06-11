@@ -6,11 +6,11 @@
  * CI environments (e.g. Cloudflare Pages) can persist it via their npm cache layer.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { contentHash, configHash } from "./image-optimizer.ts";
+import { configHash, contentHash } from "./image-optimizer.ts";
 
 import type { ImageManifest } from "./image-optimizer.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
@@ -28,7 +28,7 @@ export interface CacheManifest {
 
 // ─── Cache directory resolution ──────────────────────────────────────────────
 
-let _npmCacheBase: string | null | undefined = undefined; // undefined = not yet resolved
+let _npmCacheBase; // Undefined = not yet resolved
 
 /** Reset the memoized npm cache base so the next call re-evaluates. Tests only. */
 export function _testResetNpmCacheBase() {
@@ -59,9 +59,9 @@ export function getImageCacheDir(projectRoot: string): string {
   if (_npmCacheBase === undefined) {
     try {
       const result = execSync("npm config get cache", {
-        encoding: "utf-8",
+        cwd: tmpdir(), // Avoid ENOWORKSPACES when cwd is inside an npm workspace
+        encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],
-        cwd: tmpdir(), // avoid ENOWORKSPACES when cwd is inside an npm workspace
       }).trim();
       _npmCacheBase = result && result !== "undefined" ? result : null;
     } catch {
@@ -98,12 +98,12 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
 export function loadCache(projectRoot: string) {
   const manifestPath = resolve(getImageCacheDir(projectRoot), "manifest.json");
   if (!existsSync(manifestPath)) {
-    return { version: 1, entries: {} };
+    return { entries: {}, version: 1 };
   }
   try {
     return JSON.parse(readFileSync(manifestPath, "utf8"));
   } catch {
-    return { version: 1, entries: {} };
+    return { entries: {}, version: 1 };
   }
 }
 
@@ -130,7 +130,9 @@ export function saveCache(projectRoot: string, cache: CacheManifest) {
  */
 export function getCached(cache: CacheManifest, key: string) {
   const entry = cache.entries[key];
-  if (!entry) return null;
+  if (!entry) {
+    return null;
+  }
   return entry.manifest;
 }
 
@@ -149,8 +151,8 @@ export function setCached(
   manifest: ImageManifest,
 ) {
   cache.entries[key] = {
-    source: sourcePath,
     manifest,
+    source: sourcePath,
     timestamp: Date.now(),
   };
 }

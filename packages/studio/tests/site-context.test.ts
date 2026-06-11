@@ -1,14 +1,14 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { setProjectState } from "../src/store";
 import type { ProjectState } from "../src/types";
 import type { JxStyle } from "@jxsuite/schema/types";
 import {
-  getEffectiveMedia,
-  getEffectiveStyle,
-  getEffectiveImports,
   getEffectiveElements,
   getEffectiveHead,
+  getEffectiveImports,
+  getEffectiveMedia,
+  getEffectiveStyle,
 } from "../src/site-context";
 
 beforeEach(() => {
@@ -24,14 +24,14 @@ describe("getEffectiveMedia", () => {
   });
 
   test("returns empty object when no doc media and no project config", () => {
-    expect(getEffectiveMedia(undefined)).toEqual({});
+    expect(getEffectiveMedia()).toEqual({});
   });
 
   test("returns site media when no doc media", () => {
     setProjectState({
       projectConfig: { $media: { "--lg": "(min-width: 1024px)" } },
     } as unknown as ProjectState);
-    expect(getEffectiveMedia(undefined)).toEqual({
+    expect(getEffectiveMedia()).toEqual({
       "--lg": "(min-width: 1024px)",
     });
   });
@@ -39,7 +39,7 @@ describe("getEffectiveMedia", () => {
   test("merges site and doc media (doc wins)", () => {
     setProjectState({
       projectConfig: {
-        $media: { "--md": "(min-width: 768px)", "--lg": "(min-width: 1024px)" },
+        $media: { "--lg": "(min-width: 1024px)", "--md": "(min-width: 768px)" },
       },
     } as unknown as ProjectState);
     const docMedia = { "--md": "(min-width: 800px)" };
@@ -58,14 +58,14 @@ describe("getEffectiveStyle", () => {
   });
 
   test("returns empty object when nothing defined", () => {
-    expect(getEffectiveStyle(undefined)).toEqual({});
+    expect(getEffectiveStyle()).toEqual({});
   });
 
   test("returns site style when no doc style", () => {
     setProjectState({
       projectConfig: { style: { margin: "0" } },
     } as unknown as ProjectState);
-    expect(getEffectiveStyle(undefined)).toEqual({ margin: "0" });
+    expect(getEffectiveStyle()).toEqual({ margin: "0" });
   });
 
   test("merges styles (doc wins for flat values)", () => {
@@ -96,14 +96,14 @@ describe("getEffectiveImports", () => {
   });
 
   test("returns empty object when nothing defined", () => {
-    expect(getEffectiveImports(undefined)).toEqual({});
+    expect(getEffectiveImports()).toEqual({});
   });
 
   test("returns site imports when no doc imports", () => {
     setProjectState({
       projectConfig: { imports: { Parser: "@jx/parser" } },
     } as unknown as ProjectState);
-    expect(getEffectiveImports(undefined)).toEqual({ Parser: "@jx/parser" });
+    expect(getEffectiveImports()).toEqual({ Parser: "@jx/parser" });
   });
 
   test("merges imports (doc wins)", () => {
@@ -125,14 +125,14 @@ describe("getEffectiveElements", () => {
   });
 
   test("returns empty array when nothing defined", () => {
-    expect(getEffectiveElements(undefined)).toEqual([]);
+    expect(getEffectiveElements()).toEqual([]);
   });
 
   test("returns site elements when no doc elements", () => {
     setProjectState({
       projectConfig: { $elements: [{ $ref: "./site.json" }] },
     } as unknown as ProjectState);
-    expect(getEffectiveElements(undefined)).toEqual([{ $ref: "./site.json" }]);
+    expect(getEffectiveElements()).toEqual([{ $ref: "./site.json" }]);
   });
 
   test("deduplicates by $ref", () => {
@@ -162,34 +162,34 @@ describe("getEffectiveElements", () => {
 
 describe("getEffectiveHead", () => {
   test("returns doc head when no project config", () => {
-    const head = [{ tagName: "link", attributes: { href: "/style.css" } }];
+    const head = [{ attributes: { href: "/style.css" }, tagName: "link" }];
     expect(getEffectiveHead(head)).toEqual(head);
   });
 
   test("returns empty array when nothing defined", () => {
-    expect(getEffectiveHead(undefined)).toEqual([]);
+    expect(getEffectiveHead()).toEqual([]);
   });
 
   test("returns site head when no doc head", () => {
-    const siteHead = [{ tagName: "link", attributes: { href: "/global.css" } }];
+    const siteHead = [{ attributes: { href: "/global.css" }, tagName: "link" }];
     setProjectState({
       projectConfig: { $head: siteHead },
     } as unknown as ProjectState);
-    expect(getEffectiveHead(undefined)).toEqual(siteHead);
+    expect(getEffectiveHead()).toEqual(siteHead);
   });
 
   test("deduplicates by href", () => {
     setProjectState({
       projectConfig: {
         $head: [
-          { tagName: "link", attributes: { href: "/a.css" } },
-          { tagName: "link", attributes: { href: "/b.css" } },
+          { attributes: { href: "/a.css" }, tagName: "link" },
+          { attributes: { href: "/b.css" }, tagName: "link" },
         ],
       },
     } as unknown as ProjectState);
     const result = getEffectiveHead([
-      { tagName: "link", attributes: { href: "/a.css" } },
-      { tagName: "link", attributes: { href: "/c.css" } },
+      { attributes: { href: "/a.css" }, tagName: "link" },
+      { attributes: { href: "/c.css" }, tagName: "link" },
     ]);
     expect(result).toHaveLength(3);
   });
@@ -197,17 +197,17 @@ describe("getEffectiveHead", () => {
   test("deduplicates by src", () => {
     setProjectState({
       projectConfig: {
-        $head: [{ tagName: "script", attributes: { src: "/app.js" } }],
+        $head: [{ attributes: { src: "/app.js" }, tagName: "script" }],
       },
     } as unknown as ProjectState);
-    const result = getEffectiveHead([{ tagName: "script", attributes: { src: "/app.js" } }]);
+    const result = getEffectiveHead([{ attributes: { src: "/app.js" }, tagName: "script" }]);
     expect(result).toHaveLength(1);
   });
 
   test("deduplicates by JSON.stringify for entries without href/src", () => {
     const meta = {
+      attributes: { content: "width=device-width", name: "viewport" },
       tagName: "meta",
-      attributes: { name: "viewport", content: "width=device-width" },
     };
     setProjectState({
       projectConfig: { $head: [meta] },

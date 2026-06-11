@@ -1,7 +1,7 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
-import { showSlashMenu, dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
+import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "../src/editor/slash-menu";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -9,13 +9,13 @@ import { showSlashMenu, dismissSlashMenu, isSlashMenuOpen } from "../src/editor/
 function makeAnchor() {
   const el = document.createElement("p");
   el.textContent = "test";
-  document.body.appendChild(el);
+  document.body.append(el);
   return el;
 }
 
 /** Dispatch a keyboard event on document (capturing phase, like real browser) */
 function pressKey(key: string) {
-  document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key }));
 }
 
 /** Query all menu items in the slash menu host */
@@ -67,13 +67,13 @@ describe("Slash Menu", () => {
     test("no filter shows all commands", () => {
       showSlashMenu(anchor, "", { onSelect: () => {} });
       const items = getMenuItems();
-      expect(items.length).toBe(15); // all SLASH_COMMANDS
+      expect(items.length).toBe(15); // All SLASH_COMMANDS
     });
 
     test("filter narrows results", () => {
       showSlashMenu(anchor, "head", { onSelect: () => {} });
       const items = getMenuItems();
-      expect(items.length).toBe(3); // h1, h2, h3
+      expect(items.length).toBe(3); // H1, h2, h3
     });
 
     test("filter by tag name", () => {
@@ -114,14 +114,16 @@ describe("Slash Menu", () => {
       pressKey("ArrowUp");
 
       const items = getMenuItems();
-      expect(items[items.length - 1].hasAttribute("focused")).toBe(true);
+      expect(items.at(-1).hasAttribute("focused")).toBe(true);
     });
 
     test("ArrowDown wraps around to first item", () => {
       showSlashMenu(anchor, "", { onSelect: () => {} });
       const items = getMenuItems();
       // Navigate to last item
-      for (let i = 0; i < items.length; i++) pressKey("ArrowDown");
+      for (let i = 0; i < items.length; i++) {
+        pressKey("ArrowDown");
+      }
 
       // Should wrap to first
       expect(items[0].hasAttribute("focused")).toBe(true);
@@ -194,7 +196,7 @@ describe("Slash Menu", () => {
       pressKey("Enter");
 
       // The capturing handler in slash-menu calls stopPropagation,
-      // but our pressKey dispatches on document so the capture listener fires.
+      // But our pressKey dispatches on document so the capture listener fires.
       // The key test: after Enter, the menu is closed and item selected.
       expect(isSlashMenuOpen()).toBe(false);
       document.removeEventListener("keydown", handler);
@@ -205,15 +207,15 @@ describe("Slash Menu", () => {
 
   describe("custom commands", () => {
     const customCommands = [
-      { label: "Paragraph", tag: "p", description: "Plain text" },
-      { label: "Heading 2", tag: "h2", description: "Medium heading" },
-      { label: "Heading 3", tag: "h3", description: "Small heading" },
+      { description: "Plain text", label: "Paragraph", tag: "p" },
+      { description: "Medium heading", label: "Heading 2", tag: "h2" },
+      { description: "Small heading", label: "Heading 3", tag: "h3" },
     ];
 
     test("shows only custom commands when provided", () => {
       showSlashMenu(anchor, "", {
-        onSelect: () => {},
         commands: customCommands,
+        onSelect: () => {},
       });
       const items = getMenuItems();
       expect(items.length).toBe(3);
@@ -221,8 +223,8 @@ describe("Slash Menu", () => {
 
     test("filters within custom commands", () => {
       showSlashMenu(anchor, "head", {
-        onSelect: () => {},
         commands: customCommands,
+        onSelect: () => {},
       });
       const items = getMenuItems();
       expect(items.length).toBe(2);
@@ -231,8 +233,8 @@ describe("Slash Menu", () => {
     test("Enter selects from custom commands", () => {
       let selected: any = null;
       showSlashMenu(anchor, "", {
-        onSelect: (cmd) => (selected = cmd),
         commands: customCommands,
+        onSelect: (cmd) => (selected = cmd),
       });
       pressKey("Enter");
       expect(selected.tag).toBe("p");
@@ -241,16 +243,16 @@ describe("Slash Menu", () => {
 
     test("no matches in custom commands auto-dismisses", () => {
       showSlashMenu(anchor, "xyz", {
-        onSelect: () => {},
         commands: customCommands,
+        onSelect: () => {},
       });
       expect(isSlashMenuOpen()).toBe(false);
     });
 
     test("keyboard navigation works with custom commands", () => {
       showSlashMenu(anchor, "", {
-        onSelect: () => {},
         commands: customCommands,
+        onSelect: () => {},
       });
       const items = getMenuItems();
       expect(items[0].hasAttribute("focused")).toBe(true);

@@ -6,24 +6,25 @@
  * mapping ($map remapping), site-level style injection, and $head element injection.
  */
 
-import { elToPath, stripEventHandlers, projectState } from "../store";
+import { elToPath, projectState, stripEventHandlers } from "../store";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { toRaw } from "../reactivity";
 import {
-  renderNode as runtimeRenderNode,
   buildScope,
   defineElement,
+  renderNode as runtimeRenderNode,
   setSkipServerFunctions,
 } from "@jxsuite/runtime";
 import {
-  getEffectiveElements,
-  getEffectiveImports,
-  getEffectiveMedia,
-  getEffectiveHead,
-  getEffectiveLayoutPath,
-  resolveLayoutDoc,
   distributePageIntoLayout,
+  getEffectiveElements,
+  getEffectiveHead,
+  getEffectiveImports,
+  getEffectiveLayoutPath,
+  getEffectiveMedia,
+  resolveLayoutDoc,
 } from "../site-context";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
@@ -67,7 +68,9 @@ function findPageContentPrefix(
   node: JxMutableNode,
   path: (string | number)[] = [],
 ): (string | number)[] | null {
-  if (!node || typeof node !== "object") return null;
+  if (!node || typeof node !== "object") {
+    return null;
+  }
   if (Array.isArray(node.children)) {
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
@@ -79,7 +82,9 @@ function findPageContentPrefix(
       const child = node.children[i];
       if (child && typeof child === "object" && child.$__layout) {
         const found = findPageContentPrefix(child, [...path, "children", i]);
-        if (found) return found;
+        if (found) {
+          return found;
+        }
       }
     }
   }
@@ -94,17 +99,23 @@ export let activeLayoutPath = null as string | null;
  * rendered DOM elements came from the layout vs page content.
  */
 function markLayoutNodes(node: JxMutableNode) {
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
   node.$__layout = true;
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      if (typeof child === "string") continue;
+      if (typeof child === "string") {
+        continue;
+      }
       markLayoutNodes(child);
     }
   }
   if (node.$elements) {
     for (const el of node.$elements) {
-      if (typeof el !== "string") markLayoutNodes(el);
+      if (typeof el !== "string") {
+        markLayoutNodes(el);
+      }
     }
   }
 }
@@ -132,9 +143,9 @@ export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
 export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl: HTMLElement) {
   const tab = activeTab.value;
   const S = {
+    document: tab?.doc.document,
     documentPath: tab?.documentPath,
     mode: tab?.doc.mode,
-    document: tab?.doc.document,
   };
   const canvasMode = _ctx!.getCanvasMode();
 
@@ -144,8 +155,8 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
   }
 
   // Suppress server function resolution in non-preview modes to avoid
-  // failed proxy calls and infinite reactive retries (also covers
-  // async custom element connectedCallbacks that run after this function returns)
+  // Failed proxy calls and infinite reactive retries (also covers
+  // Async custom element connectedCallbacks that run after this function returns)
   setSkipServerFunctions(canvasMode !== "preview");
 
   let renderDoc =
@@ -172,7 +183,9 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     if (layoutPath) {
       const layoutDoc = await resolveLayoutDoc(layoutPath);
       if (layoutDoc) {
-        if (gen !== view.renderGeneration) return null;
+        if (gen !== view.renderGeneration) {
+          return null;
+        }
         activeLayoutPath = layoutPath.replace(/^\.\//, "");
         markLayoutNodes(layoutDoc);
         const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
@@ -186,11 +199,13 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
   }
 
   // In edit mode, collect paths where $map templates were inlined as children[0]
-  // so we can remap runtime paths (children,0,...) → (children,map,...)
+  // So we can remap runtime paths (children,0,...) → (children,map,...)
   const mapParentPaths = new Set();
   if (canvasMode === "design" || canvasMode === "edit") {
     (function findMapParents(node: JxMutableNode, path: (string | number)[]) {
-      if (!node || typeof node !== "object") return;
+      if (!node || typeof node !== "object") {
+        return;
+      }
       if (
         node.children &&
         typeof node.children === "object" &&
@@ -201,7 +216,9 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       if (Array.isArray(node.children)) {
         for (let i = 0; i < node.children.length; i++) {
           const child = node.children[i];
-          if (typeof child === "string") continue;
+          if (typeof child === "string") {
+            continue;
+          }
           findMapParents(child, [...path, "children", i]);
         }
       }
@@ -219,23 +236,31 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     const docBase = S.documentPath ? `${location.origin}/${docPrefix}${S.documentPath}` : undefined;
 
     // Register custom elements so the runtime can render them
-    let effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);
+    const effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);
 
     // In content mode (markdown) or when a layout is applied, auto-discover components
-    // for custom elements that have no explicit $elements registration.
+    // For custom elements that have no explicit $elements registration.
     if ((S.mode === "content" || layoutWrapped) && componentRegistry.length > 0) {
       const existingRefs = new Set(
         effectiveElements.map((e: JxElement | string) => (typeof e === "string" ? e : e?.$ref)),
       );
       /** @param {JxMutableNode} node */
       const collectTags = (node: JxMutableNode) => {
-        const tags: Set<string> = new Set();
-        if (!node || typeof node !== "object") return tags;
-        if (node.tagName) tags.add(node.tagName);
+        const tags = new Set<string>();
+        if (!node || typeof node !== "object") {
+          return tags;
+        }
+        if (node.tagName) {
+          tags.add(node.tagName);
+        }
         if (Array.isArray(node.children)) {
           for (const child of node.children) {
-            if (typeof child === "string") continue;
-            for (const t of collectTags(child)) tags.add(t);
+            if (typeof child === "string") {
+              continue;
+            }
+            for (const t of collectTags(child)) {
+              tags.add(t);
+            }
           }
         }
         return tags;
@@ -244,7 +269,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         const comp = componentRegistry.find(
           (c: import("../files/components.js").ComponentEntry) => c.tagName === tag,
         );
-        if (comp && comp.source !== "npm") {
+        if (comp && comp.source !== "npm" && comp.path) {
           const relPath = computeRelativePath(S.documentPath ?? null, comp.path);
           if (!existingRefs.has(relPath)) {
             effectiveElements.push({ $ref: relPath });
@@ -254,7 +279,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       }
     }
 
-    if (effectiveElements.length) {
+    if (effectiveElements.length > 0) {
       renderDoc.$elements = effectiveElements as (string | JxMutableNode | { $ref: string })[];
       for (const entry of effectiveElements) {
         if (typeof entry === "string") {
@@ -262,39 +287,43 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
             const specifier =
               entry.startsWith("/") || entry.startsWith(".") ? entry : `/node_modules/${entry}`;
             await import(specifier);
-          } catch (e) {
-            console.warn("Studio: failed to import package", entry, e);
+          } catch (error) {
+            console.warn("Studio: failed to import package", entry, error);
           }
         } else if (entry?.$ref) {
           let href;
           try {
-            href = new URL(entry.$ref, docBase).href;
-          } catch (urlErr) {
-            console.warn("Studio: invalid element URL", { ref: entry.$ref, docBase }, urlErr);
+            ({ href } = new URL(entry.$ref, docBase));
+          } catch (error) {
+            console.warn("Studio: invalid element URL", { docBase, ref: entry.$ref }, error);
             continue;
           }
-          if (_failedElements.has(href)) continue;
+          if (_failedElements.has(href)) {
+            continue;
+          }
           try {
             await defineElement(href);
-          } catch (e) {
+          } catch (error) {
             _failedElements.add(href);
-            console.warn("Studio: failed to register element", entry.$ref, e);
+            console.warn("Studio: failed to register element", entry.$ref, error);
           }
         }
       }
     }
 
     // Bail out if a newer render started while we were importing elements
-    if (gen !== view.renderGeneration) return null;
+    if (gen !== view.renderGeneration) {
+      return null;
+    }
 
     // Inject site-level imports so buildScope can resolve $prototype names
     renderDoc.imports = getEffectiveImports(renderDoc.imports);
 
     // Apply project-level styles mirroring the compiler convention:
-    //   viewport ≈ :root  → CSS custom properties (they inherit down)
-    //   canvasEl ≈ body   → regular CSS properties (inline beats CSS defaults)
+    //   Viewport ≈ :root  → CSS custom properties (they inherit down)
+    //   CanvasEl ≈ body   → regular CSS properties (inline beats CSS defaults)
     // This ensures project font-family, color, etc. override the
-    // content-mode fallback typography rules in the stylesheet.
+    // Content-mode fallback typography rules in the stylesheet.
     // In edit mode, propagate to the .content-edit-canvas wrapper for seamless appearance.
     const viewport = canvasEl.closest(".canvas-panel-viewport") as HTMLElement | null;
     const editSurface =
@@ -306,7 +335,9 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       viewport.style.cssText = "";
       if (siteStyle && typeof siteStyle === "object") {
         for (const [k, v] of Object.entries(siteStyle)) {
-          if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+            continue;
+          }
           if (k.startsWith("--")) {
             viewport.style.setProperty(k, String(v));
           } else {
@@ -318,7 +349,9 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     if (editSurface) {
       if (siteStyle && typeof siteStyle === "object") {
         for (const [k, v] of Object.entries(siteStyle)) {
-          if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+            continue;
+          }
           if (k.startsWith("--")) {
             editSurface.style.setProperty(k, String(v));
           } else {
@@ -329,7 +362,9 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     }
     if (siteStyle && typeof siteStyle === "object") {
       for (const [k, v] of Object.entries(siteStyle)) {
-        if (v !== null && typeof v === "object" && !Array.isArray(v)) continue;
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+          continue;
+        }
         if (!k.startsWith("--")) {
           (canvasEl.style as unknown as Record<string, string>)[k] = String(v);
         }
@@ -343,12 +378,14 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       const css = buildNestedSiteCSS(siteStyle, `[${scopeAttr}]`);
 
       if (css) {
-        const existingStyleEl = document.getElementById("jx-site-style");
-        if (existingStyleEl) existingStyleEl.remove();
+        const existingStyleEl = document.querySelector("#jx-site-style");
+        if (existingStyleEl) {
+          existingStyleEl.remove();
+        }
         const styleEl = document.createElement("style");
         styleEl.id = "jx-site-style";
         styleEl.textContent = css;
-        document.head.appendChild(styleEl);
+        document.head.append(styleEl);
       }
     }
 
@@ -357,13 +394,17 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
 
     // Inject $head elements (link/meta/script) into document.head
     const effectiveHead = getEffectiveHead(renderDoc.$head);
-    if (effectiveHead.length) {
+    if (effectiveHead.length > 0) {
       for (const entry of effectiveHead) {
-        if (!entry?.tagName) continue;
+        if (!entry?.tagName) {
+          continue;
+        }
         const tag = entry.tagName.toLowerCase();
         // Skip inline scripts — they can contain arbitrary JS/HTML that throws
-        // when the browser tries to execute it in the studio context
-        if (tag === "script" && !entry.attributes?.src) continue;
+        // When the browser tries to execute it in the studio context
+        if (tag === "script" && !entry.attributes?.src) {
+          continue;
+        }
         const attrs = { ...entry.attributes };
         for (const key of ["href", "src"]) {
           const val = attrs[key];
@@ -377,34 +418,47 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
           }
         }
         const selector = `${tag}${attrs.href ? `[href="${attrs.href}"]` : ""}${attrs.src ? `[src="${attrs.src}"]` : ""}`;
-        if (selector !== tag && document.head.querySelector(selector)) continue;
+        if (selector !== tag && document.head.querySelector(selector)) {
+          continue;
+        }
         const el = document.createElement(tag);
-        for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, String(v));
-        if (entry.textContent) el.textContent = entry.textContent;
-        document.head.appendChild(el);
+        for (const [k, v] of Object.entries(attrs)) {
+          el.setAttribute(k, String(v));
+        }
+        if (entry.textContent) {
+          el.textContent = entry.textContent;
+        }
+        document.head.append(el);
       }
     }
 
     const $defs = await buildScope(renderDoc, {}, docBase);
     // Bail out if a newer render started while buildScope was running
-    if (gen !== view.renderGeneration) return null;
+    if (gen !== view.renderGeneration) {
+      return null;
+    }
     const el = /** @type {HTMLElement} */ runtimeRenderNode(renderDoc, $defs, {
+      _path: [],
       onNodeCreated(
         el: HTMLElement | Text,
         path: (string | number)[],
-        def: Record<string, unknown>,
+        def: import("@jxsuite/schema/types").JxElement | string,
       ) {
-        if (!(el instanceof HTMLElement)) return;
+        if (!(el instanceof HTMLElement)) {
+          return;
+        }
         // Track layout-originated elements — don't store in elToPath to avoid
-        // path collisions with remapped page content paths
-        if (layoutWrapped && def?.$__layout) {
+        // Path collisions with remapped page content paths
+        if (layoutWrapped && typeof def === "object" && def?.$__layout) {
           layoutElements.add(el);
-          if (el.setAttribute) el.setAttribute("data-jx-layout", "");
+          if (el.setAttribute) {
+            el.dataset.jxLayout = "";
+          }
           return;
         }
 
         // Remap layout-wrapped paths: strip the layout prefix so paths are
-        // relative to the original page document (which is what S.document holds)
+        // Relative to the original page document (which is what S.document holds)
         let mappedPath = path;
         if (layoutWrapped && pageContentPrefix) {
           const pfx = pageContentPrefix;
@@ -417,7 +471,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         }
 
         // Remap $map paths: wrapper and template children → real document paths
-        // prepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
+        // PrepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
         // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
         if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
           for (let i = 0; i < mappedPath.length - 1; i++) {
@@ -445,9 +499,8 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         }
         elToPath.set(el, mappedPath);
       },
-      _path: [],
     });
-    if (canvasMode === "design" || canvasMode === "edit") {
+    if ((canvasMode === "design" || canvasMode === "edit") && el instanceof HTMLElement) {
       // Disable pointer events on all rendered elements for edit mode
       el.style.pointerEvents = "none";
       for (const child of el.querySelectorAll("*")) {
@@ -455,15 +508,15 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       }
     }
     // Clear and append atomically — ensures the canvas is never left empty if a
-    // newer render starts and this one would have bailed after clearing.
+    // Newer render starts and this one would have bailed after clearing.
     canvasEl.innerHTML = "";
     if (S.mode === "content") {
-      canvasEl.setAttribute("data-content-mode", "");
+      canvasEl.dataset.contentMode = "";
     } else {
-      canvasEl.removeAttribute("data-content-mode");
+      delete canvasEl.dataset.contentMode;
     }
 
-    canvasEl.appendChild(el);
+    canvasEl.append(el);
 
     // Delegated click handler prevents link navigation in all canvas modes.
     // Attached once per canvasEl (survives reactive re-renders that replace children).
@@ -476,15 +529,19 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       requestAnimationFrame(() => {
         const editingEl = getActiveElement();
         for (const child of canvasEl.querySelectorAll("*")) {
-          if (view.componentInlineEdit && child === view.componentInlineEdit.el) continue;
-          if (editingEl && child === editingEl) continue;
+          if (view.componentInlineEdit && child === view.componentInlineEdit.el) {
+            continue;
+          }
+          if (editingEl && child === editingEl) {
+            continue;
+          }
           (child as HTMLElement).style.pointerEvents = "none";
         }
       });
     }
     return $defs;
-  } catch (err) {
-    console.warn("renderCanvasLive failed:", (err as Error).message, err);
+  } catch (error) {
+    console.warn("renderCanvasLive failed:", errorMessage(error), error);
     return null;
   }
 }

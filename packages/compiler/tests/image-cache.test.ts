@@ -1,14 +1,14 @@
-import { describe, test, expect } from "bun:test";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { describe, expect, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  _testResetNpmCacheBase,
   cacheKey,
+  getCached,
+  getImageCacheDir,
   loadCache,
   saveCache,
-  getCached,
   setCached,
-  getImageCacheDir,
-  _testResetNpmCacheBase,
 } from "../src/site/image-cache";
 
 const TMP = join(import.meta.dir, "__test-image-cache__");
@@ -20,8 +20,8 @@ function setup() {
 }
 
 function teardown() {
-  rmSync(TMP, { recursive: true, force: true });
-  rmSync(getImageCacheDir(TMP), { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
+  rmSync(getImageCacheDir(TMP), { force: true, recursive: true });
   _testResetNpmCacheBase();
 }
 
@@ -31,7 +31,7 @@ describe("image-cache", () => {
     const imgPath = join(TMP, "test.png");
     writeFileSync(imgPath, Buffer.from("fake-image-data"));
 
-    const config: any = { widths: [800], formats: ["webp"], quality: 80 };
+    const config: any = { formats: ["webp"], quality: 80, widths: [800] };
     const key1 = cacheKey(imgPath, config);
     const key2 = cacheKey(imgPath, config);
     expect(key1).toBe(key2);
@@ -42,7 +42,7 @@ describe("image-cache", () => {
   test("loadCache returns empty manifest when no cache exists", () => {
     _testResetNpmCacheBase();
     const cache = loadCache("/nonexistent/path");
-    expect(cache).toEqual({ version: 1, entries: {} });
+    expect(cache).toEqual({ entries: {}, version: 1 });
   });
 
   test("loadCache returns empty manifest on corrupt JSON", () => {
@@ -53,21 +53,21 @@ describe("image-cache", () => {
     writeFileSync(join(cacheDir, "manifest.json"), "not json");
 
     const cache = loadCache(TMP);
-    expect(cache).toEqual({ version: 1, entries: {} });
+    expect(cache).toEqual({ entries: {}, version: 1 });
     teardown();
   });
 
   test("saveCache and loadCache round-trip", () => {
     setup();
     const cache: any = {
-      version: 1,
       entries: {
         "abc:def": {
+          manifest: { height: 600, src: "img.webp", srcset: "", width: 800 },
           source: "img.png",
-          manifest: { src: "img.webp", srcset: "", width: 800, height: 600 },
           timestamp: 123,
         },
       },
+      version: 1,
     };
     saveCache(TMP, cache);
     const loaded = loadCache(TMP);
@@ -76,31 +76,31 @@ describe("image-cache", () => {
   });
 
   test("getCached returns null for missing key", () => {
-    const cache: any = { version: 1, entries: {} };
+    const cache: any = { entries: {}, version: 1 };
     expect(getCached(cache, "missing")).toBeNull();
   });
 
   test("getCached returns manifest for existing key", () => {
     const manifest: any = {
+      height: 600,
       src: "img.webp",
       srcset: "",
       width: 800,
-      height: 600,
     };
     const cache: any = {
+      entries: { key1: { manifest, source: "img.png", timestamp: 123 } },
       version: 1,
-      entries: { key1: { source: "img.png", manifest, timestamp: 123 } },
     };
     expect(getCached(cache, "key1")).toEqual(manifest);
   });
 
   test("setCached adds entry to cache", () => {
-    const cache: any = { version: 1, entries: {} };
+    const cache: any = { entries: {}, version: 1 };
     const manifest: any = {
+      height: 300,
       src: "out.webp",
       srcset: "",
       width: 400,
-      height: 300,
     };
     setCached(cache, "k1", "source.png", manifest);
     expect(cache.entries.k1.source).toBe("source.png");

@@ -10,7 +10,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { effect, effectScope } from "../reactivity";
-import { workspace, activateTab, closeTab } from "../workspace/workspace";
+import { activateTab, closeTab, workspace } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { showConfirmDialog } from "../ui/layers";
 
@@ -46,9 +46,11 @@ export function unmount() {
 }
 
 function render() {
-  if (!_host) return;
+  if (!_host) {
+    return;
+  }
 
-  if (workspace.tabOrder.length < 1) {
+  if (workspace.tabOrder.length === 0) {
     litRender(nothing, _host);
     return;
   }
@@ -61,13 +63,15 @@ function render() {
           (id) => id,
           (id) => {
             const tab = workspace.tabs.get(id);
-            if (!tab) return nothing;
+            if (!tab) {
+              return nothing;
+            }
             const isActive = id === workspace.activeTabId;
             const isDirty = tab.doc.dirty;
             const label = tabLabel(tab);
             return html`
               <div
-                class=${classMap({ "tab-strip-tab": true, active: isActive })}
+                class=${classMap({ active: isActive, "tab-strip-tab": true })}
                 @click=${() => activateTab(id)}
                 @auxclick=${(e: MouseEvent) => {
                   if (e.button === 1) {
@@ -106,9 +110,11 @@ function render() {
  */
 function tabLabel(tab: Tab) {
   const path = tab.documentPath;
-  if (!path) return "Untitled";
+  if (!path) {
+    return "Untitled";
+  }
   const parts = path.split("/");
-  return parts[parts.length - 1];
+  return parts.at(-1);
 }
 
 /**
@@ -118,14 +124,18 @@ function tabLabel(tab: Tab) {
  */
 async function requestClose(id: string) {
   const tab = workspace.tabs.get(id);
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   if (tab.doc.dirty) {
     const confirmed = await showConfirmDialog(
       "Unsaved Changes",
       `"${tabLabel(tab)}" has unsaved changes. Close without saving?`,
       { confirmLabel: "Close", destructive: true },
     );
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
   }
   closeTab(id);
 }

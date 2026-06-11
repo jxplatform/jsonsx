@@ -136,8 +136,10 @@ export const view: ViewState = {
 const COLLAPSE_STORAGE_KEY = "jx-studio-panel-widths";
 
 export function applyPanelCollapse() {
-  const app = document.getElementById("app");
-  if (!app) return;
+  const app = document.querySelector("#app");
+  if (!app) {
+    return;
+  }
   app.classList.toggle("left-collapsed", view.leftPanelCollapsed);
   app.classList.toggle("right-collapsed", view.rightPanelCollapsed);
   try {
@@ -146,6 +148,6 @@ export function applyPanelCollapse() {
     saved.rightCollapsed = view.rightPanelCollapsed;
     localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(saved));
   } catch {
-    // storage unavailable
+    // Storage unavailable
   }
 }

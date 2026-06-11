@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_proto");
@@ -19,23 +19,23 @@ function setup() {
   writeFileSync(
     join(FIXTURES, "Multiplier.class.json"),
     JSON.stringify({
-      title: "Multiplier",
-      $implementation: "./Multiplier.js",
       $defs: { fields: {} },
+      $implementation: "./Multiplier.js",
+      title: "Multiplier",
     }),
   );
 
   writeFileSync(
     join(FIXTURES, "NoImpl.class.json"),
     JSON.stringify({
-      title: "NoImpl",
       $defs: { fields: {} },
+      title: "NoImpl",
     }),
   );
 }
 
 function cleanup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 }
 
 // ─── resolvePrototypes ─────────────────────────────────────────────────────
@@ -71,15 +71,15 @@ describe("resolvePrototypes", () => {
   test("skips entries with timing != compiler", async () => {
     const doc = {
       state: {
-        serverFn: {
-          $prototype: "MyClass",
-          timing: "server",
-          $src: "./x.class.json",
-        },
         clientFn: {
           $prototype: "MyClass",
-          timing: "client",
           $src: "./x.class.json",
+          timing: "client",
+        },
+        serverFn: {
+          $prototype: "MyClass",
+          $src: "./x.class.json",
+          timing: "server",
         },
       },
     };
@@ -90,8 +90,8 @@ describe("resolvePrototypes", () => {
 
   test("skips entries with no $src and no matching import", async () => {
     const doc = {
-      state: { data: { $prototype: "CSVLoader" } },
       imports: {},
+      state: { data: { $prototype: "CSVLoader" } },
     };
     await resolvePrototypes(doc, {}, "/tmp");
     expect(doc.state.data.$prototype).toBe("CSVLoader");
@@ -121,10 +121,10 @@ describe("resolvePrototypes", () => {
     setup();
     try {
       const doc = {
+        imports: { Multiplier: "./Multiplier.class.json" },
         state: {
           result: { $prototype: "Multiplier", a: 3, b: 5 },
         },
-        imports: { Multiplier: "./Multiplier.class.json" },
       };
       await resolvePrototypes(doc, { sourcePath: join(FIXTURES, "page.json") }, FIXTURES);
       expect(doc.state.result as any).toBe(15);
@@ -182,9 +182,9 @@ describe("resolvePrototypes", () => {
       writeFileSync(
         join(FIXTURES, "Echo.class.json"),
         JSON.stringify({
-          title: "Echo",
-          $implementation: "./Echo.js",
           $defs: { fields: {} },
+          $implementation: "./Echo.js",
+          title: "Echo",
         }),
       );
 
@@ -193,10 +193,10 @@ describe("resolvePrototypes", () => {
           result: {
             $prototype: "Echo",
             $src: "./Echo.class.json",
-            timing: "compiler",
-            description: "test",
-            default: "ignored",
             customArg: "kept",
+            default: "ignored",
+            description: "test",
+            timing: "compiler",
           },
         },
       };
@@ -233,7 +233,7 @@ describe("resolvePrototypes", () => {
       expect(page.$children.length).toBeGreaterThan(0);
       expect(page.slug).toBe("test");
     } finally {
-      rmSync(mdFixtures, { recursive: true, force: true });
+      rmSync(mdFixtures, { force: true, recursive: true });
     }
   });
 
@@ -269,7 +269,7 @@ describe("resolvePrototypes", () => {
       expect(titles).toContain("First");
       expect(titles).toContain("Second");
     } finally {
-      rmSync(mdFixtures, { recursive: true, force: true });
+      rmSync(mdFixtures, { force: true, recursive: true });
     }
   });
 
@@ -277,10 +277,10 @@ describe("resolvePrototypes", () => {
     setup();
     try {
       const doc = {
+        imports: { MarkdownFile: "./Multiplier.class.json" },
         state: {
           result: { $prototype: "MarkdownFile", a: 4, b: 9 },
         },
-        imports: { MarkdownFile: "./Multiplier.class.json" },
       };
       await resolvePrototypes(doc, { sourcePath: join(FIXTURES, "page.json") }, FIXTURES);
       expect(doc.state.result as any).toBe(36);
@@ -299,9 +299,9 @@ describe("resolvePrototypes", () => {
       writeFileSync(
         join(FIXTURES, "WrongExport.class.json"),
         JSON.stringify({
-          title: "WrongExport",
-          $implementation: "./WrongExport.js",
           $defs: { fields: {} },
+          $implementation: "./WrongExport.js",
+          title: "WrongExport",
         }),
       );
 
@@ -332,9 +332,9 @@ describe("resolvePrototypes", () => {
       writeFileSync(
         join(FIXTURES, "Simple.class.json"),
         JSON.stringify({
-          title: "Simple",
-          $implementation: "./Simple.js",
           $defs: { fields: {} },
+          $implementation: "./Simple.js",
+          title: "Simple",
         }),
       );
 

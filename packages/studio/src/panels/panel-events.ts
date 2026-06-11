@@ -6,22 +6,22 @@
  */
 
 import {
-  updateUi,
-  elToPath,
-  pathsEqual,
-  parentElementPath,
   childIndex,
+  elToPath,
   getNodeAtPath,
+  parentElementPath,
+  pathsEqual,
   renderOnly,
+  updateUi,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { stopEditing, isEditing, isEditableBlock } from "../editor/inline-edit";
+import { isEditableBlock, isEditing, stopEditing } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import * as insertionHelper from "../editor/insertion-helper";
 import { defaultDef } from "../panels/shared";
-import { bubbleInlinePath, findCanvasElement, effectiveZoom } from "../canvas/canvas-helpers";
-import { layoutElements, activeLayoutPath } from "../canvas/canvas-live-render";
+import { bubbleInlinePath, effectiveZoom, findCanvasElement } from "../canvas/canvas-helpers";
+import { activeLayoutPath, layoutElements } from "../canvas/canvas-live-render";
 import type { CanvasPanel } from "./canvas-dnd";
 import type { JxPath } from "../state";
 
@@ -55,11 +55,15 @@ export function registerPanelEvents(panel: CanvasPanel) {
   /** @param {() => unknown} fn */
   function withPanelPointerEvents(fn: () => unknown) {
     const els = canvas.querySelectorAll("*") as NodeListOf<HTMLElement>;
-    for (const el of els) el.style.pointerEvents = "auto";
+    for (const el of els) {
+      el.style.pointerEvents = "auto";
+    }
     overlayClk.style.display = "none";
     const result = fn();
     overlayClk.style.display = "";
-    for (const el of els) el.style.pointerEvents = "none";
+    for (const el of els) {
+      el.style.pointerEvents = "none";
+    }
     return result;
   }
 
@@ -74,8 +78,9 @@ export function registerPanelEvents(panel: CanvasPanel) {
           e.clientX <= r.right &&
           e.clientY >= r.top &&
           e.clientY <= r.bottom
-        )
+        ) {
           return;
+        }
       }
       if (isEditing()) {
         stopEditing();
@@ -88,7 +93,9 @@ export function registerPanelEvents(panel: CanvasPanel) {
         document.elementsFromPoint(e.clientX, e.clientY),
       ) as Element[];
 
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
 
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
@@ -103,7 +110,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
 
           const originalPath = elToPath.get(el);
           if (originalPath) {
-            let path = bubbleInlinePath(tab.doc.document, originalPath);
+            const path = bubbleInlinePath(tab.doc.document, originalPath);
             const newMedia = mediaName === "base" ? null : (mediaName ?? null);
 
             const resolvedEl = (
@@ -123,7 +130,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
             }
 
             if (canvasMode === "design" && tab.doc.mode !== "content") {
-              updateUi("pendingInlineEdit", { path, mediaName });
+              updateUi("pendingInlineEdit", { mediaName, path });
               tab.session.ui.activeMedia = newMedia;
               tab.session.selection = path;
               return;
@@ -151,18 +158,23 @@ export function registerPanelEvents(panel: CanvasPanel) {
           e.clientX <= r.right &&
           e.clientY >= r.top &&
           e.clientY <= r.bottom
-        )
+        ) {
           return;
+        }
       }
       const canvasMode = ctx.getCanvasMode();
-      if (canvasMode !== "edit" && canvasMode !== "design") return;
+      if (canvasMode !== "edit" && canvasMode !== "design") {
+        return;
+      }
 
       const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
         document.elementsFromPoint(e.clientX, e.clientY),
       ) as Element[];
 
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
 
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
@@ -199,8 +211,9 @@ export function registerPanelEvents(panel: CanvasPanel) {
           e.clientX <= r.right &&
           e.clientY >= r.top &&
           e.clientY <= r.bottom
-        )
+        ) {
           return;
+        }
       }
       const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
@@ -234,11 +247,14 @@ export function registerPanelEvents(panel: CanvasPanel) {
           e.clientX <= r.right &&
           e.clientY >= r.top &&
           e.clientY <= r.bottom
-        )
+        ) {
           return;
+        }
       }
       const tab = activeTab.value;
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
       const el = withPanelPointerEvents(() =>
         document.elementFromPoint(e.clientX, e.clientY),
       ) as Element | null;
@@ -271,15 +287,15 @@ export function registerPanelEvents(panel: CanvasPanel) {
   );
 
   insertionHelper.mount({
-    getCanvasMode: ctx.getCanvasMode,
-    withPanelPointerEvents,
-    effectiveZoom: effectiveZoom,
-    defaultDef,
-    parentElementPath,
     childIndex,
-    getNodeAtPath,
+    defaultDef,
+    effectiveZoom,
     elToPath,
+    getCanvasMode: ctx.getCanvasMode,
+    getNodeAtPath,
     panel: panel as unknown as Parameters<typeof insertionHelper.mount>[0]["panel"],
+    parentElementPath,
+    withPanelPointerEvents,
   });
   view.canvasEventCleanups.push(() => insertionHelper.unmount());
 }

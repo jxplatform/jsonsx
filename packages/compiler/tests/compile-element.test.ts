@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { compileElement, compileElementPage } from "../src/compiler";
 import { emitElementModule } from "../src/targets/compile-element";
 import { resolve } from "node:path";
@@ -11,9 +11,9 @@ const examplesDir = resolve(fixturesDir, "../../../examples/components");
 describe("compileElement", () => {
   test("compiles a simple custom element from a raw object", async () => {
     const result = await compileElement({
-      tagName: "test-basic",
-      state: { count: 0 },
       children: [{ tagName: "span", textContent: "${state.count}" }],
+      state: { count: 0 },
+      tagName: "test-basic",
     });
 
     expect(result.files).toHaveLength(1);
@@ -27,12 +27,12 @@ describe("compileElement", () => {
 
   test("reactive state from state", async () => {
     const result = await compileElement({
-      tagName: "test-state",
-      state: { label: "hello", count: 0, items: [1, 2, 3] },
       children: [],
+      state: { count: 0, items: [1, 2, 3], label: "hello" },
+      tagName: "test-state",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state = reactive({");
     expect(content).toContain('label: "hello"');
     expect(content).toContain("count: 0");
@@ -41,7 +41,7 @@ describe("compileElement", () => {
 
   test("functions become methods on state", async () => {
     const result = await compileElement({
-      tagName: "test-fn",
+      children: [],
       state: {
         count: 0,
         increment: {
@@ -49,17 +49,17 @@ describe("compileElement", () => {
           body: "state.count++",
         },
       },
-      children: [],
+      tagName: "test-fn",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state.increment = (state) => {");
     expect(content).toContain("state.count++");
   });
 
   test("signal functions become computed", async () => {
     const result = await compileElement({
-      tagName: "test-computed",
+      children: [],
       state: {
         items: [],
         total: {
@@ -67,22 +67,22 @@ describe("compileElement", () => {
           body: "return state.items.length",
         },
       },
-      children: [],
+      tagName: "test-computed",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state.total = computed(() => {");
     expect(content).toContain("return this.state.items.length");
   });
 
   test("connectedCallback merges properties and starts effect", async () => {
     const result = await compileElement({
-      tagName: "test-connect",
-      state: { x: 1 },
       children: [],
+      state: { x: 1 },
+      tagName: "test-connect",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("connectedCallback()");
     expect(content).toContain("this.state[key] = this[key]");
     expect(content).toContain("this.#dispose = effect(() => render(this.template(), this))");
@@ -90,30 +90,30 @@ describe("compileElement", () => {
 
   test("disconnectedCallback disposes effect", async () => {
     const result = await compileElement({
-      tagName: "test-disconnect",
-      state: {},
       children: [],
+      state: {},
+      tagName: "test-disconnect",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("disconnectedCallback()");
     expect(content).toContain("#dispose");
   });
 
   test("throws for non-hyphenated tagName", async () => {
     try {
-      await compileElement({ tagName: "nohyphen", state: {} });
+      await compileElement({ state: {}, tagName: "nohyphen" });
       expect(true).toBe(false);
-    } catch (e) {
-      expect((e as Error).message).toContain("must contain a hyphen");
+    } catch (error) {
+      expect((error as Error).message).toContain("must contain a hyphen");
     }
   });
 
   test("tagName converts to PascalCase class name", async () => {
     const result = await compileElement({
-      tagName: "my-cool-element",
-      state: {},
       children: [],
+      state: {},
+      tagName: "my-cool-element",
     });
 
     expect(result.files[0].content).toContain("class MyCoolElement extends HTMLElement");
@@ -125,28 +125,28 @@ describe("compileElement", () => {
 describe("compileElement — templates", () => {
   test("textContent with template string", async () => {
     const result = await compileElement({
-      tagName: "test-text",
-      state: { name: "world" },
       children: [{ tagName: "span", textContent: "${state.name}" }],
+      state: { name: "world" },
+      tagName: "test-text",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("${s.name}");
   });
 
   test("template string in children array emits unescaped lit expression", async () => {
     const result = await compileElement({
-      tagName: "test-tpl-child",
-      state: { status: "idle" },
       children: [
         {
-          tagName: "button",
           children: ["${state.status === 'submitting' ? 'Sending...' : 'Submit'}"],
+          tagName: "button",
         },
       ],
+      state: { status: "idle" },
+      tagName: "test-tpl-child",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("s.status === 'submitting' ? 'Sending...' : 'Submit'");
     expect(content).not.toContain("&#39;");
     expect(content).not.toContain("&amp;");
@@ -154,28 +154,28 @@ describe("compileElement — templates", () => {
 
   test("static textContent", async () => {
     const result = await compileElement({
-      tagName: "test-static-text",
-      state: {},
       children: [{ tagName: "span", textContent: "Hello" }],
+      state: {},
+      tagName: "test-static-text",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain(">Hello</span>");
   });
 
   test("inner styles use class names (CSS in sidecar, not JS)", async () => {
     const result = await compileElement({
-      tagName: "test-style",
-      state: {},
       children: [
         {
+          style: { backgroundColor: "#fff", display: "flex", gap: "1em" },
           tagName: "div",
-          style: { display: "flex", gap: "1em", backgroundColor: "#fff" },
         },
       ],
+      state: {},
+      tagName: "test-style",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('class="test-style-0"');
     expect(content).not.toContain("display: flex");
     expect(content).not.toContain("background-color: #fff");
@@ -184,82 +184,80 @@ describe("compileElement — templates", () => {
 
   test("dynamic style with template expression", async () => {
     const result = await compileElement({
-      tagName: "test-dyn-style",
-      state: { active: true },
       children: [
         {
-          tagName: "div",
           style: { color: "${state.active ? 'red' : 'gray'}" },
+          tagName: "div",
         },
       ],
+      state: { active: true },
+      tagName: "test-dyn-style",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("color: ${s.active ? 'red' : 'gray'}");
   });
 
   test("event handlers from $ref", async () => {
     const result = await compileElement({
-      tagName: "test-event",
-      state: {
-        handleClick: { $prototype: "Function", body: 'console.log("clicked")' },
-      },
       children: [
         {
-          tagName: "button",
           onclick: { $ref: "#/state/handleClick" },
+          tagName: "button",
           textContent: "Click",
         },
       ],
+      state: {
+        handleClick: { $prototype: "Function", body: 'console.log("clicked")' },
+      },
+      tagName: "test-event",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("@click=");
     expect(content).toContain("s.handleClick");
   });
 
   test("inline event handler", async () => {
     const result = await compileElement({
-      tagName: "test-inline-event",
-      state: { count: 0 },
       children: [
         {
-          tagName: "button",
           onclick: { $prototype: "Function", body: "state.count++" },
+          tagName: "button",
           textContent: "Inc",
         },
       ],
+      state: { count: 0 },
+      tagName: "test-inline-event",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("@click=");
     expect(content).toContain("s.count++");
   });
 
   test("$props on custom element child", async () => {
     const result = await compileElement({
-      tagName: "test-props",
-      state: { data: [] },
       children: [
         {
-          tagName: "child-el",
           $props: {
             items: { $ref: "#/state/data" },
             label: "test",
           },
+          tagName: "child-el",
         },
       ],
+      state: { data: [] },
+      tagName: "test-props",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('.items="${s.data}"');
     expect(content).toContain('.label="${"test"}"');
   });
 
   test("mapped array", async () => {
     const result = await compileElement({
-      tagName: "test-map",
-      state: { items: [1, 2, 3] },
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/items" },
@@ -268,21 +266,23 @@ describe("compileElement — templates", () => {
           textContent: "${$map.item}",
         },
       },
+      state: { items: [1, 2, 3] },
+      tagName: "test-map",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain(".map((item, index)");
     expect(content).toContain("s.items");
   });
 
   test("always clears innerHTML before render (no duplicate content on hydration)", async () => {
     const result = await compileElement({
-      tagName: "test-hydrate",
-      state: { name: "world" },
       children: [{ tagName: "span", textContent: "${state.name}" }],
+      state: { name: "world" },
+      tagName: "test-hydrate",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.innerHTML = '';");
     expect(content).not.toContain("} else {");
     expect(content).not.toContain("} else {\n      this.innerHTML = '';");
@@ -290,17 +290,17 @@ describe("compileElement — templates", () => {
 
   test("attributes", async () => {
     const result = await compileElement({
-      tagName: "test-attrs",
-      state: {},
       children: [
         {
+          attributes: { placeholder: "Enter...", type: "text" },
           tagName: "input",
-          attributes: { type: "text", placeholder: "Enter..." },
         },
       ],
+      state: {},
+      tagName: "test-attrs",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('type="text"');
     expect(content).toContain('placeholder="Enter..."');
   });
@@ -323,7 +323,7 @@ describe("compileElement — $elements", () => {
   test("compiles task-stats.json with computed signals", async () => {
     const result = await compileElement(resolve(examplesDir, "task-stats.json"));
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("class TaskStats extends HTMLElement");
     expect(content).toContain("this.state.total = computed(");
     expect(content).toContain("this.state.done = computed(");
@@ -344,7 +344,7 @@ describe("compileElement — $elements", () => {
   });
 
   test("does not duplicate visited elements from file", async () => {
-    // task-manager.json references task-item and task-stats
+    // Task-manager.json references task-item and task-stats
     // Compiling it should not produce duplicates
     const result = await compileElement(resolve(examplesDir, "task-manager.json"));
 
@@ -361,9 +361,9 @@ describe("compileElementPage", () => {
   test("generates HTML with import map", async () => {
     const result = await compileElementPage(
       {
-        tagName: "test-page",
-        state: { x: 1 },
         children: [{ tagName: "span", textContent: "${state.x}" }],
+        state: { x: 1 },
+        tagName: "test-page",
       },
       { title: "Test Page" },
     );
@@ -400,33 +400,33 @@ Paragraph content
         imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
       });
       const result = await compileElementPage(mdPath, {
-        title: "MD Test",
         formats,
+        title: "MD Test",
       });
       expect(result.html).toContain("<!DOCTYPE html>");
       expect(result.html).toContain("<test-markdown></test-markdown>");
       expect(result.files.length).toBeGreaterThanOrEqual(1);
       expect(result.files[0].tagName).toBe("test-markdown");
     } finally {
-      rmSync(tmpDir, { recursive: true, force: true });
+      rmSync(tmpDir, { force: true, recursive: true });
     }
   });
 
   test("custom resolveElementPath callback", async () => {
     const result = await compileElement(
       {
-        tagName: "test-resolve",
-        state: {},
-        children: [],
         $elements: ["./components/child-el.json"],
+        children: [],
+        state: {},
+        tagName: "test-resolve",
       },
       {
-        resolveElementPath: (refPath: string, _dir: string) =>
+        resolveElementPath: (refPath: string, _dir: string | null) =>
           refPath.replace(/\.json$/, ".bundle.js"),
       },
     );
 
-    const root = result.files[result.files.length - 1];
+    const root = result.files.at(-1);
     expect(root.content).toContain("import './components/child-el.bundle.js'");
   });
 });
@@ -436,40 +436,40 @@ Paragraph content
 describe("compileElement — extractInitialValue prototypes", () => {
   test("LocalStorage $prototype uses default value", async () => {
     const result = await compileElement({
-      tagName: "test-localstorage",
+      children: [],
       state: {
         theme: { $prototype: "LocalStorage", default: "dark" },
       },
-      children: [],
+      tagName: "test-localstorage",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('theme: "dark"');
   });
 
   test("LocalStorage $prototype without default uses null", async () => {
     const result = await compileElement({
-      tagName: "test-ls-null",
+      children: [],
       state: {
         token: { $prototype: "LocalStorage" },
       },
-      children: [],
+      tagName: "test-ls-null",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("token: null");
   });
 
   test("Request $prototype uses null as initial value", async () => {
     const result = await compileElement({
-      tagName: "test-request",
+      children: [],
       state: {
         data: { $prototype: "Request", url: "https://api.example.com/data" },
       },
-      children: [],
+      tagName: "test-request",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("data: null");
   });
 });
@@ -479,53 +479,53 @@ describe("compileElement — extractInitialValue prototypes", () => {
 describe("compileElement — $src imports", () => {
   test("Function with $src generates import and wrapper", async () => {
     const result = await compileElement({
-      tagName: "test-src-fn",
+      children: [],
       state: {
         handler: {
+          $export: "handler",
           $prototype: "Function",
           $src: "./utils.js",
-          $export: "handler",
           body: "state.count++",
         },
       },
-      children: [],
+      tagName: "test-src-fn",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("import { handler } from './utils.js'");
     expect(content).toContain("this.state.handler = (state) => handler(state)");
   });
 
   test("computed Function with $src generates import and computed wrapper", async () => {
     const result = await compileElement({
-      tagName: "test-src-computed",
+      children: [],
       state: {
         total: {
+          $export: "total",
           $prototype: "Function",
           $src: "./calc.js",
-          $export: "total",
           body: "return state.items.length",
         },
       },
-      children: [],
+      tagName: "test-src-computed",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("import { total } from './calc.js'");
     expect(content).toContain("this.state.total = computed(() => total(this.state))");
   });
 
   test("multiple $src imports from same file are grouped", async () => {
     const result = await compileElement({
-      tagName: "test-src-multi",
+      children: [],
       state: {
         add: { $prototype: "Function", $src: "./math.js", body: "state.x++" },
         sub: { $prototype: "Function", $src: "./math.js", body: "state.x--" },
       },
-      children: [],
+      tagName: "test-src-multi",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("import { add, sub } from './math.js'");
   });
 });
@@ -536,10 +536,10 @@ describe("compileElement — dynamic host styles", () => {
   test("template strings in host style emit effect", async () => {
     const content = emitElementModule(
       {
-        tagName: "test-dyn-host",
+        children: [],
         state: { theme: "blue" },
         style: { color: "${state.theme}", display: "flex" },
-        children: [],
+        tagName: "test-dyn-host",
       },
       "TestDynHost",
       [],
@@ -547,7 +547,7 @@ describe("compileElement — dynamic host styles", () => {
 
     expect(content).toContain("effect(() => {");
     expect(content).toContain("this.style['color'] = `${this.state.theme}`");
-    // static 'display: flex' should NOT be in the dynamic effect
+    // Static 'display: flex' should NOT be in the dynamic effect
     expect(content).not.toContain("this.style['display']");
   });
 });
@@ -557,12 +557,12 @@ describe("compileElement — dynamic host styles", () => {
 describe("compileElement — slot handling", () => {
   test("element with slot child saves and restores slotted content", async () => {
     const result = await compileElement({
-      tagName: "test-slot",
+      children: [{ children: [{ tagName: "slot" }], tagName: "div" }],
       state: {},
-      children: [{ tagName: "div", children: [{ tagName: "slot" }] }],
+      tagName: "test-slot",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("const _slotted = Array.from(this.childNodes)");
     expect(content).toContain("const _slot = this.querySelector('slot')");
     expect(content).toContain("_slot.before(n)");
@@ -575,43 +575,43 @@ describe("compileElement — slot handling", () => {
 describe("compileElement — emitLitNode edge cases", () => {
   test("dynamic attribute with template string", async () => {
     const result = await compileElement({
-      tagName: "test-dyn-attr",
-      state: { val: "hello" },
       children: [
         {
-          tagName: "div",
           attributes: { "data-x": "${state.val}" },
+          tagName: "div",
         },
       ],
+      state: { val: "hello" },
+      tagName: "test-dyn-attr",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('data-x="${s.val}"');
   });
 
   test("property bindings with template strings on non-reserved keys", async () => {
     const result = await compileElement({
-      tagName: "test-prop-bind",
-      state: { val: "test" },
       children: [
         {
           tagName: "custom-child",
           value: "${state.val}",
         },
       ],
+      state: { val: "test" },
+      tagName: "test-prop-bind",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('.value="${s.val}"');
   });
 
   test("boolean/number child nodes are escaped", async () => {
     const content = emitElementModule(
       {
-        tagName: "test-bool-child",
+        children: [{ children: [42], tagName: "div" }],
         state: {},
-        children: [{ tagName: "div", children: [42] }],
-      },
+        tagName: "test-bool-child",
+      } as unknown as import("@jxsuite/schema/types").JxDocument,
       "TestBoolChild",
       [],
     );
@@ -621,17 +621,17 @@ describe("compileElement — emitLitNode edge cases", () => {
 
   test("innerHTML in node definition", async () => {
     const result = await compileElement({
-      tagName: "test-innerhtml",
-      state: {},
       children: [
         {
-          tagName: "div",
           innerHTML: "<b>content</b>",
+          tagName: "div",
         },
       ],
+      state: {},
+      tagName: "test-innerhtml",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("<b>content</b>");
     expect(content).toContain("<div");
   });
@@ -642,62 +642,62 @@ describe("compileElement — emitLitNode edge cases", () => {
 describe("compileElement — emitMappedArray edge cases", () => {
   test("$props without $ref in mapped array", async () => {
     const result = await compileElement({
-      tagName: "test-map-props",
-      state: { items: [] },
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/items" },
         map: {
-          tagName: "child-el",
           $props: { title: "Static" },
+          tagName: "child-el",
           textContent: "${$map.item}",
         },
       },
+      state: { items: [] },
+      tagName: "test-map-props",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('.title="${"Static"}"');
     expect(content).toContain(".map((item, index)");
   });
 
   test("event handlers in mapped array", async () => {
     const result = await compileElement({
-      tagName: "test-map-event",
-      state: {
-        items: [],
-        handleClick: { $prototype: "Function", body: 'console.log("click")' },
-      },
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/items" },
         map: {
-          tagName: "button",
           onclick: { $ref: "#/state/handleClick" },
+          tagName: "button",
           textContent: "${$map.item}",
         },
       },
+      state: {
+        handleClick: { $prototype: "Function", body: 'console.log("click")' },
+        items: [],
+      },
+      tagName: "test-map-event",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("@click=");
     expect(content).toContain("s.handleClick(s, e)");
   });
 
   test("children in mapped array", async () => {
     const result = await compileElement({
-      tagName: "test-map-children",
-      state: { items: [] },
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/items" },
         map: {
-          tagName: "div",
           children: [{ tagName: "span", textContent: "nested" }],
+          tagName: "div",
         },
       },
+      state: { items: [] },
+      tagName: "test-map-children",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain(".map((item, index)");
     expect(content).toContain("<span");
     expect(content).toContain(">nested</span>");
@@ -709,59 +709,59 @@ describe("compileElement — emitMappedArray edge cases", () => {
 describe("compileElement — refToExpr edge cases", () => {
   test("$map/ prefix resolves to dotted path", async () => {
     const result = await compileElement({
-      tagName: "test-map-ref",
-      state: { items: [] },
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/items" },
         map: {
-          tagName: "span",
           $props: { name: { $ref: "$map/item/name" } },
+          tagName: "span",
         },
       },
+      state: { items: [] },
+      tagName: "test-map-ref",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("item.name");
   });
 
   test("unknown ref without #/state/ prefix uses s. prefix", async () => {
     const result = await compileElement({
-      tagName: "test-unknown-ref",
-      state: { items: [] },
       children: [
         {
-          tagName: "div",
           $props: { data: { $ref: "custom/path" } },
+          tagName: "div",
         },
       ],
+      state: { items: [] },
+      tagName: "test-unknown-ref",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("s.custom/path");
   });
 
   test("$map/ prefix ref resolves to dot path without s. prefix", async () => {
     const result = await compileElement({
-      tagName: "test-map-ref",
-      state: { items: { type: "array", default: [] } },
       children: [
         {
-          tagName: "ul",
           children: {
             $prototype: "Array",
             items: { $ref: "#/state/items" },
             map: {
-              tagName: "li",
               $props: { label: { $ref: "$map/item/title" } },
               onclick: { $ref: "$map/item/handler" },
+              tagName: "li",
             },
           },
+          tagName: "ul",
         },
       ],
+      state: { items: { default: [], type: "array" } },
+      tagName: "test-map-ref",
     });
 
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("item.title");
     expect(content).toContain("item.handler");
     expect(content).not.toContain("s.$map");
@@ -769,35 +769,35 @@ describe("compileElement — refToExpr edge cases", () => {
 
   test("Request prototype state initializes as null", async () => {
     const result = await compileElement({
-      tagName: "test-request",
+      children: [{ tagName: "div", textContent: "loading" }],
       state: {
         data: { $prototype: "Request", url: "/api/items" },
       },
-      children: [{ tagName: "div", textContent: "loading" }],
+      tagName: "test-request",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("data: null");
   });
 
   test("plain string child in lit template is escaped", async () => {
     const result = await compileElement({
-      tagName: "test-plain-text",
-      state: { items: { type: "array", default: [] } },
       children: [
         {
-          tagName: "ul",
           children: {
             $prototype: "Array",
             items: { $ref: "#/state/items" },
             map: {
-              tagName: "li",
               children: ["Hello world"],
+              tagName: "li",
             },
           },
+          tagName: "ul",
         },
       ],
+      state: { items: { default: [], type: "array" } },
+      tagName: "test-plain-text",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("Hello world");
   });
 });
@@ -808,79 +808,79 @@ describe("compileElement — $media opts", () => {
   test("assigns class names when $media opts are provided", async () => {
     const result = await compileElement(
       {
-        tagName: "test-media-prop",
         children: [
           {
-            tagName: "button",
             style: {
-              display: "none",
               "@--md": { display: "block" },
+              display: "none",
             },
+            tagName: "button",
           },
         ],
+        tagName: "test-media-prop",
       },
       { $media: { "--md": "(max-width: 768px)" } },
     );
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('class="test-media-prop-0"');
   });
 
   test("component's own $media takes precedence over opts $media", async () => {
     const result = await compileElement(
       {
-        tagName: "test-media-override",
         $media: { "--md": "(max-width: 900px)" },
         children: [
           {
-            tagName: "div",
             style: { "@--md": { color: "red" } },
+            tagName: "div",
           },
         ],
+        tagName: "test-media-override",
       },
       { $media: { "--md": "(max-width: 768px)" } },
     );
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('class="test-media-override-0"');
   });
 
   test("assigns class names for elements with @starting-style", async () => {
     const result = await compileElement({
-      tagName: "test-starting-style",
       children: [
         {
-          tagName: "nav",
           style: {
-            transform: "translateX(100%)",
             ":popover-open": { transform: "translateX(0)" },
             "@starting-style": {
               ":popover-open": { transform: "translateX(100%)" },
             },
+            transform: "translateX(100%)",
           },
+          tagName: "nav",
         },
       ],
+      tagName: "test-starting-style",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('class="test-starting-style-0"');
   });
 
   test("popover and popovertarget attributes are rendered", async () => {
     const result = await compileElement({
-      tagName: "test-popover-attrs",
       children: [
         {
+          attributes: { "aria-label": "Toggle", popovertarget: "my-menu" },
           tagName: "button",
-          attributes: { popovertarget: "my-menu", "aria-label": "Toggle" },
           textContent: "Menu",
         },
         {
-          tagName: "nav",
-          id: "my-menu",
           attributes: { popover: "" },
-          children: [{ tagName: "a", attributes: { href: "/" }, textContent: "Home" }],
+          children: [{ attributes: { href: "/" }, tagName: "a", textContent: "Home" }],
+          id: "my-menu",
+          tagName: "nav",
         },
       ],
+      tagName: "test-popover-attrs",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('popovertarget="my-menu"');
     expect(content).toContain("popover");
   });

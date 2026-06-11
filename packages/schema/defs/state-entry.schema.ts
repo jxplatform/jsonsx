@@ -17,7 +17,6 @@ export const stateEntrySchema = {
     { $ref: "#/$defs/ExternalClassDef" },
     { $ref: "#/$defs/ExpressionEntry" },
     {
-      type: "object",
       not: {
         anyOf: [
           { required: ["$prototype"] },
@@ -26,24 +25,25 @@ export const stateEntrySchema = {
           { required: ["$expression"] },
         ],
       },
+      type: "object",
     },
   ],
 } as const;
 
 export const stateMapSchema = {
+  additionalProperties: { $ref: "#/$defs/StateEntry" },
   description:
     "Map of runtime variables. Keys are camelCase (public) or #-prefixed (private). " +
     "All entries are reactive by default.",
   type: "object",
-  additionalProperties: { $ref: "#/$defs/StateEntry" },
 } as const;
 
 export const defsMapSchema = {
+  additionalProperties: { $ref: "#/$defs/TypeDefEntry" },
   description:
     "Map of reusable JSON Schema type definitions. " +
     "Keys are PascalCase type names. No runtime artifacts are produced.",
   type: "object",
-  additionalProperties: { $ref: "#/$defs/TypeDefEntry" },
 } as const;
 
 export const typeDefEntrySchema = {

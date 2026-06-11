@@ -13,15 +13,16 @@
  * @module content-loader
  */
 
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { resolve, basename, extname } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { basename, extname, resolve } from "node:path";
 import { buildProjectFormatRegistry, unknownFormatError } from "./format-host.ts";
-import type { FormatRegistry, FormatEntry } from "@jxsuite/schema/format-registry";
+import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type {
-  ProjectConfig,
   ContentTypeDef,
   ContentTypeSchema,
   JxMutableNode,
+  ProjectConfig,
 } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 
@@ -35,21 +36,21 @@ import type { ContentLoaderEntry } from "@jxsuite/parser/types";
  * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
  */
 function loadJSONEntries(filePath: string) {
-  const raw = JSON.parse(readFileSync(filePath, "utf-8"));
+  const raw = JSON.parse(readFileSync(filePath, "utf8"));
   if (Array.isArray(raw)) {
     return raw.map((item: Record<string, unknown>, i: number) => ({
-      id: (item.id as string) ?? basename(filePath, ".json") + "-" + i,
-      data: item,
       body: null,
+      data: item,
+      id: (item.id as string) ?? `${basename(filePath, ".json")}-${i}`,
     }));
   }
   // Single object file — filename is the id
   const rawObj: Record<string, unknown> = raw;
   return [
     {
-      id: (rawObj.id as string) ?? basename(filePath, ".json"),
-      data: rawObj,
       body: null,
+      data: rawObj,
+      id: (rawObj.id as string) ?? basename(filePath, ".json"),
     },
   ];
 }
@@ -106,11 +107,15 @@ export async function loadContentTypes(
   registry?: FormatRegistry,
 ) {
   const result = loadContentConfig(projectRoot, projectConfig);
-  if (!result) return new Map();
+  if (!result) {
+    return new Map();
+  }
 
   const { config } = result;
-  const contentTypes: Map<string, ContentLoaderEntry[]> = new Map();
-  if (Object.keys(config.contentTypes).length === 0) return contentTypes;
+  const contentTypes = new Map<string, ContentLoaderEntry[]>();
+  if (Object.keys(config.contentTypes).length === 0) {
+    return contentTypes;
+  }
 
   const formats = registry ?? (await buildProjectFormatRegistry(projectRoot, projectConfig));
 
@@ -136,7 +141,9 @@ export function getContentTypeElements(
   projectConfig?: ProjectConfig,
 ) {
   const result = loadContentConfig(projectRoot, projectConfig);
-  if (!result) return undefined;
+  if (!result) {
+    return;
+  }
   const def = result.config.contentTypes?.[contentTypeName];
   return def?.$elements;
 }
@@ -156,9 +163,11 @@ async function loadContentType(
   projectRoot: string,
   registry: FormatRegistry,
 ) {
-  const source = contentTypeDef.source;
-  if (!source) return [];
-  const schema = contentTypeDef.schema;
+  const { source } = contentTypeDef;
+  if (!source) {
+    return [];
+  }
+  const { schema } = contentTypeDef;
 
   // Derive directive allowedNames from content type $elements (tag names from npm packages)
   const directiveOptions = contentTypeDef.$elements?.length
@@ -200,13 +209,15 @@ async function loadContentType(
     }
     try {
       const entries = (await entry.call("load", source, {
-        schema,
         directiveOptions,
+        schema,
       })) as ContentLoaderEntry[];
-      if (schema) validateEntries(entries, schema, name);
+      if (schema) {
+        validateEntries(entries, schema, name);
+      }
       return entries;
-    } catch (e) {
-      console.warn(`Content type "${name}": ${(e as Error).message}`);
+    } catch (error) {
+      console.warn(`Content type "${name}": ${errorMessage(error)}`);
       return [];
     }
   }
@@ -218,8 +229,12 @@ async function loadContentType(
   if (formatName === "json" || (!entry && ext === ".json")) {
     const files = discoverJSONFiles(resolvedSource);
     const entries: ContentLoaderEntry[] = [];
-    for (const filePath of files) entries.push(...loadJSONEntries(filePath));
-    if (schema) validateEntries(entries, schema, name);
+    for (const filePath of files) {
+      entries.push(...loadJSONEntries(filePath));
+    }
+    if (schema) {
+      validateEntries(entries, schema, name);
+    }
     return entries;
   }
 
@@ -245,8 +260,8 @@ async function loadContentType(
   for (const filePath of files) {
     entries.push(
       ...((await entry.call("load", filePath, {
-        schema,
         directiveOptions,
+        schema,
       })) as ContentLoaderEntry[]),
     );
   }
@@ -290,7 +305,9 @@ function validateEntries(
     // Check types
     for (const [field, def] of Object.entries(properties)) {
       const value = entry.data[field];
-      if (value == null) continue;
+      if (value == null) {
+        continue;
+      }
 
       if (def.type === "string" && typeof value !== "string") {
         console.warn(
@@ -332,17 +349,25 @@ export function resolveContentTypeRefs(
   config: { contentTypes: Record<string, ContentTypeDef> },
 ) {
   for (const [name, contentTypeDef] of Object.entries(config.contentTypes)) {
-    const schema = contentTypeDef.schema;
-    if (!schema?.properties) continue;
+    const { schema } = contentTypeDef;
+    if (!schema?.properties) {
+      continue;
+    }
 
     const entries = contentTypes.get(name);
-    if (!entries) continue;
+    if (!entries) {
+      continue;
+    }
 
     for (const [field, def] of Object.entries(schema.properties)) {
-      if (!def.$ref?.startsWith("#/contentTypes/")) continue;
+      if (!def.$ref?.startsWith("#/contentTypes/")) {
+        continue;
+      }
       const refContentType = def.$ref.replace("#/contentTypes/", "");
       const refEntries = contentTypes.get(refContentType);
-      if (!refEntries) continue;
+      if (!refEntries) {
+        continue;
+      }
 
       for (const entry of entries) {
         const refId = entry.data[field];

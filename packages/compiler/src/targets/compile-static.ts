@@ -6,29 +6,34 @@
  */
 
 import {
-  isNodeDynamic,
-  createCompileContext,
-  resolveStaticValue,
   buildAttrs,
   compileStyles,
+  createCompileContext,
   escapeHtml,
+  isNodeDynamic,
+  resolveStaticValue,
 } from "../shared.ts";
 import { emitElementModule } from "./compile-element.ts";
-import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 /**
  * Compile a static document to HTML, with dynamic subtrees as islands.
  *
- * @param {JxMutableNode | Record<string, any>} raw - Raw JSON document (with $ref pointers
- *   preserved)
+ * @param {JxDocument} raw - Raw JSON document (with $ref pointers preserved)
  * @param {Record<string, unknown>} opts
  * @returns {{ html: string; files: { path: string; content: string; tagName: string }[] }}
  */
 export function compileStaticPage(
-  raw: JxMutableNode | Record<string, any>,
-  opts: Record<string, unknown>,
+  raw: JxDocument,
+  opts: {
+    title?: string;
+    reactivitySrc?: string;
+    litHtmlSrc?: string;
+    projectStyle?: JxStyle | null;
+    [key: string]: unknown;
+  },
 ) {
-  const { title, reactivitySrc, litHtmlSrc } = opts as JxMutableNode;
+  const { title = "Jx App", reactivitySrc, litHtmlSrc } = opts;
 
   const rootContext = createCompileContext(raw, null, raw.state ?? {}, raw.$media ?? {});
   const styleBlock = compileStyles(
@@ -47,8 +52,8 @@ export function compileStaticPage(
     for (const island of islands) {
       const moduleContent = emitElementModule(island.def, island.className, []);
       files.push({
-        path: `_islands/${island.tagName}.js`,
         content: moduleContent,
+        path: `_islands/${island.tagName}.js`,
         tagName: island.tagName,
       });
     }
@@ -82,7 +87,7 @@ export function compileStaticPage(
 </body>
 </html>`;
 
-  return { html, files };
+  return { files, html };
 }
 
 // ─── Node compilation ─────────────────────────────────────────────────────────
@@ -95,7 +100,7 @@ export function compileStaticPage(
  * @param {boolean} dynamic
  * @param {JxMutableNode} raw
  * @param {any} context
- * @param {{ def: any; tagName: string; className: string }[]} islands
+ * @param {{ def: JxMutableNode; tagName: string; className: string }[]} islands
  * @returns {string}
  */
 function compileNode(
@@ -116,7 +121,9 @@ function compileNode(
   if (typeof def === "number" || typeof def === "boolean") {
     return escapeHtml(String(def));
   }
-  if (!def || typeof def !== "object") return "";
+  if (!def || typeof def !== "object") {
+    return "";
+  }
 
   const nextContext = createCompileContext(
     raw,
@@ -130,7 +137,7 @@ function compileNode(
     const tagName = `jx-island-${n}`;
     const className = `JxIsland${n}`;
     const elementDef = { ...(raw ?? def), tagName };
-    islands.push({ def: elementDef, tagName, className });
+    islands.push({ className, def: elementDef, tagName });
     return `<${tagName}></${tagName}>`;
   }
 
@@ -148,7 +155,7 @@ function compileNode(
  * @param {JxMutableNode} def
  * @param {JxMutableNode} raw
  * @param {any} context
- * @param {{ def: any; tagName: string; className: string }[]} islands
+ * @param {{ def: JxMutableNode; tagName: string; className: string }[]} islands
  * @returns {string}
  */
 function buildInnerWithIslands(
@@ -167,13 +174,14 @@ function buildInnerWithIslands(
     const value = resolveStaticValue(source.textContent, context.scope);
     return value == null ? "" : escapeHtml(String(value));
   }
-  if (source.innerHTML)
+  if (source.innerHTML) {
     return (resolveStaticValue(source.innerHTML, context.scope) as string) ?? source.innerHTML;
+  }
   if (Array.isArray(source.children)) {
-    const rawChildren = raw?.children;
+    const rawChildren = Array.isArray(raw?.children) ? raw.children : undefined;
     return source.children
       .map((c, i: number) => {
-        const child = c as unknown as JxMutableNode;
+        const child = c as JxMutableNode;
         const childDynamic = isNodeDynamic(child);
         const childRaw = (rawChildren?.[i] ?? c) as JxMutableNode;
         return compileNode(child, childDynamic, childRaw, context, islands);

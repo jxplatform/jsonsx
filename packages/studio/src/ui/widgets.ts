@@ -77,8 +77,11 @@ export function renderNumberInput(
       step=${ifDefined(maximum !== undefined && maximum <= 1 ? 0.1 : undefined)}
       @change=${debouncedStyleCommit(`num:${prop}`, 400, (e: Event) => {
         const v = (e.target as HTMLInputElement & { value: number | undefined }).value;
-        if (v === undefined || isNaN(v)) onChange("");
-        else onChange(Number(v));
+        if (v === undefined || isNaN(v)) {
+          onChange("");
+        } else {
+          onChange(Number(v));
+        }
       })}
     ></sp-number-field>
   `;
@@ -120,37 +123,49 @@ export function widgetForType(
     renderSelect?: (
       entry: Record<string, unknown>,
       prop: string,
-      value: any,
+      value: string | number | undefined,
       onCommit: (val: string | number) => void,
     ) => import("lit-html").TemplateResult;
     renderCombobox?: (
       entry: Record<string, unknown>,
       prop: string,
-      value: any,
+      value: string | number | undefined,
       onCommit: (val: string | number) => void,
     ) => import("lit-html").TemplateResult;
   } = {},
 ) {
   switch (type) {
-    case "button-group":
+    case "button-group": {
       return renderButtonGroup(entry, prop, value, onCommit);
-    case "color":
+    }
+    case "color": {
       return renderColorSelector(prop, value, onCommit);
-    case "number-unit":
+    }
+    case "number-unit": {
       return renderUnitSelector(entry, prop, value, onCommit, opts.placeholder);
-    case "number":
+    }
+    case "number": {
       return renderNumberInput(entry, prop, value, onCommit, opts.placeholder);
-    case "media":
+    }
+    case "media": {
       return renderMediaPicker(prop, String(value ?? ""), onCommit);
-    case "select":
+    }
+    case "select": {
       // Allow caller to override select rendering (e.g. for typography preview)
-      if (opts.renderSelect) return opts.renderSelect(entry, prop, value, onCommit);
+      if (opts.renderSelect) {
+        return opts.renderSelect(entry, prop, value, onCommit);
+      }
       return renderTextInput(prop, value, onCommit, opts.placeholder);
-    case "combobox":
+    }
+    case "combobox": {
       // Allow caller to override combobox rendering (e.g. for font family)
-      if (opts.renderCombobox) return opts.renderCombobox(entry, prop, value, onCommit);
+      if (opts.renderCombobox) {
+        return opts.renderCombobox(entry, prop, value, onCommit);
+      }
       return renderTextInput(prop, value, onCommit, opts.placeholder);
-    default:
+    }
+    default: {
       return renderTextInput(prop, value, onCommit, opts.placeholder);
+    }
   }
 }

@@ -1,8 +1,14 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
+/** Read a scope member as a callable — tests poke the dynamic scope directly. */
+const fnOf = (scope: Record<string, unknown>, key: string) =>
+  scope[key] as (...args: unknown[]) => unknown;
+/** Read a scope member as an array. */
+const arrOf = (scope: Record<string, unknown>, key: string) => scope[key] as unknown[];
 try {
   GlobalRegistrator.register();
 } catch {
-  /* already registered */
+  /* Already registered */
 }
 
 import { describe, test, expect, beforeEach, mock, spyOn } from "bun:test";
@@ -58,7 +64,7 @@ describe("toCSSText", () => {
     );
   });
   test("skips nested selectors", () => {
-    expect(toCSSText({ color: "blue", ":hover": { color: "red" }, ".child": {} })).toBe(
+    expect(toCSSText({ ".child": {}, ":hover": { color: "red" }, color: "blue" })).toBe(
       "color: blue",
     );
   });
@@ -117,7 +123,7 @@ describe("resolveRef", () => {
   });
   // Simulate a child scope with $map
   const child = Object.create(state);
-  child.$map = { item: { text: "hello", nested: { deep: 42 } }, index: 3 };
+  child.$map = { index: 3, item: { nested: { deep: 42 }, text: "hello" } };
   child["$map/item"] = child.$map.item;
   child["$map/index"] = child.$map.index;
 
@@ -141,8 +147,8 @@ describe("resolveRef", () => {
   });
   test("$map/item resolves map item", () => {
     expect(resolveRef("$map/item", child)).toEqual({
-      text: "hello",
       nested: { deep: 42 },
+      text: "hello",
     });
   });
   test("$map/index resolves map index", () => {
@@ -174,8 +180,8 @@ describe("resolve", () => {
     const payload = { tagName: "span" };
     global.fetch = mock(() =>
       Promise.resolve({
-        ok: true,
         json: () => Promise.resolve(payload),
+        ok: true,
       }),
     ) as any;
     const result = await resolve("http://example.com/comp.json");
@@ -246,24 +252,24 @@ describe("buildScope", () => {
     const state = await buildScope({ state: { items: [1, 2] } }, {}, BASE);
     let length: unknown;
     effect(() => {
-      length = state.items.length;
+      ({ length } = arrOf(state, "items"));
     });
     expect(length).toBe(2);
-    state.items.push(3);
+    arrOf(state, "items").push(3);
     await wait();
     expect(length).toBe(3);
   });
 
   // Shape 2: Expanded signal with default
   test("Shape 2: object with default → reactive property initialized to default", async () => {
-    const state = await buildScope({ state: { count: { type: "integer", default: 7 } } }, {}, BASE);
+    const state = await buildScope({ state: { count: { default: 7, type: "integer" } } }, {}, BASE);
     expect(state.count).toBe(7);
   });
 
   // Shape 2b: Pure type definition
   test("Shape 2b: object with only schema keywords → skipped", async () => {
     const state = await buildScope(
-      { state: { email: { type: "string", format: "email" } } },
+      { state: { email: { format: "email", type: "string" } } },
       {},
       BASE,
     );
@@ -314,7 +320,7 @@ describe("buildScope", () => {
       BASE,
     );
     expect(typeof state.increment).toBe("function");
-    state.increment(state);
+    fnOf(state, "increment")(state);
     expect(state.count).toBe(1);
   });
 
@@ -322,8 +328,8 @@ describe("buildScope", () => {
     const state = await buildScope(
       {
         state: {
-          n: 3,
           doubled: { $prototype: "Function", body: "return state.n * 2" },
+          n: 3,
         },
       },
       {},
@@ -338,12 +344,12 @@ describe("buildScope", () => {
     const state = await buildScope(
       {
         state: {
-          items: { type: "array", default: [{ id: 1, text: "a" }] },
           addItem: {
             $prototype: "Function",
-            parameters: ["event"],
             body: "if (event.key !== 'Enter') return; state.items.push({ id: 2, text: 'b' });",
+            parameters: ["event"],
           },
+          items: { default: [{ id: 1, text: "a" }], type: "array" },
         },
       },
       {},
@@ -358,8 +364,8 @@ describe("buildScope", () => {
         state: {
           handler: {
             $prototype: "Function",
-            parameters: ["event"],
             body: "return event.target.value;",
+            parameters: ["event"],
           },
         },
       },
@@ -367,17 +373,17 @@ describe("buildScope", () => {
       BASE,
     );
     expect(typeof state.handler).toBe("function");
-    const result = state.handler(state, { target: { value: "hello" } });
+    const result = fnOf(state, "handler")(state, { target: { value: "hello" } });
     expect(result).toBe("hello");
   });
 
   test("Shape 4: Function with $src → computed via introspection (has return, ≤1 param)", async () => {
-    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const srcUrl = new URL("_test_computed_src.js", import.meta.url).href;
     const state = await buildScope(
       {
         state: {
-          items: { type: "array", default: [1, 2, 3] },
-          total: { $prototype: "Function", $src: srcUrl, $export: "total" },
+          items: { default: [1, 2, 3], type: "array" },
+          total: { $export: "total", $prototype: "Function", $src: srcUrl },
         },
       },
       {},
@@ -387,14 +393,14 @@ describe("buildScope", () => {
   });
 
   test("Shape 4: Function with $src + parameters in def → callable (not computed)", async () => {
-    const srcUrl = new URL("./_test_handlers_fn.js", import.meta.url).href;
+    const srcUrl = new URL("_test_handlers_fn.js", import.meta.url).href;
     const state = await buildScope(
       {
         state: {
           handler: {
+            $export: "myFn",
             $prototype: "Function",
             $src: srcUrl,
-            $export: "myFn",
             parameters: ["event"],
           },
         },
@@ -406,7 +412,7 @@ describe("buildScope", () => {
   });
 
   test("Shape 4: Function with $src → computed when fn has return and ≤1 param", async () => {
-    const srcUrl = new URL("./_test_handlers_fn.js", import.meta.url).href;
+    const srcUrl = new URL("_test_handlers_fn.js", import.meta.url).href;
     const state = await buildScope(
       {
         state: {
@@ -426,8 +432,8 @@ describe("buildScope", () => {
           state: {
             bad: {
               $prototype: "Function",
-              body: "return 1;",
               $src: "./foo.js",
+              body: "return 1;",
             },
           },
         },
@@ -448,13 +454,17 @@ describe("buildScope", () => {
       BASE,
     );
     expect(typeof state.empty).toBe("function");
-    expect(state.empty()).toBeUndefined();
+    expect(fnOf(state, "empty")()).toBeUndefined();
   });
 
   // Shape 5: External class $prototype
   test("Shape 5: $prototype other than Function → resolvePrototype", async () => {
     const doc = { state: { items: { $prototype: "Set", default: [1, 2] } } };
-    const state = await buildScope(doc, {}, BASE);
+    const state = await buildScope(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      {},
+      BASE,
+    );
     expect(state.items).toBeInstanceOf(Set);
   });
 
@@ -467,7 +477,11 @@ describe("buildScope", () => {
 
   test("stores $media in scope", async () => {
     const doc = { $media: { "--md": "(min-width: 768px)" } };
-    const state = await buildScope(doc, {}, BASE);
+    const state = await buildScope(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      {},
+      BASE,
+    );
     expect(state["$media"]).toEqual({ "--md": "(min-width: 768px)" });
   });
 });
@@ -483,12 +497,12 @@ describe("setSkipServerFunctions", () => {
       const state = await buildScope(
         {
           state: {
-            data: {
-              timing: "server",
-              $src: "./nonexistent.js",
-              $export: "getData",
-            },
             count: 5,
+            data: {
+              $export: "getData",
+              $src: "./nonexistent.js",
+              timing: "server",
+            },
           },
         },
         {},
@@ -507,8 +521,8 @@ describe("setSkipServerFunctions", () => {
       const state = await buildScope(
         {
           state: {
+            count: { default: 42, type: "integer" },
             name: "hello",
-            count: { type: "integer", default: 42 },
           },
         },
         {},
@@ -528,9 +542,9 @@ describe("setSkipServerFunctions", () => {
         state: {
           plain: "value",
           serverEntry: {
-            timing: "server",
-            $src: "./nonexistent.js",
             $export: "missing",
+            $src: "./nonexistent.js",
+            timing: "server",
           },
         },
       },
@@ -621,13 +635,13 @@ describe("applyStyle", () => {
     applyStyle(
       el,
       {
-        color: "green",
         ":focus": { outline: "2px solid blue" },
         "@--sm": { color: "red" },
+        color: "green",
       },
       { "--sm": "(min-width: 640px)" },
     );
-    // color is in stylesheet (not inline) because it's overridden by a media query
+    // Color is in stylesheet (not inline) because it's overridden by a media query
     const style = document.head.querySelector("style") as HTMLStyleElement;
     expect(style.textContent).toContain("color: green");
     expect(style.textContent).toContain("]:focus");
@@ -637,7 +651,7 @@ describe("applyStyle", () => {
   test("nested selector inside media block", () => {
     applyStyle(
       el,
-      { "@--md": { fontSize: "2rem", ":hover": { color: "blue" } } },
+      { "@--md": { ":hover": { color: "blue" }, fontSize: "2rem" } },
       { "--md": "(min-width: 768px)" },
     );
     const style = document.head.querySelector("style") as HTMLStyleElement;
@@ -670,7 +684,7 @@ describe("applyStyle", () => {
   });
 
   test("custom properties and regular properties coexist", () => {
-    applyStyle(el, { color: "blue", "--accent": "green" });
+    applyStyle(el, { "--accent": "green", color: "blue" });
     expect(el.style.color).toBe("blue");
     expect(el.style.getPropertyValue("--accent")).toBe("green");
   });
@@ -682,8 +696,8 @@ describe("resolvePrototype", () => {
   test("Request: returns ref, starts null, fetches and sets data", async () => {
     global.fetch = mock(() =>
       Promise.resolve({
-        ok: true,
         json: () => Promise.resolve({ id: 1 }),
+        ok: true,
       }),
     ) as any;
     const state = reactive({} as Record<string, unknown>);
@@ -699,10 +713,10 @@ describe("resolvePrototype", () => {
   });
 
   test("Request: manual:true does not auto-fetch", async () => {
-    const fetchMock = mock(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    const fetchMock = mock(() => Promise.resolve({ json: () => Promise.resolve({}), ok: true }));
     global.fetch = fetchMock as any;
     const state = reactive({} as Record<string, unknown>);
-    await resolvePrototype({ $prototype: "Request", url: "/api/x", manual: true }, state, "x");
+    await resolvePrototype({ $prototype: "Request", manual: true, url: "/api/x" }, state, "x");
     await wait();
     expect(fetchMock.mock.calls.length).toBe(0);
   });
@@ -710,9 +724,9 @@ describe("resolvePrototype", () => {
   test("Request: sets error on non-ok response", async () => {
     global.fetch = mock(() =>
       Promise.resolve({
+        json: () => Promise.resolve({}),
         ok: false,
         statusText: "Not Found",
-        json: () => Promise.resolve({}),
       }),
     ) as any;
     const state = reactive({} as Record<string, unknown>);
@@ -726,16 +740,16 @@ describe("resolvePrototype", () => {
     let captured = undefined as any;
     global.fetch = mock((_url, opts) => {
       captured = opts;
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ json: () => Promise.resolve({}), ok: true });
     }) as any;
     const state = reactive({} as Record<string, unknown>);
     await resolvePrototype(
       {
         $prototype: "Request",
-        url: "/api",
-        method: "POST",
-        headers: { x: "1" },
         body: { a: 1 },
+        headers: { x: "1" },
+        method: "POST",
+        url: "/api",
       },
       state,
       "r",
@@ -773,7 +787,7 @@ describe("resolvePrototype", () => {
     localStorage.removeItem("lsMissing");
     const state = reactive({} as Record<string, unknown>);
     const result = await resolvePrototype(
-      { $prototype: "LocalStorage", key: "lsMissing", default: "fallback" },
+      { $prototype: "LocalStorage", default: "fallback", key: "lsMissing" },
       state,
       "ls",
     );
@@ -785,7 +799,7 @@ describe("resolvePrototype", () => {
     localStorage.removeItem("lsPersist");
     const state = reactive({} as Record<string, unknown>);
     const result = await resolvePrototype(
-      { $prototype: "LocalStorage", key: "lsPersist", default: 0 },
+      { $prototype: "LocalStorage", default: 0, key: "lsPersist" },
       state,
       "ls",
     );
@@ -817,9 +831,9 @@ describe("resolvePrototype", () => {
     const result = await resolvePrototype(
       {
         $prototype: "Cookie",
-        name: "testCookie",
         default: null,
         maxAge: 3600,
+        name: "testCookie",
         path: "/",
       },
       state,
@@ -833,7 +847,7 @@ describe("resolvePrototype", () => {
   });
 
   test("IndexedDB: returns ref", async () => {
-    const fakeReq = { onupgradeneeded: null, onsuccess: null, onerror: null };
+    const fakeReq = { onerror: null, onsuccess: null, onupgradeneeded: null };
     global.indexedDB = { open: () => fakeReq } as any;
     const state = reactive({} as Record<string, unknown>);
     const result = await resolvePrototype(
@@ -935,7 +949,7 @@ describe("renderNode", () => {
   });
 
   test("sets plain boolean property", () => {
-    const el = renderNode({ tagName: "button", disabled: true }, reactive({}));
+    const el = renderNode({ disabled: true, tagName: "button" }, reactive({}));
     expect((el as any).disabled).toBe(true);
   });
 
@@ -956,16 +970,22 @@ describe("renderNode", () => {
 
   test("protected id property: set once, not reactive", () => {
     const state = reactive({ myId: "my-id" });
-    const el = renderNode({ tagName: "div", id: { $ref: "#/state/myId" } }, state);
+    const el = renderNode(
+      {
+        id: { $ref: "#/state/myId" },
+        tagName: "div",
+      } as unknown as import("@jxsuite/schema/types").JxElement,
+      state,
+    ) as HTMLElement;
     expect(el.id).toBe("my-id");
   });
 
   test("binds event handler via onclick $ref", async () => {
     const state = reactive({ count: 0 });
-    (state as any).clickHandler = function (state: any) {
+    (state as any).clickHandler = function clickHandler(state: any) {
       state.count++;
     };
-    const el = renderNode({ tagName: "button", onclick: { $ref: "#/state/clickHandler" } }, state);
+    const el = renderNode({ onclick: { $ref: "#/state/clickHandler" }, tagName: "button" }, state);
     el.dispatchEvent(new Event("click"));
     expect(state.count).toBe(1);
   });
@@ -973,31 +993,31 @@ describe("renderNode", () => {
   test("ignores handler $ref when not a function", () => {
     const state = reactive({ notFn: 42 });
     expect(() =>
-      renderNode({ tagName: "div", onclick: { $ref: "#/state/notFn" } }, state),
+      renderNode({ onclick: { $ref: "#/state/notFn" }, tagName: "div" }, state),
     ).not.toThrow();
   });
 
   test("applies attributes", () => {
-    const el = renderNode({ tagName: "div", attributes: { "data-x": "val" } }, reactive({}));
-    expect(el.getAttribute("data-x")).toBe("val");
+    const el = renderNode({ attributes: { "data-x": "val" }, tagName: "div" }, reactive({}));
+    expect(el.dataset.x).toBe("val");
   });
 
   test("applies reactive attribute from $ref", async () => {
     const state = reactive({ cls: "a" });
     const el = renderNode(
-      { tagName: "div", attributes: { "data-cls": { $ref: "#/state/cls" } } },
+      { attributes: { "data-cls": { $ref: "#/state/cls" } }, tagName: "div" },
       state,
     );
-    expect(el.getAttribute("data-cls")).toBe("a");
+    expect(el.dataset.cls).toBe("a");
     state.cls = "b";
     await wait();
-    expect(el.getAttribute("data-cls")).toBe("b");
+    expect(el.dataset.cls).toBe("b");
   });
 
   test("applies static attribute from plain $ref", () => {
     const state = reactive({ val: "hello" });
     const el = renderNode(
-      { tagName: "div", attributes: { "aria-label": { $ref: "#/state/val" } } },
+      { attributes: { "aria-label": { $ref: "#/state/val" } }, tagName: "div" },
       state,
     );
     expect(el.getAttribute("aria-label")).toBe("hello");
@@ -1016,7 +1036,7 @@ describe("renderNode", () => {
   test("${} template string in className", async () => {
     const state = reactive({ active: true });
     const el = renderNode(
-      { tagName: "div", className: '${state.active ? "active" : "inactive"}' },
+      { className: '${state.active ? "active" : "inactive"}', tagName: "div" },
       state,
     );
     expect(el.className).toBe("active");
@@ -1028,11 +1048,11 @@ describe("renderNode", () => {
   test("renders children recursively", () => {
     const el = renderNode(
       {
-        tagName: "ul",
         children: [
           { tagName: "li", textContent: "A" },
           { tagName: "li", textContent: "B" },
         ],
+        tagName: "ul",
       },
       reactive({}),
     );
@@ -1045,12 +1065,12 @@ describe("renderNode", () => {
     const state = reactive({ route: "about" });
     const el = renderNode(
       {
-        tagName: "div",
         $switch: { $ref: "#/state/route" },
         cases: {
-          home: { tagName: "section", textContent: "Home" },
           about: { tagName: "section", textContent: "About" },
+          home: { tagName: "section", textContent: "Home" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1061,12 +1081,12 @@ describe("renderNode", () => {
     const state = reactive({ route: "home" });
     const el = renderNode(
       {
-        tagName: "div",
         $switch: { $ref: "#/state/route" },
         cases: {
-          home: { tagName: "div", textContent: "Home" },
           about: { tagName: "div", textContent: "About" },
+          home: { tagName: "div", textContent: "Home" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1080,9 +1100,9 @@ describe("renderNode", () => {
     const state = reactive({ route: "404" });
     const el = renderNode(
       {
-        tagName: "div",
         $switch: { $ref: "#/state/route" },
         cases: { home: { tagName: "div", textContent: "Home" } },
+        tagName: "div",
       },
       state,
     );
@@ -1092,12 +1112,12 @@ describe("renderNode", () => {
   test("Array map renders static items", () => {
     const el = renderNode(
       {
-        tagName: "ul",
         children: {
           $prototype: "Array",
           items: [{ id: 1, label: "X" }],
           map: { tagName: "li" },
         },
+        tagName: "ul",
       },
       reactive({}),
     );
@@ -1108,12 +1128,12 @@ describe("renderNode", () => {
     const state = reactive({ list: [{ v: "a" }, { v: "b" }] });
     const el = renderNode(
       {
-        tagName: "ul",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/list" },
           map: { tagName: "li" },
         },
+        tagName: "ul",
       },
       state,
     );
@@ -1127,12 +1147,12 @@ describe("renderNode", () => {
     const state = reactive({ list: [1, 2] });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/list" },
           map: { tagName: "span" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1144,18 +1164,18 @@ describe("renderNode", () => {
 
   test("Array map with filter", () => {
     const state = reactive({
-      list: [1, 2, 3, 4],
       isEven: (x: any) => x % 2 === 0,
+      list: [1, 2, 3, 4],
     });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
-          items: { $ref: "#/state/list" },
           filter: { $ref: "#/state/isEven" },
+          items: { $ref: "#/state/list" },
           map: { tagName: "span" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1169,13 +1189,13 @@ describe("renderNode", () => {
     });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/list" },
-          sort: { $ref: "#/state/sortAsc" },
           map: { tagName: "span" },
+          sort: { $ref: "#/state/sortAsc" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1186,12 +1206,12 @@ describe("renderNode", () => {
     const state = reactive({ list: null });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/list" },
           map: { tagName: "span" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1207,18 +1227,20 @@ describe("renderNode", () => {
     const filterTerm = ref("");
     const filteredItems = computed(() => {
       const term = filterTerm.value.toLowerCase();
-      if (!term) return allItems;
+      if (!term) {
+        return allItems;
+      }
       return allItems.filter((i) => i.text.includes(term));
     });
     const state = reactive({ filteredItems });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/filteredItems" },
           map: { tagName: "div", textContent: "${$map.item.text}" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1240,12 +1262,12 @@ describe("renderNode", () => {
     const state = reactive({ paginatedItems });
     const el = renderNode(
       {
-        tagName: "div",
         children: {
           $prototype: "Array",
           items: { $ref: "#/state/paginatedItems" },
           map: { tagName: "div" },
         },
+        tagName: "div",
       },
       state,
     );
@@ -1258,8 +1280,8 @@ describe("renderNode", () => {
   test("$props merges into scope", () => {
     const state = reactive({ count: 10 });
     const def = {
-      tagName: "span",
       $props: { val: { $ref: "#/state/count" } },
+      tagName: "span",
       textContent: "ok",
     };
     const el = renderNode(def, state);
@@ -1267,7 +1289,7 @@ describe("renderNode", () => {
   });
 
   test("style object applied", () => {
-    const el = renderNode({ tagName: "div", style: { color: "green" } }, reactive({}));
+    const el = renderNode({ style: { color: "green" }, tagName: "div" }, reactive({}));
     expect(el.style.color).toBe("green");
   });
 });
@@ -1278,31 +1300,38 @@ describe("computed $src + Array map integration", () => {
   const BASE = "http://localhost/";
 
   test("computed function filters items for Array map rendering", async () => {
-    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const srcUrl = new URL("_test_computed_src.js", import.meta.url).href;
     const doc = {
-      state: {
-        allPosts: {
-          type: "array",
-          default: [
-            { id: 1, title: "Hello World", body: "first" },
-            { id: 2, title: "Goodbye", body: "second" },
-            { id: 3, title: "Hello Again", body: "third" },
-          ],
-        },
-        searchTerm: { type: "string", default: "" },
-        filteredPosts: { $prototype: "Function", $src: srcUrl },
-      },
-      tagName: "div",
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/filteredPosts" },
         map: { tagName: "div", textContent: "${$map.item.title}" },
       },
+      state: {
+        allPosts: {
+          default: [
+            { body: "first", id: 1, title: "Hello World" },
+            { body: "second", id: 2, title: "Goodbye" },
+            { body: "third", id: 3, title: "Hello Again" },
+          ],
+          type: "array",
+        },
+        filteredPosts: { $prototype: "Function", $src: srcUrl },
+        searchTerm: { default: "", type: "string" },
+      },
+      tagName: "div",
     };
-    const state = await buildScope(doc, {}, BASE);
+    const state = await buildScope(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      {},
+      BASE,
+    );
     expect(state.filteredPosts).toHaveLength(3);
 
-    const el = renderNode(doc, state);
+    const el = renderNode(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      state,
+    ) as HTMLElement;
     expect(el.children.length).toBe(3);
     expect(el.children[0].textContent).toBe("Hello World");
 
@@ -1315,29 +1344,36 @@ describe("computed $src + Array map integration", () => {
   });
 
   test("computed function paginates items reactively", async () => {
-    const srcUrl = new URL("./_test_computed_src.js", import.meta.url).href;
+    const srcUrl = new URL("_test_computed_src.js", import.meta.url).href;
     const doc = {
-      state: {
-        allItems: {
-          type: "array",
-          default: Array.from({ length: 12 }, (_, i) => ({
-            id: i + 1,
-            name: `Item ${i + 1}`,
-          })),
-        },
-        currentPage: { type: "integer", default: 1 },
-        perPage: { type: "integer", default: 5 },
-        paginatedItems: { $prototype: "Function", $src: srcUrl },
-      },
-      tagName: "div",
       children: {
         $prototype: "Array",
         items: { $ref: "#/state/paginatedItems" },
         map: { tagName: "span", textContent: "${$map.item.name}" },
       },
+      state: {
+        allItems: {
+          default: Array.from({ length: 12 }, (_, i) => ({
+            id: i + 1,
+            name: `Item ${i + 1}`,
+          })),
+          type: "array",
+        },
+        currentPage: { default: 1, type: "integer" },
+        paginatedItems: { $prototype: "Function", $src: srcUrl },
+        perPage: { default: 5, type: "integer" },
+      },
+      tagName: "div",
     };
-    const state = await buildScope(doc, {}, BASE);
-    const el = renderNode(doc, state);
+    const state = await buildScope(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      {},
+      BASE,
+    );
+    const el = renderNode(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      state,
+    ) as HTMLElement;
     expect(el.children.length).toBe(5);
     expect(el.children[0].textContent).toBe("Item 1");
 
@@ -1355,22 +1391,26 @@ describe("computed $src + Array map integration", () => {
   test("event handler with parameters + return is callable, not computed", async () => {
     const doc = {
       state: {
-        items: { type: "array", default: [] },
         addItem: {
           $prototype: "Function",
-          parameters: ["event"],
           body: "if (!event.text) return; state.items = [...state.items, { text: event.text }]; return true;",
+          parameters: ["event"],
         },
+        items: { default: [], type: "array" },
       },
       tagName: "div",
     };
-    const state = await buildScope(doc, {}, BASE);
+    const state = await buildScope(
+      doc as unknown as import("@jxsuite/schema/types").JxDocument,
+      {},
+      BASE,
+    );
     expect(typeof state.addItem).toBe("function");
     expect(state.items).toHaveLength(0);
-    const result = state.addItem(state, { text: "new item" });
+    const result = fnOf(state, "addItem")(state, { text: "new item" });
     expect(result).toBe(true);
     expect(state.items).toHaveLength(1);
-    expect(state.items[0].text).toBe("new item");
+    expect((arrOf(state, "items")[0] as { text: string }).text).toBe("new item");
   });
 });
 
@@ -1386,25 +1426,25 @@ describe("Jx", () => {
 
   test("returns scope with naked value property", async () => {
     const target = document.createElement("div");
-    const state = await Jx({ tagName: "div", state: { x: 1 } }, target);
+    const state = await Jx({ state: { x: 1 }, tagName: "div" }, target);
     expect(state.x).toBe(1);
   });
 
   test("returns scope with expanded signal property", async () => {
     const target = document.createElement("div");
-    const state = await Jx({ tagName: "div", state: { x: { default: 5 } } }, target);
+    const state = await Jx({ state: { x: { default: 5 } }, tagName: "div" }, target);
     expect(state.x).toBe(5);
   });
 
   test("calls onMount if present in scope", async () => {
     const target = document.createElement("div");
-    const srcUrl = new URL("./_test_handlers.js", import.meta.url).href;
+    const srcUrl = new URL("_test_handlers.js", import.meta.url).href;
     await Jx(
       {
-        tagName: "div",
         state: {
           onMount: { $prototype: "Function", $src: srcUrl },
         },
+        tagName: "div",
       },
       target,
     );
@@ -1417,8 +1457,8 @@ describe("Jx", () => {
     const doc = { tagName: "article" };
     global.fetch = mock(() =>
       Promise.resolve({
-        ok: true,
         json: () => Promise.resolve(doc),
+        ok: true,
       }),
     ) as any;
     const target = document.createElement("div");
@@ -1690,7 +1730,7 @@ describe("evaluateExpression — mutating operators", () => {
       target: { $ref: "#/state/name" },
       value: { $ref: "event#/target/value" },
     };
-    evaluateExpression(node, state, event as unknown as Event, undefined);
+    evaluateExpression(node, state, event as unknown as Event);
     expect(state.name).toBe("hello");
   });
 
@@ -1710,9 +1750,9 @@ describe("evaluateExpression — aggregates", () => {
   test("reduce: sum", () => {
     const state = reactive({ nums: [1, 2, 3, 4] });
     const node = {
+      initial: 0,
       operator: "reduce",
       target: { $ref: "#/state/nums" },
-      initial: 0,
       value: {
         operator: "+",
         target: { $ref: "$reduce/acc" },
@@ -1730,9 +1770,9 @@ describe("evaluateExpression — aggregates", () => {
       ],
     });
     const node = {
+      initial: 0,
       operator: "reduce",
       target: { $ref: "#/state/cart" },
-      initial: 0,
       value: {
         operator: "+",
         target: { $ref: "$reduce/acc" },
@@ -1782,7 +1822,7 @@ describe("buildScope — $expression (Shape 5)", () => {
       },
     });
     expect(typeof scope.increment).toBe("function");
-    scope.increment(scope, null);
+    fnOf(scope, "increment")(scope, null);
     expect(scope.count).toBe(1);
   });
 
@@ -1809,9 +1849,9 @@ describe("buildScope — $expression (Shape 5)", () => {
         nums: [1, 2, 3],
         total: {
           $expression: {
+            initial: 0,
             operator: "reduce",
             target: { $ref: "#/state/nums" },
-            initial: 0,
             value: {
               operator: "+",
               target: { $ref: "$reduce/acc" },
@@ -1822,7 +1862,7 @@ describe("buildScope — $expression (Shape 5)", () => {
       },
     });
     expect(scope.total).toBe(6);
-    scope.nums.push(4);
+    arrOf(scope, "nums").push(4);
     await new Promise((r) => setTimeout(r, 10));
     expect(scope.total).toBe(10);
   });
@@ -1840,7 +1880,7 @@ describe("buildScope — $expression (Shape 5)", () => {
         },
       },
     });
-    const el = renderNode({ tagName: "button", onclick: { $ref: "#/state/increment" } }, scope);
+    const el = renderNode({ onclick: { $ref: "#/state/increment" }, tagName: "button" }, scope);
     el.dispatchEvent(new Event("click"));
     expect(scope.count).toBe(1);
   });
@@ -1849,7 +1889,6 @@ describe("buildScope — $expression (Shape 5)", () => {
     const scope = await buildScope({ state: { count: 0 } });
     const el = renderNode(
       {
-        tagName: "button",
         onclick: {
           $expression: {
             operator: "+=",
@@ -1857,6 +1896,7 @@ describe("buildScope — $expression (Shape 5)", () => {
             value: 5,
           },
         },
+        tagName: "button",
       },
       scope,
     );
@@ -1867,6 +1907,7 @@ describe("buildScope — $expression (Shape 5)", () => {
   test("$expression not treated as plain object value", async () => {
     const scope = await buildScope({
       state: {
+        on: false,
         toggle: {
           $expression: {
             operator: "=",
@@ -1874,12 +1915,11 @@ describe("buildScope — $expression (Shape 5)", () => {
             value: { operator: "!", target: { $ref: "#/state/on" } },
           },
         },
-        on: false,
       },
     });
     expect(typeof scope.toggle).toBe("function");
     expect(scope.on).toBe(false);
-    scope.toggle(scope, null);
+    fnOf(scope, "toggle")(scope, null);
     expect(scope.on).toBe(true);
   });
 });

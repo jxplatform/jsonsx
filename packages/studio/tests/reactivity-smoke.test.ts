@@ -1,6 +1,6 @@
 import "./with-dom.js";
-import { reactive, effect, effectScope, computed } from "../src/reactivity";
-import { test, expect } from "bun:test";
+import { computed, effect, effectScope, reactive } from "../src/reactivity";
+import { expect, test } from "bun:test";
 
 test("reactive + effect basic tracking", () => {
   const obj = reactive({ count: 0 });

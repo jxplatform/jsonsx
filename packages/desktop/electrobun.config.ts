@@ -1,24 +1,20 @@
 import type { ElectrobunConfig } from "electrobun";
-import { readFileSync } from "fs";
+import { readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
 
 export default {
   app: {
-    name: "Jx Studio",
-    identifier: "com.jxsuite.jx-studio",
-    version: pkg.version,
     fileAssociations: [
       {
-        name: "Jx Project",
         ext: ["json"],
+        name: "Jx Project",
         role: "Editor",
       },
     ],
-  },
-
-  runtime: {
-    exitOnLastWindowClosed: true,
+    identifier: "com.jxsuite.jx-studio",
+    name: "Jx Studio",
+    version: pkg.version,
   },
 
   build: {
@@ -39,19 +35,19 @@ export default {
 
     mac: {
       bundleCEF: true,
-      defaultRenderer: "cef",
       codesign: true,
+      defaultRenderer: "cef",
       notarize: false,
     },
     linux: {
       bundleCEF: true,
+      chromiumFlags: {
+        "disable-gpu": false,
+        "enable-features": "UseOzonePlatform",
+        "ozone-platform-hint": "auto",
+      },
       defaultRenderer: "cef",
       icon: "icon.png",
-      chromiumFlags: {
-        "ozone-platform-hint": "auto",
-        "enable-features": "UseOzonePlatform",
-        "disable-gpu": false,
-      },
     },
     win: {
       bundleCEF: true,
@@ -59,21 +55,25 @@ export default {
       icon: "icon.ico",
     },
 
-    // preBuild copies compiled studio + runtime assets into assets/ before these run.
+    // PreBuild copies compiled studio + runtime assets into assets/ before these run.
     // Source paths are relative to packages/desktop/.
     copy: {
-      "assets/studio/index.html": "views/studio/index.html",
+      "assets/studio/dist/init.js": "views/studio/dist/init.js",
       "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
       "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
-      "assets/studio/dist/init.js": "views/studio/dist/init.js",
+      "assets/studio/index.html": "views/studio/index.html",
     },
-  },
-
-  scripts: {
-    preBuild: "./scripts/pre-build.ts",
   },
 
   release: {
     baseUrl: "https://github.com/jxsuite/jx/releases/latest/download/",
+  },
+
+  runtime: {
+    exitOnLastWindowClosed: true,
+  },
+
+  scripts: {
+    preBuild: "./scripts/pre-build.ts",
   },
 } satisfies ElectrobunConfig;

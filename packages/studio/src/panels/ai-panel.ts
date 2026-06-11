@@ -33,17 +33,29 @@ let currentAssistantText = "";
 let eventSource = null as EventSource | null;
 let mounted = false;
 
-let chatInstance: any = null;
+/** Minimal surface of the untyped quikchat library that this panel uses. */
+interface QuikChatInstance {
+  messageAddNew: (text: string, sender: string, side: string, role?: string) => number;
+  messageAddTypingIndicator: (text: string) => number;
+  messageReplaceContent: (id: number, text: string) => void;
+  messageAppendContent: (id: number, text: string) => void;
+  inputAreaSetEnabled: (enabled: boolean) => void;
+  historyImport: (history: unknown[]) => void;
+}
+
+let chatInstance: QuikChatInstance | null = null;
 let chatContainerEl: Element | null = null;
 let _quikChatEl: HTMLElement | null = null;
 let currentStreamMsgId = null as number | null;
 let streamStarted = false;
-let pendingFileReloads: Set<string> = new Set();
+const pendingFileReloads = new Set<string>();
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 export function mountAiPanel() {
-  if (mounted) return;
+  if (mounted) {
+    return;
+  }
   mounted = true;
   checkAuth();
 }
@@ -54,7 +66,9 @@ const _g = globalThis as unknown as {
 
 function rerenderPanel() {
   const { render } = _g.__jxRightPanelRender || {};
-  if (render) render();
+  if (render) {
+    render();
+  }
   requestAnimationFrame(() => mountQuikChat());
 }
 
@@ -66,19 +80,23 @@ export function registerRightPanelRender(fn: () => void) {
 
 export function mountQuikChat() {
   const container = _quikChatEl;
-  if (!container) return;
-  if (chatInstance && chatContainerEl === container) return;
+  if (!container) {
+    return;
+  }
+  if (chatInstance && chatContainerEl === container) {
+    return;
+  }
 
   chatInstance = new quikchat(
     container,
-    (_chat: any, msg: string) => {
+    (_chat: unknown, msg: string) => {
       handleUserSend(msg);
     },
     {
+      messagesArea: { alternating: false },
+      showTimestamps: false,
       theme: "quikchat-theme-dark",
       titleArea: { show: false },
-      showTimestamps: false,
-      messagesArea: { alternating: false },
     },
   );
   chatContainerEl = container;
@@ -86,12 +104,14 @@ export function mountQuikChat() {
   replayMessages();
 
   if (streaming) {
-    chatInstance.inputAreaSetEnabled(false);
+    chatInstance?.inputAreaSetEnabled(false);
   }
 }
 
 function replayMessages() {
-  if (!chatInstance || !messages.length) return;
+  if (!chatInstance || messages.length === 0) {
+    return;
+  }
   for (const msg of messages) {
     if (msg.role === "user") {
       chatInstance.messageAddNew(msg.content, "You", "right", "user");
@@ -122,9 +142,9 @@ async function checkAuth() {
     const result = await plat.aiAuthStatus();
     authStatus = result.authenticated ? "authenticated" : "unauthenticated";
     authError = result.error || "";
-  } catch (err) {
+  } catch (error) {
     authStatus = "unauthenticated";
-    authError = String(err);
+    authError = String(error);
   }
   rerenderPanel();
 }
@@ -133,9 +153,11 @@ async function checkAuth() {
 
 /** @param {string} text */
 async function handleUserSend(text: string) {
-  if (!text.trim() || streaming) return;
+  if (!text.trim() || streaming) {
+    return;
+  }
 
-  messages.push({ role: "user", content: text });
+  messages.push({ content: text, role: "user" });
   streaming = true;
   currentAssistantText = "";
   streamStarted = false;
@@ -157,19 +179,23 @@ async function handleUserSend(text: string) {
     } else {
       await plat.aiSendMessage(sessionId, text);
     }
-  } catch (err) {
+  } catch (error) {
     if (chatInstance && currentStreamMsgId != null) {
-      chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${err}`);
+      chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${error}`);
     }
-    messages.push({ role: "assistant", content: `Error: ${err}` });
+    messages.push({ content: `Error: ${error}`, role: "assistant" });
     streaming = false;
-    if (chatInstance) chatInstance.inputAreaSetEnabled(true);
+    if (chatInstance) {
+      chatInstance.inputAreaSetEnabled(true);
+    }
     rerenderPanel();
   }
 }
 
 function stop() {
-  if (!sessionId) return;
+  if (!sessionId) {
+    return;
+  }
   const plat = getPlatform();
   plat.aiStopSession(sessionId);
   finishStream();
@@ -264,18 +290,24 @@ async function connectStream(id: string) {
 }
 
 function finishStream() {
-  if (!streaming) return;
+  if (!streaming) {
+    return;
+  }
   if (currentAssistantText) {
-    messages.push({ role: "assistant", content: currentAssistantText });
+    messages.push({ content: currentAssistantText, role: "assistant" });
     currentAssistantText = "";
   }
   streaming = false;
   currentStreamMsgId = null;
   streamStarted = false;
-  if (chatInstance) chatInstance.inputAreaSetEnabled(true);
+  if (chatInstance) {
+    chatInstance.inputAreaSetEnabled(true);
+  }
 
-  if (pendingFileReloads.size) {
-    for (const fp of pendingFileReloads) reloadFileInTab(fp);
+  if (pendingFileReloads.size > 0) {
+    for (const fp of pendingFileReloads) {
+      reloadFileInTab(fp);
+    }
     pendingFileReloads.clear();
   }
 
@@ -289,10 +321,26 @@ function disconnectStream() {
   }
 }
 
-/** @param {any} data */
-function handleAssistantMessage(data: any) {
+/** SSE payload from the assistant stream: message blocks or a bare content array. */
+interface AssistantMessageData {
+  message?: { content?: AssistantBlock[] };
+  content?: AssistantBlock[];
+}
+
+interface AssistantBlock {
+  type?: string;
+  text?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** @param {AssistantMessageData} data */
+function handleAssistantMessage(data: AssistantMessageData) {
   const content = data.message?.content || data.content;
-  if (!content) return;
+  if (!content) {
+    return;
+  }
 
   let text = "";
   const toolBlocks = [];
@@ -300,21 +348,23 @@ function handleAssistantMessage(data: any) {
   for (const block of content) {
     if (block.type === "text") {
       text += block.text;
-    } else if (block.type === "tool_use") {
-      toolBlocks.push({ tool: block.name, input: block.input });
+    } else if (block.type === "tool_use" && typeof block.name === "string") {
+      toolBlocks.push({ tool: block.name, ...(block.input ? { input: block.input } : {}) });
       if ((block.name === "Edit" || block.name === "Write") && block.input) {
         const fp = block.input.file_path || block.input.path;
-        if (fp) pendingFileReloads.add(String(fp));
+        if (fp) {
+          pendingFileReloads.add(String(fp));
+        }
       }
     }
   }
 
-  if (toolBlocks.length) {
+  if (toolBlocks.length > 0) {
     if (currentAssistantText) {
-      messages.push({ role: "assistant", content: currentAssistantText });
+      messages.push({ content: currentAssistantText, role: "assistant" });
     }
     for (const t of toolBlocks) {
-      messages.push({ role: "tool", content: "", toolUse: t });
+      messages.push({ content: "", role: "tool", toolUse: t });
       if (chatInstance) {
         chatInstance.messageAddNew(formatToolLabel(t.tool, t.input), "", "left", "tool");
       }
@@ -324,7 +374,7 @@ function handleAssistantMessage(data: any) {
   currentAssistantText = text;
   if (chatInstance) {
     currentStreamMsgId = chatInstance.messageAddNew(text || "", "", "left", "assistant");
-    streamStarted = !!text;
+    streamStarted = Boolean(text);
   }
 }
 
@@ -337,24 +387,30 @@ function handleAssistantMessage(data: any) {
 function formatToolLabel(tool: string, input?: Record<string, unknown>) {
   switch (tool) {
     case "Edit":
-    case "Write":
+    case "Write": {
       return `📝 ${tool}: ${input?.file_path || input?.path || "file"}`;
-    case "Read":
+    }
+    case "Read": {
       return `📖 Read: ${input?.file_path || input?.path || "file"}`;
-    case "Bash":
+    }
+    case "Bash": {
       return `⚡ Run: ${truncate(String(input?.command || ""), 50)}`;
-    case "Glob":
+    }
+    case "Glob": {
       return `🔍 Glob: ${input?.pattern || ""}`;
-    case "Grep":
+    }
+    case "Grep": {
       return `🔍 Grep: ${truncate(String(input?.pattern || ""), 40)}`;
-    default:
+    }
+    default: {
       return `🔧 ${tool}`;
+    }
   }
 }
 
 /** @param {string} s @param {number} max */
 function truncate(s: string, max: number) {
-  return s.length > max ? s.slice(0, max) + "…" : s;
+  return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
 // ─── Template ───────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
  * $studio.elements metadata, interpreted by createNestingValidator. Assertions ported from the old
  * hard-coded markdown allowlist tests.
  */
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createNestingValidator } from "../src/format/constraints";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 
@@ -11,11 +11,15 @@ const v = createNestingValidator(MARKDOWN_FORMAT.studio?.elements);
 
 describe("createNestingValidator from Markdown $studio.elements", () => {
   test("classifies block and inline tags", () => {
-    for (const h of ["h1", "h2", "h3", "h4", "h5", "h6"]) expect(v.blockTags.has(h)).toBe(true);
-    for (const tag of ["p", "blockquote", "ul", "ol", "li", "pre", "hr", "table"])
+    for (const h of ["h1", "h2", "h3", "h4", "h5", "h6"]) {
+      expect(v.blockTags.has(h)).toBe(true);
+    }
+    for (const tag of ["p", "blockquote", "ul", "ol", "li", "pre", "hr", "table"]) {
       expect(v.blockTags.has(tag)).toBe(true);
-    for (const tag of ["em", "strong", "del", "code", "a", "img", "br"])
+    }
+    for (const tag of ["em", "strong", "del", "code", "a", "img", "br"]) {
       expect(v.inlineTags.has(tag)).toBe(true);
+    }
     expect(v.inlineTags.has("p")).toBe(false);
     expect(v.blockTags.has("div")).toBe(false);
     expect(v.allTags.size).toBe(v.blockTags.size + v.inlineTags.size);
@@ -85,7 +89,7 @@ describe("createNestingValidator from Markdown $studio.elements", () => {
   });
 
   test("empty metadata yields a permissive validator", () => {
-    const empty = createNestingValidator(undefined);
+    const empty = createNestingValidator();
     expect(empty.isValidChild("_root", "anything")).toBe(true);
     expect(empty.isVoid("hr")).toBe(false);
   });

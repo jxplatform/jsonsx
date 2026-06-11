@@ -7,11 +7,24 @@
  * @module expression
  */
 
-export interface ExpressionNode {
-  operator: string;
-  target: unknown;
-  value?: unknown;
-  initial?: unknown;
+import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
+import type { JxScope } from "./types.ts";
+
+/** The runtime's expression node — the schema's expression model. */
+export type ExpressionNode = JxExpressionNode;
+export type ExpressionOperand = JxExpressionOperand;
+
+/** The `$map` iteration context object stored in scope during mapped rendering. */
+interface ScopeMapCtx {
+  item?: unknown;
+  index?: number;
+  [key: string]: unknown;
+}
+
+/** View the scope's `$map` iteration context, if present. */
+function scopeMap(state: JxScope): ScopeMapCtx | undefined {
+  const map = state.$map;
+  return map && typeof map === "object" ? (map as ScopeMapCtx) : undefined;
 }
 
 interface CompileOpts {
@@ -77,11 +90,13 @@ interface IterCtx {
 /** Resolve an operand to its runtime value. */
 function resolveOperand(
   operand: unknown,
-  state: Record<string, any>,
+  state: JxScope,
   event: Event | null,
   iterCtx?: IterCtx,
 ): unknown {
-  if (operand === null || operand === undefined) return operand;
+  if (operand === null || operand === undefined) {
+    return operand;
+  }
 
   // Nested expression node
   if (typeof operand === "object" && !Array.isArray(operand) && "operator" in operand) {
@@ -103,12 +118,7 @@ function resolveOperand(
 }
 
 /** Resolve a $ref string within expression context. */
-function resolveExprRef(
-  ref: string,
-  state: Record<string, any>,
-  event: Event | null,
-  iterCtx?: IterCtx,
-) {
+function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCtx?: IterCtx) {
   if (ref === "$reduce/acc") {
     return iterCtx?.acc;
   }
@@ -123,66 +133,88 @@ function resolveExprRef(
     const parts = ref.split("/");
     const key = parts[1];
     let base;
-    if (key === "item") base = iterCtx?.item ?? state.$map?.item ?? state["$map/item"];
-    else if (key === "index") base = iterCtx?.index ?? state.$map?.index ?? state["$map/index"];
-    else base = state.$map?.[key] ?? state["$map/" + key];
+    const map = scopeMap(state);
+    if (key === "item") {
+      base = iterCtx?.item ?? map?.item ?? state["$map/item"];
+    } else if (key === "index") {
+      base = iterCtx?.index ?? map?.index ?? state["$map/index"];
+    } else {
+      base = map?.[key] ?? state[`$map/${key}`];
+    }
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (ref.startsWith("#/state/")) {
     const sub = ref.slice("#/state/".length);
     const slash = sub.indexOf("/");
-    if (slash < 0) return state[sub];
+    if (slash === -1) {
+      return state[sub];
+    }
     return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
   }
-  if (ref.startsWith("parent#/")) return state[ref.slice("parent#/".length)];
-  if (ref.startsWith("window#/")) return getPath(globalThis.window, ref.slice("window#/".length));
-  if (ref.startsWith("document#/"))
+  if (ref.startsWith("parent#/")) {
+    return state[ref.slice("parent#/".length)];
+  }
+  if (ref.startsWith("window#/")) {
+    return getPath(globalThis.window, ref.slice("window#/".length));
+  }
+  if (ref.startsWith("document#/")) {
     return getPath(globalThis.document, ref.slice("document#/".length));
+  }
   return state[ref] ?? null;
 }
 
 /** Resolve a $ref to a writable location — returns { obj, key } for assignment. */
 function resolveWritableRef(
   ref: string,
-  state: Record<string, any>,
+  state: JxScope,
   event: Event | null,
   iterCtx?: IterCtx,
-) {
+): { obj: JxScope; key: string } {
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
     const key = parts[1];
     let base;
-    if (key === "item") base = iterCtx?.item ?? state.$map?.item ?? state["$map/item"];
-    else if (key === "index") base = iterCtx?.index ?? state.$map?.index ?? state["$map/index"];
-    else base = state.$map?.[key] ?? state["$map/" + key];
+    const map = scopeMap(state);
+    if (key === "item") {
+      base = iterCtx?.item ?? map?.item ?? state["$map/item"];
+    } else if (key === "index") {
+      base = iterCtx?.index ?? map?.index ?? state["$map/index"];
+    } else {
+      base = map?.[key] ?? state[`$map/${key}`];
+    }
     if (parts.length > 2) {
       const pathParts = parts.slice(2);
       const lastKey = pathParts.pop();
       const obj = pathParts.length > 0 ? getPath(base, pathParts.join("/")) : base;
-      return { obj, key: lastKey as string };
+      return { key: lastKey as string, obj: obj as JxScope };
     }
     return {
-      obj: state.$map ?? state,
       key: key === "item" ? "$map/item" : "$map/index",
+      obj: scopeMap(state) ?? state,
     };
   }
   if (ref.startsWith("#/state/")) {
     const sub = ref.slice("#/state/".length);
     const slash = sub.indexOf("/");
-    if (slash < 0) return { obj: state, key: sub };
+    if (slash === -1) {
+      return { key: sub, obj: state };
+    }
     const parts = sub.split("/");
     const lastKey = parts.pop();
     let obj = state;
-    for (const p of parts) obj = obj[p];
-    return { obj, key: lastKey as string };
+    // Pointer paths address objects by construction (validated by the schema).
+    for (const p of parts) {
+      obj = obj[p] as JxScope;
+    }
+    return { key: lastKey as string, obj };
   }
-  return { obj: state, key: ref };
+  return { key: ref, obj: state };
 }
 
 /** Evaluate an expression node at runtime. */
 export function evaluateExpression(
   node: ExpressionNode,
-  state: Record<string, any>,
+  state: JxScope,
   event: Event | null,
   iterCtx?: IterCtx,
 ): unknown {
@@ -195,8 +227,12 @@ export function evaluateExpression(
   // ─── Unary ───
   if (UNARY_OPS.has(operator) && !("value" in node)) {
     const operand: unknown = resolveOperand(target, state, event, iterCtx);
-    if (operator === "!") return !operand;
-    if (operator === "-") return -(operand as number);
+    if (operator === "!") {
+      return !operand;
+    }
+    if (operator === "-") {
+      return -(operand as number);
+    }
   }
 
   // ─── Binary (pure) ───
@@ -204,32 +240,45 @@ export function evaluateExpression(
     const left = resolveOperand(target, state, event, iterCtx) as number & string;
     const right = resolveOperand(value, state, event, iterCtx) as number & string;
     switch (operator) {
-      case "+":
+      case "+": {
         return left + right;
-      case "-":
+      }
+      case "-": {
         return left - right;
-      case "*":
+      }
+      case "*": {
         return left * right;
-      case "/":
+      }
+      case "/": {
         return left / right;
-      case "%":
+      }
+      case "%": {
         return left % right;
-      case "===":
+      }
+      case "===": {
         return left === right;
-      case "!==":
+      }
+      case "!==": {
         return left !== right;
-      case "<":
+      }
+      case "<": {
         return left < right;
-      case "<=":
+      }
+      case "<=": {
         return left <= right;
-      case ">":
+      }
+      case ">": {
         return left > right;
-      case ">=":
+      }
+      case ">=": {
         return left >= right;
-      case "&&":
+      }
+      case "&&": {
         return left && right;
-      case "||":
+      }
+      case "||": {
         return left || right;
+      }
     }
   }
 
@@ -243,21 +292,26 @@ export function evaluateExpression(
       iterCtx,
     );
     switch (operator) {
-      case "=":
+      case "=": {
         obj[key] = rhs;
         break;
-      case "+=":
-        obj[key] += rhs;
+      }
+      case "+=": {
+        obj[key] = (obj[key] as number) + rhs;
         break;
-      case "-=":
-        obj[key] -= rhs;
+      }
+      case "-=": {
+        obj[key] = (obj[key] as number) - rhs;
         break;
-      case "*=":
-        obj[key] *= rhs;
+      }
+      case "*=": {
+        obj[key] = (obj[key] as number) * rhs;
         break;
-      case "/=":
-        obj[key] /= rhs;
+      }
+      case "/=": {
+        obj[key] = (obj[key] as number) / rhs;
         break;
+      }
     }
     return;
   }
@@ -266,14 +320,18 @@ export function evaluateExpression(
   if (ARRAY_METHOD_OPS.has(operator)) {
     const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
     switch (operator) {
-      case "push":
+      case "push": {
         return arr.push(resolveOperand(value, state, event, iterCtx));
-      case "unshift":
+      }
+      case "unshift": {
         return arr.unshift(resolveOperand(value, state, event, iterCtx));
-      case "pop":
+      }
+      case "pop": {
         return arr.pop();
-      case "shift":
+      }
+      case "shift": {
         return arr.shift();
+      }
       case "splice": {
         const args: unknown[] = resolveOperand(value, state, event, iterCtx) as unknown[];
         return (arr.splice as (...a: unknown[]) => unknown[])(...args);
@@ -286,31 +344,33 @@ export function evaluateExpression(
     const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
     if (operator === "reduce") {
       const seed: unknown = resolveOperand(initial, state, event, iterCtx);
-      return arr.reduce((acc: unknown, item: unknown, index: number) => {
-        return evaluateExpression(value as ExpressionNode, state, event, {
-          acc,
-          item,
-          index,
-        });
-      }, seed);
+      return arr.reduce(
+        (acc: unknown, item: unknown, index: number) =>
+          evaluateExpression(value as ExpressionNode, state, event, {
+            acc,
+            index,
+            item,
+          }),
+        seed,
+      );
     }
     if (operator === "map") {
-      return arr.map((item: unknown, index: number) => {
-        return evaluateExpression(value as ExpressionNode, state, event, {
+      return arr.map((item: unknown, index: number) =>
+        evaluateExpression(value as ExpressionNode, state, event, {
           ...iterCtx,
-          item,
           index,
-        });
-      });
+          item,
+        }),
+      );
     }
     if (operator === "filter") {
-      return arr.filter((item: unknown, index: number) => {
-        return evaluateExpression(value as ExpressionNode, state, event, {
+      return arr.filter((item: unknown, index: number) =>
+        evaluateExpression(value as ExpressionNode, state, event, {
           ...iterCtx,
-          item,
           index,
-        });
-      });
+          item,
+        }),
+      );
     }
   }
 
@@ -321,8 +381,12 @@ export function evaluateExpression(
 
 /** Compile an operand to a JS source string. */
 function compileOperand(operand: unknown, opts: CompileOpts): string {
-  if (operand === null) return "null";
-  if (operand === undefined) return "undefined";
+  if (operand === null) {
+    return "null";
+  }
+  if (operand === undefined) {
+    return "undefined";
+  }
 
   // Nested expression node
   if (typeof operand === "object" && !Array.isArray(operand) && "operator" in operand) {
@@ -354,12 +418,16 @@ function compileRef(ref: string, opts: CompileOpts) {
   const s = opts.statePrefix ?? "state";
   const e = opts.eventParam ?? "event";
 
-  if (ref === "$reduce/acc") return "_acc";
-  if (ref.startsWith("$reduce/")) return "_acc";
+  if (ref === "$reduce/acc") {
+    return "_acc";
+  }
+  if (ref.startsWith("$reduce/")) {
+    return "_acc";
+  }
 
   if (ref.startsWith("event#/")) {
     const path = ref.slice("event#/".length);
-    return `${e}.${path.replace(/\//g, ".")}`;
+    return `${e}.${path.replaceAll("/", ".")}`;
   }
 
   if (ref.startsWith("$map/")) {
@@ -368,20 +436,26 @@ function compileRef(ref: string, opts: CompileOpts) {
     if (key === "item") {
       return parts.length > 2 ? `_item.${parts.slice(2).join(".")}` : "_item";
     }
-    if (key === "index") return "_index";
+    if (key === "index") {
+      return "_index";
+    }
     return `_${key}`;
   }
 
   if (ref.startsWith("#/state/")) {
     const path = ref.slice("#/state/".length);
-    return `${s}.${path.replace(/\//g, ".")}`;
+    return `${s}.${path.replaceAll("/", ".")}`;
   }
 
-  if (ref.startsWith("parent#/")) return `${s}.${ref.slice("parent#/".length)}`;
-  if (ref.startsWith("window#/"))
-    return `window.${ref.slice("window#/".length).replace(/\//g, ".")}`;
-  if (ref.startsWith("document#/"))
-    return `document.${ref.slice("document#/".length).replace(/\//g, ".")}`;
+  if (ref.startsWith("parent#/")) {
+    return `${s}.${ref.slice("parent#/".length)}`;
+  }
+  if (ref.startsWith("window#/")) {
+    return `window.${ref.slice("window#/".length).replaceAll("/", ".")}`;
+  }
+  if (ref.startsWith("document#/")) {
+    return `document.${ref.slice("document#/".length).replaceAll("/", ".")}`;
+  }
 
   return `${s}.${ref}`;
 }
@@ -408,8 +482,12 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
   // ─── Unary ───
   if (UNARY_OPS.has(operator) && !("value" in node)) {
     const operand: string = compileOperand(target, opts);
-    if (operator === "!") return `!(${operand})`;
-    if (operator === "-") return `-(${operand})`;
+    if (operator === "!") {
+      return `!(${operand})`;
+    }
+    if (operator === "-") {
+      return `-(${operand})`;
+    }
   }
 
   // ─── Binary (pure) ───
@@ -430,14 +508,18 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
   if (ARRAY_METHOD_OPS.has(operator)) {
     const arr: string = compileTarget(target, opts);
     switch (operator) {
-      case "push":
+      case "push": {
         return `${arr}.push(${compileOperand(value, opts)})`;
-      case "unshift":
+      }
+      case "unshift": {
         return `${arr}.unshift(${compileOperand(value, opts)})`;
-      case "pop":
+      }
+      case "pop": {
         return `${arr}.pop()`;
-      case "shift":
+      }
+      case "shift": {
         return `${arr}.shift()`;
+      }
       case "splice": {
         const args: string = Array.isArray(value)
           ? value.map((o: unknown) => compileOperand(o, opts)).join(", ")

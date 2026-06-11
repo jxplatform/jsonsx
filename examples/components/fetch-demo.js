@@ -4,9 +4,12 @@ export function filteredPosts(state) {
   const userId = state.selectedUserId ? Number(state.selectedUserId) : null;
 
   return posts.filter((p) => {
-    if (userId && p.userId !== userId) return false;
-    if (term && !p.title.toLowerCase().includes(term) && !p.body.toLowerCase().includes(term))
+    if (userId && p.userId !== userId) {
       return false;
+    }
+    if (term && !p.title.toLowerCase().includes(term) && !p.body.toLowerCase().includes(term)) {
+      return false;
+    }
     return true;
   });
 }
@@ -22,6 +25,8 @@ export function paginatedPosts(state) {
 export function statsText(state) {
   const total = (state.allPosts || []).length;
   const filtered = (state.filteredPosts || []).length;
-  if (filtered === total) return `${total} posts`;
+  if (filtered === total) {
+    return `${total} posts`;
+  }
   return `${filtered} of ${total} posts`;
 }

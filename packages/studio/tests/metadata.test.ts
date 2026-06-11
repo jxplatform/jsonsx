@@ -1,8 +1,8 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
-import { readFileSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 interface MetaEntry {
   $section: string;
@@ -16,7 +16,7 @@ interface MetaEntry {
   [key: string]: unknown;
 }
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const studioDir = join(__dirname, "..");
 
 const cssMeta = JSON.parse(readFileSync(join(studioDir, "data", "css-meta.json"), "utf8"));
@@ -116,7 +116,9 @@ describe("css-meta.json", () => {
     const ordersBySection: Record<string, Record<string, any>> = {};
     for (const [prop, entry] of defs) {
       const sec = entry.$section;
-      if (!ordersBySection[sec]) ordersBySection[sec] = {};
+      if (!ordersBySection[sec]) {
+        ordersBySection[sec] = {};
+      }
       // Same order values in a section would be a conflict
       if (ordersBySection[sec][entry.$order]) {
         // Allow it but track — some sections may legitimately share order
@@ -209,13 +211,13 @@ describe("html-meta.json", () => {
   });
 
   test("tag-specific attributes have valid $elements", () => {
-    // href should only be on a, area, link
-    const href = htmlMeta.$defs.href;
+    // Href should only be on a, area, link
+    const { href } = htmlMeta.$defs;
     if (href && href.$elements) {
       expect(href.$elements).toContain("a");
     }
-    // src should include img
-    const src = htmlMeta.$defs.src;
+    // Src should include img
+    const { src } = htmlMeta.$defs;
     if (src && src.$elements) {
       expect(src.$elements).toContain("img");
     }
@@ -292,8 +294,12 @@ describe("elements-meta.json", () => {
   test("$inlineActions entries have required fields", () => {
     for (const [_tag, def] of Object.entries(elementsMeta.$defs) as [string, MetaEntry][]) {
       let actions = def.$inlineActions;
-      if (typeof actions === "string") actions = elementsMeta.$defs[actions]?.$inlineActions;
-      if (!Array.isArray(actions)) continue;
+      if (typeof actions === "string") {
+        actions = elementsMeta.$defs[actions]?.$inlineActions;
+      }
+      if (!Array.isArray(actions)) {
+        continue;
+      }
       for (const action of actions) {
         expect(typeof action.tag).toBe("string");
         expect(typeof action.label).toBe("string");

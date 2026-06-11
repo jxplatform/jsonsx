@@ -20,8 +20,10 @@ const MAX_RECENT_FILES = 10;
 export function getRecentProjects() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return (JSON.parse(raw) as RecentProject[]).sort((a, b) => b.timestamp - a.timestamp);
+    if (!raw) {
+      return [];
+    }
+    return (JSON.parse(raw) as RecentProject[]).toSorted((a, b) => b.timestamp - a.timestamp);
   } catch {
     return [];
   }
@@ -34,7 +36,9 @@ export function getRecentProjects() {
 export function addRecentProject(name: string, root: string) {
   const projects = getRecentProjects().filter((p) => p.root !== root);
   projects.unshift({ name, root, timestamp: Date.now() });
-  if (projects.length > MAX_RECENT) projects.length = MAX_RECENT;
+  if (projects.length > MAX_RECENT) {
+    projects.length = MAX_RECENT;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 }
 
@@ -46,8 +50,10 @@ export function clearRecentProjects() {
 export function getRecentFiles() {
   try {
     const raw = localStorage.getItem(FILES_STORAGE_KEY);
-    if (!raw) return [];
-    return (JSON.parse(raw) as RecentFile[]).sort((a, b) => b.timestamp - a.timestamp);
+    if (!raw) {
+      return [];
+    }
+    return (JSON.parse(raw) as RecentFile[]).toSorted((a, b) => b.timestamp - a.timestamp);
   } catch {
     return [];
   }
@@ -56,7 +62,9 @@ export function getRecentFiles() {
 /** @param {{ path: string; name: string }} file */
 export function trackRecentFile(file: { path: string; name: string }) {
   const recent = getRecentFiles().filter((f) => f.path !== file.path);
-  recent.unshift({ path: file.path, name: file.name, timestamp: Date.now() });
-  if (recent.length > MAX_RECENT_FILES) recent.length = MAX_RECENT_FILES;
+  recent.unshift({ name: file.name, path: file.path, timestamp: Date.now() });
+  if (recent.length > MAX_RECENT_FILES) {
+    recent.length = MAX_RECENT_FILES;
+  }
   localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(recent));
 }

@@ -1,5 +1,5 @@
 /**
- * jxsuite/md — Markdown integration for Jx
+ * Jxsuite/md — Markdown integration for Jx
  *
  * Provides two exports:
  *   - MarkdownFile       — Parse a single markdown file (external class for $prototype)
@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 import { basename, extname, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
 import { mdastNodeToJx } from "./transpile.ts";
-import type { MarkdownFileResult, TocEntry, MdastNode } from "./types.ts";
+import type { MarkdownFileResult, MdastNode, TocEntry } from "./types.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
 // ─── Tree utilities (inline to avoid Bun ESM resolution issues with unist-util-*) ──
@@ -42,10 +42,16 @@ function visit(
   const visitor = type ? maybeVisitor : typeOrVisitor;
 
   function walk(node: MdastNode) {
-    if (!node || typeof node !== "object") return;
-    if (!type || node.type === type) (visitor as Function)(node);
+    if (!node || typeof node !== "object") {
+      return;
+    }
+    if (!type || node.type === type) {
+      (visitor as Function)(node);
+    }
     if (Array.isArray(node.children)) {
-      for (const child of node.children) walk(child);
+      for (const child of node.children) {
+        walk(child);
+      }
     }
   }
   walk(tree as MdastNode);
@@ -58,10 +64,18 @@ function visit(
  * @returns {string}
  */
 function mdastToString(node: MdastNode): string {
-  if (!node) return "";
-  if (typeof node === "string") return node;
-  if (node.value) return node.value;
-  if (Array.isArray(node.children)) return node.children.map(mdastToString).join("");
+  if (!node) {
+    return "";
+  }
+  if (typeof node === "string") {
+    return node;
+  }
+  if (node.value) {
+    return node.value;
+  }
+  if (Array.isArray(node.children)) {
+    return node.children.map(mdastToString).join("");
+  }
   return "";
 }
 
@@ -91,11 +105,11 @@ function extractToc(tree: MdastNode) {
     const text = mdastToString(node);
     const id = text
       .toLowerCase()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
-    entries.push({ depth: node.depth as number, text, id });
+      .replaceAll(/[^\w\s-]/g, "")
+      .replaceAll(/\s+/g, "-")
+      .replaceAll(/-+/g, "-")
+      .replaceAll(/^-|-$/g, "");
+    entries.push({ depth: node.depth as number, id, text });
   });
   return entries;
 }
@@ -109,9 +123,13 @@ function extractToc(tree: MdastNode) {
 function extractExcerpt(tree: MdastNode) {
   let firstParagraph: MdastNode | null = null;
   visit(tree, "paragraph", (node: MdastNode) => {
-    if (!firstParagraph) firstParagraph = node;
+    if (!firstParagraph) {
+      firstParagraph = node;
+    }
   });
-  if (!firstParagraph) return "";
+  if (!firstParagraph) {
+    return "";
+  }
   return mdastToString(firstParagraph);
 }
 
@@ -147,7 +165,7 @@ export function processMarkdown(
 
   const tree = processor.parse(source);
   const vfile = { data: {} };
-  // @ts-ignore - vfile shape satisfies unified's internal contract
+  // @ts-expect-error - vfile shape satisfies unified's internal contract
   processor.runSync(tree, vfile);
 
   const vfileData = vfile.data as Record<string, unknown>;
@@ -166,14 +184,14 @@ export function processMarkdown(
     .filter(Boolean) as (JxElement | string)[];
 
   return {
-    slug,
-    path: filePath,
-    frontmatter,
     $children,
     $excerpt: excerpt,
-    $toc: toc,
     $readingTime: readingTime(plainText),
+    $toc: toc,
     $wordCount: plainText.split(/\s+/).filter(Boolean).length,
+    frontmatter,
+    path: filePath,
+    slug,
   };
 }
 
@@ -266,7 +284,7 @@ export class MarkdownCollection {
     const files = globSync(pattern, { absolute: true });
 
     const results = files.map((filePath: string) => {
-      const source = readFileSync(filePath, "utf-8");
+      const source = readFileSync(filePath, "utf8");
       return processMarkdown(source, filePath, processorConfig);
     });
 
@@ -280,8 +298,12 @@ export class MarkdownCollection {
     filtered.sort((a: MarkdownFileResult, b: MarkdownFileResult) => {
       const aVal = getNestedValue(a, sortBy) ?? ("" as string | number);
       const bVal = getNestedValue(b, sortBy) ?? ("" as string | number);
-      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      if (aVal < bVal) {
+        return sortOrder === "asc" ? -1 : 1;
+      }
+      if (aVal > bVal) {
+        return sortOrder === "asc" ? 1 : -1;
+      }
       return 0;
     });
 

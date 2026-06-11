@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { join, resolve } from "node:path";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 const FIXTURES = resolve(import.meta.dir, "_activate_fixtures");
 
@@ -104,7 +104,7 @@ if (errors.length) {
 }
 `,
         ],
-        { stdout: "pipe", stderr: "pipe" },
+        { stderr: "pipe", stdout: "pipe" },
       );
       const result = await proc.exited;
       const stdout = await new Response(proc.stdout).text();
@@ -114,7 +114,7 @@ if (errors.length) {
       }
       expect(stdout).toContain("ALL_PASS");
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 });

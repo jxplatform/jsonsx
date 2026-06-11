@@ -28,18 +28,22 @@ export function clearGithubToken() {
  */
 export async function authenticateGithub() {
   const existing = getGithubToken();
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   const codeRes = await fetch("https://github.com/login/device/code", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
     body: JSON.stringify({ client_id: CLIENT_ID, scope: "repo" }),
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
   });
 
-  if (!codeRes.ok) throw new Error("Failed to initiate GitHub device flow");
+  if (!codeRes.ok) {
+    throw new Error("Failed to initiate GitHub device flow");
+  }
   const codeData = await codeRes.json();
 
   const { device_code, user_code, verification_uri, interval = 5 } = codeData;
@@ -49,19 +53,21 @@ export async function authenticateGithub() {
     let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     const poll = async () => {
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       try {
         const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
           body: JSON.stringify({
             client_id: CLIENT_ID,
             device_code,
             grant_type: "urn:ietf:params:oauth:grant-type:device_code",
           }),
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          method: "POST",
         });
         const tokenData = await tokenRes.json();
 
@@ -81,7 +87,7 @@ export async function authenticateGithub() {
           return;
         }
 
-        // expired_token or access_denied
+        // Expired_token or access_denied
         done(null);
       } catch {
         pollTimer = setTimeout(poll, interval * 1000);
@@ -97,12 +103,16 @@ export async function authenticateGithub() {
         cancel-label="Cancel"
         @cancel=${() => {
           cancelled = true;
-          if (pollTimer) clearTimeout(pollTimer);
+          if (pollTimer) {
+            clearTimeout(pollTimer);
+          }
           done(null);
         }}
         @close=${() => {
           cancelled = true;
-          if (pollTimer) clearTimeout(pollTimer);
+          if (pollTimer) {
+            clearTimeout(pollTimer);
+          }
           done(null);
         }}
       >

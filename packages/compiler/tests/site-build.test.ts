@@ -1,8 +1,8 @@
 /** Site-build.test.js — Tests for the Phase 1 site build pipeline */
 
-import { describe, it, expect, beforeAll, afterAll, mock } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it, mock } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { loadProjectConfig } from "../src/site/site-loader";
 import { discoverPages } from "../src/site/pages-discovery";
 import { resolveLayout } from "../src/site/layout-resolver";
@@ -28,57 +28,57 @@ function writePlain(path: string, content: string) {
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
 beforeAll(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 
   writeJSON("project.json", {
-    name: "Test Site",
-    url: "https://test.com",
-    defaults: { layout: "./layouts/base.json", lang: "en" },
-    $head: [{ tagName: "meta", attributes: { name: "generator", content: "Jx" } }],
-    redirects: { "/old": "/new" },
+    $head: [{ attributes: { content: "Jx", name: "generator" }, tagName: "meta" }],
     build: { outDir: "./dist" },
+    defaults: { lang: "en", layout: "./layouts/base.json" },
+    name: "Test Site",
+    redirects: { "/old": "/new" },
+    url: "https://test.com",
   });
 
   writeJSON("layouts/base.json", {
-    tagName: "div",
     children: [
-      { tagName: "header", children: ["Site Header"] },
-      { tagName: "main", children: [{ tagName: "slot" }] },
-      { tagName: "footer", children: ["Site Footer"] },
+      { children: ["Site Header"], tagName: "header" },
+      { children: [{ tagName: "slot" }], tagName: "main" },
+      { children: ["Site Footer"], tagName: "footer" },
     ],
+    tagName: "div",
   });
 
   writeJSON("pages/index.json", {
+    children: [{ children: ["Welcome"], tagName: "h1" }],
     title: "Home",
-    children: [{ tagName: "h1", children: ["Welcome"] }],
   });
 
   writeJSON("pages/about.json", {
-    title: "About",
     $head: [
       {
+        attributes: { content: "About page", name: "description" },
         tagName: "meta",
-        attributes: { name: "description", content: "About page" },
       },
     ],
-    children: [{ tagName: "h1", children: ["About Us"] }],
+    children: [{ children: ["About Us"], tagName: "h1" }],
+    title: "About",
   });
 
   writeJSON("pages/blog/index.json", {
+    children: [{ children: ["Blog"], tagName: "h1" }],
     title: "Blog",
-    children: [{ tagName: "h1", children: ["Blog"] }],
   });
 
   writeJSON("pages/_helpers.json", {
-    tagName: "div",
     children: ["I should not be a route"],
+    tagName: "div",
   });
 
   writePlain("public/robots.txt", "User-agent: *\nAllow: /\n");
 });
 
 afterAll(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 });
 
 // ── site-loader ───────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ describe("site-loader", () => {
     expect(config.name).toBe("Test Site");
     expect(config.url).toBe("https://test.com");
     expect(config.defaults.lang).toBe("en");
-    expect(config.defaults.charset).toBe("utf-8");
+    expect(config.defaults.charset).toBe("utf8");
     expect(config.build.outDir).toBe("./dist");
   });
 
@@ -137,15 +137,15 @@ describe("layout-resolver", () => {
 
   it("wraps page content in layout with slot distribution", () => {
     const pageDoc = {
+      children: [{ children: ["Hello"], tagName: "p" }],
       title: "Test",
-      children: [{ tagName: "p", children: ["Hello"] }],
     };
 
     const result = resolveLayout(pageDoc, projectConfig, TMP) as any;
 
     // Should have the layout structure
     expect(result.tagName).toBe("div");
-    expect(result.children).toHaveLength(3); // header, main, footer
+    expect(result.children).toHaveLength(3); // Header, main, footer
 
     // Main should now contain the page's <p> instead of <slot>
     const main = (result.children as any)[1];
@@ -155,7 +155,7 @@ describe("layout-resolver", () => {
   });
 
   it("returns page as-is when no layout", () => {
-    const pageDoc = { tagName: "div", children: ["Hello"] };
+    const pageDoc = { children: ["Hello"], tagName: "div" };
     const result = resolveLayout(pageDoc, { defaults: {} }, TMP);
     expect(result).toEqual(pageDoc);
   });
@@ -165,11 +165,11 @@ describe("layout-resolver", () => {
 
 describe("head-merger", () => {
   it("merges site + page heads with deduplication", () => {
-    const siteHead = [{ tagName: "meta", attributes: { name: "generator", content: "Jx" } }];
+    const siteHead = [{ attributes: { content: "Jx", name: "generator" }, tagName: "meta" }];
     const pageHead = [
       {
+        attributes: { content: "Page desc", name: "description" },
         tagName: "meta",
-        attributes: { name: "description", content: "Page desc" },
       },
     ];
 
@@ -187,8 +187,8 @@ describe("head-merger", () => {
   });
 
   it("page-level overrides site-level for same key", () => {
-    const siteHead = [{ tagName: "meta", attributes: { name: "description", content: "Site" } }];
-    const pageHead = [{ tagName: "meta", attributes: { name: "description", content: "Page" } }];
+    const siteHead = [{ attributes: { content: "Site", name: "description" }, tagName: "meta" }];
+    const pageHead = [{ attributes: { content: "Page", name: "description" }, tagName: "meta" }];
 
     const merged = mergeHead(siteHead, [], pageHead, {}) as any[];
     const desc = merged.find((e) => e.tagName === "meta" && e.attributes?.name === "description");
@@ -197,11 +197,11 @@ describe("head-merger", () => {
 
   it("renders to valid HTML", () => {
     const entries = [
-      { tagName: "meta", attributes: { charset: "utf-8" } },
-      { tagName: "title", children: ["Test"] },
+      { attributes: { charset: "utf8" }, tagName: "meta" },
+      { children: ["Test"], tagName: "title" },
     ];
     const html = renderHead(entries);
-    expect(html).toContain('<meta charset="utf-8">');
+    expect(html).toContain('<meta charset="utf8">');
     expect(html).toContain("<title>Test</title>");
   });
 });
@@ -212,7 +212,7 @@ describe("context-injection", () => {
   it("injects $site and $page into state", () => {
     const doc: any = {};
     const projectConfig = { name: "Test", url: "https://test.com" };
-    const route = { urlPattern: "/about", _pathParams: {} };
+    const route = { _pathParams: {}, urlPattern: "/about" };
 
     injectContext(doc, projectConfig, route);
 
@@ -276,7 +276,7 @@ describe("buildSite — server worker", () => {
   const SERVER_TMP = resolve(import.meta.dir, "__test-site-server__");
 
   beforeAll(() => {
-    rmSync(SERVER_TMP, { recursive: true, force: true });
+    rmSync(SERVER_TMP, { force: true, recursive: true });
 
     const writeJ = (p: string, obj: unknown) => {
       mkdirSync(resolve(SERVER_TMP, ...p.split("/").slice(0, -1)), {
@@ -292,27 +292,27 @@ describe("buildSite — server worker", () => {
     };
 
     writeJ("project.json", {
+      build: { adapter: "cloudflare-workers", outDir: "./dist" },
+      defaults: { lang: "en" },
       name: "Server Test",
       url: "https://test.com",
-      defaults: { lang: "en" },
-      build: { outDir: "./dist", adapter: "cloudflare-workers" },
     });
 
     writeJ("pages/index.json", {
+      children: [{ $props: {}, tagName: "test-contact" }],
       title: "Home",
-      children: [{ tagName: "test-contact", $props: {} }],
     });
 
     writeJ("components/test-contact.json", {
-      tagName: "test-contact",
+      children: [{ children: ["Contact"], tagName: "form" }],
       state: {
         sendForm: {
-          timing: "server",
-          $src: "./contact.server.js",
           $export: "sendForm",
+          $src: "./contact.server.js",
+          timing: "server",
         },
       },
-      children: [{ tagName: "form", children: ["Contact"] }],
+      tagName: "test-contact",
     });
 
     writeP(
@@ -322,7 +322,7 @@ describe("buildSite — server worker", () => {
   });
 
   afterAll(() => {
-    rmSync(SERVER_TMP, { recursive: true, force: true });
+    rmSync(SERVER_TMP, { force: true, recursive: true });
   });
 
   it("generates worker.js in dist/", async () => {
@@ -352,7 +352,7 @@ describe("buildSite — cloudflare-pages adapter", () => {
   const PAGES_TMP = resolve(import.meta.dir, "__test-site-pages__");
 
   beforeAll(() => {
-    rmSync(PAGES_TMP, { recursive: true, force: true });
+    rmSync(PAGES_TMP, { force: true, recursive: true });
 
     const writeJ = (p: string, obj: unknown) => {
       mkdirSync(resolve(PAGES_TMP, ...p.split("/").slice(0, -1)), {
@@ -368,27 +368,27 @@ describe("buildSite — cloudflare-pages adapter", () => {
     };
 
     writeJ("project.json", {
+      build: { adapter: "cloudflare-pages", outDir: "./dist" },
+      defaults: { lang: "en" },
       name: "Pages Test",
       url: "https://test.com",
-      defaults: { lang: "en" },
-      build: { outDir: "./dist", adapter: "cloudflare-pages" },
     });
 
     writeJ("pages/index.json", {
+      children: [{ $props: {}, tagName: "test-mailer" }],
       title: "Home",
-      children: [{ tagName: "test-mailer", $props: {} }],
     });
 
     writeJ("components/test-mailer.json", {
-      tagName: "test-mailer",
+      children: [{ children: ["Mail"], tagName: "form" }],
       state: {
         sendMail: {
-          timing: "server",
-          $src: "./mailer.server.js",
           $export: "sendMail",
+          $src: "./mailer.server.js",
+          timing: "server",
         },
       },
-      children: [{ tagName: "form", children: ["Mail"] }],
+      tagName: "test-mailer",
     });
 
     writeP(
@@ -398,7 +398,7 @@ describe("buildSite — cloudflare-pages adapter", () => {
   });
 
   afterAll(() => {
-    rmSync(PAGES_TMP, { recursive: true, force: true });
+    rmSync(PAGES_TMP, { force: true, recursive: true });
   });
 
   it("generates an advanced-mode _worker.js instead of worker.js", async () => {
@@ -421,7 +421,7 @@ describe("buildSite — cloudflare-pages adapter", () => {
     await buildSite(PAGES_TMP, { verbose: false });
 
     const routes = JSON.parse(readFileSync(resolve(PAGES_TMP, "dist/_routes.json"), "utf8"));
-    expect(routes).toEqual({ version: 1, include: ["/_jx/*"], exclude: [] });
+    expect(routes).toEqual({ exclude: [], include: ["/_jx/*"], version: 1 });
   });
 
   it("copies server source files into dist/components/", async () => {
@@ -439,15 +439,15 @@ describe("buildSite — cloudflare images service", () => {
   const CF_IMG_TMP = resolve(import.meta.dir, "__test-site-cf-images__");
 
   // Cloudflare mode only reads image dimensions (no variant generation); mock sharp so the
-  // test doesn't depend on the native binary being loadable.
+  // Test doesn't depend on the native binary being loadable.
   mock.module("sharp", () => ({
     default: () => ({
-      metadata: async () => ({ width: 1280, height: 720, format: "png" }),
+      metadata: async () => ({ format: "png", height: 720, width: 1280 }),
     }),
   }));
 
   async function setupProject(adapter: string) {
-    rmSync(CF_IMG_TMP, { recursive: true, force: true });
+    rmSync(CF_IMG_TMP, { force: true, recursive: true });
 
     const writeJ = (p: string, obj: unknown) => {
       mkdirSync(resolve(CF_IMG_TMP, ...p.split("/").slice(0, -1)), {
@@ -457,21 +457,21 @@ describe("buildSite — cloudflare images service", () => {
     };
 
     writeJ("project.json", {
-      name: "CF Images Test",
-      url: "https://test.com",
+      build: { adapter, outDir: "./dist" },
       defaults: { lang: "en" },
       images: { service: "cloudflare" },
-      build: { outDir: "./dist", adapter },
+      name: "CF Images Test",
+      url: "https://test.com",
     });
 
     writeJ("pages/index.json", {
-      title: "Home",
       children: [
         {
+          attributes: { alt: "Hero", src: "/images/hero.png" },
           tagName: "img",
-          attributes: { src: "/images/hero.png", alt: "Hero" },
         },
       ],
+      title: "Home",
     });
 
     mkdirSync(resolve(CF_IMG_TMP, "public/images"), { recursive: true });
@@ -479,7 +479,7 @@ describe("buildSite — cloudflare images service", () => {
   }
 
   afterAll(() => {
-    rmSync(CF_IMG_TMP, { recursive: true, force: true });
+    rmSync(CF_IMG_TMP, { force: true, recursive: true });
   });
 
   it("rewrites img srcset to /cdn-cgi/image transform URLs without Sharp variants", async () => {
@@ -530,17 +530,17 @@ describe("buildSite — missing pages/", () => {
   const NO_PAGES_TMP = resolve(import.meta.dir, "__test-site-no-pages__");
 
   beforeAll(() => {
-    rmSync(NO_PAGES_TMP, { recursive: true, force: true });
+    rmSync(NO_PAGES_TMP, { force: true, recursive: true });
     mkdirSync(NO_PAGES_TMP, { recursive: true });
     writeFileSync(
       resolve(NO_PAGES_TMP, "project.json"),
-      JSON.stringify({ name: "Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Test" }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(NO_PAGES_TMP, { recursive: true, force: true });
+    rmSync(NO_PAGES_TMP, { force: true, recursive: true });
   });
 
   it("throws when pages/ directory does not exist", async () => {
@@ -554,26 +554,26 @@ describe("buildSite — optimized images cache-to-dist", () => {
   const OPT_TMP = resolve(import.meta.dir, "__test-site-opt-images__");
 
   function setupProject() {
-    rmSync(OPT_TMP, { recursive: true, force: true });
+    rmSync(OPT_TMP, { force: true, recursive: true });
     mkdirSync(OPT_TMP, { recursive: true });
     writeFileSync(
       resolve(OPT_TMP, "project.json"),
-      JSON.stringify({ name: "Opt Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Opt Test" }),
       "utf8",
     );
     mkdirSync(resolve(OPT_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(OPT_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
   }
 
   afterAll(() => {
-    rmSync(OPT_TMP, { recursive: true, force: true });
+    rmSync(OPT_TMP, { force: true, recursive: true });
   });
 
   it("copies cached variants from the global npm cache dir to dist", async () => {
@@ -586,8 +586,8 @@ describe("buildSite — optimized images cache-to-dist", () => {
     const { tmpdir } = await import("node:os");
     const { basename, resolve: res } = await import("node:path");
     const npmBase = execSync("npm config get cache", {
-      encoding: "utf-8",
       cwd: tmpdir(),
+      encoding: "utf8",
     }).trim();
     const npmOptDir = res(npmBase, "jxsuite-images", basename(OPT_TMP), "_optimized");
     mkdirSync(npmOptDir, { recursive: true });
@@ -598,8 +598,8 @@ describe("buildSite — optimized images cache-to-dist", () => {
       expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/npm-cached.webp"))).toBe(true);
     } finally {
       rmSync(res(npmBase, "jxsuite-images", basename(OPT_TMP)), {
-        recursive: true,
         force: true,
+        recursive: true,
       });
       _testResetNpmCacheBase();
     }
@@ -608,7 +608,7 @@ describe("buildSite — optimized images cache-to-dist", () => {
   it("falls back to project-local .cache/images when npm cache is unavailable", async () => {
     setupProject();
     // Force the fallback path — equivalent to execSync("npm config get cache") throwing,
-    // e.g. npm not in PATH or no network on a restricted CI image.
+    // E.g. npm not in PATH or no network on a restricted CI image.
     _testSetNpmCacheBase(null);
 
     // Pre-populate the project-local cache as a prior build would have
@@ -636,19 +636,19 @@ describe("buildSite — component CSS generation", () => {
   const COMP_TMP = resolve(import.meta.dir, "__test-site-comp-css__");
 
   beforeAll(() => {
-    rmSync(COMP_TMP, { recursive: true, force: true });
+    rmSync(COMP_TMP, { force: true, recursive: true });
     mkdirSync(COMP_TMP, { recursive: true });
     writeFileSync(
       resolve(COMP_TMP, "project.json"),
-      JSON.stringify({ name: "Comp Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Comp Test" }),
       "utf8",
     );
     mkdirSync(resolve(COMP_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(COMP_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ $props: { label: "Click" }, tagName: "my-button" }],
         title: "Home",
-        children: [{ tagName: "my-button", $props: { label: "Click" } }],
       }),
       "utf8",
     );
@@ -656,18 +656,18 @@ describe("buildSite — component CSS generation", () => {
     writeFileSync(
       resolve(COMP_TMP, "components/my-button.json"),
       JSON.stringify({
-        tagName: "my-button",
+        children: [{ children: ["${label}"], tagName: "button" }],
+        onClick: "console.log('clicked')",
         state: { label: { default: "Default" } },
         style: { display: "inline-block", padding: "8px" },
-        onClick: "console.log('clicked')",
-        children: [{ tagName: "button", children: ["${label}"] }],
+        tagName: "my-button",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(COMP_TMP, { recursive: true, force: true });
+    rmSync(COMP_TMP, { force: true, recursive: true });
   });
 
   it("generates component CSS file when style is defined", async () => {
@@ -693,19 +693,19 @@ describe("buildSite — component compilation errors", () => {
   const ERR_TMP = resolve(import.meta.dir, "__test-site-comp-err__");
 
   beforeAll(() => {
-    rmSync(ERR_TMP, { recursive: true, force: true });
+    rmSync(ERR_TMP, { force: true, recursive: true });
     mkdirSync(ERR_TMP, { recursive: true });
     writeFileSync(
       resolve(ERR_TMP, "project.json"),
-      JSON.stringify({ name: "Err Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Err Test" }),
       "utf8",
     );
     mkdirSync(resolve(ERR_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(ERR_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["OK"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["OK"] }],
       }),
       "utf8",
     );
@@ -715,7 +715,7 @@ describe("buildSite — component compilation errors", () => {
   });
 
   afterAll(() => {
-    rmSync(ERR_TMP, { recursive: true, force: true });
+    rmSync(ERR_TMP, { force: true, recursive: true });
   });
 
   it("captures component compilation errors without crashing", async () => {
@@ -731,13 +731,13 @@ describe("buildSite — trailingSlash never", () => {
   const TS_TMP = resolve(import.meta.dir, "__test-site-trailing-slash__");
 
   beforeAll(() => {
-    rmSync(TS_TMP, { recursive: true, force: true });
+    rmSync(TS_TMP, { force: true, recursive: true });
     mkdirSync(TS_TMP, { recursive: true });
     writeFileSync(
       resolve(TS_TMP, "project.json"),
       JSON.stringify({
-        name: "TS Test",
         build: { outDir: "./dist", trailingSlash: "never" },
+        name: "TS Test",
       }),
       "utf8",
     );
@@ -745,23 +745,23 @@ describe("buildSite — trailingSlash never", () => {
     writeFileSync(
       resolve(TS_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
     writeFileSync(
       resolve(TS_TMP, "pages/about.json"),
       JSON.stringify({
+        children: [{ children: ["About"], tagName: "p" }],
         title: "About",
-        children: [{ tagName: "p", children: ["About"] }],
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(TS_TMP, { recursive: true, force: true });
+    rmSync(TS_TMP, { force: true, recursive: true });
   });
 
   it("outputs .html files directly (not index.html in subdirs)", async () => {
@@ -780,18 +780,18 @@ describe("buildSite — redirect patterns", () => {
   const RD_TMP = resolve(import.meta.dir, "__test-site-redirect-patterns__");
 
   beforeAll(() => {
-    rmSync(RD_TMP, { recursive: true, force: true });
+    rmSync(RD_TMP, { force: true, recursive: true });
     mkdirSync(RD_TMP, { recursive: true });
     writeFileSync(
       resolve(RD_TMP, "project.json"),
       JSON.stringify({
-        name: "Redirect Test",
         build: { outDir: "./dist" },
+        name: "Redirect Test",
         redirects: {
-          "/old": "/new",
+          "/archive": { destination: "/blog", status: 302 },
           "/blog/:slug": "/posts/:slug",
           "/docs/*": "/documentation/:splat",
-          "/archive": { destination: "/blog", status: 302 },
+          "/old": "/new",
         },
       }),
       "utf8",
@@ -800,15 +800,15 @@ describe("buildSite — redirect patterns", () => {
     writeFileSync(
       resolve(RD_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(RD_TMP, { recursive: true, force: true });
+    rmSync(RD_TMP, { force: true, recursive: true });
   });
 
   it("writes pattern redirects to _redirects without HTML files", async () => {
@@ -833,14 +833,14 @@ describe("buildSite — copy config", () => {
   const COPY_TMP = resolve(import.meta.dir, "__test-site-copy__");
 
   beforeAll(() => {
-    rmSync(COPY_TMP, { recursive: true, force: true });
+    rmSync(COPY_TMP, { force: true, recursive: true });
     mkdirSync(COPY_TMP, { recursive: true });
     writeFileSync(
       resolve(COPY_TMP, "project.json"),
       JSON.stringify({
-        name: "Copy Test",
         build: { outDir: "./dist" },
         copy: { "assets/logo.svg": "images/logo.svg" },
+        name: "Copy Test",
       }),
       "utf8",
     );
@@ -848,8 +848,8 @@ describe("buildSite — copy config", () => {
     writeFileSync(
       resolve(COPY_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
@@ -858,7 +858,7 @@ describe("buildSite — copy config", () => {
   });
 
   afterAll(() => {
-    rmSync(COPY_TMP, { recursive: true, force: true });
+    rmSync(COPY_TMP, { force: true, recursive: true });
   });
 
   it("copies declarative file mappings to dist/", async () => {
@@ -875,14 +875,14 @@ describe("buildSite — markdown pages", () => {
   const MD_TMP = resolve(import.meta.dir, "__test-site-md-pages__");
 
   beforeAll(() => {
-    rmSync(MD_TMP, { recursive: true, force: true });
+    rmSync(MD_TMP, { force: true, recursive: true });
     mkdirSync(MD_TMP, { recursive: true });
     writeFileSync(
       resolve(MD_TMP, "project.json"),
       JSON.stringify({
-        name: "MD Test",
         build: { outDir: "./dist" },
         imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+        name: "MD Test",
       }),
       "utf8",
     );
@@ -902,7 +902,7 @@ This is a markdown page.
   });
 
   afterAll(() => {
-    rmSync(MD_TMP, { recursive: true, force: true });
+    rmSync(MD_TMP, { force: true, recursive: true });
   });
 
   it("compiles .md pages via the Markdown format class", async () => {
@@ -920,49 +920,49 @@ describe("buildSite — template string resolution", () => {
   const TPL_TMP = resolve(import.meta.dir, "__test-site-templates__");
 
   beforeAll(() => {
-    rmSync(TPL_TMP, { recursive: true, force: true });
+    rmSync(TPL_TMP, { force: true, recursive: true });
     mkdirSync(TPL_TMP, { recursive: true });
     writeFileSync(
       resolve(TPL_TMP, "project.json"),
-      JSON.stringify({ name: "TPL Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "TPL Test" }),
       "utf8",
     );
     mkdirSync(resolve(TPL_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(TPL_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "${state.pageTitle}",
-        state: {
-          pageTitle: { default: "Dynamic Title", timing: "compiler" },
-          metaDesc: { default: "A dynamic description", timing: "compiler" },
-        },
         $head: [
           {
+            attributes: { content: "${state.metaDesc}", name: "description" },
             tagName: "meta",
-            attributes: { name: "description", content: "${state.metaDesc}" },
           },
           {
+            attributes: { content: "${state.pageTitle}", name: "og:title" },
             tagName: "meta",
-            attributes: { name: "og:title", content: "${state.pageTitle}" },
           },
         ],
         children: [
           { tagName: "h1", textContent: "${state.pageTitle}" },
-          { tagName: "p", innerHTML: "${state.metaDesc}" },
-          { tagName: "div", style: { color: "${state.pageTitle}" } },
+          { innerHTML: "${state.metaDesc}", tagName: "p" },
+          { style: { color: "${state.pageTitle}" }, tagName: "div" },
           {
-            tagName: "a",
             attributes: { href: "/${state.pageTitle}" },
             children: ["Link"],
+            tagName: "a",
           },
         ],
+        state: {
+          metaDesc: { default: "A dynamic description", timing: "compiler" },
+          pageTitle: { default: "Dynamic Title", timing: "compiler" },
+        },
+        title: "${state.pageTitle}",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(TPL_TMP, { recursive: true, force: true });
+    rmSync(TPL_TMP, { force: true, recursive: true });
   });
 
   it("resolves template strings in title, $head, and document tree", async () => {
@@ -976,7 +976,7 @@ describe("buildSite — template string resolution", () => {
 
   it("strips compiler-timing state entries after resolution", async () => {
     // The build should succeed — if timing:compiler state was not stripped,
-    // it might cause dynamic detection issues
+    // It might cause dynamic detection issues
     const result = await buildSite(TPL_TMP);
     expect(result.errors).toHaveLength(0);
   });
@@ -988,27 +988,27 @@ describe("buildSite — npm $elements injection", () => {
   const EL_TMP = resolve(import.meta.dir, "__test-site-elements__");
 
   beforeAll(() => {
-    rmSync(EL_TMP, { recursive: true, force: true });
+    rmSync(EL_TMP, { force: true, recursive: true });
     mkdirSync(EL_TMP, { recursive: true });
     writeFileSync(
       resolve(EL_TMP, "project.json"),
-      JSON.stringify({ name: "Elem Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Elem Test" }),
       "utf8",
     );
     mkdirSync(resolve(EL_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(EL_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
         $elements: ["@shoelace-style/shoelace/components/button/button.js"],
-        children: [{ tagName: "sl-button", children: ["Click Me"] }],
+        children: [{ children: ["Click Me"], tagName: "sl-button" }],
+        title: "Home",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(EL_TMP, { recursive: true, force: true });
+    rmSync(EL_TMP, { force: true, recursive: true });
   });
 
   it("injects npm element scripts as module scripts", async () => {
@@ -1027,26 +1027,26 @@ describe("buildSite — bare specifier resolution in $head", () => {
   const BS_TMP = resolve(import.meta.dir, "__test-site-bare-spec__");
 
   beforeAll(() => {
-    rmSync(BS_TMP, { recursive: true, force: true });
+    rmSync(BS_TMP, { force: true, recursive: true });
     mkdirSync(BS_TMP, { recursive: true });
     writeFileSync(
       resolve(BS_TMP, "project.json"),
       JSON.stringify({
-        name: "Bare Spec Test",
-        build: { outDir: "./dist" },
         $head: [
           {
-            tagName: "link",
             attributes: {
-              rel: "stylesheet",
               href: "@shoelace-style/shoelace/dist/themes/light.css",
+              rel: "stylesheet",
             },
+            tagName: "link",
           },
           {
+            attributes: { src: "@pkg/lib/index.js", type: "module" },
             tagName: "script",
-            attributes: { type: "module", src: "@pkg/lib/index.js" },
           },
         ],
+        build: { outDir: "./dist" },
+        name: "Bare Spec Test",
       }),
       "utf8",
     );
@@ -1054,15 +1054,15 @@ describe("buildSite — bare specifier resolution in $head", () => {
     writeFileSync(
       resolve(BS_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(BS_TMP, { recursive: true, force: true });
+    rmSync(BS_TMP, { force: true, recursive: true });
   });
 
   it("resolves bare specifiers to /node_modules/ paths", async () => {
@@ -1080,19 +1080,19 @@ describe("buildSite — static component optimization", () => {
   const STATIC_TMP = resolve(import.meta.dir, "__test-site-static-comp__");
 
   beforeAll(() => {
-    rmSync(STATIC_TMP, { recursive: true, force: true });
+    rmSync(STATIC_TMP, { force: true, recursive: true });
     mkdirSync(STATIC_TMP, { recursive: true });
     writeFileSync(
       resolve(STATIC_TMP, "project.json"),
-      JSON.stringify({ name: "Static Comp Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Static Comp Test" }),
       "utf8",
     );
     mkdirSync(resolve(STATIC_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(STATIC_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ $props: { title: "Hello" }, tagName: "my-card" }],
         title: "Home",
-        children: [{ tagName: "my-card", $props: { title: "Hello" } }],
       }),
       "utf8",
     );
@@ -1101,16 +1101,16 @@ describe("buildSite — static component optimization", () => {
     writeFileSync(
       resolve(STATIC_TMP, "components/my-card.json"),
       JSON.stringify({
-        tagName: "my-card",
+        children: [{ children: ["Static Content"], tagName: "div" }],
         style: { display: "block", padding: "16px" },
-        children: [{ tagName: "div", children: ["Static Content"] }],
+        tagName: "my-card",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(STATIC_TMP, { recursive: true, force: true });
+    rmSync(STATIC_TMP, { force: true, recursive: true });
   });
 
   it("skips JS injection for fully static components", async () => {
@@ -1129,24 +1129,24 @@ describe("buildSite — component style template resolution with $props", () => 
   const STYLE_TMP = resolve(import.meta.dir, "__test-site-comp-style__");
 
   beforeAll(() => {
-    rmSync(STYLE_TMP, { recursive: true, force: true });
+    rmSync(STYLE_TMP, { force: true, recursive: true });
     mkdirSync(STYLE_TMP, { recursive: true });
     writeFileSync(
       resolve(STYLE_TMP, "project.json"),
-      JSON.stringify({ name: "Style Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Style Test" }),
       "utf8",
     );
     mkdirSync(resolve(STYLE_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(STYLE_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
         children: [
           {
-            tagName: "hero-banner",
             $props: { bgImage: "/images/hero.jpg" },
+            tagName: "hero-banner",
           },
         ],
+        title: "Home",
       }),
       "utf8",
     );
@@ -1154,20 +1154,20 @@ describe("buildSite — component style template resolution with $props", () => 
     writeFileSync(
       resolve(STYLE_TMP, "components/hero-banner.json"),
       JSON.stringify({
-        tagName: "hero-banner",
+        children: [{ children: ["Hero"], tagName: "div" }],
         state: { bgImage: { default: "/default.jpg" } },
         style: {
-          display: "block",
           backgroundImage: "url(${state.bgImage})",
+          display: "block",
         },
-        children: [{ tagName: "div", children: ["Hero"] }],
+        tagName: "hero-banner",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(STYLE_TMP, { recursive: true, force: true });
+    rmSync(STYLE_TMP, { force: true, recursive: true });
   });
 
   it("resolves template strings in component host styles using $props", async () => {
@@ -1186,11 +1186,11 @@ describe("buildSite — route compilation errors", () => {
   const ROUTE_ERR_TMP = resolve(import.meta.dir, "__test-site-route-err__");
 
   beforeAll(() => {
-    rmSync(ROUTE_ERR_TMP, { recursive: true, force: true });
+    rmSync(ROUTE_ERR_TMP, { force: true, recursive: true });
     mkdirSync(ROUTE_ERR_TMP, { recursive: true });
     writeFileSync(
       resolve(ROUTE_ERR_TMP, "project.json"),
-      JSON.stringify({ name: "Route Err Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Route Err Test" }),
       "utf8",
     );
     mkdirSync(resolve(ROUTE_ERR_TMP, "pages"), { recursive: true });
@@ -1199,15 +1199,15 @@ describe("buildSite — route compilation errors", () => {
     writeFileSync(
       resolve(ROUTE_ERR_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["OK"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["OK"] }],
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(ROUTE_ERR_TMP, { recursive: true, force: true });
+    rmSync(ROUTE_ERR_TMP, { force: true, recursive: true });
   });
 
   it("captures route compilation errors and continues building", async () => {
@@ -1225,14 +1225,14 @@ describe("buildSite — dynamic routes with content types", () => {
   const DYN_TMP = resolve(import.meta.dir, "__test-site-dynamic__");
 
   beforeAll(() => {
-    rmSync(DYN_TMP, { recursive: true, force: true });
+    rmSync(DYN_TMP, { force: true, recursive: true });
     mkdirSync(DYN_TMP, { recursive: true });
     writeFileSync(
       resolve(DYN_TMP, "project.json"),
       JSON.stringify({
-        name: "Dynamic Test",
         build: { outDir: "./dist" },
-        contentTypes: { posts: { source: "./content/posts/", format: "json" } },
+        contentTypes: { posts: { format: "json", source: "./content/posts/" } },
+        name: "Dynamic Test",
       }),
       "utf8",
     );
@@ -1240,21 +1240,21 @@ describe("buildSite — dynamic routes with content types", () => {
     writeFileSync(
       resolve(DYN_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Home"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Home"] }],
       }),
       "utf8",
     );
     writeFileSync(
       resolve(DYN_TMP, "pages/blog/[slug].json"),
       JSON.stringify({
-        title: "Blog Post",
         $paths: {
           contentType: "posts",
-          param: "slug",
           field: "slug",
+          param: "slug",
         },
-        children: [{ tagName: "h1", children: ["Post"] }],
+        children: [{ children: ["Post"], tagName: "h1" }],
+        title: "Blog Post",
       }),
       "utf8",
     );
@@ -1272,7 +1272,7 @@ describe("buildSite — dynamic routes with content types", () => {
   });
 
   afterAll(() => {
-    rmSync(DYN_TMP, { recursive: true, force: true });
+    rmSync(DYN_TMP, { force: true, recursive: true });
   });
 
   it("expands dynamic routes from content types", async () => {
@@ -1291,14 +1291,14 @@ describe("buildSite — image optimization cache logging", () => {
   const IMG_TMP = resolve(import.meta.dir, "__test-site-img-log__");
 
   beforeAll(() => {
-    rmSync(IMG_TMP, { recursive: true, force: true });
+    rmSync(IMG_TMP, { force: true, recursive: true });
     mkdirSync(IMG_TMP, { recursive: true });
     writeFileSync(
       resolve(IMG_TMP, "project.json"),
       JSON.stringify({
-        name: "Img Test",
         build: { outDir: "./dist" },
         images: { optimize: true },
+        name: "Img Test",
       }),
       "utf8",
     );
@@ -1306,8 +1306,8 @@ describe("buildSite — image optimization cache logging", () => {
     writeFileSync(
       resolve(IMG_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
@@ -1316,15 +1316,15 @@ describe("buildSite — image optimization cache logging", () => {
     writeFileSync(
       resolve(IMG_TMP, ".cache/images/manifest.json"),
       JSON.stringify({
-        version: 1,
         entries: { "test.jpg": { hash: "abc", outputs: ["test.webp"] } },
+        version: 1,
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(IMG_TMP, { recursive: true, force: true });
+    rmSync(IMG_TMP, { force: true, recursive: true });
   });
 
   it("logs and saves image cache when optimize is enabled", async () => {
@@ -1341,19 +1341,19 @@ describe("buildSite — markdown component file", () => {
   const MD_COMP_TMP = resolve(import.meta.dir, "__test-site-md-comp__");
 
   beforeAll(() => {
-    rmSync(MD_COMP_TMP, { recursive: true, force: true });
+    rmSync(MD_COMP_TMP, { force: true, recursive: true });
     mkdirSync(MD_COMP_TMP, { recursive: true });
     writeFileSync(
       resolve(MD_COMP_TMP, "project.json"),
-      JSON.stringify({ name: "MD Comp Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "MD Comp Test" }),
       "utf8",
     );
     mkdirSync(resolve(MD_COMP_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(MD_COMP_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Hi"], tagName: "p" }],
         title: "Home",
-        children: [{ tagName: "p", children: ["Hi"] }],
       }),
       "utf8",
     );
@@ -1373,7 +1373,7 @@ This is a note.
   });
 
   afterAll(() => {
-    rmSync(MD_COMP_TMP, { recursive: true, force: true });
+    rmSync(MD_COMP_TMP, { force: true, recursive: true });
   });
 
   it("compiles .md component files using transpileJxMarkdown", async () => {
@@ -1391,40 +1391,40 @@ describe("buildSite — resolveDocTemplates with dynamic children", () => {
   const DOC_TMP = resolve(import.meta.dir, "__test-site-doc-tpl__");
 
   beforeAll(() => {
-    rmSync(DOC_TMP, { recursive: true, force: true });
+    rmSync(DOC_TMP, { force: true, recursive: true });
     mkdirSync(DOC_TMP, { recursive: true });
     writeFileSync(
       resolve(DOC_TMP, "project.json"),
-      JSON.stringify({ name: "Doc TPL Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Doc TPL Test" }),
       "utf8",
     );
     mkdirSync(resolve(DOC_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(DOC_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
+        children: [
+          { innerHTML: "${state.greeting}", tagName: "h1" },
+          { children: "${state.items}", tagName: "ul" },
+          { children: ["Before:", "${state.items}"], tagName: "div" },
+        ],
         state: {
+          greeting: { default: "Hello World", timing: "compiler" },
           items: {
             default: [
-              { tagName: "li", children: ["Item 1"] },
-              { tagName: "li", children: ["Item 2"] },
+              { children: ["Item 1"], tagName: "li" },
+              { children: ["Item 2"], tagName: "li" },
             ],
             timing: "compiler",
           },
-          greeting: { default: "Hello World", timing: "compiler" },
         },
-        children: [
-          { tagName: "h1", innerHTML: "${state.greeting}" },
-          { tagName: "ul", children: "${state.items}" },
-          { tagName: "div", children: ["Before:", "${state.items}"] },
-        ],
+        title: "Home",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(DOC_TMP, { recursive: true, force: true });
+    rmSync(DOC_TMP, { force: true, recursive: true });
   });
 
   it("resolves children template string to array and innerHTML templates", async () => {
@@ -1443,24 +1443,24 @@ describe("buildSite — component slot content expansion", () => {
   const SLOT_TMP = resolve(import.meta.dir, "__test-site-comp-slot__");
 
   beforeAll(() => {
-    rmSync(SLOT_TMP, { recursive: true, force: true });
+    rmSync(SLOT_TMP, { force: true, recursive: true });
     mkdirSync(SLOT_TMP, { recursive: true });
     writeFileSync(
       resolve(SLOT_TMP, "project.json"),
-      JSON.stringify({ name: "Slot Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Slot Test" }),
       "utf8",
     );
     mkdirSync(resolve(SLOT_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(SLOT_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
         children: [
           {
+            children: [{ children: ["Slotted Content"], tagName: "p" }],
             tagName: "my-wrapper",
-            children: [{ tagName: "p", children: ["Slotted Content"] }],
           },
         ],
+        title: "Home",
       }),
       "utf8",
     );
@@ -1468,22 +1468,22 @@ describe("buildSite — component slot content expansion", () => {
     writeFileSync(
       resolve(SLOT_TMP, "components/my-wrapper.json"),
       JSON.stringify({
-        tagName: "my-wrapper",
-        style: { display: "block", border: "1px solid #ccc" },
         children: [
           {
-            tagName: "div",
             attributes: { class: "wrapper" },
             children: [{ tagName: "slot" }],
+            tagName: "div",
           },
         ],
+        style: { border: "1px solid #ccc", display: "block" },
+        tagName: "my-wrapper",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(SLOT_TMP, { recursive: true, force: true });
+    rmSync(SLOT_TMP, { force: true, recursive: true });
   });
 
   it("pre-renders component with slotted content from page", async () => {
@@ -1500,39 +1500,39 @@ describe("buildSite — $head textContent template resolution", () => {
   const HC_TMP = resolve(import.meta.dir, "__test-site-head-tc__");
 
   beforeAll(() => {
-    rmSync(HC_TMP, { recursive: true, force: true });
+    rmSync(HC_TMP, { force: true, recursive: true });
     mkdirSync(HC_TMP, { recursive: true });
     writeFileSync(
       resolve(HC_TMP, "project.json"),
-      JSON.stringify({ name: "Head TC Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Head TC Test" }),
       "utf8",
     );
     mkdirSync(resolve(HC_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(HC_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
+        $head: [
+          {
+            attributes: { type: "application/ld+json" },
+            tagName: "script",
+            textContent: "${state.jsonLd}",
+          },
+        ],
+        children: [{ children: ["Hi"], tagName: "p" }],
         state: {
           jsonLd: {
             default: '{"@context":"https://schema.org"}',
             timing: "compiler",
           },
         },
-        $head: [
-          {
-            tagName: "script",
-            attributes: { type: "application/ld+json" },
-            textContent: "${state.jsonLd}",
-          },
-        ],
-        children: [{ tagName: "p", children: ["Hi"] }],
+        title: "Home",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(HC_TMP, { recursive: true, force: true });
+    rmSync(HC_TMP, { force: true, recursive: true });
   });
 
   it("resolves textContent template in $head entries", async () => {
@@ -1547,14 +1547,14 @@ describe("buildSite — lang attribute handling", () => {
   const LANG_TMP = resolve(import.meta.dir, "__test-site-lang__");
 
   beforeAll(() => {
-    rmSync(LANG_TMP, { recursive: true, force: true });
+    rmSync(LANG_TMP, { force: true, recursive: true });
     mkdirSync(LANG_TMP, { recursive: true });
     writeFileSync(
       resolve(LANG_TMP, "project.json"),
       JSON.stringify({
-        name: "Lang Test",
         build: { outDir: "./dist" },
         defaults: { lang: "fr" },
+        name: "Lang Test",
       }),
       "utf8",
     );
@@ -1562,15 +1562,15 @@ describe("buildSite — lang attribute handling", () => {
     writeFileSync(
       resolve(LANG_TMP, "pages/index.json"),
       JSON.stringify({
+        children: [{ children: ["Bonjour"], tagName: "p" }],
         title: "Accueil",
-        children: [{ tagName: "p", children: ["Bonjour"] }],
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(LANG_TMP, { recursive: true, force: true });
+    rmSync(LANG_TMP, { force: true, recursive: true });
   });
 
   it("sets the lang attribute on the html element", async () => {
@@ -1587,26 +1587,26 @@ describe("buildSite — server handler without adapter", () => {
   const SH_TMP = resolve(import.meta.dir, "__test-site-server-handler__");
 
   beforeAll(() => {
-    rmSync(SH_TMP, { recursive: true, force: true });
+    rmSync(SH_TMP, { force: true, recursive: true });
     mkdirSync(SH_TMP, { recursive: true });
     writeFileSync(
       resolve(SH_TMP, "project.json"),
-      JSON.stringify({ name: "SH Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "SH Test" }),
       "utf8",
     );
     mkdirSync(resolve(SH_TMP, "pages"), { recursive: true });
     writeFileSync(
       resolve(SH_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
+        children: [{ children: ["Data Page"], tagName: "p" }],
         state: {
           loadData: {
-            timing: "server",
-            $src: "./api.server.js",
             $export: "loadData",
+            $src: "./api.server.js",
+            timing: "server",
           },
         },
-        children: [{ tagName: "p", children: ["Data Page"] }],
+        title: "Home",
       }),
       "utf8",
     );
@@ -1618,7 +1618,7 @@ describe("buildSite — server handler without adapter", () => {
   });
 
   afterAll(() => {
-    rmSync(SH_TMP, { recursive: true, force: true });
+    rmSync(SH_TMP, { force: true, recursive: true });
   });
 
   it("generates _server.js alongside page HTML when no adapter", async () => {
@@ -1635,11 +1635,11 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
   const ARR_TMP = resolve(import.meta.dir, "__test-site-arr-expand__");
 
   beforeAll(() => {
-    rmSync(ARR_TMP, { recursive: true, force: true });
+    rmSync(ARR_TMP, { force: true, recursive: true });
     mkdirSync(ARR_TMP, { recursive: true });
     writeFileSync(
       resolve(ARR_TMP, "project.json"),
-      JSON.stringify({ name: "Arr Test", build: { outDir: "./dist" } }),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Arr Test" }),
       "utf8",
     );
     mkdirSync(resolve(ARR_TMP, "pages"), { recursive: true });
@@ -1647,20 +1647,20 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
     writeFileSync(
       resolve(ARR_TMP, "layouts/main.json"),
       JSON.stringify({
-        tagName: "div",
         children: [
-          { tagName: "nav", children: [{ tagName: "a-card" }] },
-          { tagName: "main", children: [{ tagName: "slot" }] },
+          { children: [{ tagName: "a-card" }], tagName: "nav" },
+          { children: [{ tagName: "slot" }], tagName: "main" },
         ],
+        tagName: "div",
       }),
       "utf8",
     );
     writeFileSync(
       resolve(ARR_TMP, "pages/index.json"),
       JSON.stringify({
-        title: "Home",
         $layout: "./layouts/main.json",
         children: [{ tagName: "a-card" }, { tagName: "a-card" }],
+        title: "Home",
       }),
       "utf8",
     );
@@ -1668,16 +1668,16 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
     writeFileSync(
       resolve(ARR_TMP, "components/a-card.json"),
       JSON.stringify({
-        tagName: "a-card",
+        children: [{ children: ["Card Content"], tagName: "div" }],
         style: { display: "block" },
-        children: [{ tagName: "div", children: ["Card Content"] }],
+        tagName: "a-card",
       }),
       "utf8",
     );
   });
 
   afterAll(() => {
-    rmSync(ARR_TMP, { recursive: true, force: true });
+    rmSync(ARR_TMP, { force: true, recursive: true });
   });
 
   it("expands component instances in multiple positions in the tree", async () => {

@@ -1,11 +1,12 @@
 /** OXC code services (server-backed) */
 
 import { getPlatform } from "../platform";
+import { isJsonObject, paramNames } from "@jxsuite/schema/guards";
 import { projectState } from "../state";
 import { getNodeAtPath } from "../store";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import type { JxPath } from "../state";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxFunctionDef, JxMutableNode } from "@jxsuite/schema/types";
 
 export interface OxLintDiagnostic {
   severity: string;
@@ -22,7 +23,9 @@ export interface OxLintDiagnostic {
  */
 export async function codeService(action: string, payload: unknown) {
   const platform = getPlatform();
-  if (!platform.codeService) return null;
+  if (!platform.codeService) {
+    return null;
+  }
   return platform.codeService(action, payload);
 }
 
@@ -33,7 +36,9 @@ export async function codeService(action: string, payload: unknown) {
  */
 export async function locateDocument(name: string) {
   const platform = getPlatform();
-  if (!platform.locateFile) return null;
+  if (!platform.locateFile) {
+    return null;
+  }
   return platform.locateFile(name);
 }
 
@@ -55,9 +60,13 @@ export async function fetchPluginSchema(
     ? projectState?.projectConfig?.imports?.[def.$prototype]
     : null;
   const src = def.$src || importedPath;
-  if (!src || !def.$prototype) return null;
+  if (!src || !def.$prototype) {
+    return null;
+  }
   const cacheKey = `${src}::${def.$prototype}`;
-  if (pluginSchemaCache.has(cacheKey)) return pluginSchemaCache.get(cacheKey);
+  if (pluginSchemaCache.has(cacheKey)) {
+    return pluginSchemaCache.get(cacheKey);
+  }
 
   try {
     const platform = getPlatform();
@@ -85,22 +94,26 @@ export function setLintMarkers(
   diagnostics: OxLintDiagnostic[],
 ) {
   const model = editor.getModel();
-  if (!model) return;
+  if (!model) {
+    return;
+  }
   const markers = diagnostics
     .map((d) => {
       const label = d.labels?.[0];
-      if (!label) return null;
+      if (!label) {
+        return null;
+      }
       const { line, column, length } = label.span;
       return {
+        code: d.url ? { target: monaco.Uri.parse(d.url), value: d.code } : d.code,
+        endColumn: column + (length || 1),
+        endLineNumber: line,
+        message: d.message + (d.help ? `\n${d.help}` : ""),
         severity:
           d.severity === "error" ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-        message: d.message + (d.help ? `\n${d.help}` : ""),
-        startLineNumber: line,
-        startColumn: column,
-        endLineNumber: line,
-        endColumn: column + (length || 1),
-        code: d.url ? { value: d.code, target: monaco.Uri.parse(d.url) } : d.code,
         source: "oxlint",
+        startColumn: column,
+        startLineNumber: line,
       };
     })
     .filter(Boolean);
@@ -118,15 +131,32 @@ export function setLintMarkers(
 export function getFunctionArgs(
   editing: { type: string; defName?: string; path?: JxPath; eventKey?: string },
   document: JxMutableNode | null | undefined,
-) {
+): string[] {
+  // Read parameters off any object-shaped def (covers legacy entries without $prototype).
+  const fromDef = (def: unknown): string[] | null => {
+    if (!isJsonObject(def)) {
+      return null;
+    }
+    const params = def.parameters;
+    if (!Array.isArray(params) || params.length === 0) {
+      return null;
+    }
+    return paramNames(params as JxFunctionDef["parameters"]);
+  };
   if (editing.type === "def") {
-    const defName = editing.defName;
-    return (defName && document?.state?.[defName]?.parameters) || ["state", "event"];
+    const args = editing.defName ? fromDef(document?.state?.[editing.defName]) : null;
+    if (args) {
+      return args;
+    }
   } else if (editing.type === "event") {
-    if (!document || !editing.path) return ["state", "event"];
+    if (!document || !editing.path) {
+      return ["state", "event"];
+    }
     const node = getNodeAtPath(document, editing.path);
-    const eventKey = editing.eventKey;
-    return (eventKey && node?.[eventKey]?.parameters) || ["state", "event"];
+    const args = node && editing.eventKey ? fromDef(node[editing.eventKey]) : null;
+    if (args) {
+      return args;
+    }
   }
   return ["state", "event"];
 }

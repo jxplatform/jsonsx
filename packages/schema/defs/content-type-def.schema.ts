@@ -1,12 +1,20 @@
 export const contentTypeDefSchema = {
   description:
     "Content type definition. Defines the source directory, frontmatter schema, and element dependencies.",
-  type: "object",
   properties: {
-    source: {
-      description: "Path to the content directory relative to the project root.",
-      type: "string",
-      examples: ["./content/blog/", "./content/docs/"],
+    $elements: {
+      description: "Custom elements available in markdown directives for this content type.",
+      items: {
+        oneOf: [
+          {
+            properties: { $ref: { type: "string" } },
+            required: ["$ref"],
+            type: "object",
+          },
+          { type: "string" },
+        ],
+      },
+      type: "array",
     },
     format: {
       description:
@@ -19,19 +27,11 @@ export const contentTypeDefSchema = {
       description: "JSON Schema for validating frontmatter of content type entries.",
       type: "object",
     },
-    $elements: {
-      description: "Custom elements available in markdown directives for this content type.",
-      type: "array",
-      items: {
-        oneOf: [
-          {
-            type: "object",
-            required: ["$ref"],
-            properties: { $ref: { type: "string" } },
-          },
-          { type: "string" },
-        ],
-      },
+    source: {
+      description: "Path to the content directory relative to the project root.",
+      examples: ["./content/blog/", "./content/docs/"],
+      type: "string",
     },
   },
+  type: "object",
 } as const;
