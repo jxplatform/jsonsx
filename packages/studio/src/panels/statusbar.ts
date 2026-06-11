@@ -5,6 +5,7 @@ import { getNodeAtPath, nodeLabel, renderOnly, statusbarEl, updateSession } from
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
+import type { EffectScope } from "@vue/reactivity";
 
 // ─── Module state ────────────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ let statusMsg = "";
 /** @type {ReturnType<typeof setTimeout> | undefined} */
 let statusTimeout: ReturnType<typeof setTimeout> | undefined;
 let _rerender: (() => void) | null = null;
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 /**
  * Register the callback used to re-render the statusbar. Called once from studio.js during init.
@@ -119,7 +120,7 @@ function _onStatusbarClick(e: Event) {
  * @param {string} msg
  * @param {number} [duration]
  */
-export function statusMessage(msg: string, duration: number = 3000) {
+export function statusMessage(msg: string, duration = 3000) {
   statusMsg = msg;
   _rerender?.();
   clearTimeout(statusTimeout);

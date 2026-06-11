@@ -30,7 +30,8 @@ import { existsSync, readFileSync } from "node:fs";
  * @param {string} urlPath - URL pathname (e.g. "/pages/@jxsuite/parser/Foo.class.json")
  * @returns {string | null} Absolute file path or null
  */
-function resolveNpmPath(root: string, urlPath: string) {
+function resolveNpmPath(rootDir: string, urlPath: string) {
+  let root = rootDir;
   let segments = urlPath.split("/").filter(Boolean);
 
   // If "node_modules" appears in the path, use everything before it as a subdirectory
@@ -55,8 +56,8 @@ function resolveNpmPath(root: string, urlPath: string) {
     }
   }
 
-  let pkgDir: string = "";
-  let subpath: string = "";
+  let pkgDir = "";
+  let subpath = "";
 
   if (isScoped) {
     if (start < 0 || start + 1 >= segments.length) {

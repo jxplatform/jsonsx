@@ -55,7 +55,7 @@ beforeAll(async () => {
     output += decoder.decode(value, { stream: true });
     const portMatch = output.match(/port=(\d+)/);
     if (portMatch) {
-      serverPort = Number.parseInt(portMatch[1]);
+      serverPort = Number.parseInt(portMatch[1], 10);
       break;
     }
   }

@@ -205,4 +205,4 @@ async function main() {
   console.log(`Written → studio/webdata.json (${(json.length / 1024).toFixed(1)} KB)`);
 }
 
-main();
+await main();

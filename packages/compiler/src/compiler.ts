@@ -34,6 +34,7 @@ import { compileClient } from "./targets/compile-client.ts";
 import { isClassDef } from "@jxsuite/schema/guards";
 import { parseJxDocument } from "@jxsuite/schema/parse";
 import type { JxDocument, JxStyle } from "@jxsuite/schema/types";
+import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 
 // Re-exports for consumers
 export {
@@ -52,7 +53,7 @@ export interface CompileOptions {
   reactivitySrc?: string;
   litHtmlSrc?: string;
   projectStyle?: JxStyle | null;
-  formats?: import("@jxsuite/schema/format-registry").FormatRegistry;
+  formats?: FormatRegistry;
   [key: string]: unknown;
 }
 

@@ -1,11 +1,11 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
+import { describe, test, expect } from "bun:test";
+import { isSignal } from "../src/runtime";
+
 try {
   GlobalRegistrator.register();
 } catch {}
-
-import { describe, test, expect } from "bun:test";
-import { isSignal } from "../src/runtime";
 
 describe("sanity", () => {
   test("import works", () => {

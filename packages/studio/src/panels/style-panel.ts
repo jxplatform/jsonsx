@@ -53,7 +53,7 @@ type CssPropertyEntry = Record<string, unknown>;
 type StyleMutateFn = (
   t: Tab,
   prop: string,
-  val: string | Record<string, unknown> | undefined,
+  val?: string | Record<string, unknown> | undefined,
 ) => void;
 
 /**
@@ -242,7 +242,7 @@ function renderShorthandRow(
                   inferInputType(lEntry),
                   lEntry,
                   name,
-                  lVal,
+                  lVal as string,
                   (newVal: string) => {
                     const vals = longhands.map((l: CssLonghand, i: number) =>
                       i === idx
@@ -316,7 +316,7 @@ function styleSidebarTemplate(
 
   // ── Selector dropdown ──────────────────────────────────────────────────────
   const contextStyle = mediaTab ? (style[`@${mediaTab}`] as Record<string, unknown>) || {} : style;
-  const existingSelectors = Object.keys(contextStyle).filter(isNestedSelector);
+  const existingSelectors = Object.keys(contextStyle).filter((s) => isNestedSelector(s));
   const existingSet = new Set(existingSelectors);
   const commonSet = new Set(COMMON_SELECTORS);
   const extraSelectors = existingSelectors.filter((s) => !commonSet.has(s));
@@ -427,7 +427,6 @@ function styleSidebarTemplate(
 
   // ── Determine the active style object ──────────────────────────────────────
   let activeStyle: JxStyle;
-  let commitStyle: (prop: string, val: string | Record<string, unknown> | undefined) => void;
   let commitMutate: StyleMutateFn;
   if (activeSelector && isTagPath(activeSelector) && mediaTab && mediaNames.length > 0) {
     const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
@@ -442,15 +441,11 @@ function styleSidebarTemplate(
         prop,
         val as string | undefined,
       );
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && isTagPath(activeSelector)) {
     activeStyle = resolveNestedTagStyle(style, activeSelector);
     const stylePath = activeSelector.split(" ");
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateNestedStylePath(t, sel, stylePath, prop, val as string | undefined);
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector && mediaTab && mediaNames.length > 0) {
     const mediaObj = getNestedStyle(style, `@${mediaTab}`) ?? {};
     activeStyle = getNestedStyle(mediaObj, activeSelector) ?? {};
@@ -463,37 +458,27 @@ function styleSidebarTemplate(
         prop,
         val as string | undefined,
       );
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else if (activeSelector) {
     activeStyle = getNestedStyle(style, activeSelector) ?? {};
     commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
       mutateUpdateNestedStyle(t, sel, activeSelector, prop, val as string | undefined);
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
-  } else if (mediaTab !== null && mediaNames.length > 0) {
-    activeStyle = {};
-    for (const [p, v] of Object.entries(getNestedStyle(style, `@${mediaTab}`) ?? {})) {
-      if (typeof v !== "object") {
-        activeStyle[p] = v;
-      }
-    }
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateMediaStyle(t, sel, mediaTab, prop, val as string | undefined);
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
   } else {
     activeStyle = {};
-    for (const [p, v] of Object.entries(style)) {
+    const inMediaTab = mediaTab !== null && mediaNames.length > 0;
+    const flatSource = inMediaTab ? (getNestedStyle(style, `@${mediaTab}`) ?? {}) : style;
+    for (const [p, v] of Object.entries(flatSource)) {
       if (typeof v !== "object") {
         activeStyle[p] = v;
       }
     }
-    commitMutate = (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
-      mutateUpdateStyle(t, sel, prop, val as string | undefined);
-    commitStyle = (prop: string, val: string | Record<string, unknown> | undefined) =>
-      transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
+    commitMutate = inMediaTab
+      ? (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
+          mutateUpdateMediaStyle(t, sel, mediaTab, prop, val as string | undefined)
+      : (t: Tab, prop: string, val: string | Record<string, unknown> | undefined) =>
+          mutateUpdateStyle(t, sel, prop, val as string | undefined);
   }
+  const commitStyle = (prop: string, val?: string | Record<string, unknown> | undefined) =>
+    transactDoc(activeTab.value, (t) => commitMutate(t, prop, val));
 
   // ── Compute inherited style from higher breakpoints ──────────────────────
   const inheritedStyle: Record<string, string | number> = computeInheritedStyle(
@@ -838,6 +823,7 @@ function styleSidebarTemplate(
               <button
                 style="padding:6px 10px;background:none;border:1px dashed var(--spectrum-gray-400, #333);border-radius:4px;color:var(--spectrum-gray-700, #a1a1aa);font-size:12px;cursor:pointer"
                 @click=${() => {
+                  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
                   const name = prompt("Selector name (e.g. th, :hover, .active):");
                   if (name && name.trim()) {
                     commitStyle(name.trim(), {});

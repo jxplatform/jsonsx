@@ -21,7 +21,8 @@ export function createDesktopPlatform() {
     maxRequestTime: 300_000,
   });
 
-  new Electroview({ rpc });
+  const electroview = new Electroview({ rpc });
+  void electroview;
 
   const originalFetch = window.fetch.bind(window);
   (window as unknown as Record<string, unknown>).fetch = async (
@@ -53,10 +54,13 @@ export function createDesktopPlatform() {
           status,
         });
       } catch (error) {
-        return new Response(JSON.stringify({ error: String(error) }), {
-          headers: { "content-type": "application/json" },
-          status: 500,
-        });
+        return Response.json(
+          { error: String(error) },
+          {
+            headers: { "content-type": "application/json" },
+            status: 500,
+          },
+        );
       }
     }
 
@@ -141,7 +145,7 @@ export function createDesktopPlatform() {
     if (!match) {
       return;
     }
-    const val = match[1];
+    const [, val] = match;
     if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) {
       return;
     }

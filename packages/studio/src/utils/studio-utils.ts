@@ -266,3 +266,13 @@ export function parseCemType(typeText: string | undefined | null) {
   }
   return { kind: "text" };
 }
+
+/**
+ * Clone a (possibly reactive) document tree via JSON round-trip. Unlike structuredClone, this works
+ * on Vue reactive proxies and JSON-normalizes the tree (drops undefined values and functions) —
+ * both required for document snapshots and clipboard payloads.
+ */
+export function jsonClone<T>(value: T): T {
+  // oxlint-disable-next-line unicorn/prefer-structured-clone -- structuredClone throws on reactive proxies; JSON normalization is the point
+  return JSON.parse(JSON.stringify(value)) as T;
+}

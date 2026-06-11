@@ -121,7 +121,7 @@ export function computeDocumentDiff(
   const walk = (
     origNode: JxMutableNode | undefined,
     currNode: JxMutableNode | undefined,
-    path: string = "",
+    path = "",
   ) => {
     const pathKey = path || "/";
     allPaths.add(pathKey);
@@ -164,7 +164,6 @@ export function computeDocumentDiff(
         const childPath = pathKey === "/" ? `children/${i}` : `${pathKey}/children/${i}`;
         markRecursive(children[i], "removed", childPath, diffMap, allPaths);
       }
-      return;
     }
   };
 
@@ -194,7 +193,10 @@ export function computeDocumentDiff(
   };
 
   // Propagate upwards until no more changes
-  while (propagateModified()) {}
+  let propagating = true;
+  while (propagating) {
+    propagating = propagateModified();
+  }
 
   return { allPaths, byPath: diffMap };
 }
@@ -205,9 +207,10 @@ export function computeDocumentDiff(
  * @param {HTMLElement} canvas
  */
 export function clearDiffHighlight(canvas: HTMLElement) {
-  canvas
-    .querySelectorAll(".element-diff-added, .element-diff-removed, .element-diff-modified")
-    .forEach((el: Element) => {
-      el.classList.remove("element-diff-added", "element-diff-removed", "element-diff-modified");
-    });
+  const marked = canvas.querySelectorAll(
+    ".element-diff-added, .element-diff-removed, .element-diff-modified",
+  );
+  for (const el of marked) {
+    el.classList.remove("element-diff-added", "element-diff-removed", "element-diff-modified");
+  }
 }

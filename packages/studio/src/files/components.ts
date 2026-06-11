@@ -35,7 +35,7 @@ export function computeRelativePath(fromDocPath: string | null, toCompPath: stri
   }
   const from = fromDocPath.replaceAll("\\", "/");
   const to = toCompPath.replaceAll("\\", "/");
-  const fromDir = from.substring(0, from.lastIndexOf("/"));
+  const fromDir = from.includes("/") ? from.slice(0, from.lastIndexOf("/")) : "";
   const fromParts = fromDir.split("/").filter(Boolean);
   const toParts = to.split("/").filter(Boolean);
   let common = 0;
@@ -44,7 +44,7 @@ export function computeRelativePath(fromDocPath: string | null, toCompPath: stri
     common < toParts.length &&
     fromParts[common] === toParts[common]
   ) {
-    common++;
+    common += 1;
   }
   const ups = fromParts.length - common;
   const remaining = toParts.slice(common);

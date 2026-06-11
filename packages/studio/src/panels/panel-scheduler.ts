@@ -35,15 +35,15 @@ export function isTextInput(el: Element | null): boolean {
 
 export interface PanelScheduler {
   /** Request a render. Coalesced; deferred while a text input in the panel is focused. */
-  schedule(): void;
+  schedule: () => void;
   /** True when a render would currently be deferred (text input focused or blockWhile()). */
-  isEditing(): boolean;
+  isEditing: () => boolean;
   /** Attach focusin/focusout listeners to the panel root. */
-  bindFocus(): void;
+  bindFocus: () => void;
   /** Detach listeners and cancel any pending frame. */
-  unbind(): void;
+  unbind: () => void;
   /** Render immediately, bypassing the rAF coalescing (still respects the focus guard). */
-  flushNow(): void;
+  flushNow: () => void;
 }
 
 /**

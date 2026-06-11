@@ -19,13 +19,7 @@ import { isColorPopoverOpen } from "../ui/color-selector";
 import { renderStylePanelTemplate } from "./style-panel";
 import { renderPropertiesPanelTemplate } from "./properties-panel";
 
-interface RightPanelCtx {
-  navigateToComponent: (path: string) => void;
-  getCanvasMode: () => string;
-  renderCanvas: () => void;
-  updateForcedPseudoPreview: () => void;
-}
-
+import type { EffectScope } from "@vue/reactivity";
 import {
   renderAiPanelTemplate,
   mountAiPanel,
@@ -33,9 +27,16 @@ import {
   registerRightPanelRender,
 } from "./ai-panel";
 
+interface RightPanelCtx {
+  navigateToComponent: (path: string) => void;
+  getCanvasMode: () => string;
+  renderCanvas: () => void;
+  updateForcedPseudoPreview: () => void;
+}
+
 let _ctx: RightPanelCtx | null = null;
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 let _scheduler: PanelScheduler | null = null;
 

@@ -32,6 +32,7 @@ import { renderComponentPreview } from "./stylebook-panel";
 import { defaultDef, unsafeTags } from "./shared";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { ComponentEntry } from "../files/components.js";
 
 interface DragCanDragArgs {
   element: HTMLElement;
@@ -59,11 +60,11 @@ export function registerLayersDnD() {
       return;
     }
 
-    (container.querySelectorAll("[data-dnd-row]") as NodeListOf<HTMLElement>).forEach((row) => {
+    for (const row of container.querySelectorAll("[data-dnd-row]") as NodeListOf<HTMLElement>) {
       const rowPath = (row.dataset.path as string)
         .split("/")
-        .map((s: string) => (/^\d+$/.test(s) ? Number.parseInt(s) : s)) as JxPath;
-      const rowDepth = Number.parseInt(row.dataset.dndDepth as string) || 0;
+        .map((s: string) => (/^\d+$/.test(s) ? Number.parseInt(s, 10) : s)) as JxPath;
+      const rowDepth = Number.parseInt(row.dataset.dndDepth as string, 10) || 0;
       const isVoid = Object.hasOwn(row.dataset, "dndVoid");
       const isExpanded = Object.hasOwn(row.dataset, "dndExpanded");
 
@@ -136,13 +137,13 @@ export function registerLayersDnD() {
         }),
       );
       view.dndCleanups.push(cleanup);
-    });
+    }
 
     // Global monitor
     const monitorCleanup = monitorForElements({
       onDrop({ source, location }: DragMonitorDropArgs) {
         clearLayerDropGap(container);
-        const target = location.current.dropTargets[0];
+        const [target] = location.current.dropTargets;
         if (!target) {
           return;
         }
@@ -163,7 +164,7 @@ export function registerLayersDnD() {
           const tab = activeTab.value;
           const newPath = tab?.session.selection;
           if (newPath) {
-            const collapsed = view._layersCollapsed || (view._layersCollapsed = new Set());
+            const collapsed = (view._layersCollapsed ||= new Set());
             collapsed.add(newPath.join("/"));
           }
         }
@@ -171,7 +172,7 @@ export function registerLayersDnD() {
       onDropTargetChange({ location }: DragMonitorDropArgs) {
         // Clear the layer gap when the drag moves onto a non-tree target (e.g. a canvas
         // Element). When there is no target at all, keep the gap so it persists.
-        const inner = location.current.dropTargets[0];
+        const [inner] = location.current.dropTargets;
         if (inner && !extractInstruction(inner.data)) {
           clearLayerDropGap(container);
         }
@@ -189,50 +190,48 @@ export function registerComponentsDnD() {
       return;
     }
 
-    (container.querySelectorAll("[data-component-tag]") as NodeListOf<HTMLElement>).forEach(
-      (row) => {
-        const tagName = row.dataset.componentTag;
-        if (!tagName) {
-          return;
-        }
-        const comp = componentRegistry.find(
-          (c: import("../files/components.js").ComponentEntry) => c.tagName === tagName,
-        );
-        if (!comp) {
-          return;
-        }
+    for (const row of container.querySelectorAll(
+      "[data-component-tag]",
+    ) as NodeListOf<HTMLElement>) {
+      const tagName = row.dataset.componentTag;
+      if (!tagName) {
+        continue;
+      }
+      const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tagName);
+      if (!comp) {
+        continue;
+      }
 
-        // Fill preview with live rendered component
-        const preview = row.querySelector(".element-card-preview");
-        if (preview && !preview.querySelector(tagName)) {
-          renderComponentPreview(comp).then((el: HTMLElement) => {
-            preview.textContent = "";
-            preview.append(el);
-          });
-        }
-
-        const instanceDef = {
-          $props: comp.props
-            ? Object.fromEntries(
-                comp.props.map(
-                  (/** @type {{ name: string; default?: unknown; [k: string]: unknown }} */ p) => [
-                    p.name,
-                    p.default !== undefined ? p.default : "",
-                  ],
-                ),
-              )
-            : {},
-          tagName: comp.tagName,
-        };
-        const cleanup = draggable({
-          element: row,
-          getInitialData() {
-            return { fragment: structuredClone(instanceDef), type: "block" };
-          },
+      // Fill preview with live rendered component
+      const preview = row.querySelector(".element-card-preview");
+      if (preview && !preview.querySelector(tagName)) {
+        renderComponentPreview(comp).then((el: HTMLElement) => {
+          preview.textContent = "";
+          preview.append(el);
         });
-        view.dndCleanups.push(cleanup);
-      },
-    );
+      }
+
+      const instanceDef = {
+        $props: comp.props
+          ? Object.fromEntries(
+              comp.props.map(
+                (/** @type {{ name: string; default?: unknown; [k: string]: unknown }} */ p) => [
+                  p.name,
+                  p.default !== undefined ? p.default : "",
+                ],
+              ),
+            )
+          : {},
+        tagName: comp.tagName,
+      };
+      const cleanup = draggable({
+        element: row,
+        getInitialData() {
+          return { fragment: structuredClone(instanceDef), type: "block" };
+        },
+      });
+      view.dndCleanups.push(cleanup);
+    }
   });
 }
 
@@ -243,7 +242,7 @@ export function registerElementsDnD() {
     if (!container) {
       return;
     }
-    (container.querySelectorAll("[data-block-tag]") as NodeListOf<HTMLElement>).forEach((row) => {
+    for (const row of container.querySelectorAll("[data-block-tag]") as NodeListOf<HTMLElement>) {
       const tag = row.dataset.blockTag as string;
       const preview = row.querySelector(".element-card-preview");
       if (preview && !preview.firstChild) {
@@ -259,7 +258,7 @@ export function registerElementsDnD() {
         },
       });
       view.dndCleanups.push(cleanup);
-    });
+    }
   });
 }
 
@@ -380,6 +379,9 @@ export function applyDropInstruction(
         transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetPath, len));
         break;
       }
+      default: {
+        break;
+      }
     }
   } else if (srcData.type === "block") {
     const targetParent = parentElementPath(targetPath) as JxPath;
@@ -419,15 +421,16 @@ export function applyDropInstruction(
         );
         break;
       }
+      default: {
+        break;
+      }
     }
 
     // Auto-import to $elements if the dropped block is a custom component
     const fragment = srcData.fragment as JxMutableNode | undefined;
     const tag = fragment?.tagName;
     if (tag && tag.includes("-")) {
-      const comp = componentRegistry.find(
-        (c: import("../files/components.js").ComponentEntry) => c.tagName === tag,
-      );
+      const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
       if (comp) {
         const tab = activeTab.value;
         const elements = tab?.doc.document?.$elements || [];
@@ -440,11 +443,11 @@ export function applyDropInstruction(
             (e: JxMutableNode | string | { $ref: string }) => e === specifier || e === comp.package,
           );
           if (!alreadyImported) {
-            transact(activeTab.value, (doc: JxMutableNode) => {
-              if (!doc.$elements) {
-                doc.$elements = [];
+            transact(activeTab.value, (d: JxMutableNode) => {
+              if (!d.$elements) {
+                d.$elements = [];
               }
-              doc.$elements.push(specifier);
+              d.$elements.push(specifier);
             });
           }
         } else {
@@ -459,11 +462,11 @@ export function applyDropInstruction(
           });
           if (!alreadyImported && comp.path) {
             const relPath = computeRelativePath(tab?.documentPath ?? null, comp.path);
-            transact(activeTab.value, (doc: JxMutableNode) => {
-              if (!doc.$elements) {
-                doc.$elements = [];
+            transact(activeTab.value, (d: JxMutableNode) => {
+              if (!d.$elements) {
+                d.$elements = [];
               }
-              doc.$elements.push({ $ref: relPath });
+              d.$elements.push({ $ref: relPath });
             });
           }
         }

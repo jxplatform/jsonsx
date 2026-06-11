@@ -23,18 +23,24 @@ import { renderLayersTemplate } from "./layers-panel";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
 import { renderElementsTemplate } from "./elements-panel";
 import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
+import type { renderImportsTemplate } from "./imports-panel";
+import type { renderSignalsTemplate } from "./signals-panel";
+import type { renderDataExplorerTemplate } from "./data-explorer";
+import type { renderHeadTemplate } from "./head-panel";
+import type { renderGitPanel } from "./git-panel";
+import type { EffectScope } from "@vue/reactivity";
 
 interface LeftPanelCtx {
   getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
   // Renderers injected from studio.ts (dependency inversion avoids circular imports);
   // Typed against their implementations so call sites stay checked.
-  renderImportsTemplate: typeof import("./imports-panel").renderImportsTemplate;
+  renderImportsTemplate: typeof renderImportsTemplate;
   renderFilesTemplate: () => TemplateResult;
-  renderSignalsTemplate: typeof import("./signals-panel").renderSignalsTemplate;
-  renderDataExplorerTemplate: typeof import("./data-explorer").renderDataExplorerTemplate;
-  renderHeadTemplate: typeof import("./head-panel").renderHeadTemplate;
-  renderGitPanel: typeof import("./git-panel").renderGitPanel;
+  renderSignalsTemplate: typeof renderSignalsTemplate;
+  renderDataExplorerTemplate: typeof renderDataExplorerTemplate;
+  renderHeadTemplate: typeof renderHeadTemplate;
+  renderGitPanel: typeof renderGitPanel;
   renderCanvas: () => void;
   defCategory: (def: unknown) => string;
   defBadgeLabel: (def: unknown) => string;
@@ -52,7 +58,7 @@ interface LeftPanelCtx {
 
 let _ctx: LeftPanelCtx | null = null;
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 let _scheduler: PanelScheduler | null = null;
 
@@ -114,8 +120,8 @@ function _doRender() {
       // @ts-expect-error — clear Lit's internal state to recover from marker corruption
       delete leftPanel["_$litPart$"];
       _render();
-    } catch (error) {
-      console.error("left-panel retry failed:", error);
+    } catch (retryError) {
+      console.error("left-panel retry failed:", retryError);
     }
   }
 
@@ -243,20 +249,20 @@ function _render() {
     content = ctx.renderHeadTemplate({
       applyMutation: isContent
         ? (fn: (doc: JxMutableNode) => void) => {
-            const tab = activeTab.value!;
-            const fm = (tab.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
-            const fmHead = fm.$head as JxHeadEntry[] | undefined;
+            const tabNow = activeTab.value!;
+            const fmNow = (tabNow.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
+            const fmHead = fmNow.$head as JxHeadEntry[] | undefined;
             const tmp: JxMutableNode = {
-              ...(typeof fm.title === "string" ? { title: fm.title } : {}),
+              ...(typeof fmNow.title === "string" ? { title: fmNow.title } : {}),
               ...(fmHead ? { $head: [...fmHead] } : {}),
             };
             fn(tmp);
-            if (tmp.title !== fm.title) {
-              mutateUpdateFrontmatter(tab, "title", tmp.title as JsonValue);
+            if (tmp.title !== fmNow.title) {
+              mutateUpdateFrontmatter(tabNow, "title", tmp.title as JsonValue);
             }
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
             // JxHeadEntry[] is JSON document content by construction.
-            mutateUpdateFrontmatter(tab, "$head", newHead as JsonValue);
+            mutateUpdateFrontmatter(tabNow, "$head", newHead as JsonValue);
             render();
           }
         : (fn: (doc: JxMutableNode) => void) => {

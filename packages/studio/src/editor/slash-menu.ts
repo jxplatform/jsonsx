@@ -232,7 +232,8 @@ function onFilterInput(e: Event) {
   requestAnimationFrame(() => {
     if (_filterEl && _filterEl !== document.activeElement) {
       _filterEl.focus();
-      _filterEl.selectionStart = _filterEl.selectionEnd = _filterEl.value.length;
+      _filterEl.selectionStart = _filterEl.value.length;
+      _filterEl.selectionEnd = _filterEl.value.length;
     }
   });
 }

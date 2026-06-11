@@ -12,8 +12,7 @@ import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { configHash, contentHash } from "./image-optimizer.ts";
 
-import type { ImageManifest } from "./image-optimizer.ts";
-import type { ImageConfig } from "./image-optimizer.ts";
+import type { ImageConfig, ImageManifest } from "./image-optimizer.ts";
 
 interface CacheEntry {
   source: string; // Relative path to source image
@@ -28,7 +27,7 @@ export interface CacheManifest {
 
 // ─── Cache directory resolution ──────────────────────────────────────────────
 
-let _npmCacheBase; // Undefined = not yet resolved
+let _npmCacheBase: string | null | undefined; // Undefined = not yet resolved
 
 /** Reset the memoized npm cache base so the next call re-evaluates. Tests only. */
 export function _testResetNpmCacheBase() {

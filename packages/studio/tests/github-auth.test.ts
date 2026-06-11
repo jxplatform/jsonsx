@@ -24,7 +24,7 @@ const originalFetch = globalThis.fetch;
 function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[]) {
   mockFetchResponses = [...responses];
   mockFetchCalls = [];
-  // @ts-expect-error
+  // @ts-expect-error -- minimal fetch mock does not implement the full fetch type
   globalThis.fetch = async (url: any, opts: any) => {
     mockFetchCalls.push({ opts, url: String(url) });
     const next = mockFetchResponses.shift();
@@ -106,7 +106,9 @@ describe("authenticateGithub", () => {
 
     const promise = authenticateGithub();
     // Wait for initial fetch + poll interval (1s) + token fetch
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => {
+      setTimeout(r, 1200);
+    });
     const result = await promise;
 
     expect(mockFetchCalls[0].url).toBe("https://github.com/login/device/code");
@@ -133,13 +135,15 @@ describe("authenticateGithub", () => {
 
     const promise = authenticateGithub();
     // 1st poll at 1s (authorization_pending), 2nd poll at 2s (success)
-    await new Promise((r) => setTimeout(r, 2200));
+    await new Promise((r) => {
+      setTimeout(r, 2200);
+    });
     const result = await promise;
 
     expect(result).toBe("ghp_polled");
     expect(mockFetchCalls.length).toBe(3);
 
-    const tokenCall = mockFetchCalls[1];
+    const [, tokenCall] = mockFetchCalls;
     expect(tokenCall.url).toBe("https://github.com/login/oauth/access_token");
     const tokenBody = JSON.parse(tokenCall.opts.body);
     expect(tokenBody.device_code).toBe("dc_456");
@@ -163,7 +167,9 @@ describe("authenticateGithub", () => {
 
     const promise = authenticateGithub();
     // 1st poll at 1s (slow_down), 2nd poll at 1+6=7s (interval+5)
-    await new Promise((r) => setTimeout(r, 7200));
+    await new Promise((r) => {
+      setTimeout(r, 7200);
+    });
     const result = await promise;
 
     expect(result).toBe("ghp_slow");
@@ -184,7 +190,9 @@ describe("authenticateGithub", () => {
     ]);
 
     const promise = authenticateGithub();
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => {
+      setTimeout(r, 1200);
+    });
     const result = await promise;
     expect(result).toBeNull();
   });

@@ -524,7 +524,7 @@ if (process.argv[1] && process.argv[1].endsWith("schema.ts")) {
   const projectStr = JSON.stringify(projectSchema, null, 2);
   const classStr = JSON.stringify(classSchema, null, 2);
 
-  const [, , out] = process.argv;
+  const [out] = process.argv.slice(2);
 
   if (out) {
     writeFileSync(out, componentStr, "utf8");

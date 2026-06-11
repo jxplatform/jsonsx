@@ -16,7 +16,7 @@ const NON_GIT_FIXTURE = resolve("/tmp", `_jx_non_git_fixture_${process.pid}`);
  */
 async function studioGitReq(
   path: string,
-  method: string = "GET",
+  method = "GET",
   body?: Record<string, unknown>,
   cwd: string = GIT_FIXTURE,
 ) {

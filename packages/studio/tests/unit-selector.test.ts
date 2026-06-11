@@ -1,7 +1,6 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { render } from "lit-html";
-import { html } from "lit-html";
+import { html, render } from "lit-html";
 import { UNIT_RE, renderUnitSelector } from "../src/ui/unit-selector";
 import { cancelStyleDebounce } from "../src/store";
 
@@ -13,12 +12,7 @@ const SIZE_ENTRY = {
 // Entry with no units (unitless property)
 const UNITLESS_ENTRY = { $keywords: [], $units: [] };
 
-function mount(
-  value: string | number | undefined,
-  placeholder = "",
-  entry = SIZE_ENTRY,
-  prop = "height",
-) {
+function mount(value?: string | number, placeholder = "", entry = SIZE_ENTRY, prop = "height") {
   const commits: string[] = [];
   const container = document.createElement("div");
   render(
@@ -203,7 +197,9 @@ describe("renderUnitSelector — @change cancels pending @input debounce", () =>
     dispatch(tf, "change", "500");
 
     // Wait past the debounce window
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
 
     // Should have committed exactly once (from @change), not twice
     expect(commits).toEqual(["500px"]);
@@ -218,7 +214,9 @@ describe("renderUnitSelector — @change cancels pending @input debounce", () =>
     handler(new Event("input"));
     // Immediately cancel
     cancelStyleDebounce("manual-cancel-test");
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
     expect(fired).toHaveLength(0);
   });
 });
@@ -229,7 +227,9 @@ describe("renderUnitSelector — @input debounce", () => {
   test("input event with numeric value debounces and commits with unit after delay", async () => {
     const { tf, commits } = mount("");
     dispatch(tf, "input", "200");
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
     expect(commits).toEqual(["200px"]);
   });
 
@@ -238,14 +238,18 @@ describe("renderUnitSelector — @input debounce", () => {
     dispatch(tf, "input", "1");
     dispatch(tf, "input", "10");
     dispatch(tf, "input", "100");
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
     expect(commits).toEqual(["100px"]);
   });
 
   test("input event with empty value debounces and commits empty string", async () => {
     const { tf, commits } = mount("500px");
     dispatch(tf, "input", "");
-    await new Promise((r) => setTimeout(r, 450));
+    await new Promise((r) => {
+      setTimeout(r, 450);
+    });
     expect(commits).toEqual([""]);
   });
 });

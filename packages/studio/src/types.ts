@@ -1,5 +1,10 @@
 /// <reference lib="dom" />
-import type { JxMutableNode, JxPath, ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  JsonValue as SchemaJsonValue,
+  JxMutableNode,
+  JxPath,
+  ProjectConfig,
+} from "@jxsuite/schema/types";
 
 // ─── Git & Platform Types ───────────────────────────────────────────────────
 
@@ -60,12 +65,12 @@ export interface DirEntry {
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
-  activate(root?: string): Promise<void>;
-  openProject(): Promise<{
+  activate: (root?: string) => Promise<void>;
+  openProject: () => Promise<{
     config: ProjectConfig;
     handle: { root: string; name: string; projectConfig: ProjectConfig };
   } | null>;
-  probeRootProject(): Promise<{
+  probeRootProject: () => Promise<{
     meta: { root: string; name: string };
     info: {
       isSiteProject: boolean;
@@ -73,60 +78,60 @@ export interface StudioPlatform {
       directories?: string[];
     };
   } | null>;
-  listDirectory(dir: string): Promise<DirEntry[]>;
-  readFile(path: string): Promise<string>;
-  writeFile(path: string, content: string): Promise<void>;
-  uploadFile(path: string, data: string | File | Blob | ArrayBuffer): Promise<unknown>;
-  deleteFile(path: string): Promise<void>;
-  renameFile(from: string, to: string): Promise<void>;
-  createDirectory(path: string): Promise<void>;
-  discoverComponents(dir?: string): Promise<ComponentMeta[]>;
-  addPackage(name: string): Promise<unknown>;
-  removePackage(name: string): Promise<unknown>;
-  listPackages(): Promise<PackageInfo[]>;
-  codeService(action: string, payload: unknown): Promise<CodeServiceResult | null>;
-  resolveSiteContext(filePath: string): Promise<{
+  listDirectory: (dir: string) => Promise<DirEntry[]>;
+  readFile: (path: string) => Promise<string>;
+  writeFile: (path: string, content: string) => Promise<void>;
+  uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
+  deleteFile: (path: string) => Promise<void>;
+  renameFile: (from: string, to: string) => Promise<void>;
+  createDirectory: (path: string) => Promise<void>;
+  discoverComponents: (dir?: string) => Promise<ComponentMeta[]>;
+  addPackage: (name: string) => Promise<unknown>;
+  removePackage: (name: string) => Promise<unknown>;
+  listPackages: () => Promise<PackageInfo[]>;
+  codeService: (action: string, payload: unknown) => Promise<CodeServiceResult | null>;
+  resolveSiteContext: (filePath: string) => Promise<{
     sitePath: string | null;
     projectConfig?: ProjectConfig;
     fileRelPath?: string;
   }>;
-  locateFile(name: string): Promise<string | null>;
-  searchFiles(query: string, extensions?: string[]): Promise<DirEntry[]>;
+  locateFile: (name: string) => Promise<string | null>;
+  searchFiles: (query: string, extensions?: string[]) => Promise<DirEntry[]>;
   /** List the project's registered format classes (auto-discovered from imports). */
-  listFormats?(): Promise<unknown[]>;
+  listFormats?: () => Promise<unknown[]>;
   /** Invoke a format capability (parse/serialize) — { format, action, source?, doc?, options? }. */
-  formatAction?(payload: Record<string, unknown>): Promise<unknown>;
-  fetchPluginSchema(src: string, prototype?: string, base?: string): Promise<unknown>;
-  gitStatus(): Promise<GitStatusResult>;
-  gitBranches(): Promise<GitBranchesResult>;
-  gitLog(limit?: number): Promise<GitLogEntry[]>;
-  gitStage(files: string[]): Promise<void>;
-  gitUnstage(files: string[]): Promise<void>;
-  gitCommit(message: string): Promise<void>;
-  gitPush(opts?: { setUpstream?: boolean }): Promise<void>;
-  gitPull(): Promise<void>;
-  gitFetch(): Promise<void>;
-  gitCheckout(branch: string): Promise<void>;
-  gitCreateBranch(name: string): Promise<void>;
-  gitDiff(path?: string): Promise<string>;
-  gitShow(opts: { path: string; ref?: string }): Promise<string>;
-  gitDiscard(files: string[]): Promise<void>;
-  gitClone?(url: string): Promise<{ ok: boolean; root: string }>;
-  gitInit(): Promise<void>;
-  gitAddRemote(name: string, url: string): Promise<void>;
-  createProject(opts: {
+  formatAction?: (payload: Record<string, unknown>) => Promise<unknown>;
+  fetchPluginSchema: (src: string, prototype?: string, base?: string) => Promise<unknown>;
+  gitStatus: () => Promise<GitStatusResult>;
+  gitBranches: () => Promise<GitBranchesResult>;
+  gitLog: (limit?: number) => Promise<GitLogEntry[]>;
+  gitStage: (files: string[]) => Promise<void>;
+  gitUnstage: (files: string[]) => Promise<void>;
+  gitCommit: (message: string) => Promise<void>;
+  gitPush: (opts?: { setUpstream?: boolean }) => Promise<void>;
+  gitPull: () => Promise<void>;
+  gitFetch: () => Promise<void>;
+  gitCheckout: (branch: string) => Promise<void>;
+  gitCreateBranch: (name: string) => Promise<void>;
+  gitDiff: (path?: string) => Promise<string>;
+  gitShow: (opts: { path: string; ref?: string }) => Promise<string>;
+  gitDiscard: (files: string[]) => Promise<void>;
+  gitClone?: (url: string) => Promise<{ ok: boolean; root: string }>;
+  gitInit: () => Promise<void>;
+  gitAddRemote: (name: string, url: string) => Promise<void>;
+  createProject: (opts: {
     name: string;
     description?: string;
     url?: string;
     adapter?: string;
     directory: string;
-  }): Promise<{ root: string; config: ProjectConfig }>;
-  aiAuthStatus(): Promise<{ authenticated: boolean; error?: string }>;
-  aiCreateSession(opts: { message: string; systemPrompt?: string }): Promise<{ id: string }>;
-  aiSendMessage(id: string, message: string): Promise<void>;
-  aiStreamUrl(id: string): string | Promise<string>;
-  aiStopSession(id: string): Promise<void>;
-  aiDeleteSession(id: string): Promise<void>;
+  }) => Promise<{ root: string; config: ProjectConfig }>;
+  aiAuthStatus: () => Promise<{ authenticated: boolean; error?: string }>;
+  aiCreateSession: (opts: { message: string; systemPrompt?: string }) => Promise<{ id: string }>;
+  aiSendMessage: (id: string, message: string) => Promise<void>;
+  aiStreamUrl: (id: string) => string | Promise<string>;
+  aiStopSession: (id: string) => Promise<void>;
+  aiDeleteSession: (id: string) => Promise<void>;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────
@@ -167,8 +172,8 @@ export interface GitDiffState {
   originalContent: string;
   currentContent: string;
   fileStatus: string;
-  originalDoc?: import("@jxsuite/schema/types").JxMutableNode;
-  currentDoc?: import("@jxsuite/schema/types").JxMutableNode;
+  originalDoc?: JxMutableNode;
+  currentDoc?: JxMutableNode;
   original?: unknown;
 }
 
@@ -195,4 +200,4 @@ export interface ProjectState {
  * A JSON document value, or `undefined` to signal property removal in the mutators. Re-uses the
  * schema's precise recursive JSON model.
  */
-export type JsonValue = import("@jxsuite/schema/types").JsonValue | undefined;
+export type JsonValue = SchemaJsonValue | undefined;

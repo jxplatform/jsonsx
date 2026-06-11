@@ -26,6 +26,7 @@ import type {
 // These are the precise types derived from the JSON Schema defs via FromSchema.
 // Use these when you need exact schema conformance (e.g., validation, serialization).
 
+// oxlint-disable typescript/no-namespace, no-shadow -- type-only grouping of schema-derived types whose members intentionally mirror the loose top-level type names (Strict.ImageConfig vs ImageConfig); an ES module split would fragment the schema package's public surface
 export namespace Strict {
   export type HeadEntry = FromSchema<typeof headEntrySchema>;
   export type ImageConfig = FromSchema<typeof imageConfigSchema>;
@@ -51,6 +52,7 @@ export namespace Strict {
   export type ClassConstructorDef = FromSchema<typeof classConstructorDefSchema>;
   export type ProjectConfig = FromSchema<typeof projectConfigSchema>;
 }
+// oxlint-enable typescript/no-namespace, no-shadow
 
 // ─── JSON Value Model ───────────────────────────────────────────────────────────
 // Jx documents are JSON. These types describe what can actually appear in one,
@@ -411,6 +413,7 @@ export interface JxClassDef {
      * key, plain property access yields `Object.prototype.constructor` (a Function) — narrow with
      * `typeof === "object"` before use.
      */
+    // oxlint-disable-next-line typescript/ban-types, typescript/no-unsafe-function-type -- only `Function` absorbs the inherited Object.prototype.constructor on plain object literals
     constructor?: JxClassCtorDef | Function;
     methods?: Record<string, JxClassMethodDef>;
     parameters?: Record<string, JxClassParamDef>;

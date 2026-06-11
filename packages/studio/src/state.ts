@@ -173,7 +173,7 @@ export interface FlatRow {
 export function flattenTree(
   doc: JxMutableNode | string | number | boolean,
   path: JxPath = [],
-  depth: number = 0,
+  depth = 0,
 ): FlatRow[] {
   // Text node children: bare primitives get a "text" row
   if (typeof doc === "string" || typeof doc === "number" || typeof doc === "boolean") {

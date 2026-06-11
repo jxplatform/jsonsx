@@ -17,7 +17,7 @@ import { openModal } from "../ui/layers";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
-let _activeSection: string = "general";
+let _activeSection = "general";
 
 let _contentEl: HTMLElement | null = null;
 
@@ -129,6 +129,9 @@ function renderActiveSection() {
     }
     case "contentTypes": {
       renderContentTypesEditor(_contentEl);
+      break;
+    }
+    default: {
       break;
     }
   }

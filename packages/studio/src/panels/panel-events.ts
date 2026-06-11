@@ -287,7 +287,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
   );
 
   insertionHelper.mount({
-    childIndex,
+    childIndex: (path: JxPath) => childIndex(path) ?? 0,
     defaultDef,
     effectiveZoom,
     elToPath,

@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { toRaw } from "../reactivity";
+import { jsonClone } from "../utils/studio-utils";
 import { childIndex, getNodeAtPath, isAncestor, parentElementPath, pathsEqual } from "../state";
 
 import type { Tab } from "../tabs/tab";
@@ -60,7 +61,7 @@ export function transactDoc(
 
   if (!skipHistory) {
     const snapshot = {
-      document: JSON.parse(JSON.stringify(raw)),
+      document: jsonClone(raw),
       selection: tab.session.selection ? [...tab.session.selection] : null,
     };
     const truncated = tab.history.snapshots.slice(0, tab.history.index + 1);
@@ -97,7 +98,7 @@ export function undo(tab: Tab) {
   if (tab.history.index <= 0) {
     return;
   }
-  tab.history.index--;
+  tab.history.index -= 1;
   const snap = tab.history.snapshots[tab.history.index];
   tab.doc.document = structuredClone(toRaw(snap.document));
   tab.session.selection = snap.selection ? [...toRaw(snap.selection)] : null;
@@ -109,7 +110,7 @@ export function redo(tab: Tab) {
   if (tab.history.index >= tab.history.snapshots.length - 1) {
     return;
   }
-  tab.history.index++;
+  tab.history.index += 1;
   const snap = tab.history.snapshots[tab.history.index];
   tab.doc.document = structuredClone(toRaw(snap.document));
   tab.session.selection = snap.selection ? [...toRaw(snap.selection)] : null;
@@ -177,7 +178,7 @@ export function mutateDuplicateNode(tab: Tab, path: JxPath) {
  * @param {JxPath} path
  * @param {string} wrapperTag
  */
-export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag: string = "div") {
+export function mutateWrapNode(tab: Tab, path: JxPath, wrapperTag = "div") {
   if (!path || path.length < 2) {
     return;
   }
@@ -219,7 +220,7 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
   }
   let adjustedIndex = toIndex;
   if (fromParent === toParent && fromIdx < toIndex) {
-    adjustedIndex--;
+    adjustedIndex -= 1;
   }
   childArray(toParent).splice(adjustedIndex, 0, node);
 
@@ -242,7 +243,7 @@ export function mutateMoveNode(tab: Tab, fromPath: JxPath, toParentPath: JxPath,
  * @param {string} key
  * @param {JxNodeValue} value
  */
-export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value: JxNodeValue) {
+export function mutateUpdateProperty(tab: Tab, path: JxPath, key: string, value?: JxNodeValue) {
   const node = getNodeAtPath(tab.doc.document, path);
   if (value === undefined || value === null || value === "") {
     delete node[key];
@@ -282,7 +283,7 @@ export function mutateUpdateAttribute(
   tab: Tab,
   path: JxPath,
   attr: string,
-  value: string | undefined,
+  value?: string | undefined,
 ) {
   const node = getNodeAtPath(tab.doc.document, path);
   if (!node.attributes) {
@@ -505,11 +506,7 @@ export function mutateUpdateMediaNestedStylePath(
  * @param {JxPath} path
  * @param {Record<string, string | undefined> | undefined} style
  */
-export function mutateReplaceStyle(
-  tab: Tab,
-  path: JxPath,
-  style: Record<string, string | undefined> | undefined,
-) {
+export function mutateReplaceStyle(tab: Tab, path: JxPath, style: JxStyle | undefined) {
   const node = getNodeAtPath(tab.doc.document, path);
   if (style && Object.keys(style).length > 0) {
     node.style = style;
@@ -550,7 +547,7 @@ export function mutateRemoveDef(tab: Tab, name: string) {
  * @param {string} name
  * @param {Record<string, JsonValue>} updates
  */
-export function mutateUpdateDef(tab: Tab, name: string, updates: Record<string, JsonValue>) {
+export function mutateUpdateDef(tab: Tab, name: string, updates: Record<string, unknown>) {
   const doc = tab.doc.document;
   if (!doc.state) {
     doc.state = {};
@@ -590,7 +587,7 @@ export function mutateRenameDef(tab: Tab, oldName: string, newName: string) {
  * @param {string} name
  * @param {string | undefined} query
  */
-export function mutateUpdateMedia(tab: Tab, name: string, query: string | undefined) {
+export function mutateUpdateMedia(tab: Tab, name: string, query?: string | undefined) {
   const doc = tab.doc.document;
   if (!doc.$media) {
     doc.$media = {};
@@ -681,7 +678,7 @@ export function mutateRenameSwitchCase(tab: Tab, path: JxPath, oldName: string, 
  * @param {string} field
  * @param {JsonValue} value
  */
-export function mutateUpdateFrontmatter(tab: Tab, field: string, value: JsonValue) {
+export function mutateUpdateFrontmatter(tab: Tab, field: string, value?: JsonValue) {
   if (value === undefined || value === null || value === "") {
     delete tab.doc.content.frontmatter[field];
   } else {

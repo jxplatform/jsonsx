@@ -3,9 +3,10 @@
 // Uses Spectrum workflow icons where available; custom SVGs for flex-specific concepts.
 
 import { html } from "lit";
+import type { TemplateResult } from "lit";
 
 // Helper for custom filled-rect icons (alignment/justify diagrams) where no Spectrum match exists
-const _R = (d: import("lit").TemplateResult) =>
+const _R = (d: TemplateResult) =>
   html`<svg
     xmlns="http://www.w3.org/2000/svg"
     width="16"
@@ -18,7 +19,7 @@ const _R = (d: import("lit").TemplateResult) =>
   </svg>`;
 
 // Helper for custom stroke icons
-const _S = (d: import("lit").TemplateResult) =>
+const _S = (d: TemplateResult) =>
   html`<svg
     xmlns="http://www.w3.org/2000/svg"
     width="16"
@@ -33,7 +34,7 @@ const _S = (d: import("lit").TemplateResult) =>
     ${d}
   </svg>`;
 
-const icons = {
+export const icons = {
   // ─── Arrows — flexDirection ───
   "arrow-right": html`<sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>`,
   "arrow-left": html`<sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>`,
@@ -79,5 +80,3 @@ const icons = {
   "display-inline": html`<sp-icon-remove slot="icon"></sp-icon-remove>`,
   "display-none": html`<sp-icon-visibility-off slot="icon"></sp-icon-visibility-off>`,
 };
-
-export default icons;

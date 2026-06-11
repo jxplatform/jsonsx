@@ -39,6 +39,9 @@ import {
 } from "../format/format-host";
 import { view } from "../view";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
+import type { TemplateResult } from "lit-html";
+import type { StudioState } from "../state.js";
+import type { Tab } from "../tabs/tab.js";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -49,7 +52,7 @@ const fileIconMap = {
   "sp-icon-folder": html`<sp-icon-folder></sp-icon-folder>`,
   "sp-icon-folder-open": html`<sp-icon-folder-open></sp-icon-folder-open>`,
   "sp-icon-image": html`<sp-icon-image></sp-icon-image>`,
-} as Record<string, import("lit-html").TemplateResult>;
+} as Record<string, TemplateResult>;
 
 // ─── File management ──────────────────────────────────────────────────────────
 
@@ -332,7 +335,7 @@ function renderTreeLevelTemplate(
   dirPath: string,
   depth: number,
   ctx: { openFileFn: (path: string) => void; renderLeftPanel: () => void },
-): import("lit-html").TemplateResult | import("lit-html").TemplateResult[] {
+): TemplateResult | TemplateResult[] {
   const entries = requireProjectState().dirs.get(dirPath);
   if (!entries) {
     loadDirectory(dirPath).then(() => ctx.renderLeftPanel());
@@ -500,11 +503,11 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
 
     const items = tree.querySelectorAll(".file-tree-item") as NodeListOf<HTMLElement>;
 
-    items.forEach((row) => {
+    for (const row of items) {
       const { path } = row.dataset;
       const { type } = row.dataset;
       if (!path) {
-        return;
+        continue;
       }
 
       const cleanups = [
@@ -565,7 +568,7 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
       }
 
       _fileTreeDndCleanups.push(combine(...cleanups));
-    });
+    }
 
     // Root-level drop target (move to project root)
     const rootCleanup = dropTargetForElements({
@@ -595,7 +598,7 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
     // Monitor for drop events
     const monitorCleanup = monitorForElements({
       onDrop({ source, location }) {
-        const target = location.current.dropTargets[0];
+        const [target] = location.current.dropTargets;
         if (!target) {
           return;
         }
@@ -668,7 +671,7 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
 function parentDir(path: string) {
   const normalized = path.replaceAll("\\", "/");
   const lastSlash = normalized.lastIndexOf("/");
-  return lastSlash === -1 ? "." : normalized.substring(0, lastSlash);
+  return lastSlash === -1 ? "." : normalized.slice(0, lastSlash);
 }
 
 // ─── Context menu ─────────────────────────────────────────────────────────────
@@ -765,7 +768,8 @@ function showFileContextMenu(
 
 // ─── File CRUD ────────────────────────────────────────────────────────────────
 
-async function createNewFile(dirPath = ".", renderLeftPanel: () => void) {
+async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
+  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
   const name = prompt("File name:", "untitled.json");
   if (!name) {
     return;
@@ -850,14 +854,14 @@ async function renameFile(
     return;
   }
   const entryPath = entry.path.replaceAll("\\", "/");
-  const parentDir = entryPath.includes("/")
-    ? entryPath.substring(0, entryPath.lastIndexOf("/"))
+  const parentDirPath = entryPath.includes("/")
+    ? entryPath.slice(0, entryPath.lastIndexOf("/"))
     : ".";
-  const newPath = parentDir === "." ? newName : `${parentDir}/${newName}`;
+  const newPath = parentDirPath === "." ? newName : `${parentDirPath}/${newName}`;
   try {
     const platform = getPlatform();
     await platform.renameFile(entry.path, newPath);
-    await loadDirectory(parentDir);
+    await loadDirectory(parentDirPath);
     if (requireProjectState().selectedPath === entry.path) {
       requireProjectState().selectedPath = newPath;
     }
@@ -886,8 +890,8 @@ async function deleteFile(
     const platform = getPlatform();
     await platform.deleteFile(entry.path);
     const delPath = entry.path.replaceAll("\\", "/");
-    const parentDir = delPath.includes("/") ? delPath.substring(0, delPath.lastIndexOf("/")) : ".";
-    await loadDirectory(parentDir);
+    const parentDirPath = delPath.includes("/") ? delPath.slice(0, delPath.lastIndexOf("/")) : ".";
+    await loadDirectory(parentDirPath);
     if (requireProjectState().selectedPath === entry.path) {
       requireProjectState().selectedPath = null;
     }
@@ -913,8 +917,8 @@ async function deleteFile(
  */
 export async function openFileFromTree(
   ctx: {
-    S: import("../state.js").StudioState;
-    commit: (s: import("../state.js").StudioState) => void;
+    S: StudioState;
+    commit: (s: StudioState) => void;
     render: () => void;
     loadMarkdown: (source: string, handle: unknown) => void;
   },
@@ -932,7 +936,7 @@ export async function openFileFromTree(
           mode: ctx.S.mode,
           sourceFormat: formatForPath(ctx.S.documentPath)?.name ?? null,
         },
-      } as unknown as import("../tabs/tab.js").Tab;
+      } as unknown as Tab;
       const output = await serializeDocument(tabLike);
       await platform.writeFile(ctx.S.documentPath, output);
     } catch (error) {

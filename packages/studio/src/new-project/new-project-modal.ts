@@ -29,9 +29,9 @@ let _form = {
   url: "",
 };
 
-let _error: string = "";
+let _error = "";
 
-let _creating: boolean = false;
+let _creating = false;
 
 /** @type {((result: { root: string; config: object } | null) => void) | null} */
 let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void) | null = null;

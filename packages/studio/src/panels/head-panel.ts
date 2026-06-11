@@ -21,6 +21,7 @@ import { invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 
 import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
+import type { TemplateResult } from "lit-html";
 
 interface MetaField {
   label: string;
@@ -330,15 +331,14 @@ export function renderHeadTemplate({
     projectState?.isSiteProject &&
     (tab.documentPath.startsWith("pages/") || tab.documentPath.startsWith("./pages/"));
 
-  let layoutSection: import("lit-html").TemplateResult | symbol = nothing;
+  let layoutSection: TemplateResult | symbol = nothing;
   if (isPage) {
     if (layoutEntries === null) {
       loadLayoutEntries();
     } else {
       const currentLayout = doc.$layout;
       const defaultLayout = projectState?.projectConfig?.defaults?.layout;
-      const displayValue =
-        currentLayout === false ? "__none__" : currentLayout ? currentLayout : "__default__";
+      const displayValue = currentLayout === false ? "__none__" : currentLayout || "__default__";
       const defaultLabel = defaultLayout
         ? defaultLayout
             .replace(/^\.\/layouts\//, "")

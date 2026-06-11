@@ -3,6 +3,7 @@
 
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
+import type { TemplateResult } from "lit-html";
 
 /** Expanded data entries set — persists across renders. */
 const expandedDataKeys = new Set();
@@ -127,7 +128,7 @@ export function renderDataTreeTemplate(
   value: unknown,
   depth: number,
   maxDepth = 5,
-): import("lit-html").TemplateResult {
+): TemplateResult {
   const indent = `${(depth + 1) * 12}px`;
 
   if (depth > maxDepth) {
@@ -152,7 +153,7 @@ export function renderDataTreeTemplate(
 
   if (Array.isArray(value)) {
     const cap = 20;
-    const items: import("lit-html").TemplateResult[] = value.slice(0, cap).map((item, i) => {
+    const items: TemplateResult[] = value.slice(0, cap).map((item, i) => {
       if (item === null || item === undefined || typeof item !== "object") {
         const valText =
           typeof item === "string" && item.length > 80
@@ -183,7 +184,7 @@ export function renderDataTreeTemplate(
   const obj = value as Record<string, unknown>;
   const keys = Object.keys(obj);
   const cap = 30;
-  const items: import("lit-html").TemplateResult[] = keys.slice(0, cap).map((key) => {
+  const items: TemplateResult[] = keys.slice(0, cap).map((key) => {
     const v = obj[key];
     if (v === null || v === undefined || typeof v !== "object") {
       const valText =

@@ -24,6 +24,8 @@ import { showSlashMenu } from "../editor/slash-menu";
 import { getConvertTargets } from "../editor/convert-targets";
 
 import type { JxPath } from "../state";
+import type { TemplateResult } from "lit-html";
+import type { SlashCommand } from "../editor/convert-targets.js";
 
 /**
  * @type {{
@@ -65,7 +67,7 @@ const formatIconMap = {
     slot="icon"
   ></sp-icon-text-superscript>`,
   "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
-} as Record<string, import("lit-html").TemplateResult>;
+} as Record<string, TemplateResult>;
 
 /**
  * Prevent the bar from stealing focus from contenteditable
@@ -90,11 +92,7 @@ function onBarMousedown(e: MouseEvent) {
  * @param {import("../editor/convert-targets.js").SlashCommand[]} targets
  * @param {JxPath} selection
  */
-function onTagBadgeClick(
-  e: MouseEvent,
-  targets: import("../editor/convert-targets.js").SlashCommand[],
-  selection: JxPath,
-) {
+function onTagBadgeClick(e: MouseEvent, targets: SlashCommand[], selection: JxPath) {
   e.stopPropagation();
   const anchorEl = e.currentTarget as HTMLElement;
   showSlashMenu(anchorEl, "", {
@@ -444,8 +442,8 @@ export function renderBlockActionBar() {
           ? html`<span
               class="bar-drag-handle"
               title="Drag to reorder"
-              ${ref((el) => {
-                if (!el) {
+              ${ref((handleEl) => {
+                if (!handleEl) {
                   return;
                 }
                 if (view.selDragCleanup) {
@@ -453,7 +451,7 @@ export function renderBlockActionBar() {
                   view.selDragCleanup = null;
                 }
                 view.selDragCleanup = draggable({
-                  element: el as HTMLElement,
+                  element: handleEl as HTMLElement,
                   getInitialData: () => ({
                     path: activeTab.value?.session.selection,
                     type: "tree-node",

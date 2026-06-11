@@ -138,24 +138,24 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
     }
     document.removeEventListener("mousedown", outsideHandler, true);
 
-    let hitPath: (string | number)[] | null = null,
-      hitMedia = null;
+    let hitMedia = null;
+    let hitPath: (string | number)[] | null = null;
     for (const p of canvasPanels) {
       const els = p.canvas.querySelectorAll("*") as NodeListOf<HTMLElement>;
-      for (const el of els) {
-        el.style.pointerEvents = "auto";
+      for (const child of els) {
+        child.style.pointerEvents = "auto";
       }
       p.overlayClk.style.display = "none";
       const found = document.elementsFromPoint(evt.clientX, evt.clientY);
       p.overlayClk.style.display = "";
-      for (const el of els) {
-        el.style.pointerEvents = "none";
+      for (const child of els) {
+        child.style.pointerEvents = "none";
       }
       for (const hit of found) {
         if (p.canvas.contains(hit) && hit !== p.canvas) {
-          const path = elToPath.get(hit);
-          if (path) {
-            hitPath = path;
+          const hitElPath = elToPath.get(hit);
+          if (hitElPath) {
+            hitPath = hitElPath;
             hitMedia = p.mediaName;
             break;
           }
@@ -203,17 +203,15 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
       } else {
         activeTab.value!.session.selection = hp;
       }
+    } else if (isEmpty && pPath) {
+      transactDoc(activeTab.value, (t) => mutateRemoveNode(t, editPath));
+    } else if (newText !== originalText) {
+      transactDoc(activeTab.value, (t) =>
+        mutateUpdateProperty(t, editPath, "textContent", newText || undefined),
+      );
     } else {
-      if (isEmpty && pPath) {
-        transactDoc(activeTab.value, (t) => mutateRemoveNode(t, editPath));
-      } else if (newText !== originalText) {
-        transactDoc(activeTab.value, (t) =>
-          mutateUpdateProperty(t, editPath, "textContent", newText || undefined),
-        );
-      } else {
-        renderOnly("canvas");
-        renderOnly("overlays");
-      }
+      renderOnly("canvas");
+      renderOnly("overlays");
     }
   };
   document.addEventListener("mousedown", outsideHandler, true);
@@ -224,10 +222,8 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
 
 /** @param {KeyboardEvent} e */
 function componentInlineKeydown(e: KeyboardEvent) {
-  if (isSlashMenuOpen()) {
-    if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
-      return;
-    }
+  if (isSlashMenuOpen() && ["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
+    return;
   }
 
   if (e.key === "Enter" && !e.shiftKey) {

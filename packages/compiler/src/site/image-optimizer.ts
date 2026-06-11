@@ -10,6 +10,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { createRequire } from "node:module";
+import type { FormatEnum } from "sharp";
 
 export interface ImageVariant {
   width: number; // Pixel width of the variant
@@ -40,7 +41,10 @@ export interface ImageConfig {
   remoteDomains?: string[];
 }
 
-let _sharp: typeof import("sharp") | null = null;
+// oxlint-disable-next-line typescript/consistent-type-imports -- sharp is an optional native dep loaded lazily; its `export =` module type is only nameable via import()
+type SharpModule = typeof import("sharp");
+
+let _sharp: SharpModule | null = null;
 
 async function getSharp() {
   if (_sharp) {
@@ -50,7 +54,7 @@ async function getSharp() {
   // Production installs where @img/sharp-* native packages are adjacent to cli.js.
   try {
     const sharpMod = await import("sharp");
-    _sharp = sharpMod.default as typeof import("sharp");
+    _sharp = sharpMod.default as SharpModule;
     return _sharp;
   } catch {
     // Fall through to CJS fallback below.
@@ -61,7 +65,7 @@ async function getSharp() {
   // Unreachable via the primary import path.
   try {
     const req = createRequire(resolve(process.cwd(), "package.json"));
-    _sharp = req("sharp") as typeof import("sharp");
+    _sharp = req("sharp") as SharpModule;
     return _sharp;
   } catch (error) {
     throw new Error(
@@ -171,7 +175,7 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
       const quality = config.quality[format as keyof ImageConfig["quality"]] ?? 80;
       const task = sharp(srcPath)
         .resize(width)
-        .toFormat(format as keyof import("sharp").FormatEnum, { quality })
+        .toFormat(format as keyof FormatEnum, { quality })
         .toFile(absolutePath)
         .then(() => {});
 

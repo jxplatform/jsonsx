@@ -1,5 +1,4 @@
-import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
-import Electrobun from "electrobun/bun";
+import Electrobun, { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
 import type { StudioRPC } from "./rpc-schema";
 import {
   codeService,
@@ -72,8 +71,6 @@ setFileDialog(openFileDialog);
 
 let _maximized = false;
 let _restoreFrame = { height: 900, width: 1400, x: 0, y: 0 };
-
-let win: InstanceType<typeof BrowserWindow>;
 
 // ─── Register RPC handlers ────────────────────────────────────────────────────
 
@@ -190,7 +187,7 @@ const aiServerUrl = `http://localhost:${aiServer.port}`;
 
 // ─── Open the main window ─────────────────────────────────────────────────────
 
-win = new BrowserWindow({
+const win = new BrowserWindow({
   frame: { height: 900, width: 1400, x: 0, y: 0 },
   navigationRules: "views://*,^*",
   rpc,

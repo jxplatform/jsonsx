@@ -59,7 +59,7 @@ function convertHastNode(node: HastNode) {
     const kids = node.children ? convertHastChildren(node.children) : [];
 
     if (kids.length === 1 && typeof kids[0] === "string") {
-      el.textContent = kids[0];
+      [el.textContent] = kids;
     } else if (kids.length > 0) {
       el.children = kids as JxElement[];
     }

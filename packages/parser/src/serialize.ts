@@ -26,12 +26,15 @@ import remarkGfm from "remark-gfm";
 import { stringify as stringifyYaml } from "yaml";
 import { htmlToJx } from "./html-to-jx.ts";
 import type {
+  JsonValue,
+  JxAttributeValue,
   JxDocument,
   JxElement,
   JxMutableNode,
   JxStateDefinition,
 } from "@jxsuite/schema/types";
 import type { MdastNode } from "./types.ts";
+import type { Root } from "mdast";
 
 /** Static text content of a node — bound (`$ref`) text has no serializable form. */
 function textOf(el: JxElement | undefined): string | undefined {
@@ -240,7 +243,7 @@ export function mdastToJx(mdast: MdastNode): JxElement {
     return {
       children: (mdast.children ?? [])
         .filter((n) => n.type !== "yaml" && n.type !== "toml")
-        .flatMap(convertMdastNode)
+        .flatMap((n) => convertMdastNode(n))
         .filter(Boolean) as (JxElement | string)[],
     };
   }
@@ -277,7 +280,10 @@ function convertMdastNode(node: MdastNode): JxElement | null {
   const el: JxElement = { tagName: tag };
 
   const childNodes = () =>
-    (node.children ?? []).flatMap(convertMdastNode).filter(Boolean) as (JxElement | string)[];
+    (node.children ?? []).flatMap((n) => convertMdastNode(n)).filter(Boolean) as (
+      | JxElement
+      | string
+    )[];
   const flattenOrChildren = () => {
     if (node.children?.length === 1 && node.children[0].type === "text") {
       el.textContent = node.children[0].value ?? null;
@@ -371,6 +377,9 @@ function convertMdastNode(node: MdastNode): JxElement | null {
       el.children = [thead, tbody].filter(Boolean) as (JxElement | string)[];
       break;
     }
+    default: {
+      break;
+    }
   }
 
   return el;
@@ -385,13 +394,16 @@ function convertDirective(node: MdastNode): JxElement {
     if (node.children?.length === 1 && node.children[0].type === "text") {
       el.textContent = node.children[0].value ?? null;
     } else if (node.children?.length) {
-      el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (
+      el.children = node.children.flatMap((n) => convertMdastNode(n)).filter(Boolean) as (
         | JxElement
         | string
       )[];
     }
   } else if (node.type === "containerDirective" && node.children?.length) {
-    el.children = node.children.flatMap(convertMdastNode).filter(Boolean) as (JxElement | string)[];
+    el.children = node.children.flatMap((n) => convertMdastNode(n)).filter(Boolean) as (
+      | JxElement
+      | string
+    )[];
   }
   return el;
 }
@@ -601,6 +613,9 @@ function convertJxNode(
 
     case "tableCell": {
       return { children: inline(el), type: "tableCell" };
+    }
+    default: {
+      break;
     }
   }
 
@@ -957,6 +972,9 @@ function nodeToMdast(
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
       return [{ children, type: "tableCell" }];
     }
+    default: {
+      break;
+    }
   }
 
   return [];
@@ -994,16 +1012,13 @@ function inlineComponent(node: JxElement, tag: string, ctx: ExportContext): Mdas
   for (const [key, value] of Object.entries(props)) {
     if (key in stateDefs) {
       const existing = stateDefs[key];
-      if (
+      stateDefs[key] =
         existing &&
         typeof existing === "object" &&
         !Array.isArray(existing) &&
         "default" in existing
-      ) {
-        stateDefs[key] = { ...existing, default: value };
-      } else {
-        stateDefs[key] = value as JxStateDefinition;
-      }
+          ? { ...existing, default: value }
+          : (value as JxStateDefinition);
     } else {
       stateDefs[key] = value as JxStateDefinition;
     }
@@ -1070,9 +1085,7 @@ function resolveNode(
     for (const [k, v] of Object.entries(result.attributes)) {
       if (typeof v === "string") {
         // Template evaluation yields a substituted scalar for attribute values.
-        const evaluated = ctx.evaluateTemplate?.(v, scope) as
-          | import("@jxsuite/schema/types").JxAttributeValue
-          | undefined;
+        const evaluated = ctx.evaluateTemplate?.(v, scope) as JxAttributeValue | undefined;
         if (evaluated !== undefined) {
           result.attributes[k] = evaluated;
         }
@@ -1142,7 +1155,7 @@ function resolveMapNode(node: JxMutableNode, item: Record<string, unknown>) {
     result.$props = resolveMapNode(
       result.$props as unknown as JxMutableNode,
       item,
-    ) as unknown as Record<string, import("@jxsuite/schema/types").JsonValue>;
+    ) as unknown as Record<string, JsonValue>;
   }
 
   if (typeof result.textContent === "string" && result.textContent.startsWith("$map/")) {
@@ -1416,16 +1429,15 @@ function parseInlineHtml(html: string) {
           nodes.push({ type: "inlineCode", value: decodeHtmlEntities(inner) });
           break;
         }
+        default: {
+          break;
+        }
       }
       continue;
     }
 
     const skipMatch = html.slice(tagStart).match(/^<[^>]*>/);
-    if (skipMatch) {
-      pos = tagStart + skipMatch[0].length;
-    } else {
-      pos = tagStart + 1;
-    }
+    pos = skipMatch ? tagStart + skipMatch[0].length : tagStart + 1;
   }
 
   return nodes;
@@ -1447,11 +1459,11 @@ function findMatchingClose(html: string, start: number, tag: string) {
     }
 
     if (openMatch && openMatch.index < closeMatch.index) {
-      depth++;
+      depth += 1;
       openRe.lastIndex = openMatch.index + openMatch[0].length;
       closeRe.lastIndex = closeMatch.index; // Re-check this close
     } else {
-      depth--;
+      depth -= 1;
       if (depth === 0) {
         return closeMatch.index;
       }
@@ -1556,7 +1568,7 @@ function serializeRoundtrip(doc: JxDocument, opts: SerializeOptions): string {
       .use(remarkGfm)
       .use(remarkDirective)
       .use(remarkStringify, { bullet: "-", emphasis: "*", strong: "*" })
-      .stringify(mdast as unknown as import("mdast").Root);
+      .stringify(mdast as unknown as Root);
 
     lines.push(md as string);
   }
@@ -1609,7 +1621,7 @@ function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
   const mdast = {
     children: cleaned,
     type: "root",
-  } as unknown as import("mdast").Root;
+  } as unknown as Root;
 
   const md = unified()
     .use(remarkGfm)

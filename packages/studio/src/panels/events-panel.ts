@@ -144,7 +144,7 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
                         }),
                       );
                     } else {
-                      const firstFn = functionDefs[0];
+                      const [firstFn] = functionDefs;
                       transactDoc(activeTab.value, (t) =>
                         mutateUpdateProperty(
                           t,

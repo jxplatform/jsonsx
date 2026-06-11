@@ -264,7 +264,7 @@ export function spNumberField(
       @change=${(e: Event) => {
         const raw = (e.target as HTMLInputElement).value;
         const n = Number(raw);
-        commit(raw === "" || isNaN(n) ? undefined : n);
+        commit(raw === "" || Number.isNaN(n) ? undefined : n);
       }}
     ></sp-number-field>
   `;

@@ -1,12 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-try {
-  GlobalRegistrator.register();
-} catch {
-  /* Already registered */
-}
-
 import {
   defineElement,
   renderNode as _renderNode,
@@ -14,11 +8,17 @@ import {
   RESERVED_KEYS,
 } from "../src/runtime";
 
+try {
+  GlobalRegistrator.register();
+} catch {
+  /* Already registered */
+}
+
 const renderNode: (...args: Parameters<typeof _renderNode>) => HTMLElement = _renderNode as any;
 
 // Use unique tag names per test to avoid cross-test registration collisions
 let uid = 0;
-const uniqueTag = () => `ce-test-${++uid}`;
+const uniqueTag = () => `ce-test-${(uid += 1)}`;
 
 describe("Custom Elements", () => {
   test("RESERVED_KEYS includes $elements and observedAttributes", () => {
@@ -38,12 +38,14 @@ describe("Custom Elements", () => {
 
     const el = document.createElement(tag);
     document.body.append(el);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
 
     const span = el.querySelector("span");
     expect(span).not.toBeNull();
     expect((span as HTMLElement).textContent).toBe("Hello");
-    document.body.removeChild(el);
+    el.remove();
   });
 
   test("$props override state defaults", async () => {
@@ -57,10 +59,12 @@ describe("Custom Elements", () => {
     const el = document.createElement(tag);
     (el as any).label = "overridden";
     document.body.append(el);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
 
     expect((el.querySelector("span") as HTMLElement).textContent).toBe("overridden");
-    document.body.removeChild(el);
+    el.remove();
   });
 
   test("lifecycle hooks (onMount)", async () => {
@@ -76,11 +80,13 @@ describe("Custom Elements", () => {
 
     const el = document.createElement(tag);
     document.body.append(el);
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => {
+      setTimeout(r, 200);
+    });
 
     expect(el.querySelector("div")).not.toBeNull();
     expect((el as any).mountCalled).toBe(true);
-    document.body.removeChild(el);
+    el.remove();
   });
 
   test("throws for non-hyphenated tagName", async () => {
@@ -123,13 +129,15 @@ describe("Custom Elements", () => {
     const scope = await buildScope({ state: {} });
     const el = renderNode(parentDef, scope);
     document.body.append(el);
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => {
+      setTimeout(r, 150);
+    });
 
     const child = el.querySelector(tag);
     expect(child).not.toBeNull();
     expect(((child as HTMLElement).querySelector(".val") as HTMLElement).textContent).toBe("42");
     expect(((child as HTMLElement).querySelector(".name") as HTMLElement).textContent).toBe("test");
-    document.body.removeChild(el);
+    el.remove();
   });
 
   test("observed attributes sync to state", async () => {
@@ -143,14 +151,18 @@ describe("Custom Elements", () => {
 
     const el = document.createElement(tag);
     document.body.append(el);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
     expect((el.querySelector("span") as HTMLElement).textContent).toBe("initial");
 
     // Set an observed attribute — should sync to state.myLabel
     el.setAttribute("my-label", "updated");
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => {
+      setTimeout(r, 50);
+    });
     expect((el as any).myLabel).toBe("updated");
 
-    document.body.removeChild(el);
+    el.remove();
   });
 });

@@ -13,10 +13,11 @@ import { effect, effectScope } from "../reactivity";
 import { activateTab, closeTab, workspace } from "../workspace/workspace";
 import type { Tab } from "../tabs/tab";
 import { showConfirmDialog } from "../ui/layers";
+import type { EffectScope } from "@vue/reactivity";
 
 let _host: HTMLElement | null = null;
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 /**
  * Mount the tab strip into the given host element.

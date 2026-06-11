@@ -6,13 +6,12 @@
  * @param {string} scope - The scoping selector (e.g. `[data-jx-site]`)
  * @returns {string} Generated CSS text
  */
-export function buildNestedSiteCSS(
-  styleObj: import("@jxsuite/schema/types").JxStyle,
-  scope: string,
-) {
+import type { JxStyle } from "@jxsuite/schema/types";
+
+export function buildNestedSiteCSS(styleObj: JxStyle, scope: string) {
   let css = "";
 
-  function emit(parentSel: string, rules: import("@jxsuite/schema/types").JxStyle) {
+  function emit(parentSel: string, rules: JxStyle) {
     const props = Object.entries(rules)
       .filter(([, val]) => val === null || typeof val !== "object" || Array.isArray(val))
       .map(([p, val]) => `${camelToKebab(p)}: ${val}`)

@@ -229,6 +229,7 @@ function classFromSchema(classDef: JxClassDef) {
   const ctor = typeof rawCtor === "object" ? rawCtor : undefined;
   const methods = classDef.$defs?.methods ?? {};
 
+  // oxlint-disable-next-line typescript/no-extraneous-class -- methods are attached to the prototype dynamically below
   class DynClass {
     constructor(config = {}) {
       const self = this as Record<string, unknown>;

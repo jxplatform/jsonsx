@@ -1,14 +1,17 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-try {
-  GlobalRegistrator.register();
-} catch {}
-
 import { describe, test, expect, mock } from "bun:test";
 import { reactive, isRef } from "@vue/reactivity";
 import { resolvePrototype } from "../src/runtime";
 
-const wait = () => new Promise((r) => setTimeout(r, 0));
+try {
+  GlobalRegistrator.register();
+} catch {}
+
+const wait = () =>
+  new Promise((r) => {
+    setTimeout(r, 0);
+  });
 
 describe("resolvePrototype", () => {
   test("Request: returns ref", async () => {

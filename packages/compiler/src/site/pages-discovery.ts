@@ -16,7 +16,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { parseJxDocument } from "@jxsuite/schema/parse";
 import { extname, join, relative, resolve } from "node:path";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
-import type { JxDocument } from "@jxsuite/schema/types";
+import type { JxDocument, JxPathsDef } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 
 interface Route {
@@ -183,12 +183,12 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   );
 
   // Peek at the page to extract $layout if present
-  /** @type {string | null} */
-  let $layout = null;
+  let $layout: string | null = null;
   try {
     const doc = await readPageDocument(absolutePath, registry);
-    if (typeof doc.$layout === "string") {
-      ({ $layout } = doc);
+    const layout = doc.$layout;
+    if (typeof layout === "string") {
+      $layout = layout;
     }
   } catch {
     // Skip unreadable files — will error during compilation
@@ -283,7 +283,7 @@ export async function expandDynamicRoutes(
  * @returns {Record<string, unknown>[]} Array of { paramName: value } objects
  */
 function resolvePathEntries(
-  $paths: import("@jxsuite/schema/types").JxPathsDef,
+  $paths: JxPathsDef,
   projectRoot: string,
   contentTypes: Map<string, ContentLoaderEntry[]>,
 ): Record<string, unknown>[] {

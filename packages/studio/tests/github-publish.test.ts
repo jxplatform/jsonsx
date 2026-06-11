@@ -25,7 +25,7 @@ const originalFetch = globalThis.fetch;
 function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[]) {
   mockFetchResponses = [...responses];
   mockFetchCalls = [];
-  // @ts-expect-error
+  // @ts-expect-error -- minimal fetch mock does not implement the full fetch type
   globalThis.fetch = async (url: any, opts: any) => {
     mockFetchCalls.push({ opts, url: String(url) });
     const next = mockFetchResponses.shift();

@@ -7,6 +7,7 @@ import { parseSourceForPath } from "../src/files/file-ops";
 import { registerPlatform } from "../src/platform";
 import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import type { StudioPlatform } from "../src/types";
+import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 seedMarkdownFormat();
 registerPlatform({
@@ -14,7 +15,6 @@ registerPlatform({
 } as unknown as StudioPlatform);
 
 const loadMarkdown = (source: string) => parseSourceForPath("doc.md", source);
-import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
  *
  * @param {any} node
  */
-function collectTags(node: any) {
+function collectTags(node?: any) {
   const tags = new Set();
   if (!node || typeof node !== "object") {
     return tags;
@@ -79,7 +79,7 @@ function autoDiscoverElements(
  * @param {string | null} documentPath
  * @param {string} projectRoot
  */
-function buildDocBase(origin: string, documentPath: string | null, root: string = "") {
+function buildDocBase(origin: string, documentPath: string | null, root = "") {
   const docPrefix = root && root !== "." ? `${root}/` : "";
   return documentPath ? `${origin}/${docPrefix}${documentPath}` : undefined;
 }
@@ -387,13 +387,13 @@ describe("ctx getter pattern for S reference", () => {
     };
 
     // LoadMarkdown replaces S entirely
-    function loadMarkdown() {
+    function loadMarkdownState() {
       const newState = createState({ tagName: "article" });
       newState.mode = "content";
       S = newState;
     }
 
-    loadMarkdown();
+    loadMarkdownState();
 
     // After loadMarkdown, the old ctx.S still references the OLD state
     expect(badCtx.S.documentPath).toBe("pages/index.json");

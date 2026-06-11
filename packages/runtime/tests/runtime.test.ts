@@ -1,16 +1,5 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-/** Read a scope member as a callable — tests poke the dynamic scope directly. */
-const fnOf = (scope: Record<string, unknown>, key: string) =>
-  scope[key] as (...args: unknown[]) => unknown;
-/** Read a scope member as an array. */
-const arrOf = (scope: Record<string, unknown>, key: string) => scope[key] as unknown[];
-try {
-  GlobalRegistrator.register();
-} catch {
-  /* Already registered */
-}
-
 import { describe, test, expect, beforeEach, mock, spyOn } from "bun:test";
 import { reactive, ref, computed, effect, isRef } from "@vue/reactivity";
 import {
@@ -28,12 +17,27 @@ import {
   setSkipServerFunctions,
 } from "../src/runtime";
 import { evaluateExpression, isMutating } from "../src/expression";
+import type { JxDocument, JxElement } from "@jxsuite/schema/types";
+
+/** Read a scope member as a callable — tests poke the dynamic scope directly. */
+const fnOf = (scope: Record<string, unknown>, key: string) =>
+  scope[key] as (...args: unknown[]) => unknown;
+/** Read a scope member as an array. */
+const arrOf = (scope: Record<string, unknown>, key: string) => scope[key] as unknown[];
+try {
+  GlobalRegistrator.register();
+} catch {
+  /* Already registered */
+}
 
 const renderNode: (...args: Parameters<typeof _renderNode>) => HTMLElement = _renderNode as any;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const wait = () => new Promise((r) => setTimeout(r, 0));
+const wait = () =>
+  new Promise((r) => {
+    setTimeout(r, 0);
+  });
 
 // ─── isSignal ─────────────────────────────────────────────────────────────────
 
@@ -460,11 +464,7 @@ describe("buildScope", () => {
   // Shape 5: External class $prototype
   test("Shape 5: $prototype other than Function → resolvePrototype", async () => {
     const doc = { state: { items: { $prototype: "Set", default: [1, 2] } } };
-    const state = await buildScope(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      {},
-      BASE,
-    );
+    const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     expect(state.items).toBeInstanceOf(Set);
   });
 
@@ -477,11 +477,7 @@ describe("buildScope", () => {
 
   test("stores $media in scope", async () => {
     const doc = { $media: { "--md": "(min-width: 768px)" } };
-    const state = await buildScope(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      {},
-      BASE,
-    );
+    const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     expect(state["$media"]).toEqual({ "--md": "(min-width: 768px)" });
   });
 });
@@ -564,7 +560,9 @@ describe("applyStyle", () => {
   let el: HTMLElement;
   beforeEach(() => {
     el = document.createElement("div");
-    document.head.querySelectorAll("style").forEach((s) => s.remove());
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
   });
 
   test("sets inline style properties", () => {
@@ -847,7 +845,7 @@ describe("resolvePrototype", () => {
   });
 
   test("IndexedDB: returns ref", async () => {
-    const fakeReq = { onerror: null, onsuccess: null, onupgradeneeded: null };
+    const fakeReq = { addEventListener: () => {} };
     global.indexedDB = { open: () => fakeReq } as any;
     const state = reactive({} as Record<string, unknown>);
     const result = await resolvePrototype(
@@ -974,7 +972,7 @@ describe("renderNode", () => {
       {
         id: { $ref: "#/state/myId" },
         tagName: "div",
-      } as unknown as import("@jxsuite/schema/types").JxElement,
+      } as unknown as JxElement,
       state,
     ) as HTMLElement;
     expect(el.id).toBe("my-id");
@@ -982,8 +980,8 @@ describe("renderNode", () => {
 
   test("binds event handler via onclick $ref", async () => {
     const state = reactive({ count: 0 });
-    (state as any).clickHandler = function clickHandler(state: any) {
-      state.count++;
+    (state as any).clickHandler = function clickHandler(s: any) {
+      s.count += 1;
     };
     const el = renderNode({ onclick: { $ref: "#/state/clickHandler" }, tagName: "button" }, state);
     el.dispatchEvent(new Event("click"));
@@ -1321,17 +1319,10 @@ describe("computed $src + Array map integration", () => {
       },
       tagName: "div",
     };
-    const state = await buildScope(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      {},
-      BASE,
-    );
+    const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     expect(state.filteredPosts).toHaveLength(3);
 
-    const el = renderNode(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      state,
-    ) as HTMLElement;
+    const el = renderNode(doc as unknown as JxDocument, state) as HTMLElement;
     expect(el.children.length).toBe(3);
     expect(el.children[0].textContent).toBe("Hello World");
 
@@ -1365,15 +1356,8 @@ describe("computed $src + Array map integration", () => {
       },
       tagName: "div",
     };
-    const state = await buildScope(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      {},
-      BASE,
-    );
-    const el = renderNode(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      state,
-    ) as HTMLElement;
+    const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
+    const el = renderNode(doc as unknown as JxDocument, state) as HTMLElement;
     expect(el.children.length).toBe(5);
     expect(el.children[0].textContent).toBe("Item 1");
 
@@ -1400,11 +1384,7 @@ describe("computed $src + Array map integration", () => {
       },
       tagName: "div",
     };
-    const state = await buildScope(
-      doc as unknown as import("@jxsuite/schema/types").JxDocument,
-      {},
-      BASE,
-    );
+    const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     expect(typeof state.addItem).toBe("function");
     expect(state.items).toHaveLength(0);
     const result = fnOf(state, "addItem")(state, { text: "new item" });
@@ -1515,7 +1495,9 @@ describe("applyStyle — non-media at-rules", () => {
   let el: HTMLElement;
   beforeEach(() => {
     el = document.createElement("div");
-    document.head.querySelectorAll("style").forEach((s) => s.remove());
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
   });
 
   test("@starting-style emits without @media wrapper", () => {
@@ -1863,7 +1845,9 @@ describe("buildScope — $expression (Shape 5)", () => {
     });
     expect(scope.total).toBe(6);
     arrOf(scope, "nums").push(4);
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
     expect(scope.total).toBe(10);
   });
 

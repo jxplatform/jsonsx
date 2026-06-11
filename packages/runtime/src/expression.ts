@@ -131,7 +131,7 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
   }
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
-    const key = parts[1];
+    const [, key] = parts;
     let base;
     const map = scopeMap(state);
     if (key === "item") {
@@ -172,7 +172,7 @@ function resolveWritableRef(
 ): { obj: JxScope; key: string } {
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
-    const key = parts[1];
+    const [, key] = parts;
     let base;
     const map = scopeMap(state);
     if (key === "item") {
@@ -279,6 +279,9 @@ export function evaluateExpression(
       case "||": {
         return left || right;
       }
+      default: {
+        break;
+      }
     }
   }
 
@@ -297,19 +300,26 @@ export function evaluateExpression(
         break;
       }
       case "+=": {
-        obj[key] = (obj[key] as number) + rhs;
+        const current = obj[key] as number;
+        obj[key] = current + rhs;
         break;
       }
       case "-=": {
-        obj[key] = (obj[key] as number) - rhs;
+        const current = obj[key] as number;
+        obj[key] = current - rhs;
         break;
       }
       case "*=": {
-        obj[key] = (obj[key] as number) * rhs;
+        const current = obj[key] as number;
+        obj[key] = current * rhs;
         break;
       }
       case "/=": {
-        obj[key] = (obj[key] as number) / rhs;
+        const current = obj[key] as number;
+        obj[key] = current / rhs;
+        break;
+      }
+      default: {
         break;
       }
     }
@@ -336,6 +346,9 @@ export function evaluateExpression(
         const args: unknown[] = resolveOperand(value, state, event, iterCtx) as unknown[];
         return (arr.splice as (...a: unknown[]) => unknown[])(...args);
       }
+      default: {
+        break;
+      }
     }
   }
 
@@ -343,16 +356,15 @@ export function evaluateExpression(
   if (AGGREGATE_OPS.has(operator)) {
     const arr: unknown[] = resolveOperand(target, state, event, iterCtx) as unknown[];
     if (operator === "reduce") {
-      const seed: unknown = resolveOperand(initial, state, event, iterCtx);
-      return arr.reduce(
-        (acc: unknown, item: unknown, index: number) =>
-          evaluateExpression(value as ExpressionNode, state, event, {
-            acc,
-            index,
-            item,
-          }),
-        seed,
-      );
+      let acc: unknown = resolveOperand(initial, state, event, iterCtx);
+      for (const [index, item] of arr.entries()) {
+        acc = evaluateExpression(value as ExpressionNode, state, event, {
+          acc,
+          index,
+          item,
+        });
+      }
+      return acc;
     }
     if (operator === "map") {
       return arr.map((item: unknown, index: number) =>
@@ -432,7 +444,7 @@ function compileRef(ref: string, opts: CompileOpts) {
 
   if (ref.startsWith("$map/")) {
     const parts = ref.split("/");
-    const key = parts[1];
+    const [, key] = parts;
     if (key === "item") {
       return parts.length > 2 ? `_item.${parts.slice(2).join(".")}` : "_item";
     }
@@ -526,6 +538,9 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
           : compileOperand(value, opts);
         return `${arr}.splice(${args})`;
       }
+      default: {
+        break;
+      }
     }
   }
 
@@ -552,5 +567,9 @@ export function compileExpression(node: ExpressionNode, opts: CompileOpts = {}):
 
 /** Resolve a dotted/slashed path on an object. */
 function getPath(obj: unknown, path: string): unknown {
-  return path.split(/[./]/).reduce((o, k) => (o as Record<string, unknown>)?.[k], obj);
+  let current: unknown = obj;
+  for (const k of path.split(/[./]/)) {
+    current = (current as Record<string, unknown>)?.[k];
+  }
+  return current;
 }

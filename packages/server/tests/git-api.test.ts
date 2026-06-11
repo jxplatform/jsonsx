@@ -140,7 +140,7 @@ describe("parseGitStatus", () => {
  * @param {Record<string, unknown>} [body]
  * @returns {Promise<Response>}
  */
-async function studioGitReq(path: string, method: string = "GET", body?: Record<string, unknown>) {
+async function studioGitReq(path: string, method = "GET", body?: Record<string, unknown>) {
   const urlStr = `http://localhost${path}`;
   const init: RequestInit = { method };
   if (body !== undefined) {

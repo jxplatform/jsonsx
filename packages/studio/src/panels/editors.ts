@@ -162,14 +162,14 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
     clearTimeout(syncDebounce);
     syncDebounce = setTimeout(() => {
       const newBody = editor.getValue();
-      const ed = editing as EditingTarget;
-      if (ed.type === "def") {
-        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, ed.defName, { body: newBody }));
-      } else if (ed.type === "event") {
-        const node = getNodeAtPath(activeTab.value?.doc.document as JxMutableNode, ed.path);
-        const current = node?.[ed.eventKey] || {};
+      const target = editing as EditingTarget;
+      if (target.type === "def") {
+        transactDoc(activeTab.value, (t) => mutateUpdateDef(t, target.defName, { body: newBody }));
+      } else if (target.type === "event") {
+        const node = getNodeAtPath(activeTab.value?.doc.document as JxMutableNode, target.path);
+        const current = node?.[target.eventKey] || {};
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateProperty(t, ed.path, ed.eventKey, {
+          mutateUpdateProperty(t, target.path, target.eventKey, {
             ...current,
             $prototype: "Function",
             body: newBody,
@@ -181,7 +181,7 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
 
     clearTimeout(lintDebounce);
     lintDebounce = setTimeout(() => {
-      const gen = ++lintGen;
+      const gen = (lintGen += 1);
       const currentCode = editor.getValue();
       codeService("lint", { args, code: currentCode }).then((result) => {
         if (gen !== lintGen) {

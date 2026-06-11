@@ -44,10 +44,10 @@ function unwrapFormatted(formatted: string) {
   // Remove first line (function header) and last non-empty line (closing brace)
   let end = lines.length - 1;
   while (end > 0 && lines[end].trim() === "") {
-    end--;
+    end -= 1;
   }
   if (lines[end].trim() === "}") {
-    end--;
+    end -= 1;
   }
   const bodyLines = lines.slice(1, end + 1);
   // Dedent by one tab (oxfmt uses the project's indentStyle)
@@ -64,17 +64,14 @@ function adjustDiagnostics(diagnostics: OxcDiagnostic[], headerLen: number) {
       const line = d.labels?.[0]?.span?.line;
       return line == null || line > 1;
     })
-    .map((d) => ({
-      ...d,
-      labels: d.labels?.map((label) => ({
-        ...label,
-        span: {
-          ...label.span,
-          line: label.span.line - 1,
-          offset: label.span.offset - headerLen,
-        },
-      })),
-    }));
+    .map((d) => {
+      // Diagnostics are freshly parsed and serialized right after; mutate in place
+      for (const label of d.labels ?? []) {
+        label.span.line -= 1;
+        label.span.offset -= headerLen;
+      }
+      return d;
+    });
 }
 
 // ─── Reusable transpiler ─────────────────────────────────────────────────────

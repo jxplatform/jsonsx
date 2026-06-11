@@ -5,7 +5,7 @@
  * file.
  */
 
-import $RefParser from "@apidevtools/json-schema-ref-parser";
+import { dereference } from "@apidevtools/json-schema-ref-parser";
 import { collectServerEntries } from "../shared.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -30,7 +30,7 @@ export async function compileServer(
   } = {},
 ) {
   const { baseUrl = "/_jx/server" } = opts;
-  const doc = (await $RefParser.dereference(sourcePath)) as JxElement;
+  const doc = (await dereference(sourcePath)) as JxElement;
   const entries = collectServerEntries(doc);
   if (entries.length === 0) {
     return null;

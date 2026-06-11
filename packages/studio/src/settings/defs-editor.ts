@@ -12,6 +12,7 @@ import { getPlatform } from "../platform";
 import { projectState } from "../store";
 import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 
+import type { FieldHandlers, SchemaProperty } from "./schema-field-ui.js";
 import type {
   ContentTypeSchema,
   ContentTypeSchemaField,
@@ -477,7 +478,7 @@ export function renderDefsEditor(container: HTMLElement) {
     const properties = def.properties || {};
     const required = def.required || [];
 
-    const handlers: import("./schema-field-ui.js").FieldHandlers = {
+    const handlers: FieldHandlers = {
       onAddNestedField: (p: string, s: { name: string; type: string; required: boolean }) =>
         handleAddNestedField(p, s, rerender),
       onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),
@@ -495,12 +496,7 @@ export function renderDefsEditor(container: HTMLElement) {
     };
 
     const fieldCards = Object.entries(properties).map(([name, fieldDef]) =>
-      fieldCardTpl(
-        name,
-        fieldDef as import("./schema-field-ui.js").SchemaProperty,
-        required.includes(name),
-        handlers,
-      ),
+      fieldCardTpl(name, fieldDef as SchemaProperty, required.includes(name), handlers),
     );
 
     editorTpl = html`

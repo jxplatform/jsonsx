@@ -116,9 +116,9 @@ export function parseGitStatus(out: string) {
       }
     } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
       const parts = line.split(" ");
-      const xy = parts[1];
-      const stagedCode = xy[0];
-      const unstagedCode = xy[1];
+      const [, xy] = parts;
+      const [stagedCode] = xy;
+      const [, unstagedCode] = xy;
       let filePath;
       if (line.startsWith("2 ")) {
         const tabIdx = line.indexOf("\t");
@@ -1175,7 +1175,8 @@ export async function handleStudioApi(
         } catch {}
         const { setUpstream } = body as { setUpstream?: boolean };
         if (setUpstream) {
-          const branch = (await runGit(["rev-parse", "--abbrev-ref", "HEAD"])).trim();
+          const branchRaw = await runGit(["rev-parse", "--abbrev-ref", "HEAD"]);
+          const branch = branchRaw.trim();
           await runGit(["push", "-u", "origin", branch]);
         } else {
           await runGit(["push"]);
@@ -1251,13 +1252,13 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "clone" && req.method === "POST") {
-        const { url } = await req.json();
-        if (!url || typeof url !== "string") {
+        const { url: repoUrl } = await req.json();
+        if (!repoUrl || typeof repoUrl !== "string") {
           return Response.json({ error: "Missing url" }, { status: 400 });
         }
-        const repoName = basename(url.replace(/\.git$/, ""));
+        const repoName = basename(repoUrl.replace(/\.git$/, ""));
         const dest = resolve(cwd, repoName);
-        const proc = Bun.spawn(["git", "clone", url, dest], {
+        const proc = Bun.spawn(["git", "clone", repoUrl, dest], {
           cwd,
           stderr: "pipe",
           stdout: "pipe",
@@ -1302,7 +1303,7 @@ export async function handleStudioApi(
     path.endsWith("/stream") &&
     req.method === "GET"
   ) {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     return claude.streamSession(id);
   }
 
@@ -1312,7 +1313,7 @@ export async function handleStudioApi(
     req.method === "POST"
   ) {
     try {
-      const id = path.split("/")[4];
+      const [id] = path.split("/").slice(4);
       const body = await req.json();
       claude.sendMessage(id, body.message);
       return Response.json({ ok: true });
@@ -1325,19 +1326,19 @@ export async function handleStudioApi(
   }
 
   if (path.startsWith("/__studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     claude.stopSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/__studio/ai/session/") && req.method === "DELETE") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     claude.deleteSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     const info = claude.getSession(id);
     if (!info) {
       return Response.json({ error: "Not found" }, { status: 404 });

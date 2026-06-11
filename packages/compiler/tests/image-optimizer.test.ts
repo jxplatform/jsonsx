@@ -3,15 +3,6 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
-// Mock sharp module before any imports that use it
-const mockToFile = mock(() => Promise.resolve());
-const mockToFormat = mock(() => ({ toFile: mockToFile }));
-const mockResize = mock(() => ({ toFormat: mockToFormat }));
-const mockMetadata = mock(() => Promise.resolve({ format: "jpeg", height: 600, width: 800 }));
-const mockSharpInstance = { metadata: mockMetadata, resize: mockResize };
-const mockSharp = mock(() => mockSharpInstance);
-mock.module("sharp", () => ({ default: mockSharp }));
-
 import {
   contentHash,
   configHash,
@@ -22,6 +13,15 @@ import {
 } from "../src/site/image-optimizer";
 import { loadCache, saveCache, getCached, setCached } from "../src/site/image-cache";
 import { transformImageNodes } from "../src/site/image-transform";
+
+// Mock sharp module before any imports that use it
+const mockToFile = mock(() => Promise.resolve());
+const mockToFormat = mock(() => ({ toFile: mockToFile }));
+const mockResize = mock(() => ({ toFormat: mockToFormat }));
+const mockMetadata = mock(() => Promise.resolve({ format: "jpeg", height: 600, width: 800 }));
+const mockSharpInstance = { metadata: mockMetadata, resize: mockResize };
+const mockSharp = mock(() => mockSharpInstance);
+mock.module("sharp", () => ({ default: mockSharp }));
 
 const TMP = resolve(tmpdir(), `jx-image-test-${Date.now()}`);
 

@@ -1,6 +1,6 @@
 /** Watch.js — File watcher + SSE live reload */
 
-import chokidar from "chokidar";
+import { watch as chokidarWatch } from "chokidar";
 import { relative } from "node:path";
 import { rebuild } from "./build.ts";
 import type { BuildEntry } from "./types.ts";
@@ -121,7 +121,7 @@ export function createWatcher(
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const watcher = chokidar.watch(root, {
+  const watcher = chokidarWatch(root, {
     awaitWriteFinish: {
       pollInterval: 10,
       stabilityThreshold: debounceMs,

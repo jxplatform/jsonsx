@@ -25,7 +25,7 @@ declare module "@webref/css" {
     [key: string]: unknown;
   }
   const css: {
-    listAll(): Promise<CssData>;
+    listAll: () => Promise<CssData>;
   };
   export default css;
 }
@@ -48,8 +48,8 @@ declare module "@webref/idl" {
     [key: string]: unknown;
   }
   const idl: {
-    parseAll(options?: { folder?: string }): Promise<Record<string, IdlDefinition[]>>;
-    listAll(options?: { folder?: string }): Promise<Record<string, unknown>>;
+    parseAll: (options?: { folder?: string }) => Promise<Record<string, IdlDefinition[]>>;
+    listAll: (options?: { folder?: string }) => Promise<Record<string, unknown>>;
   };
   export default idl;
 }

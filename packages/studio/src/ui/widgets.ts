@@ -19,6 +19,7 @@ import { renderColorSelector } from "./color-selector";
 import { renderUnitSelector } from "./unit-selector";
 import { renderButtonGroup } from "./button-group";
 import { renderMediaPicker } from "./media-picker";
+import type { TemplateResult } from "lit-html";
 
 /**
  * Render a plain text input widget.
@@ -33,7 +34,7 @@ export function renderTextInput(
   prop: string,
   value: string | number | undefined,
   onChange: (val: string) => void,
-  placeholder: string = "",
+  placeholder = "",
 ) {
   return html`
     <sp-textfield
@@ -62,7 +63,7 @@ export function renderNumberInput(
   prop: string,
   value: string | number | undefined,
   onChange: (val: string | number) => void,
-  placeholder: string = "",
+  placeholder = "",
 ) {
   const minimum = entry.minimum as number | undefined;
   const maximum = entry.maximum as number | undefined;
@@ -77,7 +78,7 @@ export function renderNumberInput(
       step=${ifDefined(maximum !== undefined && maximum <= 1 ? 0.1 : undefined)}
       @change=${debouncedStyleCommit(`num:${prop}`, 400, (e: Event) => {
         const v = (e.target as HTMLInputElement & { value: number | undefined }).value;
-        if (v === undefined || isNaN(v)) {
+        if (v === undefined || Number.isNaN(v)) {
           onChange("");
         } else {
           onChange(Number(v));
@@ -125,13 +126,13 @@ export function widgetForType(
       prop: string,
       value: string | number | undefined,
       onCommit: (val: string | number) => void,
-    ) => import("lit-html").TemplateResult;
+    ) => TemplateResult;
     renderCombobox?: (
       entry: Record<string, unknown>,
       prop: string,
       value: string | number | undefined,
       onCommit: (val: string | number) => void,
-    ) => import("lit-html").TemplateResult;
+    ) => TemplateResult;
   } = {},
 ) {
   switch (type) {

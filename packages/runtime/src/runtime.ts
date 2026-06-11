@@ -27,13 +27,19 @@ import {
   paramNames,
 } from "@jxsuite/schema/guards";
 import type {
+  JxAttributeValue,
+  JxClassDef,
   JxDocument,
   JxElement,
   JxFunctionDef,
+  JxHeadEntry,
+  JxMappedArray,
   JxPrototypeDef,
+  JxRef,
   JxServerFnDef,
   JxStyle,
 } from "@jxsuite/schema/types";
+import type { Ref } from "@vue/reactivity";
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
@@ -127,7 +133,9 @@ export function setSkipServerFunctions(v: boolean) {
 }
 
 /** @deprecated No longer needed — ContentCollection/ContentEntry resolve via generic class path */
-export function setSkipContentResolution(_v: boolean) {}
+export function setSkipContentResolution(_v: boolean) {
+  // No-op retained for API compatibility
+}
 
 /**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
@@ -734,6 +742,29 @@ export function applyStyle(
     emitNested(resolved, rules);
   }
 
+  function emitMediaNested(atRule: string, parentSel: string, obj: JxStyle) {
+    for (const [sel, sub] of Object.entries(obj)) {
+      if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
+        continue;
+      }
+      if (sel.startsWith("@")) {
+        continue;
+      }
+      const resolved = sel.startsWith("&")
+        ? sel.replace("&", parentSel)
+        : sel.startsWith("[")
+          ? `${parentSel}${sel}`
+          : sel.startsWith(":") || sel.startsWith(".")
+            ? `${parentSel}${sel}`
+            : `${parentSel} ${sel}`;
+      const props = toCSSText(sub);
+      if (props) {
+        css += `${atRule} { ${resolved} { ${props} } }\n`;
+      }
+      emitMediaNested(atRule, resolved, sub);
+    }
+  }
+
   for (const [key, rules] of Object.entries(media)) {
     if (key === "@--") {
       continue;
@@ -745,30 +776,7 @@ export function applyStyle(
         : key;
     const scope = `[data-jx="${uid}"]`;
     css += `${atRule} { ${scope} { ${toCSSText(rules)} } }\n`;
-
-    function emitMediaNested(parentSel: string, obj: JxStyle) {
-      for (const [sel, sub] of Object.entries(obj)) {
-        if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
-          continue;
-        }
-        if (sel.startsWith("@")) {
-          continue;
-        }
-        const resolved = sel.startsWith("&")
-          ? sel.replace("&", parentSel)
-          : sel.startsWith("[")
-            ? `${parentSel}${sel}`
-            : sel.startsWith(":") || sel.startsWith(".")
-              ? `${parentSel}${sel}`
-              : `${parentSel} ${sel}`;
-        const props = toCSSText(sub);
-        if (props) {
-          css += `${atRule} { ${resolved} { ${props} } }\n`;
-        }
-        emitMediaNested(resolved, sub);
-      }
-    }
-    emitMediaNested(scope, rules);
+    emitMediaNested(atRule, scope, rules);
   }
 
   const tag = document.createElement("style");
@@ -781,11 +789,7 @@ export function applyStyle(
  * @param {Record<string, import("@jxsuite/schema/types").JxAttributeValue>} attrs
  * @param {JxScope} state
  */
-function applyAttributes(
-  el: HTMLElement,
-  attrs: Record<string, import("@jxsuite/schema/types").JxAttributeValue>,
-  state: JxScope,
-) {
+function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue>, state: JxScope) {
   for (const [k, v] of Object.entries(attrs)) {
     if (isRefObj(v)) {
       effect(() => el.setAttribute(k, String(resolveRef(v.$ref, state) ?? "")));
@@ -808,7 +812,7 @@ function applyAttributes(
  */
 function renderMappedArray(
   def: JxElement,
-  arrayDef: import("@jxsuite/schema/types").JxMappedArray,
+  arrayDef: JxMappedArray,
   state: JxScope,
   options?: JxRenderOptions,
 ) {
@@ -827,11 +831,7 @@ function renderMappedArray(
   effect(() => {
     container.innerHTML = "";
     let items: unknown;
-    if (isRefObj(itemsSrc)) {
-      items = resolveRef(itemsSrc.$ref, state);
-    } else {
-      items = itemsSrc;
-    }
+    items = isRefObj(itemsSrc) ? resolveRef(itemsSrc.$ref, state) : itemsSrc;
     if (!Array.isArray(items)) {
       return;
     }
@@ -848,7 +848,7 @@ function renderMappedArray(
       }
     }
 
-    (items as unknown[]).forEach((item, index) => {
+    for (const [index, item] of (items as unknown[]).entries()) {
       const child = Object.create(state);
       child.$map = { index, item };
       child["$map/item"] = item;
@@ -859,7 +859,7 @@ function renderMappedArray(
       if (mapDef) {
         container.append(renderNode(mapDef, child, childOpts));
       }
-    });
+    }
   });
 
   return container;
@@ -899,7 +899,7 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
 
     if (isRefObj(caseDef)) {
       // External $ref — fetch and render asynchronously
-      const gen = ++generation;
+      const gen = (generation += 1);
       const { href } = new URL(caseDef.$ref, location.href);
       resolve(href)
         .then(async (doc) => {
@@ -954,7 +954,7 @@ export async function resolvePrototype(
 
   switch (def.$prototype) {
     case "Request": {
-      const s: import("@vue/reactivity").Ref<unknown> = ref(null);
+      const s: Ref<unknown> = ref(null);
       const debounceMs = def.debounce ?? 0;
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -1035,7 +1035,7 @@ export async function resolvePrototype(
       } catch {
         init = def.default ?? null;
       }
-      const storageState: import("@vue/reactivity").Ref<unknown> = ref(init);
+      const storageState: Ref<unknown> = ref(init);
       // Persist on change
       effect(() => {
         const v = storageState.value;
@@ -1065,9 +1065,7 @@ export async function resolvePrototype(
           return m[1];
         }
       };
-      const cookieState: import("@vue/reactivity").Ref<unknown> = ref(
-        read() ?? def.default ?? null,
-      );
+      const cookieState: Ref<unknown> = ref(read() ?? def.default ?? null);
       // Persist on change
       effect(() => {
         const v = cookieState.value;
@@ -1087,13 +1085,14 @@ export async function resolvePrototype(
         if (def.sameSite) {
           s += `; SameSite=${def.sameSite}`;
         }
+        // oxlint-disable-next-line unicorn/no-document-cookie -- the Cookie $prototype IS the cookie store binding
         document.cookie = s;
       });
       return cookieState;
     }
 
     case "IndexedDB": {
-      const idbState: import("@vue/reactivity").Ref<unknown> = ref(null);
+      const idbState: Ref<unknown> = ref(null);
       const {
         database,
         store,
@@ -1106,7 +1105,7 @@ export async function resolvePrototype(
         throw new Error(`Jx: IndexedDB entry '${key}' requires database and store`);
       }
       const req = indexedDB.open(database, version);
-      req.onupgradeneeded = (e) => {
+      req.addEventListener("upgradeneeded", (e) => {
         const db: IDBDatabase = (e.target as IDBOpenDBRequest).result;
         if (!db.objectStoreNames.contains(store)) {
           const os = db.createObjectStore(store, { autoIncrement, keyPath });
@@ -1114,8 +1113,8 @@ export async function resolvePrototype(
             os.createIndex(i.name, i.keyPath, { unique: i.unique ?? false });
           }
         }
-      };
-      req.onsuccess = (e) => {
+      });
+      req.addEventListener("success", (e) => {
         const db: IDBDatabase = (e.target as IDBOpenDBRequest).result;
         idbState.value = {
           database,
@@ -1125,10 +1124,10 @@ export async function resolvePrototype(
           store,
           version,
         };
-      };
-      req.onerror = () => {
+      });
+      req.addEventListener("error", () => {
         idbState.value = { error: req.error?.message };
-      };
+      });
       return idbState;
     }
 
@@ -1266,7 +1265,7 @@ async function importAndInstantiate(def: JxScope, src: string, exportName: strin
   }
 
   // Always wrap in ref for reactivity with external classes
-  const s: import("@vue/reactivity").Ref<unknown> = ref(value);
+  const s: Ref<unknown> = ref(value);
   if (typeof instance.subscribe === "function") {
     instance.subscribe((newVal: unknown) => {
       s.value = newVal;
@@ -1290,7 +1289,7 @@ async function resolveClassJson(def: JxPrototypeDef, state: JxScope, key: string
   if (!src) {
     throw new Error(`Jx: class entry '${key}' has no $src`);
   }
-  let classDef: import("@jxsuite/schema/types").JxClassDef;
+  let classDef: JxClassDef;
 
   // Bare specifiers (package references like @scope/pkg/file) can't be fetched directly —
   // Go straight to dev proxy which can resolve them via node_modules.
@@ -1311,7 +1310,7 @@ async function resolveClassJson(def: JxPrototypeDef, state: JxScope, key: string
       throw new Error(`HTTP ${res.status}`);
     }
     // Trust boundary: fetched .class.json sources are class definitions by contract.
-    classDef = (await res.json()) as import("@jxsuite/schema/types").JxClassDef;
+    classDef = (await res.json()) as JxClassDef;
   } catch {
     // Fall back to dev proxy (server will handle .class.json resolution)
     return resolveViaDevProxy(def, state, key, base);
@@ -1355,7 +1354,7 @@ async function resolveClassJson(def: JxPrototypeDef, state: JxScope, key: string
   }
 
   // Always wrap in ref for reactivity
-  const s: import("@vue/reactivity").Ref<unknown> = ref(value);
+  const s: Ref<unknown> = ref(value);
   if (typeof instance.subscribe === "function") {
     instance.subscribe((newVal: unknown) => {
       s.value = newVal;
@@ -1371,13 +1370,14 @@ async function resolveClassJson(def: JxPrototypeDef, state: JxScope, key: string
  * @param {import("@jxsuite/schema/types").JxClassDef} classDef
  * @returns {DynamicClass}
  */
-function classFromSchema(classDef: import("@jxsuite/schema/types").JxClassDef) {
+function classFromSchema(classDef: JxClassDef) {
   const fields = classDef.$defs?.fields ?? {};
   // JSON objects inherit Object.prototype.constructor — only an own object value counts.
   const rawCtor = classDef.$defs?.constructor;
   const ctor = typeof rawCtor === "object" ? rawCtor : undefined;
   const methods = classDef.$defs?.methods ?? {};
 
+  // oxlint-disable-next-line typescript/no-extraneous-class -- methods are attached to the prototype dynamically below
   class DynClass {
     constructor(config: Record<string, unknown> = {}) {
       for (const [key, typedField] of Object.entries(fields)) {
@@ -1484,7 +1484,7 @@ async function resolveViaDevProxy(def: JxPrototypeDef, state: JxScope, key: stri
     });
 
   // Always wrap in ref for reactivity
-  const s: import("@vue/reactivity").Ref<unknown> = ref(null);
+  const s: Ref<unknown> = ref(null);
   if (hasTemplates) {
     effect(() => {
       const resolvedConfig: JxScope = {};
@@ -1569,7 +1569,7 @@ async function resolveServerFunction(
   };
 
   // Always wrap in ref for reactivity
-  const s: import("@vue/reactivity").Ref<unknown> = ref(null);
+  const s: Ref<unknown> = ref(null);
   if (hasReactiveArg) {
     effect(() => {
       const args = resolveArgs();
@@ -1633,7 +1633,7 @@ async function resolveServerFunctionViaProxy(
     });
 
   // Always wrap in ref for reactivity
-  const s: import("@vue/reactivity").Ref<unknown> = ref(null);
+  const s: Ref<unknown> = ref(null);
   if (hasReactiveArg) {
     effect(() => {
       const args = resolveArgs();
@@ -1664,35 +1664,35 @@ async function resolveServerFunctionViaProxy(
  * @param {JxScope} state - Reactive scope proxy (or child scope)
  * @returns {unknown}
  */
-export function resolveRef(ref: string, state: JxScope) {
-  if (typeof ref !== "string") {
-    return ref;
+export function resolveRef(refPath: string, state: JxScope) {
+  if (typeof refPath !== "string") {
+    return refPath;
   }
-  if (ref.startsWith("$map/")) {
-    const parts = ref.split("/");
-    const key = parts[1]; // 'item' or 'index'
+  if (refPath.startsWith("$map/")) {
+    const parts = refPath.split("/");
+    const [, key] = parts; // "item" or "index"
     const map = state.$map as Record<string, unknown> | undefined;
     const base = map?.[key] ?? state[`$map/${key}`];
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
-  if (ref.startsWith("#/state/")) {
-    const sub = ref.slice("#/state/".length);
+  if (refPath.startsWith("#/state/")) {
+    const sub = refPath.slice("#/state/".length);
     const slash = sub.indexOf("/");
     if (slash === -1) {
       return state[sub];
     }
     return getPath(state[sub.slice(0, slash)], sub.slice(slash + 1));
   }
-  if (ref.startsWith("parent#/")) {
-    return state[ref.slice("parent#/".length)];
+  if (refPath.startsWith("parent#/")) {
+    return state[refPath.slice("parent#/".length)];
   }
-  if (ref.startsWith("window#/")) {
-    return getPath(globalThis.window, ref.slice("window#/".length));
+  if (refPath.startsWith("window#/")) {
+    return getPath(globalThis.window, refPath.slice("window#/".length));
   }
-  if (ref.startsWith("document#/")) {
-    return getPath(globalThis.document, ref.slice("document#/".length));
+  if (refPath.startsWith("document#/")) {
+    return getPath(globalThis.document, refPath.slice("document#/".length));
   }
-  return state[ref] ?? null;
+  return state[refPath] ?? null;
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -1711,7 +1711,7 @@ export function isSignal(v: unknown) {
  * @param {unknown} v
  * @returns {v is import("@jxsuite/schema/types").JxRef}
  */
-function isRefObj(v: unknown): v is import("@jxsuite/schema/types").JxRef {
+function isRefObj(v: unknown): v is JxRef {
   return isRefValue(v);
 }
 
@@ -1729,7 +1729,11 @@ function isNestedSelector(k: string) {
  * @returns {unknown}
  */
 function getPath(obj: unknown, path: string) {
-  return path.split(/[./]/).reduce((o, k) => (o as Record<string, unknown>)?.[k], obj);
+  let current: unknown = obj;
+  for (const k of path.split(/[./]/)) {
+    current = (current as Record<string, unknown>)?.[k];
+  }
+  return current;
 }
 
 /**
@@ -1823,7 +1827,7 @@ async function registerElements(elements: NonNullable<JxDocument["$elements"]>, 
  * @param {import("@jxsuite/schema/types").JxHeadEntry[]} entries
  * @param {string} _base - Document base URL for resolving relative paths
  */
-function injectHead(entries: import("@jxsuite/schema/types").JxHeadEntry[], _base: string) {
+function injectHead(entries: JxHeadEntry[], _base: string) {
   for (const entry of entries) {
     if (!entry || !entry.tagName) {
       continue;
@@ -1870,18 +1874,20 @@ function injectHead(entries: import("@jxsuite/schema/types").JxHeadEntry[], _bas
  */
 const _definedSources = new Set<string>();
 
-export async function defineElement(source: string | JxDocument, base?: string) {
+export async function defineElement(source: string | JxDocument, baseUrl?: string) {
+  let base = baseUrl;
+  let doc = source;
   if (typeof source === "string") {
     base = new URL(source, base ?? location.href).href;
     if (_definedSources.has(base)) {
       return;
     }
     _definedSources.add(base);
-    source = await resolve(source);
+    doc = await resolve(source);
   }
-  base = base ?? location.href;
+  base ??= location.href;
 
-  const source_: JxDocument = source;
+  const source_: JxDocument = doc as JxDocument;
 
   const { tagName } = source_;
   if (!tagName || !tagName.includes("-")) {

@@ -108,7 +108,9 @@ describe("createWatcher", () => {
       const reader = (response.body as ReadableStream).getReader();
 
       // Wait for chokidar to be ready before writing
-      await new Promise((resolve) => watcher.on("ready", () => resolve()));
+      await new Promise<void>((resolve) => {
+        watcher.on("ready", () => resolve());
+      });
 
       // Write a file to trigger the watcher
       writeFileSync(join(FIXTURES, "trigger.txt"), `change-${Date.now()}`);
@@ -116,7 +118,9 @@ describe("createWatcher", () => {
       // Wait for debounce + watcher to fire
       const { value } = (await Promise.race([
         reader.read(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error("timeout")), 3000);
+        }),
       ])) as ReadableStreamReadResult<Uint8Array>;
       const text = new TextDecoder().decode(value);
       expect(text).toContain("data: reload");

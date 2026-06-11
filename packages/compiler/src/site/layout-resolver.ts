@@ -206,5 +206,5 @@ function fillSlots(
  * @returns {JxDocument}
  */
 function deepClone(obj: JxDocument) {
-  return JSON.parse(JSON.stringify(obj));
+  return structuredClone(obj);
 }

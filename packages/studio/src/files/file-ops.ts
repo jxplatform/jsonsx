@@ -24,6 +24,7 @@ import {
   splitFormatDocument,
 } from "../format/format-host";
 import type { StudioFormat } from "../format/format-host";
+import type { Tab } from "../tabs/tab.js";
 
 /**
  * Parse a format-class source string into document + frontmatter + mode per the format's
@@ -103,7 +104,9 @@ export async function openFile() {
 
     if ("showOpenFilePicker" in window) {
       const [handle] = await (
-        window as unknown as { showOpenFilePicker: Function }
+        window as unknown as {
+          showOpenFilePicker: (options?: unknown) => Promise<FileSystemFileHandle[]>;
+        }
       ).showOpenFilePicker({ types: pickerTypes });
       const file = await handle.getFile();
       await handleSource(handle.name, await file.text(), handle);
@@ -112,13 +115,13 @@ export async function openFile() {
       const input = document.createElement("input");
       input.type = "file";
       input.accept = acceptExts;
-      input.onchange = async () => {
+      input.addEventListener("change", async () => {
         const file = input.files?.[0];
         if (!file) {
           return;
         }
         await handleSource(file.name, await file.text());
-      };
+      });
       input.click();
     }
   } catch (error) {
@@ -170,7 +173,7 @@ export async function saveFile() {
 }
 
 /** The output format for a tab: its source format, or the default content format. */
-function tabFormat(tab: import("../tabs/tab.js").Tab): StudioFormat | undefined {
+function tabFormat(tab: Tab): StudioFormat | undefined {
   return (
     formatByName(tab.doc.sourceFormat) ??
     (tab.doc.mode === "content" ? defaultContentFormat() : undefined)
@@ -195,7 +198,9 @@ export async function exportFile() {
     if ("showSaveFilePicker" in window) {
       const suggestedName = tab.documentPath ? tab.documentPath.split("/").pop() : fallbackName;
       const handle = await (
-        window as unknown as { showSaveFilePicker: Function }
+        window as unknown as {
+          showSaveFilePicker: (options?: unknown) => Promise<FileSystemFileHandle>;
+        }
       ).showSaveFilePicker({
         suggestedName,
         types: [{ accept: { [mimeType]: [ext] }, description }],
@@ -231,7 +236,7 @@ export async function exportFile() {
  * @param {import("../tabs/tab.js").Tab} tab
  * @returns {Promise<string>}
  */
-export async function serializeDocument(tab: import("../tabs/tab.js").Tab): Promise<string> {
+export async function serializeDocument(tab: Tab): Promise<string> {
   await loadFormats();
   const sourceFormat = formatByName(tab.doc.sourceFormat);
   if (sourceFormat?.capabilities.serialize) {

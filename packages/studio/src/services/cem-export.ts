@@ -3,15 +3,15 @@ import type { CemParameter, JxMutableNode, JxStateObject } from "@jxsuite/schema
 import { isFunctionDef, isJsonObject } from "@jxsuite/schema/guards";
 
 /** Collect slot elements from the document tree. */
-export function collectSlots(node: JxMutableNode | null | undefined, slots: string[] = []) {
+export function collectSlots(node?: JxMutableNode | null, slots: string[] = []) {
   if (node?.tagName === "slot") {
     const name = node.attributes?.name;
     slots.push(typeof name === "string" ? name : "");
   }
   if (Array.isArray(node?.children)) {
-    node.children.forEach((c: JxMutableNode | string) =>
-      collectSlots(typeof c === "string" ? undefined : c, slots),
-    );
+    for (const c of node.children) {
+      collectSlots(typeof c === "string" ? undefined : c, slots);
+    }
   }
   return slots;
 }
@@ -112,10 +112,13 @@ export function exportCemManifest(
 
   // Slots
   const slotNames = collectSlots(doc);
-  const slots = slotNames.map((name: string) => ({
-    name: name || "",
-    ...(name ? {} : { description: "Default slot" }),
-  }));
+  const slots = slotNames.map((name: string) => {
+    const slot: { name: string; description?: string } = { name: name || "" };
+    if (!name) {
+      slot.description = "Default slot";
+    }
+    return slot;
+  });
 
   // CSS custom properties
   const style = doc.style || {};

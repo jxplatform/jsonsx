@@ -19,7 +19,7 @@ test("effectScope disposes effects", () => {
   const scope = effectScope();
   scope.run(() => {
     effect(() => {
-      runs++;
+      runs += 1;
       void obj.x;
     });
   });

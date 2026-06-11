@@ -199,7 +199,7 @@ describe("Editing lifecycle", () => {
     let endCount = 0;
     startEditing(el, path, {
       onCommit: () => {},
-      onEnd: () => endCount++,
+      onEnd: () => (endCount += 1),
       onInsert: () => {},
       onSplit: () => {},
     });

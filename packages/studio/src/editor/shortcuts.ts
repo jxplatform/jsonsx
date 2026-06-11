@@ -180,9 +180,9 @@ export function initShortcuts(
         case "w": {
           e.preventDefault();
           if (workspace.activeTabId && workspace.tabOrder.length > 1) {
-            const tab = workspace.tabs.get(workspace.activeTabId);
-            if (tab?.doc.dirty) {
-              const name = tab.documentPath?.split("/").pop() || "Untitled";
+            const tabToClose = workspace.tabs.get(workspace.activeTabId);
+            if (tabToClose?.doc.dirty) {
+              const name = tabToClose.documentPath?.split("/").pop() || "Untitled";
               showConfirmDialog(
                 "Unsaved Changes",
                 `"${name}" has unsaved changes. Close without saving?`,
@@ -274,6 +274,9 @@ export function initShortcuts(
           applyTransform();
           break;
         }
+        default: {
+          break;
+        }
       }
       return;
     }
@@ -333,6 +336,9 @@ export function initShortcuts(
         }
         break;
       }
+      default: {
+        break;
+      }
     }
   });
 
@@ -349,7 +355,7 @@ export function initShortcuts(
 }
 
 /** @param {number} [direction] */
-function navigateSelection(direction: number = -1) {
+function navigateSelection(direction = -1) {
   const tab = activeTab.value;
   if (!tab?.session.selection) {
     activeTab.value!.session.selection = [];

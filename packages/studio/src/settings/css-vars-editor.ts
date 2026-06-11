@@ -7,8 +7,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { projectState } from "../store";
-import { updateSiteConfig } from "../site-context";
-import { getEffectiveMedia } from "../site-context";
+import { getEffectiveMedia, updateSiteConfig } from "../site-context";
 import { friendlyNameToVar, varDisplayName } from "../utils/studio-utils";
 
 import type { JxStyle } from "@jxsuite/schema/types";

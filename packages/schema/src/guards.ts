@@ -137,7 +137,7 @@ export function isNodeObject(value: unknown): value is JxMutableNode & JxElement
 }
 
 /** A `${...}` template-expression string. */
-export function isTemplateString(value: unknown): value is string {
+export function isTemplateString(value?: unknown): value is string {
   return typeof value === "string" && value.includes("${");
 }
 

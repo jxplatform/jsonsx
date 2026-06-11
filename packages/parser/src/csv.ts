@@ -32,7 +32,7 @@ export function parseCSV(csv: string): Record<string, string>[] {
       current += ch;
       if (inQuotes && csv[i + 1] === '"') {
         current += csv[i + 1];
-        i++;
+        i += 1;
       } else {
         inQuotes = !inQuotes;
       }
@@ -40,7 +40,7 @@ export function parseCSV(csv: string): Record<string, string>[] {
       lines.push(current);
       current = "";
       if (ch === "\r") {
-        i++;
+        i += 1;
       }
     } else {
       current += ch;
@@ -63,7 +63,7 @@ export function parseCSV(csv: string): Record<string, string>[] {
       if (ch === '"') {
         if (q && line[i + 1] === '"') {
           field += '"';
-          i++;
+          i += 1;
         } else {
           q = !q;
         }
@@ -123,7 +123,7 @@ export function coerceCSVRows(
           } else {
             const cleaned = raw.replaceAll(/[$€£¥,\s]/g, "");
             const n = Number(cleaned);
-            data[key] = isNaN(n) ? null : n;
+            data[key] = Number.isNaN(n) ? null : n;
           }
         } else if (def.type === "boolean") {
           data[key] = data[key] === "true";

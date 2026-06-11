@@ -1,90 +1,196 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // All categories are enforced at error; "nursery" stays off (unstable/experimental rules).
+  // Every rule below that is "off" carries its justification inline. Default stance: fix the
+  // code, not the config — add an opt-out only when a rule conflicts with a framework idiom
+  // or a tool we can't change, and say why.
   "categories": {
-    "correctness": "off",
+    "correctness": "error",
     "nursery": "off",
-    "pedantic": "off",
-    "perf": "off",
-    "restriction": "off",
-    "style": "off",
-    "suspicious": "off"
+    "pedantic": "error",
+    "perf": "error",
+    "restriction": "error",
+    "style": "error",
+    "suspicious": "error"
   },
   "ignorePatterns": ["dist", "**/*.map"],
   "overrides": [
     {
+      // Tool contracts (commitlint, electrobun, etc.) require default exports.
+      "files": ["**/*.config.*", "**/commitlint.config.js"],
+      "rules": {
+        "import/no-default-export": "off"
+      }
+    },
+    {
+      // Ambient declaration files are intentionally side-effect-free and module-less.
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "import/unambiguous": "off"
+      }
+    },
+    {
       "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*"],
       "rules": {
-        "typescript/no-explicit-any": "off"
+        // Tests stub external shapes freely.
+        "typescript/no-explicit-any": "off",
+        // Test fixtures are intentionally minimal classes (e.g. $prototype resolution doubles).
+        "typescript/no-extraneous-class": "off",
+        "unicorn/no-static-only-class": "off",
+        // Fixture filenames mirror the class they export (WithSchema.ts); test files use a
+        // deliberate underscore-prefix grouping convention (_data_url.test.ts).
+        "unicorn/filename-case": "off",
+        // Build/release scripts are CLIs; exit codes are their interface.
+        "unicorn/no-process-exit": "off"
       }
     }
   ],
   "plugins": ["jsdoc", "import", "unicorn", "oxc", "typescript"],
   "rules": {
-    "curly": "off",
-    "eqeqeq": "off",
+    // ─── Configured (enabled with options) ────────────────────────────────────
+    // `== null` is the deliberate null-or-undefined check; everything else must be strict.
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    // Intentional no-op catches are allowed; everything else must handle or comment.
+    "eslint/no-empty": ["error", { "allowEmptyCatch": true }],
+    // `() => {}` is the idiomatic noop default; named empty functions need a comment.
+    "eslint/no-empty-function": ["error", { "allow": ["arrowFunctions"] }],
+    "eslint/no-plusplus": ["error", { "allowForLoopAfterthoughts": true }],
+    // Function decls hoist; module-level state referenced from closures initializes before use.
+    "eslint/no-use-before-define": ["error", { "functions": false, "variables": false }],
+    // `void promise` is the explicit fire-and-forget marker.
+    "eslint/no-void": ["error", { "allowAsStatement": true }],
+    // A couple of files deliberately co-locate a small helper class with the main one.
+    "max-classes-per-file": ["error", 2],
+    // Jx() is the framework entry point; D-Bus portal methods are capitalized by protocol;
+    // quikchat is a third-party lowercase class.
+    "new-cap": ["error", { "capIsNew": false, "newIsCapExceptions": ["quikchat"] }],
+    // Members are implicitly public; only private/protected must be explicit.
+    "typescript/explicit-member-accessibility": ["error", { "accessibility": "no-public" }],
+
+    // ─── Off: framework-core conflicts ────────────────────────────────────────
+    // "${expr}" template strings inside plain JSON strings ARE the Jx binding syntax.
+    "no-template-curly-in-string": "off",
+    // new Function() is the evaluation mechanism for $prototype: "Function", template
+    // strings, and .class.json dynamic classes.
+    "no-new-func": "off",
+    // __jsonsx_resolve__/__jsonsx_server__ are wire protocol; _name is the private convention.
+    "no-underscore-dangle": "off",
+    // null is a JSON value and Jx documents are JSON; null vs undefined is semantic here.
+    "unicorn/no-null": "off",
+    // delete obj[key] on plain JSON documents is the product (studio document editing).
+    "typescript/no-dynamic-delete": "off",
+
+    // ─── Off: redundant with the TypeScript compiler ──────────────────────────
+    // tsgo (strict) owns undefined-identifier checking; the lint rule has no type info.
     "eslint/no-undef": "off",
-    "eslint/no-undefined": "off",
-    "eslint/no-unused-vars": "off",
-    "eslint/no-use-before-define": "off",
-    "eslint/no-void": "off",
-    "eslint/prefer-named-capture-group": "off",
-    "eslint/require-unicode-regexp": "off",
-    "eslint/sort-imports": "off",
-    "eslint/sort-keys": "off",
-    "eslint/require-await": "off",
-    "func-style": "off",
-    "id-length": "off",
-    "import/exports-last": "off",
-    "import/group-exports": "off",
-    "import/max-dependencies": "off",
-    "import/no-duplicates": "off",
-    "import/no-named-export": "off",
-    "import/no-namespace": "off",
-    "import/no-nodejs-modules": "off",
-    "import/no-unassigned-import": "off",
-    "import/prefer-default-export": "off",
-    "import/no-relative-parent-imports": "off",
-    "init-declarations": "off",
+    // Types live in signatures; JSDoc keeps prose only (param/return types would duplicate TS).
+    "jsdoc/require-param": "off",
     "jsdoc/require-param-description": "off",
+    "jsdoc/require-param-type": "off",
     "jsdoc/require-returns": "off",
     "jsdoc/require-returns-description": "off",
     "jsdoc/require-returns-type": "off",
-    "max-classes-per-file": "off",
+    // Inference-first codebase; tsgo strict mode validates every boundary anyway.
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-module-boundary-types": "off",
+
+    // ─── Off: TypeScript idiom ────────────────────────────────────────────────
+    // `undefined` is central to optionality with exactOptionalPropertyTypes on.
+    "eslint/no-undefined": "off",
+    // `!` asserts established invariants (activeTab.value! after guards) pervasively;
+    // converting ~150 sites to runtime guards is a behavioral refactor, not a lint fix.
+    "typescript/no-non-null-assertion": "off",
+
+    // ─── Off: contradicts an enabled rule or the formatter ────────────────────
+    // Superseded by eqeqeq with null: "ignore" — `== null` is allowed on purpose.
+    "eslint/no-eq-null": "off",
+    // import/no-default-export is enforced; its mirror images must stay off.
+    "import/prefer-default-export": "off",
+    "import/no-named-export": "off",
+    // The eslint variant flags split value/type imports; import/no-duplicates (enabled,
+    // type-aware) covers this correctly.
+    "no-duplicate-imports": "off",
+    // oxfmt rewrites hex digits to lowercase; this rule demands uppercase. Formatter wins.
+    "unicorn/number-literal-case": "off",
+
+    // ─── Off: deliberate architecture ─────────────────────────────────────────
+    // Studio store/PAL pattern: `export let` refs populated once by initShellRefs().
+    "import/no-mutable-exports": "off",
+    // Side-effect imports are the registration mechanism (Spectrum components,
+    // monaco-setup, happy-dom test bootstrap).
+    "import/no-unassigned-import": "off",
+    // `import * as panel` module-object registries (studio panels) and monaco's canonical
+    // namespace import.
+    "import/no-namespace": "off",
+    // server/compiler/desktop are Node programs; node: imports are the point.
+    "import/no-nodejs-modules": "off",
+    // Intra-package "../x" imports are the monorepo layout; aliases would add indirection.
+    "import/no-relative-parent-imports": "off",
+    // Sequential awaits in build/IO pipelines are ordered on purpose (file writes,
+    // git operations, page compilation).
+    "no-await-in-loop": "off",
+    // async-without-await implements Promise-returning PAL/platform interface contracts.
+    "eslint/require-await": "off",
+    // CLI and server logging is the product's output, not leftover debugging.
+    "no-console": "off",
+    // Single-use helpers are deliberately co-located inside their only caller; the rule
+    // would scatter them to module scope (and false-positives on lit render helpers).
+    "unicorn/consistent-function-scoping": "off",
+    // Browser-targeted modules (studio, runtime DOM paths) use window/document by intent;
+    // globalThis is reserved for genuinely isomorphic code.
+    "unicorn/prefer-global-this": "off",
+
+    // ─── Off: style preferences that fight existing convention ────────────────
+    // Both declarations and arrow consts are used, by role (hoisted helpers vs closures).
+    "func-style": "off",
+    // e/t/i/S-style short names are pervasive in render/loop code.
+    "id-length": "off",
+    // Threshold caps would mandate refactors without correctness value; complexity is
+    // reviewed, not counted.
+    "complexity": "off",
     "max-depth": "off",
     "max-lines": "off",
     "max-lines-per-function": "off",
     "max-params": "off",
     "max-statements": "off",
-    "no-await-in-loop": "off",
-    "no-console": "off",
-    "no-continue": "off",
-    "no-duplicate-imports": "off",
-    "no-inline-comments": "off",
+    // Widths/timeouts/indices read fine inline; naming 2600 constants is noise.
     "no-magic-numbers": "off",
+    // Guard-clause `continue` is the established loop idiom.
+    "no-continue": "off",
+    "no-inline-comments": "off",
+    // Negated conditions with early returns are often the clearest form.
     "no-negated-condition": "off",
+    "unicorn/no-negated-condition": "off",
+    // Nested ternaries are idiomatic in lit-html template expressions.
     "no-nested-ternary": "off",
-    "no-shadow": "off",
+    "unicorn/no-nested-ternary": "off",
     "no-ternary": "off",
+    // let-without-initializer across branches is normal TS control flow.
+    "init-declarations": "off",
+    // Object keys are mostly alphabetized by convention, but semantic groupings (icon
+    // sections, platform method domains, option objects mirroring signatures) are
+    // deliberate; mechanical sorting would destroy them.
+    "sort-keys": "off",
+    // Import order isn't formatter-managed here; manual alphabetization is churn.
+    "sort-imports": "off",
+    // Section-comment organization (── headers ──) takes precedence over export grouping.
+    "import/exports-last": "off",
+    "import/group-exports": "off",
+    // Hub modules (studio.ts) intentionally exceed any sensible dependency cap.
+    "import/max-dependencies": "off",
+    // unicorn's per-module import-style table contradicts existing named-import usage.
+    "unicorn/import-style": "off",
+    // Index captures in local one-line regexes don't benefit from names; /u retrofits
+    // across 200+ existing regexes risk subtle escape-semantics changes.
+    "eslint/prefer-named-capture-group": "off",
+    "eslint/require-unicode-regexp": "off",
+
+    // ─── Off: ES-downlevel restrictions (irrelevant on modern targets) ────────
     "oxc/no-async-await": "off",
     "oxc/no-optional-chaining": "off",
-    "oxc/no-rest-spread-properties": "off",
-    "sort-imports": "off",
-    "sort-keys": "off",
-    "typescript/explicit-function-return-type": "off",
-    "typescript/explicit-module-boundary-types": "off",
-    "typescript/no-explicit-any": "off",
-    "unicorn/consistent-function-scoping": "off",
-    "unicorn/filename-case": "off",
-    "unicorn/no-array-sort": "off",
-    "unicorn/no-nested-ternary": "off",
-    "unicorn/no-null": "off",
-    "unicorn/prefer-global-this": "off",
-    "unicorn/prefer-top-level-await": "off"
+    "oxc/no-rest-spread-properties": "off"
   },
   "settings": {
-    "eslint": {
-      "sort-imports": false
-    },
     "jsdoc": {
       "check-access": true,
       "check-property-names": true,
@@ -92,10 +198,10 @@
       "empty-tags": true,
       "implements-on-classes": true,
       "no-defaults": true,
-      "require-param": true,
+      "require-param": false,
       "require-param-description": false,
       "require-param-name": true,
-      "require-param-type": true,
+      "require-param-type": false,
       "require-property": true,
       "require-property-description": true,
       "require-property-name": true,

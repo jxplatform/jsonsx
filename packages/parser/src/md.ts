@@ -46,7 +46,7 @@ function visit(
       return;
     }
     if (!type || node.type === type) {
-      (visitor as Function)(node);
+      (visitor as (node: MdastNode) => void)(node);
     }
     if (Array.isArray(node.children)) {
       for (const child of node.children) {
@@ -165,7 +165,6 @@ export function processMarkdown(
 
   const tree = processor.parse(source);
   const vfile = { data: {} };
-  // @ts-expect-error - vfile shape satisfies unified's internal contract
   processor.runSync(tree, vfile);
 
   const vfileData = vfile.data as Record<string, unknown>;
@@ -179,9 +178,10 @@ export function processMarkdown(
   const bodyNodes = tree.children.filter(
     (n: MdastNode) => n.type !== "yaml" && n.type !== "toml",
   ) as MdastNode[];
-  const $children = bodyNodes
-    .map(/** @type {(n: MdastNode) => any} */ mdastNodeToJx)
-    .filter(Boolean) as (JxElement | string)[];
+  const $children = bodyNodes.map((n: MdastNode) => mdastNodeToJx(n)).filter(Boolean) as (
+    | JxElement
+    | string
+  )[];
 
   return {
     $children,
@@ -203,12 +203,11 @@ export function processMarkdown(
  * @returns {unknown}
  */
 function getNestedValue(obj: Record<string, unknown> | MarkdownFileResult, path: string) {
-  return path
-    .split(".")
-    .reduce(
-      (o: unknown, k) => (o as Record<string, unknown> | undefined)?.[k],
-      /** @type {unknown} */ obj,
-    );
+  let current: unknown = obj;
+  for (const k of path.split(".")) {
+    current = (current as Record<string, unknown> | undefined)?.[k];
+  }
+  return current;
 }
 
 // ─── Markdown format class (re-exported from browser-safe module) ────────────
@@ -291,7 +290,9 @@ export class MarkdownCollection {
     // Filter
     let filtered = results;
     if (typeof filter === "function") {
-      filtered = results.filter(/** @type {(r: MarkdownFileResult) => boolean} */ filter);
+      filtered = results.filter((r: MarkdownFileResult) =>
+        (filter as (r: MarkdownFileResult) => boolean)(r),
+      );
     }
 
     // Sort

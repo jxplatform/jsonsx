@@ -18,9 +18,9 @@ import { effectiveZoom } from "../canvas/canvas-helpers";
 
 import type { CanvasPanel } from "../types";
 
-export type { CanvasPanel };
-
 import type { JxPath } from "../state";
+
+export type { CanvasPanel };
 
 interface DropInstruction {
   type: "reorder-above" | "reorder-below" | "make-child";
@@ -55,7 +55,7 @@ export function registerPanelDnD(panel: CanvasPanel) {
       }[];
     };
   }) => {
-    const target = location.current.dropTargets[0];
+    const [target] = location.current.dropTargets;
     if (!target) {
       return null;
     }

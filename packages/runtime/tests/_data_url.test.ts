@@ -1,13 +1,16 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
+import { describe, test, expect, mock } from "bun:test";
+import { buildScope, Jx } from "../src/runtime";
+
 try {
   GlobalRegistrator.register();
 } catch {}
 
-import { describe, test, expect, mock } from "bun:test";
-import { buildScope, Jx } from "../src/runtime";
-
-const wait = () => new Promise((r) => setTimeout(r, 0));
+const wait = () =>
+  new Promise((r) => {
+    setTimeout(r, 0);
+  });
 const BASE = "http://localhost/";
 
 describe("buildScope", () => {

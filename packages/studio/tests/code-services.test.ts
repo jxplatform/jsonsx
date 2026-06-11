@@ -3,15 +3,6 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { registerPlatform } from "../src/platform";
 import type { StudioPlatform } from "../src/types";
 
-// Mock monaco-editor
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
-  MarkerSeverity: { Error: 8, Warning: 4 },
-  Uri: { parse: (url: any) => ({ toString: () => url }) },
-  editor: {
-    setModelMarkers: mock(() => {}),
-  },
-}));
-
 import {
   codeService,
   locateDocument,
@@ -21,6 +12,15 @@ import {
   getFunctionArgs,
 } from "../src/services/code-services";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
+
+// Mock monaco-editor
+mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+  MarkerSeverity: { Error: 8, Warning: 4 },
+  Uri: { parse: (url: any) => ({ toString: () => url }) },
+  editor: {
+    setModelMarkers: mock(() => {}),
+  },
+}));
 
 // ─── codeService ────────────────────────────────────────────────────────────
 
@@ -148,7 +148,7 @@ describe("setLintMarkers", () => {
     ] as any;
     setLintMarkers(editor, diagnostics);
     expect(monaco.editor.setModelMarkers).toHaveBeenCalled();
-    const call = (monaco.editor.setModelMarkers as any).mock.calls[0];
+    const [call] = (monaco.editor.setModelMarkers as any).mock.calls;
     expect(call[0]).toBe(model);
     expect(call[1]).toBe("oxlint");
     expect(call[2][0].message).toContain("Unused variable");

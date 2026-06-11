@@ -101,11 +101,11 @@ export function getLonghands(shorthandProp: string) {
  */
 export function expandShorthand(shortVal: string, count: number) {
   if (!shortVal) {
-    return Array(count).fill("");
+    return Array.from({ length: count }, () => "");
   }
   const parts = shortVal.trim().split(/\s+/);
   if (count !== 4 || parts.length === 0) {
-    return Array(count).fill("");
+    return Array.from({ length: count }, () => "");
   }
   if (parts.length === 1) {
     return [parts[0], parts[0], parts[0], parts[0]];
@@ -164,10 +164,10 @@ export function expandBorderSide(value: string) {
   let depth = 0;
   for (const ch of value.trim()) {
     if (ch === "(") {
-      depth++;
+      depth += 1;
     }
     if (ch === ")") {
-      depth--;
+      depth -= 1;
     }
     if (ch === " " && depth === 0) {
       if (current) {

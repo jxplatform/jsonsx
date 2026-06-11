@@ -8,8 +8,10 @@ import { activeTab } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
 import { openSettingsModal } from "../settings/settings-modal";
 import { refreshGitStatus } from "./git-panel";
+import type { EffectScope } from "@vue/reactivity";
+import type { TemplateResult } from "lit-html";
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 export function mount() {
   _scope = effectScope();
@@ -57,7 +59,7 @@ const gitBranchIcon = (s: string) => html`
  * @param {string} [size]
  */
 export function tabIcon(tag: string, size?: string) {
-  const m: Record<string, (s: string) => import("lit-html").TemplateResult> = {
+  const m: Record<string, (s: string) => TemplateResult> = {
     "sp-icon-artboard": (s: string) =>
       html`<sp-icon-artboard slot="icon" size=${s}></sp-icon-artboard>`,
     "sp-icon-box": (s: string) => html`<sp-icon-box slot="icon" size=${s}></sp-icon-box>`,
@@ -107,14 +109,13 @@ export function renderActivityBar() {
         if (clicked === view.leftTab && !view.leftPanelCollapsed) {
           view.leftPanelCollapsed = true;
           applyPanelCollapse();
-          renderActivityBar();
         } else {
           view.leftTab = clicked;
           view.leftPanelCollapsed = false;
           applyPanelCollapse();
           renderOnly("leftPanel");
-          renderActivityBar();
         }
+        renderActivityBar();
       }}
     >
       ${tabs.map(

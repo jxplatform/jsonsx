@@ -69,14 +69,12 @@ import { html, render as litRender } from "lit-html";
 
 import webdata from "../data/webdata.json";
 import { renderDataExplorerTemplate } from "./panels/data-explorer";
-import { renderGitPanel } from "./panels/git-panel";
+import { cloneRepository, renderGitPanel } from "./panels/git-panel";
 
 // ─── Spectrum Web Components ──────────────────────────────────────────────────
 // Explicit class imports + registration — bare side-effect imports are tree-shaken
 // By Bun's bundler despite sideEffects declarations in Spectrum's package.json.
 import { components as _swc } from "./ui/spectrum";
-
-void _swc;
 import "./ui/panel-resize.js";
 import { initLayers } from "./ui/layers";
 import { initShortcuts } from "./editor/shortcuts";
@@ -98,10 +96,11 @@ import { initQuickSearch } from "./panels/quick-search";
 import { addRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
-import { cloneRepository } from "./panels/git-panel";
 import type { DocumentStackEntry, GitDiffState } from "./types";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+
+void _swc;
 
 // ─── Globals ──────────────────────────────────────────────────────────────────
 // These mutable variables are local to studio.js for now. As sections are extracted
@@ -499,6 +498,7 @@ if (_projectParam) {
   } else {
     render();
     const platform = getPlatform();
+    // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: project probing must not block the initial render
     (async () => {
       try {
         const siteCtx = platform.resolveSiteContext
@@ -581,7 +581,7 @@ if (_projectParam) {
 
         const content = await platform.readFile(fileRelPath);
         if (content) {
-          let parsedDoc, frontmatter, parsedMode;
+          let frontmatter, parsedDoc, parsedMode;
           await loadFormats();
           const fileFormat = formatForPath(fileRelPath);
           if (fileFormat) {
@@ -731,7 +731,7 @@ initShortcuts(() => ({
 
 // ─── Autosave (registered as update middleware) ──────────────────────────────
 
-const AUTO_SAVE_DELAY: number = 2000;
+const AUTO_SAVE_DELAY = 2000;
 
 function scheduleAutosave() {
   const tab = activeTab.value;

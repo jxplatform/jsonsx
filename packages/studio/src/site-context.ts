@@ -24,7 +24,7 @@ import type {
  *   undefined)
  * @returns {Record<string, string>}
  */
-export function getEffectiveMedia(docMedia: Record<string, string> | undefined) {
+export function getEffectiveMedia(docMedia?: Record<string, string>) {
   const siteMedia = projectState?.projectConfig?.$media;
   if (!siteMedia) {
     return docMedia || {};
@@ -42,7 +42,7 @@ export function getEffectiveMedia(docMedia: Record<string, string> | undefined) 
  * @param {JxStyle | undefined} docStyle - The current document's style (may be undefined)
  * @returns {JxStyle}
  */
-export function getEffectiveStyle(docStyle: JxStyle | undefined) {
+export function getEffectiveStyle(docStyle?: JxStyle) {
   const siteStyle = projectState?.projectConfig?.style;
   if (!siteStyle) {
     return docStyle || {};
@@ -52,16 +52,10 @@ export function getEffectiveStyle(docStyle: JxStyle | undefined) {
   }
   const merged = { ...siteStyle };
   for (const [k, v] of Object.entries(docStyle)) {
-    if (
-      typeof v === "object" &&
-      v !== null &&
-      typeof merged[k] === "object" &&
-      merged[k] !== null
-    ) {
-      merged[k] = { ...(merged[k] as JxStyle), ...(v as JxStyle) };
-    } else {
-      merged[k] = v;
-    }
+    merged[k] =
+      typeof v === "object" && v !== null && typeof merged[k] === "object" && merged[k] !== null
+        ? { ...(merged[k] as JxStyle), ...(v as JxStyle) }
+        : v;
   }
   return merged;
 }
@@ -73,7 +67,7 @@ export function getEffectiveStyle(docStyle: JxStyle | undefined) {
  *   undefined)
  * @returns {Record<string, string>}
  */
-export function getEffectiveImports(docImports: Record<string, string> | undefined) {
+export function getEffectiveImports(docImports?: Record<string, string>) {
   const siteImports = projectState?.projectConfig?.imports;
   if (!siteImports) {
     return docImports || {};

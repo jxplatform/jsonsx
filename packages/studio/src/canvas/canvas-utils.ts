@@ -16,6 +16,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getLayerSlot } from "../ui/layers";
 import { findCanvasElement, getActivePanel } from "./canvas-helpers";
+import type { TemplateResult } from "lit-html";
 
 let _ctx: {
   getCanvasMode: () => string;
@@ -58,7 +59,7 @@ export function canvasPanelTemplate(
   label: string | null,
   fullWidth: boolean,
   width: number | null = null,
-): { tpl: import("lit-html").TemplateResult; panel: CanvasPanel } {
+): { tpl: TemplateResult; panel: CanvasPanel } {
   // The DOM fields start null and are wired by the template's ref() directives,
   // Which lit runs synchronously during render — before any consumer reads them.
   const panel = {
@@ -269,7 +270,7 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
     const targetY = startY + offsetY;
     const start = performance.now();
     const duration = 250;
-    function step(now: number) {
+    const step = (now: number) => {
       const t = Math.min((now - start) / duration, 1);
       const ease = t * (2 - t);
       view.panY = startY + (targetY - startY) * ease;
@@ -277,7 +278,7 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
       if (t < 1) {
         requestAnimationFrame(step);
       }
-    }
+    };
     requestAnimationFrame(step);
   }
 }

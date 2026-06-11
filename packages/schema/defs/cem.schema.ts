@@ -15,7 +15,7 @@ export const cemParameterSchema = {
 
 export const cemEventSchema = {
   description:
-    "A CEM-compatible event definition. " + "Describes a CustomEvent the function dispatches.",
+    "A CEM-compatible event definition. Describes a CustomEvent the function dispatches.",
   properties: {
     deprecated: {
       description: "Deprecation notice.",

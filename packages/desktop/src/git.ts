@@ -39,7 +39,8 @@ export async function gitStatus(): Promise<GitStatusResult> {
     };
   }
 
-  const branch = (await git("branch", "--show-current")).trim();
+  const branchRaw = await git("branch", "--show-current");
+  const branch = branchRaw.trim();
   const porcelain = await git("status", "--porcelain=v1");
   const files = porcelain
     .trim()
@@ -53,8 +54,8 @@ export async function gitStatus(): Promise<GitStatusResult> {
   let ahead = 0;
   let behind = 0;
   try {
-    ahead = Number.parseInt(await git("rev-list", "--count", "@{u}..HEAD")) || 0;
-    behind = Number.parseInt(await git("rev-list", "--count", "HEAD..@{u}")) || 0;
+    ahead = Number.parseInt(await git("rev-list", "--count", "@{u}..HEAD"), 10) || 0;
+    behind = Number.parseInt(await git("rev-list", "--count", "HEAD..@{u}"), 10) || 0;
   } catch {
     // No upstream configured
   }
@@ -71,7 +72,8 @@ export async function gitStatus(): Promise<GitStatusResult> {
 }
 
 export async function gitBranches(): Promise<GitBranchesResult> {
-  const current = (await git("branch", "--show-current")).trim();
+  const currentRaw = await git("branch", "--show-current");
+  const current = currentRaw.trim();
   const output = await git("branch", "-a", "--format=%(refname:short)");
   const branches = output.trim().split("\n").filter(Boolean);
   return { branches, current };
@@ -105,7 +107,8 @@ export async function gitCommit(params: { message: string }): Promise<void> {
 
 export async function gitPush(params?: { setUpstream?: boolean }): Promise<void> {
   if (params?.setUpstream) {
-    const branch = (await git("rev-parse", "--abbrev-ref", "HEAD")).trim();
+    const branchRaw = await git("rev-parse", "--abbrev-ref", "HEAD");
+    const branch = branchRaw.trim();
     await git("push", "-u", "origin", branch);
   } else {
     await git("push");

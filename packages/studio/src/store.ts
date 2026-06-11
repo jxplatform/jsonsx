@@ -13,6 +13,7 @@ import { activeTab } from "./workspace/workspace";
 import { isEventBinding } from "@jxsuite/schema/guards";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { CanvasPanel } from "./panels/canvas-dnd.js";
 
 export {
   createState,
@@ -53,7 +54,7 @@ export function initShellRefs() {
 
 export const elToPath = new WeakMap<Element, JxPath>();
 
-export const canvasPanels: import("./panels/canvas-dnd.js").CanvasPanel[] = [];
+export const canvasPanels: CanvasPanel[] = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
   }
   if (Array.isArray(node)) {
     // Arrays of nodes round-trip element-wise; the array itself is not a node.
-    return node.map(stripEventHandlers) as unknown as JxMutableNode;
+    return node.map((n) => stripEventHandlers(n)) as unknown as JxMutableNode;
   }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(node)) {
@@ -147,7 +148,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
     }
     if (k === "children") {
       out.children = Array.isArray(v)
-        ? v.map(stripEventHandlers)
+        ? v.map((c) => stripEventHandlers(c))
         : stripEventHandlers(v as JxMutableNode);
     } else if (k === "cases" && typeof v === "object") {
       const cases: Record<string, unknown> = {};
@@ -175,7 +176,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
 
 // ─── Render orchestration ────────────────────────────────────────────────────
 
-const _renderers = new Map<string, Function>();
+const _renderers = new Map<string, () => void>();
 
 /**
  * Register a named renderer. Called at module import time by each module.

@@ -6,7 +6,6 @@ import { projectState } from "../store";
 import { updateSiteConfig } from "../site-context";
 import { getPlatform } from "../platform";
 import { openFileInTab } from "../files/files";
-import { closeSettingsModal } from "./settings-modal";
 
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
@@ -18,7 +17,7 @@ export function renderGeneralSettings(container: HTMLElement) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*,.ico,.svg";
-    input.onchange = async () => {
+    input.addEventListener("change", async () => {
       const file = input.files?.[0];
       if (!file) {
         return;
@@ -27,7 +26,7 @@ export function renderGeneralSettings(container: HTMLElement) {
       await platform.uploadFile("public/favicon.ico", file);
       await updateSiteConfig({ favicon: "/favicon.ico" });
       renderGeneralSettings(container);
-    };
+    });
     input.click();
   };
 
@@ -37,7 +36,9 @@ export function renderGeneralSettings(container: HTMLElement) {
     });
   };
 
-  const onEditGlobalStyles = () => {
+  const onEditGlobalStyles = async () => {
+    // Lazy import breaks the general-settings ↔ settings-modal module cycle
+    const { closeSettingsModal } = await import("./settings-modal");
     closeSettingsModal();
     openFileInTab("project.json");
   };

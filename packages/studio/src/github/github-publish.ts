@@ -7,7 +7,6 @@ import { ref } from "lit-html/directives/ref.js";
 import { showDialog } from "../ui/layers";
 import { authenticateGithub } from "./github-auth";
 import { getPlatform } from "../platform";
-import { refreshGitStatus } from "../panels/git-panel";
 import { statusMessage } from "../panels/statusbar";
 
 /**
@@ -127,6 +126,8 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
     return false;
   }
 
+  // Lazy import breaks the github-publish ↔ git-panel module cycle
+  const { refreshGitStatus } = await import("../panels/git-panel");
   await refreshGitStatus();
   statusMessage(`Published to GitHub: ${repo.html_url}`);
   return true;

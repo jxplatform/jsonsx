@@ -89,7 +89,7 @@ export function createDevServerPlatform() {
       try {
         dirHandle = await (
           window as unknown as {
-            showDirectoryPicker(opts: { mode: string }): Promise<FileSystemDirectoryHandle>;
+            showDirectoryPicker: (opts: { mode: string }) => Promise<FileSystemDirectoryHandle>;
           }
         ).showDirectoryPicker({ mode: "readwrite" });
       } catch (error) {
@@ -247,7 +247,7 @@ export function createDevServerPlatform() {
      * @param {string} path — project-relative destination path
      * @param {File | Blob | ArrayBuffer} data — file content
      */
-    async uploadFile(path: string, data: File | Blob | ArrayBuffer) {
+    async uploadFile(path: string, data: string | File | Blob | ArrayBuffer) {
       const res = await fetch(
         `/__studio/file/upload?path=${encodeURIComponent(serverPath(path))}`,
         { body: data, method: "POST" },
@@ -294,7 +294,7 @@ export function createDevServerPlatform() {
     // ─── Component discovery ──────────────────────────────────────────────
 
     /** @param {string} dir */
-    async discoverComponents(dir: string) {
+    async discoverComponents(dir?: string) {
       const scanDir = dir || _projectRoot;
       if (!scanDir) {
         return [];
@@ -392,7 +392,8 @@ export function createDevServerPlatform() {
           method: "POST",
         });
         if (res.ok) {
-          return (await res.json()).path || null;
+          const body = await res.json();
+          return body.path || null;
         }
       } catch {}
       return null;
@@ -426,7 +427,8 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         return [];
       }
-      return (await res.json()).formats ?? [];
+      const body = await res.json();
+      return body.formats ?? [];
     },
 
     /**
@@ -454,7 +456,7 @@ export function createDevServerPlatform() {
      * @param {string} prototype
      * @param {string} base
      */
-    async fetchPluginSchema(src: string, prototype: string, base: string) {
+    async fetchPluginSchema(src: string, prototype?: string, base?: string) {
       const params = new URLSearchParams({ src });
       if (prototype) {
         params.set("prototype", prototype);
@@ -506,7 +508,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -519,7 +522,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -532,7 +536,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -545,7 +550,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -553,7 +559,8 @@ export function createDevServerPlatform() {
     async gitPull() {
       const res = await fetch("/__studio/git/pull", { method: "POST" });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -561,7 +568,8 @@ export function createDevServerPlatform() {
     async gitFetch() {
       const res = await fetch("/__studio/git/fetch", { method: "POST" });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -574,7 +582,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -587,14 +596,15 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
 
-    /** @param {string} path */
-    async gitDiff(path: string) {
-      const res = await fetch(`/__studio/git/diff?path=${encodeURIComponent(path)}`);
+    /** @param {string} [path] */
+    async gitDiff(path?: string) {
+      const res = await fetch(`/__studio/git/diff?path=${encodeURIComponent(path ?? "")}`);
       if (!res.ok) {
         throw new Error(await res.text());
       }
@@ -623,7 +633,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -636,7 +647,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -644,7 +656,8 @@ export function createDevServerPlatform() {
     async gitInit() {
       const res = await fetch("/__studio/git/init", { method: "POST" });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
     },
 
@@ -659,7 +672,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
     },
 
@@ -678,7 +692,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },
@@ -691,7 +706,8 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        throw new Error((await res.json()).error);
+        const body = await res.json();
+        throw new Error(body.error);
       }
       return await res.json();
     },

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { compileStaticPage } from "../src/targets/compile-static";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 // ─── compileStaticPage ─────────────────────────────────────────────────────
 
@@ -148,7 +149,7 @@ describe("compileStaticPage", () => {
   test("handles numeric and boolean children", () => {
     const doc = {
       children: [{ children: [42, true], tagName: "p" }],
-    } as unknown as import("@jxsuite/schema/types").JxDocument;
+    } as unknown as JxDocument;
     const { html } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("42");
     expect(html).toContain("true");

@@ -10,7 +10,7 @@ import { stdin, stdout } from "node:process";
 import { basename, resolve } from "node:path";
 import { generateProject } from "./generate";
 
-const dest = process.argv[2];
+const [dest] = process.argv.slice(2);
 if (!dest) {
   console.error("Usage: bun create @jxsuite <directory>");
   process.exit(1);

@@ -6,7 +6,13 @@
 
 import { html, nothing } from "lit-html";
 import { errorMessage } from "@jxsuite/schema/parse";
-import type { GitBranchesResult, GitDiffState, GitFileStatus, GitStatusResult } from "../types";
+import type {
+  GitBranchesResult,
+  GitDiffState,
+  GitFileStatus,
+  GitStatusResult,
+  StudioPlatform,
+} from "../types";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
 import { getPlatform } from "../platform";
@@ -17,7 +23,6 @@ import { view } from "../view";
 import { showConfirmDialog, showDialog } from "../ui/layers";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
-import type { StudioPlatform } from "../types";
 
 interface GitLogEntry {
   hash: string;
@@ -122,7 +127,8 @@ export function platformSupportsClone() {
  * @param {unknown} [body]
  */
 async function gitAction(action: string, body?: unknown) {
-  const plat = getPlatform() as Record<string, Function> & StudioPlatform;
+  const plat = getPlatform() as Record<string, (...args: unknown[]) => Promise<unknown>> &
+    StudioPlatform;
   updateUi("gitLoading", true);
   updateUi("gitError", null);
   try {
@@ -386,6 +392,7 @@ export function renderGitPanel(
           const val = (e.target as HTMLInputElement).value;
           if (val === "__new__") {
             (e.target as HTMLInputElement).value = branches?.current || "";
+            // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
             const name = prompt("New branch name:");
             if (name?.trim()) {
               await gitAction("gitCreateBranch", name.trim());

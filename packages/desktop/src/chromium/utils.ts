@@ -2,15 +2,15 @@ import { sessionBus } from "dbus-ts";
 
 // Minimal D-Bus portal interface types (external/opaque)
 interface DbusFileChooserPortal {
-  OpenFile(
+  OpenFile: (
     parent: string,
     title: string,
     options: [string, [string, unknown]][],
-  ): Promise<[string, ...unknown[]]>;
+  ) => Promise<[string, ...unknown[]]>;
 }
 
 interface DbusRequest {
-  on(event: "Response", handler: (response: number, results: unknown) => void): void;
+  on: (event: "Response", handler: (response: number, results: unknown) => void) => void;
 }
 
 export async function openFileDialog(): Promise<string | null> {

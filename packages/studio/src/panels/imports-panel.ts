@@ -338,7 +338,7 @@ function renderDocumentLevelImports({
   const availableComponents = componentRegistry.filter(
     (c: ComponentEntry) =>
       c.source !== "npm" &&
-      Boolean(c.path) &&
+      c.path != null &&
       !importedRefs.has(`./${c.path}`) &&
       !importedRefs.has(c.path),
   );

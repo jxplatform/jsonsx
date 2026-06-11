@@ -104,7 +104,7 @@ describe("mdToJx", () => {
       type: "paragraph",
     });
     const result: any = mdToJx(mdast);
-    const p = result.children[0];
+    const [p] = result.children;
     expect(p.children[0]).toEqual({ tagName: "em", textContent: "italic" });
   });
 
@@ -114,7 +114,7 @@ describe("mdToJx", () => {
       type: "paragraph",
     });
     const result: any = mdToJx(mdast);
-    const p = result.children[0];
+    const [p] = result.children;
     expect(p.children[0]).toEqual({ tagName: "strong", textContent: "bold" });
   });
 
@@ -124,7 +124,7 @@ describe("mdToJx", () => {
       type: "paragraph",
     });
     const result: any = mdToJx(mdast);
-    const p = result.children[0];
+    const [p] = result.children;
     expect(p.children[0]).toEqual({
       tagName: "code",
       textContent: "const x = 1",
@@ -137,7 +137,7 @@ describe("mdToJx", () => {
       type: "paragraph",
     });
     const result: any = mdToJx(mdast);
-    const a = result.children[0].children[0];
+    const [a] = result.children[0].children;
     expect(a.tagName).toBe("a");
     expect(a.attributes.href).toBe("https://example.com");
     expect(a.textContent).toBe("Example");
@@ -149,7 +149,7 @@ describe("mdToJx", () => {
       type: "paragraph",
     });
     const result: any = mdToJx(mdast);
-    const img = result.children[0].children[0];
+    const [img] = result.children[0].children;
     expect(img.tagName).toBe("img");
     expect(img.attributes.src).toBe("img.png");
     expect(img.attributes.alt).toBe("Alt text");
@@ -159,7 +159,7 @@ describe("mdToJx", () => {
   test("converts unordered list", () => {
     const mdast = root(list(false, listItem(paragraph("Item 1")), listItem(paragraph("Item 2"))));
     const result: any = mdToJx(mdast);
-    const ul = result.children[0];
+    const [ul] = result.children;
     expect(ul.tagName).toBe("ul");
     expect(ul.children.length).toBe(2);
     expect(ul.children[0].tagName).toBe("li");
@@ -174,7 +174,7 @@ describe("mdToJx", () => {
   test("converts code block", () => {
     const mdast = root(codeBlock("console.log('hi')", "js"));
     const result: any = mdToJx(mdast);
-    const pre = result.children[0];
+    const [pre] = result.children;
     expect(pre.tagName).toBe("pre");
     expect(pre.children[0].tagName).toBe("code");
     expect(pre.children[0].textContent).toBe("console.log('hi')");
@@ -200,7 +200,7 @@ describe("mdToJx", () => {
       type: "blockquote",
     });
     const result: any = mdToJx(mdast);
-    const bq = result.children[0];
+    const [bq] = result.children;
     expect(bq.tagName).toBe("blockquote");
     expect(bq.children[0]).toEqual({
       tagName: "p",
@@ -254,9 +254,9 @@ describe("jxToMd", () => {
       ],
       tagName: "div",
     });
-    const link = result.children[0].children[0];
-    expect(link.type).toBe("link");
-    expect(link.url).toBe("https://x.com");
+    const [linkNode] = result.children[0].children;
+    expect(linkNode.type).toBe("link");
+    expect(linkNode.url).toBe("https://x.com");
   });
 
   test("image", () => {
@@ -274,7 +274,7 @@ describe("jxToMd", () => {
       ],
       tagName: "div",
     });
-    const img = result.children[0].children[0];
+    const [img] = result.children[0].children;
     expect(img.type).toBe("image");
     expect(img.url).toBe("photo.jpg");
     expect(img.alt).toBe("A photo");
@@ -293,10 +293,10 @@ describe("jxToMd", () => {
       ],
       tagName: "div",
     });
-    const list = result.children[0];
-    expect(list.type).toBe("list");
-    expect(list.ordered).toBe(false);
-    expect(list.children.length).toBe(2);
+    const [listNode] = result.children;
+    expect(listNode.type).toBe("list");
+    expect(listNode.ordered).toBe(false);
+    expect(listNode.children.length).toBe(2);
   });
 
   test("ordered list", () => {
@@ -333,7 +333,7 @@ describe("jxToMd", () => {
       ],
       tagName: "div",
     });
-    const code = result.children[0];
+    const [code] = result.children;
     expect(code.type).toBe("code");
     expect(code.lang).toBe("js");
     expect(code.value).toBe("const x = 1");
@@ -352,7 +352,7 @@ describe("jxToMd", () => {
       children: [{ attributes: { color: "red" }, tagName: "my-widget" }],
       tagName: "div",
     });
-    const directive = result.children[0];
+    const [directive] = result.children;
     expect(directive.type).toBe("leafDirective");
     expect(directive.name).toBe("my-widget");
     expect(directive.attributes.color).toBe("red");
@@ -408,7 +408,7 @@ describe("jxToMd bare text nodes", () => {
         },
       ],
     });
-    const p = result.children[0];
+    const [p] = result.children;
     expect(p.type).toBe("paragraph");
     expect(p.children).toEqual([
       { type: "text", value: "Hello " },
@@ -421,7 +421,7 @@ describe("jxToMd bare text nodes", () => {
     const result: any = jxToMd({
       children: [{ children: ["Score: ", 42] as any, tagName: "p" }],
     });
-    const p = result.children[0];
+    const [p] = result.children;
     expect(p.children[0]).toEqual({ type: "text", value: "Score: " });
     expect(p.children[1]).toEqual({ type: "text", value: "42" });
   });
@@ -487,7 +487,7 @@ describe("container directive inline content", () => {
         },
       ],
     });
-    const directive = result.children[0];
+    const [directive] = result.children;
     expect(directive.type).toBe("containerDirective");
     expect(directive.name).toBe("p");
     // Children should be a single paragraph wrapping all inline nodes
@@ -515,7 +515,7 @@ describe("container directive inline content", () => {
         },
       ],
     });
-    const directive = result.children[0];
+    const [directive] = result.children;
     expect(directive.type).toBe("containerDirective");
     expect(directive.children.length).toBe(1);
     expect(directive.children[0].type).toBe("paragraph");
@@ -534,7 +534,7 @@ describe("container directive inline content", () => {
         },
       ],
     });
-    const directive = result.children[0];
+    const [directive] = result.children;
     expect(directive.type).toBe("containerDirective");
     // Block children stay as separate nodes, not wrapped in a paragraph
     expect(directive.children.length).toBe(2);
@@ -552,7 +552,7 @@ describe("container directive inline content", () => {
         },
       ],
     });
-    const directive = result.children[0];
+    const [directive] = result.children;
     expect(directive.children.length).toBe(1);
     expect(directive.children[0].type).toBe("paragraph");
     expect(directive.children[0].children[0].value).toBe("Simple text");

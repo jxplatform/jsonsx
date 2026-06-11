@@ -17,7 +17,7 @@ describe("panel scheduler", () => {
   test("flushNow renders when not editing", () => {
     const root = document.createElement("div");
     let renders = 0;
-    const s = createPanelScheduler({ render: () => renders++, root });
+    const s = createPanelScheduler({ render: () => (renders += 1), root });
     s.flushNow();
     expect(renders).toBe(1);
   });
@@ -28,7 +28,7 @@ describe("panel scheduler", () => {
     root.append(input);
     document.body.append(root);
     let renders = 0;
-    const s = createPanelScheduler({ render: () => renders++, root });
+    const s = createPanelScheduler({ render: () => (renders += 1), root });
     s.bindFocus();
 
     input.dispatchEvent(new Event("focusin", { bubbles: true }));
@@ -39,9 +39,9 @@ describe("panel scheduler", () => {
 
     input.dispatchEvent(new Event("focusout", { bubbles: true }));
     // Focusout schedules a flush via rAF — wait two frames.
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-    );
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
     expect(renders).toBe(1);
     s.unbind();
     root.remove();
@@ -53,7 +53,7 @@ describe("panel scheduler", () => {
     let renders = 0;
     const s = createPanelScheduler({
       blockWhile: () => blocked,
-      render: () => renders++,
+      render: () => (renders += 1),
       root,
     });
     s.flushNow();

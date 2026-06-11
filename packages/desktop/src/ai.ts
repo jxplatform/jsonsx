@@ -50,7 +50,7 @@ export async function handleAiRoute(
   }
 
   if (path.startsWith("/studio/ai/session/") && path.endsWith("/stream") && req.method === "GET") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     return streamSession(id);
   }
 
@@ -60,7 +60,7 @@ export async function handleAiRoute(
     req.method === "POST"
   ) {
     try {
-      const id = path.split("/")[4];
+      const [id] = path.split("/").slice(4);
       const body = (await req.json()) as { message: string };
       sendMessage(id, body.message);
       return Response.json({ ok: true });
@@ -73,19 +73,19 @@ export async function handleAiRoute(
   }
 
   if (path.startsWith("/studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     stopSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/studio/ai/session/") && req.method === "DELETE") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     deleteSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/studio/ai/session/") && req.method === "GET") {
-    const id = path.split("/")[4];
+    const [id] = path.split("/").slice(4);
     const info = getSession(id);
     if (!info) {
       return Response.json({ error: "Not found" }, { status: 404 });

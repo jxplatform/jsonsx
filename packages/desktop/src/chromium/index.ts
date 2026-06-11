@@ -1,3 +1,4 @@
+// oxlint-disable unicorn/no-process-exit -- standalone launcher CLI; exit codes are its interface
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import {
@@ -87,8 +88,8 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
 const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../../assets/studio");
 
 const server = Bun.serve({
-  async fetch(req, server) {
-    if (server.upgrade(req)) {
+  async fetch(req, srv) {
+    if (srv.upgrade(req)) {
       return;
     }
 

@@ -64,7 +64,7 @@ function setupHandle(
     document.body.style.userSelect = "none";
 
     const current =
-      Number.parseInt(getComputedStyle(root).getPropertyValue(cssVar)) || defaultWidth;
+      Number.parseInt(getComputedStyle(root).getPropertyValue(cssVar), 10) || defaultWidth;
     drag = { startWidth: current, startX: e.clientX };
   });
 
@@ -101,9 +101,10 @@ function setupHandle(
 
 function persistWidths() {
   const left =
-    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-left")) || DEFAULT_LEFT;
+    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-left"), 10) || DEFAULT_LEFT;
   const right =
-    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-right")) || DEFAULT_RIGHT;
+    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-right"), 10) ||
+    DEFAULT_RIGHT;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ left, right }));
   } catch {
@@ -113,8 +114,8 @@ function persistWidths() {
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
 
-const resizeLeft = document.querySelector("#resize-left");
-const resizeRight = document.querySelector("#resize-right");
+const resizeLeft = document.querySelector<HTMLElement>("#resize-left");
+const resizeRight = document.querySelector<HTMLElement>("#resize-right");
 
 if (resizeLeft) {
   setupHandle(resizeLeft, "--panel-w-left", "left", DEFAULT_LEFT);

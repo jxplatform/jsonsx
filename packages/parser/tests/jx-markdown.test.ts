@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   applyStyleKeyMapping,
@@ -328,7 +327,7 @@ Some content here.
 ::::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const section = doc.children[0];
+    const [section] = doc.children;
     expect(section.tagName).toBe("my-section");
     expect(section.style).toEqual({
       backgroundColor: "white",
@@ -344,7 +343,7 @@ tagName: my-comp
 ::button{style.color="red" style.hover.color="blue" style.hover.cursor="pointer"}
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const button = doc.children[0];
+    const [button] = doc.children;
     expect(button.style).toEqual({
       ":hover": { color: "blue", cursor: "pointer" },
       color: "red",
@@ -359,7 +358,7 @@ tagName: my-comp
 ::div{style.gap="0.5rem" style.--md.gap="1rem" style.--dark.backgroundColor="#1a1a1a"}
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const div = doc.children[0];
+    const [div] = doc.children;
     expect(div.style).toEqual({
       "@--dark": { backgroundColor: "#1a1a1a" },
       "@--md": { gap: "1rem" },
@@ -375,7 +374,7 @@ tagName: my-comp
 ::input{type="text" value="\${state.name}" placeholder="Enter name"}
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const input = doc.children[0];
+    const [input] = doc.children;
     expect(input.tagName).toBe("input");
     expect(input.attributes.type).toBe("text");
     expect(input.attributes.value).toBe("${state.name}");
@@ -390,7 +389,7 @@ tagName: my-comp
 ::button{onclick="handleClick()" aria-label="Close" data-id="42"}
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const button = doc.children[0];
+    const [button] = doc.children;
     expect(button.onclick).toBe("handleClick()");
     expect(button.attributes).toEqual({
       "aria-label": "Close",
@@ -425,9 +424,9 @@ Content
 ::::::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const outer = doc.children[0];
+    const [outer] = doc.children;
     expect(outer.tagName).toBe("outer");
-    const inner = outer.children[0];
+    const [inner] = outer.children;
     expect(inner.tagName).toBe("inner");
   });
 
@@ -441,7 +440,7 @@ Hello world
 :::::::::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const p = doc.children[0];
+    const [p] = doc.children;
     expect(p.tagName).toBe("p");
     expect(p.style).toEqual({ color: "red", fontSize: "1.25rem" });
     // Text should be textContent, NOT a nested paragraph
@@ -463,7 +462,7 @@ Ship as static HTML.
 :::::::::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const h1 = doc.children[0];
+    const [h1] = doc.children;
     expect(h1.tagName).toBe("h1");
     expect(h1.style).toEqual({ fontSize: "3rem" });
     // Should have mixed children: text, br, span
@@ -485,7 +484,7 @@ Some text
 :::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const div = doc.children[0];
+    const [div] = doc.children;
     expect(div.tagName).toBe("div");
     // Div CAN contain paragraphs, so they should NOT be unwrapped
     expect(div.children[0].tagName).toBe("p");
@@ -501,11 +500,11 @@ tagName: my-comp
 A paragraph with **bold** and *italic* text.
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const h1 = doc.children[0];
+    const [h1] = doc.children;
     expect(h1.tagName).toBe("h1");
     expect(h1.textContent).toBe("Hello World");
 
-    const p = doc.children[1];
+    const [, p] = doc.children;
     expect(p.tagName).toBe("p");
     // Should have mixed children (text, strong, text, em, text)
     expect(p.children.length).toBeGreaterThan(1);
@@ -522,7 +521,7 @@ state:
 ::::::
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const list = doc.children[0];
+    const [list] = doc.children;
     expect(list.tagName).toBe("todo-list");
     expect(list.children).toEqual({
       $prototype: "Array",
@@ -590,7 +589,7 @@ tagName: my-comp
 This has \`inline code\` in it.
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const para = doc.children[0];
+    const [para] = doc.children;
     expect(para.tagName).toBe("p");
     const codeNode = para.children.find((c: any) => c.tagName === "code");
     expect(codeNode).toBeDefined();
@@ -605,7 +604,7 @@ tagName: my-comp
 Click [here](https://example.com "Example") for more.
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const para = doc.children[0];
+    const [para] = doc.children;
     const link = para.children.find((c: any) => c.tagName === "a");
     expect(link).toBeDefined();
     expect(link.attributes.href).toBe("https://example.com");
@@ -620,7 +619,7 @@ tagName: my-comp
 ![Alt text](image.png "Image title")
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const para = doc.children[0];
+    const [para] = doc.children;
     const img = para.children.find((c: any) => c.tagName === "img");
     expect(img).toBeDefined();
     expect(img.attributes.src).toBe("image.png");
@@ -702,7 +701,7 @@ tagName: my-comp
 [**Bold link** text](https://example.com)
 `;
     const doc = transpileJxMarkdown(source) as any;
-    const para = doc.children[0];
+    const [para] = doc.children;
     const link = para.children.find((c: any) => c.tagName === "a");
     expect(link).toBeDefined();
     expect(link.children).toBeDefined();

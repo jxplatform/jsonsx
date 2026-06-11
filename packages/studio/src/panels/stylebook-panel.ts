@@ -29,6 +29,8 @@ import { activeBreakpointsForWidth, parseMediaEntries } from "../utils/canvas-me
 import { mediaDisplayName } from "./shared";
 import { panToCanvasEl } from "../canvas/canvas-utils";
 import stylebookMeta from "../../data/stylebook-meta.json";
+import type { TemplateResult } from "lit-html";
+import type { CanvasPanel } from "../types";
 
 export interface StylebookEntry {
   tag: string;
@@ -57,7 +59,7 @@ interface StylebookCtx {
     label: string | null,
     fullWidth: boolean,
     width?: number | null,
-  ) => { tpl: import("lit-html").TemplateResult; panel: import("../types").CanvasPanel };
+  ) => { tpl: TemplateResult; panel: CanvasPanel };
   applyTransform: () => void;
   observeCenterUntilStable: () => void;
   renderZoomIndicator: () => void;
@@ -65,7 +67,7 @@ interface StylebookCtx {
   overlayBoxDescriptor: (
     el: Element,
     type: string,
-    panel: import("../types").CanvasPanel,
+    panel: CanvasPanel,
   ) => {
     cls: string;
     top: string;
@@ -636,7 +638,7 @@ export function renderStylebookElementsIntoCanvas(
     }
   }
 
-  const sectionTemplates: import("lit-html").TemplateResult[] = [];
+  const sectionTemplates: TemplateResult[] = [];
 
   for (const section of stylebookMeta.$sections) {
     let entries = section.elements as StylebookEntry[];

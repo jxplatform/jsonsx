@@ -4,6 +4,7 @@ import type { Tab } from "../tabs/tab";
 
 import type { ComponentEntry } from "../files/components";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
+import type { ComputedRef } from "@vue/reactivity";
 
 interface FileEntry {
   name: string;
@@ -53,7 +54,7 @@ export const workspace: Workspace = reactive({
 
 export const activeTab = computed(() =>
   workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
-) as unknown as import("@vue/reactivity").ComputedRef<Tab | null>;
+) as unknown as ComputedRef<Tab | null>;
 
 /**
  * Open a new tab and make it active.

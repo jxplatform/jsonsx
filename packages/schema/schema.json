@@ -1,153 +1,11 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://jxsuite.com/schema/v1",
-  "title": "Jx Document",
-  "description": "Schema for Jx component files. A Jx document is a JSON object that declaratively describes a reactive web component: its structure (DOM tree), styling, type definitions ($defs), runtime state, and inline or external functions. Reactivity is powered by @vue/reactivity.",
-  "type": "object",
-  "properties": {
-    "$schema": {
-      "description": "URI identifying the Jx dialect version. Enables schema-aware IDE tooling.",
-      "type": "string",
-      "examples": [
-        "https://jxsuite.com/schema/v1"
-      ]
-    },
-    "$id": {
-      "description": "Component identifier string. Used by tooling and the builder.",
-      "type": "string",
-      "examples": [
-        "Counter",
-        "TodoApp",
-        "UserCard"
-      ]
-    },
-    "$defs": {
-      "description": "Pure JSON Schema type definitions for this component. All entries are reusable type schemas — no runtime artifacts are produced. Referenced from state entries via $ref. Naming convention: PascalCase.",
-      "$ref": "#/$defs/DefsMap"
-    },
-    "state": {
-      "description": "Runtime variables for this component. All entries are reactive by default. Entry shape is determined by value type: scalar/array → reactive property, string with ${} → computed, object with $prototype → function or data source, object with type and default → typed reactive property.",
-      "$ref": "#/$defs/StateMap"
-    },
-    "$media": {
-      "description": "Named media breakpoints following CSS @custom-media convention. Keys use the CSS custom property -- prefix.",
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "examples": [
-        {
-          "--sm": "(min-width: 640px)",
-          "--md": "(min-width: 768px)",
-          "--dark": "(prefers-color-scheme: dark)"
-        }
-      ]
-    },
-    "$elements": {
-      "description": "Custom element dependencies. Items are either $ref objects pointing to JX element definitions, or bare npm package name strings for web component libraries.",
-      "type": "array",
-      "items": {
-        "oneOf": [
-          {
-            "type": "object",
-            "required": [
-              "$ref"
-            ],
-            "properties": {
-              "$ref": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
-          },
-          {
-            "type": "string",
-            "description": "npm package specifier (must declare customElements in package.json)"
-          }
-        ]
-      }
-    },
-    "$head": {
-      "description": "Page-level <head> entries. Array of element definitions for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/ElementDef"
-      }
-    },
-    "$layout": {
-      "description": "Layout reference for pages. String path to a layout JSON file, or false to opt out of the default layout.",
-      "oneOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "boolean",
-          "const": false
-        }
-      ],
-      "examples": [
-        "./layouts/base.json"
-      ]
-    },
-    "$paths": {
-      "description": "Dynamic route parameters. Maps parameter names to data sources for generating one page per entry at build time.",
-      "type": "object"
-    },
-    "title": {
-      "description": "Page title. Can be a static string or a template string with ${} expressions.",
-      "$ref": "#/$defs/StringOrRef"
-    },
-    "imports": {
-      "description": "Import map: $prototype names to .class.json file paths. Allows state entries to reference external classes by name without $src.",
-      "type": "object",
-      "additionalProperties": {
-        "type": "string"
-      }
-    },
-    "observedAttributes": {
-      "description": "HTML attributes the custom element watches for changes. Follows the Web Components observedAttributes convention.",
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
-    },
-    "cases": {
-      "description": "Switch cases object. Maps case values to element definitions or external component refs. Used alongside $switch for dynamic component rendering.",
-      "type": "object",
-      "additionalProperties": {
-        "oneOf": [
-          {
-            "$ref": "#/$defs/ElementDef"
-          },
-          {
-            "$ref": "#/$defs/ExternalComponentRef"
-          }
-        ]
-      }
-    },
-    "tagName": {
-      "$ref": "#/$defs/TagName"
-    },
-    "children": {
-      "$ref": "#/$defs/ChildrenValue"
-    },
-    "style": {
-      "$ref": "#/$defs/StyleObject"
-    },
-    "attributes": {
-      "$ref": "#/$defs/AttributesObject"
-    }
-  },
-  "additionalProperties": {
-    "$ref": "#/$defs/ElementPropertyValue"
-  },
   "$defs": {
     "DefsMap": {
-      "description": "Map of reusable JSON Schema type definitions. Keys are PascalCase type names. No runtime artifacts are produced.",
-      "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/TypeDefEntry"
-      }
+      },
+      "description": "Map of reusable JSON Schema type definitions. Keys are PascalCase type names. No runtime artifacts are produced.",
+      "type": "object"
     },
     "TypeDefEntry": {
       "description": "A $defs type definition entry. Must be a pure JSON Schema type definition or a class definition (.class.json format).",
@@ -161,11 +19,11 @@
       ]
     },
     "StateMap": {
-      "description": "Map of runtime variables. Keys are camelCase (public) or #-prefixed (private). All entries are reactive by default.",
-      "type": "object",
       "additionalProperties": {
         "$ref": "#/$defs/StateEntry"
-      }
+      },
+      "description": "Map of runtime variables. Keys are camelCase (public) or #-prefixed (private). All entries are reactive by default.",
+      "type": "object"
     },
     "StateEntry": {
       "description": "A single state entry. Shape is determined by value type: scalar/array → naked reactive property, string with ${} → computed, object with $prototype: \"Function\" → function, object with $prototype: <other> → data source, object with type and default → typed reactive property, plain object → naked object reactive property.",
@@ -198,7 +56,6 @@
           "$ref": "#/$defs/ExpressionEntry"
         },
         {
-          "type": "object",
           "not": {
             "anyOf": [
               {
@@ -222,41 +79,29 @@
                 ]
               }
             ]
-          }
+          },
+          "type": "object"
         }
       ]
     },
     "TypedStateDef": {
       "description": "A typed reactive state variable with explicit type and default value. The type property is a JSON Schema or $ref to a $defs type definition. The default property is the initial runtime value.",
-      "type": "object",
-      "required": [
-        "default"
-      ],
+      "not": {
+        "required": [
+          "$prototype"
+        ]
+      },
       "properties": {
-        "default": {
-          "description": "Initial state value."
-        },
-        "type": {
-          "description": "JSON Schema type definition, $ref to a $defs type, or JSON Schema type string.",
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "object"
-            }
-          ]
-        },
-        "description": {
+        "$ref": {
+          "description": "Reference to a shared type definition.",
           "type": "string"
         },
         "attribute": {
           "description": "Linked HTML attribute name for CEM extraction.",
           "type": "string"
         },
-        "reflects": {
-          "description": "Whether property changes reflect back to the HTML attribute.",
-          "type": "boolean"
+        "default": {
+          "description": "Initial state value."
         },
         "deprecated": {
           "description": "Deprecation notice for CEM extraction.",
@@ -269,67 +114,35 @@
             }
           ]
         },
-        "examples": {
-          "type": "array"
-        },
-        "$ref": {
-          "description": "Reference to a shared type definition.",
-          "type": "string"
-        }
-      },
-      "not": {
-        "required": [
-          "$prototype"
-        ]
-      }
-    },
-    "PureTypeDef": {
-      "description": "A reusable JSON Schema type definition for tooling only. No function, no runtime artifact. Referenced from state entries via $ref. Naming convention: PascalCase.",
-      "type": "object",
-      "required": [
-        "type"
-      ],
-      "properties": {
-        "type": {
-          "$ref": "#/$defs/JsonSchemaType"
-        },
         "description": {
           "type": "string"
         },
-        "enum": {
-          "type": "array"
-        },
-        "minimum": {
-          "type": "number"
-        },
-        "maximum": {
-          "type": "number"
-        },
-        "minLength": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "maxLength": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "pattern": {
-          "type": "string"
-        },
-        "items": {},
-        "properties": {
-          "type": "object"
-        },
-        "required": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "examples": {
           "type": "array"
+        },
+        "reflects": {
+          "description": "Whether property changes reflect back to the HTML attribute.",
+          "type": "boolean"
+        },
+        "type": {
+          "description": "JSON Schema type definition, $ref to a $defs type, or JSON Schema type string.",
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object"
+            }
+          ]
         }
       },
+      "required": [
+        "default"
+      ],
+      "type": "object"
+    },
+    "PureTypeDef": {
+      "description": "A reusable JSON Schema type definition for tooling only. No function, no runtime artifact. Referenced from state entries via $ref. Naming convention: PascalCase.",
       "not": {
         "anyOf": [
           {
@@ -343,41 +156,98 @@
             ]
           }
         ]
-      }
+      },
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "enum": {
+          "type": "array"
+        },
+        "examples": {
+          "type": "array"
+        },
+        "items": {},
+        "maxLength": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "minLength": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "object"
+        },
+        "required": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "$ref": "#/$defs/JsonSchemaType"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
     },
     "FunctionDef": {
+      "additionalProperties": false,
       "description": "A function declaration. $prototype must be \"Function\". body (inline) and $src (external) are mutually exclusive. First parameter is always state (the reactive scope).",
-      "type": "object",
-      "required": [
-        "$prototype"
-      ],
       "properties": {
+        "$export": {
+          "description": "Named export in $src module. Defaults to the state key name.",
+          "type": "string"
+        },
         "$prototype": {
-          "type": "string",
-          "const": "Function"
+          "const": "Function",
+          "type": "string"
+        },
+        "$src": {
+          "description": "External module specifier. Mutually exclusive with body.",
+          "examples": [
+            "./counter.js",
+            "npm:@myorg/validators"
+          ],
+          "type": "string"
         },
         "body": {
           "description": "Inline function body string. First implicit parameter is state.",
-          "type": "string",
           "examples": [
             "state.count++",
             "state.items.push({ id: Date.now(), text: \"\", done: false })",
             "return state.score >= 90 ? \"gold\" : \"silver\""
-          ]
+          ],
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "emits": {
+          "description": "Array of CEM-compatible Event objects this function dispatches. Used for CEM extraction and studio event discovery.",
+          "items": {
+            "$ref": "#/$defs/CemEvent"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Explicit function name. Defaults to the state key name.",
+          "type": "string"
         },
         "parameters": {
           "description": "Function parameters (after the implicit state parameter). Accepts CEM-compatible parameter objects or bare string names for backward compatibility.",
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/$defs/CemParameter"
-              }
-            ]
-          },
           "examples": [
             [
               "event"
@@ -392,77 +262,95 @@
             ],
             [
               {
+                "description": "Item identifier",
                 "name": "id",
                 "type": {
                   "text": "number"
-                },
-                "description": "Item identifier"
+                }
               }
             ]
-          ]
-        },
-        "name": {
-          "description": "Explicit function name. Defaults to the state key name.",
-          "type": "string"
-        },
-        "$src": {
-          "description": "External module specifier. Mutually exclusive with body.",
-          "type": "string",
-          "examples": [
-            "./counter.js",
-            "npm:@myorg/validators"
-          ]
-        },
-        "$export": {
-          "description": "Named export in $src module. Defaults to the state key name.",
-          "type": "string"
+          ],
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/CemParameter"
+              }
+            ]
+          },
+          "type": "array"
         },
         "type": {
           "description": "Return type for tooling (JSON Schema or CEM { text } format)."
-        },
-        "emits": {
-          "description": "Array of CEM-compatible Event objects this function dispatches. Used for CEM extraction and studio event discovery.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/CemEvent"
-          }
-        },
-        "description": {
-          "type": "string"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$prototype"
+      ],
+      "type": "object"
     },
     "ClassDef": {
+      "additionalProperties": false,
       "description": "A .class.json schema-defined class. $prototype must be \"Class\". Defines fields, constructor, methods, and type parameters via $defs. Optionally points to a JS module via $implementation for hybrid execution.",
-      "type": "object",
-      "required": [
-        "$prototype",
-        "title"
-      ],
       "properties": {
-        "$schema": {
-          "type": "string"
+        "$defs": {
+          "description": "Class members: parameters, returnTypes, fields, constructor, methods.",
+          "properties": {
+            "constructor": {
+              "$ref": "#/$defs/ClassConstructorDef"
+            },
+            "fields": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ClassFieldDef"
+              },
+              "description": "Class fields with role, access, scope, and type information.",
+              "type": "object"
+            },
+            "methods": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ClassMethodDef"
+              },
+              "description": "Class methods and accessors.",
+              "type": "object"
+            },
+            "parameters": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ClassParameterDef"
+              },
+              "description": "Reusable typed parameter schemas, keyed by name.",
+              "type": "object"
+            },
+            "returnTypes": {
+              "additionalProperties": {
+                "type": "object"
+              },
+              "description": "Output type schemas, keyed by name.",
+              "type": "object"
+            }
+          },
+          "type": "object"
         },
         "$id": {
           "type": "string"
         },
+        "$implementation": {
+          "description": "Relative path to a JS module containing the actual class implementation.",
+          "type": "string"
+        },
         "$prototype": {
-          "type": "string",
-          "const": "Class"
-        },
-        "title": {
-          "description": "PascalCase class name, used as the export name.",
+          "const": "Class",
           "type": "string"
         },
-        "description": {
+        "$schema": {
           "type": "string"
-        },
-        "format": {
-          "$ref": "#/$defs/FormatDef"
         },
         "$studio": {
           "$ref": "#/$defs/StudioHints"
+        },
+        "description": {
+          "type": "string"
         },
         "extends": {
           "description": "Base class — string name or $ref to another .class.json.",
@@ -471,171 +359,103 @@
               "type": "string"
             },
             {
-              "type": "object",
-              "required": [
-                "$ref"
-              ],
               "properties": {
                 "$ref": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "$ref"
+              ],
+              "type": "object"
             }
           ]
         },
-        "$implementation": {
-          "description": "Relative path to a JS module containing the actual class implementation.",
-          "type": "string"
+        "format": {
+          "$ref": "#/$defs/FormatDef"
         },
-        "$defs": {
-          "description": "Class members: parameters, returnTypes, fields, constructor, methods.",
-          "type": "object",
-          "properties": {
-            "parameters": {
-              "description": "Reusable typed parameter schemas, keyed by name.",
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/$defs/ClassParameterDef"
-              }
-            },
-            "returnTypes": {
-              "description": "Output type schemas, keyed by name.",
-              "type": "object",
-              "additionalProperties": {
-                "type": "object"
-              }
-            },
-            "fields": {
-              "description": "Class fields with role, access, scope, and type information.",
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/$defs/ClassFieldDef"
-              }
-            },
-            "constructor": {
-              "$ref": "#/$defs/ClassConstructorDef"
-            },
-            "methods": {
-              "description": "Class methods and accessors.",
-              "type": "object",
-              "additionalProperties": {
-                "$ref": "#/$defs/ClassMethodDef"
-              }
-            }
-          }
+        "title": {
+          "description": "PascalCase class name, used as the export name.",
+          "type": "string"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$prototype",
+        "title"
+      ],
+      "type": "object"
     },
     "ClassParameterDef": {
       "description": "A typed parameter definition for a class.",
-      "type": "object",
-      "required": [
-        "identifier"
-      ],
       "properties": {
-        "identifier": {
+        "default": {},
+        "description": {
           "type": "string"
         },
-        "type": {},
+        "examples": {
+          "type": "array"
+        },
         "format": {
           "description": "When \"json-schema\", this parameter's value is itself a JSON Schema.",
           "type": "string"
         },
-        "description": {
-          "type": "string"
-        },
-        "default": {},
-        "examples": {
-          "type": "array"
-        }
-      }
-    },
-    "ClassFieldDef": {
-      "description": "A class field definition with access control and scope.",
-      "type": "object",
-      "properties": {
-        "role": {
-          "type": "string",
-          "const": "field"
-        },
-        "access": {
-          "type": "string",
-          "enum": [
-            "public",
-            "private",
-            "protected"
-          ]
-        },
-        "scope": {
-          "type": "string",
-          "enum": [
-            "instance",
-            "static"
-          ]
-        },
         "identifier": {
           "type": "string"
         },
-        "type": {},
+        "type": {}
+      },
+      "required": [
+        "identifier"
+      ],
+      "type": "object"
+    },
+    "ClassFieldDef": {
+      "description": "A class field definition with access control and scope.",
+      "properties": {
         "$prototype": {
           "description": "Data source prototype for this field (e.g., \"Request\").",
           "type": "string"
         },
-        "initializer": {},
+        "access": {
+          "enum": [
+            "public",
+            "private",
+            "protected"
+          ],
+          "type": "string"
+        },
         "default": {},
         "description": {
           "type": "string"
         },
         "examples": {
           "type": "array"
-        }
-      }
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "initializer": {},
+        "role": {
+          "const": "field",
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "instance",
+            "static"
+          ],
+          "type": "string"
+        },
+        "type": {}
+      },
+      "type": "object"
     },
     "ClassConstructorDef": {
       "description": "Class constructor definition.",
-      "type": "object",
       "properties": {
-        "role": {
-          "type": "string",
-          "const": "constructor"
-        },
         "$prototype": {
-          "type": "string",
-          "const": "Function"
-        },
-        "parameters": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "object",
-                "required": [
-                  "$ref"
-                ],
-                "properties": {
-                  "$ref": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              },
-              {
-                "$ref": "#/$defs/ClassParameterDef"
-              }
-            ]
-          }
-        },
-        "superCall": {
-          "type": "object",
-          "properties": {
-            "arguments": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          }
+          "const": "Function",
+          "type": "string"
         },
         "body": {
           "oneOf": [
@@ -643,24 +463,122 @@
               "type": "string"
             },
             {
-              "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "type": "array"
             }
           ]
         },
         "description": {
           "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "$ref": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "$ref"
+                ],
+                "type": "object"
+              },
+              {
+                "$ref": "#/$defs/ClassParameterDef"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "role": {
+          "const": "constructor",
+          "type": "string"
+        },
+        "superCall": {
+          "properties": {
+            "arguments": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
         }
-      }
+      },
+      "type": "object"
     },
     "ClassMethodDef": {
       "description": "A class method or accessor definition. Capability roles (parse, serialize, discover, load) mark static methods that hosts (compiler, server, studio) invoke for format dispatch.",
-      "type": "object",
       "properties": {
+        "$prototype": {
+          "const": "Function",
+          "type": "string"
+        },
+        "access": {
+          "enum": [
+            "public",
+            "private",
+            "protected"
+          ],
+          "type": "string"
+        },
+        "body": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "getter": {
+          "properties": {
+            "body": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "$ref": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "$ref"
+                ],
+                "type": "object"
+              },
+              {
+                "$ref": "#/$defs/ClassParameterDef"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "returnType": {},
         "role": {
-          "type": "string",
           "enum": [
             "method",
             "accessor",
@@ -668,171 +586,91 @@
             "serialize",
             "discover",
             "load"
-          ]
-        },
-        "$prototype": {
-          "type": "string",
-          "const": "Function"
-        },
-        "access": {
-          "type": "string",
-          "enum": [
-            "public",
-            "private",
-            "protected"
-          ]
+          ],
+          "type": "string"
         },
         "scope": {
-          "type": "string",
           "enum": [
             "instance",
             "static"
-          ]
-        },
-        "identifier": {
+          ],
           "type": "string"
+        },
+        "setter": {
+          "properties": {
+            "body": {
+              "type": "string"
+            },
+            "parameters": {
+              "type": "array"
+            }
+          },
+          "type": "object"
         },
         "timing": {
           "description": "Execution environments allowed to call this capability directly. Hosts outside the list round-trip through the dev server.",
-          "type": "array",
           "items": {
-            "type": "string",
             "enum": [
               "compiler",
               "server",
               "client"
-            ]
-          }
-        },
-        "parameters": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "object",
-                "required": [
-                  "$ref"
-                ],
-                "properties": {
-                  "$ref": {
-                    "type": "string"
-                  }
-                },
-                "additionalProperties": false
-              },
-              {
-                "$ref": "#/$defs/ClassParameterDef"
-              }
-            ]
-          }
-        },
-        "returnType": {},
-        "body": {
-          "oneOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          ]
-        },
-        "getter": {
-          "type": "object",
-          "properties": {
-            "body": {
-              "type": "string"
-            }
-          }
-        },
-        "setter": {
-          "type": "object",
-          "properties": {
-            "parameters": {
-              "type": "array"
-            },
-            "body": {
-              "type": "string"
-            }
-          }
-        },
-        "description": {
-          "type": "string"
+            ],
+            "type": "string"
+          },
+          "type": "array"
         }
-      }
+      },
+      "type": "object"
     },
     "FormatDef": {
       "description": "Format participation marker. A class carrying this block is auto-discovered from the project imports map and used for file-extension dispatch by the compiler, server, and studio.",
-      "type": "object",
-      "required": [
-        "extensions"
-      ],
       "properties": {
-        "extensions": {
-          "description": "File extensions this format claims, with leading dot (e.g. [\".md\"]).",
-          "type": "array",
-          "items": {
-            "type": "string",
-            "pattern": "^\\."
-          },
-          "minItems": 1
-        },
-        "mediaType": {
-          "description": "MIME type for the format (icons, labels, HTTP).",
-          "type": "string"
-        },
         "documentKinds": {
           "description": "\"page\"/\"component\" allow the extension in pages/components discovery; \"content\" allows it as a content-type source.",
-          "type": "array",
           "items": {
-            "type": "string",
             "enum": [
               "page",
               "component",
               "content"
-            ]
-          }
+            ],
+            "type": "string"
+          },
+          "type": "array"
         },
         "exportTarget": {
           "description": "When true, site builds emit a serialized sidecar per page in this format.",
           "type": "boolean"
         },
+        "extensions": {
+          "description": "File extensions this format claims, with leading dot (e.g. [\".md\"]).",
+          "items": {
+            "pattern": "^\\.",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "mediaType": {
+          "description": "MIME type for the format (icons, labels, HTTP).",
+          "type": "string"
+        },
         "remote": {
           "description": "When true, the load capability accepts http(s) URLs as sources.",
           "type": "boolean"
         }
-      }
+      },
+      "required": [
+        "extensions"
+      ],
+      "type": "object"
     },
     "StudioHints": {
       "description": "Studio control-surface hints for a format class: editor modes, document-mode rules, templates, and the element/nesting constraints that gate structural editing.",
-      "type": "object",
       "properties": {
-        "icon": {
-          "type": "string"
-        },
-        "modes": {
-          "description": "Editor modes the studio offers for documents of this format.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "documentMode": {
-          "type": "object",
           "properties": {
-            "default": {
-              "type": "string",
-              "enum": [
-                "content",
-                "component"
-              ]
-            },
             "componentWhen": {
               "description": "Treat the document as a component when this top-level/frontmatter key matches the regex.",
-              "type": "object",
               "properties": {
                 "frontmatterKey": {
                   "type": "string"
@@ -840,83 +678,99 @@
                 "matches": {
                   "type": "string"
                 }
-              }
+              },
+              "type": "object"
+            },
+            "default": {
+              "enum": [
+                "content",
+                "component"
+              ],
+              "type": "string"
             }
-          }
-        },
-        "newFileTemplate": {
-          "description": "Initial source text for newly created files of this format.",
-          "type": "string"
+          },
+          "type": "object"
         },
         "elements": {
           "description": "Element allowlist and nesting constraints for structural editing.",
-          "type": "object",
           "properties": {
             "block": {
-              "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "type": "array"
             },
             "inline": {
-              "type": "array",
               "items": {
                 "type": "string"
-              }
-            },
-            "void": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "textOnly": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
+              },
+              "type": "array"
             },
             "nesting": {
-              "description": "Per-parent child rules keyed by tag (or \"_root\"): { block, inline, directive } booleans or { only: [tags] }.",
-              "type": "object",
               "additionalProperties": {
-                "type": "object",
                 "properties": {
                   "block": {
-                    "type": "boolean"
-                  },
-                  "inline": {
                     "type": "boolean"
                   },
                   "directive": {
                     "type": "boolean"
                   },
+                  "inline": {
+                    "type": "boolean"
+                  },
                   "only": {
-                    "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "type": "array"
                   }
-                }
-              }
+                },
+                "type": "object"
+              },
+              "description": "Per-parent child rules keyed by tag (or \"_root\"): { block, inline, directive } booleans or { only: [tags] }.",
+              "type": "object"
+            },
+            "textOnly": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "void": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
             }
-          }
+          },
+          "type": "object"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "modes": {
+          "description": "Editor modes the studio offers for documents of this format.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "newFileTemplate": {
+          "description": "Initial source text for newly created files of this format.",
+          "type": "string"
         }
-      }
+      },
+      "type": "object"
     },
     "ExternalClassDef": {
       "description": "An external class / data source. $prototype is a constructor name (not \"Function\"). When $prototype is not in the built-in registry, $src is required. All state entries are reactive by default.",
-      "type": "object",
-      "required": [
-        "$prototype"
-      ],
       "properties": {
+        "$export": {
+          "description": "Named export in $src module. Defaults to the $prototype value.",
+          "type": "string"
+        },
         "$prototype": {
           "description": "Constructor name — built-in Web API class or external class name.",
-          "type": "string",
-          "not": {
-            "const": "Function"
-          },
           "examples": [
             "Request",
             "URLSearchParams",
@@ -932,41 +786,99 @@
             "ReadableStream",
             "MarkdownCollection",
             "MyParser"
-          ]
+          ],
+          "not": {
+            "const": "Function"
+          },
+          "type": "string"
         },
         "$src": {
           "description": "External module specifier. Required when $prototype is not a built-in.",
-          "type": "string",
           "examples": [
             "@jxsuite/md",
             "./lib/my-parser.js",
             "npm:@myorg/data"
-          ]
-        },
-        "$export": {
-          "description": "Named export in $src module. Defaults to the $prototype value.",
+          ],
           "type": "string"
         },
-        "timing": {
-          "type": "string",
-          "enum": [
-            "compiler",
-            "server",
-            "client"
-          ]
+        "autoIncrement": {
+          "type": "boolean"
+        },
+        "body": {},
+        "database": {
+          "type": "string"
+        },
+        "debounce": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "default": {},
+        "description": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "expires": {
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/RefObject"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "indexes": {
+          "items": {
+            "properties": {
+              "keyPath": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "unique": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "keyPath"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "items": {},
+        "key": {
+          "type": "string"
+        },
+        "keyPath": {
+          "type": "string"
         },
         "manual": {
           "type": "boolean"
         },
-        "debounce": {
-          "type": "integer",
-          "minimum": 0
+        "map": {
+          "$ref": "#/$defs/ElementDef"
         },
-        "url": {
-          "$ref": "#/$defs/StringOrRef"
+        "maxAge": {
+          "type": "integer"
         },
         "method": {
-          "type": "string",
           "enum": [
             "GET",
             "POST",
@@ -975,17 +887,16 @@
             "DELETE",
             "HEAD",
             "OPTIONS"
-          ]
+          ],
+          "type": "string"
         },
-        "headers": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
+        "name": {
+          "type": "string"
         },
-        "body": {},
+        "path": {
+          "type": "string"
+        },
         "responseType": {
-          "type": "string",
           "enum": [
             "json",
             "text",
@@ -993,94 +904,19 @@
             "arraybuffer",
             "document",
             ""
-          ]
-        },
-        "key": {
+          ],
           "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "maxAge": {
-          "type": "integer"
-        },
-        "expires": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        },
-        "domain": {
-          "type": "string"
-        },
-        "secure": {
-          "type": "boolean"
         },
         "sameSite": {
-          "type": "string",
           "enum": [
             "strict",
             "lax",
             "none"
-          ]
-        },
-        "database": {
+          ],
           "type": "string"
         },
-        "store": {
-          "type": "string"
-        },
-        "version": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "keyPath": {
-          "type": "string"
-        },
-        "autoIncrement": {
+        "secure": {
           "type": "boolean"
-        },
-        "indexes": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "required": [
-              "name",
-              "keyPath"
-            ],
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "keyPath": {
-                "oneOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                ]
-              },
-              "unique": {
-                "type": "boolean"
-              }
-            }
-          }
-        },
-        "default": {},
-        "description": {
-          "type": "string"
-        },
-        "items": {},
-        "map": {
-          "$ref": "#/$defs/ElementDef"
-        },
-        "filter": {
-          "$ref": "#/$defs/RefObject"
         },
         "sort": {
           "$ref": "#/$defs/RefObject"
@@ -1088,31 +924,52 @@
         "src": {
           "description": "Configuration property passed to external class constructor.",
           "type": "string"
+        },
+        "store": {
+          "type": "string"
+        },
+        "timing": {
+          "enum": [
+            "compiler",
+            "server",
+            "client"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "$ref": "#/$defs/StringOrRef"
+        },
+        "version": {
+          "minimum": 1,
+          "type": "integer"
         }
-      }
+      },
+      "required": [
+        "$prototype"
+      ],
+      "type": "object"
     },
     "ExpressionPointer": {
+      "additionalProperties": false,
       "description": "A JSON Pointer $ref operand within an expression node.",
-      "type": "object",
       "properties": {
         "$ref": {
-          "type": "string",
-          "pattern": "^(\\$map/|\\$reduce/|event#/|#/|parent#/|window#/|document#/)"
+          "pattern": "^(\\$map/|\\$reduce/|event#/|#/|parent#/|window#/|document#/)",
+          "type": "string"
         }
       },
       "required": [
         "$ref"
       ],
-      "additionalProperties": false
+      "type": "object"
     },
     "ExpressionLiteral": {
-      "description": "A non-reactive operand: scalar or array of operands.",
       "anyOf": [
         {
-          "type": "string",
           "not": {
             "pattern": "\\$\\{"
-          }
+          },
+          "type": "string"
         },
         {
           "type": "number"
@@ -1124,15 +981,15 @@
           "type": "null"
         },
         {
-          "type": "array",
           "items": {
             "$ref": "#/$defs/ExpressionOperand"
-          }
+          },
+          "type": "array"
         }
-      ]
+      ],
+      "description": "A non-reactive operand: scalar or array of operands."
     },
     "ExpressionOperand": {
-      "description": "Anything that may appear in target or value: a pointer, a literal, or a nested expression node.",
       "anyOf": [
         {
           "$ref": "#/$defs/ExpressionPointer"
@@ -1143,7 +1000,8 @@
         {
           "$ref": "#/$defs/ExpressionLiteral"
         }
-      ]
+      ],
+      "description": "Anything that may appear in target or value: a pointer, a literal, or a nested expression node."
     },
     "UnaryOperator": {
       "enum": [
@@ -1202,38 +1060,10 @@
       ]
     },
     "ExpressionNode": {
-      "description": "The core expression node. operator + target, with value gated by arity.",
-      "type": "object",
-      "required": [
-        "operator",
-        "target"
-      ],
       "additionalProperties": false,
-      "properties": {
-        "operator": {
-          "type": "string"
-        },
-        "target": {
-          "$ref": "#/$defs/ExpressionOperand"
-        },
-        "value": {
-          "$ref": "#/$defs/ExpressionOperand"
-        },
-        "initial": {
-          "$ref": "#/$defs/ExpressionOperand"
-        }
-      },
+      "description": "The core expression node. operator + target, with value gated by arity.",
       "oneOf": [
         {
-          "title": "Unary — target only, no value",
-          "properties": {
-            "operator": {
-              "$ref": "#/$defs/UnaryOperator"
-            }
-          },
-          "required": [
-            "operator"
-          ],
           "not": {
             "anyOf": [
               {
@@ -1247,10 +1077,23 @@
                 ]
               }
             ]
-          }
+          },
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/UnaryOperator"
+            }
+          },
+          "required": [
+            "operator"
+          ],
+          "title": "Unary — target only, no value"
         },
         {
-          "title": "Binary — left in target, right in value",
+          "not": {
+            "required": [
+              "initial"
+            ]
+          },
           "properties": {
             "operator": {
               "$ref": "#/$defs/BinaryOperator"
@@ -1260,14 +1103,14 @@
             "operator",
             "value"
           ],
+          "title": "Binary — left in target, right in value"
+        },
+        {
           "not": {
             "required": [
               "initial"
             ]
-          }
-        },
-        {
-          "title": "Assignment — writable target, value required",
+          },
           "properties": {
             "operator": {
               "$ref": "#/$defs/AssignmentOperator"
@@ -1280,25 +1123,9 @@
             "operator",
             "value"
           ],
-          "not": {
-            "required": [
-              "initial"
-            ]
-          }
+          "title": "Assignment — writable target, value required"
         },
         {
-          "title": "pop / shift — array receiver, no value",
-          "properties": {
-            "operator": {
-              "$ref": "#/$defs/NoArgMethod"
-            },
-            "target": {
-              "$ref": "#/$defs/ExpressionPointer"
-            }
-          },
-          "required": [
-            "operator"
-          ],
           "not": {
             "anyOf": [
               {
@@ -1312,10 +1139,26 @@
                 ]
               }
             ]
-          }
+          },
+          "properties": {
+            "operator": {
+              "$ref": "#/$defs/NoArgMethod"
+            },
+            "target": {
+              "$ref": "#/$defs/ExpressionPointer"
+            }
+          },
+          "required": [
+            "operator"
+          ],
+          "title": "pop / shift — array receiver, no value"
         },
         {
-          "title": "push / unshift — array receiver, single value argument",
+          "not": {
+            "required": [
+              "initial"
+            ]
+          },
           "properties": {
             "operator": {
               "$ref": "#/$defs/OneArgMethod"
@@ -1328,14 +1171,14 @@
             "operator",
             "value"
           ],
+          "title": "push / unshift — array receiver, single value argument"
+        },
+        {
           "not": {
             "required": [
               "initial"
             ]
-          }
-        },
-        {
-          "title": "splice — array receiver, [start, deleteCount, ...items]",
+          },
           "properties": {
             "operator": {
               "$ref": "#/$defs/SpliceMethod"
@@ -1344,25 +1187,20 @@
               "$ref": "#/$defs/ExpressionPointer"
             },
             "value": {
-              "type": "array",
               "items": {
                 "$ref": "#/$defs/ExpressionOperand"
               },
-              "minItems": 1
+              "minItems": 1,
+              "type": "array"
             }
           },
           "required": [
             "operator",
             "value"
           ],
-          "not": {
-            "required": [
-              "initial"
-            ]
-          }
+          "title": "splice — array receiver, [start, deleteCount, ...items]"
         },
         {
-          "title": "reduce — pure fold; per-item expression in value, seed in initial",
           "properties": {
             "operator": {
               "$ref": "#/$defs/ReduceMethod"
@@ -1378,10 +1216,15 @@
             "operator",
             "value",
             "initial"
-          ]
+          ],
+          "title": "reduce — pure fold; per-item expression in value, seed in initial"
         },
         {
-          "title": "map / filter — pure; per-item expression in value, no initial",
+          "not": {
+            "required": [
+              "initial"
+            ]
+          },
           "properties": {
             "operator": {
               "$ref": "#/$defs/MapFilterMethod"
@@ -1397,51 +1240,103 @@
             "operator",
             "value"
           ],
-          "not": {
-            "required": [
-              "initial"
-            ]
-          }
+          "title": "map / filter — pure; per-item expression in value, no initial"
         }
-      ]
-    },
-    "ExpressionEntry": {
-      "description": "A declarative expression entry (Shape 5). Used as a state entry or inline event handler.",
-      "type": "object",
-      "required": [
-        "$expression"
       ],
       "properties": {
+        "initial": {
+          "$ref": "#/$defs/ExpressionOperand"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/ExpressionOperand"
+        },
+        "value": {
+          "$ref": "#/$defs/ExpressionOperand"
+        }
+      },
+      "required": [
+        "operator",
+        "target"
+      ],
+      "type": "object"
+    },
+    "ExpressionEntry": {
+      "additionalProperties": false,
+      "description": "A declarative expression entry (Shape 5). Used as a state entry or inline event handler.",
+      "properties": {
+        "$description": {
+          "type": "string"
+        },
         "$expression": {
           "$ref": "#/$defs/ExpressionNode"
         },
         "$title": {
           "type": "string"
-        },
-        "$description": {
-          "type": "string"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$expression"
+      ],
+      "type": "object"
     },
     "ElementDef": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ElementPropertyValue"
+      },
       "description": "A Jx element definition. Maps directly to a DOM element.",
-      "type": "object",
-      "required": [
-        "tagName"
-      ],
       "properties": {
-        "tagName": {
-          "$ref": "#/$defs/TagName"
+        "$map/index": {
+          "$ref": "#/$defs/RefObject"
         },
-        "id": {
-          "type": "string"
+        "$map/item": {
+          "$ref": "#/$defs/RefObject"
+        },
+        "$props": {
+          "$ref": "#/$defs/PropsObject"
+        },
+        "$ref": {
+          "$ref": "#/$defs/ExternalRef"
+        },
+        "$switch": {
+          "$ref": "#/$defs/SwitchDef"
+        },
+        "alt": {
+          "$ref": "#/$defs/StringOrRef"
+        },
+        "attributes": {
+          "$ref": "#/$defs/AttributesObject"
+        },
+        "checked": {
+          "$ref": "#/$defs/BoolOrRef"
+        },
+        "children": {
+          "$ref": "#/$defs/ChildrenValue"
         },
         "className": {
           "$ref": "#/$defs/StringOrRef"
         },
-        "textContent": {
+        "dir": {
+          "enum": [
+            "ltr",
+            "rtl",
+            "auto"
+          ],
+          "type": "string"
+        },
+        "disabled": {
+          "$ref": "#/$defs/BoolOrRef"
+        },
+        "hidden": {
+          "$ref": "#/$defs/BoolOrRef"
+        },
+        "href": {
           "$ref": "#/$defs/StringOrRef"
+        },
+        "id": {
+          "type": "string"
         },
         "innerHTML": {
           "$ref": "#/$defs/StringOrRef"
@@ -1449,48 +1344,7 @@
         "innerText": {
           "$ref": "#/$defs/StringOrRef"
         },
-        "hidden": {
-          "$ref": "#/$defs/BoolOrRef"
-        },
-        "tabIndex": {
-          "$ref": "#/$defs/NumberOrRef"
-        },
-        "title": {
-          "$ref": "#/$defs/StringOrRef"
-        },
         "lang": {
-          "$ref": "#/$defs/StringOrRef"
-        },
-        "dir": {
-          "type": "string",
-          "enum": [
-            "ltr",
-            "rtl",
-            "auto"
-          ]
-        },
-        "value": {
-          "$ref": "#/$defs/StringOrRef"
-        },
-        "checked": {
-          "$ref": "#/$defs/BoolOrRef"
-        },
-        "disabled": {
-          "$ref": "#/$defs/BoolOrRef"
-        },
-        "selected": {
-          "$ref": "#/$defs/BoolOrRef"
-        },
-        "src": {
-          "$ref": "#/$defs/StringOrRef"
-        },
-        "href": {
-          "$ref": "#/$defs/StringOrRef"
-        },
-        "alt": {
-          "$ref": "#/$defs/StringOrRef"
-        },
-        "type": {
           "$ref": "#/$defs/StringOrRef"
         },
         "name": {
@@ -1499,29 +1353,32 @@
         "placeholder": {
           "$ref": "#/$defs/StringOrRef"
         },
-        "children": {
-          "$ref": "#/$defs/ChildrenValue"
+        "selected": {
+          "$ref": "#/$defs/BoolOrRef"
+        },
+        "src": {
+          "$ref": "#/$defs/StringOrRef"
         },
         "style": {
           "$ref": "#/$defs/StyleObject"
         },
-        "attributes": {
-          "$ref": "#/$defs/AttributesObject"
+        "tabIndex": {
+          "$ref": "#/$defs/NumberOrRef"
         },
-        "$switch": {
-          "$ref": "#/$defs/SwitchDef"
+        "tagName": {
+          "$ref": "#/$defs/TagName"
         },
-        "$ref": {
-          "$ref": "#/$defs/ExternalRef"
+        "textContent": {
+          "$ref": "#/$defs/StringOrRef"
         },
-        "$props": {
-          "$ref": "#/$defs/PropsObject"
+        "title": {
+          "$ref": "#/$defs/StringOrRef"
         },
-        "$map/item": {
-          "$ref": "#/$defs/RefObject"
+        "type": {
+          "$ref": "#/$defs/StringOrRef"
         },
-        "$map/index": {
-          "$ref": "#/$defs/RefObject"
+        "value": {
+          "$ref": "#/$defs/StringOrRef"
         },
         "onabort": {
           "description": "Event handler for the \"abort\" event.",
@@ -4802,15 +4659,15 @@
           ]
         }
       },
-      "additionalProperties": {
-        "$ref": "#/$defs/ElementPropertyValue"
-      }
+      "required": [
+        "tagName"
+      ],
+      "type": "object"
     },
     "ChildrenValue": {
       "description": "Static array of child definitions, or an Array namespace for dynamic lists.",
       "oneOf": [
         {
-          "type": "array",
           "items": {
             "oneOf": [
               {
@@ -4823,7 +4680,8 @@
                 "type": "number"
               }
             ]
-          }
+          },
+          "type": "array"
         },
         {
           "$ref": "#/$defs/ArrayNamespace"
@@ -4831,17 +4689,15 @@
       ]
     },
     "ArrayNamespace": {
+      "additionalProperties": false,
       "description": "Dynamic mapped list. Re-renders when the items state entry changes.",
-      "type": "object",
-      "required": [
-        "$prototype",
-        "items",
-        "map"
-      ],
       "properties": {
         "$prototype": {
-          "type": "string",
-          "const": "Array"
+          "const": "Array",
+          "type": "string"
+        },
+        "filter": {
+          "$ref": "#/$defs/RefObject"
         },
         "items": {
           "oneOf": [
@@ -4856,43 +4712,36 @@
         "map": {
           "$ref": "#/$defs/ElementDef"
         },
-        "filter": {
-          "$ref": "#/$defs/RefObject"
-        },
         "sort": {
           "$ref": "#/$defs/RefObject"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$prototype",
+        "items",
+        "map"
+      ],
+      "type": "object"
     },
     "SwitchDef": {
+      "additionalProperties": false,
       "description": "Reactive $ref that drives which case to render.",
-      "type": "object",
-      "required": [
-        "$ref"
-      ],
       "properties": {
         "$ref": {
           "$ref": "#/$defs/InternalRef"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$ref"
+      ],
+      "type": "object"
     },
     "SwitchNode": {
-      "type": "object",
-      "required": [
-        "$switch",
-        "cases"
-      ],
       "properties": {
-        "tagName": {
-          "$ref": "#/$defs/TagName"
-        },
         "$switch": {
           "$ref": "#/$defs/SwitchDef"
         },
         "cases": {
-          "type": "object",
           "additionalProperties": {
             "oneOf": [
               {
@@ -4902,13 +4751,45 @@
                 "$ref": "#/$defs/ExternalComponentRef"
               }
             ]
-          }
+          },
+          "type": "object"
+        },
+        "tagName": {
+          "$ref": "#/$defs/TagName"
         }
-      }
+      },
+      "required": [
+        "$switch",
+        "cases"
+      ],
+      "type": "object"
     },
     "StyleObject": {
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "description": "Nested CSS selector or media breakpoint rules.",
+            "type": "object"
+          }
+        ]
+      },
       "description": "CSS style definition. camelCase property names follow CSSOM convention. Keys starting with :, ., &, or [ are treated as nested CSS selectors. Keys matching $media breakpoint names are treated as responsive rules.",
-      "type": "object",
       "properties": {
         "-webkit-align-content": {
           "oneOf": [
@@ -21181,34 +21062,9 @@
           ]
         }
       },
-      "additionalProperties": {
-        "oneOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "number"
-          },
-          {
-            "description": "Nested CSS selector or media breakpoint rules.",
-            "type": "object",
-            "additionalProperties": {
-              "oneOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "number"
-                }
-              ]
-            }
-          }
-        ]
-      }
+      "type": "object"
     },
     "AttributesObject": {
-      "description": "HTML attributes and ARIA attributes set via element.setAttribute().",
-      "type": "object",
       "additionalProperties": {
         "oneOf": [
           {
@@ -21224,11 +21080,11 @@
             "$ref": "#/$defs/RefObject"
           }
         ]
-      }
+      },
+      "description": "HTML attributes and ARIA attributes set via element.setAttribute().",
+      "type": "object"
     },
     "PropsObject": {
-      "description": "Explicit prop passing at a component boundary.",
-      "type": "object",
       "additionalProperties": {
         "oneOf": [
           {
@@ -21250,23 +21106,24 @@
             "$ref": "#/$defs/RefObject"
           }
         ]
-      }
+      },
+      "description": "Explicit prop passing at a component boundary.",
+      "type": "object"
     },
     "RefObject": {
+      "additionalProperties": false,
       "description": "A $ref binding. Resolves to a state entry (reactive) or plain value (static).",
-      "type": "object",
-      "required": [
-        "$ref"
-      ],
       "properties": {
         "$ref": {
           "$ref": "#/$defs/AnyRef"
         }
       },
-      "additionalProperties": false
+      "required": [
+        "$ref"
+      ],
+      "type": "object"
     },
     "AnyRef": {
-      "type": "string",
       "oneOf": [
         {
           "$ref": "#/$defs/InternalRef"
@@ -21286,79 +21143,80 @@
         {
           "$ref": "#/$defs/MapRef"
         }
-      ]
+      ],
+      "type": "string"
     },
     "InternalRef": {
       "description": "Reference to a $defs type definition in the current component.",
-      "type": "string",
-      "pattern": "^#/\\$defs/",
       "examples": [
         "#/$defs/Count",
         "#/$defs/TodoItem",
         "#/$defs/Status"
-      ]
+      ],
+      "pattern": "^#/\\$defs/",
+      "type": "string"
     },
     "StateRef": {
       "description": "Reference to a state entry (runtime variable) in the current component.",
-      "type": "string",
-      "pattern": "^#/state/",
       "examples": [
         "#/state/count",
         "#/state/addTask",
         "#/state/items"
-      ]
+      ],
+      "pattern": "^#/state/",
+      "type": "string"
     },
     "ExternalRef": {
       "description": "Reference to an external Jx component file.",
-      "type": "string",
-      "pattern": "^(\\./|\\.\\./).*\\.json$|^https?://",
       "examples": [
         "./card.json",
         "https://cdn.example.com/button.json"
-      ]
+      ],
+      "pattern": "^(\\./|\\.\\./).*\\.json$|^https?://",
+      "type": "string"
     },
     "ExternalComponentRef": {
-      "type": "object",
+      "properties": {
+        "$props": {
+          "$ref": "#/$defs/PropsObject"
+        },
+        "$ref": {
+          "$ref": "#/$defs/ExternalRef"
+        }
+      },
       "required": [
         "$ref"
       ],
-      "properties": {
-        "$ref": {
-          "$ref": "#/$defs/ExternalRef"
-        },
-        "$props": {
-          "$ref": "#/$defs/PropsObject"
-        }
-      }
+      "type": "object"
     },
     "GlobalRef": {
       "description": "Reference to a window or document global.",
-      "type": "string",
-      "pattern": "^(window|document)#/",
       "examples": [
         "window#/currentUser",
         "document#/appConfig"
-      ]
+      ],
+      "pattern": "^(window|document)#/",
+      "type": "string"
     },
     "ParentRef": {
       "description": "Reference to a named state entry passed via $props from a parent component.",
-      "type": "string",
-      "pattern": "^parent#/",
       "examples": [
         "parent#/sharedState",
         "parent#/theme"
-      ]
+      ],
+      "pattern": "^parent#/",
+      "type": "string"
     },
     "MapRef": {
       "description": "Reference to the current Array map iteration context.",
-      "type": "string",
-      "pattern": "^\\$map/(item|index)(/.*)?$",
       "examples": [
         "$map/item",
         "$map/index",
         "$map/item/text",
         "$map/item/done"
-      ]
+      ],
+      "pattern": "^\\$map/(item|index)(/.*)?$",
+      "type": "string"
     },
     "ElementPropertyValue": {
       "oneOf": [
@@ -21411,49 +21269,34 @@
     },
     "CemParameter": {
       "description": "A CEM-compatible parameter definition for a function. Follows the Custom Elements Manifest Parameter shape.",
-      "type": "object",
-      "required": [
-        "name"
-      ],
       "properties": {
-        "name": {
-          "description": "Parameter name.",
-          "type": "string"
-        },
-        "type": {
-          "description": "Parameter type (JSON Schema or CEM { text } format)."
+        "default": {
+          "description": "Default value for the parameter."
         },
         "description": {
           "description": "Parameter documentation.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Parameter name.",
           "type": "string"
         },
         "optional": {
           "description": "Whether the parameter is optional.",
           "type": "boolean"
         },
-        "default": {
-          "description": "Default value for the parameter."
+        "type": {
+          "description": "Parameter type (JSON Schema or CEM { text } format)."
         }
-      }
-    },
-    "CemEvent": {
-      "description": "A CEM-compatible event definition. Describes a CustomEvent the function dispatches.",
-      "type": "object",
+      },
       "required": [
         "name"
       ],
+      "type": "object"
+    },
+    "CemEvent": {
+      "description": "A CEM-compatible event definition. Describes a CustomEvent the function dispatches.",
       "properties": {
-        "name": {
-          "description": "Event name (e.g. 'task-toggled').",
-          "type": "string"
-        },
-        "type": {
-          "description": "Event type (e.g. { text: 'CustomEvent' })."
-        },
-        "description": {
-          "description": "Event documentation.",
-          "type": "string"
-        },
         "deprecated": {
           "description": "Deprecation notice.",
           "oneOf": [
@@ -21464,13 +21307,28 @@
               "type": "string"
             }
           ]
+        },
+        "description": {
+          "description": "Event documentation.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Event name (e.g. 'task-toggled').",
+          "type": "string"
+        },
+        "type": {
+          "description": "Event type (e.g. { text: 'CustomEvent' })."
         }
-      }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
     },
     "TagName": {
       "description": "HTML element tag name or custom element name (must contain a hyphen per Web Components spec).",
-      "type": "string",
       "minLength": 1,
+      "type": "string",
       "examples": [
         "a",
         "abbr",
@@ -21686,7 +21544,6 @@
       ]
     },
     "JsonSchemaType": {
-      "type": "string",
       "enum": [
         "string",
         "number",
@@ -21695,20 +21552,14 @@
         "array",
         "object",
         "null"
-      ]
+      ],
+      "type": "string"
     },
     "HeadEntry": {
+      "additionalProperties": true,
       "description": "A page-level <head> entry. Defines meta tags, link tags, script tags, etc.",
-      "type": "object",
-      "required": [
-        "tagName"
-      ],
       "properties": {
-        "tagName": {
-          "type": "string"
-        },
         "attributes": {
-          "type": "object",
           "additionalProperties": {
             "oneOf": [
               {
@@ -21718,45 +21569,44 @@
                 "type": "boolean"
               }
             ]
-          }
+          },
+          "type": "object"
+        },
+        "children": {
+          "items": {
+            "$ref": "#/$defs/HeadEntry"
+          },
+          "type": "array"
+        },
+        "tagName": {
+          "type": "string"
         },
         "textContent": {
           "type": "string"
-        },
-        "children": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/HeadEntry"
-          }
         }
       },
-      "additionalProperties": true
+      "required": [
+        "tagName"
+      ],
+      "type": "object"
     },
     "ImageConfig": {
       "description": "Image optimization configuration for the project.",
-      "type": "object",
       "properties": {
+        "formats": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lazyLoad": {
+          "type": "boolean"
+        },
         "optimize": {
           "type": "boolean"
         },
-        "widths": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          }
-        },
-        "formats": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "quality": {
-          "type": "object",
           "properties": {
-            "webp": {
-              "type": "number"
-            },
             "avif": {
               "type": "number"
             },
@@ -21765,43 +21615,64 @@
             },
             "png": {
               "type": "number"
+            },
+            "webp": {
+              "type": "number"
             }
-          }
+          },
+          "type": "object"
+        },
+        "remoteDomains": {
+          "description": "Hostnames whose remote (https) images are optimized through /cdn-cgi/image transform URLs (cloudflare service only), e.g. [\"drive.usercontent.google.com\"]. Remote sources from other hosts are left untouched.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "service": {
+          "description": "How images are optimized: \"build\" runs Sharp at build time; \"cloudflare\" emits /cdn-cgi/image transform URLs served by Cloudflare Image Transformations (requires the feature to be enabled on the serving zone).",
+          "enum": [
+            "build",
+            "cloudflare"
+          ],
+          "type": "string"
         },
         "sizes": {
           "type": "string"
         },
-        "lazyLoad": {
-          "type": "boolean"
-        },
-        "service": {
-          "description": "How images are optimized: \"build\" runs Sharp at build time; \"cloudflare\" emits /cdn-cgi/image transform URLs served by Cloudflare Image Transformations (requires the feature to be enabled on the serving zone).",
-          "type": "string",
-          "enum": [
-            "build",
-            "cloudflare"
-          ]
-        },
-        "remoteDomains": {
-          "description": "Hostnames whose remote (https) images are optimized through /cdn-cgi/image transform URLs (cloudflare service only), e.g. [\"drive.usercontent.google.com\"]. Remote sources from other hosts are left untouched.",
-          "type": "array",
+        "widths": {
           "items": {
-            "type": "string"
-          }
+            "type": "number"
+          },
+          "type": "array"
         }
-      }
+      },
+      "type": "object"
     },
     "ContentTypeDef": {
       "description": "Content type definition. Defines the source directory, frontmatter schema, and element dependencies.",
-      "type": "object",
       "properties": {
-        "source": {
-          "description": "Path to the content directory relative to the project root.",
-          "type": "string",
-          "examples": [
-            "./content/blog/",
-            "./content/docs/"
-          ]
+        "$elements": {
+          "description": "Custom elements available in markdown directives for this content type.",
+          "items": {
+            "oneOf": [
+              {
+                "properties": {
+                  "$ref": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "$ref"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "type": "array"
         },
         "format": {
           "description": "Import name of a format class declared in the project imports map (e.g. \"Markdown\", \"Csv\"). When omitted, the format is derived from the source file extension via the format registry. \"json\" is the only built-in.",
@@ -21811,29 +21682,158 @@
           "description": "JSON Schema for validating frontmatter of content type entries.",
           "type": "object"
         },
-        "$elements": {
-          "description": "Custom elements available in markdown directives for this content type.",
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "object",
-                "required": [
-                  "$ref"
-                ],
-                "properties": {
-                  "$ref": {
-                    "type": "string"
-                  }
-                }
-              },
-              {
+        "source": {
+          "description": "Path to the content directory relative to the project root.",
+          "examples": [
+            "./content/blog/",
+            "./content/docs/"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "https://jxsuite.com/schema/v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": {
+    "$ref": "#/$defs/ElementPropertyValue"
+  },
+  "description": "Schema for Jx component files. A Jx document is a JSON object that declaratively describes a reactive web component: its structure (DOM tree), styling, type definitions ($defs), runtime state, and inline or external functions. Reactivity is powered by @vue/reactivity.",
+  "properties": {
+    "$defs": {
+      "$ref": "#/$defs/DefsMap",
+      "description": "Pure JSON Schema type definitions for this component. All entries are reusable type schemas — no runtime artifacts are produced. Referenced from state entries via $ref. Naming convention: PascalCase."
+    },
+    "$elements": {
+      "description": "Custom element dependencies. Items are either $ref objects pointing to JX element definitions, or bare npm package name strings for web component libraries.",
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "$ref": {
                 "type": "string"
               }
-            ]
+            },
+            "required": [
+              "$ref"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "npm package specifier (must declare customElements in package.json)",
+            "type": "string"
           }
+        ]
+      },
+      "type": "array"
+    },
+    "$head": {
+      "description": "Page-level <head> entries. Array of element definitions for meta tags, link tags, script tags, etc. Merged with layout and site-level $head entries.",
+      "items": {
+        "$ref": "#/$defs/ElementDef"
+      },
+      "type": "array"
+    },
+    "$id": {
+      "description": "Component identifier string. Used by tooling and the builder.",
+      "examples": [
+        "Counter",
+        "TodoApp",
+        "UserCard"
+      ],
+      "type": "string"
+    },
+    "$layout": {
+      "description": "Layout reference for pages. String path to a layout JSON file, or false to opt out of the default layout.",
+      "examples": [
+        "./layouts/base.json"
+      ],
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "const": false,
+          "type": "boolean"
         }
-      }
+      ]
+    },
+    "$media": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Named media breakpoints following CSS @custom-media convention. Keys use the CSS custom property -- prefix.",
+      "examples": [
+        {
+          "--dark": "(prefers-color-scheme: dark)",
+          "--md": "(min-width: 768px)",
+          "--sm": "(min-width: 640px)"
+        }
+      ],
+      "type": "object"
+    },
+    "$paths": {
+      "description": "Dynamic route parameters. Maps parameter names to data sources for generating one page per entry at build time.",
+      "type": "object"
+    },
+    "$schema": {
+      "description": "URI identifying the Jx dialect version. Enables schema-aware IDE tooling.",
+      "examples": [
+        "https://jxsuite.com/schema/v1"
+      ],
+      "type": "string"
+    },
+    "attributes": {
+      "$ref": "#/$defs/AttributesObject"
+    },
+    "cases": {
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/ElementDef"
+          },
+          {
+            "$ref": "#/$defs/ExternalComponentRef"
+          }
+        ]
+      },
+      "description": "Switch cases object. Maps case values to element definitions or external component refs. Used alongside $switch for dynamic component rendering.",
+      "type": "object"
+    },
+    "children": {
+      "$ref": "#/$defs/ChildrenValue"
+    },
+    "imports": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Import map: $prototype names to .class.json file paths. Allows state entries to reference external classes by name without $src.",
+      "type": "object"
+    },
+    "observedAttributes": {
+      "description": "HTML attributes the custom element watches for changes. Follows the Web Components observedAttributes convention.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "state": {
+      "$ref": "#/$defs/StateMap",
+      "description": "Runtime variables for this component. All entries are reactive by default. Entry shape is determined by value type: scalar/array → reactive property, string with ${} → computed, object with $prototype → function or data source, object with type and default → typed reactive property."
+    },
+    "style": {
+      "$ref": "#/$defs/StyleObject"
+    },
+    "tagName": {
+      "$ref": "#/$defs/TagName"
+    },
+    "title": {
+      "$ref": "#/$defs/StringOrRef",
+      "description": "Page title. Can be a static string or a template string with ${} expressions."
     }
-  }
+  },
+  "title": "Jx Document",
+  "type": "object"
 }

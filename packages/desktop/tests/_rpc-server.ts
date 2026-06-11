@@ -68,8 +68,8 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
 };
 
 const server = Bun.serve({
-  async fetch(req, server) {
-    if (server.upgrade(req)) {
+  async fetch(req, srv) {
+    if (srv.upgrade(req)) {
       return;
     }
     return new Response("Not Found", { status: 404 });

@@ -49,8 +49,8 @@ export interface Tab {
   fileHandle: FileSystemFileHandle | null;
   capabilities: { modes: string[] };
   scope: {
-    stop(): void;
-    run<T>(fn: () => T): T | undefined;
+    stop: () => void;
+    run: <T>(fn: () => T) => T | undefined;
     [k: string]: unknown;
   };
   doc: {
@@ -69,7 +69,7 @@ export interface Tab {
     ui: TabUi;
     canvas: {
       status: string;
-      scope: { stop(): void; [k: string]: unknown } | null;
+      scope: { stop: () => void; [k: string]: unknown } | null;
       error: string | null;
       pendingInlineEdit: InlineEditDef | null;
     };

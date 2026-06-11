@@ -27,7 +27,9 @@ export async function buildAll(
       ...opts,
     });
     if (!result.success) {
-      result.logs.forEach((l) => console.error(l));
+      for (const l of result.logs) {
+        console.error(l);
+      }
     } else {
       console.log(`Built → ${entry.outdir}/${label ?? "bundle"}.js`);
     }
@@ -81,7 +83,9 @@ export async function rebuild(
       rebuilt.push(label ?? entry.outdir);
       console.log(`Rebuilt  → ${entry.outdir}/${label ?? "bundle"}.js  (${changedFile} changed)`);
     } else {
-      result.logs.forEach((l) => console.error(l));
+      for (const l of result.logs) {
+        console.error(l);
+      }
       ok = false;
     }
   }

@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+/// <reference lib="dom.iterable" />
 /** Canvas media/breakpoint utilities — pure functions extracted for testability. */
 
 import type { JxStyle } from "@jxsuite/schema/types";
@@ -14,12 +15,12 @@ import type { JxStyle } from "@jxsuite/schema/types";
  *   baseWidth: number;
  * }}
  */
-export function parseMediaEntries(mediaDef: Record<string, string> | null | undefined) {
+export function parseMediaEntries(mediaDef?: Record<string, string> | null) {
   if (!mediaDef) {
     return { baseWidth: 320, featureQueries: [], sizeBreakpoints: [] };
   }
-  const sizes = [],
-    features = [];
+  const features = [];
+  const sizes = [];
   let baseWidth = 320;
   for (const [name, query] of Object.entries(mediaDef)) {
     if (name === "--") {
@@ -146,16 +147,14 @@ export function collectMediaOverrides(
     if (!rules) {
       continue;
     }
-    for (let ri = 0; ri < rules.length; ri++) {
-      const rule = rules[ri];
+    for (const rule of rules) {
       if (!(rule instanceof CSSMediaRule)) {
         continue;
       }
       if (!activeBreakpoints.has(rule.conditionText)) {
         continue;
       }
-      for (let mi = 0; mi < rule.cssRules.length; mi++) {
-        const mediaRule = rule.cssRules[mi];
+      for (const mediaRule of rule.cssRules) {
         if (!(mediaRule instanceof CSSStyleRule)) {
           continue;
         }
@@ -164,13 +163,12 @@ export function collectMediaOverrides(
         if (!jxMatch) {
           continue;
         }
-        const uid = jxMatch[1];
+        const [, uid] = jxMatch;
         if (!overrides.has(uid)) {
           overrides.set(uid, new Map());
         }
         const props = overrides.get(uid) as Map<string, string>;
-        for (let i = 0; i < mediaRule.style.length; i++) {
-          const prop = mediaRule.style[i];
+        for (const prop of mediaRule.style) {
           props.set(prop, mediaRule.style.getPropertyValue(prop));
         }
       }

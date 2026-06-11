@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { effect } from "../src/reactivity";
+import { jsonClone } from "../src/utils/studio-utils";
 import { createTab, disposeTab } from "../src/tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
@@ -24,13 +25,12 @@ import {
 } from "../src/tabs/transact";
 import { describe, expect, test } from "bun:test";
 
-function makeTab(
-  doc: JxMutableNode = {
+function makeTab(doc?: JxMutableNode) {
+  const document = doc ?? {
     children: [{ tagName: "p", textContent: "Hello" }],
     tagName: "div",
-  },
-) {
-  return createTab({ document: doc, id: "test" });
+  };
+  return createTab({ document, id: "test" });
 }
 
 describe("transactDoc", () => {
@@ -215,17 +215,17 @@ describe("mutateMoveNode", () => {
 
   test("non-numeric source index is a no-op", () => {
     const tab = makeTab();
-    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    const before = jsonClone(tab.doc.document);
     transactDoc(tab, (t) => mutateMoveNode(t, ["children"], [], 0));
-    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    expect(jsonClone(tab.doc.document)).toEqual(before);
     disposeTab(tab);
   });
 
   test("missing source parent is a no-op", () => {
     const tab = makeTab();
-    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    const before = jsonClone(tab.doc.document);
     transactDoc(tab, (t) => mutateMoveNode(t, ["children", 3, "children", 0], [], 0));
-    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    expect(jsonClone(tab.doc.document)).toEqual(before);
     disposeTab(tab);
   });
 

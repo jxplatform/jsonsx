@@ -262,8 +262,7 @@ describe("applyOverridesToCanvas", () => {
     child.style.gridTemplateColumns = "1fr 1fr 1fr";
     canvas.append(child);
 
-    const overrides = new Map();
-    overrides.set("jx-abc12", new Map([["grid-template-columns", "1fr"]]));
+    const overrides = new Map([["jx-abc12", new Map([["grid-template-columns", "1fr"]])]]);
 
     applyOverridesToCanvas(canvas, overrides);
     expect(child.style.getPropertyValue("grid-template-columns")).toBe("1fr");
@@ -278,8 +277,7 @@ describe("applyOverridesToCanvas", () => {
     canvas.append(el1);
     canvas.append(el2);
 
-    const overrides = new Map();
-    overrides.set("jx-same1", new Map([["color", "red"]]));
+    const overrides = new Map([["jx-same1", new Map([["color", "red"]])]]);
 
     applyOverridesToCanvas(canvas, overrides);
     expect(el1.style.color).toBe("red");
@@ -293,8 +291,7 @@ describe("applyOverridesToCanvas", () => {
     el.style.color = "blue";
     canvas.append(el);
 
-    const overrides = new Map();
-    overrides.set("jx-nomatch", new Map([["color", "red"]]));
+    const overrides = new Map([["jx-nomatch", new Map([["color", "red"]])]]);
 
     applyOverridesToCanvas(canvas, overrides);
     expect(el.style.color).toBe("blue");
@@ -306,15 +303,16 @@ describe("applyOverridesToCanvas", () => {
     el.dataset.jx = "jx-multi";
     canvas.append(el);
 
-    const overrides = new Map();
-    overrides.set(
-      "jx-multi",
-      new Map([
-        ["grid-template-columns", "1fr"],
-        ["gap", "1rem"],
-        ["padding", "0.5rem"],
-      ]),
-    );
+    const overrides = new Map([
+      [
+        "jx-multi",
+        new Map([
+          ["grid-template-columns", "1fr"],
+          ["gap", "1rem"],
+          ["padding", "0.5rem"],
+        ]),
+      ],
+    ]);
 
     applyOverridesToCanvas(canvas, overrides);
     expect(el.style.getPropertyValue("grid-template-columns")).toBe("1fr");
@@ -340,8 +338,7 @@ describe("applyOverridesToCanvas", () => {
     outside.style.color = "blue";
     document.body.append(outside);
 
-    const overrides = new Map();
-    overrides.set("jx-out1", new Map([["color", "red"]]));
+    const overrides = new Map([["jx-out1", new Map([["color", "red"]])]]);
 
     applyOverridesToCanvas(canvas, overrides);
     expect(outside.style.color).toBe("blue");

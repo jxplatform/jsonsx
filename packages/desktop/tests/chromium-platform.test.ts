@@ -50,8 +50,8 @@ const responses: Record<string, unknown> = {
 const forcedErrors = new Map<string, string>();
 
 const server = Bun.serve({
-  fetch(req, server) {
-    if (server.upgrade(req)) {
+  fetch(req, srv) {
+    if (srv.upgrade(req)) {
       return;
     }
     return new Response("Not Found", { status: 404 });
@@ -120,7 +120,7 @@ if (wsStr.includes("WebSocketImplementation") || wsStr.includes("DOMException"))
   const saved = globalThis.WebSocket;
   // Bun supports native WebSocket via its internal implementation.
   // We can get a working one by deleting happy-dom's override — Bun re-exposes the built-in.
-  // @ts-expect-error
+  // @ts-expect-error -- deleting a required global; Bun re-exposes its built-in WebSocket
   delete globalThis.WebSocket;
   if (!globalThis.WebSocket) {
     // Fallback: re-assign — shouldn't happen in Bun but just in case

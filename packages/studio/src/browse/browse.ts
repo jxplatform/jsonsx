@@ -323,6 +323,7 @@ async function handleNewEntity(
     return;
   }
 
+  // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
   const name = prompt(`${typeInfo.label} name:`, "untitled");
   if (!name) {
     return;
@@ -337,11 +338,9 @@ async function handleNewEntity(
   let content;
   const entityFormat = formatForPath(filePath);
   if (entityFormat) {
-    if (contentTypeName) {
-      content = `---\n${buildFrontmatterYaml(contentTypeName)}---\n\n`;
-    } else {
-      content = entityFormat.studio?.newFileTemplate ?? "";
-    }
+    content = contentTypeName
+      ? `---\n${buildFrontmatterYaml(contentTypeName)}---\n\n`
+      : (entityFormat.studio?.newFileTemplate ?? "");
   } else {
     content = JSON.stringify({ children: [], tagName: "div" }, null, "\t");
   }
@@ -500,7 +499,7 @@ async function browseRenameFile(
     return;
   }
   const filePath = file.path.replaceAll("\\", "/");
-  const parentDir = filePath.includes("/") ? filePath.substring(0, filePath.lastIndexOf("/")) : ".";
+  const parentDir = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/")) : ".";
   const newPath = parentDir === "." ? newName : `${parentDir}/${newName}`;
   try {
     const platform = getPlatform();
@@ -524,7 +523,7 @@ async function browseDuplicateFile(
   ctx: { openFile: (path: string) => void },
 ) {
   const filePath = file.path.replaceAll("\\", "/");
-  const parentDir = filePath.includes("/") ? filePath.substring(0, filePath.lastIndexOf("/")) : ".";
+  const parentDir = filePath.includes("/") ? filePath.slice(0, filePath.lastIndexOf("/")) : ".";
   const baseName = file.name.replace(/(\.[^.]+)$/, "");
   const ext = file.ext || "";
   const copyName = `${baseName}-copy${ext}`;
@@ -698,11 +697,9 @@ async function loadPreview(el: Element, file: { path: string; category: string }
   if (!preview) {
     try {
       const comp = componentRegistry.find((c: ComponentEntry) => c.path === file.path);
-      if (comp) {
-        preview = (await renderComponentPreview(comp)) as HTMLElement | undefined;
-      } else {
-        preview = ((await renderDocPreview(file.path)) as HTMLElement | undefined) || undefined;
-      }
+      preview = comp
+        ? ((await renderComponentPreview(comp)) as HTMLElement | undefined)
+        : ((await renderDocPreview(file.path)) as HTMLElement | undefined) || undefined;
       if (preview) {
         _previewCache.set(file.path, /** @type {HTMLElement} */ preview);
       }

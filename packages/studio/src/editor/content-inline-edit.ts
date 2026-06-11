@@ -9,8 +9,7 @@ import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 
-import type { JxContentResult } from "./inline-edit";
-import type { SlashCommand } from "./inline-edit";
+import type { JxContentResult, SlashCommand } from "./inline-edit";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -100,9 +99,9 @@ export function enterInlineEdit(el: HTMLElement, path: JxPath) {
         requestAnimationFrame(() => {
           const activePanel = getActivePanel();
           if (activePanel) {
-            const el = findCanvasElement(afterPath, activePanel.canvas);
-            if (el && isEditableBlock(el)) {
-              enterInlineEdit(el, afterPath);
+            const nextEl = findCanvasElement(afterPath, activePanel.canvas);
+            if (nextEl && isEditableBlock(nextEl)) {
+              enterInlineEdit(nextEl, afterPath);
             }
           }
         });

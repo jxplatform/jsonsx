@@ -19,7 +19,7 @@ import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { htmlToJx } from "./html-to-jx.ts";
 import type { MdastNode } from "./types.ts";
-import type { JxDocument, JxElement } from "@jxsuite/schema/types";
+import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
 
 export { htmlToJx };
 
@@ -94,7 +94,7 @@ export function expandDotPaths(attrs: Record<string, string>) {
       }
       target = target[seg] as Record<string, unknown>;
     }
-    target[jxKey(segments.at(-1))] = value;
+    target[jxKey(segments.at(-1) as string)] = value;
   }
 
   return result;
@@ -379,7 +379,7 @@ export function mdastNodeToJx(node: MdastNode) {
     case "tableCell": {
       const children = convertChildren(node.children ?? []);
       if (children.length === 1 && typeof children[0] === "string") {
-        el.textContent = children[0];
+        [el.textContent] = children;
       } else if (children.length > 0) {
         el.children = children;
       }
@@ -393,7 +393,7 @@ export function mdastNodeToJx(node: MdastNode) {
 
     case "link": {
       {
-        const linkAttrs: Record<string, import("@jxsuite/schema/types").JxAttributeValue> = {
+        const linkAttrs: Record<string, JxAttributeValue> = {
           href: node.url ?? "",
         };
         if (node.title) {
@@ -404,7 +404,7 @@ export function mdastNodeToJx(node: MdastNode) {
       {
         const children = convertChildren(node.children ?? []);
         if (children.length === 1 && typeof children[0] === "string") {
-          el.textContent = children[0];
+          [el.textContent] = children;
         } else if (children.length > 0) {
           el.children = children;
         }
@@ -413,7 +413,7 @@ export function mdastNodeToJx(node: MdastNode) {
     }
 
     case "image": {
-      const imageAttrs: Record<string, import("@jxsuite/schema/types").JxAttributeValue> = {
+      const imageAttrs: Record<string, JxAttributeValue> = {
         alt: node.alt ?? "",
         src: node.url ?? "",
       };
@@ -457,6 +457,9 @@ export function mdastNodeToJx(node: MdastNode) {
       el.children = [thead, tbody].filter(Boolean) as JxElement[];
       break;
     }
+    default: {
+      break;
+    }
   }
 
   return el;
@@ -489,12 +492,12 @@ function directiveToJx(node: MdastNode) {
         ) {
           el[key] = value;
         } else if (key === "props") {
-          el.$props = value as Record<string, import("@jxsuite/schema/types").JsonValue>;
+          el.$props = value as Record<string, JsonValue>;
         } else {
           if (!el.attributes) {
             el.attributes = {};
           }
-          el.attributes[key] = value as import("@jxsuite/schema/types").JxAttributeValue;
+          el.attributes[key] = value as JxAttributeValue;
         }
       }
     } else {
@@ -522,7 +525,7 @@ function directiveToJx(node: MdastNode) {
           if (!el.attributes) {
             el.attributes = {};
           }
-          el.attributes[key] = value as import("@jxsuite/schema/types").JxAttributeValue;
+          el.attributes[key] = value as JxAttributeValue;
         }
       }
     }
@@ -535,7 +538,7 @@ function directiveToJx(node: MdastNode) {
     if (node.children && node.children.length > 0) {
       const children = convertChildren(node.children ?? []);
       if (children.length === 1 && typeof children[0] === "string") {
-        el.textContent = children[0];
+        [el.textContent] = children;
       } else if (children.length > 0) {
         el.children = children;
       }
@@ -583,7 +586,7 @@ function directiveToJx(node: MdastNode) {
     if (el.children && typeof el.children === "object" && !Array.isArray(el.children)) {
       // Children was set to a descriptor object by dot-path expansion — keep it
     } else if (jxChildren.length === 1 && typeof jxChildren[0] === "string") {
-      el.textContent = jxChildren[0];
+      [el.textContent] = jxChildren;
     } else if (jxChildren.length > 0) {
       el.children = jxChildren;
     }
@@ -602,7 +605,10 @@ export function convertChildren(children: MdastNode[]) {
   if (!children) {
     return [];
   }
-  return children.flatMap(mdastNodeToJx).filter((c) => c != null) as (JxElement | string)[];
+  return children.flatMap((n) => mdastNodeToJx(n)).filter((c) => c != null) as (
+    | JxElement
+    | string
+  )[];
 }
 
 /**

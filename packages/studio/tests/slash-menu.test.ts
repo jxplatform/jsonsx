@@ -114,14 +114,14 @@ describe("Slash Menu", () => {
       pressKey("ArrowUp");
 
       const items = getMenuItems();
-      expect(items.at(-1).hasAttribute("focused")).toBe(true);
+      expect(items.at(-1)!.hasAttribute("focused")).toBe(true);
     });
 
     test("ArrowDown wraps around to first item", () => {
       showSlashMenu(anchor, "", { onSelect: () => {} });
       const items = getMenuItems();
       // Navigate to last item
-      for (let i = 0; i < items.length; i++) {
+      for (const _item of items) {
         pressKey("ArrowDown");
       }
 

@@ -1,8 +1,8 @@
 /** Shared project generation logic. Used by both the CLI scaffolder and the Studio server endpoint. */
 
 import { cp, mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+
 import { existsSync } from "node:fs";
 
 const __dirname = import.meta.dirname;
@@ -65,18 +65,20 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
 function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }) {
   const compatibilityDate = new Date().toISOString().slice(0, 10);
 
-  // nodejs_compat: server functions routinely pull in Node-flavored npm packages
+  // Nodejs_compat: server functions routinely pull in Node-flavored npm packages
   const config =
     adapter === "cloudflare-workers"
       ? {
           assets: { binding: "ASSETS", directory: "./dist" },
           compatibility_date: compatibilityDate,
           compatibility_flags: ["nodejs_compat"],
-          assets: { directory: "./dist", binding: "ASSETS" },
+          main: "./dist/worker.js",
+          name: slug,
         }
       : {
           compatibility_date: compatibilityDate,
           compatibility_flags: ["nodejs_compat"],
+          name: slug,
           pages_build_output_dir: "./dist",
         };
 
@@ -165,7 +167,7 @@ function buildPackageJson({
     dependencies["hono"] = "^4";
   }
 
-  if (adapter && CF_ADAPTERS.includes(adapter)) {
+  if (adapter && CF_ADAPTERS.has(adapter)) {
     devDependencies["wrangler"] = "^4";
     scripts.deploy =
       adapter === "cloudflare-workers" ? "wrangler deploy" : "wrangler pages deploy dist";
@@ -179,6 +181,5 @@ function buildPackageJson({
     private: true,
     scripts,
     ...(Object.keys(dependencies).length > 0 && { dependencies }),
-    devDependencies,
   };
 }

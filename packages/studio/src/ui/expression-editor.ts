@@ -5,6 +5,7 @@ import { isJsonObject, isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
 
 import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
+import type { TemplateResult } from "lit-html";
 
 // ─── Operator Categories ────────────────────────────────────────────────────
 
@@ -360,7 +361,7 @@ function renderOperandEditor(
     depth: number;
     mustBeRef?: boolean;
   },
-): import("lit-html").TemplateResult {
+): TemplateResult {
   if (opts.mustBeRef) {
     const refVal = ((operand as Record<string, unknown> | null)?.$ref as string) ?? "";
     return html`
@@ -412,7 +413,7 @@ function renderSpliceArgsEditor(
   args: unknown[],
   onChange: (newArgs: unknown[]) => void,
   opts: { stateDefs: string[]; allowEventRef: boolean; depth: number },
-): import("lit-html").TemplateResult {
+): TemplateResult {
   const safeArgs = Array.isArray(args) ? args : [];
   const labels = ["start", "del", "item"];
 
@@ -484,7 +485,7 @@ export function renderExpressionEditor(
   node: unknown,
   onChange: (node: unknown) => void,
   opts: { stateDefs: string[]; allowEventRef: boolean; depth?: number },
-): import("lit-html").TemplateResult {
+): TemplateResult {
   const depth = opts.depth ?? 0;
   const safeNode: Record<string, unknown> =
     node && typeof node === "object"

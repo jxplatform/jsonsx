@@ -116,22 +116,22 @@ function extractComponentDef(node: JxMutableNode) {
  * @returns {{ valid: boolean; error: string }}
  */
 function validateName(val: string) {
-  val = val.trim().toLowerCase();
-  if (!val.includes("-")) {
+  const name = val.trim().toLowerCase();
+  if (!name.includes("-")) {
     return {
       error: "Name must contain a hyphen (e.g. my-component)",
       valid: false,
     };
   }
-  if (!VALID_NAME.test(val)) {
+  if (!VALID_NAME.test(name)) {
     return {
       error: "Lowercase letters, digits, and hyphens only",
       valid: false,
     };
   }
-  const exists = componentRegistry.some((c) => c.tagName === val);
+  const exists = componentRegistry.some((c) => c.tagName === name);
   if (exists) {
-    return { error: `Component <${val}> already exists`, valid: false };
+    return { error: `Component <${name}> already exists`, valid: false };
   }
   return { error: "", valid: true };
 }

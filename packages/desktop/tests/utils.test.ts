@@ -41,7 +41,7 @@ describe("openFileDialog", () => {
   test("passes correct options to Utils.openFileDialog", async () => {
     await init();
     await openFileDialog();
-    const call = (mockOpenFileDialog.mock.calls[0] as unknown as [Record<string, unknown>])[0];
+    const [call] = mockOpenFileDialog.mock.calls[0] as unknown as [Record<string, unknown>];
     expect(call.allowedFileTypes).toBe("json");
     expect(call.canChooseFiles).toBe(true);
     expect(call.canChooseDirectory).toBe(false);

@@ -8,6 +8,8 @@ import { componentRegistry } from "../files/components";
 
 import type { StylebookEntry } from "./stylebook-panel";
 import type { JxStyle } from "@jxsuite/schema/types";
+import type { TemplateResult } from "lit-html";
+import type { ComponentEntry } from "../files/components.js";
 
 /**
  * @param {JxStyle} rootStyle
@@ -45,11 +47,7 @@ export function renderStylebookLayersTemplate(ctx: {
      * @param {string} parentPath
      * @returns {import("lit-html").TemplateResult}
      */
-    const renderEntryRow = (
-      entry: StylebookEntry,
-      depth: number = 0,
-      parentPath: string = "",
-    ): import("lit-html").TemplateResult => {
+    const renderEntryRow = (entry: StylebookEntry, depth = 0, parentPath = ""): TemplateResult => {
       const { tag } = entry;
       const fullPath = parentPath ? `${parentPath} ${tag}` : tag;
       const uniqueChildren = entry.children
@@ -83,7 +81,7 @@ export function renderStylebookLayersTemplate(ctx: {
       `;
     };
 
-    const elementRows: import("lit-html").TemplateResult[] = [];
+    const elementRows: TemplateResult[] = [];
     for (const section of ctx.stylebookMeta.$sections) {
       for (const entry of section.elements) {
         elementRows.push(renderEntryRow(entry, 0));
@@ -91,7 +89,7 @@ export function renderStylebookLayersTemplate(ctx: {
     }
     const compRows = componentRegistry.map(
       /** @param {import("../files/components.js").ComponentEntry} comp */ (
-        comp: import("../files/components.js").ComponentEntry,
+        comp: ComponentEntry,
       ) => html`
         <div
           class=${classMap({

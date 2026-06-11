@@ -1,19 +1,19 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
-import { dirname, join, resolve as resolvePath } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve as resolvePath } from "node:path";
+
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import type { MarkdownFileResult, TocEntry } from "../src/types";
-import type { JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxPrototypeDef } from "@jxsuite/schema/types";
+
+import { buildScope, resolvePrototype, isSignal, RESERVED_KEYS } from "@jxsuite/runtime";
+import { Markdown, MarkdownCollection } from "../src/md";
+import { readFileSync } from "node:fs";
 
 try {
   GlobalRegistrator.register();
 } catch {
   /* Already registered */
 }
-
-import { buildScope, resolvePrototype, isSignal, RESERVED_KEYS } from "@jxsuite/runtime";
-import { Markdown, MarkdownCollection } from "../src/md";
-import { readFileSync } from "node:fs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,7 +136,7 @@ describe("Markdown", () => {
   });
 
   test("$toc entries have depth, text, and id", () => {
-    const entry = result.$toc![0];
+    const [entry] = result.$toc!;
     expect(entry).toHaveProperty("depth");
     expect(entry).toHaveProperty("text");
     expect(entry).toHaveProperty("id");
@@ -473,11 +473,7 @@ describe("Runtime external prototype ($src)", () => {
       src: join(FIXTURE_DIR, "getting-started.md"),
       timing: "client",
     };
-    const sig = (await resolvePrototype(
-      def as unknown as import("@jxsuite/schema/types").JxPrototypeDef,
-      {},
-      "$test",
-    )) as any;
+    const sig = (await resolvePrototype(def as unknown as JxPrototypeDef, {}, "$test")) as any;
     expect(isSignal(sig)).toBe(true);
     // If reserved keys leaked in, the constructor would get them — but resolve() still works
     expect(sig.value.slug).toBe("getting-started");

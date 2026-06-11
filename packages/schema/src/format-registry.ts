@@ -66,11 +66,11 @@ export interface CapabilityInfo {
 
 export interface FormatHostIO {
   /** Read and parse a JSON file or URL. */
-  loadJson(pathOrUrl: string): Promise<Record<string, unknown>>;
+  loadJson: (pathOrUrl: string) => Promise<Record<string, unknown>>;
   /** Import a JS module by path or URL. */
-  importModule(pathOrUrl: string): Promise<Record<string, unknown>>;
+  importModule: (pathOrUrl: string) => Promise<Record<string, unknown>>;
   /** Resolve a relative reference against a base (node: path.resolve; browser: new URL). */
-  resolvePath(base: string, ref: string): string;
+  resolvePath: (base: string, ref: string) => string;
 }
 
 interface ClassMethodLike {

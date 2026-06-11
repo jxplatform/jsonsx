@@ -60,6 +60,7 @@ import type {
 } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
 import type { SiteRoute } from "../types.ts";
+import type { CacheManifest } from "./image-cache.js";
 
 /**
  * Build an entire Jx site from a project directory.
@@ -160,7 +161,7 @@ export async function buildSite(
           if (f.tagName) {
             compiledComponentTags.push(f.tagName);
           }
-          fileCount++;
+          fileCount += 1;
         }
 
         // Pre-render component HTML scaffold and CSS sidecar
@@ -171,7 +172,7 @@ export async function buildSite(
           if (css) {
             componentCSS.set(doc.tagName, css);
             writeFileSync(resolve(componentOutDir, `${doc.tagName}.css`), css, "utf8");
-            fileCount++;
+            fileCount += 1;
           }
         }
       } catch (error) {
@@ -251,7 +252,7 @@ export async function buildSite(
       const outPath = routeToOutputPath(route.urlPattern, outDir, trailingSlash);
       mkdirSync(dirname(outPath), { recursive: true });
       writeFileSync(outPath, result.html, "utf8");
-      fileCount++;
+      fileCount += 1;
 
       // Write serialized export sidecars alongside HTML (formats with exportTarget: true)
       for (const fmt of formatRegistry.withCapability("serialize")) {
@@ -274,7 +275,7 @@ export async function buildSite(
           if (content) {
             const sidecarPath = outPath.replace(/\.html$/, fmt.extensions[0]);
             writeFileSync(sidecarPath, content, "utf8");
-            fileCount++;
+            fileCount += 1;
           }
         } catch (error) {
           const err = error as Error;
@@ -287,14 +288,14 @@ export async function buildSite(
         const filePath = resolve(dirname(outPath), file.path);
         mkdirSync(dirname(filePath), { recursive: true });
         writeFileSync(filePath, file.content, "utf8");
-        fileCount++;
+        fileCount += 1;
       }
 
       // Write server handler if present
       if (result.serverHandler) {
         const serverPath = resolve(dirname(outPath), "_server.js");
         writeFileSync(serverPath, result.serverHandler, "utf8");
-        fileCount++;
+        fileCount += 1;
       }
     } catch (error) {
       const err = error as Error;
@@ -340,7 +341,7 @@ export async function buildSite(
     if (workerSource) {
       const workerName = adapter === "cloudflare-pages" ? "_worker.js" : "worker.js";
       writeFileSync(resolve(outDir, workerName), workerSource, "utf8");
-      fileCount++;
+      fileCount += 1;
       log(`  Generated dist/${workerName} (${deduped.size} server function(s))`);
 
       if (adapter === "cloudflare-pages") {
@@ -350,7 +351,7 @@ export async function buildSite(
           `${JSON.stringify({ exclude: [], include: ["/_jx/*"], version: 1 }, null, 2)}\n`,
           "utf8",
         );
-        fileCount++;
+        fileCount += 1;
       }
 
       // Copy server source files into dist/components/ so worker imports resolve
@@ -423,7 +424,7 @@ async function compilePage(
   projectConfig: ProjectConfig,
   projectRoot: string,
   contentTypes = new Map<string, ContentLoaderEntry[]>(),
-  imageCache: import("./image-cache.js").CacheManifest | null = null,
+  imageCache: CacheManifest | null = null,
   componentDefs = new Map<string, JxElement>(),
   imageMetaCache: ImageMetaCache | null = null,
   formatRegistry?: FormatRegistry,
@@ -435,9 +436,9 @@ async function compilePage(
   const layoutDoc = resolveLayout(pageDoc, projectConfig, projectRoot);
 
   // Extract head arrays before they get lost in the merge
-  const pageHead = pageDoc.$head ?? layoutDoc._pageHead ?? ([] as JxHeadEntry[]);
-  const layoutHead = layoutDoc.$head ?? [];
-  const pageTitle = pageDoc.title ?? layoutDoc._pageTitle ?? (null as string | null);
+  const pageHead = (pageDoc.$head ?? layoutDoc._pageHead ?? []) as JxHeadEntry[];
+  const layoutHead = (layoutDoc.$head ?? []) as JxHeadEntry[];
+  const pageTitle = (pageDoc.title ?? layoutDoc._pageTitle ?? null) as string | null;
 
   // Clean up internal properties
   delete layoutDoc._pageHead;
@@ -537,7 +538,7 @@ async function compilePage(
     (e: JxElement | string) => typeof e === "string" && !e.startsWith("./") && !e.startsWith("../"),
   );
   if (npmElements.length > 0) {
-    result.html = injectNpmElementScripts(result.html, /** @type {string[]} */ npmElements);
+    result.html = injectNpmElementScripts(result.html, npmElements as string[]);
   }
 
   // Compile server handler if applicable (skip when provider bundles site-wide)
@@ -806,7 +807,7 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
         }
       }
       resolveDocTemplates(child, scope);
-      i++;
+      i += 1;
     }
   }
 }
@@ -823,7 +824,9 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
     return;
   }
   if (Array.isArray(node)) {
-    node.forEach((n) => expandComponents(n, componentDefs));
+    for (const n of node) {
+      expandComponents(n, componentDefs);
+    }
     return;
   }
 
@@ -851,11 +854,8 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
     if (def.style && node.$props) {
       const stateDefs: Record<string, JxStateDefinition> = { ...def.state };
       for (const [key, value] of Object.entries(node.$props)) {
-        if (key in stateDefs) {
-          stateDefs[key] = value as JxStateDefinition;
-        } else {
-          stateDefs[key] = value as JxStateDefinition;
-        }
+        stateDefs[key] =
+          key in stateDefs ? (value as JxStateDefinition) : (value as JxStateDefinition);
       }
       const scope = buildInitialScope(stateDefs, null);
       const resolvedStyle: Record<string, unknown> = {};
@@ -911,14 +911,15 @@ function injectComponentScripts(
     .filter((tag: string) => cssMap.has(tag))
     .map((tag: string) => `<link rel="stylesheet" href="/components/${tag}.css">`)
     .join("\n  ");
+  let result = html;
   if (cssLinks) {
-    html = html.replace("</head>", `  ${cssLinks}\n</head>`);
+    result = result.replace("</head>", `  ${cssLinks}\n</head>`);
   }
 
   // Only inject JS for components that have non-static instances
   const jsTags = usedTags.filter((tag: string) => !staticTags.has(tag));
   if (jsTags.length === 0) {
-    return html;
+    return result;
   }
 
   // Build import map (needed for @vue/reactivity and lit-html)
@@ -936,10 +937,10 @@ function injectComponentScripts(
     .join("\n  ");
 
   // Check if an import map already exists (from islands etc.)
-  const hasImportMap = html.includes('<script type="importmap">');
+  const hasImportMap = result.includes('<script type="importmap">');
   const injection = (hasImportMap ? "" : `${importMap}\n  `) + moduleScripts;
 
-  return html.replace("</body>", `  ${injection}\n</body>`);
+  return result.replace("</body>", `  ${injection}\n</body>`);
 }
 
 /**
@@ -984,19 +985,20 @@ function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
       preservedBlocks += `\n  ${scripts.join("\n  ")}`;
     }
   }
-  if (headPattern.test(html)) {
-    html = html.replace(headPattern, `<head>\n  ${headHtml}${preservedBlocks}\n</head>`);
+  let result = html;
+  if (headPattern.test(result)) {
+    result = result.replace(headPattern, `<head>\n  ${headHtml}${preservedBlocks}\n</head>`);
   }
 
   // Set the lang attribute on <html>
-  html = html.replace(/<html\s[^>]*>/i, (match: string) => {
+  result = result.replace(/<html\s[^>]*>/i, (match: string) => {
     if (/lang=/.test(match)) {
       return match.replace(/lang="[^"]*"/, `lang="${lang}"`);
     }
     return match.replace("<html", `<html lang="${lang}"`);
   });
 
-  return html;
+  return result;
 }
 
 /**
@@ -1066,14 +1068,14 @@ function generateRedirects(
 </html>`;
     mkdirSync(dirname(htmlPath), { recursive: true });
     writeFileSync(htmlPath, html, "utf8");
-    count++;
+    count += 1;
     redirectLines.push(`${source} ${dest} ${status}`);
   }
 
   // Write _redirects file (Netlify/Cloudflare format)
   if (redirectLines.length > 0) {
     writeFileSync(join(outDir, "_redirects"), `${redirectLines.join("\n")}\n`, "utf8");
-    count++;
+    count += 1;
   }
 
   return count;

@@ -24,11 +24,10 @@ function evaluateTemplate(str: string, scope: Record<string, unknown>) {
 function buildScope(stateDefs: Record<string, JxStateDefinition>) {
   const scope: Record<string, unknown> = {};
   for (const [key, def] of Object.entries(stateDefs ?? {})) {
-    if (def && typeof def === "object" && !Array.isArray(def) && "default" in def) {
-      scope[key] = (def as { default: unknown }).default;
-    } else {
-      scope[key] = def;
-    }
+    scope[key] =
+      def && typeof def === "object" && !Array.isArray(def) && "default" in def
+        ? (def as { default: unknown }).default
+        : def;
   }
   return scope;
 }

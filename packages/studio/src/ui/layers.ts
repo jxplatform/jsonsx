@@ -1,5 +1,6 @@
 /// <reference lib="dom" />
 import { html, render as litRender, nothing } from "lit-html";
+import type { TemplateResult } from "lit-html";
 
 let _popoverLayer: HTMLElement;
 let _modalLayer: HTMLElement;
@@ -19,7 +20,7 @@ export function initLayers() {
  * @returns {Promise<T>}
  */
 export function showDialog<T>(
-  templateFn: (done: (value: T) => void) => import("lit-html").TemplateResult,
+  templateFn: (done: (value: T) => void) => TemplateResult,
 ): Promise<T> {
   return new Promise((resolve) => {
     const slot = document.createElement("div");
@@ -49,7 +50,7 @@ export function showDialog<T>(
  */
 export function showConfirmDialog(
   headline: string,
-  message: string | import("lit-html").TemplateResult,
+  message: string | TemplateResult,
   opts: {
     confirmLabel?: string;
     cancelLabel?: string;
@@ -82,7 +83,7 @@ export function showConfirmDialog(
  *
  * @param {import("lit-html").TemplateResult} template
  */
-export function openModal(template: import("lit-html").TemplateResult) {
+export function openModal(template: TemplateResult) {
   const slot = document.createElement("div");
   slot.style.pointerEvents = "auto";
   _modalLayer.append(slot);
@@ -94,7 +95,7 @@ export function openModal(template: import("lit-html").TemplateResult) {
     },
     host: slot,
     /** @param {import("lit-html").TemplateResult} tpl */
-    update(tpl: import("lit-html").TemplateResult) {
+    update(tpl: TemplateResult) {
       litRender(tpl, slot);
     },
   };
@@ -111,7 +112,7 @@ export function openModal(template: import("lit-html").TemplateResult) {
  * }} [opts]
  */
 export function renderPopover(
-  template: import("lit-html").TemplateResult,
+  template: TemplateResult,
   opts: {
     dismissOnOutsideClick?: boolean;
     onDismiss?: () => void;
@@ -150,7 +151,7 @@ export function renderPopover(
     },
     host: slot,
     /** @param {import("lit-html").TemplateResult} tpl */
-    update(tpl: import("lit-html").TemplateResult) {
+    update(tpl: TemplateResult) {
       litRender(tpl, slot);
     },
   };

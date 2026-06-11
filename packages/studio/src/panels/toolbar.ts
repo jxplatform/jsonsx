@@ -19,6 +19,8 @@ import { getPlatform } from "../platform";
 import { refreshGitStatus } from "./git-panel";
 import { openBrowseModal } from "../browse/browse-modal";
 import { openNewProjectModal } from "../new-project/new-project-modal";
+import type { EffectScope } from "@vue/reactivity";
+import type { TemplateResult } from "lit-html";
 
 interface ToolbarCtx {
   navigateBack: () => void;
@@ -48,7 +50,7 @@ let _rootEl: HTMLElement | null = null;
 
 let _ctx: ToolbarCtx | null = null;
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 const toolbarIconMap = {
   "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
@@ -66,7 +68,7 @@ const toolbarIconMap = {
   "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
   "sp-icon-undo": html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
   "sp-icon-view-list": html`<sp-icon-view-list slot="icon"></sp-icon-view-list>`,
-} as Record<string, import("lit-html").TemplateResult>;
+} as Record<string, TemplateResult>;
 
 /**
  * @param {string} label
@@ -371,11 +373,9 @@ function toolbarTemplate() {
               if (!allowedModes.has(m.key)) {
                 return;
               }
-              if (S.ui.editingFunction) {
-                if (view.functionEditor) {
-                  view.functionEditor.dispose();
-                  view.functionEditor = null;
-                }
+              if (S.ui.editingFunction && view.functionEditor) {
+                view.functionEditor.dispose();
+                view.functionEditor = null;
               }
               ctx.setCanvasMode(m.key);
               view.panX = 0;

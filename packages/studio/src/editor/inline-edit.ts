@@ -12,6 +12,12 @@ import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
+import {
+  showSlashMenu as sharedShowSlashMenu,
+  dismissSlashMenu as sharedDismissSlashMenu,
+  isSlashMenuOpen,
+} from "./slash-menu";
+
 export interface InlineAction {
   tag: string;
   label: string;
@@ -35,12 +41,6 @@ export interface JxContentResult {
   textContent?: string | null;
   children?: (JxMutableNode | string)[];
 }
-
-import {
-  showSlashMenu as sharedShowSlashMenu,
-  dismissSlashMenu as sharedDismissSlashMenu,
-  isSlashMenuOpen,
-} from "./slash-menu";
 
 // ─── Inline tag set (tags that represent rich text formatting) ─────────────
 
@@ -365,6 +365,9 @@ function handleKeydown(e: KeyboardEvent) {
       case "`": {
         e.preventDefault();
         toggleInlineFormat("code", activeEl);
+        break;
+      }
+      default: {
         break;
       }
     }

@@ -14,19 +14,19 @@ export interface NestingValidator {
   blockTags: ReadonlySet<string>;
   inlineTags: ReadonlySet<string>;
   allTags: ReadonlySet<string>;
-  isVoid(tag: string): boolean;
-  isTextOnly(tag: string): boolean;
+  isVoid: (tag: string) => boolean;
+  isTextOnly: (tag: string) => boolean;
   /** Whether childTag may appear inside parentTag ("_root" for the document root). */
-  isValidChild(parentTag: string, childTag: string): boolean;
+  isValidChild: (parentTag: string, childTag: string) => boolean;
 }
 
 /** Build a nesting validator from a format's `$studio.elements` declaration. */
-export function createNestingValidator(elements: ElementsHints | undefined): NestingValidator {
-  const blockTags = new Set(elements?.block ?? []);
-  const inlineTags = new Set(elements?.inline ?? []);
+export function createNestingValidator(elements?: ElementsHints): NestingValidator {
+  const blockTags = new Set(elements?.block);
+  const inlineTags = new Set(elements?.inline);
   const allTags = new Set([...blockTags, ...inlineTags]);
-  const voidTags = new Set(elements?.void ?? []);
-  const textOnly = new Set(elements?.textOnly ?? []);
+  const voidTags = new Set(elements?.void);
+  const textOnly = new Set(elements?.textOnly);
   const nesting = elements?.nesting ?? {};
 
   return {

@@ -1,15 +1,14 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
+import { describe, test, expect, mock, spyOn } from "bun:test";
+import { buildScope, resolvePrototype, isSignal } from "@jxsuite/runtime";
+import { resolve as resolvePath, join } from "node:path";
+
 try {
   GlobalRegistrator.register();
 } catch {
   /* Already registered */
 }
-
-import { describe, test, expect, mock, spyOn } from "bun:test";
-import { buildScope, resolvePrototype, isSignal } from "@jxsuite/runtime";
-import { resolve as resolvePath, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const __filename = import.meta.filename;
 const __dirname = join(__filename, "..");

@@ -119,17 +119,13 @@ export function compileClient(
     // $expression: Shape 5
     if (isExpressionDef(def)) {
       const node = def.$expression as ExpressionNode;
+      const compiled = compileExpression(node, {
+        eventParam: "e",
+        statePrefix: "state",
+      });
       if (isMutating(node.operator)) {
-        const compiled = compileExpression(node, {
-          eventParam: "e",
-          statePrefix: "state",
-        });
         onEntries.push([key, { args: ["state", "e"], body: compiled }]);
       } else {
-        const compiled = compileExpression(node, {
-          eventParam: "e",
-          statePrefix: "state",
-        });
         computedEntries.push([key, `() => ${compiled}`]);
       }
       continue;
@@ -320,7 +316,8 @@ function buildClientNode(
       addRefBinding(bindings, key, (tc as JxMutableNode).$ref as string);
       needsBind = true;
     } else if (isTemplateString(tc)) {
-      const key = `_t${counter.t++}`;
+      const key = `_t${counter.t}`;
+      counter.t += 1;
       bindAttrs.push(`:text-content="${key}"`);
       bindings.set(key, `() => \`${tc}\``);
       needsBind = true;
@@ -338,7 +335,8 @@ function buildClientNode(
       bindAttrs.push(`@${eventName}="${key}"`);
       needsBind = true;
     } else if (isFunctionDef(val)) {
-      const key = `_h${counter.h++}`;
+      const key = `_h${counter.h}`;
+      counter.h += 1;
       bindAttrs.push(`@${eventName}="${key}"`);
       handlers.set(key, {
         args: val.parameters ? paramNames(val.parameters) : (val.arguments ?? ["state", "event"]),
@@ -346,7 +344,8 @@ function buildClientNode(
       });
       needsBind = true;
     } else if (isExpressionDef(val)) {
-      const key = `_h${counter.h++}`;
+      const key = `_h${counter.h}`;
+      counter.h += 1;
       bindAttrs.push(`@${eventName}="${key}"`);
       const compiled = compileExpression(val.$expression as ExpressionNode, {
         eventParam: "e",
@@ -373,7 +372,8 @@ function buildClientNode(
         continue;
       }
       if (isTemplateString(val)) {
-        const key = `_s${counter.s++}`;
+        const key = `_s${counter.s}`;
+        counter.s += 1;
         bindAttrs.push(`:style.${camelToKebab(prop)}="${key}"`);
         bindings.set(key, `() => \`${val}\``);
         needsBind = true;
@@ -390,7 +390,8 @@ function buildClientNode(
         addRefBinding(bindings, key, (val as JxMutableNode).$ref as string);
         needsBind = true;
       } else if (isTemplateString(val)) {
-        const key = `_t${counter.t++}`;
+        const key = `_t${counter.t}`;
+        counter.t += 1;
         bindAttrs.push(`:attr.${attr}="${key}"`);
         bindings.set(key, `() => \`${val}\``);
         needsBind = true;
@@ -421,7 +422,8 @@ function buildClientNode(
       addRefBinding(bindings, key, (val as JxMutableNode).$ref as string);
       needsBind = true;
     } else if (isTemplateString(val)) {
-      const key = `_t${counter.t++}`;
+      const key = `_t${counter.t}`;
+      counter.t += 1;
       bindAttrs.push(`:${camelToKebab(prop)}="${key}"`);
       bindings.set(key, `() => \`${val}\``);
       needsBind = true;
@@ -449,7 +451,8 @@ function buildClientNode(
   } else if (isMappedArray(source.children)) {
     // ─── Mapped array → lit-html render binding ───
     counter.needsLit = true;
-    const listKey = `_list${counter.l++}`;
+    const listKey = `_list${counter.l}`;
+    counter.l += 1;
     const arrayDef = source.children;
 
     // Resolve items source expression
@@ -530,11 +533,10 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
   // Attributes object
   if (def.attributes && typeof def.attributes === "object") {
     for (const [k, v] of Object.entries(def.attributes)) {
-      if (typeof v === "string" && isTemplateString(v)) {
-        attrs += ` ${k}="${mapRefsToLit(v)}"`;
-      } else {
-        attrs += ` ${k}="${escapeHtml(String(v))}"`;
-      }
+      attrs +=
+        typeof v === "string" && isTemplateString(v)
+          ? ` ${k}="${mapRefsToLit(v)}"`
+          : ` ${k}="${escapeHtml(String(v))}"`;
     }
   }
 
@@ -800,9 +802,10 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
     return `// ${key}: manual Request — fetch triggered by user action`;
   }
 
-  const lines: string[] = [];
-  lines.push(`// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`);
-  lines.push("effect(() => {");
+  const lines: string[] = [
+    `// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`,
+    "effect(() => {",
+  ];
 
   if (isTemplateUrl) {
     lines.push(`  const url = \`${url}\`;`);
@@ -844,19 +847,20 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
  * @returns {string}
  */
 function emitStorageInit(key: string, storeName: string, storageKey: string, defaultVal: unknown) {
-  const lines: string[] = [];
-  lines.push(`// ${key}: ${storeName} (key: "${storageKey}")`);
-  lines.push("try {");
-  lines.push(`  const _s = ${storeName}.getItem(${JSON.stringify(storageKey)});`);
-  lines.push(`  state.${key} = _s !== null ? JSON.parse(_s) : ${JSON.stringify(defaultVal)};`);
-  lines.push(`} catch { state.${key} = ${JSON.stringify(defaultVal)}; }`);
-  lines.push("effect(() => {");
-  lines.push(`  const v = state.${key};`);
-  lines.push("  try {");
-  lines.push(`    if (v === null) ${storeName}.removeItem(${JSON.stringify(storageKey)});`);
-  lines.push(`    else ${storeName}.setItem(${JSON.stringify(storageKey)}, JSON.stringify(v));`);
-  lines.push("  } catch {}");
-  lines.push("});");
+  const lines: string[] = [
+    `// ${key}: ${storeName} (key: "${storageKey}")`,
+    "try {",
+    `  const _s = ${storeName}.getItem(${JSON.stringify(storageKey)});`,
+    `  state.${key} = _s !== null ? JSON.parse(_s) : ${JSON.stringify(defaultVal)};`,
+    `} catch { state.${key} = ${JSON.stringify(defaultVal)}; }`,
+    "effect(() => {",
+    `  const v = state.${key};`,
+    "  try {",
+    `    if (v === null) ${storeName}.removeItem(${JSON.stringify(storageKey)});`,
+    `    else ${storeName}.setItem(${JSON.stringify(storageKey)}, JSON.stringify(v));`,
+    "  } catch {}",
+    "});",
+  ];
   return lines.join("\n");
 }
 
@@ -867,17 +871,16 @@ function emitStorageInit(key: string, storeName: string, storageKey: string, def
  * @returns {string}
  */
 function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
-  const lines: string[] = [];
-  lines.push(`// ${key}: Cookie (name: "${cookieName}")`);
-  lines.push("{");
-  lines.push(`  const _m = document.cookie.match(new RegExp("(?:^|; )${cookieName}=([^;]*)"));`);
-  lines.push(
+  const lines: string[] = [
+    `// ${key}: Cookie (name: "${cookieName}")`,
+    "{",
+    `  const _m = document.cookie.match(new RegExp("(?:^|; )${cookieName}=([^;]*)"));`,
     `  try { state.${key} = _m ? JSON.parse(decodeURIComponent(_m[1])) : ${JSON.stringify(
       defaultVal,
     )}; }`,
-  );
-  lines.push(`  catch { state.${key} = _m ? _m[1] : ${JSON.stringify(defaultVal)}; }`);
-  lines.push("}");
+    `  catch { state.${key} = _m ? _m[1] : ${JSON.stringify(defaultVal)}; }`,
+    "}",
+  ];
   return lines.join("\n");
 }
 

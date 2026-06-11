@@ -1,7 +1,6 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { render } from "lit-html";
-import { html } from "lit-html";
+import { html, render } from "lit-html";
 import {
   clearDraft,
   commitField,
@@ -41,7 +40,7 @@ describe("field-input draft store", () => {
     let calls = 0;
     setDraft("k4", "x");
     clearDraft("k4");
-    commitField("k4", () => calls++); // No draft → nothing to commit
+    commitField("k4", () => (calls += 1)); // No draft → nothing to commit
     expect(calls).toBe(0);
   });
 });
@@ -54,7 +53,9 @@ describe("draft commit semantics", () => {
     setDraft("d1", "abc"); // Keep typing before the debounce fires
     scheduleDraftCommit("d1", 20, (v) => (committed = v));
     expect(committed).toBe(null); // Nothing committed synchronously
-    await new Promise((r) => setTimeout(r, 45));
+    await new Promise((r) => {
+      setTimeout(r, 45);
+    });
     expect(committed as string | null).toBe("abc"); // Latest value, not the earlier "ab"
     // Draft is kept after a debounced commit so the field stays controlled while focused.
     expect(getFieldValue("d1", "doc")).toBe("abc");
@@ -64,10 +65,12 @@ describe("draft commit semantics", () => {
   test("a later scheduleDraftCommit cancels the earlier pending one", async () => {
     let calls = 0;
     setDraft("d2", "one");
-    scheduleDraftCommit("d2", 15, () => calls++);
+    scheduleDraftCommit("d2", 15, () => (calls += 1));
     setDraft("d2", "two");
-    scheduleDraftCommit("d2", 15, () => calls++);
-    await new Promise((r) => setTimeout(r, 40));
+    scheduleDraftCommit("d2", 15, () => (calls += 1));
+    await new Promise((r) => {
+      setTimeout(r, 40);
+    });
     expect(calls).toBe(1); // Only the latest timer fires
     clearDraft("d2");
   });
@@ -76,14 +79,16 @@ describe("draft commit semantics", () => {
     let committed: string | null = null;
     let calls = 0;
     setDraft("d3", "typed");
-    scheduleDraftCommit("d3", 50, () => calls++);
+    scheduleDraftCommit("d3", 50, () => (calls += 1));
     commitField("d3", (v) => {
       committed = v;
-      calls++;
+      calls += 1;
     });
     expect(committed as string | null).toBe("typed");
     expect(hasDraft("d3")).toBe(false);
-    await new Promise((r) => setTimeout(r, 80));
+    await new Promise((r) => {
+      setTimeout(r, 80);
+    });
     expect(calls).toBe(1); // The debounce timer was cancelled by commitField
   });
 });

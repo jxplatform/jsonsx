@@ -148,7 +148,7 @@ describe("layout-resolver", () => {
     expect(result.children).toHaveLength(3); // Header, main, footer
 
     // Main should now contain the page's <p> instead of <slot>
-    const main = (result.children as any)[1];
+    const [, main] = result.children as any;
     expect(main.tagName).toBe("main");
     expect(main.children[0].tagName).toBe("p");
     expect(main.children[0].children[0]).toBe("Hello");

@@ -68,7 +68,7 @@ describe("expandRangeToTemplateExpressions", () => {
     expandRangeToTemplateExpressions(range);
     expect(range.startOffset).toBe(6);
 
-    document.body.removeChild(container);
+    container.remove();
   });
 
   test("expands end boundary into template expression", () => {
@@ -84,7 +84,7 @@ describe("expandRangeToTemplateExpressions", () => {
     expandRangeToTemplateExpressions(range);
     expect(range.endOffset).toBe(13);
 
-    document.body.removeChild(container);
+    container.remove();
   });
 
   test("does nothing when range is outside expressions", () => {
@@ -101,7 +101,7 @@ describe("expandRangeToTemplateExpressions", () => {
     expect(range.startOffset).toBe(0);
     expect(range.endOffset).toBe(5);
 
-    document.body.removeChild(container);
+    container.remove();
   });
 
   test("handles non-text node containers", () => {
@@ -117,7 +117,7 @@ describe("expandRangeToTemplateExpressions", () => {
     expandRangeToTemplateExpressions(range);
     expect(range.startOffset).toBe(0);
 
-    document.body.removeChild(el);
+    el.remove();
   });
 });
 
@@ -238,7 +238,7 @@ describe("isTagActiveInSelection", () => {
     sel?.removeAllRanges();
     const result = isTagActiveInSelection("strong", el);
     expect(result).toBe(false);
-    document.body.removeChild(el);
+    el.remove();
   });
 });
 
@@ -265,7 +265,7 @@ describe("toggleInlineFormat", () => {
     toggleInlineFormat("strong", root);
     expect(root.querySelectorAll("strong").length).toBe(0);
 
-    document.body.removeChild(root);
+    root.remove();
   });
 
   test("wraps selected text in tag", () => {
@@ -286,7 +286,7 @@ describe("toggleInlineFormat", () => {
     expect(root.querySelector("strong")).not.toBeNull();
     expect((root.querySelector("strong") as Element).textContent).toBe("world");
 
-    document.body.removeChild(root);
+    root.remove();
   });
 
   test("unwraps existing formatting", () => {
@@ -308,7 +308,7 @@ describe("toggleInlineFormat", () => {
     expect(root.querySelectorAll("strong").length).toBe(0);
     expect(root.textContent).toBe("bold text");
 
-    document.body.removeChild(root);
+    root.remove();
   });
 
   test("does not act on selection outside root", () => {
@@ -329,7 +329,7 @@ describe("toggleInlineFormat", () => {
     toggleInlineFormat("strong", root);
     expect(root.querySelectorAll("strong").length).toBe(0);
 
-    document.body.removeChild(root);
-    document.body.removeChild(outside);
+    root.remove();
+    outside.remove();
   });
 });

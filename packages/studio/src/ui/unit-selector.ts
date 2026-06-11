@@ -28,7 +28,7 @@ export function renderUnitSelector(
   /** @type {string} */ prop: string,
   /** @type {string | number | undefined} */ value: string | number | undefined,
   /** @type {(val: string) => void} */ onChange: (val: string) => void,
-  /** @type {string} */ placeholder: string = "",
+  /** @type {string} */ placeholder = "",
 ) {
   const units = (entry.$units || []) as string[];
   const keywords = (entry.$keywords || []) as string[];
@@ -42,10 +42,10 @@ export function renderUnitSelector(
   if (isKeyword) {
     displayValue = strVal;
   } else if (match) {
-    displayValue = match[1];
+    [, displayValue] = match;
   } else if (strVal !== "") {
     const num = Number.parseFloat(strVal);
-    displayValue = isNaN(num) ? strVal : String(num);
+    displayValue = Number.isNaN(num) ? strVal : String(num);
   } else {
     displayValue = "";
   }

@@ -24,7 +24,7 @@ import {
   resetZoomIndicator,
   updateActivePanelHeaders,
 } from "./canvas-utils";
-import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
+import { effectiveZoom, findCanvasElement, overlayBoxDescriptor } from "./canvas-helpers";
 import {
   activeBreakpointsForWidth,
   applyOverridesToCanvas,
@@ -38,7 +38,6 @@ import { registerPanelDnD } from "../panels/canvas-dnd";
 import { registerPanelEvents } from "../panels/panel-events";
 import { computeDocumentDiff } from "./canvas-diff";
 import { updateForcedPseudoPreview } from "../panels/pseudo-preview";
-import { findCanvasElement } from "./canvas-helpers";
 import { enterComponentInlineEdit } from "../editor/component-inline-edit";
 import { refreshStylebookStyles, renderStylebookMode } from "../panels/stylebook-panel";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
@@ -52,6 +51,7 @@ import * as overlaysPanel from "../panels/overlays";
 import type { CanvasPanel } from "../panels/canvas-dnd";
 import type { GitDiffState, InlineEditDef } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { Tab } from "../tabs/tab.js";
 
 interface CanvasRenderCtx {
   getCanvasMode: () => string;
@@ -78,7 +78,7 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
 }
 
 /** Monaco language for the source view of a tab's document. */
-function sourceLang(tab: import("../tabs/tab.js").Tab) {
+function sourceLang(tab: Tab) {
   const format = formatByName(tab.doc.sourceFormat);
   if (format) {
     return format.mediaType?.split("/").pop() ?? "plaintext";
@@ -90,7 +90,7 @@ function sourceLang(tab: import("../tabs/tab.js").Tab) {
  * The full source text for the source view. Format-class files serialize to their on-disk form
  * (e.g. frontmatter YAML plus the body for markdown), not just the JSON of the body tree.
  */
-async function sourceContent(tab: import("../tabs/tab.js").Tab, lang: string) {
+async function sourceContent(tab: Tab, lang: string) {
   if (formatByName(tab.doc.sourceFormat)) {
     return serializeDocument(tab);
   }
@@ -119,7 +119,7 @@ export function renderCanvas() {
   const canvasMode = ctx.getCanvasMode();
 
   // Advance render generation so stale async renders from the previous cycle bail out
-  ++view.renderGeneration;
+  view.renderGeneration += 1;
 
   // Detect whether this is a mode transition or a content-only re-render
   const modeChanged = canvasMode !== view.prevCanvasMode;
@@ -128,10 +128,10 @@ export function renderCanvas() {
   // For content re-renders in the same mode, Lit's template diffing preserves
   // The panel structure. Bailed async renders can't corrupt the DOM because
   // RenderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
-  // @ts-expect-error
+  // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   if (modeChanged && canvasWrap["_$litPart$"]) {
     canvasWrap.textContent = "";
-    // @ts-expect-error
+    // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
     delete canvasWrap["_$litPart$"];
   }
 
@@ -317,32 +317,32 @@ export function renderCanvas() {
       }
       clearTimeout(debounce);
       debounce = setTimeout(async () => {
-        const tab = activeTab.value;
-        if (!tab) {
+        const tabNow = activeTab.value;
+        if (!tabNow) {
           return;
         }
-        if (formatByName(tab.doc.sourceFormat) && tab.documentPath) {
+        if (formatByName(tabNow.doc.sourceFormat) && tabNow.documentPath) {
           try {
             // Parse the full source back into body + frontmatter (title, $head, etc.).
             const { document, frontmatter } = await parseSourceForPath(
-              tab.documentPath,
+              tabNow.documentPath,
               editor.getValue(),
             );
-            tab.doc.document = document as JxMutableNode;
-            tab.doc.content.frontmatter = frontmatter;
-            tab.doc.dirty = true;
+            tabNow.doc.document = document as JxMutableNode;
+            tabNow.doc.content.frontmatter = frontmatter;
+            tabNow.doc.dirty = true;
           } catch {
             // Unparseable source — don't update state
           }
         } else if (lang === "json") {
           try {
-            tab.doc.document = JSON.parse(editor.getValue());
-            tab.doc.dirty = true;
+            tabNow.doc.document = JSON.parse(editor.getValue());
+            tabNow.doc.dirty = true;
           } catch {
             // Invalid JSON — don't update state
           }
         } else {
-          tab.doc.dirty = true;
+          tabNow.doc.dirty = true;
         }
       }, 600);
     });
@@ -650,8 +650,8 @@ function renderCanvasIntoPanel(
       }
       try {
         registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (error) {
-        console.warn("registerPanelDnD failed:", errorMessage(error));
+      } catch (dndError) {
+        console.warn("registerPanelDnD failed:", errorMessage(dndError));
       }
       registerPanelEvents(panel as unknown as CanvasPanel);
       renderOverlays();
@@ -681,8 +681,8 @@ function renderCanvasIntoPanel(
       renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       try {
         registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (error) {
-        console.warn("registerPanelDnD failed:", errorMessage(error));
+      } catch (dndError) {
+        console.warn("registerPanelDnD failed:", errorMessage(dndError));
       }
       registerPanelEvents(panel as unknown as CanvasPanel);
       renderOverlays();
@@ -726,7 +726,7 @@ function applyDiffHighlightToCanvas(
       const childPath =
         pathKey === "/" ? `children/${childIdx}` : `${pathKey}/children/${childIdx}`;
       walkCanvas(child as HTMLElement, childPath);
-      childIdx++;
+      childIdx += 1;
     }
   };
 

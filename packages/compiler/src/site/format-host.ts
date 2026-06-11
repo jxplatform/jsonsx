@@ -44,7 +44,7 @@ export async function importImplementation(path: string): Promise<Record<string,
       lastError = error;
     }
   }
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /** Create a node FormatHostIO rooted at a project (bare specifiers resolve via node_modules). */

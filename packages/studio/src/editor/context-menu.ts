@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 // ─── Clipboard & Context Menu ─────────────────────────────────────────────────
 import { html } from "lit-html";
+import { jsonClone } from "../utils/studio-utils";
 import { ref } from "lit-html/directives/ref.js";
 import { htmlToJx } from "@jxsuite/parser/html-to-jx";
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
@@ -18,7 +19,6 @@ import { convertToComponent } from "./convert-to-component";
 import { convertToRepeater } from "./convert-to-repeater";
 import { componentRegistry } from "../files/components";
 import { renderPopover } from "../ui/layers";
-import { startLayerTitleEdit } from "../panels/layers-panel";
 
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -131,7 +131,7 @@ async function readFromClipboard() {
   } catch {
     // Clipboard API unavailable — use workspace fallback
     if (workspace.clipboard) {
-      return [JSON.parse(JSON.stringify(workspace.clipboard))];
+      return [jsonClone(workspace.clipboard)];
     }
   }
   return null;
@@ -148,7 +148,7 @@ export async function copyNode() {
   if (!node) {
     return;
   }
-  const json = JSON.parse(JSON.stringify(node));
+  const json = jsonClone(node);
   await writeToClipboard(json);
   statusMessage("Copied");
 }
@@ -163,7 +163,7 @@ export async function cutNode() {
   if (!node) {
     return;
   }
-  const json = JSON.parse(JSON.stringify(node));
+  const json = jsonClone(node);
   await writeToClipboard(json);
   transactDoc(tab, (t) => mutateRemoveNode(t, sel));
   statusMessage("Cut");
@@ -214,7 +214,7 @@ export function copyStyles() {
   if (!node?.style) {
     return;
   }
-  workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
+  workspace.styleClipboard = jsonClone(node.style);
   statusMessage("Styles copied");
 }
 
@@ -226,7 +226,7 @@ export function pasteStyles() {
   if (!tab?.session.selection) {
     return;
   }
-  const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
+  const style = jsonClone(workspace.styleClipboard);
   const sel = tab.session.selection as JxPath;
   transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
   statusMessage("Styles pasted");
@@ -272,10 +272,10 @@ export function showContextMenu(
   // Select the node
   tab.session.selection = path;
 
-  /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
-  const items = [];
+  const items: { label: string; action?: () => void | Promise<void>; danger?: boolean }[] = [
+    { action: () => copyNode(), label: "Copy" },
+  ];
 
-  items.push({ action: () => copyNode(), label: "Copy" });
   if (path.length >= 2) {
     items.push({ action: () => cutNode(), label: "Cut" });
     items.push({
@@ -283,9 +283,10 @@ export function showContextMenu(
       label: "Duplicate",
     });
     if (node.style) {
+      const nodeStyle = node.style;
       items.push({
         action: () => {
-          workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
+          workspace.styleClipboard = jsonClone(nodeStyle);
           statusMessage("Styles copied");
         },
         label: "Copy styles",
@@ -297,7 +298,7 @@ export function showContextMenu(
           if (!workspace.styleClipboard) {
             return;
           }
-          const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
+          const style = jsonClone(workspace.styleClipboard);
           transactDoc(activeTab.value, (t) => mutateReplaceStyle(t, path, style));
           statusMessage("Styles pasted");
         },
@@ -337,8 +338,10 @@ export function showContextMenu(
       });
     }
     items.push({
-      action: () => {
+      action: async () => {
         if (opts.rerender) {
+          // Lazy import breaks the context-menu ↔ layers-panel module cycle
+          const { startLayerTitleEdit } = await import("../panels/layers-panel");
           startLayerTitleEdit(path, opts.rerender);
         }
       },

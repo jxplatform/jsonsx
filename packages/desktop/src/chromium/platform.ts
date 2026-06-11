@@ -38,7 +38,7 @@ export function createDesktopPlatform(): StudioPlatform {
     return ready.then(
       () =>
         new Promise((resolve, reject) => {
-          const id = nextId++;
+          const id = (nextId += 1);
           pending.set(id, { reject, resolve });
           ws.send(JSON.stringify({ id, method, params }));
         }),
@@ -50,7 +50,9 @@ export function createDesktopPlatform(): StudioPlatform {
 
     projectRoot: "",
 
-    async activate() {},
+    async activate() {
+      // No-op: the chromium platform needs no activation step
+    },
 
     async openProject() {
       return request("openProject") as Promise<{

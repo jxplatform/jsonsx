@@ -91,6 +91,9 @@ function onKeydown(e: KeyboardEvent) {
       closeQuickSearch();
       break;
     }
+    default: {
+      break;
+    }
   }
 }
 

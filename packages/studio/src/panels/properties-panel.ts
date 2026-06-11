@@ -38,8 +38,14 @@ import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
-import type { JxMutableNode, JxPrototypeDef } from "@jxsuite/schema/types";
+import type {
+  JxMutableNode,
+  JxPrototypeDef,
+  JxStateDefinition,
+  JxStateObject,
+} from "@jxsuite/schema/types";
 import type { JxPath } from "../state";
+import type { SignalDef } from "./signals-panel.js";
 
 interface SignalOption {
   value: string;
@@ -85,11 +91,11 @@ function isInsideMapTemplate(path: JxPath | null) {
  * @param {import("@jxsuite/schema/types").JxStateDefinition | undefined} def
  * @returns {string}
  */
-function defaultAsString(def: import("@jxsuite/schema/types").JxStateDefinition | undefined) {
+function defaultAsString(def: JxStateDefinition | undefined) {
   if (!def || typeof def !== "object" || Array.isArray(def)) {
     return "";
   }
-  const dv = (def as import("@jxsuite/schema/types").JxStateObject).default;
+  const dv = (def as JxStateObject).default;
   if (dv === undefined) {
     return "";
   }
@@ -103,9 +109,9 @@ function defaultAsString(def: import("@jxsuite/schema/types").JxStateDefinition 
 function bindableFieldRow(
   label: string,
   type: string,
-  rawValue: JsonValue | undefined,
-  onChange: (v: JsonValue) => void,
-  filterFn: ((d: import("./signals-panel.js").SignalDef) => boolean) | null = null,
+  rawValue: unknown,
+  onChange: (v?: JsonValue) => void,
+  filterFn: ((d: SignalDef) => boolean) | null = null,
   extraSignals: SignalOption[] | null = null,
 ) {
   const tab = activeTab.value;
@@ -115,7 +121,7 @@ function bindableFieldRow(
 
   const signalDefs = Object.entries(defs).filter(([, d]) =>
     filterFn
-      ? filterFn(d as import("./signals-panel.js").SignalDef)
+      ? filterFn(d as SignalDef)
       : !(d as Record<string, unknown>)?.$handler &&
         (d as JxPrototypeDef)?.$prototype !== "Function",
   );
@@ -164,14 +170,12 @@ function bindableFieldRow(
   const onToggle = () => {
     if (boundRef !== null) {
       const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
-      const staticVal = defaultAsString(defs[defName]);
-      onChange(staticVal || undefined);
-    } else {
-      if (signalDefs.length > 0) {
-        onChange({ $ref: `#/state/${signalDefs[0][0]}` });
-      } else if (extraSignals && extraSignals.length > 0) {
-        onChange({ $ref: extraSignals[0].value });
-      }
+      const staticDefault = defaultAsString(defs[defName]);
+      onChange(staticDefault || undefined);
+    } else if (signalDefs.length > 0) {
+      onChange({ $ref: `#/state/${signalDefs[0][0]}` });
+    } else if (extraSignals && extraSignals.length > 0) {
+      onChange({ $ref: extraSignals[0].value });
     }
   };
 
@@ -404,11 +408,11 @@ function renderComponentPropsFieldsTemplate(
   const isNpm = comp.source === "npm";
   const currentVals = isNpm ? node.attributes || {} : node.$props || {};
   const updateFn = isNpm
-    ? (name: string, v: JsonValue) =>
+    ? (name: string, v?: JsonValue) =>
         transactDoc(activeTab.value, (t) =>
           mutateUpdateAttribute(t, path, name, v === "" ? undefined : (v as string | undefined)),
         )
-    : (name: string, v: JsonValue) =>
+    : (name: string, v?: JsonValue) =>
         transactDoc(activeTab.value, (t) => mutateUpdateProp(t, path, name, v));
 
   const defs = tab!.doc.document.state || {};
@@ -428,7 +432,7 @@ function renderComponentPropsFieldsTemplate(
         const isBound = boundRef !== null;
         const hasVal = rawValue !== undefined && rawValue !== null;
         const parsed = parseCemType(prop.type);
-        const onChange = (v: JsonValue) => updateFn(prop.name, v);
+        const onChange = (v?: JsonValue) => updateFn(prop.name, v);
         const staticVal = isBound ? "" : String(rawValue ?? "");
 
         const clearProp = (e: Event) => {
@@ -439,14 +443,12 @@ function renderComponentPropsFieldsTemplate(
         const onToggleBind = () => {
           if (boundRef !== null) {
             const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
-            const staticVal = defaultAsString(defs[defName]);
-            onChange(staticVal || undefined);
-          } else {
-            if (signalDefs.length > 0) {
-              onChange({ $ref: `#/state/${signalDefs[0][0]}` });
-            } else if (extraSignals && extraSignals.length > 0) {
-              onChange({ $ref: extraSignals[0].value });
-            }
+            const staticDefault = defaultAsString(defs[defName]);
+            onChange(staticDefault || undefined);
+          } else if (signalDefs.length > 0) {
+            onChange({ $ref: `#/state/${signalDefs[0][0]}` });
+          } else if (extraSignals && extraSignals.length > 0) {
+            onChange({ $ref: extraSignals[0].value });
           }
         };
 
@@ -814,8 +816,7 @@ function renderPageSection(node: JxMutableNode) {
   const currentLayout = node.$layout;
   const defaultLayout = projectState?.projectConfig?.defaults?.layout;
   const effectivePath = getEffectiveLayoutPath(currentLayout);
-  const displayValue =
-    currentLayout === false ? "__none__" : currentLayout ? currentLayout : "__default__";
+  const displayValue = currentLayout === false ? "__none__" : currentLayout || "__default__";
 
   return html`
     <sp-accordion-item label="Page" open>

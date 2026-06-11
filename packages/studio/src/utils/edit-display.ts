@@ -51,7 +51,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   }
   if (Array.isArray(node)) {
     // Arrays of nodes round-trip element-wise; the array itself is not a node.
-    return node.map(prepareForEditMode) as unknown as JxMutableNode;
+    return node.map((n) => prepareForEditMode(n)) as unknown as JxMutableNode;
   }
 
   const /** @type {Record<string, unknown>} */ obj = node as Record<string, unknown>;
@@ -95,7 +95,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       out[k] = propsOut;
     } else if (k === "children") {
       if (Array.isArray(v)) {
-        out.children = v.map(prepareForEditMode);
+        out.children = v.map((c) => prepareForEditMode(c));
       } else if (
         v &&
         typeof v === "object" &&
@@ -104,17 +104,16 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
         // Wrap the map template in a visual repeater perimeter
         const vObj = v as Record<string, unknown>;
         const template = vObj.map;
-        if (template && typeof template === "object") {
-          out.children = [
-            {
-              children: [prepareForEditMode(template as JxMutableNode)],
-              className: "repeater-perimeter",
-              tagName: "div",
-            },
-          ];
-        } else {
-          out.children = [];
-        }
+        out.children =
+          template && typeof template === "object"
+            ? [
+                {
+                  children: [prepareForEditMode(template as JxMutableNode)],
+                  className: "repeater-perimeter",
+                  tagName: "div",
+                },
+              ]
+            : [];
       } else {
         out.children = prepareForEditMode(v as JxMutableNode);
       }
@@ -123,30 +122,25 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       const caseKeys = Object.keys(v);
       if (caseKeys.length > 0) {
         const firstCase = (v as Record<string, unknown>)[caseKeys[0]];
-        if (
-          firstCase &&
-          typeof firstCase === "object" &&
-          !(firstCase as Record<string, unknown>).$ref
-        ) {
-          out.children = [prepareForEditMode(firstCase as JxMutableNode)];
-        } else {
-          out.children = [
-            {
-              style: {
-                background: "color-mix(in srgb, var(--danger) 8%, transparent)",
-                border: "1px dashed color-mix(in srgb, var(--danger) 40%, transparent)",
-                borderRadius: "4px",
-                color: "var(--danger)",
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontSize: "11px",
-                fontStyle: "italic",
-                padding: "6px 10px",
-              },
-              tagName: "div",
-              textContent: `[$switch: ${caseKeys.join(" | ")}]`,
-            },
-          ];
-        }
+        out.children =
+          firstCase && typeof firstCase === "object" && !(firstCase as Record<string, unknown>).$ref
+            ? [prepareForEditMode(firstCase as JxMutableNode)]
+            : [
+                {
+                  style: {
+                    background: "color-mix(in srgb, var(--danger) 8%, transparent)",
+                    border: "1px dashed color-mix(in srgb, var(--danger) 40%, transparent)",
+                    borderRadius: "4px",
+                    color: "var(--danger)",
+                    fontFamily: "'SF Mono', 'Fira Code', monospace",
+                    fontSize: "11px",
+                    fontStyle: "italic",
+                    padding: "6px 10px",
+                  },
+                  tagName: "div",
+                  textContent: `[$switch: ${caseKeys.join(" | ")}]`,
+                },
+              ];
       }
     } else if (k === "attributes" && isMediaElement && v && typeof v === "object") {
       // Process attributes for media elements: replace src/poster with transparent pixel

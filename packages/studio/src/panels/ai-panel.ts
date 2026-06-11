@@ -284,9 +284,9 @@ async function connectStream(id: string) {
     finishStream();
   });
 
-  eventSource.onerror = () => {
+  eventSource.addEventListener("error", () => {
     finishStream();
-  };
+  });
 }
 
 function finishStream() {

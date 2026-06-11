@@ -31,6 +31,7 @@ import { view } from "../view";
 import { isInlineElement } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import { panToElement } from "../canvas/canvas-utils";
+import type { TemplateResult } from "lit-html";
 
 /**
  * Start inline title editing on a layer row.
@@ -120,9 +121,9 @@ export function renderLayersTemplate(ctx: {
   view.dndCleanups = [];
 
   const rows = flattenTree(tab!.doc.document);
-  const collapsed = view._layersCollapsed || (view._layersCollapsed = new Set());
+  const collapsed = (view._layersCollapsed ||= new Set());
 
-  const layerRows: import("lit-html").TemplateResult[] = [];
+  const layerRows: TemplateResult[] = [];
   for (const { node, path, depth, nodeType } of rows) {
     let hidden = false;
     for (let d = 1; d <= path.length; d++) {

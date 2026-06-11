@@ -57,11 +57,15 @@ export function isTagActiveInSelection(tag: string, editableRoot: HTMLElement | 
    * @returns {boolean}
    */
   const hasTag = (node: Node | null) => {
-    while (node && node !== editableRoot) {
-      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName.toLowerCase() === tag) {
+    let current = node;
+    while (current && current !== editableRoot) {
+      if (
+        current.nodeType === Node.ELEMENT_NODE &&
+        (current as Element).tagName.toLowerCase() === tag
+      ) {
         return true;
       }
-      node = node.parentNode;
+      current = current.parentNode;
     }
     return false;
   };
@@ -171,7 +175,7 @@ function unwrapElement(el: Element) {
   while (el.firstChild) {
     frag.append(el.firstChild);
   }
-  parent.replaceChild(frag, el);
+  el.replaceWith(frag);
 }
 
 /**
@@ -245,10 +249,10 @@ function trimLeadingWhitespace(frag: DocumentFragment) {
   if (!match) {
     return null;
   }
-  const ws = match[1];
+  const [, ws] = match;
   if (text.length === ws.length) {
     // Entire node is whitespace — remove it
-    frag.removeChild(first);
+    first.remove();
   } else {
     first.textContent = text.slice(ws.length);
   }
@@ -272,9 +276,9 @@ function trimTrailingWhitespace(frag: DocumentFragment) {
   if (!match) {
     return null;
   }
-  const ws = match[1];
+  const [, ws] = match;
   if (text.length === ws.length) {
-    frag.removeChild(last);
+    last.remove();
   } else {
     last.textContent = text.slice(0, -ws.length);
   }
@@ -298,7 +302,7 @@ export function normalizeInlineContent(root: HTMLElement | null) {
   let iterations = 0;
   while (changed && iterations < 10) {
     changed = false;
-    iterations++;
+    iterations += 1;
 
     // 1. Merge adjacent text nodes
     root.normalize();
@@ -402,9 +406,9 @@ function collapseRedundantNesting(root: HTMLElement) {
     const inner = el.firstChild as Element;
     // Replace outer with inner's children
     while (inner.firstChild) {
-      el.insertBefore(inner.firstChild, inner);
+      inner.before(inner.firstChild);
     }
-    el.removeChild(inner);
+    inner.remove();
     changed = true;
   }
   return changed;
@@ -588,11 +592,9 @@ function expandBoundary(range: Range, isStart: boolean) {
       if (offset > expr.start && offset < expr.end) {
         range.setStart(node, expr.start);
       }
-    } else {
+    } else if (offset > expr.start && offset < expr.end) {
       // If the range ends inside this expression, expand to include the whole expr
-      if (offset > expr.start && offset < expr.end) {
-        range.setEnd(node, expr.end);
-      }
+      range.setEnd(node, expr.end);
     }
   }
 }
@@ -615,11 +617,11 @@ export function findTemplateExpressions(text: string) {
       let j = i + 2;
       while (j < text.length && depth > 0) {
         if (text[j] === "{") {
-          depth++;
+          depth += 1;
         } else if (text[j] === "}") {
-          depth--;
+          depth -= 1;
         }
-        j++;
+        j += 1;
       }
       if (depth === 0) {
         results.push({ end: j, start });
@@ -627,7 +629,7 @@ export function findTemplateExpressions(text: string) {
         continue;
       }
     }
-    i++;
+    i += 1;
   }
   return results;
 }

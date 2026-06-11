@@ -61,7 +61,7 @@ export {
  * @param {unknown} src
  * @returns {boolean}
  */
-export function isClassJsonSrc(src: unknown): src is string {
+export function isClassJsonSrc(src?: unknown): src is string {
   return typeof src === "string" && src.endsWith(".class.json");
 }
 
@@ -117,10 +117,8 @@ export function isDynamic(def: JxElement | JxMutableNode | string) {
     return true;
   }
 
-  if (Array.isArray(def.children)) {
-    if (def.children.some((c) => isDynamic(c))) {
-      return true;
-    }
+  if (Array.isArray(def.children) && def.children.some((c) => isDynamic(c))) {
+    return true;
   }
 
   for (const [key, val] of Object.entries(def)) {
@@ -319,10 +317,11 @@ export function buildInitialScope(
       }
       continue;
     }
-    if (isPrototypeDef(def)) {
-      if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
-        setOwnScopeValue(scope, key, cloneValue(def.default ?? null));
-      }
+    if (
+      isPrototypeDef(def) &&
+      (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
+    ) {
+      setOwnScopeValue(scope, key, cloneValue(def.default ?? null));
     }
   }
 
@@ -394,7 +393,7 @@ export function resolveRefValue(refValue: unknown, scope: Record<string, unknown
   }
   if (refValue.startsWith("$map/")) {
     const parts = refValue.split("/");
-    const key = parts[1];
+    const [, key] = parts;
     const base = (scope.$map as Record<string, unknown> | undefined)?.[key] ?? scope[`$map/${key}`];
     return parts.length > 2 ? getPathValue(base, parts.slice(2).join("/")) : base;
   }
@@ -437,12 +436,11 @@ export function getPathValue(base: unknown, path: string) {
   if (!path) {
     return base;
   }
-  return path
-    .split("/")
-    .reduce<unknown>(
-      (acc, key: string) => (acc == null ? undefined : (acc as Record<string, unknown>)[key]),
-      base,
-    );
+  let acc: unknown = base;
+  for (const key of path.split("/")) {
+    acc = acc == null ? undefined : (acc as Record<string, unknown>)[key];
+  }
+  return acc;
 }
 
 /**
@@ -453,7 +451,7 @@ export function cloneValue(value: unknown) {
   if (value === null || typeof value !== "object") {
     return value;
   }
-  return JSON.parse(JSON.stringify(value));
+  return structuredClone(value);
 }
 
 // ─── HTML building ────────────────────────────────────────────────────────────
@@ -617,7 +615,7 @@ export function compileStyles(
   // Everything else on body.  Project-level style is implicitly :root, so a
   // Flat object like { "--bg": "#000", "margin": "0" } is the expected format.
   if (projectStyle && typeof projectStyle === "object") {
-    function emitProjectRules(selector: string, obj: Record<string, unknown>) {
+    const emitProjectRules = (selector: string, obj: Record<string, unknown>) => {
       const props = toCSSText(obj);
       if (props) {
         rules.push(`${selector} { ${props} }`);
@@ -660,7 +658,7 @@ export function compileStyles(
             : `${selector} ${key}`;
         emitProjectRules(resolved, val as Record<string, unknown>);
       }
-    }
+    };
 
     for (const [key, val] of Object.entries(projectStyle)) {
       if (key.startsWith(":") || key.startsWith(".") || key.startsWith("[")) {
@@ -794,18 +792,18 @@ export function collectStyles(
   def: JxElement | JxMutableNode | string,
   rules: string[],
   mediaQueries: Record<string, string>,
-  _parentSel: string = "",
-  counter: { n: number } = { n: 0 },
+  _parentSel = "",
+  counterArg?: { n: number },
   prefix = "jx",
 ) {
+  const counter = counterArg ?? { n: 0 };
   if (!def || typeof def !== "object") {
     return;
   }
 
-  if (def.style) {
-    if (!def.id && !def.className) {
-      def.className = `${prefix}-${counter.n++}`;
-    }
+  if (def.style && !def.id && !def.className) {
+    def.className = `${prefix}-${counter.n}`;
+    counter.n += 1;
   }
 
   const selector = def.id
@@ -889,9 +887,9 @@ export function collectStyles(
   }
 
   if (Array.isArray(def.children)) {
-    def.children.forEach((c: JxElement | JxMutableNode | string) => {
+    for (const c of def.children) {
       collectStyles(c, rules, mediaQueries, selector, counter, prefix);
-    });
+    }
   }
 }
 
@@ -970,7 +968,9 @@ function _walkSrc(def: JxElement | JxMutableNode | string, srcs: Set<string>) {
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((c: JxElement | JxMutableNode | string) => _walkSrc(c, srcs));
+    for (const c of def.children) {
+      _walkSrc(c, srcs);
+    }
   }
 }
 
@@ -1006,7 +1006,9 @@ function _walkServerEntries(
     }
   }
   if (Array.isArray(def.children)) {
-    def.children.forEach((c: JxElement | JxMutableNode | string) => _walkServerEntries(c, entries));
+    for (const c of def.children) {
+      _walkServerEntries(c, entries);
+    }
   }
 }
 
@@ -1112,19 +1114,13 @@ export function preRenderComponentHtml(
     for (const [key, value] of Object.entries(propsOverride)) {
       if (key in stateDefs) {
         const existing = stateDefs[key];
-        if (
+        stateDefs[key] =
           existing &&
           typeof existing === "object" &&
           !Array.isArray(existing) &&
           "default" in existing
-        ) {
-          stateDefs[key] = {
-            .../** @type {JxStateObject} */ existing,
-            default: value,
-          };
-        } else {
-          stateDefs[key] = value as JxStateDefinition;
-        }
+            ? { .../** @type {JxStateObject} */ existing, default: value }
+            : (value as JxStateDefinition);
       } else {
         stateDefs[key] = value as JxStateDefinition;
       }
@@ -1156,12 +1152,12 @@ export function isComponentFullyStatic(doc: JxElement) {
  * @param {JxElement | string | (JxElement | string)[]} node
  * @returns {boolean}
  */
-function _isStaticNode(node: JxElement | string | (JxElement | string)[]) {
+function _isStaticNode(node: JxElement | string | (JxElement | string)[]): boolean {
   if (!node || typeof node !== "object") {
     return true;
   }
   if (Array.isArray(node)) {
-    return node.every(_isStaticNode);
+    return node.every((n) => _isStaticNode(n));
   }
 
   // Check for $prototype (Functions, Request, Storage, etc.)
@@ -1198,14 +1194,11 @@ function _isStaticNode(node: JxElement | string | (JxElement | string)[]) {
 
   // Recurse into children
   if (Array.isArray(node.children)) {
-    if (!node.children.every(_isStaticNode)) {
-      return false;
-    }
-  } else if (node.children && typeof node.children === "object") {
-    // Children descriptor object ($prototype: "Array", etc.)
-    if (node.children.$prototype) {
-      return false;
-    }
+    return node.children.every((c) => _isStaticNode(c));
+  }
+  // Children descriptor object ($prototype: "Array", etc.)
+  if (node.children && typeof node.children === "object" && node.children.$prototype) {
+    return false;
   }
 
   return true;
@@ -1223,7 +1216,7 @@ function _isStaticNode(node: JxElement | string | (JxElement | string)[]) {
  */
 export function buildComponentCSS(
   tagName: string,
-  styleDef: JxStyle | null | undefined,
+  styleDef?: JxStyle | null | undefined,
   doc: JxElement | null = null,
   mediaQueries: Record<string, string> = {},
 ) {

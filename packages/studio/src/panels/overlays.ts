@@ -12,6 +12,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { effectiveZoom, findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 import { layoutElements } from "../canvas/canvas-live-render";
+import type { EffectScope } from "@vue/reactivity";
 
 interface OverlayBox {
   cls: string;
@@ -31,7 +32,7 @@ interface OverlaysCtx {
 
 let _ctx: OverlaysCtx | null = null;
 
-let _scope: import("@vue/reactivity").EffectScope | null = null;
+let _scope: EffectScope | null = null;
 
 let _scheduled = false;
 

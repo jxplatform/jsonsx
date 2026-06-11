@@ -134,7 +134,8 @@ function headEntryKey(entry: JxHeadEntry) {
 function simpleHash(str: string) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.codePointAt(i)) | 0;
+    // oxlint-disable-next-line no-bitwise -- classic 31x string hash; the shift is the algorithm
+    hash = Math.trunc((hash << 5) - hash + (str.codePointAt(i) ?? 0));
   }
   return hash.toString(36);
 }

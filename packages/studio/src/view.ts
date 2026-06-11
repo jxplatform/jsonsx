@@ -7,6 +7,8 @@
  * store.js) makes renderer dependencies explicit.
  */
 
+import type { editor } from "monaco-editor";
+
 interface ViewState {
   panzoomWrap: HTMLElement | null;
   renderGeneration: number;
@@ -16,12 +18,12 @@ interface ViewState {
   panY: number;
   prevCanvasMode: string | null;
   monacoEditor:
-    | (import("monaco-editor").editor.IStandaloneCodeEditor & {
+    | (editor.IStandaloneCodeEditor & {
         _ignoreNextChange?: boolean;
       })
     | null;
   functionEditor:
-    | (import("monaco-editor").editor.IStandaloneCodeEditor & {
+    | (editor.IStandaloneCodeEditor & {
         _ignoreNextChange?: boolean;
         _editingTarget?: string | null;
       })

@@ -62,7 +62,7 @@ describe("Markdown.class.json $studio elements", () => {
     expect(def.$studio.elements.inline).toEqual(MD_ELEMENTS.inline);
     expect(def.$studio.elements.void).toEqual(MD_ELEMENTS.void);
     expect(def.$studio.elements.textOnly).toEqual(MD_ELEMENTS.textOnly);
-    expect(def.$studio.elements.nesting).toEqual(JSON.parse(JSON.stringify(MD_ELEMENTS.nesting)));
+    expect(def.$studio.elements.nesting).toEqual(structuredClone(MD_ELEMENTS.nesting));
   });
 });
 
@@ -91,7 +91,6 @@ describe("Markdown capability behavior", () => {
 
   test("load packages a markdown file as a content entry", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
-    const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-load__");
     rmSync(TMP, { force: true, recursive: true });
     mkdirSync(TMP, { recursive: true });
@@ -114,7 +113,6 @@ describe("Markdown capability behavior", () => {
 
   test("discover lists .md files in a directory", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
-    const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-discover__");
     rmSync(TMP, { force: true, recursive: true });
     mkdirSync(resolve(TMP, "posts"), { recursive: true });
@@ -132,7 +130,6 @@ describe("Markdown capability behavior", () => {
 
   test("instance resolve parses the configured file", async () => {
     const { mkdirSync, rmSync, writeFileSync } = await import("node:fs");
-    const { resolve } = await import("node:path");
     const TMP = resolve(import.meta.dir, "__test-md-resolve__");
     rmSync(TMP, { force: true, recursive: true });
     mkdirSync(TMP, { recursive: true });

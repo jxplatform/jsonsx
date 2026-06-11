@@ -13,6 +13,7 @@ import { projectState } from "../store";
 import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 import { toCamelCase } from "../utils/studio-utils";
 
+import type { FieldHandlers } from "./schema-field-ui.js";
 import type {
   ContentTypeSchema,
   ContentTypeSchemaField,
@@ -512,7 +513,7 @@ export function renderContentTypesEditor(container: HTMLElement) {
     const properties = schema.properties || {};
     const required = schema.required || [];
 
-    const handlers: import("./schema-field-ui.js").FieldHandlers = {
+    const handlers: FieldHandlers = {
       onAddNestedField: (p: string, s: { name: string; type: string; required: boolean }) =>
         handleAddNestedField(p, s, rerender),
       onChangeFormat: (n: string, f: string) => handleChangeFormat(n, f, rerender),

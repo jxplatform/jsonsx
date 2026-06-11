@@ -1,12 +1,12 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
-try {
-  GlobalRegistrator.register();
-} catch {}
-
 import { describe, test, expect } from "bun:test";
 import { reactive, ref } from "@vue/reactivity";
 import { resolvePrototype, isSignal, Jx } from "../src/runtime";
+
+try {
+  GlobalRegistrator.register();
+} catch {}
 
 describe("isSignal", () => {
   test("true for ref", () => expect(isSignal(ref(0))).toBe(true));

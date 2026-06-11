@@ -14,8 +14,8 @@ import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 interface ObservableSubscription {
-  subscribe(observer: { next: (e: Event) => void }): void;
-  subscribe(observer: { next: (e: MouseEvent) => void }): void;
+  subscribe: ((observer: { next: (e: Event) => void }) => void) &
+    ((observer: { next: (e: MouseEvent) => void }) => void);
 }
 
 interface ObservableElement {

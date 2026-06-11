@@ -85,7 +85,7 @@ describe("Tab primitive", () => {
     let runs = 0;
     tab.scope.run(() => {
       effect(() => {
-        runs++;
+        runs += 1;
         void tab.doc.dirty;
       });
     });

@@ -31,9 +31,10 @@ import { prepareForEditMode } from "../utils/edit-display";
 import { getActiveElement } from "../editor/inline-edit";
 import { buildNestedSiteCSS } from "./nested-site-style";
 
-export { buildNestedSiteCSS } from "./nested-site-style";
+import type { JxDocument, JxElement, JxMutableNode } from "@jxsuite/schema/types";
+import type { ComponentEntry } from "../files/components.js";
 
-import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
+export { buildNestedSiteCSS } from "./nested-site-style";
 
 /** @param {Event} e */
 function _preventNav(e: Event) {
@@ -72,8 +73,7 @@ function findPageContentPrefix(
     return null;
   }
   if (Array.isArray(node.children)) {
-    for (let i = 0; i < node.children.length; i++) {
-      const child = node.children[i];
+    for (const child of node.children) {
       if (child && typeof child === "object" && !child.$__layout) {
         return [...path, "children"];
       }
@@ -114,7 +114,7 @@ function markLayoutNodes(node: JxMutableNode) {
   if (node.$elements) {
     for (const el of node.$elements) {
       if (typeof el !== "string") {
-        markLayoutNodes(el);
+        markLayoutNodes(el as JxMutableNode);
       }
     }
   }
@@ -266,9 +266,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         return tags;
       };
       for (const tag of collectTags(renderDoc)) {
-        const comp = componentRegistry.find(
-          (c: import("../files/components.js").ComponentEntry) => c.tagName === tag,
-        );
+        const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
         if (comp && comp.source !== "npm" && comp.path) {
           const relPath = computeRelativePath(S.documentPath ?? null, comp.path);
           if (!existingRefs.has(relPath)) {
@@ -346,17 +344,15 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         }
       }
     }
-    if (editSurface) {
-      if (siteStyle && typeof siteStyle === "object") {
-        for (const [k, v] of Object.entries(siteStyle)) {
-          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-            continue;
-          }
-          if (k.startsWith("--")) {
-            editSurface.style.setProperty(k, String(v));
-          } else {
-            (editSurface.style as unknown as Record<string, string>)[k] = String(v);
-          }
+    if (editSurface && siteStyle && typeof siteStyle === "object") {
+      for (const [k, v] of Object.entries(siteStyle)) {
+        if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+          continue;
+        }
+        if (k.startsWith("--")) {
+          editSurface.style.setProperty(k, String(v));
+        } else {
+          (editSurface.style as unknown as Record<string, string>)[k] = String(v);
         }
       }
     }
@@ -432,7 +428,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
       }
     }
 
-    const $defs = await buildScope(renderDoc, {}, docBase);
+    const $defs = await buildScope(renderDoc as JxDocument, {}, docBase);
     // Bail out if a newer render started while buildScope was running
     if (gen !== view.renderGeneration) {
       return null;
@@ -440,20 +436,18 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     const el = /** @type {HTMLElement} */ runtimeRenderNode(renderDoc, $defs, {
       _path: [],
       onNodeCreated(
-        el: HTMLElement | Text,
+        created: HTMLElement | Text,
         path: (string | number)[],
-        def: import("@jxsuite/schema/types").JxElement | string,
+        def: JxElement | string,
       ) {
-        if (!(el instanceof HTMLElement)) {
+        if (!(created instanceof HTMLElement)) {
           return;
         }
         // Track layout-originated elements — don't store in elToPath to avoid
         // Path collisions with remapped page content paths
         if (layoutWrapped && typeof def === "object" && def?.$__layout) {
-          layoutElements.add(el);
-          if (el.setAttribute) {
-            el.dataset.jxLayout = "";
-          }
+          layoutElements.add(created);
+          created.dataset.jxLayout = "";
           return;
         }
 
@@ -497,7 +491,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
             }
           }
         }
-        elToPath.set(el, mappedPath);
+        elToPath.set(created, mappedPath);
       },
     });
     if ((canvasMode === "design" || canvasMode === "edit") && el instanceof HTMLElement) {

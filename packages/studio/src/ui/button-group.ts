@@ -9,7 +9,7 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { abbreviateValue, kebabToLabel } from "../utils/studio-utils";
-import icons from "./icons";
+import { icons } from "./icons";
 
 /**
  * Render a button group widget with optional overflow menu.

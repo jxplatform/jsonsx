@@ -50,7 +50,7 @@ export function compileStaticPage(
   let moduleScripts = "";
   if (islands.length > 0) {
     for (const island of islands) {
-      const moduleContent = emitElementModule(island.def, island.className, []);
+      const moduleContent = emitElementModule(island.def as JxDocument, island.className, []);
       files.push({
         content: moduleContent,
         path: `_islands/${island.tagName}.js`,

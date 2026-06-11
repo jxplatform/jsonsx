@@ -10,7 +10,7 @@
 import { resolve } from "node:path";
 
 const args = process.argv.slice(2);
-const command = args[0];
+const [command] = args;
 
 if (!command || command === "--help" || command === "-h") {
   console.log(`Usage: jx <command> [options]
@@ -27,9 +27,9 @@ Options:
 if (command === "build") {
   const rest = args.slice(1);
   const flags = new Set(rest.filter((a) => a.startsWith("--")));
-  const positional = rest.filter((a) => !a.startsWith("--"));
+  const positional = rest.find((a) => !a.startsWith("--"));
 
-  const projectRoot = resolve(positional[0] ?? ".");
+  const projectRoot = resolve(positional ?? ".");
   const verbose = flags.has("--verbose");
   const clean = !flags.has("--no-clean");
 

@@ -17,11 +17,9 @@ import {
 } from "./image-optimizer.ts";
 import { getCached, getImageCacheDir, setCached } from "./image-cache.ts";
 
-import type { ImageConfig } from "./image-optimizer.ts";
-import type { ImageManifest } from "./image-optimizer.ts";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { ImageConfig, ImageManifest } from "./image-optimizer.ts";
+import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 import type { CacheManifest } from "./image-cache.ts";
-import type { JxDocument } from "@jxsuite/schema/types";
 
 const SKIP_EXTENSIONS = new Set([".svg", ".gif"]);
 const EXTERNAL_PREFIXES = ["http://", "https://", "data:", "//"];
@@ -51,11 +49,11 @@ async function resolveCfMeta(absoluteSrc: string, metaCache: ImageMetaCache) {
     try {
       const m = await getImageMetadata(absoluteSrc);
       meta = { width: m.width, height: m.height, hash };
-    } catch (e) {
+    } catch (error) {
       if (!sharpWarned) {
         sharpWarned = true;
         console.warn(
-          `Could not read image dimensions (${(e as Error).message}) — ` +
+          `Could not read image dimensions (${(error as Error).message}) — ` +
             `emitting srcsets without width/height attributes.`,
         );
       }
@@ -326,12 +324,6 @@ async function transformImgNode(
     // Original dimensions are unknown without fetching — emit every configured width and let
     // Fit=scale-down avoid upscaling past the source size.
     srcset = buildCloudflareSrcset(src, config, Infinity, null);
-  } else if (config.service === "cloudflare") {
-    const meta = await resolveCfMeta(absoluteSrc as string, metaCache);
-    srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
-    if (meta.width != null && meta.height != null) {
-      original = { width: meta.width, height: meta.height };
-    }
   } else {
     const absoluteSrc = resolveImagePath(src, projectRoot);
     if (!existsSync(absoluteSrc)) {
@@ -340,8 +332,10 @@ async function transformImgNode(
 
     if (config.service === "cloudflare") {
       const meta = await resolveCfMeta(absoluteSrc, metaCache);
-      srcset = buildCloudflareSrcset(src, config, meta.width, meta.hash);
-      original = meta;
+      srcset = buildCloudflareSrcset(src, config, meta.width ?? Infinity, meta.hash);
+      if (meta.width != null && meta.height != null) {
+        original = { width: meta.width, height: meta.height };
+      }
     } else {
       let manifest = imageRefs.get(absoluteSrc);
 
@@ -358,7 +352,7 @@ async function transformImgNode(
 
   if (srcset) {
     node.attributes.srcset = srcset;
-    node.attributes.sizes = node.attributes.sizes ?? config.sizes;
+    node.attributes.sizes ??= config.sizes;
   }
 
   if (!node.attributes.width && original?.width) {
@@ -402,8 +396,8 @@ async function transformInnerHtmlImages(
   const replacements = [];
 
   for (const m of html.matchAll(IMG_TAG_RE)) {
-    const tag = m[0];
-    const attrs = m[1];
+    const [tag] = m;
+    const [, attrs] = m;
 
     if (SRCSET_ATTR_RE.test(attrs)) {
       continue;

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { compileElement, compileElementPage } from "../src/compiler";
 import { emitElementModule } from "../src/targets/compile-element";
 import { resolve } from "node:path";
+import type { JxDocument } from "@jxsuite/schema/types";
 
 const fixturesDir = import.meta.dir;
 const examplesDir = resolve(fixturesDir, "../../../examples/components");
@@ -17,7 +18,7 @@ describe("compileElement", () => {
     });
 
     expect(result.files).toHaveLength(1);
-    const file = result.files[0];
+    const [file] = result.files;
     expect(file.tagName).toBe("test-basic");
     expect(file.content).toContain("class TestBasic extends HTMLElement");
     expect(file.content).toContain("customElements.define('test-basic'");
@@ -32,7 +33,7 @@ describe("compileElement", () => {
       tagName: "test-state",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("this.state = reactive({");
     expect(content).toContain('label: "hello"');
     expect(content).toContain("count: 0");
@@ -52,7 +53,7 @@ describe("compileElement", () => {
       tagName: "test-fn",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("this.state.increment = (state) => {");
     expect(content).toContain("state.count++");
   });
@@ -70,7 +71,7 @@ describe("compileElement", () => {
       tagName: "test-computed",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("this.state.total = computed(() => {");
     expect(content).toContain("return this.state.items.length");
   });
@@ -82,7 +83,7 @@ describe("compileElement", () => {
       tagName: "test-connect",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("connectedCallback()");
     expect(content).toContain("this.state[key] = this[key]");
     expect(content).toContain("this.#dispose = effect(() => render(this.template(), this))");
@@ -95,7 +96,7 @@ describe("compileElement", () => {
       tagName: "test-disconnect",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("disconnectedCallback()");
     expect(content).toContain("#dispose");
   });
@@ -130,7 +131,7 @@ describe("compileElement — templates", () => {
       tagName: "test-text",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("${s.name}");
   });
 
@@ -146,7 +147,7 @@ describe("compileElement — templates", () => {
       tagName: "test-tpl-child",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("s.status === 'submitting' ? 'Sending...' : 'Submit'");
     expect(content).not.toContain("&#39;");
     expect(content).not.toContain("&amp;");
@@ -159,7 +160,7 @@ describe("compileElement — templates", () => {
       tagName: "test-static-text",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain(">Hello</span>");
   });
 
@@ -175,7 +176,7 @@ describe("compileElement — templates", () => {
       tagName: "test-style",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('class="test-style-0"');
     expect(content).not.toContain("display: flex");
     expect(content).not.toContain("background-color: #fff");
@@ -194,7 +195,7 @@ describe("compileElement — templates", () => {
       tagName: "test-dyn-style",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("color: ${s.active ? 'red' : 'gray'}");
   });
 
@@ -213,7 +214,7 @@ describe("compileElement — templates", () => {
       tagName: "test-event",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("@click=");
     expect(content).toContain("s.handleClick");
   });
@@ -231,7 +232,7 @@ describe("compileElement — templates", () => {
       tagName: "test-inline-event",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("@click=");
     expect(content).toContain("s.count++");
   });
@@ -251,7 +252,7 @@ describe("compileElement — templates", () => {
       tagName: "test-props",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('.items="${s.data}"');
     expect(content).toContain('.label="${"test"}"');
   });
@@ -270,7 +271,7 @@ describe("compileElement — templates", () => {
       tagName: "test-map",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain(".map((item, index)");
     expect(content).toContain("s.items");
   });
@@ -282,7 +283,7 @@ describe("compileElement — templates", () => {
       tagName: "test-hydrate",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("this.innerHTML = '';");
     expect(content).not.toContain("} else {");
     expect(content).not.toContain("} else {\n      this.innerHTML = '';");
@@ -300,7 +301,7 @@ describe("compileElement — templates", () => {
       tagName: "test-attrs",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('type="text"');
     expect(content).toContain('placeholder="Enter..."');
   });
@@ -313,7 +314,7 @@ describe("compileElement — $elements", () => {
     const result = await compileElement(resolve(examplesDir, "task-item.json"));
 
     expect(result.files).toHaveLength(1);
-    const file = result.files[0];
+    const [file] = result.files;
     expect(file.tagName).toBe("task-item");
     expect(file.content).toContain("class TaskItem extends HTMLElement");
     expect(file.content).toContain("this.state.toggleDone");
@@ -323,7 +324,7 @@ describe("compileElement — $elements", () => {
   test("compiles task-stats.json with computed signals", async () => {
     const result = await compileElement(resolve(examplesDir, "task-stats.json"));
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("class TaskStats extends HTMLElement");
     expect(content).toContain("this.state.total = computed(");
     expect(content).toContain("this.state.done = computed(");
@@ -338,7 +339,7 @@ describe("compileElement — $elements", () => {
     expect(result.files.map((f) => f.tagName)).toEqual(["task-item", "task-stats", "task-manager"]);
 
     // Root element (task-manager) should import the deps
-    const root = result.files[2];
+    const [root] = result.files.slice(2);
     expect(root.content).toContain("import './task-item.js'");
     expect(root.content).toContain("import './task-stats.js'");
   });
@@ -426,7 +427,7 @@ Paragraph content
       },
     );
 
-    const root = result.files.at(-1);
+    const root = result.files.at(-1)!;
     expect(root.content).toContain("import './components/child-el.bundle.js'");
   });
 });
@@ -443,7 +444,7 @@ describe("compileElement — extractInitialValue prototypes", () => {
       tagName: "test-localstorage",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('theme: "dark"');
   });
 
@@ -456,7 +457,7 @@ describe("compileElement — extractInitialValue prototypes", () => {
       tagName: "test-ls-null",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("token: null");
   });
 
@@ -469,7 +470,7 @@ describe("compileElement — extractInitialValue prototypes", () => {
       tagName: "test-request",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("data: null");
   });
 });
@@ -491,7 +492,7 @@ describe("compileElement — $src imports", () => {
       tagName: "test-src-fn",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("import { handler } from './utils.js'");
     expect(content).toContain("this.state.handler = (state) => handler(state)");
   });
@@ -510,7 +511,7 @@ describe("compileElement — $src imports", () => {
       tagName: "test-src-computed",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("import { total } from './calc.js'");
     expect(content).toContain("this.state.total = computed(() => total(this.state))");
   });
@@ -525,7 +526,7 @@ describe("compileElement — $src imports", () => {
       tagName: "test-src-multi",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("import { add, sub } from './math.js'");
   });
 });
@@ -562,7 +563,7 @@ describe("compileElement — slot handling", () => {
       tagName: "test-slot",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("const _slotted = Array.from(this.childNodes)");
     expect(content).toContain("const _slot = this.querySelector('slot')");
     expect(content).toContain("_slot.before(n)");
@@ -585,7 +586,7 @@ describe("compileElement — emitLitNode edge cases", () => {
       tagName: "test-dyn-attr",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('data-x="${s.val}"');
   });
 
@@ -601,7 +602,7 @@ describe("compileElement — emitLitNode edge cases", () => {
       tagName: "test-prop-bind",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('.value="${s.val}"');
   });
 
@@ -611,7 +612,7 @@ describe("compileElement — emitLitNode edge cases", () => {
         children: [{ children: [42], tagName: "div" }],
         state: {},
         tagName: "test-bool-child",
-      } as unknown as import("@jxsuite/schema/types").JxDocument,
+      } as unknown as JxDocument,
       "TestBoolChild",
       [],
     );
@@ -631,7 +632,7 @@ describe("compileElement — emitLitNode edge cases", () => {
       tagName: "test-innerhtml",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("<b>content</b>");
     expect(content).toContain("<div");
   });
@@ -655,7 +656,7 @@ describe("compileElement — emitMappedArray edge cases", () => {
       tagName: "test-map-props",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('.title="${"Static"}"');
     expect(content).toContain(".map((item, index)");
   });
@@ -678,7 +679,7 @@ describe("compileElement — emitMappedArray edge cases", () => {
       tagName: "test-map-event",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("@click=");
     expect(content).toContain("s.handleClick(s, e)");
   });
@@ -697,7 +698,7 @@ describe("compileElement — emitMappedArray edge cases", () => {
       tagName: "test-map-children",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain(".map((item, index)");
     expect(content).toContain("<span");
     expect(content).toContain(">nested</span>");
@@ -721,7 +722,7 @@ describe("compileElement — refToExpr edge cases", () => {
       tagName: "test-map-ref",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("item.name");
   });
 
@@ -737,7 +738,7 @@ describe("compileElement — refToExpr edge cases", () => {
       tagName: "test-unknown-ref",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("s.custom/path");
   });
 
@@ -761,7 +762,7 @@ describe("compileElement — refToExpr edge cases", () => {
       tagName: "test-map-ref",
     });
 
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("item.title");
     expect(content).toContain("item.handler");
     expect(content).not.toContain("s.$map");
@@ -775,7 +776,7 @@ describe("compileElement — refToExpr edge cases", () => {
       },
       tagName: "test-request",
     });
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("data: null");
   });
 
@@ -797,7 +798,7 @@ describe("compileElement — refToExpr edge cases", () => {
       state: { items: { default: [], type: "array" } },
       tagName: "test-plain-text",
     });
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain("Hello world");
   });
 });
@@ -821,7 +822,7 @@ describe("compileElement — $media opts", () => {
       },
       { $media: { "--md": "(max-width: 768px)" } },
     );
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('class="test-media-prop-0"');
   });
 
@@ -839,7 +840,7 @@ describe("compileElement — $media opts", () => {
       },
       { $media: { "--md": "(max-width: 768px)" } },
     );
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('class="test-media-override-0"');
   });
 
@@ -859,7 +860,7 @@ describe("compileElement — $media opts", () => {
       ],
       tagName: "test-starting-style",
     });
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('class="test-starting-style-0"');
   });
 
@@ -880,7 +881,7 @@ describe("compileElement — $media opts", () => {
       ],
       tagName: "test-popover-attrs",
     });
-    const { content } = result.files[0];
+    const [{ content }] = result.files;
     expect(content).toContain('popovertarget="my-menu"');
     expect(content).toContain("popover");
   });

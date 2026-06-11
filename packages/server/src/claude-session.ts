@@ -8,8 +8,7 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { Options as AgentOptions } from "@anthropic-ai/claude-agent-sdk";
+import type { Options as AgentOptions, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 
 interface Session {
   id: string;
@@ -44,7 +43,7 @@ const sessions = new Map<string, Session>();
 let idCounter = 0;
 
 function genId() {
-  return `ai_${Date.now().toString(36)}_${(++idCounter).toString(36)}`;
+  return `ai_${Date.now().toString(36)}_${(idCounter += 1).toString(36)}`;
 }
 
 /**

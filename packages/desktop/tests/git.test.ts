@@ -69,7 +69,7 @@ describe("gitStatus", () => {
     const result = await gitStatus();
     expect(result.files.length).toBeGreaterThan(0);
     // The status and path are parsed from porcelain output
-    const file = result.files[0];
+    const [file] = result.files;
     expect(file.status).toBeTruthy();
     expect(file.path.length).toBeGreaterThan(0);
     run(["git", "checkout", "--", "initial.txt"]);

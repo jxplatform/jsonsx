@@ -7,6 +7,7 @@ import { getNodeAtPath } from "../store";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import type { JxPath } from "../state";
 import type { JxFunctionDef, JxMutableNode } from "@jxsuite/schema/types";
+import type { editor } from "monaco-editor";
 
 export interface OxLintDiagnostic {
   severity: string;
@@ -90,7 +91,7 @@ export async function fetchPluginSchema(
  * @param {OxLintDiagnostic[]} diagnostics
  */
 export function setLintMarkers(
-  editor: import("monaco-editor").editor.IStandaloneCodeEditor,
+  editor: editor.IStandaloneCodeEditor,
   diagnostics: OxLintDiagnostic[],
 ) {
   const model = editor.getModel();
@@ -117,11 +118,7 @@ export function setLintMarkers(
       };
     })
     .filter(Boolean);
-  monaco.editor.setModelMarkers(
-    model,
-    "oxlint",
-    markers as import("monaco-editor").editor.IMarkerData[],
-  );
+  monaco.editor.setModelMarkers(model, "oxlint", markers as editor.IMarkerData[]);
 }
 
 /**

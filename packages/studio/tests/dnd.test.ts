@@ -2,6 +2,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { closeTab, openTab, workspace } from "../src/workspace/workspace";
 import { applyDropInstruction } from "../src/panels/dnd";
+import { jsonClone } from "../src/utils/studio-utils";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 function openDoc(doc: JxMutableNode) {
@@ -71,7 +72,7 @@ describe("applyDropInstruction — tree-node moves", () => {
       "children",
       0,
     ]);
-    const section = (tab.doc.document as any).children[0];
+    const [section] = (tab.doc.document as any).children;
     expect(section.children).toHaveLength(2);
     expect(section.children[1].textContent).toBe("first");
     expect(tab.doc.document.children).toHaveLength(2);
@@ -101,12 +102,12 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("reorder around a root-level path is a no-op", () => {
     const tab = openDoc(makeDoc());
-    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    const before = jsonClone(tab.doc.document);
     // TargetPath ["children"] has no parent element and a non-numeric index
     applyDropInstruction({ type: "reorder-above" }, { path: ["children", 1], type: "tree-node" }, [
       "children",
     ]);
-    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    expect(jsonClone(tab.doc.document)).toEqual(before);
   });
 });
 
@@ -136,7 +137,7 @@ describe("applyDropInstruction — block inserts", () => {
       "children",
       0,
     ]);
-    const section = (tab.doc.document as any).children[0];
+    const [section] = (tab.doc.document as any).children;
     expect(section.children).toHaveLength(2);
     expect(section.children[1].tagName).toBe("img");
     assertNoHoles(tab.doc.document);
@@ -144,12 +145,12 @@ describe("applyDropInstruction — block inserts", () => {
 
   test("reorder on a root-level path is a no-op", () => {
     const tab = openDoc(makeDoc());
-    const before = JSON.parse(JSON.stringify(tab.doc.document));
+    const before = jsonClone(tab.doc.document);
     applyDropInstruction(
       { type: "reorder-below" },
       { fragment: { tagName: "hr" }, type: "block" },
       ["children"],
     );
-    expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
+    expect(jsonClone(tab.doc.document)).toEqual(before);
   });
 });
