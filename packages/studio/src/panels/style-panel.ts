@@ -289,7 +289,7 @@ function styleSidebarTemplate(
   const style = effectiveStyle || node.style || {};
   const { sizeBreakpoints } = parseMediaEntries(getEffectiveMedia(tab.doc.document.$media));
   const mediaNames = sizeBreakpoints.map((bp) => bp.name);
-  const mediaTab = activeMediaTab;
+  const mediaTab = activeMediaTab || null;
 
   // ── Media tabs template ──────────────────────────────────────────────────
   const mediaTabsT =

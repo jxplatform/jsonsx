@@ -20,7 +20,12 @@ import { isEditableBlock, isEditing, stopEditing } from "../editor/inline-edit";
 import { showContextMenu } from "../editor/context-menu";
 import * as insertionHelper from "../editor/insertion-helper";
 import { defaultDef } from "../panels/shared";
-import { bubbleInlinePath, effectiveZoom, findCanvasElement } from "../canvas/canvas-helpers";
+import {
+  bubbleInlinePath,
+  effectiveZoom,
+  findCanvasElement,
+  panelMediaToActiveMedia,
+} from "../canvas/canvas-helpers";
 import { activeLayoutPath, layoutElements } from "../canvas/canvas-live-render";
 import type { CanvasPanel } from "./canvas-dnd";
 import type { JxPath } from "../state";
@@ -111,7 +116,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
           const originalPath = elToPath.get(el);
           if (originalPath) {
             const path = bubbleInlinePath(tab.doc.document, originalPath);
-            const newMedia = mediaName === "base" ? null : (mediaName ?? null);
+            const newMedia = panelMediaToActiveMedia(mediaName);
 
             const resolvedEl = (
               path === originalPath
@@ -187,7 +192,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
                 : (findCanvasElement(path, canvas) as HTMLElement | null) || el
             ) as HTMLElement;
             if (isEditableBlock(resolvedEl)) {
-              const newMedia = mediaName === "base" ? null : (mediaName ?? null);
+              const newMedia = panelMediaToActiveMedia(mediaName);
               tab.session.ui.activeMedia = newMedia;
               tab.session.selection = path;
               ctx.enterInlineEdit(resolvedEl, path);

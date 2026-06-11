@@ -31,6 +31,17 @@ export function effectiveZoom() {
     : (ctx.getZoom?.() ?? activeTab.value?.session.ui.zoom ?? 1);
 }
 
+/**
+ * Convert a canvas panel's mediaName to an activeMedia value. Panels without a breakpoint (content
+ * mode, single-panel docs) carry "" or "base" — both mean the base style context (null).
+ *
+ * @param {string | null | undefined} mediaName
+ * @returns {string | null}
+ */
+export function panelMediaToActiveMedia(mediaName: string | null | undefined) {
+  return !mediaName || mediaName === "base" ? null : mediaName;
+}
+
 /** Return the active canvas panel based on the current activeMedia setting. */
 export function getActivePanel() {
   if (canvasPanels.length === 0) {

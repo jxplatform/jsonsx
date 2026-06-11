@@ -519,7 +519,9 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
 
   if (def.attributes) {
     for (const [key, val] of Object.entries(def.attributes)) {
-      if (typeof val === "string" && val.includes("${")) {
+      if (val && typeof val === "object" && isRef(val)) {
+        parts.push(`${key}="\${${refToExpr(val.$ref)}}"`);
+      } else if (typeof val === "string" && val.includes("${")) {
         parts.push(`${key}="${toLitExpr(val)}"`);
       } else {
         parts.push(`${key}="${val}"`);
@@ -604,7 +606,20 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
   }
 
   let inner = "";
-  if (def.textContent !== undefined) {
+  if (def.$switch) {
+    const switchRef = isRef(def.$switch) ? def.$switch.$ref : (def.$switch as string);
+    const switchExpr = refToExpr(switchRef);
+    const cases = (def.cases ?? {}) as Record<string, JxMutableNode>;
+    const caseEntries: string[] = [];
+    for (const [key, caseDef] of Object.entries(cases)) {
+      if (!caseDef || isRef(caseDef)) {
+        continue;
+      }
+      const renderedCase = emitLitNode(caseDef, `${indent}  `);
+      caseEntries.push(`  ${JSON.stringify(key)}: html\`\n${renderedCase}\n  \``);
+    }
+    inner = `\${{\n${caseEntries.join(",\n")}\n}[${switchExpr}]}`;
+  } else if (def.textContent !== undefined) {
     inner = toLitTextContent(def.textContent);
   } else if (def.innerHTML !== undefined) {
     inner = def.innerHTML;
