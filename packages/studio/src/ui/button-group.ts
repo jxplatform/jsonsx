@@ -74,8 +74,9 @@ export function renderButtonGroup(
               <sp-popover>
                 <sp-menu
                   @change=${(e: Event) => {
-                    if ((e.target as HTMLInputElement).value)
+                    if ((e.target as HTMLInputElement).value) {
                       onChange((e.target as HTMLInputElement).value);
+                    }
                   }}
                 >
                   <sp-menu-item value="__none__">—</sp-menu-item>

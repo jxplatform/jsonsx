@@ -1,14 +1,14 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { StudioPlatform } from "../src/types";
 
-if (typeof globalThis.localStorage === "undefined") {
+if (globalThis.localStorage === undefined) {
   const store = new Map();
   globalThis.localStorage = {
-    getItem: (k: string) => store.get(k) ?? null,
-    setItem: (k: string, v: string) => store.set(k, v),
-    removeItem: (k: string) => store.delete(k),
     clear: () => store.clear(),
+    getItem: (k: string) => store.get(k) ?? null,
+    removeItem: (k: string) => store.delete(k),
+    setItem: (k: string, v: string) => store.set(k, v),
   } as any;
 }
 
@@ -25,14 +25,16 @@ const originalFetch = globalThis.fetch;
 function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[]) {
   mockFetchResponses = [...responses];
   mockFetchCalls = [];
-  // @ts-ignore
+  // @ts-expect-error
   globalThis.fetch = async (url: any, opts: any) => {
-    mockFetchCalls.push({ url: String(url), opts });
+    mockFetchCalls.push({ opts, url: String(url) });
     const next = mockFetchResponses.shift();
-    if (!next) throw new Error(`Unexpected fetch to ${url}`);
+    if (!next) {
+      throw new Error(`Unexpected fetch to ${url}`);
+    }
     return {
-      ok: next.ok ?? true,
       json: async () => next.json,
+      ok: next.ok ?? true,
       status: next.status ?? 200,
     };
   };
@@ -43,14 +45,14 @@ let statusMessages: string[] = [];
 let showDialogResult: any = null;
 
 mock.module("../src/ui/layers.js", () => ({
-  showDialog: async () => showDialogResult,
   showConfirmDialog: async () => true,
+  showDialog: async () => showDialogResult,
 }));
 
 mock.module("../src/github/github-auth.js", () => ({
-  getGithubToken: () => localStorage.getItem(STORAGE_KEY),
-  clearGithubToken: () => localStorage.removeItem(STORAGE_KEY),
   authenticateGithub: async () => localStorage.getItem(STORAGE_KEY),
+  clearGithubToken: () => localStorage.removeItem(STORAGE_KEY),
+  getGithubToken: () => localStorage.getItem(STORAGE_KEY),
 }));
 
 mock.module("../src/platform.js", () => ({
@@ -59,9 +61,9 @@ mock.module("../src/platform.js", () => ({
 }));
 
 mock.module("../src/panels/git-panel.js", () => ({
+  platformSupportsClone: () => false,
   refreshGitStatus: async () => {},
   renderGitPanel: () => null,
-  platformSupportsClone: () => false,
 }));
 
 mock.module("../src/panels/statusbar.js", () => ({
@@ -100,18 +102,18 @@ describe("publishToGithub", () => {
   test("creates repo, adds remote, and pushes on success", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
     showDialogResult = {
-      name: "my-repo",
       description: "A test",
       isPrivate: true,
+      name: "my-repo",
     };
 
     setupFetch([
       {
-        ok: true,
         json: {
           clone_url: "https://github.com/user/my-repo.git",
           html_url: "https://github.com/user/my-repo",
         },
+        ok: true,
       },
     ]);
 
@@ -137,16 +139,16 @@ describe("publishToGithub", () => {
 
   test("returns false and reports error when GitHub API fails", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
-    showDialogResult = { name: "my-repo", description: "", isPrivate: false };
+    showDialogResult = { description: "", isPrivate: false, name: "my-repo" };
 
     setupFetch([
       {
+        json: {
+          errors: [{ message: "name already exists" }],
+          message: "Validation Failed",
+        },
         ok: false,
         status: 422,
-        json: {
-          message: "Validation Failed",
-          errors: [{ message: "name already exists" }],
-        },
       },
     ]);
 
@@ -158,19 +160,19 @@ describe("publishToGithub", () => {
   test("returns false when push fails", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
     showDialogResult = {
-      name: "push-fail-repo",
       description: "",
       isPrivate: true,
+      name: "push-fail-repo",
     };
     mockPlatform.gitPush = mock(() => Promise.reject(new Error("push rejected")));
 
     setupFetch([
       {
-        ok: true,
         json: {
           clone_url: "https://github.com/user/push-fail-repo.git",
           html_url: "https://github.com/user/push-fail-repo",
         },
+        ok: true,
       },
     ]);
 
@@ -182,18 +184,18 @@ describe("publishToGithub", () => {
   test("sends correct Accept header to GitHub API", async () => {
     localStorage.setItem(STORAGE_KEY, "ghp_test_token");
     showDialogResult = {
-      name: "header-test",
       description: "desc",
       isPrivate: false,
+      name: "header-test",
     };
 
     setupFetch([
       {
-        ok: true,
         json: {
           clone_url: "https://github.com/user/header-test.git",
           html_url: "https://github.com/user/header-test",
         },
+        ok: true,
       },
     ]);
 

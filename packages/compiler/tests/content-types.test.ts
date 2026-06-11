@@ -1,15 +1,15 @@
 /** Content-types.test.js — Tests for Phase 2 content type system */
 
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import {
+  findEntry,
+  getContentTypeElements,
   loadContentConfig,
   loadContentTypes,
   queryContentType,
-  findEntry,
   resolveContentTypeRefs,
-  getContentTypeElements,
 } from "../src/site/content-loader";
 import { discoverPages, expandDynamicRoutes } from "../src/site/pages-discovery";
 import { injectContext } from "../src/site/context-injection";
@@ -40,68 +40,68 @@ function writeFile(relPath: string, content: string | object) {
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 
 beforeAll(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 
-  // project.json (includes contentTypes definition)
+  // Project.json (includes contentTypes definition)
   writeFile("project.json", {
-    name: "Content Test Site",
-    url: "https://test.com",
-    defaults: { layout: "./layouts/base.json", lang: "en" },
     build: { outDir: "./dist" },
+    contentTypes: {
+      authors: {
+        format: "json",
+        schema: {
+          properties: {
+            bio: { type: "string" },
+            name: { type: "string" },
+          },
+          required: ["name"],
+          type: "object",
+        },
+        source: "./content/authors/",
+      },
+      blog: {
+        format: "Markdown",
+        schema: {
+          properties: {
+            author: { $ref: "#/contentTypes/authors" },
+            draft: { default: false, type: "boolean" },
+            pubDate: { format: "date", type: "string" },
+            tags: { items: { type: "string" }, type: "array" },
+            title: { type: "string" },
+          },
+          required: ["title", "pubDate"],
+          type: "object",
+        },
+        source: "./content/blog/",
+      },
+      products: {
+        schema: {
+          properties: {
+            category: { type: "string" },
+            name: { type: "string" },
+            price: { type: "number" },
+            sku: { type: "string" },
+          },
+          required: ["sku", "name", "price"],
+          type: "object",
+        },
+        source: "./content/products/catalog.csv",
+      },
+    },
+    defaults: { lang: "en", layout: "./layouts/base.json" },
     imports: {
       ContentCollection: "@jxsuite/parser/ContentCollection.class.json",
       ContentEntry: "@jxsuite/parser/ContentEntry.class.json",
-      Markdown: "@jxsuite/parser/Markdown.class.json",
       Csv: "@jxsuite/parser/Csv.class.json",
+      Markdown: "@jxsuite/parser/Markdown.class.json",
     },
-    contentTypes: {
-      blog: {
-        source: "./content/blog/",
-        format: "Markdown",
-        schema: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            pubDate: { type: "string", format: "date" },
-            draft: { type: "boolean", default: false },
-            author: { $ref: "#/contentTypes/authors" },
-            tags: { type: "array", items: { type: "string" } },
-          },
-          required: ["title", "pubDate"],
-        },
-      },
-      authors: {
-        source: "./content/authors/",
-        format: "json",
-        schema: {
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            bio: { type: "string" },
-          },
-          required: ["name"],
-        },
-      },
-      products: {
-        source: "./content/products/catalog.csv",
-        schema: {
-          type: "object",
-          properties: {
-            sku: { type: "string" },
-            name: { type: "string" },
-            price: { type: "number" },
-            category: { type: "string" },
-          },
-          required: ["sku", "name", "price"],
-        },
-      },
-    },
+    name: "Content Test Site",
+    url: "https://test.com",
   });
 
   // Layout
   writeFile("layouts/base.json", {
+    children: [{ children: [{ tagName: "slot" }], tagName: "main" }],
     tagName: "div",
-    children: [{ tagName: "main", children: [{ tagName: "slot" }] }],
   });
 
   // Blog posts (Markdown)
@@ -156,9 +156,9 @@ This shouldn't show up in published lists.
 
   // Authors (JSON)
   writeFile("content/authors/jane.json", {
+    bio: "A prolific writer",
     id: "jane",
     name: "Jane Doe",
-    bio: "A prolific writer",
   });
 
   // Products (CSV)
@@ -174,13 +174,13 @@ WIDGET-3,Green Widget,14.99,widgets`,
 
   // Static index page
   writeFile("pages/index.json", {
+    children: [{ children: ["Home"], tagName: "h1" }],
     title: "Home",
-    children: [{ tagName: "h1", children: ["Home"] }],
   });
 
   // Blog listing page
   writeFile("pages/blog/index.json", {
-    title: "Blog",
+    children: [{ children: ["Blog Posts"], tagName: "h1" }],
     state: {
       posts: {
         $prototype: "ContentCollection",
@@ -189,17 +189,17 @@ WIDGET-3,Green Widget,14.99,widgets`,
         sort: { field: "pubDate", order: "desc" },
       },
     },
-    children: [{ tagName: "h1", children: ["Blog Posts"] }],
+    title: "Blog",
   });
 
   // Dynamic blog post page — content type-based $paths
   writeFile("pages/blog/[slug].json", {
-    title: "Blog Post",
     $paths: {
       contentType: "blog",
-      param: "slug",
       field: "id",
+      param: "slug",
     },
+    children: [{ children: ["Post content here"], tagName: "article" }],
     state: {
       post: {
         $prototype: "ContentEntry",
@@ -207,22 +207,22 @@ WIDGET-3,Green Widget,14.99,widgets`,
         id: { $ref: "#/$params/slug" },
       },
     },
-    children: [{ tagName: "article", children: ["Post content here"] }],
+    title: "Blog Post",
   });
 
   // Page with explicit $paths values
   writeFile("pages/[lang]/index.json", {
-    title: "Localized",
     $paths: {
-      values: ["en", "fr", "de"],
       param: "lang",
+      values: ["en", "fr", "de"],
     },
-    children: [{ tagName: "h1", children: ["Localized Page"] }],
+    children: [{ children: ["Localized Page"], tagName: "h1" }],
+    title: "Localized",
   });
 });
 
 afterAll(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 });
 
 // ── content-loader ────────────────────────────────────────────────────────────
@@ -239,7 +239,7 @@ describe("content-loader", () => {
     });
 
     it("returns empty contentTypes when no project config", () => {
-      const result = loadContentConfig("/tmp/nope-" + Date.now()) as any;
+      const result = loadContentConfig(`/tmp/nope-${Date.now()}`) as any;
       expect(result).not.toBeNull();
       expect(result.config.contentTypes).toEqual({});
     });
@@ -250,7 +250,7 @@ describe("content-loader", () => {
       const contentTypes = await loadContentTypes(TMP, getProjectConfig());
       const blog = contentTypes.get("blog") as ContentLoaderEntry[];
       expect(blog).toBeDefined();
-      expect(blog.length).toBe(3); // hello-world, second-post, draft-post
+      expect(blog.length).toBe(3); // Hello-world, second-post, draft-post
 
       const hello = blog.find((e) => e.id === "hello-world") as any;
       expect(hello).toBeDefined();
@@ -279,7 +279,7 @@ describe("content-loader", () => {
       const widget = products.find((e) => e.id === "WIDGET-1") as any;
       expect(widget).toBeDefined();
       expect(widget.data.name).toBe("Blue Widget");
-      expect(widget.data.price).toBe(9.99); // coerced to number
+      expect(widget.data.price).toBe(9.99); // Coerced to number
       expect(typeof widget.data.price).toBe("number");
     });
   });
@@ -314,11 +314,11 @@ describe("content-loader", () => {
       const blog = contentTypes.get("blog") as ContentLoaderEntry[];
       const result = queryContentType(blog, {
         filter: { draft: false },
-        sort: { field: "pubDate", order: "desc" },
         limit: 1,
+        sort: { field: "pubDate", order: "desc" },
       });
       expect(result.length).toBe(1);
-      expect(result[0].data.title).toBe("Second Post"); // most recent non-draft
+      expect(result[0].data.title).toBe("Second Post"); // Most recent non-draft
     });
   });
 
@@ -368,7 +368,7 @@ describe("$paths expansion", () => {
     );
     // Should have one route per blog entry (3 posts)
     expect(blogRoutes.length).toBe(3);
-    expect(blogRoutes.map((r) => r.urlPattern).sort()).toEqual([
+    expect(blogRoutes.map((r) => r.urlPattern).toSorted()).toEqual([
       "/blog/draft-post",
       "/blog/hello-world",
       "/blog/second-post",
@@ -415,7 +415,7 @@ describe("$prototype resolution in context-injection", () => {
       },
     };
     const projectConfig = { name: "Test" };
-    const route = { urlPattern: "/blog", _pathParams: {} };
+    const route = { _pathParams: {}, urlPattern: "/blog" };
 
     injectContext(doc, projectConfig, route, contentTypes);
     await resolvePrototypes(doc, route, TMP, {
@@ -424,8 +424,8 @@ describe("$prototype resolution in context-injection", () => {
     });
 
     expect(Array.isArray(doc.state.posts)).toBe(true);
-    expect(doc.state.posts.length).toBe(2); // non-drafts
-    expect(doc.state.posts[0].data.title).toBe("Second Post"); // desc order
+    expect(doc.state.posts.length).toBe(2); // Non-drafts
+    expect(doc.state.posts[0].data.title).toBe("Second Post"); // Desc order
   });
 
   it("resolves ContentEntry $prototype with $params ref", async () => {
@@ -444,8 +444,8 @@ describe("$prototype resolution in context-injection", () => {
     };
     const projectConfig = { name: "Test" };
     const route = {
-      urlPattern: "/blog/hello-world",
       _pathParams: { slug: "hello-world" },
+      urlPattern: "/blog/hello-world",
     };
 
     injectContext(doc, projectConfig, route, contentTypes);
@@ -475,7 +475,7 @@ describe("$prototype resolution in context-injection", () => {
       },
     };
     const projectConfig = { name: "Test" };
-    const route = { urlPattern: "/blog/nope", _pathParams: {} };
+    const route = { _pathParams: {}, urlPattern: "/blog/nope" };
 
     injectContext(doc, projectConfig, route, contentTypes);
     await resolvePrototypes(doc, route, TMP, {
@@ -500,7 +500,7 @@ describe("$prototype resolution in context-injection", () => {
       },
     };
     const projectConfig = { name: "Test" };
-    const route = { urlPattern: "/", _pathParams: {} };
+    const route = { _pathParams: {}, urlPattern: "/" };
 
     injectContext(doc, projectConfig, route, contentTypes);
     await resolvePrototypes(doc, route, TMP, {
@@ -543,26 +543,26 @@ describe("buildSite with content types", () => {
 describe("content-loader edge cases", () => {
   it("parses CSV with quoted newlines and escaped quotes", async () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-csv__");
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
     mkdirSync(resolve(TMP2, "content/items"), { recursive: true });
 
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        imports: { Csv: "@jxsuite/parser/Csv.class.json" },
         contentTypes: {
           items: {
-            source: "./content/items/data.csv",
             format: "Csv",
             schema: {
               properties: {
-                name: { type: "string" },
                 desc: { type: "string" },
+                name: { type: "string" },
               },
               required: ["name"],
             },
+            source: "./content/items/data.csv",
           },
         },
+        imports: { Csv: "@jxsuite/parser/Csv.class.json" },
       }),
     );
     // CSV with: multiline field (newline inside quotes) AND doubled-quote escape
@@ -583,13 +583,13 @@ describe("content-loader edge cases", () => {
       // Second item: escaped quotes resolved to literal quotes
       expect(items[1].data.name).toBe('Has "quotes"');
     } finally {
-      rmSync(TMP2, { recursive: true, force: true });
+      rmSync(TMP2, { force: true, recursive: true });
     }
   });
 
   it("loads JSON array entries without id fields", async () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-json-arr__");
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
     mkdirSync(resolve(TMP2, "content/items"), { recursive: true });
 
     writeFileSync(
@@ -597,8 +597,8 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           items: {
-            source: "./content/items/list.json",
             schema: { properties: { name: { type: "string" } } },
+            source: "./content/items/list.json",
           },
         },
       }),
@@ -618,20 +618,20 @@ describe("content-loader edge cases", () => {
       expect(items[0].id).toContain("list-0");
       expect(items[1].id).toContain("list-1");
     } finally {
-      rmSync(TMP2, { recursive: true, force: true });
+      rmSync(TMP2, { force: true, recursive: true });
     }
   });
 
   it("getContentTypeElements returns $elements from content type def", () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-elements__");
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
     mkdirSync(TMP2, { recursive: true });
 
     const projectConfig = {
       contentTypes: {
         blog: {
-          source: "./content/blog/",
           $elements: ["my-component", { $ref: "./card.json" }],
+          source: "./content/blog/",
         },
       },
     };
@@ -642,12 +642,12 @@ describe("content-loader edge cases", () => {
     const missing = getContentTypeElements(TMP2, "nonexistent", projectConfig);
     expect(missing).toBeUndefined();
 
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
   });
 
   it("validates entries: warns on missing required field", async () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-validate__");
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
     mkdirSync(resolve(TMP2, "content/items"), { recursive: true });
 
     writeFileSync(
@@ -655,17 +655,17 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           items: {
-            source: "./content/items/",
             format: "json",
             schema: {
               properties: {
-                name: { type: "string" },
-                count: { type: "number" },
                 active: { type: "boolean" },
+                count: { type: "number" },
+                name: { type: "string" },
                 tags: { type: "array" },
               },
               required: ["name"],
             },
+            source: "./content/items/",
           },
         },
       }),
@@ -674,10 +674,10 @@ describe("content-loader edge cases", () => {
     writeFileSync(
       resolve(TMP2, "content/items/bad.json"),
       JSON.stringify({
+        active: "yes",
+        count: "not-a-number",
         id: "bad",
         name: 123,
-        count: "not-a-number",
-        active: "yes",
         tags: "not-array",
       }),
     );
@@ -691,7 +691,7 @@ describe("content-loader edge cases", () => {
       expect(items.length).toBe(1);
       expect(items[0].id).toBe("bad");
     } finally {
-      rmSync(TMP2, { recursive: true, force: true });
+      rmSync(TMP2, { force: true, recursive: true });
     }
   });
 
@@ -706,21 +706,21 @@ describe("content-loader edge cases", () => {
 
   it("loadCollection with $elements passes allowedNames", async () => {
     const TMP2 = resolve(import.meta.dir, "__test-content-directives__");
-    rmSync(TMP2, { recursive: true, force: true });
+    rmSync(TMP2, { force: true, recursive: true });
     mkdirSync(resolve(TMP2, "content/docs"), { recursive: true });
 
     writeFileSync(
       resolve(TMP2, "project.json"),
       JSON.stringify({
-        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
         contentTypes: {
           docs: {
-            source: "./content/docs/",
-            format: "Markdown",
             $elements: ["my-widget", { $ref: "./card.json" }],
+            format: "Markdown",
             schema: { properties: { title: { type: "string" } } },
+            source: "./content/docs/",
           },
         },
+        imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
       }),
     );
     writeFileSync(resolve(TMP2, "content/docs/intro.md"), "---\ntitle: Intro\n---\n\nHello docs\n");
@@ -734,13 +734,13 @@ describe("content-loader edge cases", () => {
       expect(docs.length).toBe(1);
       expect(docs[0].data.title).toBe("Intro");
     } finally {
-      rmSync(TMP2, { recursive: true, force: true });
+      rmSync(TMP2, { force: true, recursive: true });
     }
   });
 
   it("validates missing required fields with console.warn", async () => {
     const TMP3 = resolve(import.meta.dir, "__test-content-validation__");
-    rmSync(TMP3, { recursive: true, force: true });
+    rmSync(TMP3, { force: true, recursive: true });
     mkdirSync(resolve(TMP3, "content/items"), { recursive: true });
 
     writeFileSync(
@@ -748,15 +748,15 @@ describe("content-loader edge cases", () => {
       JSON.stringify({
         contentTypes: {
           items: {
-            source: "./content/items/",
             format: "json",
             schema: {
-              required: ["name", "price"],
               properties: {
                 name: { type: "string" },
                 price: { type: "number" },
               },
+              required: ["name", "price"],
             },
+            source: "./content/items/",
           },
         },
       }),
@@ -778,15 +778,15 @@ describe("content-loader edge cases", () => {
       expect(warnings.some((w) => w.includes("missing required field"))).toBe(true);
     } finally {
       console.warn = origWarn;
-      rmSync(TMP3, { recursive: true, force: true });
+      rmSync(TMP3, { force: true, recursive: true });
     }
   });
 
   it("sorts entries in descending order", async () => {
     const entries: any[] = [
-      { id: "a", data: { score: 10 }, body: null },
-      { id: "b", data: { score: 30 }, body: null },
-      { id: "c", data: { score: 20 }, body: null },
+      { body: null, data: { score: 10 }, id: "a" },
+      { body: null, data: { score: 30 }, id: "b" },
+      { body: null, data: { score: 20 }, id: "c" },
     ];
     const ascSorted = queryContentType(entries, {
       sort: { field: "score", order: "asc" },
@@ -806,29 +806,29 @@ describe("content-loader edge cases", () => {
 describe("queryContentType — array filter with operators", () => {
   const entries: any[] = [
     {
+      body: null,
+      data: { draft: false, score: 10, tags: ["web"], title: "Alpha Guide" },
       id: "a",
-      data: { title: "Alpha Guide", score: 10, draft: false, tags: ["web"] },
-      body: null,
     },
     {
+      body: null,
+      data: { draft: true, score: 25, tags: [], title: "Beta Post" },
       id: "b",
-      data: { title: "Beta Post", score: 25, draft: true, tags: [] },
-      body: null,
     },
     {
-      id: "c",
+      body: null,
       data: {
-        title: "Gamma Tutorial",
-        score: 15,
         draft: false,
+        score: 15,
         tags: ["api", "web"],
+        title: "Gamma Tutorial",
       },
-      body: null,
+      id: "c",
     },
     {
-      id: "d",
-      data: { title: "", score: 5, draft: false, tags: null },
       body: null,
+      data: { draft: false, score: 5, tags: null, title: "" },
+      id: "d",
     },
   ];
 
@@ -869,7 +869,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "score", op: ">", value: 10 }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["b", "c"]);
   });
 
   it("< operator for numeric comparison", () => {
@@ -877,7 +877,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "score", op: "<", value: 15 }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["a", "d"]);
   });
 
   it(">= operator", () => {
@@ -885,7 +885,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "score", op: ">=", value: 15 }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["b", "c"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["b", "c"]);
   });
 
   it("<= operator", () => {
@@ -893,7 +893,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "score", op: "<=", value: 10 }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["a", "d"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["a", "d"]);
   });
 
   it("empty operator detects null/empty string/empty array", () => {
@@ -901,7 +901,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "tags", op: "empty" }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["b", "d"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["b", "d"]);
   });
 
   it("not empty operator detects non-null/non-empty", () => {
@@ -909,7 +909,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "tags", op: "not empty" }],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["a", "c"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["a", "c"]);
   });
 
   it("empty operator on string field", () => {
@@ -928,7 +928,7 @@ describe("queryContentType — array filter with operators", () => {
       ],
     });
     expect(result.length).toBe(2);
-    expect(result.map((e) => e.id).sort()).toEqual(["a", "c"]);
+    expect(result.map((e) => e.id).toSorted()).toEqual(["a", "c"]);
   });
 
   it("field 'id' matches entry.id", () => {
@@ -950,10 +950,10 @@ describe("queryContentType — array filter with operators", () => {
 
 describe("queryContentType — multi-field sort", () => {
   const entries: any[] = [
-    { id: "1", data: { category: "B", title: "Zebra" }, body: null },
-    { id: "2", data: { category: "A", title: "Mango" }, body: null },
-    { id: "3", data: { category: "B", title: "Apple" }, body: null },
-    { id: "4", data: { category: "A", title: "Cherry" }, body: null },
+    { body: null, data: { category: "B", title: "Zebra" }, id: "1" },
+    { body: null, data: { category: "A", title: "Mango" }, id: "2" },
+    { body: null, data: { category: "B", title: "Apple" }, id: "3" },
+    { body: null, data: { category: "A", title: "Cherry" }, id: "4" },
   ];
 
   it("sorts by multiple fields (array format)", () => {
@@ -994,8 +994,8 @@ describe("queryContentType — multi-field sort", () => {
   it("combined array filter + array sort + limit", () => {
     const result = queryContentType(entries, {
       filter: [{ field: "category", op: "==", value: "B" }],
-      sort: [{ field: "title", order: "asc" }],
       limit: 1,
+      sort: [{ field: "title", order: "asc" }],
     });
     expect(result.length).toBe(1);
     expect(result[0].data.title).toBe("Apple");

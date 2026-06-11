@@ -1,17 +1,17 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { setProjectRoot } from "../src/handlers";
-import { gitStatus, gitInit, gitAddRemote, gitPush } from "../src/git";
+import { gitAddRemote, gitInit, gitPush, gitStatus } from "../src/git";
 
 const FIXTURES = join(import.meta.dir, "_fixtures_git_new");
 
 function run(args: string[]) {
   const proc = Bun.spawnSync(args, {
     cwd: FIXTURES,
-    stdout: "pipe",
     stderr: "pipe",
+    stdout: "pipe",
   });
   if (proc.exitCode !== 0) {
     throw new Error(`${args.join(" ")} failed: ${proc.stderr.toString()}`);
@@ -21,14 +21,14 @@ function run(args: string[]) {
 
 afterAll(() => {
   setProjectRoot(null);
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
 });
 
 // ─── gitStatus — isRepo / remotes ────────────────────────────────────────────
 
 describe("gitStatus — isRepo and remotes", () => {
   beforeAll(() => {
-    rmSync(FIXTURES, { recursive: true, force: true });
+    rmSync(FIXTURES, { force: true, recursive: true });
     mkdirSync(FIXTURES, { recursive: true });
     run(["git", "init"]);
     run(["git", "config", "user.email", "test@test.com"]);
@@ -63,7 +63,7 @@ describe("gitStatus — non-git directory", () => {
   const NON_GIT = join("/tmp", `_jx_non_git_${process.pid}`);
 
   beforeAll(() => {
-    rmSync(NON_GIT, { recursive: true, force: true });
+    rmSync(NON_GIT, { force: true, recursive: true });
     mkdirSync(NON_GIT, { recursive: true });
     writeFileSync(join(NON_GIT, "file.txt"), "not a repo");
     setProjectRoot(NON_GIT);
@@ -71,7 +71,7 @@ describe("gitStatus — non-git directory", () => {
 
   afterAll(() => {
     setProjectRoot(FIXTURES);
-    rmSync(NON_GIT, { recursive: true, force: true });
+    rmSync(NON_GIT, { force: true, recursive: true });
   });
 
   test("returns isRepo=false for non-git directory", async () => {
@@ -91,7 +91,7 @@ describe("gitInit", () => {
   const INIT_DIR = join(import.meta.dir, "_fixtures_git_init");
 
   beforeAll(() => {
-    rmSync(INIT_DIR, { recursive: true, force: true });
+    rmSync(INIT_DIR, { force: true, recursive: true });
     mkdirSync(INIT_DIR, { recursive: true });
     writeFileSync(join(INIT_DIR, "file.txt"), "hello");
     setProjectRoot(INIT_DIR);
@@ -99,7 +99,7 @@ describe("gitInit", () => {
 
   afterAll(() => {
     setProjectRoot(FIXTURES);
-    rmSync(INIT_DIR, { recursive: true, force: true });
+    rmSync(INIT_DIR, { force: true, recursive: true });
   });
 
   test("initializes a git repository", async () => {
@@ -124,14 +124,16 @@ describe("gitAddRemote", () => {
   const REMOTE_DIR = join(import.meta.dir, "_fixtures_git_addremote");
 
   beforeAll(() => {
-    rmSync(REMOTE_DIR, { recursive: true, force: true });
+    rmSync(REMOTE_DIR, { force: true, recursive: true });
     mkdirSync(REMOTE_DIR, { recursive: true });
     const proc = Bun.spawnSync(["git", "init"], {
       cwd: REMOTE_DIR,
-      stdout: "pipe",
       stderr: "pipe",
+      stdout: "pipe",
     });
-    if (proc.exitCode !== 0) throw new Error("git init failed");
+    if (proc.exitCode !== 0) {
+      throw new Error("git init failed");
+    }
     Bun.spawnSync(["git", "config", "user.email", "test@test.com"], {
       cwd: REMOTE_DIR,
     });
@@ -142,10 +144,10 @@ describe("gitAddRemote", () => {
       cwd: REMOTE_DIR,
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: "Test",
         GIT_AUTHOR_EMAIL: "test@test.com",
-        GIT_COMMITTER_NAME: "Test",
+        GIT_AUTHOR_NAME: "Test",
         GIT_COMMITTER_EMAIL: "test@test.com",
+        GIT_COMMITTER_NAME: "Test",
       },
     });
     setProjectRoot(REMOTE_DIR);
@@ -153,7 +155,7 @@ describe("gitAddRemote", () => {
 
   afterAll(() => {
     setProjectRoot(FIXTURES);
-    rmSync(REMOTE_DIR, { recursive: true, force: true });
+    rmSync(REMOTE_DIR, { force: true, recursive: true });
   });
 
   test("adds a remote successfully", async () => {
@@ -192,8 +194,8 @@ describe("gitPush — setUpstream option", () => {
   const BARE_DIR = join(import.meta.dir, "_fixtures_git_push_bare");
 
   beforeAll(() => {
-    rmSync(PUSH_DIR, { recursive: true, force: true });
-    rmSync(BARE_DIR, { recursive: true, force: true });
+    rmSync(PUSH_DIR, { force: true, recursive: true });
+    rmSync(BARE_DIR, { force: true, recursive: true });
 
     mkdirSync(BARE_DIR, { recursive: true });
     Bun.spawnSync(["git", "init", "--bare"], { cwd: BARE_DIR });
@@ -210,10 +212,10 @@ describe("gitPush — setUpstream option", () => {
       cwd: PUSH_DIR,
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: "Test",
         GIT_AUTHOR_EMAIL: "test@test.com",
-        GIT_COMMITTER_NAME: "Test",
+        GIT_AUTHOR_NAME: "Test",
         GIT_COMMITTER_EMAIL: "test@test.com",
+        GIT_COMMITTER_NAME: "Test",
       },
     });
     Bun.spawnSync(["git", "remote", "add", "origin", BARE_DIR], {
@@ -224,8 +226,8 @@ describe("gitPush — setUpstream option", () => {
 
   afterAll(() => {
     setProjectRoot(FIXTURES);
-    rmSync(PUSH_DIR, { recursive: true, force: true });
-    rmSync(BARE_DIR, { recursive: true, force: true });
+    rmSync(PUSH_DIR, { force: true, recursive: true });
+    rmSync(BARE_DIR, { force: true, recursive: true });
   });
 
   test("pushes with upstream tracking when setUpstream=true", async () => {
@@ -245,10 +247,10 @@ describe("gitPush — setUpstream option", () => {
       cwd: PUSH_DIR,
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: "Test",
         GIT_AUTHOR_EMAIL: "test@test.com",
-        GIT_COMMITTER_NAME: "Test",
+        GIT_AUTHOR_NAME: "Test",
         GIT_COMMITTER_EMAIL: "test@test.com",
+        GIT_COMMITTER_NAME: "Test",
       },
     });
 

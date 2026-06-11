@@ -95,7 +95,7 @@ export interface UpdateStatus {
 
 // ─── RPC Schema ───────────────────────────────────────────────────────────────
 
-export type StudioRPC = {
+export interface StudioRPC {
   bun: RPCSchema<{
     requests: {
       openProject: {
@@ -348,4 +348,4 @@ export type StudioRPC = {
       updateReady: { version: string };
     };
   }>;
-};
+}

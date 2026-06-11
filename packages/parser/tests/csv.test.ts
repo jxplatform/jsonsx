@@ -1,19 +1,19 @@
-import { describe, test, expect, afterAll } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseCSV, coerceCSVRows, Csv } from "../src/csv";
+import { Csv, coerceCSVRows, parseCSV } from "../src/csv";
 
 const TMP = resolve(import.meta.dir, "__test-csv__");
 
 afterAll(() => {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 });
 
 describe("parseCSV", () => {
   test("parses simple rows with header mapping", () => {
     const rows = parseCSV("sku,name,price\nA-1,Widget,9.99\nB-2,Gadget,19.99");
     expect(rows.length).toBe(2);
-    expect(rows[0]).toEqual({ sku: "A-1", name: "Widget", price: "9.99" });
+    expect(rows[0]).toEqual({ name: "Widget", price: "9.99", sku: "A-1" });
   });
 
   test("handles quoted fields with commas", () => {
@@ -44,8 +44,8 @@ describe("parseCSV", () => {
 describe("coerceCSVRows", () => {
   const schema = {
     properties: {
-      price: { type: "number" },
       active: { type: "boolean" },
+      price: { type: "number" },
       tags: { type: "array" },
     },
   };
@@ -68,8 +68,8 @@ describe("coerceCSVRows", () => {
   test("coerces booleans — only 'true' is true", () => {
     const entries = coerceCSVRows(
       [
-        { id: "a", active: "true" },
-        { id: "b", active: "yes" },
+        { active: "true", id: "a" },
+        { active: "yes", id: "b" },
       ],
       schema,
     );
@@ -91,7 +91,7 @@ describe("coerceCSVRows", () => {
   });
 
   test("explicit idField wins over the fallback chain", () => {
-    const entries = coerceCSVRows([{ id: "i", code: "c" }], undefined, "code");
+    const entries = coerceCSVRows([{ code: "c", id: "i" }], undefined, "code");
     expect(entries[0].id).toBe("c");
   });
 });
@@ -140,7 +140,7 @@ describe("Csv.discover / Csv.load / resolve", () => {
   });
 
   test("instance resolve loads the configured source", async () => {
-    const csv = new Csv({ src: "./data/catalog.csv", basePath: TMP });
+    const csv = new Csv({ basePath: TMP, src: "./data/catalog.csv" });
     const entries = await csv.resolve();
     expect(entries.length).toBe(1);
     expect(entries[0].data.name).toBe("Widget");

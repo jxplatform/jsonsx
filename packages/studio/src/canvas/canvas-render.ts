@@ -5,10 +5,11 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
-import { canvasWrap, canvasPanels, updateCanvas } from "../store";
+import { canvasPanels, canvasWrap, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { parseSourceForPath, serializeDocument } from "../files/file-ops";
@@ -16,8 +17,8 @@ import { formatByName, formatForPath } from "../format/format-host";
 import { renderWelcome } from "../panels/welcome-screen";
 import { projectState } from "../state";
 import {
-  canvasPanelTemplate,
   applyTransform,
+  canvasPanelTemplate,
   observeCenterUntilStable,
   renderZoomIndicator,
   resetZoomIndicator,
@@ -25,10 +26,10 @@ import {
 } from "./canvas-utils";
 import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
 import {
-  parseMediaEntries,
   activeBreakpointsForWidth,
-  collectMediaOverrides,
   applyOverridesToCanvas,
+  collectMediaOverrides,
+  parseMediaEntries,
 } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
 import { renderCanvasLive } from "./canvas-live-render";
@@ -39,8 +40,8 @@ import { computeDocumentDiff } from "./canvas-diff";
 import { updateForcedPseudoPreview } from "../panels/pseudo-preview";
 import { findCanvasElement } from "./canvas-helpers";
 import { enterComponentInlineEdit } from "../editor/component-inline-edit";
-import { renderStylebookMode, refreshStylebookStyles } from "../panels/stylebook-panel";
-import { dismissLinkPopover, dismissBlockActionBar } from "../panels/block-action-bar";
+import { refreshStylebookStyles, renderStylebookMode } from "../panels/stylebook-panel";
+import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
 import { dismissContextMenu } from "../editor/context-menu";
 import { dismissSlashMenu } from "../editor/slash-menu";
 import { renderFunctionEditor } from "../panels/editors";
@@ -79,7 +80,9 @@ export function initCanvasRender(ctx: CanvasRenderCtx) {
 /** Monaco language for the source view of a tab's document. */
 function sourceLang(tab: import("../tabs/tab.js").Tab) {
   const format = formatByName(tab.doc.sourceFormat);
-  if (format) return format.mediaType?.split("/").pop() ?? "plaintext";
+  if (format) {
+    return format.mediaType?.split("/").pop() ?? "plaintext";
+  }
   return (tab.documentPath || "").endsWith(".js") ? "javascript" : "json";
 }
 
@@ -88,8 +91,12 @@ function sourceLang(tab: import("../tabs/tab.js").Tab) {
  * (e.g. frontmatter YAML plus the body for markdown), not just the JSON of the body tree.
  */
 async function sourceContent(tab: import("../tabs/tab.js").Tab, lang: string) {
-  if (formatByName(tab.doc.sourceFormat)) return serializeDocument(tab);
-  if (lang === "javascript") return tab.doc.document?.toString?.() || "";
+  if (formatByName(tab.doc.sourceFormat)) {
+    return serializeDocument(tab);
+  }
+  if (lang === "javascript") {
+    return tab.doc.document?.toString?.() || "";
+  }
   return JSON.stringify(tab.doc.document, null, 2);
 }
 
@@ -106,8 +113,8 @@ export function renderCanvas() {
   const ctx = _ctx as CanvasRenderCtx;
   const S = {
     document: tab.doc.document,
-    ui: tab.session.ui,
     mode: tab.doc.mode,
+    ui: tab.session.ui,
   };
   const canvasMode = ctx.getCanvasMode();
 
@@ -119,12 +126,12 @@ export function renderCanvas() {
 
   // Only clear Lit's internal state on mode transitions (structural panel changes).
   // For content re-renders in the same mode, Lit's template diffing preserves
-  // the panel structure. Bailed async renders can't corrupt the DOM because
-  // renderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
-  // @ts-ignore
+  // The panel structure. Bailed async renders can't corrupt the DOM because
+  // RenderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
+  // @ts-expect-error
   if (modeChanged && canvasWrap["_$litPart$"]) {
     canvasWrap.textContent = "";
-    // @ts-ignore
+    // @ts-expect-error
     delete canvasWrap["_$litPart$"];
   }
 
@@ -141,13 +148,15 @@ export function renderCanvas() {
   }
 
   // Source mode: update existing Monaco editor without recreating. Don't replace the buffer while
-  // the user is actively typing in it — that would reformat under the cursor (the source view is
-  // the editing surface here, mirroring the panel draft-state behaviour).
+  // The user is actively typing in it — that would reformat under the cursor (the source view is
+  // The editing surface here, mirroring the panel draft-state behaviour).
   if (canvasMode === "source" && view.monacoEditor) {
     const editor = view.monacoEditor;
     sourceContent(tab, sourceLang(tab))
       .then((newVal) => {
-        if (view.monacoEditor !== editor) return;
+        if (view.monacoEditor !== editor) {
+          return;
+        }
         if (!editor.hasTextFocus() && editor.getValue() !== newVal) {
           editor._ignoreNextChange = true;
           editor.setValue(newVal);
@@ -162,7 +171,7 @@ export function renderCanvas() {
   // Stylebook fast-path: re-apply styles without rebuilding DOM
   if (canvasMode === "stylebook" && !modeChanged) {
     const curFilter = tab.session.ui.stylebookFilter || "";
-    const curCustomized = !!tab.session.ui.stylebookCustomizedOnly;
+    const curCustomized = Boolean(tab.session.ui.stylebookCustomizedOnly);
     const filterChanged =
       curFilter !== _prevStylebookFilter || curCustomized !== _prevStylebookCustomizedOnly;
     if (!filterChanged) {
@@ -175,13 +184,17 @@ export function renderCanvas() {
   view.prevCanvasMode = canvasMode;
 
   // DnD handlers are registered on inner canvas elements that get replaced on every
-  // content render, so always clean them up.
-  for (const fn of view.canvasDndCleanups) fn();
+  // Content render, so always clean them up.
+  for (const fn of view.canvasDndCleanups) {
+    fn();
+  }
   view.canvasDndCleanups = [];
 
   // Panel event handlers (click, dblclick, etc.) capture closures over panel references.
   // Always re-register to keep closures fresh across document switches.
-  for (const fn of view.canvasEventCleanups) fn();
+  for (const fn of view.canvasEventCleanups) {
+    fn();
+  }
   view.canvasEventCleanups = [];
 
   // Panel JS objects are cheap — always clear and repopulate from templates.
@@ -225,15 +238,15 @@ export function renderCanvas() {
   // Stylebook mode: render element catalog with panzoom surface
   if (canvasMode === "stylebook") {
     _prevStylebookFilter = tab.session.ui.stylebookFilter || "";
-    _prevStylebookCustomizedOnly = !!tab.session.ui.stylebookCustomizedOnly;
+    _prevStylebookCustomizedOnly = Boolean(tab.session.ui.stylebookCustomizedOnly);
     renderStylebookMode({
-      canvasPanelTemplate,
       applyTransform,
+      canvasPanelTemplate,
+      effectiveZoom,
       observeCenterUntilStable,
+      overlayBoxDescriptor,
       renderZoomIndicator,
       updateActivePanelHeaders,
-      overlayBoxDescriptor,
-      effectiveZoom,
     });
     return;
   }
@@ -254,7 +267,9 @@ export function renderCanvas() {
         <div
           class="source-editor"
           ${ref((el) => {
-            if (el) editorContainer = el as HTMLDivElement;
+            if (el) {
+              editorContainer = el as HTMLDivElement;
+            }
           })}
         ></div>
       </div>`,
@@ -263,7 +278,7 @@ export function renderCanvas() {
 
     const filePath = tab.documentPath || "document.json";
     const lang = sourceLang(tab);
-    const modelUri = monaco.Uri.parse("file:///" + filePath);
+    const modelUri = monaco.Uri.parse(`file:///${filePath}`);
     const model = monaco.editor.createModel("", lang, modelUri);
     sourceContent(tab, lang)
       .then((content) => {
@@ -277,23 +292,25 @@ export function renderCanvas() {
         // Serialization unavailable — leave the buffer empty rather than crash the render
       });
     view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
-      model,
-      theme: "vs-dark",
       automaticLayout: true,
-      minimap: { enabled: false },
-      fontSize: 12,
       fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+      fontSize: 12,
       lineNumbers: "on",
+      minimap: { enabled: false },
+      model,
       scrollBeyondLastLine: false,
-      wordWrap: "on",
       tabSize: 2,
+      theme: "vs-dark",
+      wordWrap: "on",
     });
 
     // Debounced sync back to state
     let debounce: ReturnType<typeof setTimeout> | undefined;
     view.monacoEditor.onDidChangeModelContent(() => {
       const editor = view.monacoEditor;
-      if (!editor) return;
+      if (!editor) {
+        return;
+      }
       if (editor._ignoreNextChange) {
         editor._ignoreNextChange = false;
         return;
@@ -301,7 +318,9 @@ export function renderCanvas() {
       clearTimeout(debounce);
       debounce = setTimeout(async () => {
         const tab = activeTab.value;
-        if (!tab) return;
+        if (!tab) {
+          return;
+        }
         if (formatByName(tab.doc.sourceFormat) && tab.documentPath) {
           try {
             // Parse the full source back into body + frontmatter (title, $head, etc.).
@@ -343,7 +362,7 @@ export function renderCanvas() {
       canvasWrap.style.overflow = "hidden";
     }
 
-    const gitDiffState = ctx.gitDiffState;
+    const { gitDiffState } = ctx;
     const panelWidth = 800;
 
     const { tpl: origTpl, panel: origPanel } = canvasPanelTemplate(
@@ -365,7 +384,9 @@ export function renderCanvas() {
           class="panzoom-wrap"
           style="transform-origin:0 0"
           ${ref((el) => {
-            if (el) view.panzoomWrap = el as HTMLDivElement;
+            if (el) {
+              view.panzoomWrap = el as HTMLDivElement;
+            }
           })}
         >
           ${origTpl} ${currTpl}
@@ -388,14 +409,14 @@ export function renderCanvas() {
           return JSON.parse(content);
         } catch {
           return {
-            tagName: "div",
             children: [{ tagName: "p", textContent: "Failed to parse" }],
+            tagName: "div",
           };
         }
       });
     };
 
-    const featureToggles = S.ui.featureToggles;
+    const { featureToggles } = S.ui;
     Promise.all([
       parseContent(gitDiffState.originalContent || ""),
       parseContent(gitDiffState.currentContent || ""),
@@ -417,7 +438,9 @@ export function renderCanvas() {
     });
 
     applyTransform();
-    if (modeChanged) observeCenterUntilStable();
+    if (modeChanged) {
+      observeCenterUntilStable();
+    }
     renderZoomIndicator();
     return;
   }
@@ -462,7 +485,7 @@ export function renderCanvas() {
     baseWidth,
   } = parseMediaEntries(getEffectiveMedia(S.document.$media));
   const hasMedia = sizeBreakpoints.length > 0;
-  const featureToggles = S.ui.featureToggles;
+  const { featureToggles } = S.ui;
 
   // Create panzoom wrapper (the element that gets transformed)
   if (!hasMedia) {
@@ -482,7 +505,9 @@ export function renderCanvas() {
           class="panzoom-wrap"
           style="transform-origin:0 0"
           ${ref((el) => {
-            if (el) view.panzoomWrap = el as HTMLDivElement;
+            if (el) {
+              view.panzoomWrap = el as HTMLDivElement;
+            }
           })}
         >
           ${panelTpl}
@@ -501,28 +526,28 @@ export function renderCanvas() {
   }
 
   // Build all panels: base first, then breakpoints in declared order (ascending for min-width,
-  // descending for max-width — matching the direction of the design's media queries).
+  // Descending for max-width — matching the direction of the design's media queries).
   const allPanelDefs = [
     {
-      name: "base",
-      displayName: mediaDisplayName("--"),
-      width: baseWidth,
       activeSet: activeBreakpointsForWidth(sizeBreakpoints, baseWidth),
+      displayName: mediaDisplayName("--"),
+      name: "base",
+      width: baseWidth,
     },
   ];
   for (const bp of sizeBreakpoints) {
     allPanelDefs.push({
-      name: bp.name,
-      displayName: mediaDisplayName(bp.name),
-      width: bp.width,
       activeSet: activeBreakpointsForWidth(sizeBreakpoints, bp.width),
+      displayName: mediaDisplayName(bp.name),
+      name: bp.name,
+      width: bp.width,
     });
   }
 
   const panelEntries = allPanelDefs.map((def) => {
     const label = `${def.displayName} (${def.width}px)`;
     const { tpl, panel } = canvasPanelTemplate(def.name, label, false, def.width);
-    return { tpl, panel, activeSet: def.activeSet };
+    return { activeSet: def.activeSet, panel, tpl };
   });
 
   litRender(
@@ -531,7 +556,9 @@ export function renderCanvas() {
         class="panzoom-wrap"
         style="transform-origin:0 0"
         ${ref((el) => {
-          if (el) view.panzoomWrap = el as HTMLDivElement;
+          if (el) {
+            view.panzoomWrap = el as HTMLDivElement;
+          }
         })}
       >
         ${panelEntries.map((e) => e.tpl)}
@@ -591,9 +618,11 @@ function renderCanvasIntoPanel(
   renderCanvasLive(gen, docToRender, canvas)
     .then((scope: Record<string, unknown> | null) => {
       // Skip post-render setup if a newer render has started
-      if (gen !== view.renderGeneration) return;
+      if (gen !== view.renderGeneration) {
+        return;
+      }
       if (scope) {
-        updateCanvas({ status: "ready", scope, error: null });
+        updateCanvas({ error: null, scope, status: "ready" });
         applyCanvasMediaOverrides(canvas, activeBreakpoints);
         statusMessage("Runtime render OK", 1500);
 
@@ -615,14 +644,14 @@ function renderCanvasIntoPanel(
         }
       } else {
         // Fallback to structural preview
-        updateCanvas({ status: "ready", scope: null, error: null });
+        updateCanvas({ error: null, scope: null, status: "ready" });
         canvas.innerHTML = "";
         renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       }
       try {
         registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (e) {
-        console.warn("registerPanelDnD failed:", (e as Error).message);
+      } catch (error) {
+        console.warn("registerPanelDnD failed:", errorMessage(error));
       }
       registerPanelEvents(panel as unknown as CanvasPanel);
       renderOverlays();
@@ -636,20 +665,24 @@ function renderCanvasIntoPanel(
         const targetPanel = canvasPanels.find((p) => p.mediaName === mn) || canvasPanels[0];
         if (targetPanel) {
           const el = findCanvasElement(path, targetPanel.canvas);
-          if (el) enterComponentInlineEdit(el, path);
+          if (el) {
+            enterComponentInlineEdit(el, path);
+          }
         }
       }
     })
-    .catch((err: unknown) => {
-      if (gen !== view.renderGeneration) return;
-      console.warn("renderCanvasLive rejected:", err instanceof Error ? err.message : err);
-      updateCanvas({ status: "ready", scope: null, error: null });
+    .catch((error: unknown) => {
+      if (gen !== view.renderGeneration) {
+        return;
+      }
+      console.warn("renderCanvasLive rejected:", error instanceof Error ? error.message : error);
+      updateCanvas({ error: null, scope: null, status: "ready" });
       canvas.innerHTML = "";
       renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
       try {
         registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (e) {
-        console.warn("registerPanelDnD failed:", (e as Error).message);
+      } catch (error) {
+        console.warn("registerPanelDnD failed:", errorMessage(error));
       }
       registerPanelEvents(panel as unknown as CanvasPanel);
       renderOverlays();
@@ -668,7 +701,9 @@ function applyDiffHighlightToCanvas(
   canvas: HTMLElement,
   diffMap: Map<string, "added" | "removed" | "modified">,
 ) {
-  if (!diffMap || diffMap.size === 0) return;
+  if (!diffMap || diffMap.size === 0) {
+    return;
+  }
 
   // Walk all elements in canvas and check their data attributes or other markers
   const walkCanvas = (el: HTMLElement, /** @type {string} */ path = "") => {
@@ -676,9 +711,13 @@ function applyDiffHighlightToCanvas(
 
     if (diffMap.has(pathKey)) {
       const status = diffMap.get(pathKey);
-      if (status === "added") el.classList.add("element-diff-added");
-      else if (status === "removed") el.classList.add("element-diff-removed");
-      else if (status === "modified") el.classList.add("element-diff-modified");
+      if (status === "added") {
+        el.classList.add("element-diff-added");
+      } else if (status === "removed") {
+        el.classList.add("element-diff-removed");
+      } else if (status === "modified") {
+        el.classList.add("element-diff-modified");
+      }
     }
 
     // Check for child elements (heuristic: children array markers)
@@ -703,14 +742,20 @@ function applyDiffHighlightToCanvas(
  * @param {Set<string>} activeBreakpoints
  */
 function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: Set<string>) {
-  if (!activeBreakpoints.size) return;
+  if (activeBreakpoints.size === 0) {
+    return;
+  }
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   const docMedia = getEffectiveMedia(tab.doc.document.$media || {});
   // Build a set of CSS condition texts that match active breakpoints
   const activeConditions = new Set<string>();
   for (const name of activeBreakpoints) {
-    if (docMedia[name]) activeConditions.add(docMedia[name]);
+    if (docMedia[name]) {
+      activeConditions.add(docMedia[name]);
+    }
   }
   const overrides = collectMediaOverrides(document.styleSheets, activeConditions);
   applyOverridesToCanvas(canvasEl, overrides);

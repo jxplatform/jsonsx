@@ -32,7 +32,9 @@ export async function compileServer(
   const { baseUrl = "/_jx/server" } = opts;
   const doc = (await $RefParser.dereference(sourcePath)) as JxElement;
   const entries = collectServerEntries(doc);
-  if (entries.length === 0) return null;
+  if (entries.length === 0) {
+    return null;
+  }
 
   const imports = entries
     .map(({ exportName, src }) => `import { ${exportName} } from '${src}'`)
@@ -73,7 +75,9 @@ export function compileSiteServer(
   } = {},
 ) {
   const { baseUrl = "/_jx/server", adapter = null } = opts;
-  if (entries.length === 0 && !adapter) return null;
+  if (entries.length === 0 && !adapter) {
+    return null;
+  }
 
   const imports = entries
     .map(({ exportName, src }) => `import { ${exportName} } from '${src}'`)
@@ -82,7 +86,7 @@ export function compileSiteServer(
   const routes = entries.map(({ exportName }) => buildRoute(exportName, baseUrl)).join("\n");
 
   // Workers static assets and Pages advanced mode (_worker.js) both route every request
-  // through the worker — unmatched paths must fall through to the ASSETS binding.
+  // Through the worker — unmatched paths must fall through to the ASSETS binding.
   const adapterBlock =
     adapter === "cloudflare-workers" || adapter === "cloudflare-pages"
       ? "\napp.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))\n"

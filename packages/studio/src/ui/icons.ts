@@ -1,4 +1,4 @@
-// packages/studio/icons.js
+// Packages/studio/icons.js
 // Icon templates for style sidebar button groups.
 // Uses Spectrum workflow icons where available; custom SVGs for flex-specific concepts.
 

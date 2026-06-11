@@ -1,14 +1,14 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { render } from "lit-html";
 import { html } from "lit-html";
 import {
-  getFieldValue,
-  setDraft,
   clearDraft,
   commitField,
-  scheduleDraftCommit,
+  getFieldValue,
   hasDraft,
+  scheduleDraftCommit,
+  setDraft,
   spTextField,
 } from "../src/ui/field-input";
 
@@ -41,7 +41,7 @@ describe("field-input draft store", () => {
     let calls = 0;
     setDraft("k4", "x");
     clearDraft("k4");
-    commitField("k4", () => calls++); // no draft → nothing to commit
+    commitField("k4", () => calls++); // No draft → nothing to commit
     expect(calls).toBe(0);
   });
 });
@@ -51,11 +51,11 @@ describe("draft commit semantics", () => {
     let committed: string | null = null;
     setDraft("d1", "ab");
     scheduleDraftCommit("d1", 20, (v) => (committed = v));
-    setDraft("d1", "abc"); // keep typing before the debounce fires
+    setDraft("d1", "abc"); // Keep typing before the debounce fires
     scheduleDraftCommit("d1", 20, (v) => (committed = v));
-    expect(committed).toBe(null); // nothing committed synchronously
+    expect(committed).toBe(null); // Nothing committed synchronously
     await new Promise((r) => setTimeout(r, 45));
-    expect(committed as string | null).toBe("abc"); // latest value, not the earlier "ab"
+    expect(committed as string | null).toBe("abc"); // Latest value, not the earlier "ab"
     // Draft is kept after a debounced commit so the field stays controlled while focused.
     expect(getFieldValue("d1", "doc")).toBe("abc");
     clearDraft("d1");
@@ -68,7 +68,7 @@ describe("draft commit semantics", () => {
     setDraft("d2", "two");
     scheduleDraftCommit("d2", 15, () => calls++);
     await new Promise((r) => setTimeout(r, 40));
-    expect(calls).toBe(1); // only the latest timer fires
+    expect(calls).toBe(1); // Only the latest timer fires
     clearDraft("d2");
   });
 
@@ -84,7 +84,7 @@ describe("draft commit semantics", () => {
     expect(committed as string | null).toBe("typed");
     expect(hasDraft("d3")).toBe(false);
     await new Promise((r) => setTimeout(r, 80));
-    expect(calls).toBe(1); // the debounce timer was cancelled by commitField
+    expect(calls).toBe(1); // The debounce timer was cancelled by commitField
   });
 });
 
@@ -95,7 +95,7 @@ describe("spTextField widget render", () => {
     render(html`<div>${spTextField("r1", "committed", () => {})}</div>`, container);
     const el = container.querySelector("sp-textfield");
     expect(el).toBeTruthy();
-    // live() binds the draft value as the property.
+    // Live() binds the draft value as the property.
     expect((el as unknown as { value?: string }).value).toBe("draftval");
     clearDraft("r1");
   });

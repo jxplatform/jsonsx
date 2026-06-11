@@ -1,16 +1,16 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
-  isEditableBlock,
-  isInlineInContext,
-  isInlineElement,
+  getActiveElement,
   getInlineActions,
+  isEditableBlock,
+  isEditing,
+  isInlineElement,
+  isInlineInContext,
   normalizeChildren,
   startEditing,
   stopEditing,
-  isEditing,
-  getActiveElement,
 } from "../src/editor/inline-edit";
 
 // ─── Pure function tests ─────────────────────────────────────────────────────
@@ -62,10 +62,10 @@ describe("isInlineInContext", () => {
   });
 
   test("uses $inlineChildren from elements-meta for parent context", () => {
-    // p allows inline children like em, strong, a, span
+    // P allows inline children like em, strong, a, span
     expect(isInlineInContext("em", "p")).toBe(true);
     expect(isInlineInContext("strong", "p")).toBe(true);
-    // p does not allow block children
+    // P does not allow block children
     expect(isInlineInContext("div", "p")).toBe(false);
   });
 
@@ -104,7 +104,7 @@ describe("getInlineActions", () => {
   });
 
   test("returns null for tags without $inlineActions", () => {
-    // div has no $inlineActions in elements-meta
+    // Div has no $inlineActions in elements-meta
     expect(getInlineActions("div")).toBeNull();
   });
 
@@ -126,11 +126,13 @@ describe("Editing lifecycle", () => {
   beforeEach(() => {
     el = document.createElement("p");
     el.textContent = "test content";
-    document.body.appendChild(el);
+    document.body.append(el);
   });
 
   afterEach(() => {
-    if (isEditing()) stopEditing();
+    if (isEditing()) {
+      stopEditing();
+    }
     el.remove();
   });
 
@@ -142,9 +144,9 @@ describe("Editing lifecycle", () => {
   test("startEditing enables contentEditable and marks as editing", () => {
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
     expect(isEditing()).toBe(true);
@@ -155,9 +157,9 @@ describe("Editing lifecycle", () => {
   test("stopEditing resets element and marks as not editing", () => {
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
     stopEditing();
@@ -171,9 +173,9 @@ describe("Editing lifecycle", () => {
     let endCalled = false;
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => (endCalled = true),
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
     stopEditing();
@@ -184,9 +186,9 @@ describe("Editing lifecycle", () => {
     let commitPath: any = null;
     startEditing(el, path, {
       onCommit: (p: any) => (commitPath = p),
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
     stopEditing();
@@ -197,23 +199,23 @@ describe("Editing lifecycle", () => {
     let endCount = 0;
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => endCount++,
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
     const el2 = document.createElement("p");
     el2.textContent = "second";
-    document.body.appendChild(el2);
+    document.body.append(el2);
 
     startEditing(el2, ["children", 1], {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
-    expect(endCount).toBe(1); // first editing's onEnd was called
+    expect(endCount).toBe(1); // First editing's onEnd was called
     expect(getActiveElement()).toBe(el2);
     expect(el.contentEditable).toBe("false");
 
@@ -230,29 +232,33 @@ describe("Keyboard event propagation", () => {
   beforeEach(() => {
     el = document.createElement("p");
     el.textContent = "test";
-    document.body.appendChild(el);
+    document.body.append(el);
   });
 
   afterEach(() => {
-    if (isEditing()) stopEditing();
+    if (isEditing()) {
+      stopEditing();
+    }
     el.remove();
   });
 
   test("Enter on editing element does not propagate to document", () => {
     let documentGotEnter = false;
     const docHandler = (e: KeyboardEvent) => {
-      if (e.key === "Enter") documentGotEnter = true;
+      if (e.key === "Enter") {
+        documentGotEnter = true;
+      }
     };
     document.addEventListener("keydown", docHandler);
 
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
     expect(documentGotEnter).toBe(false);
 
     document.removeEventListener("keydown", docHandler);
@@ -261,18 +267,20 @@ describe("Keyboard event propagation", () => {
   test("Escape on editing element does not propagate to document", () => {
     let documentGotEscape = false;
     const docHandler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") documentGotEscape = true;
+      if (e.key === "Escape") {
+        documentGotEscape = true;
+      }
     };
     document.addEventListener("keydown", docHandler);
 
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
     expect(documentGotEscape).toBe(false);
 
     document.removeEventListener("keydown", docHandler);
@@ -281,12 +289,12 @@ describe("Keyboard event propagation", () => {
   test("Escape stops editing", () => {
     startEditing(el, path, {
       onCommit: () => {},
-      onSplit: () => {},
-      onInsert: () => {},
       onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
     });
 
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
     expect(isEditing()).toBe(false);
   });
 });

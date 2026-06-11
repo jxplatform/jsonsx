@@ -1,35 +1,35 @@
 export const expressionPointerSchema = {
+  additionalProperties: false,
   description: "A JSON Pointer $ref operand within an expression node.",
-  type: "object",
   properties: {
     $ref: {
-      type: "string",
       pattern: "^(\\$map/|\\$reduce/|event#/|#/|parent#/|window#/|document#/)",
+      type: "string",
     },
   },
   required: ["$ref"],
-  additionalProperties: false,
+  type: "object",
 } as const;
 
 export const expressionLiteralSchema = {
-  description: "A non-reactive operand: scalar or array of operands.",
   anyOf: [
-    { type: "string", not: { pattern: "\\$\\{" } },
+    { not: { pattern: "\\$\\{" }, type: "string" },
     { type: "number" },
     { type: "boolean" },
     { type: "null" },
-    { type: "array", items: { $ref: "#/$defs/ExpressionOperand" } },
+    { items: { $ref: "#/$defs/ExpressionOperand" }, type: "array" },
   ],
+  description: "A non-reactive operand: scalar or array of operands.",
 } as const;
 
 export const expressionOperandSchema = {
-  description:
-    "Anything that may appear in target or value: a pointer, a literal, or a nested expression node.",
   anyOf: [
     { $ref: "#/$defs/ExpressionPointer" },
     { $ref: "#/$defs/ExpressionNode" },
     { $ref: "#/$defs/ExpressionLiteral" },
   ],
+  description:
+    "Anything that may appear in target or value: a pointer, a literal, or a nested expression node.",
 } as const;
 
 export const unaryOperatorSchema = { enum: ["!", "-"] } as const;
@@ -44,97 +44,97 @@ export const reduceMethodSchema = { const: "reduce" } as const;
 export const mapFilterMethodSchema = { enum: ["map", "filter"] } as const;
 
 export const expressionNodeSchema = {
-  description: "The core expression node. operator + target, with value gated by arity.",
-  type: "object",
-  required: ["operator", "target"],
   additionalProperties: false,
-  properties: {
-    operator: { type: "string" },
-    target: { $ref: "#/$defs/ExpressionOperand" },
-    value: { $ref: "#/$defs/ExpressionOperand" },
-    initial: { $ref: "#/$defs/ExpressionOperand" },
-  },
+  description: "The core expression node. operator + target, with value gated by arity.",
   oneOf: [
     {
-      title: "Unary — target only, no value",
+      not: { anyOf: [{ required: ["value"] }, { required: ["initial"] }] },
       properties: { operator: { $ref: "#/$defs/UnaryOperator" } },
       required: ["operator"],
-      not: { anyOf: [{ required: ["value"] }, { required: ["initial"] }] },
+      title: "Unary — target only, no value",
     },
     {
-      title: "Binary — left in target, right in value",
+      not: { required: ["initial"] },
       properties: { operator: { $ref: "#/$defs/BinaryOperator" } },
       required: ["operator", "value"],
-      not: { required: ["initial"] },
+      title: "Binary — left in target, right in value",
     },
     {
-      title: "Assignment — writable target, value required",
+      not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/AssignmentOperator" },
         target: { $ref: "#/$defs/ExpressionPointer" },
       },
       required: ["operator", "value"],
-      not: { required: ["initial"] },
+      title: "Assignment — writable target, value required",
     },
     {
-      title: "pop / shift — array receiver, no value",
+      not: { anyOf: [{ required: ["value"] }, { required: ["initial"] }] },
       properties: {
         operator: { $ref: "#/$defs/NoArgMethod" },
         target: { $ref: "#/$defs/ExpressionPointer" },
       },
       required: ["operator"],
-      not: { anyOf: [{ required: ["value"] }, { required: ["initial"] }] },
+      title: "pop / shift — array receiver, no value",
     },
     {
-      title: "push / unshift — array receiver, single value argument",
+      not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/OneArgMethod" },
         target: { $ref: "#/$defs/ExpressionPointer" },
       },
       required: ["operator", "value"],
-      not: { required: ["initial"] },
+      title: "push / unshift — array receiver, single value argument",
     },
     {
-      title: "splice — array receiver, [start, deleteCount, ...items]",
+      not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/SpliceMethod" },
         target: { $ref: "#/$defs/ExpressionPointer" },
-        value: { type: "array", items: { $ref: "#/$defs/ExpressionOperand" }, minItems: 1 },
+        value: { items: { $ref: "#/$defs/ExpressionOperand" }, minItems: 1, type: "array" },
       },
       required: ["operator", "value"],
-      not: { required: ["initial"] },
+      title: "splice — array receiver, [start, deleteCount, ...items]",
     },
     {
-      title: "reduce — pure fold; per-item expression in value, seed in initial",
       properties: {
         operator: { $ref: "#/$defs/ReduceMethod" },
         target: { $ref: "#/$defs/ExpressionPointer" },
         value: { $ref: "#/$defs/ExpressionNode" },
       },
       required: ["operator", "value", "initial"],
+      title: "reduce — pure fold; per-item expression in value, seed in initial",
     },
     {
-      title: "map / filter — pure; per-item expression in value, no initial",
+      not: { required: ["initial"] },
       properties: {
         operator: { $ref: "#/$defs/MapFilterMethod" },
         target: { $ref: "#/$defs/ExpressionPointer" },
         value: { $ref: "#/$defs/ExpressionNode" },
       },
       required: ["operator", "value"],
-      not: { required: ["initial"] },
+      title: "map / filter — pure; per-item expression in value, no initial",
     },
   ],
+  properties: {
+    initial: { $ref: "#/$defs/ExpressionOperand" },
+    operator: { type: "string" },
+    target: { $ref: "#/$defs/ExpressionOperand" },
+    value: { $ref: "#/$defs/ExpressionOperand" },
+  },
+  required: ["operator", "target"],
+  type: "object",
 } as const;
 
 export const expressionEntrySchema = {
+  additionalProperties: false,
   description:
     "A declarative expression entry (Shape 5). Used as a state entry or inline event handler.",
-  type: "object",
-  required: ["$expression"],
   properties: {
+    $description: { type: "string" },
     $expression: { $ref: "#/$defs/ExpressionNode" },
     $title: { type: "string" },
-    $description: { type: "string" },
   },
-  additionalProperties: false,
+  required: ["$expression"],
+  type: "object",
 } as const;

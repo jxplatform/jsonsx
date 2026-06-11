@@ -24,34 +24,48 @@ export function computeInheritedStyle(
   activeTab: string | null,
   activeSelector: string | null = null,
 ) {
-  if (activeTab === null || mediaNames.length === 0) return {};
+  if (activeTab === null || mediaNames.length === 0) {
+    return {};
+  }
 
-  let inherited: Record<string, string | number> = {};
+  const inherited: Record<string, string | number> = {};
 
   if (!activeSelector) {
     // Start with base flat props
     for (const [p, v] of Object.entries(style)) {
-      if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
+      if (typeof v !== "object") {
+        inherited[p] = (v as string | number) ?? "";
+      }
     }
     // Layer each media block in order until current tab
     for (const name of mediaNames) {
-      if (name === activeTab) break;
+      if (name === activeTab) {
+        break;
+      }
       const block = (style[`@${name}`] || {}) as JxStyle;
       for (const [p, v] of Object.entries(block)) {
-        if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
+        if (typeof v !== "object") {
+          inherited[p] = (v as string | number) ?? "";
+        }
       }
     }
   } else {
     // Selector inheritance: base selector → each media's selector block in order
     const baseSel = (style[activeSelector] || {}) as JxStyle;
     for (const [p, v] of Object.entries(baseSel)) {
-      if (typeof v !== "object") inherited[p] = (v as string | number) ?? "";
+      if (typeof v !== "object") {
+        inherited[p] = (v as string | number) ?? "";
+      }
     }
     for (const name of mediaNames) {
-      if (name === activeTab) break;
+      if (name === activeTab) {
+        break;
+      }
       const selBlock = ((style[`@${name}`] || {}) as Record<string, unknown>)[activeSelector] || {};
       for (const [p, v] of Object.entries(selBlock)) {
-        if (typeof v !== "object") inherited[p] = v ?? "";
+        if (typeof v !== "object") {
+          inherited[p] = v ?? "";
+        }
       }
     }
   }

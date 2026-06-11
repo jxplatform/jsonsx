@@ -8,21 +8,22 @@
  */
 
 import { locateDocument } from "../services/code-services";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { statusMessage } from "../panels/statusbar";
 import { getPlatform } from "../platform";
 import { activeTab, openTab } from "../workspace/workspace";
 import { isEditing, stopEditing } from "../editor/inline-edit";
 import {
-  loadFormats,
-  getFormats,
-  formatForPath,
+  defaultContentFormat,
   formatByName,
+  formatForPath,
   formatParse,
   formatSerialize,
-  defaultContentFormat,
+  getFormats,
+  loadFormats,
   splitFormatDocument,
-  type StudioFormat,
 } from "../format/format-host";
+import type { StudioFormat } from "../format/format-host";
 
 /**
  * Parse a format-class source string into document + frontmatter + mode per the format's
@@ -64,14 +65,14 @@ export async function openFile() {
     const formats = getFormats();
     const pickerTypes = [
       {
-        description: "Jx Component",
         accept: { "application/json": [".json"] },
+        description: "Jx Component",
       },
       ...formats
         .filter((f) => f.capabilities.parse)
         .map((f) => ({
-          description: f.name,
           accept: { [f.mediaType ?? "text/plain"]: f.extensions },
+          description: f.name,
         })),
     ];
     const acceptExts = [".json", ...formats.flatMap((f) => f.extensions)].join(",");
@@ -86,16 +87,16 @@ export async function openFile() {
       if (format) {
         const { document, frontmatter } = await parseFormatSource(format, text);
         openTab({
-          id: name,
+          document,
           documentPath,
           fileHandle: handle,
-          document,
           frontmatter,
+          id: name,
           sourceFormat: format.name,
         });
       } else {
         const document = JSON.parse(text);
-        openTab({ id: name, documentPath, fileHandle: handle, document });
+        openTab({ document, documentPath, fileHandle: handle, id: name });
       }
       statusMessage(`Opened ${name}`);
     };
@@ -113,21 +114,29 @@ export async function openFile() {
       input.accept = acceptExts;
       input.onchange = async () => {
         const file = input.files?.[0];
-        if (!file) return;
+        if (!file) {
+          return;
+        }
         await handleSource(file.name, await file.text());
       };
       input.click();
     }
-  } catch (e) {
-    if ((e as Error).name !== "AbortError") statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      statusMessage(`Error: ${errorMessage(error)}`);
+    }
   }
 }
 
 /** Save the current document back to its source location. */
 export async function saveFile() {
-  if (isEditing()) stopEditing();
+  if (isEditing()) {
+    stopEditing();
+  }
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   try {
     const output = await serializeDocument(tab);
 
@@ -153,8 +162,10 @@ export async function saveFile() {
     } else {
       statusMessage("No save target — use Export");
     }
-  } catch (e) {
-    if ((e as Error).name !== "AbortError") statusMessage(`Save error: ${(e as Error).message}`);
+  } catch (error) {
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      statusMessage(`Save error: ${errorMessage(error)}`);
+    }
   }
 }
 
@@ -169,7 +180,9 @@ function tabFormat(tab: import("../tabs/tab.js").Tab): StudioFormat | undefined 
 /** Export the current document to a new location (Save As / download). */
 export async function exportFile() {
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   try {
     await loadFormats();
     const format = tabFormat(tab);
@@ -185,7 +198,7 @@ export async function exportFile() {
         window as unknown as { showSaveFilePicker: Function }
       ).showSaveFilePicker({
         suggestedName,
-        types: [{ description, accept: { [mimeType]: [ext] } }],
+        types: [{ accept: { [mimeType]: [ext] }, description }],
       });
       const writable = await handle.createWritable();
       await writable.write(output);
@@ -204,8 +217,10 @@ export async function exportFile() {
       tab.doc.dirty = false;
       statusMessage("Downloaded");
     }
-  } catch (e) {
-    if ((e as Error).name !== "AbortError") statusMessage(`Export error: ${(e as Error).message}`);
+  } catch (error) {
+    if (!(error instanceof Error && error.name === "AbortError")) {
+      statusMessage(`Export error: ${errorMessage(error)}`);
+    }
   }
 }
 
@@ -232,8 +247,8 @@ export async function serializeDocument(tab: import("../tabs/tab.js").Tab): Prom
       const hasFrontmatter = Object.keys(fm).length > 0;
       const fullDoc = { ...fm, ...tab.doc.document };
       return formatSerialize(format.name, fullDoc, {
-        mode: "roundtrip",
         frontmatter: hasFrontmatter,
+        mode: "roundtrip",
       });
     }
   }

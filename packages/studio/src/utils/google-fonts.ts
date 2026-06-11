@@ -45,8 +45,10 @@ export function isGoogleFontPreconnect(entry: JxHeadEntry) {
  */
 export function extractFontFamily(href: string) {
   const match = href.match(/family=([^&:]+)/);
-  if (!match) return "";
-  return decodeURIComponent(match[1].replace(/\+/g, " "));
+  if (!match) {
+    return "";
+  }
+  return decodeURIComponent(match[1].replaceAll("+", " "));
 }
 
 /**
@@ -56,7 +58,7 @@ export function extractFontFamily(href: string) {
  * @returns {string}
  */
 export function buildGoogleFontUrl(family: string) {
-  return `${GFONTS_CSS_PREFIX}family=${encodeURIComponent(family).replace(/%20/g, "+")}&display=swap`;
+  return `${GFONTS_CSS_PREFIX}family=${encodeURIComponent(family).replaceAll("%20", "+")}&display=swap`;
 }
 
 /**
@@ -74,11 +76,13 @@ export function ensureGoogleFontPreconnects(head: JxHeadEntry[]) {
     );
     if (!exists) {
       const attrs: Record<string, string | boolean> = {
-        rel: "preconnect",
         href: origin,
+        rel: "preconnect",
       };
-      if (origin === "https://fonts.gstatic.com") attrs.crossorigin = "";
-      head.push({ tagName: "link", attributes: attrs });
+      if (origin === "https://fonts.gstatic.com") {
+        attrs.crossorigin = "";
+      }
+      head.push({ attributes: attrs, tagName: "link" });
     }
   }
 }

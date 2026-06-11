@@ -9,7 +9,7 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { classMap } from "lit-html/directives/class-map.js";
-import { debouncedStyleCommit, cancelStyleDebounce } from "../store";
+import { cancelStyleDebounce, debouncedStyleCommit } from "../store";
 
 export const UNIT_RE = /^(-?[\d.]+)(px|rem|em|%|vw|vh|svw|svh|dvh|ms|s|fr|ch|ex|deg)?$/;
 
@@ -39,12 +39,16 @@ export function renderUnitSelector(
 
   const currentUnit = isKeyword ? units[0] || "" : match ? match[2] || "" : units[0] || "";
   let displayValue;
-  if (isKeyword) displayValue = strVal;
-  else if (match) displayValue = match[1];
-  else if (strVal !== "") {
-    const num = parseFloat(strVal);
+  if (isKeyword) {
+    displayValue = strVal;
+  } else if (match) {
+    displayValue = match[1];
+  } else if (strVal !== "") {
+    const num = Number.parseFloat(strVal);
     displayValue = isNaN(num) ? strVal : String(num);
-  } else displayValue = "";
+  } else {
+    displayValue = "";
+  }
 
   // Parse placeholder so inherited values display as "500" not "500px"
   const placeholderMatch = placeholder.match(UNIT_RE);
@@ -60,8 +64,11 @@ export function renderUnitSelector(
       onChange("");
       return;
     }
-    if (isNumericVal(val)) onChange(units.length > 0 ? val + currentUnit : val);
-    else onChange(val);
+    if (isNumericVal(val)) {
+      onChange(units.length > 0 ? val + currentUnit : val);
+    } else {
+      onChange(val);
+    }
   };
 
   return html`
@@ -100,7 +107,9 @@ export function renderUnitSelector(
                       } else if (units.includes(chosen)) {
                         const curMatch = String(value ?? "").match(UNIT_RE);
                         const numPart = curMatch ? curMatch[1] : "";
-                        if (numPart) onChange(numPart + chosen);
+                        if (numPart) {
+                          onChange(numPart + chosen);
+                        }
                       }
                     }}
                   >

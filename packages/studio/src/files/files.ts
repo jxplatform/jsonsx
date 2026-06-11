@@ -8,10 +8,11 @@
  */
 
 import { html, nothing } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ref } from "lit-html/directives/ref.js";
-import { renderPopover, showDialog, showConfirmDialog } from "../ui/layers";
-import { createState, projectState, setProjectState, requireProjectState } from "../store";
+import { renderPopover, showConfirmDialog, showDialog } from "../ui/layers";
+import { createState, projectState, requireProjectState, setProjectState } from "../store";
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 import { loadComponentRegistry } from "./components";
@@ -22,19 +23,19 @@ import {
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import {
-  workspace,
-  openTab,
   activateTab,
+  activeTab,
+  openTab,
   renameTab,
   replaceAllTabs,
-  activeTab,
+  workspace,
 } from "../workspace/workspace";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
 import {
+  documentExtensions,
+  formatForPath,
   loadFormats,
   refreshFormats,
-  formatForPath,
-  documentExtensions,
 } from "../format/format-host";
 import { view } from "../view";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
@@ -42,18 +43,20 @@ import { addRecentProject, trackRecentFile } from "../recent-projects";
 // ─── File icon map ────────────────────────────────────────────────────────────
 
 const fileIconMap = {
-  "sp-icon-folder-open": html`<sp-icon-folder-open></sp-icon-folder-open>`,
-  "sp-icon-folder": html`<sp-icon-folder></sp-icon-folder>`,
+  "sp-icon-document": html`<sp-icon-document></sp-icon-document>`,
   "sp-icon-file-code": html`<sp-icon-file-code></sp-icon-file-code>`,
   "sp-icon-file-txt": html`<sp-icon-file-txt></sp-icon-file-txt>`,
+  "sp-icon-folder": html`<sp-icon-folder></sp-icon-folder>`,
+  "sp-icon-folder-open": html`<sp-icon-folder-open></sp-icon-folder-open>`,
   "sp-icon-image": html`<sp-icon-image></sp-icon-image>`,
-  "sp-icon-document": html`<sp-icon-document></sp-icon-document>`,
 } as Record<string, import("lit-html").TemplateResult>;
 
 // ─── File management ──────────────────────────────────────────────────────────
 
 export async function loadDirectory(dirPath: string) {
-  if (!projectState) return;
+  if (!projectState) {
+    return;
+  }
   try {
     const platform = getPlatform();
     const entries = await platform.listDirectory(dirPath);
@@ -68,23 +71,25 @@ export async function loadProject() {
   try {
     const platform = getPlatform();
     const result = await platform.probeRootProject();
-    if (!result) return;
+    if (!result) {
+      return;
+    }
     const { meta, info } = result;
 
     refreshFormats();
     void loadFormats();
 
     setProjectState({
-      root: meta.root,
-      name: info.isSiteProject ? info.projectConfig?.name || meta.name : meta.name,
-      projectRoot: ".",
-      isSiteProject: info.isSiteProject,
-      projectConfig: (info.isSiteProject ? info.projectConfig : null) || null,
-      projectDirs: info.directories || [],
       dirs: new Map(),
       expanded: new Set(),
-      selectedPath: null,
+      isSiteProject: info.isSiteProject,
+      name: info.isSiteProject ? info.projectConfig?.name || meta.name : meta.name,
+      projectConfig: (info.isSiteProject ? info.projectConfig : null) || null,
+      projectDirs: info.directories || [],
+      projectRoot: ".",
+      root: meta.root,
       searchQuery: "",
+      selectedPath: null,
     });
 
     if (info.isSiteProject) {
@@ -118,13 +123,15 @@ export async function openProject({
   try {
     const platform = getPlatform();
     const result = await platform.openProject();
-    if (!result) return; // User cancelled
+    if (!result) {
+      return;
+    } // User cancelled
 
     const { config, handle } = result;
 
     replaceAllTabs({
+      document: { children: [], tagName: "div" },
       id: "initial",
-      document: { tagName: "div", children: [] },
     });
 
     refreshFormats();
@@ -132,21 +139,21 @@ export async function openProject({
 
     setProjectState({
       .../** @type {ProjectState} */ projectState,
-      projectRoot: handle.root,
-      isSiteProject: true,
-      projectConfig: config,
-      name: config.name || handle.name,
       dirs: new Map(),
       expanded: new Set(),
-      selectedPath: null,
+      isSiteProject: true,
+      name: config.name || handle.name,
+      projectConfig: config,
+      projectRoot: handle.root,
       searchQuery: "",
+      selectedPath: null,
     });
 
     await loadDirectory(".");
     await loadComponentRegistry();
 
     // Auto-expand key directories and populate projectDirs for Browse view
-    const conventionalDirs = [
+    const conventionalDirs = new Set([
       "pages",
       "layouts",
       "components",
@@ -154,11 +161,11 @@ export async function openProject({
       "data",
       "public",
       "styles",
-    ];
+    ]);
     const entries = requireProjectState().dirs.get(".") || [];
     const foundDirs = [];
     for (const e of entries) {
-      if (e.type === "directory" && conventionalDirs.includes(e.name)) {
+      if (e.type === "directory" && conventionalDirs.has(e.name)) {
         foundDirs.push(e.name);
         requireProjectState().expanded.add(e.path || e.name);
         await loadDirectory(e.path || e.name);
@@ -173,8 +180,8 @@ export async function openProject({
     statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -203,30 +210,36 @@ function fileTypeIconTpl(name: string, type: string) {
   } else {
     const ext = name.split(".").pop()?.toLowerCase();
     switch (ext) {
-      case "json":
+      case "json": {
         tag = "sp-icon-file-code";
         break;
-      case "md":
+      }
+      case "md": {
         tag = "sp-icon-file-txt";
         break;
+      }
       case "js":
-      case "ts":
+      case "ts": {
         tag = "sp-icon-file-code";
         break;
-      case "css":
+      }
+      case "css": {
         tag = "sp-icon-file-code";
         break;
+      }
       case "png":
       case "jpg":
       case "jpeg":
       case "svg":
       case "webp":
-      case "gif":
+      case "gif": {
         tag = "sp-icon-image";
         break;
-      default:
+      }
+      default: {
         tag = "sp-icon-document";
         break;
+      }
     }
   }
   return fileIconMap[tag] || fileIconMap["sp-icon-document"];
@@ -287,7 +300,9 @@ export function renderFilesTemplate({
           @click=${async () => {
             requireProjectState().dirs.clear();
             await loadDirectory(".");
-            for (const dir of requireProjectState().expanded) await loadDirectory(dir);
+            for (const dir of requireProjectState().expanded) {
+              await loadDirectory(dir);
+            }
             renderLeftPanel();
           }}
         >
@@ -329,9 +344,13 @@ function renderTreeLevelTemplate(
     </div>`;
   }
 
-  const sorted = [...entries].sort((a, b) => {
-    if (a.type === "directory" && b.type !== "directory") return -1;
-    if (a.type !== "directory" && b.type === "directory") return 1;
+  const sorted = [...entries].toSorted((a, b) => {
+    if (a.type === "directory" && b.type !== "directory") {
+      return -1;
+    }
+    if (a.type !== "directory" && b.type === "directory") {
+      return 1;
+    }
     return a.name.localeCompare(b.name);
   });
 
@@ -358,10 +377,13 @@ function renderTreeLevelTemplate(
         @click=${async (e: MouseEvent) => {
           e.stopPropagation();
           if (isDir) {
-            if (isExpanded) requireProjectState().expanded.delete(entry.path);
-            else {
+            if (isExpanded) {
+              requireProjectState().expanded.delete(entry.path);
+            } else {
               requireProjectState().expanded.add(entry.path);
-              if (!requireProjectState().dirs.has(entry.path)) await loadDirectory(entry.path);
+              if (!requireProjectState().dirs.has(entry.path)) {
+                await loadDirectory(entry.path);
+              }
             }
             ctx.renderLeftPanel();
           } else {
@@ -375,7 +397,7 @@ function renderTreeLevelTemplate(
         }}
       >
         ${isDir
-          ? html`<span class="file-tree-toggle">${isExpanded ? "\u25bc" : "\u25b6"}</span>`
+          ? html`<span class="file-tree-toggle">${isExpanded ? "\u25BC" : "\u25B6"}</span>`
           : html`<span class="file-tree-toggle empty"> </span>`}
         <span class="file-tree-icon">${fileTypeIconTpl(entry.path, entry.type)}</span>
         <span class="file-tree-name">${entry.name}</span>
@@ -391,52 +413,69 @@ export function setupTreeKeyboard(tree: HTMLElement) {
   tree.addEventListener("keydown", (e: KeyboardEvent) => {
     const items = [...tree.querySelectorAll(".file-tree-item")] as HTMLElement[];
     const focused = tree.querySelector(".file-tree-item:focus") as HTMLElement | null;
-    if (!focused || items.length === 0) return;
+    if (!focused || items.length === 0) {
+      return;
+    }
 
     const idx = items.indexOf(focused);
     let handled = true;
 
     switch (e.key) {
-      case "ArrowDown":
-        if (idx < items.length - 1) items[idx + 1].focus();
+      case "ArrowDown": {
+        if (idx < items.length - 1) {
+          items[idx + 1].focus();
+        }
         break;
-      case "ArrowUp":
-        if (idx > 0) items[idx - 1].focus();
+      }
+      case "ArrowUp": {
+        if (idx > 0) {
+          items[idx - 1].focus();
+        }
         break;
-      case "ArrowRight":
+      }
+      case "ArrowRight": {
         if (focused.dataset.type === "directory") {
           const path = focused.dataset.path as string;
           if (!requireProjectState().expanded.has(path)) {
             requireProjectState().expanded.add(path);
             loadDirectory(path).then(() => {
               const panel = tree.closest(".panel-body");
-              if (panel)
+              if (panel) {
                 (panel.querySelector(".file-tree-item:focus") as HTMLElement | null)?.click();
+              }
             });
           }
         }
         break;
-      case "ArrowLeft":
+      }
+      case "ArrowLeft": {
         if (focused.dataset.type === "directory") {
           const path = focused.dataset.path as string;
           if (requireProjectState().expanded.has(path)) {
             requireProjectState().expanded.delete(path);
-            // renderLeftPanel will be called by the caller who sets up keyboard
+            // RenderLeftPanel will be called by the caller who sets up keyboard
           }
         }
         break;
-      case "Enter":
+      }
+      case "Enter": {
         focused.click();
         break;
-      default:
+      }
+      default: {
         handled = false;
+      }
     }
-    if (handled) e.preventDefault();
+    if (handled) {
+      e.preventDefault();
+    }
   });
 
   // Set first item focusable
   const first = tree.querySelector(".file-tree-item");
-  if (first) first.setAttribute("tabindex", "0");
+  if (first) {
+    first.setAttribute("tabindex", "0");
+  }
 }
 
 let _fileTreeDndCleanups: (() => void)[] = [];
@@ -448,25 +487,31 @@ let _fileTreeDndCleanups: (() => void)[] = [];
  */
 export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () => void }) {
   // Clean up previous registrations
-  for (const fn of _fileTreeDndCleanups) fn();
+  for (const fn of _fileTreeDndCleanups) {
+    fn();
+  }
   _fileTreeDndCleanups = [];
 
   requestAnimationFrame(() => {
     const tree = document.querySelector(".file-tree") as HTMLElement | null;
-    if (!tree) return;
+    if (!tree) {
+      return;
+    }
 
     const items = tree.querySelectorAll(".file-tree-item") as NodeListOf<HTMLElement>;
 
     items.forEach((row) => {
-      const path = row.dataset.path;
-      const type = row.dataset.type;
-      if (!path) return;
+      const { path } = row.dataset;
+      const { type } = row.dataset;
+      if (!path) {
+        return;
+      }
 
       const cleanups = [
         draggable({
           element: row,
           getInitialData() {
-            return { type: "file-tree", path, entryType: type };
+            return { entryType: type, path, type: "file-tree" };
           },
           onDragStart() {
             row.classList.add("dragging");
@@ -480,30 +525,40 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
       if (type === "directory") {
         cleanups.push(
           dropTargetForElements({
-            element: row,
             canDrop({ source }) {
-              if (source.data.type !== "file-tree") return false;
+              if (source.data.type !== "file-tree") {
+                return false;
+              }
               const srcPath = source.data.path as string;
-              if (srcPath === path) return false;
-              if (srcPath.startsWith(path + "/")) return false;
+              if (srcPath === path) {
+                return false;
+              }
+              if (srcPath.startsWith(`${path}/`)) {
+                return false;
+              }
               const srcParent = parentDir(srcPath);
-              if (srcParent === path) return false;
+              if (srcParent === path) {
+                return false;
+              }
               return true;
+            },
+            element: row,
+            getData() {
+              return { targetDir: path, type: "file-tree-target" };
+            },
+            onDrag() {
+              if (!row.classList.contains("drag-over")) {
+                row.classList.add("drag-over");
+              }
             },
             onDragEnter() {
               row.classList.add("drag-over");
-            },
-            onDrag() {
-              if (!row.classList.contains("drag-over")) row.classList.add("drag-over");
             },
             onDragLeave() {
               row.classList.remove("drag-over");
             },
             onDrop() {
               row.classList.remove("drag-over");
-            },
-            getData() {
-              return { type: "file-tree-target", targetDir: path };
             },
           }),
         );
@@ -514,11 +569,16 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
 
     // Root-level drop target (move to project root)
     const rootCleanup = dropTargetForElements({
-      element: tree,
       canDrop({ source }) {
-        if (source.data.type !== "file-tree") return false;
+        if (source.data.type !== "file-tree") {
+          return false;
+        }
         const srcPath = source.data.path as string;
         return parentDir(srcPath) !== ".";
+      },
+      element: tree,
+      getData() {
+        return { targetDir: ".", type: "file-tree-target" };
       },
       onDragEnter() {
         tree.classList.add("drag-over-root");
@@ -529,9 +589,6 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
       onDrop() {
         tree.classList.remove("drag-over-root");
       },
-      getData() {
-        return { type: "file-tree-target", targetDir: "." };
-      },
     });
     _fileTreeDndCleanups.push(rootCleanup);
 
@@ -539,16 +596,24 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
     const monitorCleanup = monitorForElements({
       onDrop({ source, location }) {
         const target = location.current.dropTargets[0];
-        if (!target) return;
-        if (source.data.type !== "file-tree") return;
-        if (target.data.type !== "file-tree-target") return;
+        if (!target) {
+          return;
+        }
+        if (source.data.type !== "file-tree") {
+          return;
+        }
+        if (target.data.type !== "file-tree-target") {
+          return;
+        }
 
         const srcPath = source.data.path as string;
         const targetDirPath = target.data.targetDir as string;
         const fileName = srcPath.split("/").pop();
         const newPath = targetDirPath === "." ? fileName : `${targetDirPath}/${fileName}`;
 
-        if (newPath === srcPath) return;
+        if (newPath === srcPath) {
+          return;
+        }
 
         moveFileEntry(srcPath, newPath!, renderLeftPanel);
       },
@@ -573,7 +638,7 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
     for (const [id] of workspace.tabs.entries()) {
       if (id === oldPath) {
         renameTab(oldPath, newPath, newPath);
-      } else if (id.startsWith(oldPath + "/")) {
+      } else if (id.startsWith(`${oldPath}/`)) {
         const newTabPath = newPath + id.slice(oldPath.length);
         renameTab(id, newTabPath, newTabPath);
       }
@@ -583,15 +648,19 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
     const oldParent = parentDir(oldPath);
     const newParent = parentDir(newPath);
     await loadDirectory(oldParent);
-    if (newParent !== oldParent) await loadDirectory(newParent);
+    if (newParent !== oldParent) {
+      await loadDirectory(newParent);
+    }
 
     // Auto-expand target directory
-    if (newParent !== ".") requireProjectState().expanded.add(newParent);
+    if (newParent !== ".") {
+      requireProjectState().expanded.add(newParent);
+    }
 
     renderLeftPanel();
     statusMessage(`Moved to ${newPath}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -626,23 +695,23 @@ function showFileContextMenu(
   const items = [];
 
   if (!isDir) {
-    items.push({ label: "Open", action: () => ctx.openFileFn(entry.path) });
+    items.push({ action: () => ctx.openFileFn(entry.path), label: "Open" });
   }
   if (isDir) {
     items.push({
-      label: "New File\u2026",
       action: () => createNewFile(entry.path, ctx.renderLeftPanel),
+      label: "New File\u2026",
     });
   }
   items.push({ label: "\u2014" });
   items.push({
-    label: "Rename\u2026",
     action: () => renameFile(entry, ctx.renderLeftPanel),
+    label: "Rename\u2026",
   });
   items.push({
-    label: "Delete",
     action: () => deleteFile(entry, ctx.renderLeftPanel),
     danger: true,
+    label: "Delete",
   });
 
   let x = e.clientX,
@@ -653,13 +722,18 @@ function showFileContextMenu(
       open
       style="position:fixed;z-index:10000;left:${x}px;top:${y}px"
       ${ref((el) => {
-        if (!el) return;
+        if (!el) {
+          return;
+        }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
           const menuRect = popover.getBoundingClientRect();
-          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-          if (y + menuRect.height > window.innerHeight)
+          if (x + menuRect.width > window.innerWidth) {
+            x = window.innerWidth - menuRect.width - 4;
+          }
+          if (y + menuRect.height > window.innerHeight) {
             y = window.innerHeight - menuRect.height - 4;
+          }
           popover.style.left = `${x}px`;
           popover.style.top = `${y}px`;
         });
@@ -693,7 +767,9 @@ function showFileContextMenu(
 
 async function createNewFile(dirPath = ".", renderLeftPanel: () => void) {
   const name = prompt("File name:", "untitled.json");
-  if (!name) return;
+  if (!name) {
+    return;
+  }
   const path = dirPath === "." ? name : `${dirPath}/${name}`;
   await loadFormats();
   const format = formatForPath(name);
@@ -701,15 +777,15 @@ async function createNewFile(dirPath = ".", renderLeftPanel: () => void) {
     format?.studio?.newFileTemplate ??
     (format
       ? ""
-      : JSON.stringify({ tagName: "div", children: [{ tagName: "p", children: [] }] }, null, 2));
+      : JSON.stringify({ children: [{ children: [], tagName: "p" }], tagName: "div" }, null, 2));
   try {
     const platform = getPlatform();
     await platform.writeFile(path, content);
     await loadDirectory(dirPath);
     renderLeftPanel();
     statusMessage(`Created ${path}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -719,7 +795,9 @@ function showRenameFileDialog(currentName: string): Promise<string | null> {
   return showDialog<string | null>((done) => {
     function confirm() {
       const trimmed = value.trim();
-      if (!trimmed) return;
+      if (!trimmed) {
+        return;
+      }
       done(trimmed);
     }
     const tpl = html`
@@ -741,18 +819,22 @@ function showRenameFileDialog(currentName: string): Promise<string | null> {
             value = (e.target as HTMLInputElement).value || "";
           }}
           @keydown=${(e: KeyboardEvent) => {
-            if (e.key === "Enter") confirm();
+            if (e.key === "Enter") {
+              confirm();
+            }
           }}
         ></sp-textfield>
       </sp-dialog-wrapper>
     `;
     requestAnimationFrame(() => {
-      const layer = document.getElementById("layer-dialog");
+      const layer = document.querySelector("#layer-dialog");
       const tf = layer?.querySelector("sp-textfield") as HTMLElement | null;
       if (tf) {
         tf.focus();
         const input = tf.shadowRoot?.querySelector("input");
-        if (input) input.select();
+        if (input) {
+          input.select();
+        }
       }
     });
     return tpl;
@@ -764,7 +846,9 @@ async function renameFile(
   renderLeftPanel: () => void,
 ) {
   const newName = await showRenameFileDialog(entry.name);
-  if (!newName || newName === entry.name) return;
+  if (!newName || newName === entry.name) {
+    return;
+  }
   const entryPath = entry.path.replaceAll("\\", "/");
   const parentDir = entryPath.includes("/")
     ? entryPath.substring(0, entryPath.lastIndexOf("/"))
@@ -782,8 +866,8 @@ async function renameFile(
     }
     renderLeftPanel();
     statusMessage(`Renamed to ${newName}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -795,7 +879,9 @@ async function deleteFile(
     confirmLabel: "Delete",
     destructive: true,
   });
-  if (!confirmed) return;
+  if (!confirmed) {
+    return;
+  }
   try {
     const platform = getPlatform();
     await platform.deleteFile(entry.path);
@@ -807,8 +893,8 @@ async function deleteFile(
     }
     renderLeftPanel();
     statusMessage(`Deleted ${entry.name}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -841,23 +927,25 @@ export async function openFileFromTree(
     try {
       const tabLike = {
         doc: {
-          sourceFormat: formatForPath(ctx.S.documentPath)?.name ?? null,
-          mode: ctx.S.mode,
           content: ctx.S.content,
           document: ctx.S.document,
+          mode: ctx.S.mode,
+          sourceFormat: formatForPath(ctx.S.documentPath)?.name ?? null,
         },
       } as unknown as import("../tabs/tab.js").Tab;
       const output = await serializeDocument(tabLike);
       await platform.writeFile(ctx.S.documentPath, output);
-    } catch (e) {
-      statusMessage(`Save error: ${(e as Error).message}`);
+    } catch (error) {
+      statusMessage(`Save error: ${errorMessage(error)}`);
     }
   }
 
   // Fetch the file
   try {
     const content = await platform.readFile(path);
-    if (!content) return;
+    if (!content) {
+      return;
+    }
 
     if (formatForPath(path)) {
       await ctx.loadMarkdown(content, null);
@@ -877,8 +965,8 @@ export async function openFileFromTree(
 
     ctx.render();
     statusMessage(`Opened ${path}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -899,15 +987,17 @@ export async function openFileInTab(path: string) {
   const platform = getPlatform();
   try {
     const content = await platform.readFile(path);
-    if (!content) return;
+    if (!content) {
+      return;
+    }
 
     await loadFormats();
     let document, frontmatter;
     const format = formatForPath(path);
     if (format) {
       const result = await parseSourceForPath(path, content);
-      document = result.document;
-      frontmatter = result.frontmatter;
+      ({ document } = result);
+      ({ frontmatter } = result);
     } else {
       document = JSON.parse(content);
     }
@@ -921,16 +1011,18 @@ export async function openFileInTab(path: string) {
       sourceFormat: format?.name ?? null,
     });
     requireProjectState().selectedPath = path;
-    trackRecentFile({ path, name: path.split("/").pop() || path });
+    trackRecentFile({ name: path.split("/").pop() || path, path });
 
     if (path === "project.json") {
       const tab = activeTab.value;
-      if (tab) tab.session.ui.canvasMode = "stylebook";
+      if (tab) {
+        tab.session.ui.canvasMode = "stylebook";
+      }
     }
 
     statusMessage(`Opened ${path.split("/").pop()}`);
-  } catch (e) {
-    statusMessage(`Error: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Error: ${errorMessage(error)}`);
   }
 }
 
@@ -946,7 +1038,9 @@ export async function reloadFileInTab(path: string) {
       const platform = getPlatform();
       try {
         const content = await platform.readFile(path);
-        if (!content) return;
+        if (!content) {
+          return;
+        }
         await loadFormats();
         if (formatForPath(path)) {
           const { document, frontmatter } = await parseSourceForPath(path, content);

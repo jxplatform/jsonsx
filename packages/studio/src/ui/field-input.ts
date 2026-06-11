@@ -49,14 +49,19 @@ export function hasDraft(key: string): boolean {
 /** Record the in-progress value for a field without committing it. */
 export function setDraft(key: string, value: string): void {
   const d = _drafts.get(key);
-  if (d) d.value = value;
-  else _drafts.set(key, { value });
+  if (d) {
+    d.value = value;
+  } else {
+    _drafts.set(key, { value });
+  }
 }
 
 /** Discard a field's draft (and cancel any pending debounced commit). */
 export function clearDraft(key: string): void {
   const d = _drafts.get(key);
-  if (d?.timer) clearTimeout(d.timer);
+  if (d?.timer) {
+    clearTimeout(d.timer);
+  }
   _drafts.delete(key);
 }
 
@@ -67,11 +72,17 @@ export function clearDraft(key: string): void {
  */
 export function scheduleDraftCommit(key: string, ms: number, commit: (v: string) => void): void {
   const d = _drafts.get(key);
-  if (!d) return;
-  if (d.timer) clearTimeout(d.timer);
+  if (!d) {
+    return;
+  }
+  if (d.timer) {
+    clearTimeout(d.timer);
+  }
   d.timer = setTimeout(() => {
     const cur = _drafts.get(key);
-    if (!cur) return;
+    if (!cur) {
+      return;
+    }
     delete cur.timer;
     commit(cur.value);
   }, ms);
@@ -83,9 +94,13 @@ export function scheduleDraftCommit(key: string, ms: number, commit: (v: string)
  */
 export function commitField(key: string, commit: (v: string) => void): void {
   const d = _drafts.get(key);
-  if (!d) return;
-  if (d.timer) clearTimeout(d.timer);
-  const value = d.value;
+  if (!d) {
+    return;
+  }
+  if (d.timer) {
+    clearTimeout(d.timer);
+  }
+  const { value } = d;
   _drafts.delete(key);
   commit(value);
 }
@@ -119,15 +134,17 @@ function makeHandlers(
   commitMode: "live" | "blur" = "live",
 ) {
   return {
-    onInput: (e: Event) => {
-      const v = (e.target as HTMLInputElement).value;
-      setDraft(key, v);
-      if (commitMode === "live") scheduleDraftCommit(key, ms, commit);
-    },
     onCommit: (e: Event) => {
       const v = (e.target as HTMLInputElement).value;
       setDraft(key, v);
       commitField(key, commit);
+    },
+    onInput: (e: Event) => {
+      const v = (e.target as HTMLInputElement).value;
+      setDraft(key, v);
+      if (commitMode === "live") {
+        scheduleDraftCommit(key, ms, commit);
+      }
     },
     onKeydown: (e: KeyboardEvent, multiline: boolean) => {
       if (e.key === "Enter" && !multiline) {
@@ -158,7 +175,7 @@ export function spTextField(
       <sp-textfield
         size=${opts.size ?? "s"}
         placeholder=${opts.placeholder ?? ""}
-        ?disabled=${!!opts.disabled}
+        ?disabled=${Boolean(opts.disabled)}
         style=${opts.style ?? ""}
         .value=${live(getFieldValue(key, value))}
         @input=${onInput}
@@ -185,7 +202,7 @@ export function spTextArea(
         multiline
         size=${opts.size ?? "s"}
         placeholder=${opts.placeholder ?? ""}
-        ?disabled=${!!opts.disabled}
+        ?disabled=${Boolean(opts.disabled)}
         style=${opts.style ?? ""}
         .value=${live(getFieldValue(key, value))}
         @input=${onInput}
@@ -218,7 +235,7 @@ export function rawTextArea(
         class="field-input"
         style=${style}
         placeholder=${opts.placeholder ?? ""}
-        ?disabled=${!!opts.disabled}
+        ?disabled=${Boolean(opts.disabled)}
         .value=${live(getFieldValue(key, value))}
         @input=${onInput}
         @change=${onCommit}
@@ -241,7 +258,7 @@ export function spNumberField(
     <sp-number-field
       size=${opts.size ?? "s"}
       ?hide-stepper=${opts.hideStepper ?? true}
-      ?disabled=${!!opts.disabled}
+      ?disabled=${Boolean(opts.disabled)}
       style=${opts.style ?? ""}
       .value=${live(value !== undefined ? Number(value) : undefined)}
       @change=${(e: Event) => {

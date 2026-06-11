@@ -1,11 +1,11 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { createState, setProjectState } from "../src/state";
-import { getEffectiveElements, getEffectiveStyle, getEffectiveMedia } from "../src/site-context";
+import { getEffectiveElements, getEffectiveMedia, getEffectiveStyle } from "../src/site-context";
 import { computeRelativePath } from "../src/files/components";
 import { parseSourceForPath } from "../src/files/file-ops";
 import { registerPlatform } from "../src/platform";
-import { seedMarkdownFormat, mockFormatAction } from "./format-fixture";
+import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 import type { StudioPlatform } from "../src/types";
 
 seedMarkdownFormat();
@@ -26,11 +26,17 @@ import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
  */
 function collectTags(node: any) {
   const tags = new Set();
-  if (!node || typeof node !== "object") return tags;
-  if (node.tagName) tags.add(node.tagName);
+  if (!node || typeof node !== "object") {
+    return tags;
+  }
+  if (node.tagName) {
+    tags.add(node.tagName);
+  }
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      for (const t of collectTags(child)) tags.add(t);
+      for (const t of collectTags(child)) {
+        tags.add(t);
+      }
     }
   }
   return tags;
@@ -73,8 +79,7 @@ function autoDiscoverElements(
  * @param {string | null} documentPath
  * @param {string} projectRoot
  */
-function buildDocBase(origin: string, documentPath: string | null, projectRoot: string) {
-  const root = projectRoot || "";
+function buildDocBase(origin: string, documentPath: string | null, root: string = "") {
   const docPrefix = root && root !== "." ? `${root}/` : "";
   return documentPath ? `${origin}/${docPrefix}${documentPath}` : undefined;
 }
@@ -84,22 +89,22 @@ function buildDocBase(origin: string, documentPath: string | null, projectRoot: 
 describe("collectTags", () => {
   test("collects tag names from a flat tree", () => {
     const doc = {
-      tagName: "div",
       children: [{ tagName: "hero" }, { tagName: "footer" }],
+      tagName: "div",
     };
     expect([...collectTags(doc)]).toEqual(["div", "hero", "footer"]);
   });
 
   test("collects tag names from a nested tree", () => {
     const doc = {
-      tagName: "div",
       children: [
         {
-          tagName: "section",
           children: [{ tagName: "hero" }, { tagName: "p" }],
+          tagName: "section",
         },
         { tagName: "cta-banner" },
       ],
+      tagName: "div",
     };
     const tags = collectTags(doc);
     expect(tags.has("div")).toBe(true);
@@ -111,15 +116,15 @@ describe("collectTags", () => {
 
   test("deduplicates tag names", () => {
     const doc = {
-      tagName: "div",
       children: [{ tagName: "p" }, { tagName: "p" }, { tagName: "p" }],
+      tagName: "div",
     };
     expect([...collectTags(doc)]).toEqual(["div", "p"]);
   });
 
   test("handles null/undefined nodes", () => {
     expect(collectTags(null).size).toBe(0);
-    expect(collectTags(undefined).size).toBe(0);
+    expect(collectTags().size).toBe(0);
   });
 
   test("handles nodes without children", () => {
@@ -173,25 +178,25 @@ describe("buildDocBase", () => {
 
 describe("autoDiscoverElements", () => {
   const registry = [
-    { tagName: "hero", path: "components/hero.json", source: "jx" },
+    { path: "components/hero.json", source: "jx", tagName: "hero" },
     {
-      tagName: "product-showcase",
       path: "components/product-showcase.json",
       source: "jx",
+      tagName: "product-showcase",
     },
     {
-      tagName: "feature-grid",
       path: "components/feature-grid.json",
       source: "jx",
+      tagName: "feature-grid",
     },
-    { tagName: "cta-banner", path: "components/cta-banner.json", source: "jx" },
-    { tagName: "npm-widget", path: "npm-widget", source: "npm" },
+    { path: "components/cta-banner.json", source: "jx", tagName: "cta-banner" },
+    { path: "npm-widget", source: "npm", tagName: "npm-widget" },
   ];
 
   test("discovers components matching tag names in the document", () => {
     const doc = {
-      tagName: "div",
       children: [{ tagName: "hero" }, { tagName: "cta-banner" }],
+      tagName: "div",
     };
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, []);
     const refs = result.map((e) => e.$ref);
@@ -201,35 +206,35 @@ describe("autoDiscoverElements", () => {
 
   test("discovers all directive components from a typical markdown tree", () => {
     const doc = {
-      tagName: "div",
       children: [
         { tagName: "hero" },
         { tagName: "product-showcase" },
         { tagName: "feature-grid" },
         { tagName: "cta-banner" },
       ],
+      tagName: "div",
     };
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, []);
     expect(result.length).toBe(4);
   });
 
   test("skips npm-sourced components", () => {
-    const doc = { tagName: "div", children: [{ tagName: "npm-widget" }] };
+    const doc = { children: [{ tagName: "npm-widget" }], tagName: "div" };
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, []);
     expect(result.length).toBe(0);
   });
 
   test("skips tags not in the registry", () => {
     const doc = {
-      tagName: "div",
       children: [{ tagName: "p" }, { tagName: "h1" }, { tagName: "unknown-thing" }],
+      tagName: "div",
     };
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, []);
     expect(result.length).toBe(0);
   });
 
   test("does not duplicate already-existing $elements", () => {
-    const doc = { tagName: "div", children: [{ tagName: "hero" }] };
+    const doc = { children: [{ tagName: "hero" }], tagName: "div" };
     const existing = [{ $ref: "../../components/hero.json" }];
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, existing);
     const heroRefs = result.filter((e) => e.$ref?.includes("hero"));
@@ -237,7 +242,7 @@ describe("autoDiscoverElements", () => {
   });
 
   test("merges with pre-existing elements", () => {
-    const doc = { tagName: "div", children: [{ tagName: "cta-banner" }] };
+    const doc = { children: [{ tagName: "cta-banner" }], tagName: "div" };
     const existing = [{ $ref: "../../components/hero.json" }];
     const result = autoDiscoverElements(doc, "content/pages/home.md", registry, existing);
     expect(result.length).toBe(2);
@@ -265,7 +270,10 @@ describe("computeRelativePath for content → component", () => {
   });
 
   test("handles backslash paths (Windows)", () => {
-    const rel = computeRelativePath("content\\pages\\home.md", "components\\hero.json");
+    const rel = computeRelativePath(
+      String.raw`content\pages\home.md`,
+      String.raw`components\hero.json`,
+    );
     expect(rel).toBe("../../components/hero.json");
   });
 
@@ -289,7 +297,7 @@ describe("getEffectiveElements", () => {
   });
 
   test("returns empty array when no doc elements and no site config", () => {
-    expect(getEffectiveElements(undefined)).toEqual([]);
+    expect(getEffectiveElements()).toEqual([]);
     expect(getEffectiveElements()).toEqual([]);
   });
 
@@ -297,7 +305,7 @@ describe("getEffectiveElements", () => {
     setProjectState({
       projectConfig: { $elements: [{ $ref: "./components/hero.json" }] },
     } as any);
-    const result = getEffectiveElements(undefined);
+    const result = getEffectiveElements();
     expect(result).toEqual([{ $ref: "./components/hero.json" }]);
   });
 
@@ -338,7 +346,8 @@ describe("loadMarkdown state", () => {
     const result = await loadMarkdown(md);
     const doc = result.document as JxMutableNode;
     expect(doc.tagName).toBeUndefined();
-    const tags = doc.children?.map((c: unknown) => (c as JxMutableNode).tagName);
+    const children = Array.isArray(doc.children) ? doc.children : [];
+    const tags = children.map((c) => (c as JxMutableNode).tagName);
     expect(tags).toContain("hero");
     expect(tags).toContain("cta-banner");
   });
@@ -351,7 +360,7 @@ describe("loadMarkdown state", () => {
 
   test("documentPath is null (must be set by caller)", async () => {
     const result = await loadMarkdown("# Hello");
-    // loadMarkdown doesn't set documentPath — that's the caller's responsibility
+    // LoadMarkdown doesn't set documentPath — that's the caller's responsibility
     expect(result.document).toBeDefined();
   });
 });
@@ -377,7 +386,7 @@ describe("ctx getter pattern for S reference", () => {
       },
     };
 
-    // loadMarkdown replaces S entirely
+    // LoadMarkdown replaces S entirely
     function loadMarkdown() {
       const newState = createState({ tagName: "article" });
       newState.mode = "content";
@@ -407,9 +416,9 @@ describe("ctx getter pattern for S reference", () => {
     // Replace S
     S = createState({ tagName: "article" });
 
-    // ctx.S still points to old state
+    // Ctx.S still points to old state
     ctx.S.documentPath = "content/pages/home.md";
-    expect(S.documentPath).toBeNull(); // documentPath set on wrong object!
+    expect(S.documentPath).toBeNull(); // DocumentPath set on wrong object!
   });
 });
 
@@ -426,14 +435,14 @@ describe("getEffectiveStyle", () => {
   });
 
   test("returns empty object when no doc style and no site config", () => {
-    expect(getEffectiveStyle(undefined)).toEqual({});
+    expect(getEffectiveStyle()).toEqual({});
   });
 
   test("returns site style when doc has none", () => {
     setProjectState({
       projectConfig: { style: { color: "blue", fontFamily: "sans-serif" } },
     } as any);
-    expect(getEffectiveStyle(undefined)).toEqual({
+    expect(getEffectiveStyle()).toEqual({
       color: "blue",
       fontFamily: "sans-serif",
     });
@@ -455,7 +464,7 @@ describe("getEffectiveStyle", () => {
       },
     } as any);
     const result = getEffectiveStyle({
-      "& li": { margin: "8px", color: "red" },
+      "& li": { color: "red", margin: "8px" },
     });
     expect((result["& li"] as JxStyle).margin).toBe("8px");
     expect((result["& li"] as JxStyle).padding).toBe("4px");
@@ -468,12 +477,12 @@ describe("getEffectiveStyle", () => {
         style: {
           "--bg-primary": "#0a0a0a",
           "--text-primary": "#fafafa",
-          fontFamily: "system-ui",
           backgroundColor: "var(--bg-primary)",
+          fontFamily: "system-ui",
         },
       },
     } as any);
-    const result = getEffectiveStyle(undefined);
+    const result = getEffectiveStyle();
     expect(result["--bg-primary"]).toBe("#0a0a0a");
     expect(result["--text-primary"]).toBe("#fafafa");
     expect(result.backgroundColor).toBe("var(--bg-primary)");
@@ -492,8 +501,8 @@ describe("flat project style (implicit :root)", () => {
     const style = {
       "--bg": "#000",
       "--text": "#fff",
-      fontFamily: "sans-serif",
       backgroundColor: "var(--bg)",
+      fontFamily: "sans-serif",
     };
     // No promotion needed — already flat
     expect(style["--bg"]).toBe("#000");
@@ -520,13 +529,13 @@ describe("flat project style (implicit :root)", () => {
         style: {
           "--bg-primary": "#0a0a0a",
           "--text-primary": "#fafafa",
-          fontFamily: "system-ui",
           backgroundColor: "var(--bg-primary)",
           color: "var(--text-primary)",
+          fontFamily: "system-ui",
         },
       },
     } as any);
-    const result = getEffectiveStyle(undefined);
+    const result = getEffectiveStyle();
     expect(result["--bg-primary"]).toBe("#0a0a0a");
     expect(result["--text-primary"]).toBe("#fafafa");
     expect(result.backgroundColor).toBe("var(--bg-primary)");
@@ -547,25 +556,25 @@ describe("getEffectiveMedia", () => {
   });
 
   test("returns empty object when no doc media and no site config", () => {
-    expect(getEffectiveMedia(undefined)).toEqual({});
+    expect(getEffectiveMedia()).toEqual({});
   });
 
   test("returns site media when doc has none", () => {
     setProjectState({
       projectConfig: {
-        $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
+        $media: { "--md": "(min-width: 768px)", "--sm": "(min-width: 640px)" },
       },
     } as any);
-    expect(getEffectiveMedia(undefined)).toEqual({
-      "--sm": "(min-width: 640px)",
+    expect(getEffectiveMedia()).toEqual({
       "--md": "(min-width: 768px)",
+      "--sm": "(min-width: 640px)",
     });
   });
 
   test("doc media overrides site media on conflict", () => {
     setProjectState({
       projectConfig: {
-        $media: { "--sm": "(min-width: 640px)", "--md": "(min-width: 768px)" },
+        $media: { "--md": "(min-width: 768px)", "--sm": "(min-width: 640px)" },
       },
     } as any);
     const result = getEffectiveMedia({ "--sm": "(min-width: 600px)" });

@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeAll, afterAll, spyOn } from "bun:test";
-import { resolve as resolvePath, dirname, join } from "node:path";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import type { MarkdownFileResult, TocEntry } from "../src/types";
@@ -8,7 +8,7 @@ import type { JxElement } from "@jxsuite/schema/types";
 try {
   GlobalRegistrator.register();
 } catch {
-  /* already registered */
+  /* Already registered */
 }
 
 import { buildScope, resolvePrototype, isSignal, RESERVED_KEYS } from "@jxsuite/runtime";
@@ -17,8 +17,8 @@ import { readFileSync } from "node:fs";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __filename = import.meta.filename;
+const __dirname = import.meta.dirname;
 const FIXTURE_DIR = join(__dirname, "..", "..", "..", "examples", "content", "posts");
 
 /**
@@ -36,8 +36,8 @@ function setupClassJsonFetchMock(fileMap: Record<string, string>) {
       if (urlStr.includes(pattern)) {
         const content = readFileSync(filePath, "utf8");
         return new Response(content, {
-          status: 200,
           headers: { "Content-Type": "application/json" },
+          status: 200,
         });
       }
     }
@@ -162,8 +162,8 @@ describe("Markdown", () => {
 
   test("basePath resolves relative src", async () => {
     const mf = new Markdown({
-      src: "getting-started.md",
       basePath: FIXTURE_DIR,
+      src: "getting-started.md",
     });
     const r = (await mf.resolve()) as any;
     expect(r.slug).toBe("getting-started");
@@ -177,8 +177,8 @@ describe("Markdown with directives", () => {
 
   beforeAll(async () => {
     const mf = new Markdown({
-      src: join(FIXTURE_DIR, "interactive-post.md"),
       directives: true,
+      src: join(FIXTURE_DIR, "interactive-post.md"),
     });
     result = await mf.resolve();
   });
@@ -245,7 +245,7 @@ describe("MarkdownCollection", () => {
       src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
-    expect(results.length).toBe(4); // getting-started, advanced-patterns, building-a-blog, interactive-post
+    expect(results.length).toBe(4); // Getting-started, advanced-patterns, building-a-blog, interactive-post
   });
 
   test("each item has the MarkdownFileResult shape", async () => {
@@ -278,8 +278,8 @@ describe("MarkdownCollection", () => {
 
   test("sortOrder asc works", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       sortOrder: "asc",
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     const dates = results.map((r: any) => r.frontmatter.date);
@@ -290,9 +290,9 @@ describe("MarkdownCollection", () => {
 
   test("custom sortBy field", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       sortBy: "frontmatter.title",
       sortOrder: "asc",
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     const titles = results.map((r: any) => r.frontmatter.title);
@@ -303,8 +303,8 @@ describe("MarkdownCollection", () => {
 
   test("limit caps the result count", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       limit: 2,
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     expect(results.length).toBe(2);
@@ -312,8 +312,8 @@ describe("MarkdownCollection", () => {
 
   test("filter function removes items", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       filter: (item: any) => item.frontmatter.author === "Jane Smith",
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     for (const item of results) {
@@ -324,8 +324,8 @@ describe("MarkdownCollection", () => {
 
   test("basePath resolves relative glob patterns", async () => {
     const mc = new MarkdownCollection({
-      src: "*.md",
       basePath: FIXTURE_DIR,
+      src: "*.md",
     });
     const results = await mc.resolve();
     expect(results.length).toBe(4);
@@ -333,11 +333,11 @@ describe("MarkdownCollection", () => {
 
   test("combined filter, sort, and limit", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       filter: (item: any) => item.frontmatter.published === true,
+      limit: 2,
       sortBy: "frontmatter.date",
       sortOrder: "desc",
-      limit: 2,
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     expect(results.length).toBe(2);
@@ -346,8 +346,8 @@ describe("MarkdownCollection", () => {
 
   test("directives option applies to all files", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "interactive-post.md"),
       directives: true,
+      src: join(FIXTURE_DIR, "interactive-post.md"),
     });
     const results = await mc.resolve();
     expect(results.length).toBe(1);
@@ -370,13 +370,13 @@ describe("External class contract", () => {
   });
 
   test("Markdown constructor accepts single config object", () => {
-    const config = { src: "test.md", directives: true };
+    const config = { directives: true, src: "test.md" };
     const mf = new Markdown(config);
     expect(mf.config).toEqual(config);
   });
 
   test("MarkdownCollection constructor accepts single config object", () => {
-    const config = { src: "*.md", sortBy: "frontmatter.title", limit: 5 };
+    const config = { limit: 5, sortBy: "frontmatter.title", src: "*.md" };
     const mc = new MarkdownCollection(config);
     expect(mc.config).toEqual(config);
   });
@@ -395,8 +395,8 @@ describe("External class contract", () => {
 
   test("MarkdownCollection.resolve returns JSON-serializable result", async () => {
     const mc = new MarkdownCollection({
-      src: join(FIXTURE_DIR, "*.md"),
       limit: 1,
+      src: join(FIXTURE_DIR, "*.md"),
     });
     const results = await mc.resolve();
     const serialized = JSON.stringify(results);
@@ -423,7 +423,9 @@ describe("Runtime external prototype ($src)", () => {
   });
 
   afterAll(() => {
-    if (_restore) _restore();
+    if (_restore) {
+      _restore();
+    }
   });
 
   test("RESERVED_KEYS includes $src", () => {
@@ -437,7 +439,7 @@ describe("Runtime external prototype ($src)", () => {
   test("resolvePrototype with $src loads Markdown", async () => {
     const def = {
       $prototype: "Markdown",
-      $src: "file://" + mdFilePath,
+      $src: `file://${mdFilePath}`,
       src: join(FIXTURE_DIR, "getting-started.md"),
     };
     const sig = (await resolvePrototype(def, {}, "$post")) as any;
@@ -450,11 +452,11 @@ describe("Runtime external prototype ($src)", () => {
   test("resolvePrototype with $src loads MarkdownCollection", async () => {
     const def = {
       $prototype: "MarkdownCollection",
-      $src: "file://" + mdCollPath,
-      src: join(FIXTURE_DIR, "*.md"),
+      $src: `file://${mdCollPath}`,
+      limit: 2,
       sortBy: "frontmatter.date",
       sortOrder: "desc",
-      limit: 2,
+      src: join(FIXTURE_DIR, "*.md"),
     };
     const sig = (await resolvePrototype(def, {}, "$posts")) as any;
     expect(isSignal(sig)).toBe(true);
@@ -466,12 +468,16 @@ describe("Runtime external prototype ($src)", () => {
   test("resolvePrototype strips reserved keys from config", async () => {
     const def = {
       $prototype: "Markdown",
-      $src: "file://" + mdFilePath,
+      $src: `file://${mdFilePath}`,
+      description: "test",
       src: join(FIXTURE_DIR, "getting-started.md"),
       timing: "client",
-      description: "test",
     };
-    const sig = (await resolvePrototype(def, {}, "$test")) as any;
+    const sig = (await resolvePrototype(
+      def as unknown as import("@jxsuite/schema/types").JxPrototypeDef,
+      {},
+      "$test",
+    )) as any;
     expect(isSignal(sig)).toBe(true);
     // If reserved keys leaked in, the constructor would get them — but resolve() still works
     expect(sig.value.slug).toBe("getting-started");
@@ -480,11 +486,11 @@ describe("Runtime external prototype ($src)", () => {
   test("resolvePrototype with $export override", async () => {
     // MarkdownCollection is a named export referenced via .class.json
     const def = {
-      $prototype: "MC",
-      $src: "file://" + mdCollPath,
       $export: "MarkdownCollection",
-      src: join(FIXTURE_DIR, "*.md"),
+      $prototype: "MC",
+      $src: `file://${mdCollPath}`,
       limit: 1,
+      src: join(FIXTURE_DIR, "*.md"),
     };
     const sig = (await resolvePrototype(def, {}, "$posts")) as any;
     expect(isSignal(sig)).toBe(true);
@@ -506,14 +512,14 @@ describe("Runtime external prototype ($src)", () => {
       state: {
         $post: {
           $prototype: "Markdown",
-          $src: "file://" + mdFilePath,
+          $src: `file://${mdFilePath}`,
           src: join(FIXTURE_DIR, "getting-started.md"),
         },
       },
     };
     const scope = await buildScope(doc, {}, "http://localhost/");
     // Vue reactive() unwraps refs, so scope.$post is the raw value
-    expect(scope.$post.slug).toBe("getting-started");
+    expect((scope.$post as { slug: string }).slug).toBe("getting-started");
   });
 
   test("unknown $prototype without $src warns with helpful message", async () => {

@@ -12,10 +12,10 @@
  * title $page.params — dynamic route parameters (if any)
  */
 
-import { resolve, dirname, relative } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import type {
-  JxElement,
   JxDocument,
+  JxElement,
   JxStateDefinition,
   ProjectConfig,
 } from "@jxsuite/schema/types";
@@ -36,10 +36,12 @@ export function injectContext(
   doc: JxDocument,
   projectConfig: ProjectConfig,
   route: SiteRoute,
-  contentTypes: Map<string, ContentLoaderEntry[]> = new Map(),
+  contentTypes = new Map<string, ContentLoaderEntry[]>(),
   projectRoot: string | null = null,
 ) {
-  if (!doc.state) doc.state = {};
+  if (!doc.state) {
+    doc.state = {};
+  }
 
   // $site context — read-only project-level data
   doc.state.$site = {
@@ -50,9 +52,9 @@ export function injectContext(
 
   // $page context — read-only page-level data
   doc.state.$page = {
-    url: route.urlPattern,
-    title: doc.title ?? doc._pageTitle ?? projectConfig.name ?? "",
     params: route._pathParams ?? {},
+    title: doc.title ?? doc._pageTitle ?? projectConfig.name ?? "",
+    url: route.urlPattern,
   };
 
   // Merge project-level state into page state (page wins on conflicts)
@@ -71,14 +73,16 @@ export function injectContext(
 
   // Merge project-level imports into page imports (page wins on collision)
   if (projectConfig.imports && Object.keys(projectConfig.imports).length > 0) {
-    if (!doc.imports) doc.imports = {};
+    if (!doc.imports) {
+      doc.imports = {};
+    }
     for (const [name, srcPath] of Object.entries(projectConfig.imports)) {
       if (!(name in doc.imports)) {
         const src = srcPath as string;
         // Only rebase relative paths — bare/npm specifiers pass through unmodified
         if (projectRoot && route.sourcePath && (src.startsWith("./") || src.startsWith("../"))) {
           const abs = resolve(projectRoot, src);
-          doc.imports[name] = "./" + relative(dirname(route.sourcePath), abs);
+          doc.imports[name] = `./${relative(dirname(route.sourcePath), abs)}`;
         } else {
           doc.imports[name] = src;
         }
@@ -91,7 +95,7 @@ export function injectContext(
     if (!doc.$elements?.length) {
       doc.$elements = [...projectConfig.$elements];
     } else {
-      const seen: Set<string> = new Set();
+      const seen = new Set<string>();
       const merged: (string | JxElement)[] = [];
       for (const entry of [
         ...projectConfig.$elements,

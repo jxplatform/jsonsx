@@ -18,7 +18,7 @@ const TRANSPARENT_PX =
  * @param {string} str
  */
 export function templateToEditDisplay(str: string) {
-  return str.replace(/\$\{([^}]+)\}/g, "\u276A $1 \u276B");
+  return str.replaceAll(/\$\{([^}]+)\}/g, "\u276A $1 \u276B");
 }
 
 /**
@@ -32,7 +32,7 @@ export function restoreTemplateExpressions(el: HTMLElement) {
   while (walker.nextNode()) {
     const node = walker.currentNode as Text;
     if (node.data.includes("\u276A")) {
-      node.data = node.data.replace(/\u276A\s*(.*?)\s*\u276B/g, "${$1}");
+      node.data = node.data.replaceAll(/\u276A\s*(.*?)\s*\u276B/g, "${$1}");
     }
   }
 }
@@ -46,8 +46,13 @@ export function restoreTemplateExpressions(el: HTMLElement) {
  * @returns {JxMutableNode}
  */
 export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
-  if (!node || typeof node !== "object") return node;
-  if (Array.isArray(node)) return node.map(prepareForEditMode);
+  if (!node || typeof node !== "object") {
+    return node;
+  }
+  if (Array.isArray(node)) {
+    // Arrays of nodes round-trip element-wise; the array itself is not a node.
+    return node.map(prepareForEditMode) as unknown as JxMutableNode;
+  }
 
   const /** @type {Record<string, unknown>} */ obj = node as Record<string, unknown>;
 
@@ -71,7 +76,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
 
   for (const [k, v] of Object.entries(obj)) {
     if (k === "state" || k === "$media" || k === "$elements") {
-      out[k] = v; // preserve as-is for runtime resolution
+      out[k] = v; // Preserve as-is for runtime resolution
     } else if (k === "$props" && v && typeof v === "object") {
       // Process $props values: convert template strings to display format
       const propsOut: Record<string, unknown> = {};
@@ -102,9 +107,9 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
         if (template && typeof template === "object") {
           out.children = [
             {
-              tagName: "div",
-              className: "repeater-perimeter",
               children: [prepareForEditMode(template as JxMutableNode)],
+              className: "repeater-perimeter",
+              tagName: "div",
             },
           ];
         } else {
@@ -123,22 +128,22 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
           typeof firstCase === "object" &&
           !(firstCase as Record<string, unknown>).$ref
         ) {
-          out.children = [prepareForEditMode(firstCase)];
+          out.children = [prepareForEditMode(firstCase as JxMutableNode)];
         } else {
           out.children = [
             {
-              tagName: "div",
-              textContent: `[$switch: ${caseKeys.join(" | ")}]`,
               style: {
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontSize: "11px",
-                padding: "6px 10px",
                 background: "color-mix(in srgb, var(--danger) 8%, transparent)",
                 border: "1px dashed color-mix(in srgb, var(--danger) 40%, transparent)",
                 borderRadius: "4px",
                 color: "var(--danger)",
+                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                fontSize: "11px",
                 fontStyle: "italic",
+                padding: "6px 10px",
               },
+              tagName: "div",
+              textContent: `[$switch: ${caseKeys.join(" | ")}]`,
             },
           ];
         }
@@ -276,11 +281,11 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       ]);
       if (textTags.has(tag)) {
         out.className = out.className
-          ? out.className + " empty-text-placeholder"
+          ? `${out.className} empty-text-placeholder`
           : "empty-text-placeholder";
       } else if (containerTags.has(tag)) {
         out.className = out.className
-          ? out.className + " empty-container-placeholder"
+          ? `${out.className} empty-container-placeholder`
           : "empty-container-placeholder";
       }
     }
@@ -290,7 +295,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   if (needsMediaPlaceholder) {
     const cls = (out.className as string) || "";
     if (!cls.includes("empty-media-placeholder")) {
-      out.className = cls ? cls + " empty-media-placeholder" : "empty-media-placeholder";
+      out.className = cls ? `${cls} empty-media-placeholder` : "empty-media-placeholder";
     }
   }
 

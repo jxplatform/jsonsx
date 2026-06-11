@@ -13,9 +13,10 @@
  * - Named slots use attributes.slot on page children
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { parseJxDocument } from "@jxsuite/schema/parse";
 import { resolve } from "node:path";
-import type { JxElement, JxDocument } from "@jxsuite/schema/types";
+import type { JxDocument, JxElement } from "@jxsuite/schema/types";
 
 /**
  * Resolve a page's layout, wrapping the page content in the layout structure.
@@ -48,10 +49,10 @@ export function resolveLayout(
   /** @type {JxDocument} */
   let layoutDoc;
   try {
-    layoutDoc = JSON.parse(readFileSync(layoutPath, "utf8"));
-  } catch (e) {
-    const err = e as Error;
-    throw new Error(`Invalid layout JSON at ${layoutPath}: ${err.message}`);
+    layoutDoc = parseJxDocument(readFileSync(layoutPath, "utf8"), layoutPath);
+  } catch (error) {
+    const err = error as Error;
+    throw new Error(`Invalid layout JSON at ${layoutPath}: ${err.message}`, { cause: error });
   }
 
   // Check for nested layouts (layout inheriting from another layout)
@@ -93,8 +94,12 @@ export function resolveLayout(
   }
 
   // Preserve page-level metadata
-  if (pageDoc.$head) merged._pageHead = pageDoc.$head;
-  if (pageDoc.title) merged._pageTitle = pageDoc.title;
+  if (pageDoc.$head) {
+    merged._pageHead = pageDoc.$head;
+  }
+  if (pageDoc.title) {
+    merged._pageTitle = pageDoc.title;
+  }
 
   // Remove $layout from merged doc (already resolved)
   delete merged.$layout;
@@ -117,17 +122,23 @@ export function resolveLayout(
  * @param {(JxElement | string)[]} children - Page children to distribute
  */
 function distributeSlots(node: JxElement, children: (JxElement | string)[]) {
-  if (!node || typeof node !== "object") return;
-  if (!Array.isArray(node.children)) return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (!Array.isArray(node.children)) {
+    return;
+  }
 
   // Collect named and default children
-  const named: Map<string, (JxElement | string)[]> = new Map(); // slot name → children[]
-  const defaults: (JxElement | string)[] = []; // children without a slot target
+  const named = new Map<string, (JxElement | string)[]>(); // Slot name → children[]
+  const defaults: (JxElement | string)[] = []; // Children without a slot target
 
   for (const child of children) {
     if (child && typeof child === "object" && child.attributes?.slot) {
       const slotName = child.attributes.slot as string;
-      if (!named.has(slotName)) named.set(slotName, []);
+      if (!named.has(slotName)) {
+        named.set(slotName, []);
+      }
       (named.get(slotName) as (JxElement | string)[]).push(child);
     } else {
       defaults.push(child);
@@ -150,8 +161,12 @@ function fillSlots(
   named: Map<string, (JxElement | string)[]>,
   defaults: (JxElement | string)[],
 ) {
-  if (!node || typeof node !== "object") return;
-  if (!Array.isArray(node.children)) return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (!Array.isArray(node.children)) {
+    return;
+  }
 
   const newChildren: (JxElement | string)[] = [];
 
@@ -162,12 +177,12 @@ function fillSlots(
       if (slotName && named.has(slotName as string)) {
         // Named slot — replace with matching children
         newChildren.push(...(named.get(slotName as string) as (JxElement | string)[]));
-        named.delete(slotName as string); // consumed
+        named.delete(slotName as string); // Consumed
       } else if (!slotName && defaults.length > 0) {
         // Default slot — replace with unassigned children
         newChildren.push(...defaults);
         // Don't clear defaults — only one default slot should exist,
-        // but if there are multiple, the first one wins
+        // But if there are multiple, the first one wins
       } else {
         // No matching content — keep slot's fallback children
         if (Array.isArray(child.children)) {

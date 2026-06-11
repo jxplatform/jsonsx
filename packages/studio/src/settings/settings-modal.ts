@@ -22,21 +22,25 @@ let _activeSection: string = "general";
 let _contentEl: HTMLElement | null = null;
 
 const sections = [
-  { key: "general", label: "General", icon: "sp-icon-properties" },
-  { key: "head", label: "Head", icon: "sp-icon-file-single-web-page" },
-  { key: "cssVars", label: "CSS Variables", icon: "sp-icon-brush" },
-  { key: "definitions", label: "Definitions", icon: "sp-icon-data" },
-  { key: "contentTypes", label: "Content Types", icon: "sp-icon-view-grid" },
+  { icon: "sp-icon-properties", key: "general", label: "General" },
+  { icon: "sp-icon-file-single-web-page", key: "head", label: "Head" },
+  { icon: "sp-icon-brush", key: "cssVars", label: "CSS Variables" },
+  { icon: "sp-icon-data", key: "definitions", label: "Definitions" },
+  { icon: "sp-icon-view-grid", key: "contentTypes", label: "Content Types" },
 ];
 
 export function openSettingsModal() {
-  if (_handle) return;
+  if (_handle) {
+    return;
+  }
   _activeSection = "general";
   renderModal();
 }
 
 export function closeSettingsModal() {
-  if (!_handle) return;
+  if (!_handle) {
+    return;
+  }
   _handle.close();
   _handle = null;
   _contentEl = null;
@@ -54,7 +58,9 @@ function renderModal() {
     <div
       class="settings-modal"
       @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") closeSettingsModal();
+        if (e.key === "Escape") {
+          closeSettingsModal();
+        }
       }}
     >
       <div class="settings-modal-header">
@@ -69,8 +75,8 @@ function renderModal() {
             (s) => html`
               <button
                 class=${classMap({
-                  "settings-nav-item": true,
                   active: _activeSection === s.key,
+                  "settings-nav-item": true,
                 })}
                 @click=${() => onNavClick(s.key)}
               >
@@ -83,7 +89,9 @@ function renderModal() {
           class="settings-modal-content"
           ${ref((el: Element | undefined) => {
             _contentEl = (el as HTMLElement) || null;
-            if (_contentEl) requestAnimationFrame(() => renderActiveSection());
+            if (_contentEl) {
+              requestAnimationFrame(() => renderActiveSection());
+            }
           })}
         ></div>
       </div>
@@ -98,23 +106,30 @@ function renderModal() {
 }
 
 function renderActiveSection() {
-  if (!_handle || !_contentEl) return;
+  if (!_handle || !_contentEl) {
+    return;
+  }
 
   switch (_activeSection) {
-    case "general":
+    case "general": {
       renderGeneralSettings(_contentEl);
       break;
-    case "head":
+    }
+    case "head": {
       renderHeadEditor(_contentEl);
       break;
-    case "cssVars":
+    }
+    case "cssVars": {
       renderCssVarsEditor(_contentEl);
       break;
-    case "definitions":
+    }
+    case "definitions": {
       renderDefsEditor(_contentEl);
       break;
-    case "contentTypes":
+    }
+    case "contentTypes": {
       renderContentTypesEditor(_contentEl);
       break;
+    }
   }
 }

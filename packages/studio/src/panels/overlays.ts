@@ -10,7 +10,7 @@ import { canvasPanels, pathsEqual } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { findCanvasElement, getActivePanel, effectiveZoom } from "../canvas/canvas-helpers";
+import { effectiveZoom, findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 import { layoutElements } from "../canvas/canvas-live-render";
 
 interface OverlayBox {
@@ -46,7 +46,9 @@ export function mount(ctx: OverlaysCtx) {
   _scope.run(() => {
     effect(() => {
       const tab = activeTab.value;
-      if (!tab) return;
+      if (!tab) {
+        return;
+      }
       // Track selection, hover, and mode
       void tab.session.selection;
       void tab.session.hover;
@@ -63,7 +65,9 @@ export function unmount() {
 }
 
 export function render() {
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
   if (!_scheduled) {
     _scheduled = true;
     queueMicrotask(_flush);
@@ -72,9 +76,13 @@ export function render() {
 
 function _flush() {
   _scheduled = false;
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   const { selection, hover } = tab.session;
   const { stylebookTab } = tab.session.ui;
   const canvasMode = _ctx.getCanvasMode();
@@ -112,10 +120,12 @@ function _flush() {
     const boxes: OverlayBox[] = [];
 
     // Batch layout reads: read viewport geometry once per panel
-    if (!p.viewport) continue;
+    if (!p.viewport) {
+      continue;
+    }
     const vpRect = p.viewport.getBoundingClientRect();
-    const scrollTop = p.viewport.scrollTop;
-    const scrollLeft = p.viewport.scrollLeft;
+    const { scrollTop } = p.viewport;
+    const { scrollLeft } = p.viewport;
     const scale = effectiveZoom();
 
     if (hover && !pathsEqual(hover, selection)) {
@@ -124,12 +134,14 @@ function _flush() {
         const elRect = el.getBoundingClientRect();
         const desc: OverlayBox = {
           cls: "overlay-box overlay-hover",
-          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
-          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
-          width: `${elRect.width / scale}px`,
           height: `${elRect.height / scale}px`,
+          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
+          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
+          width: `${elRect.width / scale}px`,
         };
-        if (layoutElements.has(el)) desc.isLayout = true;
+        if (layoutElements.has(el)) {
+          desc.isLayout = true;
+        }
         boxes.push(desc);
       }
     }
@@ -140,13 +152,17 @@ function _flush() {
         const elRect = el.getBoundingClientRect();
         const desc: OverlayBox = {
           cls: "overlay-box overlay-selection",
-          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
-          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
-          width: `${elRect.width / scale}px`,
           height: `${elRect.height / scale}px`,
+          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
+          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
+          width: `${elRect.width / scale}px`,
         };
-        if (view.componentInlineEdit || _ctx.isEditing()) desc.border = "none";
-        if (layoutElements.has(el)) desc.isLayout = true;
+        if (view.componentInlineEdit || _ctx.isEditing()) {
+          desc.border = "none";
+        }
+        if (layoutElements.has(el)) {
+          desc.isLayout = true;
+        }
         boxes.push(desc);
       }
     }
@@ -159,11 +175,11 @@ function _flush() {
             <div
               class="${b.cls}${b.isLayout ? " overlay-layout" : ""}"
               style=${styleMap({
-                top: b.top,
-                left: b.left,
-                width: b.width,
-                height: b.height,
                 border: b.border,
+                height: b.height,
+                left: b.left,
+                top: b.top,
+                width: b.width,
               })}
             >
               ${b.isLayout ? html`<span class="overlay-layout-badge">Layout</span>` : nothing}

@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { mdastToJx as mdToJx, jxToMdast as jxToMd, serializeJxMarkdown } from "../src/serialize";
+import { describe, expect, test } from "bun:test";
+import { jxToMdast as jxToMd, mdastToJx as mdToJx, serializeJxMarkdown } from "../src/serialize";
 
 const jxDocToMd = (doc: Record<string, unknown>) => serializeJxMarkdown(doc as any);
 
@@ -7,42 +7,42 @@ const jxDocToMd = (doc: Record<string, unknown>) => serializeJxMarkdown(doc as a
 
 /** @param {any[]} children */
 function root(...children: any[]) {
-  return { type: "root", children };
+  return { children, type: "root" };
 }
 
 /** @param {any} depth @param {any} text */
 function heading(depth: any, text: any) {
-  return { type: "heading", depth, children: [{ type: "text", value: text }] };
+  return { children: [{ type: "text", value: text }], depth, type: "heading" };
 }
 
 /** @param {any} text */
 function paragraph(text: any) {
-  return { type: "paragraph", children: [{ type: "text", value: text }] };
+  return { children: [{ type: "text", value: text }], type: "paragraph" };
 }
 
 /** @param {any} text */
 function emphasis(text: any) {
-  return { type: "emphasis", children: [{ type: "text", value: text }] };
+  return { children: [{ type: "text", value: text }], type: "emphasis" };
 }
 
 /** @param {any} text */
 function strong(text: any) {
-  return { type: "strong", children: [{ type: "text", value: text }] };
+  return { children: [{ type: "text", value: text }], type: "strong" };
 }
 
 /** @param {any} url @param {any} text @param {any} [title] */
 function link(url: any, text: any, title?: any) {
   return {
+    children: [{ type: "text", value: text }],
+    title: title ?? null,
     type: "link",
     url,
-    title: title ?? null,
-    children: [{ type: "text", value: text }],
   };
 }
 
 /** @param {any} url @param {any} alt @param {any} title */
 function image(url: any, alt: any, title: any) {
-  return { type: "image", url, alt: alt ?? "", title: title ?? null };
+  return { alt: alt ?? "", title: title ?? null, type: "image", url };
 }
 
 /** @param {any} value */
@@ -52,17 +52,17 @@ function inlineCode(value: any) {
 
 /** @param {any} ordered @param {any[]} items */
 function list(ordered: any, ...items: any[]) {
-  return { type: "list", ordered, spread: false, children: items };
+  return { children: items, ordered, spread: false, type: "list" };
 }
 
 /** @param {any[]} children */
 function listItem(...children: any[]) {
-  return { type: "listItem", spread: false, children };
+  return { children, spread: false, type: "listItem" };
 }
 
 /** @param {any} value @param {any} lang */
 function codeBlock(value: any, lang: any) {
-  return { type: "code", lang: lang ?? null, value };
+  return { lang: lang ?? null, type: "code", value };
 }
 
 function thematicBreak() {
@@ -100,8 +100,8 @@ describe("mdToJx", () => {
 
   test("converts emphasis", () => {
     const mdast = root({
-      type: "paragraph",
       children: [emphasis("italic")],
+      type: "paragraph",
     });
     const result: any = mdToJx(mdast);
     const p = result.children[0];
@@ -110,8 +110,8 @@ describe("mdToJx", () => {
 
   test("converts strong", () => {
     const mdast = root({
-      type: "paragraph",
       children: [strong("bold")],
+      type: "paragraph",
     });
     const result: any = mdToJx(mdast);
     const p = result.children[0];
@@ -120,8 +120,8 @@ describe("mdToJx", () => {
 
   test("converts inline code", () => {
     const mdast = root({
-      type: "paragraph",
       children: [inlineCode("const x = 1")],
+      type: "paragraph",
     });
     const result: any = mdToJx(mdast);
     const p = result.children[0];
@@ -133,8 +133,8 @@ describe("mdToJx", () => {
 
   test("converts link", () => {
     const mdast = root({
-      type: "paragraph",
       children: [link("https://example.com", "Example")],
+      type: "paragraph",
     });
     const result: any = mdToJx(mdast);
     const a = result.children[0].children[0];
@@ -145,8 +145,8 @@ describe("mdToJx", () => {
 
   test("converts image", () => {
     const mdast = root({
-      type: "paragraph",
       children: [image("img.png", "Alt text", "Title")],
+      type: "paragraph",
     });
     const result: any = mdToJx(mdast);
     const img = result.children[0].children[0];
@@ -196,8 +196,8 @@ describe("mdToJx", () => {
 
   test("converts blockquote", () => {
     const mdast = root({
-      type: "blockquote",
       children: [paragraph("Quoted text")],
+      type: "blockquote",
     });
     const result: any = mdToJx(mdast);
     const bq = result.children[0];
@@ -213,14 +213,14 @@ describe("mdToJx", () => {
 
 describe("jxToMd", () => {
   test("empty document", () => {
-    const result: any = jxToMd({ tagName: "div", children: [] });
-    expect(result).toEqual({ type: "root", children: [] });
+    const result: any = jxToMd({ children: [], tagName: "div" });
+    expect(result).toEqual({ children: [], type: "root" });
   });
 
   test("paragraph", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [{ tagName: "p", textContent: "Hello" }],
+      tagName: "div",
     });
     expect(result.children[0].type).toBe("paragraph");
     expect(result.children[0].children[0]).toEqual({
@@ -231,8 +231,8 @@ describe("jxToMd", () => {
 
   test("heading depth", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [{ tagName: "h3", textContent: "Title" }],
+      tagName: "div",
     });
     expect(result.children[0].type).toBe("heading");
     expect(result.children[0].depth).toBe(3);
@@ -240,19 +240,19 @@ describe("jxToMd", () => {
 
   test("link", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [
         {
-          tagName: "p",
           children: [
             {
-              tagName: "a",
               attributes: { href: "https://x.com" },
+              tagName: "a",
               textContent: "Link",
             },
           ],
+          tagName: "p",
         },
       ],
+      tagName: "div",
     });
     const link = result.children[0].children[0];
     expect(link.type).toBe("link");
@@ -261,18 +261,18 @@ describe("jxToMd", () => {
 
   test("image", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [
         {
-          tagName: "p",
           children: [
             {
+              attributes: { alt: "A photo", src: "photo.jpg" },
               tagName: "img",
-              attributes: { src: "photo.jpg", alt: "A photo" },
             },
           ],
+          tagName: "p",
         },
       ],
+      tagName: "div",
     });
     const img = result.children[0].children[0];
     expect(img.type).toBe("image");
@@ -282,16 +282,16 @@ describe("jxToMd", () => {
 
   test("unordered list", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [
         {
-          tagName: "ul",
           children: [
-            { tagName: "li", children: [{ tagName: "p", textContent: "A" }] },
-            { tagName: "li", children: [{ tagName: "p", textContent: "B" }] },
+            { children: [{ tagName: "p", textContent: "A" }], tagName: "li" },
+            { children: [{ tagName: "p", textContent: "B" }], tagName: "li" },
           ],
+          tagName: "ul",
         },
       ],
+      tagName: "div",
     });
     const list = result.children[0];
     expect(list.type).toBe("list");
@@ -301,37 +301,37 @@ describe("jxToMd", () => {
 
   test("ordered list", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [
         {
-          tagName: "ol",
           children: [
             {
-              tagName: "li",
               children: [{ tagName: "p", textContent: "First" }],
+              tagName: "li",
             },
           ],
+          tagName: "ol",
         },
       ],
+      tagName: "div",
     });
     expect(result.children[0].ordered).toBe(true);
   });
 
   test("code block with language", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [
         {
-          tagName: "pre",
           children: [
             {
+              className: "language-js",
               tagName: "code",
               textContent: "const x = 1",
-              className: "language-js",
             },
           ],
+          tagName: "pre",
         },
       ],
+      tagName: "div",
     });
     const code = result.children[0];
     expect(code.type).toBe("code");
@@ -341,16 +341,16 @@ describe("jxToMd", () => {
 
   test("thematic break", () => {
     const result: any = jxToMd({
-      tagName: "div",
       children: [{ tagName: "hr" }],
+      tagName: "div",
     });
     expect(result.children[0].type).toBe("thematicBreak");
   });
 
   test("non-markdown tag becomes directive", () => {
     const result: any = jxToMd({
+      children: [{ attributes: { color: "red" }, tagName: "my-widget" }],
       tagName: "div",
-      children: [{ tagName: "my-widget", attributes: { color: "red" } }],
     });
     const directive = result.children[0];
     expect(directive.type).toBe("leafDirective");
@@ -403,8 +403,8 @@ describe("jxToMd bare text nodes", () => {
     const result: any = jxToMd({
       children: [
         {
-          tagName: "p",
           children: ["Hello ", { tagName: "strong", textContent: "world" }, "!"],
+          tagName: "p",
         },
       ],
     });
@@ -412,14 +412,14 @@ describe("jxToMd bare text nodes", () => {
     expect(p.type).toBe("paragraph");
     expect(p.children).toEqual([
       { type: "text", value: "Hello " },
-      { type: "strong", children: [{ type: "text", value: "world" }] },
+      { children: [{ type: "text", value: "world" }], type: "strong" },
       { type: "text", value: "!" },
     ]);
   });
 
   test("bare number children become text nodes", () => {
     const result: any = jxToMd({
-      children: [{ tagName: "p", children: ["Score: ", 42] as any }],
+      children: [{ children: ["Score: ", 42] as any, tagName: "p" }],
     });
     const p = result.children[0];
     expect(p.children[0]).toEqual({ type: "text", value: "Score: " });
@@ -428,7 +428,7 @@ describe("jxToMd bare text nodes", () => {
 
   test("null and undefined children are filtered out", () => {
     const result: any = jxToMd({
-      children: [{ tagName: "p", children: ["text", null, undefined] as any }],
+      children: [{ children: ["text", null, undefined] as any, tagName: "p" }],
     });
     expect(result.children[0].children).toEqual([{ type: "text", value: "text" }]);
   });
@@ -446,7 +446,7 @@ describe("jxToMd Jx props trigger directive", () => {
 
   test("p with style becomes container directive", () => {
     const result: any = jxToMd({
-      children: [{ tagName: "p", style: { color: "red" }, textContent: "Hello" }],
+      children: [{ style: { color: "red" }, tagName: "p", textContent: "Hello" }],
     });
     expect(result.children[0].type).toBe("containerDirective");
     expect(result.children[0].name).toBe("p");
@@ -455,7 +455,7 @@ describe("jxToMd Jx props trigger directive", () => {
 
   test("heading with style becomes container directive", () => {
     const result: any = jxToMd({
-      children: [{ tagName: "h2", style: { fontSize: "2em" }, textContent: "Title" }],
+      children: [{ style: { fontSize: "2em" }, tagName: "h2", textContent: "Title" }],
     });
     expect(result.children[0].type).toBe("containerDirective");
     expect(result.children[0].name).toBe("h2");
@@ -463,7 +463,7 @@ describe("jxToMd Jx props trigger directive", () => {
 
   test("element with $ref becomes directive", () => {
     const result: any = jxToMd({
-      children: [{ tagName: "p", $ref: "./components/fancy-p.json", textContent: "Hi" }],
+      children: [{ $ref: "./components/fancy-p.json", tagName: "p", textContent: "Hi" }],
     });
     expect(result.children[0].type).toBe("containerDirective");
     expect(result.children[0].attributes.ref).toBe("./components/fancy-p.json");
@@ -477,13 +477,13 @@ describe("container directive inline content", () => {
     const result: any = jxToMd({
       children: [
         {
-          tagName: "p",
-          style: { color: "#b59a9a" },
           children: [
             "Another paragraph, just to test ",
             { tagName: "strong", textContent: "things" },
             " out.",
           ],
+          style: { color: "#b59a9a" },
+          tagName: "p",
         },
       ],
     });
@@ -509,9 +509,9 @@ describe("container directive inline content", () => {
     const result: any = jxToMd({
       children: [
         {
-          tagName: "h1",
-          style: { color: "blue" },
           children: ["Welcome to ", { tagName: "em", textContent: "Jx" }],
+          style: { color: "blue" },
+          tagName: "h1",
         },
       ],
     });
@@ -526,11 +526,11 @@ describe("container directive inline content", () => {
     const result: any = jxToMd({
       children: [
         {
-          tagName: "my-section",
           children: [
             { tagName: "h1", textContent: "Title" },
             { tagName: "p", textContent: "Body" },
           ],
+          tagName: "my-section",
         },
       ],
     });
@@ -546,8 +546,8 @@ describe("container directive inline content", () => {
     const result: any = jxToMd({
       children: [
         {
-          tagName: "p",
           style: { fontWeight: "bold" },
+          tagName: "p",
           textContent: "Simple text",
         },
       ],
@@ -564,11 +564,11 @@ describe("container directive inline content", () => {
 describe("jxDocToMd", () => {
   test("undecorated elements emit standard markdown", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       children: [
         { tagName: "h1", textContent: "Title" },
         { tagName: "p", textContent: "Paragraph." },
       ],
+      tagName: "my-comp",
     });
     expect(md).toContain("# Title");
     expect(md).toContain("Paragraph.");
@@ -578,8 +578,8 @@ describe("jxDocToMd", () => {
 
   test("decorated element emits directive syntax", () => {
     const md = jxDocToMd({
+      children: [{ style: { color: "red" }, tagName: "p", textContent: "Colored" }],
       tagName: "my-comp",
-      children: [{ tagName: "p", style: { color: "red" }, textContent: "Colored" }],
     });
     expect(md).toContain(':::p{style.color="red"}');
     expect(md).toContain("Colored");
@@ -588,18 +588,18 @@ describe("jxDocToMd", () => {
 
   test("mixed inline content in decorated p serializes on one line", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       children: [
         {
-          tagName: "p",
-          style: { color: "#b59a9a" },
           children: [
             "Another paragraph, just to test ",
             { tagName: "strong", textContent: "things" },
             " out.",
           ],
+          style: { color: "#b59a9a" },
+          tagName: "p",
         },
       ],
+      tagName: "my-comp",
     });
     expect(md).toContain(':::p{style.color="#b59a9a"}');
     expect(md).toContain("Another paragraph, just to test **things** out.");
@@ -607,13 +607,13 @@ describe("jxDocToMd", () => {
 
   test("bare text nodes serialize in standard paragraphs", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       children: [
         {
-          tagName: "p",
           children: ["Hello ", { tagName: "strong", textContent: "world" }, "!"],
+          tagName: "p",
         },
       ],
+      tagName: "my-comp",
     });
     expect(md).toContain("Hello **world**!");
     expect(md).not.toContain(":::p");
@@ -621,9 +621,9 @@ describe("jxDocToMd", () => {
 
   test("frontmatter emitted for non-children props", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       $elements: [{ $ref: "./components/hero.json" }],
       children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "my-comp",
     });
     expect(md).toContain("---");
     expect(md).toContain("tagName: my-comp");
@@ -632,25 +632,25 @@ describe("jxDocToMd", () => {
 
   test("custom element without children emits leaf directive", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       children: [{ tagName: "hero-banner" }],
+      tagName: "my-comp",
     });
     expect(md).toContain("::hero-banner");
   });
 
   test("inline HTML in markdown converts to Jx directives on save", () => {
     const md = jxDocToMd({
-      tagName: "my-comp",
       children: [
         {
-          tagName: "iframe",
           attributes: { src: "https://example.com/form", title: "Form" },
+          tagName: "iframe",
         },
         {
-          tagName: "script",
           attributes: { src: "https://example.com/embed.js" },
+          tagName: "script",
         },
       ],
+      tagName: "my-comp",
     });
     expect(md).toContain("::iframe");
     expect(md).toContain('src="https://example.com/form"');

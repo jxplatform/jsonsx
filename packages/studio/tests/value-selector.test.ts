@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 // ─── Unit tests for jx-value-selector logic ─────────────────────────────────
 // Tests the component's core algorithms without importing Lit (avoids
@@ -13,7 +13,7 @@ import { describe, test, expect } from "bun:test";
  * @param {any[]} options
  */
 function isPicker(value: string, options: any[]) {
-  return !!value && options.some((o) => !o.divider && o.value === value);
+  return Boolean(value) && options.some((o) => !o.divider && o.value === value);
 }
 
 /**
@@ -23,24 +23,26 @@ function isPicker(value: string, options: any[]) {
  * @param {any[]} options
  */
 function selectedStyle(value: string, options: any[]) {
-  if (!isPicker(value, options)) return "";
+  if (!isPicker(value, options)) {
+    return "";
+  }
   const opt = options.find((o) => !o.divider && o.value === value);
   return opt?.style || "";
 }
 
 const SAMPLE_OPTIONS: any[] = [
-  { value: "bold", label: "Bold", style: "font-weight: bold" },
-  { value: "normal", label: "Normal", style: "font-weight: normal" },
-  { value: "lighter", label: "Lighter", style: "font-weight: lighter" },
+  { label: "Bold", style: "font-weight: bold", value: "bold" },
+  { label: "Normal", style: "font-weight: normal", value: "normal" },
+  { label: "Lighter", style: "font-weight: lighter", value: "lighter" },
 ];
 
 const OPTIONS_WITH_DIVIDER: any[] = [
-  { value: "--font-custom", label: "Custom", style: "font-family: Georgia" },
+  { label: "Custom", style: "font-family: Georgia", value: "--font-custom" },
   { divider: true },
   {
-    value: "__preset__:System UI",
     label: "System UI",
     style: "font-family: system-ui",
+    value: "__preset__:System UI",
   },
 ];
 
@@ -88,7 +90,7 @@ describe("jx-value-selector: selectedStyle logic", () => {
   });
 
   test("returns empty string when option has no style", () => {
-    expect(selectedStyle("x", [{ value: "x", label: "X" }])).toBe("");
+    expect(selectedStyle("x", [{ label: "X", value: "x" }])).toBe("");
   });
 });
 
@@ -128,7 +130,7 @@ describe("jx-value-selector: options with dividers", () => {
 
 // ─── Picker mode does NOT include a clear option ───────────────────────────
 // The component relies on the external "clear dot" indicator, not an
-// internal "—" menu item. Verified by checking the source directly.
+// Internal "—" menu item. Verified by checking the source directly.
 
 describe("jx-value-selector: no __none__ clear option", () => {
   test("picker render method does not reference __none__", async () => {
@@ -146,7 +148,7 @@ describe("jx-value-selector: no __none__ clear option", () => {
 
 // ─── Event handler behavior ────────────────────────────────────────────────
 // Tests the handler functions' value normalization and event dispatch logic
-// using minimal mock objects that mimic the component's state and behavior.
+// Using minimal mock objects that mimic the component's state and behavior.
 
 describe("jx-value-selector: event handler logic", () => {
   /**
@@ -156,14 +158,14 @@ describe("jx-value-selector: event handler logic", () => {
   function createMock(/** @type {string} */ value = "") {
     const dispatched: Event[] = [];
     return {
-      value,
-      /** @type {Event[]} */
-      dispatched,
       /** @param {Event} e */
       dispatchEvent(e: Event) {
         dispatched.push(e);
         return true;
       },
+      /** @type {Event[]} */
+      dispatched,
+      value,
     };
   }
 
@@ -193,7 +195,9 @@ describe("jx-value-selector: event handler logic", () => {
     e: { target: { value: string }; stopPropagation: () => void },
   ) {
     e.stopPropagation();
-    if (!e.target.value) return;
+    if (!e.target.value) {
+      return;
+    }
     ctx.value = e.target.value;
     ctx.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   }
@@ -217,13 +221,13 @@ describe("jx-value-selector: event handler logic", () => {
   function mkEvent(val: string) {
     let stopped = false;
     return {
-      target: { value: val },
       stopPropagation() {
         stopped = true;
       },
       get stopped() {
         return stopped;
       },
+      target: { value: val },
     };
   }
 
@@ -242,7 +246,7 @@ describe("jx-value-selector: event handler logic", () => {
     const mock = createMock("bold");
     menuChange(mock, mkEvent(""));
 
-    expect(mock.value).toBe("bold"); // unchanged
+    expect(mock.value).toBe("bold"); // Unchanged
     expect(mock.dispatched.length).toBe(0);
   });
 

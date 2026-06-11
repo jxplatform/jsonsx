@@ -2,11 +2,11 @@
 
 import { getPlatform } from "../platform";
 import { projectState } from "../store";
+import type { ComponentMeta } from "../types";
 
-export interface ComponentEntry {
-  tagName: string;
-  path: string;
-  props?: { name: string; type?: string; [k: string]: unknown }[];
+/** A discovered component: project components carry a file path; package components may not. */
+export interface ComponentEntry extends Omit<ComponentMeta, "path"> {
+  path?: string;
   source?: string;
   package?: string;
   modulePath?: string;
@@ -30,7 +30,9 @@ export async function loadComponentRegistry() {
  * @param {string} toCompPath
  */
 export function computeRelativePath(fromDocPath: string | null, toCompPath: string) {
-  if (!fromDocPath) return `./${toCompPath}`;
+  if (!fromDocPath) {
+    return `./${toCompPath}`;
+  }
   const from = fromDocPath.replaceAll("\\", "/");
   const to = toCompPath.replaceAll("\\", "/");
   const fromDir = from.substring(0, from.lastIndexOf("/"));

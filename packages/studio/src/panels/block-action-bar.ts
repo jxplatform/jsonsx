@@ -9,13 +9,13 @@ import { styleMap } from "lit-html/directives/style-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
-import { getNodeAtPath, nodeLabel, parentElementPath, childIndex } from "../store";
+import { childIndex, childList, getNodeAtPath, nodeLabel, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateMoveNode, mutateUpdateProperty } from "../tabs/transact";
+import { mutateMoveNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
-import { isEditing, getActiveElement, getInlineActions } from "../editor/inline-edit";
+import { getActiveElement, getInlineActions, isEditing } from "../editor/inline-edit";
 import type { InlineAction } from "../editor/inline-edit";
-import { toggleInlineFormat, isTagActiveInSelection } from "../editor/inline-format";
+import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
 import { componentRegistry } from "../files/components";
 import { convertToComponent } from "../editor/convert-to-component";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
@@ -53,18 +53,18 @@ export function initBlockActionBar(ctx: {
 
 /** Pre-built icon templates for inline format buttons (avoids unsafeStatic) */
 const formatIconMap = {
+  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
+  "sp-icon-link": html`<sp-icon-link slot="icon"></sp-icon-link>`,
   "sp-icon-text-bold": html`<sp-icon-text-bold slot="icon"></sp-icon-text-bold>`,
   "sp-icon-text-italic": html`<sp-icon-text-italic slot="icon"></sp-icon-text-italic>`,
-  "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
   "sp-icon-text-strikethrough": html`<sp-icon-text-strikethrough
     slot="icon"
   ></sp-icon-text-strikethrough>`,
+  "sp-icon-text-subscript": html`<sp-icon-text-subscript slot="icon"></sp-icon-text-subscript>`,
   "sp-icon-text-superscript": html`<sp-icon-text-superscript
     slot="icon"
   ></sp-icon-text-superscript>`,
-  "sp-icon-text-subscript": html`<sp-icon-text-subscript slot="icon"></sp-icon-text-subscript>`,
-  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
-  "sp-icon-link": html`<sp-icon-link slot="icon"></sp-icon-link>`,
+  "sp-icon-text-underline": html`<sp-icon-text-underline slot="icon"></sp-icon-text-underline>`,
 } as Record<string, import("lit-html").TemplateResult>;
 
 /**
@@ -73,9 +73,15 @@ const formatIconMap = {
  * @param {MouseEvent} e
  */
 function onBarMousedown(e: MouseEvent) {
-  if ((e.target as HTMLElement).closest("sp-textfield")) return;
-  if ((e.target as HTMLElement).closest(".bar-drag-handle")) return;
-  if ((e.target as HTMLElement).closest(".bar-tag--interactive")) return;
+  if ((e.target as HTMLElement).closest("sp-textfield")) {
+    return;
+  }
+  if ((e.target as HTMLElement).closest(".bar-drag-handle")) {
+    return;
+  }
+  if ((e.target as HTMLElement).closest(".bar-tag--interactive")) {
+    return;
+  }
   e.preventDefault();
 }
 
@@ -92,20 +98,22 @@ function onTagBadgeClick(
   e.stopPropagation();
   const anchorEl = e.currentTarget as HTMLElement;
   showSlashMenu(anchorEl, "", {
-    showFilter: targets.length > 6,
     commands: targets,
     onSelect: (cmd) => {
       transactDoc(activeTab.value, (t) => {
         mutateUpdateProperty(t, selection, "tagName", cmd.tag);
       });
     },
+    showFilter: targets.length > 6,
   });
 }
 
 /** Saved selection range for format button mousedown→click flow */
 function captureSelectionRange() {
   const sel = window.getSelection();
-  if (sel && sel.rangeCount) view.savedRange = sel.getRangeAt(0).cloneRange();
+  if (sel && sel.rangeCount) {
+    view.savedRange = sel.getRangeAt(0).cloneRange();
+  }
 }
 
 /**
@@ -133,9 +141,13 @@ function onFormatClick(e: MouseEvent, action: InlineAction) {
 
 function renderParentSelector() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) return nothing;
+  if (!tab?.session.selection) {
+    return nothing;
+  }
   const pPath = parentElementPath(tab.session.selection);
-  if (!pPath) return nothing;
+  if (!pPath) {
+    return nothing;
+  }
   const parentNode = getNodeAtPath(tab.doc.document, pPath);
   return html`
     <sp-action-button
@@ -154,12 +166,14 @@ function renderParentSelector() {
 
 function renderMoveArrows() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) return nothing;
+  if (!tab?.session.selection) {
+    return nothing;
+  }
   const sel = tab.session.selection;
   const idx = childIndex(sel) as number;
   const pPath = parentElementPath(sel);
   const parentNode = pPath ? getNodeAtPath(tab.doc.document, pPath) : null;
-  const siblings = parentNode?.children;
+  const siblings = parentNode ? childList(parentNode) : null;
   return html`
     <sp-action-button
       size="xs"
@@ -196,12 +210,12 @@ function renderMoveArrows() {
 function applyInlineFormat(action: InlineAction) {
   const cmdToTag: Record<string, string> = {
     bold: "strong",
-    italic: "em",
-    underline: "u",
-    strikethrough: "del",
-    superscript: "sup",
-    subscript: "sub",
     code: "code",
+    italic: "em",
+    strikethrough: "del",
+    subscript: "sub",
+    superscript: "sup",
+    underline: "u",
   };
 
   const tag = action.command ? cmdToTag[action.command] : undefined;
@@ -220,7 +234,9 @@ export function dismissLinkPopover() {
 
 /** Dismiss the block action bar. */
 export function dismissBlockActionBar() {
-  if (view.blockActionBarEl) litRender(nothing, view.blockActionBarEl);
+  if (view.blockActionBarEl) {
+    litRender(nothing, view.blockActionBarEl);
+  }
 }
 
 /** @param {HTMLElement} anchorBtn */
@@ -257,17 +273,22 @@ function showLinkPopover(anchorBtn: HTMLElement) {
   };
 
   const onRemove = () => {
-    if (!existingLink?.parentNode) return;
+    if (!existingLink?.parentNode) {
+      return;
+    }
     const frag = document.createDocumentFragment();
-    while (existingLink.firstChild) frag.appendChild(existingLink.firstChild);
+    while (existingLink.firstChild) {
+      frag.append(existingLink.firstChild);
+    }
     existingLink.parentNode.replaceChild(frag, existingLink);
     litRender(nothing, host);
     renderBlockActionBar();
   };
 
   const onKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") onApply();
-    else if (e.key === "Escape") {
+    if (e.key === "Enter") {
+      onApply();
+    } else if (e.key === "Escape") {
       litRender(nothing, host);
     }
   };
@@ -278,8 +299,8 @@ function showLinkPopover(anchorBtn: HTMLElement) {
         class="link-popover"
         open
         style=${styleMap({
-          position: "fixed",
           left: `${rect.left}px`,
+          position: "fixed",
           top: `${rect.bottom + 4}px`,
           zIndex: "30",
         })}
@@ -292,7 +313,9 @@ function showLinkPopover(anchorBtn: HTMLElement) {
           @keydown=${onKeydown}
           ${ref((el) => {
             _linkField = (el as HTMLInputElement | null) || null;
-            if (el) requestAnimationFrame(() => (el as HTMLElement).focus());
+            if (el) {
+              requestAnimationFrame(() => (el as HTMLElement).focus());
+            }
           })}
         ></sp-textfield>
         <sp-action-button size="xs" @click=${onApply}>
@@ -310,10 +333,14 @@ function showLinkPopover(anchorBtn: HTMLElement) {
 /** Move the selected node up (swap with previous sibling). */
 function moveSelectionUp() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
   const sel = tab.session.selection;
   const idx = childIndex(sel) as number;
-  if (idx <= 0) return;
+  if (idx <= 0) {
+    return;
+  }
   const pPath = parentElementPath(sel) as JxPath;
   transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx - 1));
   tab.session.selection = [...pPath, "children", idx - 1];
@@ -322,20 +349,26 @@ function moveSelectionUp() {
 /** Move the selected node down (swap with next sibling). */
 function moveSelectionDown() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
   const sel = tab.session.selection;
   const idx = childIndex(sel) as number;
   const pPath = parentElementPath(sel) as JxPath;
   const parentNode = getNodeAtPath(tab.doc.document, pPath);
-  const siblings = parentNode?.children;
-  if (!siblings || idx >= siblings.length - 1) return;
+  const siblings = childList(parentNode);
+  if (idx >= siblings.length - 1) {
+    return;
+  }
   transactDoc(tab, (t) => mutateMoveNode(t, sel, pPath, idx + 2));
   tab.session.selection = [...pPath, "children", idx + 1];
 }
 
 /** Render the unified block action bar above the selected element. */
 export function renderBlockActionBar() {
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
   if (!view.blockActionBarEl) {
     view.blockActionBarEl = getLayerSlot("popover", "block-action-bar");
   }
@@ -353,7 +386,7 @@ export function renderBlockActionBar() {
     return;
   }
 
-  const selection = tab.session.selection;
+  const { selection } = tab.session;
   const activePanel = getActivePanel();
   if (!activePanel) {
     litRender(nothing, view.blockActionBarEl);
@@ -382,14 +415,11 @@ export function renderBlockActionBar() {
   const isComponent =
     node.tagName?.includes("-") &&
     componentRegistry.some((/** @type {{ tagName: string }} */ c) => c.tagName === node.tagName);
+  const children = childList(node);
   const isEmpty =
     !node.textContent &&
-    (!node.children ||
-      node.children.length === 0 ||
-      (Array.isArray(node.children) &&
-        node.children.length === 1 &&
-        typeof node.children[0] === "object" &&
-        node.children[0]?.tagName === "br"));
+    (children.length === 0 ||
+      (children.length === 1 && typeof children[0] === "object" && children[0]?.tagName === "br"));
   const convertTargets = !isComponent ? getConvertTargets(tag, isEmpty) : [];
   const badgeInteractive = convertTargets.length > 0;
 
@@ -415,7 +445,9 @@ export function renderBlockActionBar() {
               class="bar-drag-handle"
               title="Drag to reorder"
               ${ref((el) => {
-                if (!el) return;
+                if (!el) {
+                  return;
+                }
                 if (view.selDragCleanup) {
                   view.selDragCleanup();
                   view.selDragCleanup = null;
@@ -423,8 +455,8 @@ export function renderBlockActionBar() {
                 view.selDragCleanup = draggable({
                   element: el as HTMLElement,
                   getInitialData: () => ({
-                    type: "tree-node",
                     path: activeTab.value?.session.selection,
+                    type: "tree-node",
                   }),
                 });
               })}
@@ -469,7 +501,7 @@ export function renderBlockActionBar() {
                 compact
                 emphasized
                 selects="multiple"
-                selected=${activeValues.length ? JSON.stringify(activeValues) : nothing}
+                selected=${activeValues.length > 0 ? JSON.stringify(activeValues) : nothing}
               >
                 ${actions.map(
                   (action) => html`
@@ -495,7 +527,9 @@ export function renderBlockActionBar() {
   // Post-render side effects
   requestAnimationFrame(() => {
     const bar = view.blockActionBarEl?.firstElementChild as HTMLElement | null;
-    if (!bar) return;
+    if (!bar) {
+      return;
+    }
     // Clamp to window
     const barRect = bar.getBoundingClientRect();
     if (barRect.right > window.innerWidth) {

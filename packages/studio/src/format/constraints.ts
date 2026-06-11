@@ -30,26 +30,36 @@ export function createNestingValidator(elements: ElementsHints | undefined): Nes
   const nesting = elements?.nesting ?? {};
 
   return {
+    allTags,
     blockTags,
     inlineTags,
-    allTags,
-    isVoid: (tag) => voidTags.has(tag),
     isTextOnly: (tag) => textOnly.has(tag),
     isValidChild(parentTag, childTag) {
       const rule = nesting[parentTag];
-      if (!rule) return true; // unknown parents (directive components) allow anything
+      if (!rule) {
+        return true;
+      } // Unknown parents (directive components) allow anything
 
-      if (rule.only) return rule.only.includes(childTag);
+      if (rule.only) {
+        return rule.only.includes(childTag);
+      }
 
       const isBlock = blockTags.has(childTag);
       const isInline = inlineTags.has(childTag);
       const isDirective = !allTags.has(childTag);
 
-      if (isBlock && rule.block) return true;
-      if (isInline && rule.inline) return true;
-      if (isDirective && rule.directive) return true;
+      if (isBlock && rule.block) {
+        return true;
+      }
+      if (isInline && rule.inline) {
+        return true;
+      }
+      if (isDirective && rule.directive) {
+        return true;
+      }
 
       return false;
     },
+    isVoid: (tag) => voidTags.has(tag),
   };
 }

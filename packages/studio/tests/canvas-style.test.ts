@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { applyStyle } from "@jxsuite/runtime";
 import { friendlyNameToVar, varDisplayName } from "../src/utils/studio-utils";
 
@@ -40,7 +40,7 @@ describe("applyStyle with CSS custom properties", () => {
 
   test("custom properties and regular properties coexist", () => {
     const el = document.createElement("div");
-    applyStyle(el, { color: "blue", "--accent": "green", fontSize: "14px" });
+    applyStyle(el, { "--accent": "green", color: "blue", fontSize: "14px" });
     expect(el.style.color).toBe("blue");
     expect(el.style.fontSize).toBe("14px");
     expect(el.style.getPropertyValue("--accent")).toBe("green");
@@ -49,8 +49,8 @@ describe("applyStyle with CSS custom properties", () => {
   test("font stack variable set on parent is accessible", () => {
     const parent = document.createElement("div");
     const child = document.createElement("h1");
-    parent.appendChild(child);
-    document.body.appendChild(parent);
+    parent.append(child);
+    document.body.append(parent);
 
     applyStyle(parent, {
       "--font-geometric-humanist": "Avenir, Montserrat, Corbel, sans-serif",
@@ -183,8 +183,8 @@ describe("Font stack selection roundtrip", () => {
     // Apply to DOM elements
     const parent = document.createElement("div");
     const child = document.createElement("h1");
-    parent.appendChild(child);
-    document.body.appendChild(parent);
+    parent.append(child);
+    document.body.append(parent);
 
     // Apply root style (including the new CSS variable)
     for (const [prop, val] of Object.entries(rootStyle)) {
@@ -218,7 +218,7 @@ describe("Font stack selection roundtrip", () => {
 
 // ─── Font option grouping ───────────────────────────────────────────────────
 // Tests the renderFontOptions grouping logic: local vars first, divider, then
-// unadded presets.
+// Unadded presets.
 
 describe("Font option grouping", () => {
   /** @type {{ title: string; value: string }[]} */
@@ -308,19 +308,21 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
     presets: { title: string; value: string }[],
   ) {
     const opts: any[] = fontVars.map((fv) => ({
-      value: fv.name,
       label: varDisplayName(fv.name, "--font-"),
       style: `font-family: ${fv.value}`,
+      value: fv.name,
     }));
     const unadded = presets.filter(
       (p) => !fontVars.some((fv) => fv.name === friendlyNameToVar(p.title, "--font-")),
     );
-    if (unadded.length > 0 && opts.length > 0) opts.push({ divider: true });
+    if (unadded.length > 0 && opts.length > 0) {
+      opts.push({ divider: true });
+    }
     for (const p of unadded) {
       opts.push({
-        value: "__preset__:" + p.title,
         label: p.title,
         style: `font-family: ${p.value}`,
+        value: `__preset__:${p.title}`,
       });
     }
     return opts;
@@ -330,9 +332,9 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
     const opts = buildFontOptions([], PRESETS);
     expect(opts.length).toBe(2);
     expect(opts[0]).toEqual({
-      value: "__preset__:System UI",
       label: "System UI",
       style: "font-family: system-ui, sans-serif",
+      value: "__preset__:System UI",
     });
     expect(opts.every((o: any) => !o.divider)).toBe(true);
   });
@@ -340,7 +342,7 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
   test("local vars + presets produces divider between groups", () => {
     const fontVars = [{ name: "--font-custom", value: "Georgia, serif" }];
     const opts = buildFontOptions(fontVars, PRESETS);
-    // local var + divider + 2 presets = 4
+    // Local var + divider + 2 presets = 4
     expect(opts.length).toBe(4);
     expect(opts[0].value).toBe("--font-custom");
     expect(opts[0].label).toBe("Custom");
@@ -352,7 +354,7 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
   test("preset already added as local var is excluded from presets", () => {
     const fontVars = [{ name: "--font-system-ui", value: "system-ui, sans-serif" }];
     const opts = buildFontOptions(fontVars, PRESETS);
-    // local var + divider + 1 remaining preset = 3
+    // Local var + divider + 1 remaining preset = 3
     expect(opts.length).toBe(3);
     expect(opts[0].value).toBe("--font-system-ui");
     expect(opts[2].value).toBe("__preset__:Geometric Humanist");
@@ -373,7 +375,9 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
   test("each option has value, label, and style properties", () => {
     const opts = buildFontOptions([], PRESETS);
     for (const opt of opts) {
-      if ((opt as any).divider) continue;
+      if ((opt as any).divider) {
+        continue;
+      }
       expect(typeof (opt as any).value).toBe("string");
       expect(typeof (opt as any).label).toBe("string");
       expect(typeof (opt as any).style).toBe("string");
@@ -383,7 +387,7 @@ describe("buildFontOptions format for jx-styled-combobox", () => {
 });
 
 // ─── Menu @change value handling ────────────────────────────────────────────
-// jx-styled-combobox dispatches @change with the option's value attribute.
+// Jx-styled-combobox dispatches @change with the option's value attribute.
 // These tests verify the handleFontSelection logic that processes those values.
 
 describe("Menu @change value-attribute handling", () => {
@@ -402,14 +406,18 @@ describe("Menu @change value-attribute handling", () => {
     presets: { title: string; value: string }[],
     rootStyle: Record<string, string>,
   ) {
-    if (!val) return "";
+    if (!val) {
+      return "";
+    }
     // __preset__: prefix (from sp-menu-item value attribute)
     if (val.startsWith("__preset__:")) {
       const title = val.slice("__preset__:".length);
       const preset = presets.find((p: { title: string; value: string }) => p.title === title);
       if (preset) {
         const varName = friendlyNameToVar(preset.title, "--font-");
-        if (!rootStyle[varName]) rootStyle[varName] = preset.value;
+        if (!rootStyle[varName]) {
+          rootStyle[varName] = preset.value;
+        }
         return `var(${varName})`;
       }
       return "";
@@ -422,7 +430,9 @@ describe("Menu @change value-attribute handling", () => {
     const preset = presets.find((p: { title: string; value: string }) => p.title === val);
     if (preset) {
       const varName = friendlyNameToVar(preset.title, "--font-");
-      if (!rootStyle[varName]) rootStyle[varName] = preset.value;
+      if (!rootStyle[varName]) {
+        rootStyle[varName] = preset.value;
+      }
       return `var(${varName})`;
     }
     return val;
@@ -441,7 +451,7 @@ describe("Menu @change value-attribute handling", () => {
     const result = simulateMenuChange("--font-system-ui", PRESETS, rootStyle);
 
     expect(result).toBe("var(--font-system-ui)");
-    expect(Object.keys(rootStyle).length).toBe(0); // no new variable created
+    expect(Object.keys(rootStyle).length).toBe(0); // No new variable created
   });
 
   test("display text fallback still matches presets", () => {

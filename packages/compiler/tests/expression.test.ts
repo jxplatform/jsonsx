@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { compileExpression } from "@jxsuite/runtime/expression";
 import { compileElement } from "../src/compiler";
 import { buildInitialScope } from "../src/shared";
@@ -76,7 +76,7 @@ describe("compileExpression — assignment operators", () => {
       target: { $ref: "#/state/name" },
       value: { $ref: "event#/target/value" },
     };
-    expect(compileExpression(node, { statePrefix: "s", eventParam: "e" })).toBe(
+    expect(compileExpression(node, { eventParam: "e", statePrefix: "s" })).toBe(
       "s.name = e.target.value",
     );
   });
@@ -128,9 +128,9 @@ describe("compileExpression — array methods", () => {
 describe("compileExpression — aggregates", () => {
   test("reduce: sum", () => {
     const node = {
+      initial: 0,
       operator: "reduce",
       target: { $ref: "#/state/nums" },
-      initial: 0,
       value: {
         operator: "+",
         target: { $ref: "$reduce/acc" },
@@ -166,9 +166,9 @@ describe("compileExpression — aggregates", () => {
 
   test("reduce: cart total (nested multiply)", () => {
     const node = {
+      initial: 0,
       operator: "reduce",
       target: { $ref: "#/state/cart" },
-      initial: 0,
       value: {
         operator: "+",
         target: { $ref: "$reduce/acc" },
@@ -206,7 +206,7 @@ describe("compileExpression — $ref schemes", () => {
       target: { $ref: "#/state/x" },
       value: { $ref: "event#/detail/id" },
     };
-    expect(compileExpression(node, { statePrefix: "s", eventParam: "ev" })).toBe(
+    expect(compileExpression(node, { eventParam: "ev", statePrefix: "s" })).toBe(
       "s.x = ev.detail.id",
     );
   });
@@ -226,7 +226,7 @@ describe("compileExpression — $ref schemes", () => {
 describe("compileElement — $expression state entries", () => {
   test("mutating expression emits handler function", async () => {
     const result = await compileElement({
-      tagName: "test-expr-handler",
+      children: [],
       state: {
         count: 0,
         increment: {
@@ -237,15 +237,15 @@ describe("compileElement — $expression state entries", () => {
           },
         },
       },
-      children: [],
+      tagName: "test-expr-handler",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state.increment = (s, e) => { s.count += 1; };");
   });
 
   test("pure expression emits computed", async () => {
     const result = await compileElement({
-      tagName: "test-expr-computed",
+      children: [],
       state: {
         a: 3,
         b: 4,
@@ -257,20 +257,16 @@ describe("compileElement — $expression state entries", () => {
           },
         },
       },
-      children: [],
+      tagName: "test-expr-computed",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state.sum = computed(() => (this.state.a + this.state.b));");
   });
 
   test("inline $expression on event emits @event handler", async () => {
     const result = await compileElement({
-      tagName: "test-expr-inline",
-      state: { count: 0 },
       children: [
         {
-          tagName: "button",
-          textContent: "Click",
           onclick: {
             $expression: {
               operator: "+=",
@@ -278,16 +274,20 @@ describe("compileElement — $expression state entries", () => {
               value: 1,
             },
           },
+          tagName: "button",
+          textContent: "Click",
         },
       ],
+      state: { count: 0 },
+      tagName: "test-expr-inline",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain('@click="${(e) => { s.count += 1; }}"');
   });
 
   test("toggle expression compiles correctly", async () => {
     const result = await compileElement({
-      tagName: "test-expr-toggle",
+      children: [],
       state: {
         dark: false,
         toggleDark: {
@@ -298,22 +298,22 @@ describe("compileElement — $expression state entries", () => {
           },
         },
       },
-      children: [],
+      tagName: "test-expr-toggle",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain("this.state.toggleDark = (s, e) => { s.dark = !(s.dark); };");
   });
 
   test("reduce aggregate emits computed", async () => {
     const result = await compileElement({
-      tagName: "test-expr-reduce",
+      children: [],
       state: {
         nums: [1, 2, 3],
         total: {
           $expression: {
+            initial: 0,
             operator: "reduce",
             target: { $ref: "#/state/nums" },
-            initial: 0,
             value: {
               operator: "+",
               target: { $ref: "$reduce/acc" },
@@ -322,9 +322,9 @@ describe("compileElement — $expression state entries", () => {
           },
         },
       },
-      children: [],
+      tagName: "test-expr-reduce",
     });
-    const content = result.files[0].content;
+    const { content } = result.files[0];
     expect(content).toContain(
       "this.state.total = computed(() => this.state.nums.reduce((_acc, _item, _index) => (_acc + _item), 0));",
     );
@@ -367,6 +367,7 @@ describe("buildInitialScope — $expression", () => {
 
   test("$expression not treated as plain object", () => {
     const scope = buildInitialScope({
+      on: false,
       toggle: {
         $expression: {
           operator: "=",
@@ -374,7 +375,6 @@ describe("buildInitialScope — $expression", () => {
           value: { operator: "!", target: { $ref: "#/state/on" } },
         },
       },
-      on: false,
     });
     expect(typeof scope.toggle).toBe("function");
   });

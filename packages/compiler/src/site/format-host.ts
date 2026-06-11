@@ -7,14 +7,11 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, resolve, isAbsolute, sep } from "node:path";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
-import {
-  buildFormatRegistry,
-  type FormatRegistry,
-  type FormatHostIO,
-} from "@jxsuite/schema/format-registry";
+import { buildFormatRegistry } from "@jxsuite/schema/format-registry";
+import type { FormatHostIO, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
 export type { FormatRegistry, FormatEntry } from "@jxsuite/schema/format-registry";
@@ -32,15 +29,19 @@ export async function importImplementation(path: string): Promise<Record<string,
   const candidates = [path];
   const srcSeg = `${sep}src${sep}`;
   const distSeg = `${sep}dist${sep}`;
-  if (path.includes(srcSeg)) candidates.push(path.replace(srcSeg, distSeg));
-  if (path.endsWith(".js")) candidates.push(path.slice(0, -3) + ".ts");
+  if (path.includes(srcSeg)) {
+    candidates.push(path.replace(srcSeg, distSeg));
+  }
+  if (path.endsWith(".js")) {
+    candidates.push(`${path.slice(0, -3)}.ts`);
+  }
 
   let lastError: unknown;
   for (const candidate of candidates) {
     try {
       return await import(pathToFileURL(candidate).href);
-    } catch (e) {
-      lastError = e;
+    } catch (error) {
+      lastError = error;
     }
   }
   throw lastError;
@@ -49,13 +50,15 @@ export async function importImplementation(path: string): Promise<Record<string,
 /** Create a node FormatHostIO rooted at a project (bare specifiers resolve via node_modules). */
 export function createNodeFormatIO(projectRoot: string): FormatHostIO {
   return {
-    loadJson: async (path) => JSON.parse(readFileSync(path, "utf-8")),
     importModule: (path) => importImplementation(path),
+    loadJson: async (path) => JSON.parse(readFileSync(path, "utf8")),
     resolvePath: (base, ref) => {
       if (ref.startsWith("./") || ref.startsWith("../")) {
         return resolve(dirname(base), ref);
       }
-      if (isAbsolute(ref)) return ref;
+      if (isAbsolute(ref)) {
+        return ref;
+      }
       const require = createRequire(resolve(projectRoot, "package.json"));
       return require.resolve(ref);
     },

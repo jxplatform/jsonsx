@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { injectSSE, SSE_SCRIPT, createWatcher, shouldIgnore } from "../src/watch";
+import { describe, expect, test } from "bun:test";
+import { SSE_SCRIPT, createWatcher, injectSSE, shouldIgnore } from "../src/watch";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -49,7 +49,7 @@ describe("createWatcher", () => {
       expect(typeof broadcast).toBe("function");
       expect(typeof handleSSE).toBe("function");
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 
@@ -62,7 +62,7 @@ describe("createWatcher", () => {
       expect(response.headers.get("Content-Type")).toBe("text/event-stream");
       expect(response.headers.get("Cache-Control")).toBe("no-cache");
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 
@@ -80,7 +80,7 @@ describe("createWatcher", () => {
       expect(text).toContain("data: reload");
       reader.cancel();
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 
@@ -88,12 +88,12 @@ describe("createWatcher", () => {
     mkdirSync(FIXTURES, { recursive: true });
     try {
       const { broadcast } = createWatcher(FIXTURES, [], {
-        ignore: ["**/temp/**"],
         debounce: 10,
+        ignore: ["**/temp/**"],
       });
       expect(typeof broadcast).toBe("function");
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 
@@ -108,10 +108,10 @@ describe("createWatcher", () => {
       const reader = (response.body as ReadableStream).getReader();
 
       // Wait for chokidar to be ready before writing
-      await new Promise((resolve) => watcher.on("ready", () => resolve(undefined)));
+      await new Promise((resolve) => watcher.on("ready", () => resolve()));
 
       // Write a file to trigger the watcher
-      writeFileSync(join(FIXTURES, "trigger.txt"), "change-" + Date.now());
+      writeFileSync(join(FIXTURES, "trigger.txt"), `change-${Date.now()}`);
 
       // Wait for debounce + watcher to fire
       const { value } = (await Promise.race([
@@ -122,7 +122,7 @@ describe("createWatcher", () => {
       expect(text).toContain("data: reload");
       reader.cancel();
     } finally {
-      rmSync(FIXTURES, { recursive: true, force: true });
+      rmSync(FIXTURES, { force: true, recursive: true });
     }
   });
 });

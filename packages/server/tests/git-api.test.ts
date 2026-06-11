@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { parseGitStatus, handleStudioApi } from "../src/studio-api";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { handleStudioApi, parseGitStatus } from "../src/studio-api";
 import { join, resolve } from "node:path";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -32,13 +32,13 @@ describe("parseGitStatus", () => {
   test("parses staged modified file (type 1)", () => {
     const out = "1 M. N... 100644 100644 100644 abc123 def456 src/app.js\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "src/app.js", status: "M", staged: true }]);
+    expect(result.files).toEqual([{ path: "src/app.js", staged: true, status: "M" }]);
   });
 
   test("parses unstaged modified file (type 1)", () => {
     const out = "1 .M N... 100644 100644 100644 abc123 def456 src/app.js\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "src/app.js", status: "M", staged: false }]);
+    expect(result.files).toEqual([{ path: "src/app.js", staged: false, status: "M" }]);
   });
 
   test("parses file modified in both index and worktree", () => {
@@ -47,38 +47,38 @@ describe("parseGitStatus", () => {
     expect(result.files).toHaveLength(2);
     expect(result.files[0]).toEqual({
       path: "src/app.js",
-      status: "M",
       staged: true,
+      status: "M",
     });
     expect(result.files[1]).toEqual({
       path: "src/app.js",
-      status: "M",
       staged: false,
+      status: "M",
     });
   });
 
   test("parses staged added file", () => {
     const out = "1 A. N... 000000 100644 100644 0000000 abc123 newfile.js\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "newfile.js", status: "A", staged: true }]);
+    expect(result.files).toEqual([{ path: "newfile.js", staged: true, status: "A" }]);
   });
 
   test("parses staged deleted file", () => {
     const out = "1 D. N... 100644 000000 000000 abc123 0000000 old.js\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "old.js", status: "D", staged: true }]);
+    expect(result.files).toEqual([{ path: "old.js", staged: true, status: "D" }]);
   });
 
   test("parses untracked file", () => {
     const out = "? todo.txt\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "todo.txt", status: "U", staged: false }]);
+    expect(result.files).toEqual([{ path: "todo.txt", staged: false, status: "U" }]);
   });
 
   test("parses rename entry (type 2)", () => {
     const out = "2 R. N... 100644 100644 100644 abc123 def456 R100\told.js\tnew.js\n";
     const result = parseGitStatus(out);
-    expect(result.files).toEqual([{ path: "new.js", status: "R", staged: true }]);
+    expect(result.files).toEqual([{ path: "new.js", staged: true, status: "R" }]);
   });
 
   test("parses file paths with spaces", () => {
@@ -89,7 +89,7 @@ describe("parseGitStatus", () => {
 
   test("handles empty output", () => {
     const result = parseGitStatus("");
-    expect(result).toEqual({ branch: "", ahead: 0, behind: 0, files: [] });
+    expect(result).toEqual({ ahead: 0, behind: 0, branch: "", files: [] });
   });
 
   test("parses full realistic output", () => {
@@ -111,23 +111,23 @@ describe("parseGitStatus", () => {
     expect(result.files).toHaveLength(4);
     expect(result.files[0]).toEqual({
       path: "src/index.js",
-      status: "M",
       staged: true,
+      status: "M",
     });
     expect(result.files[1]).toEqual({
       path: "src/utils.js",
-      status: "M",
       staged: false,
+      status: "M",
     });
     expect(result.files[2]).toEqual({
       path: "src/new.js",
-      status: "A",
       staged: true,
+      status: "A",
     });
     expect(result.files[3]).toEqual({
       path: "untracked.txt",
-      status: "U",
       staged: false,
+      status: "U",
     });
   });
 });
@@ -148,7 +148,9 @@ async function studioGitReq(path: string, method: string = "GET", body?: Record<
     init.headers = { "Content-Type": "application/json" };
   }
   const res = await handleStudioApi(new Request(urlStr, init), new URL(urlStr), GIT_FIXTURE);
-  if (!res) throw new Error(`No response from handleStudioApi for ${method} ${path}`);
+  if (!res) {
+    throw new Error(`No response from handleStudioApi for ${method} ${path}`);
+  }
   return res;
 }
 
@@ -164,17 +166,17 @@ function git(cmd: string) {
     encoding: "utf8",
     env: {
       ...process.env,
-      GIT_AUTHOR_NAME: "Test",
       GIT_AUTHOR_EMAIL: "test@test.com",
-      GIT_COMMITTER_NAME: "Test",
+      GIT_AUTHOR_NAME: "Test",
       GIT_COMMITTER_EMAIL: "test@test.com",
+      GIT_COMMITTER_NAME: "Test",
     },
   });
 }
 
 describe("git endpoints", () => {
   beforeAll(() => {
-    rmSync(GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(GIT_FIXTURE, { force: true, recursive: true });
     mkdirSync(GIT_FIXTURE, { recursive: true });
     git("init -b main");
     git("config user.email test@test.com");
@@ -185,7 +187,7 @@ describe("git endpoints", () => {
   });
 
   afterAll(() => {
-    rmSync(GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(GIT_FIXTURE, { force: true, recursive: true });
   });
 
   test("GET status returns branch and empty files on clean repo", async () => {
@@ -343,7 +345,7 @@ describe("git endpoints", () => {
   });
 
   test("POST fetch succeeds with no remotes (no-op)", async () => {
-    // git fetch exits 0 when there are no remotes configured — it is a silent no-op
+    // Git fetch exits 0 when there are no remotes configured — it is a silent no-op
     const res = await studioGitReq("/__studio/git/fetch", "POST");
     expect(res.status).toBe(200);
     const data = (await res.json()) as any;

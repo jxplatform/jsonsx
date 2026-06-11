@@ -1,7 +1,10 @@
 /// <reference lib="dom" />
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
+import { isJsonObject, isRef } from "@jxsuite/schema/guards";
 import { renderFieldRow } from "./field-row";
+
+import type { JxExpressionNode, JxExpressionOperand } from "@jxsuite/schema/types";
 
 // ─── Operator Categories ────────────────────────────────────────────────────
 
@@ -49,75 +52,83 @@ const OPERATOR_GROUPS = [
  * }}
  */
 function operatorInfo(op: string) {
-  if (UNARY_OPS.has(op))
+  if (UNARY_OPS.has(op)) {
     return {
+      needsInitial: false,
       needsValue: false,
-      needsInitial: false,
-      targetMustBeRef: false,
       spliceArray: false,
+      targetMustBeRef: false,
       valueIsNode: false,
     };
-  if (BINARY_OPS.has(op))
+  }
+  if (BINARY_OPS.has(op)) {
     return {
-      needsValue: true,
       needsInitial: false,
-      targetMustBeRef: false,
+      needsValue: true,
       spliceArray: false,
+      targetMustBeRef: false,
       valueIsNode: false,
     };
-  if (ASSIGN_OPS.has(op))
+  }
+  if (ASSIGN_OPS.has(op)) {
     return {
-      needsValue: true,
       needsInitial: false,
+      needsValue: true,
+      spliceArray: false,
       targetMustBeRef: true,
-      spliceArray: false,
       valueIsNode: false,
     };
-  if (NO_ARG_OPS.has(op))
+  }
+  if (NO_ARG_OPS.has(op)) {
     return {
+      needsInitial: false,
       needsValue: false,
-      needsInitial: false,
-      targetMustBeRef: true,
       spliceArray: false,
+      targetMustBeRef: true,
       valueIsNode: false,
     };
-  if (ONE_ARG_OPS.has(op))
+  }
+  if (ONE_ARG_OPS.has(op)) {
     return {
-      needsValue: true,
       needsInitial: false,
-      targetMustBeRef: true,
+      needsValue: true,
       spliceArray: false,
+      targetMustBeRef: true,
       valueIsNode: false,
     };
-  if (op === "splice")
+  }
+  if (op === "splice") {
     return {
-      needsValue: true,
       needsInitial: false,
-      targetMustBeRef: true,
+      needsValue: true,
       spliceArray: true,
+      targetMustBeRef: true,
       valueIsNode: false,
     };
-  if (op === "reduce")
+  }
+  if (op === "reduce") {
     return {
-      needsValue: true,
       needsInitial: true,
-      targetMustBeRef: true,
-      spliceArray: false,
-      valueIsNode: true,
-    };
-  if (op === "map" || op === "filter")
-    return {
       needsValue: true,
-      needsInitial: false,
-      targetMustBeRef: true,
       spliceArray: false,
+      targetMustBeRef: true,
       valueIsNode: true,
     };
+  }
+  if (op === "map" || op === "filter") {
+    return {
+      needsInitial: false,
+      needsValue: true,
+      spliceArray: false,
+      targetMustBeRef: true,
+      valueIsNode: true,
+    };
+  }
   return {
-    needsValue: false,
     needsInitial: false,
-    targetMustBeRef: false,
+    needsValue: false,
     spliceArray: false,
+    targetMustBeRef: false,
     valueIsNode: false,
   };
 }
@@ -125,71 +136,105 @@ function operatorInfo(op: string) {
 // ─── Operand Mode Detection ─────────────────────────────────────────────────
 
 /**
- * @param {any} operand
+ * @param {unknown} operand
  * @returns {"ref" | "expression" | "literal"}
  */
-function operandMode(operand: any) {
+function operandMode(operand: unknown) {
   if (operand && typeof operand === "object") {
-    if ("$ref" in operand) return "ref";
-    if ("operator" in operand) return "expression";
+    if ("$ref" in operand) {
+      return "ref";
+    }
+    if ("operator" in operand) {
+      return "expression";
+    }
   }
   return "literal";
 }
 
 /**
  * @param {string} mode
- * @returns {any}
+ * @returns {JxExpressionOperand}
  */
-function defaultForMode(mode: string) {
-  if (mode === "ref") return { $ref: "" };
-  if (mode === "expression") return { operator: "!", target: null };
+function defaultForMode(mode: string): JxExpressionOperand {
+  if (mode === "ref") {
+    return { $ref: "" };
+  }
+  if (mode === "expression") {
+    return { operator: "!", target: null };
+  }
   return null;
 }
 
 // ─── Literal Type Detection ─────────────────────────────────────────────────
 
 /**
- * @param {any} val
+ * @param {unknown} val
  * @returns {"string" | "number" | "boolean" | "null"}
  */
-function literalType(val: any) {
-  if (val === null || val === undefined) return "null";
-  if (typeof val === "boolean") return "boolean";
-  if (typeof val === "number") return "number";
+function literalType(val: unknown) {
+  if (val === null || val === undefined) {
+    return "null";
+  }
+  if (typeof val === "boolean") {
+    return "boolean";
+  }
+  if (typeof val === "number") {
+    return "number";
+  }
   return "string";
 }
 
 /**
  * @param {string} type
- * @returns {any}
+ * @returns {JxExpressionOperand}
  */
-function defaultForLiteralType(type: string) {
-  if (type === "number") return 0;
-  if (type === "boolean") return false;
-  if (type === "null") return null;
+function defaultForLiteralType(type: string): JxExpressionOperand {
+  if (type === "number") {
+    return 0;
+  }
+  if (type === "boolean") {
+    return false;
+  }
+  if (type === "null") {
+    return null;
+  }
   return "";
 }
 
 // ─── Hint (one-line summary for signal rows) ────────────────────────────────
 
 /**
- * @param {any} node
+ * @param {unknown} node
  * @returns {string}
  */
-export function expressionHint(node: any) {
-  if (!node || !node.operator) return "$expression";
-  const op = node.operator;
-  const targetLabel = node.target?.$ref
-    ? node.target.$ref.replace("#/state/", "")
-    : node.target?.operator
-      ? `(${node.target.operator}…)`
-      : String(node.target ?? "?");
+export function expressionHint(node: unknown) {
+  if (!isJsonObject(node) || typeof node.operator !== "string") {
+    return "$expression";
+  }
+  const expr = node as unknown as JxExpressionNode;
+  const op = expr.operator;
+  const { target } = expr;
+  const targetLabel = isRef(target)
+    ? target.$ref.replace("#/state/", "")
+    : isJsonObject(target) && typeof target.operator === "string"
+      ? `(${target.operator}…)`
+      : String(target ?? "?");
 
-  if (ASSIGN_OPS.has(op) || ONE_ARG_OPS.has(op)) return `${op} ${targetLabel}`;
-  if (NO_ARG_OPS.has(op)) return `${op}(${targetLabel})`;
-  if (op === "splice") return `splice(${targetLabel})`;
-  if (op === "reduce" || op === "map" || op === "filter") return `${op}(${targetLabel})`;
-  if (UNARY_OPS.has(op)) return `${op}${targetLabel}`;
+  if (ASSIGN_OPS.has(op) || ONE_ARG_OPS.has(op)) {
+    return `${op} ${targetLabel}`;
+  }
+  if (NO_ARG_OPS.has(op)) {
+    return `${op}(${targetLabel})`;
+  }
+  if (op === "splice") {
+    return `splice(${targetLabel})`;
+  }
+  if (op === "reduce" || op === "map" || op === "filter") {
+    return `${op}(${targetLabel})`;
+  }
+  if (UNARY_OPS.has(op)) {
+    return `${op}${targetLabel}`;
+  }
   return `${targetLabel} ${op} …`;
 }
 
@@ -219,7 +264,9 @@ function renderRefPicker(
       .value=${live(isCustom ? "__custom__" : refVal || "")}
       @change=${(e: Event) => {
         const val = (e.target as HTMLInputElement).value;
-        if (val === "__custom__") return;
+        if (val === "__custom__") {
+          return;
+        }
         onRefChange(val);
       }}
     >
@@ -241,11 +288,11 @@ function renderRefPicker(
 // ─── Literal Editor ─────────────────────────────────────────────────────────
 
 /**
- * @param {any} operand
- * @param {(newVal: any) => void} onChange
+ * @param {unknown} operand
+ * @param {(newVal: JxExpressionOperand) => void} onChange
  * @returns {import("lit-html").TemplateResult}
  */
-function renderLiteralEditor(operand: any, onChange: (newVal: any) => void) {
+function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOperand) => void) {
   const type = literalType(operand);
   return html`
     <div style="display:flex;gap:4px;align-items:center;flex:1">
@@ -280,7 +327,7 @@ function renderLiteralEditor(operand: any, onChange: (newVal: any) => void) {
           : type === "boolean"
             ? html`<sp-checkbox
                 size="s"
-                ?checked=${!!operand}
+                ?checked=${Boolean(operand)}
                 @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
                 >true</sp-checkbox
               >`
@@ -294,8 +341,8 @@ function renderLiteralEditor(operand: any, onChange: (newVal: any) => void) {
 // ─── Operand Editor ─────────────────────────────────────────────────────────
 
 /**
- * @param {any} operand
- * @param {(newOperand: any) => void} onChange
+ * @param {unknown} operand
+ * @param {(newOperand: unknown) => void} onChange
  * @param {{
  *   stateDefs: string[];
  *   allowEventRef: boolean;
@@ -356,8 +403,8 @@ function renderOperandEditor(
 // ─── Splice Args Editor ─────────────────────────────────────────────────────
 
 /**
- * @param {any[]} args
- * @param {(newArgs: any[]) => void} onChange
+ * @param {unknown[]} args
+ * @param {(newArgs: unknown[]) => void} onChange
  * @param {{ stateDefs: string[]; allowEventRef: boolean; depth: number }} opts
  * @returns {import("lit-html").TemplateResult}
  */
@@ -424,8 +471,8 @@ const _operatorMenuCache = OPERATOR_GROUPS.map(
 // ─── Main Expression Editor ─────────────────────────────────────────────────
 
 /**
- * @param {any} node
- * @param {(node: any) => void} onChange
+ * @param {unknown} node
+ * @param {(node: unknown) => void} onChange
  * @param {{
  *   stateDefs: string[];
  *   allowEventRef: boolean;
@@ -454,9 +501,9 @@ export function renderExpressionEditor(
   return html`
     <div class="expression-editor" style=${nestStyle}>
       ${renderFieldRow({
-        prop: "operator",
-        label: "Operator",
         hasValue: false,
+        label: "Operator",
+        prop: "operator",
         widget: html`
           <sp-picker
             size="s"
@@ -464,7 +511,10 @@ export function renderExpressionEditor(
             @change=${(e: Event) => {
               const newOp = (e.target as HTMLInputElement).value;
               const newInfo = operatorInfo(newOp);
-              const updated: any = { operator: newOp, target: safeNode.target };
+              const updated: Record<string, unknown> = {
+                operator: newOp,
+                target: safeNode.target,
+              };
               if (newInfo.targetMustBeRef && operandMode(safeNode.target) !== "ref") {
                 updated.target = { $ref: "" };
               }
@@ -478,7 +528,9 @@ export function renderExpressionEditor(
                   updated.value = safeNode.value ?? null;
                 }
               }
-              if (newInfo.needsInitial) updated.initial = safeNode.initial ?? 0;
+              if (newInfo.needsInitial) {
+                updated.initial = safeNode.initial ?? 0;
+              }
               onChange(updated);
             }}
           >
@@ -487,9 +539,9 @@ export function renderExpressionEditor(
         `,
       })}
       ${renderFieldRow({
-        prop: "target",
-        label: "Target",
         hasValue: false,
+        label: "Target",
+        prop: "target",
         widget: renderOperandEditor(safeNode.target, (t) => onChange({ ...safeNode, target: t }), {
           ...opts,
           depth,
@@ -498,9 +550,9 @@ export function renderExpressionEditor(
       })}
       ${info.needsValue && !info.valueIsNode && !info.spliceArray
         ? renderFieldRow({
-            prop: "value",
-            label: "Value",
             hasValue: false,
+            label: "Value",
+            prop: "value",
             widget: renderOperandEditor(
               safeNode.value,
               (v) => onChange({ ...safeNode, value: v }),
@@ -512,9 +564,9 @@ export function renderExpressionEditor(
         ? html`
             <div style="margin-top:4px">
               ${renderFieldRow({
-                prop: "value",
-                label: "Per-item",
                 hasValue: false,
+                label: "Per-item",
+                prop: "value",
                 widget: nothing,
               })}
               ${renderExpressionEditor(
@@ -531,9 +583,9 @@ export function renderExpressionEditor(
         ? html`
             <div style="margin-top:4px">
               ${renderFieldRow({
-                prop: "value",
-                label: "Args",
                 hasValue: false,
+                label: "Args",
+                prop: "value",
                 widget: nothing,
               })}
               ${renderSpliceArgsEditor(
@@ -549,9 +601,9 @@ export function renderExpressionEditor(
         : nothing}
       ${info.needsInitial
         ? renderFieldRow({
-            prop: "initial",
-            label: "Initial",
             hasValue: false,
+            label: "Initial",
+            prop: "initial",
             widget: renderOperandEditor(
               safeNode.initial,
               (v) => onChange({ ...safeNode, initial: v }),

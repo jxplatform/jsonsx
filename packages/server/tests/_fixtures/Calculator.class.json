@@ -1,1 +1,1 @@
-{"title":"Calculator","$prototype":"Class","$implementation":"./calc.js","$defs":{"parameters":{"a":{"identifier":"a","type":{"type":"number"}},"b":{"identifier":"b","type":{"type":"number"}}}}}
+{"$defs":{"parameters":{"a":{"identifier":"a","type":{"type":"number"}},"b":{"identifier":"b","type":{"type":"number"}}}},"$implementation":"./calc.js","$prototype":"Class","title":"Calculator"}

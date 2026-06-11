@@ -13,18 +13,18 @@ import { projectState } from "../state";
 import type { JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
 import {
-  transactDoc,
-  mutateUpdateDef,
   mutateAddDef,
   mutateRemoveDef,
   mutateRenameDef,
+  mutateUpdateDef,
+  transactDoc,
 } from "../tabs/transact";
 import { renderFieldRow } from "../ui/field-row";
-import { spTextField, rawTextArea } from "../ui/field-input";
-import { renderExpressionEditor, expressionHint } from "../ui/expression-editor";
+import { rawTextArea, spTextField } from "../ui/field-input";
+import { expressionHint, renderExpressionEditor } from "../ui/expression-editor";
 import { renderMediaPicker } from "../ui/media-picker";
 import type { TabUi } from "../tabs/tab";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { CemEvent, CemParameter, JxMutableNode } from "@jxsuite/schema/types";
 import { fetchPluginSchema, pluginSchemaCache } from "../services/code-services";
 
 interface SignalsPanelState {
@@ -41,19 +41,6 @@ interface SignalsPanelCtx {
   renderLeftPanel(): void;
   renderCanvas(): void;
   updateSession(patch: Record<string, unknown>): void;
-}
-
-interface CemParameter {
-  name: string;
-  type?: { text?: string };
-  description?: string;
-  optional?: boolean;
-}
-
-interface CemEvent {
-  name: string;
-  type?: { text?: string };
-  description?: string;
 }
 
 interface JsonSchema {
@@ -120,19 +107,19 @@ const advancedParamOpen = new Set();
 
 /** Default templates for creating new signal definitions. */
 const DEF_TEMPLATES = {
-  state: { type: "string", default: "" },
   computed: { $compute: "", $deps: [] },
-  request: { $prototype: "Request", url: "", method: "GET", timing: "client" },
-  localStorage: { $prototype: "LocalStorage", key: "", default: null },
-  sessionStorage: { $prototype: "SessionStorage", key: "", default: null },
-  indexedDB: { $prototype: "IndexedDB", database: "", store: "", version: 1 },
-  cookie: { $prototype: "Cookie", name: "", default: "" },
-  set: { $prototype: "Set", default: [] },
-  map: { $prototype: "Map", default: {} },
-  formData: { $prototype: "FormData", fields: {} },
-  function: { $prototype: "Function", body: "", parameters: [] },
+  cookie: { $prototype: "Cookie", default: "", name: "" },
   expression: { $expression: { operator: "=", target: null } },
   external: { $prototype: "", $src: "" },
+  formData: { $prototype: "FormData", fields: {} },
+  function: { $prototype: "Function", body: "", parameters: [] },
+  indexedDB: { $prototype: "IndexedDB", database: "", store: "", version: 1 },
+  localStorage: { $prototype: "LocalStorage", default: null, key: "" },
+  map: { $prototype: "Map", default: {} },
+  request: { $prototype: "Request", method: "GET", timing: "client", url: "" },
+  sessionStorage: { $prototype: "SessionStorage", default: null, key: "" },
+  set: { $prototype: "Set", default: [] },
+  state: { default: "", type: "string" },
 } as Record<string, SignalDef>;
 
 /** Keys handled by the framework — skip when rendering schema fields. */
@@ -155,17 +142,38 @@ const STUDIO_RESERVED_KEYS = new Set([
 // ─── Signals / defs helpers ──────────────────────────────────────────────────
 
 /**
+ * View a state entry through the panel's flattened editing lens. Naked primitive and array entries
+ * surface as an empty view — the renderers guard every field access.
+ *
+ * @param {import("@jxsuite/schema/types").JxStateDefinition} def
+ * @returns {SignalDef}
+ */
+function asSignalDef(def: import("@jxsuite/schema/types").JxStateDefinition): SignalDef {
+  return (typeof def === "object" && def !== null && !Array.isArray(def) ? def : {}) as SignalDef;
+}
+
+/**
  * Classify a state entry into a category string.
  *
  * @param {SignalDef | unknown} def
  */
 export function defCategory(def: SignalDef | unknown) {
-  if (!def) return "state";
+  if (!def) {
+    return "state";
+  }
   const d = def as SignalDef;
-  if (d.$expression) return "expression";
-  if (d.$handler || d.$prototype === "Function") return "function";
-  if (d.$compute) return "computed";
-  if (d.$prototype) return "data";
+  if (d.$expression) {
+    return "expression";
+  }
+  if (d.$handler || d.$prototype === "Function") {
+    return "function";
+  }
+  if (d.$compute) {
+    return "computed";
+  }
+  if (d.$prototype) {
+    return "data";
+  }
   return "state";
 }
 
@@ -175,12 +183,22 @@ export function defCategory(def: SignalDef | unknown) {
  * @param {SignalDef | unknown} def
  */
 export function defBadgeLabel(def: SignalDef | unknown) {
-  if (!def) return "S";
+  if (!def) {
+    return "S";
+  }
   const d = def as SignalDef;
-  if (d.$expression) return "E";
-  if (d.$handler || d.$prototype === "Function") return "F";
-  if (d.$compute) return "C";
-  if (d.$prototype) return d.$prototype.charAt(0);
+  if (d.$expression) {
+    return "E";
+  }
+  if (d.$handler || d.$prototype === "Function") {
+    return "F";
+  }
+  if (d.$compute) {
+    return "C";
+  }
+  if (d.$prototype) {
+    return d.$prototype.charAt(0);
+  }
   return "S";
 }
 
@@ -191,24 +209,45 @@ export function defBadgeLabel(def: SignalDef | unknown) {
  * @param {SignalDef | null | undefined} def
  */
 export function defHint(name: string, def: SignalDef | null | undefined) {
-  if (!def) return "";
-  if (def.$expression) return expressionHint(def.$expression);
+  if (!def) {
+    return "";
+  }
+  if (def.$expression) {
+    return expressionHint(def.$expression);
+  }
   if (def.$prototype === "Function") {
-    if (def.body) return def.body.length > 20 ? def.body.slice(0, 20) + "..." : def.body;
-    if (def.$src) return def.$src;
+    if (def.body) {
+      return def.body.length > 20 ? `${def.body.slice(0, 20)}...` : def.body;
+    }
+    if (def.$src) {
+      return def.$src;
+    }
     return "function";
   }
-  if (def.$handler) return "handler (legacy)";
-  if (def.$compute)
-    return "=" + (def.$compute.length > 20 ? def.$compute.slice(0, 20) + "..." : def.$compute);
-  if (def.$prototype === "Request")
-    return (def.method || "GET") + " " + (def.url || "").slice(0, 20);
-  if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage")
+  if (def.$handler) {
+    return "handler (legacy)";
+  }
+  if (def.$compute) {
+    return `=${def.$compute.length > 20 ? `${def.$compute.slice(0, 20)}...` : def.$compute}`;
+  }
+  if (def.$prototype === "Request") {
+    return `${def.method || "GET"} ${(def.url || "").slice(0, 20)}`;
+  }
+  if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
     return def.key || "";
-  if (def.$prototype === "IndexedDB") return def.database || "";
-  if (def.$prototype === "Cookie") return def.name || "";
-  if (def.$prototype) return def.$prototype;
-  if (def.attribute) return `[${def.attribute}] ${def.type || ""}`;
+  }
+  if (def.$prototype === "IndexedDB") {
+    return def.database || "";
+  }
+  if (def.$prototype === "Cookie") {
+    return def.name || "";
+  }
+  if (def.$prototype) {
+    return def.$prototype;
+  }
+  if (def.attribute) {
+    return `[${def.attribute}] ${def.type || ""}`;
+  }
   return def.type || "";
 }
 
@@ -231,12 +270,17 @@ export function collectCssParts(
   node: JxMutableNode | null | undefined,
   parts: { name: string; tag: string }[] = [],
 ) {
-  if (node?.attributes?.part)
-    parts.push({ name: node.attributes.part, tag: node.tagName || "div" });
-  if (Array.isArray(node?.children))
+  const part = node?.attributes?.part;
+  if (typeof part === "string" && part) {
+    parts.push({ name: part, tag: node?.tagName || "div" });
+  }
+  if (Array.isArray(node?.children)) {
     node.children.forEach((c) => {
-      if (typeof c !== "string") collectCssParts(c, parts);
+      if (typeof c !== "string") {
+        collectCssParts(c, parts);
+      }
     });
+  }
   return parts;
 }
 
@@ -249,40 +293,59 @@ export function collectCssParts(
  */
 export function resolveDefaultForCanvas(
   value: unknown,
-  defs: Record<string, SignalDef> | null | undefined,
+  defs: Record<string, import("@jxsuite/schema/types").JxStateDefinition> | null | undefined,
 ) {
-  if (!value || typeof value !== "object" || !(value as Record<string, unknown>).$ref) return value;
+  if (!value || typeof value !== "object" || !(value as Record<string, unknown>).$ref) {
+    return value;
+  }
   const ref = (value as Record<string, unknown>).$ref as string;
   /** @type {string | undefined} */
   let defName;
-  if (ref.startsWith("#/state/")) defName = ref.slice(8);
-  else if (ref.startsWith("$")) defName = ref;
-  else return `{${ref}}`;
+  if (ref.startsWith("#/state/")) {
+    defName = ref.slice(8);
+  } else if (ref.startsWith("$")) {
+    defName = ref;
+  } else {
+    return `{${ref}}`;
+  }
 
-  const def = defs?.[defName];
-  if (!def) return `{${defName}}`;
+  const rawDef = defs?.[defName];
+  if (!rawDef) {
+    return `{${defName}}`;
+  }
+  const def = asSignalDef(rawDef);
 
   // State signal → use default
   if (!def.$compute && !def.$prototype) {
     if (def.default !== undefined && def.default !== null) {
-      if (typeof def.default === "object") return JSON.stringify(def.default);
+      if (typeof def.default === "object") {
+        return JSON.stringify(def.default);
+      }
       return String(def.default);
     }
     return "";
   }
   // Computed → expression indicator
-  if (def.$compute) return `\u0192(${defName})`;
+  if (def.$compute) {
+    return `\u0192(${defName})`;
+  }
   // Request → URL hint
-  if (def.$prototype === "Request") return `\u27F3 ${def.url || "fetch"}`;
+  if (def.$prototype === "Request") {
+    return `\u27F3 ${def.url || "fetch"}`;
+  }
   // Storage → use default or key
   if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
     if (def.default !== undefined && def.default !== null) {
-      if (typeof def.default === "object") return JSON.stringify(def.default);
+      if (typeof def.default === "object") {
+        return JSON.stringify(def.default);
+      }
       return String(def.default);
     }
     return `[${def.key || "storage"}]`;
   }
-  if (def.$prototype) return `{${def.$prototype}}`;
+  if (def.$prototype) {
+    return `{${def.$prototype}}`;
+  }
   return `{${defName}}`;
 }
 
@@ -294,13 +357,15 @@ export function signalFieldRow(label: string, value: string, onChange: (value: s
     prop: label,
     label,
     hasValue: false,
-    // commitMode "blur": signal fields (rename, src, etc.) commit on blur/Enter only — a debounced
-    // mid-typing commit would, e.g., rename the signal on every keystroke pause.
+    // CommitMode "blur": signal fields (rename, src, etc.) commit on blur/Enter only — a debounced
+    // Mid-typing commit would, e.g., rename the signal on every keystroke pause.
     widget: spTextField(
       `sig:${label}`,
       value,
       (v: string) => {
-        if (v !== value) onChange(v);
+        if (v !== value) {
+          onChange(v);
+        }
       },
       { commitMode: "blur" },
     ),
@@ -308,8 +373,19 @@ export function signalFieldRow(label: string, value: string, onChange: (value: s
 }
 
 /** Normalize a parameter entry to a CEM object. */
-export function normParam(p: string | Record<string, unknown>) {
-  return typeof p === "string" ? { name: p } : (p as unknown as CemParameter);
+export function normParam(p: string | CemParameter): CemParameter {
+  return typeof p === "string" ? { name: p } : p;
+}
+
+/** Extract the display text from a CEM `{ text }` type value, if present. */
+function cemTypeText(type: import("@jxsuite/schema/types").JsonValue | undefined): string {
+  if (typeof type === "object" && type !== null && !Array.isArray(type)) {
+    const { text } = type;
+    if (typeof text === "string") {
+      return text;
+    }
+  }
+  return "";
 }
 
 // ─── Left panel: Signals ─────────────────────────────────────────────────────
@@ -324,22 +400,22 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
 
   // Group by category
   const groups = {
-    state: [],
     computed: [],
     data: [],
     expression: [],
     function: [],
+    state: [],
   } as Record<string, [string, SignalDef][]>;
   for (const [name, def] of entries) {
-    groups[defCategory(def)].push([name, def]);
+    groups[defCategory(def)].push([name, asSignalDef(def)]);
   }
 
   const categories = [
-    { key: "state", label: "State", items: groups.state },
-    { key: "computed", label: "Computed", items: groups.computed },
-    { key: "data", label: "Data", items: groups.data },
-    { key: "expression", label: "Expressions", items: groups.expression },
-    { key: "function", label: "Functions", items: groups.function },
+    { items: groups.state, key: "state", label: "State" },
+    { items: groups.computed, key: "computed", label: "Computed" },
+    { items: groups.data, key: "data", label: "Data" },
+    { items: groups.expression, key: "expression", label: "Expressions" },
+    { items: groups.function, key: "function", label: "Functions" },
   ];
 
   const collapsedCats = S._collapsedSignalCats || (S._collapsedSignalCats = new Set());
@@ -352,8 +428,11 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
           label="${label} (${items.length})"
           ?open=${!collapsedCats.has(key)}
           @sp-accordion-item-toggle=${() => {
-            if (collapsedCats.has(key)) collapsedCats.delete(key);
-            else collapsedCats.add(key);
+            if (collapsedCats.has(key)) {
+              collapsedCats.delete(key);
+            } else {
+              collapsedCats.add(key);
+            }
             ctx.renderLeftPanel();
           }}
         >
@@ -361,7 +440,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
             const isExpanded: boolean = expandedSignal === name;
             return html`
               <div
-                class=${classMap({ "signal-row": true, expanded: isExpanded })}
+                class=${classMap({ expanded: isExpanded, "signal-row": true })}
                 @click=${() => {
                   expandedSignal = isExpanded ? null : name;
                   ctx.renderLeftPanel();
@@ -404,13 +483,15 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
           placeholder="+ Add…"
           @change=${(e: Event) => {
             const type = (e.target as HTMLInputElement).value;
-            if (!type) return;
+            if (!type) {
+              return;
+            }
 
             // Handle import-based prototypes (e.g., "import:ContentCollection")
             if (type.startsWith("import:")) {
               const protoName = type.slice(7);
               const src = projectState?.projectConfig?.imports?.[protoName];
-              let n = "$" + protoName.charAt(0).toLowerCase() + protoName.slice(1);
+              let n = `$${protoName.charAt(0).toLowerCase()}${protoName.slice(1)}`;
               let i = 1;
               const base = n;
               while (S.document.state && S.document.state[n]) {
@@ -442,9 +523,11 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
             }
 
             const template = DEF_TEMPLATES[type];
-            if (!template) return;
+            if (!template) {
+              return;
+            }
             const isFunction = type === "function";
-            let nameBase = isFunction ? "newFunction" : "$newSignal";
+            const nameBase = isFunction ? "newFunction" : "$newSignal";
             let n = nameBase;
             let i = 1;
             while (S.document.state && S.document.state[n]) {
@@ -501,11 +584,11 @@ function renderSignalEditorTemplate(
     options: string[],
     currentVal: string,
     onChange: (value: string) => void,
-  ) => {
-    return renderFieldRow({
-      prop: label,
-      label,
+  ) =>
+    renderFieldRow({
       hasValue: false,
+      label,
+      prop: label,
       widget: html`
         <sp-picker
           size="s"
@@ -516,27 +599,25 @@ function renderSignalEditorTemplate(
         </sp-picker>
       `,
     });
-  };
 
   // Helper for textarea rows — uses the shared draft layer (commits on blur/Enter and a 500ms
-  // debounce) so a panel re-render mid-edit can't truncate the in-progress text.
+  // Debounce) so a panel re-render mid-edit can't truncate the in-progress text.
   const textareaRow = (
     label: string,
     value: string,
     onChange: (value: string) => void,
     opts: { minHeight?: string; mono?: boolean } = {},
-  ) => {
-    return renderFieldRow({
-      prop: label,
-      label,
+  ) =>
+    renderFieldRow({
       hasValue: false,
+      label,
+      prop: label,
       widget: rawTextArea(`sig:${label}`, value, onChange, {
         debounceMs: 500,
         ...(opts.minHeight != null && { minHeight: opts.minHeight }),
         ...(opts.mono != null && { mono: opts.mono }),
       }),
     });
-  };
 
   // Name field (common to all)
   const nameField = signalFieldRow("Name", name, (v: string) => {
@@ -564,13 +645,13 @@ function renderSignalEditorTemplate(
             ),
           )}
           ${renderFieldRow({
-            prop: "reflects",
-            label: "Reflects",
             hasValue: false,
+            label: "Reflects",
+            prop: "reflects",
             widget: html`
               <sp-checkbox
                 class="field-check"
-                ?checked=${!!def.reflects}
+                ?checked=${Boolean(def.reflects)}
                 @change=${(e: Event) =>
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, {
@@ -607,9 +688,9 @@ function renderSignalEditorTemplate(
         : nothing}
       ${def.format === "image"
         ? renderFieldRow({
-            prop: "Default",
-            label: "Default",
             hasValue: false,
+            label: "Default",
+            prop: "Default",
             widget: renderMediaPicker("default", defaultVal, (v: string) => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, { default: v || undefined }),
@@ -618,10 +699,13 @@ function renderSignalEditorTemplate(
           })
         : signalFieldRow("Default", defaultVal, (v: string) => {
             let parsed: unknown = v;
-            if (def.type === "integer") parsed = parseInt(v, 10) || 0;
-            else if (def.type === "number") parsed = parseFloat(v) || 0;
-            else if (def.type === "boolean") parsed = v === "true";
-            else if (def.type === "array" || def.type === "object") {
+            if (def.type === "integer") {
+              parsed = Number.parseInt(v, 10) || 0;
+            } else if (def.type === "number") {
+              parsed = Number.parseFloat(v) || 0;
+            } else if (def.type === "boolean") {
+              parsed = v === "true";
+            } else if (def.type === "array" || def.type === "object") {
               try {
                 parsed = JSON.parse(v);
               } catch {
@@ -643,9 +727,9 @@ function renderSignalEditorTemplate(
     let debounce: ReturnType<typeof setTimeout> | undefined;
     fields = html`
       ${renderFieldRow({
-        prop: "expression",
-        label: "Expression",
         hasValue: false,
+        label: "Expression",
+        prop: "expression",
         widget: html`
           <textarea
             class="field-input"
@@ -667,9 +751,9 @@ function renderSignalEditorTemplate(
       })}
       ${def.$deps && def.$deps.length > 0
         ? renderFieldRow({
-            prop: "dependencies",
-            label: "Dependencies",
             hasValue: false,
+            label: "Dependencies",
+            prop: "dependencies",
             widget: html`
               <span class="signal-hint" style="flex:1;max-width:none"
                 >${def.$deps.map((d: string) => d.replace("#/state/", "")).join(", ")}</span
@@ -687,11 +771,14 @@ function renderSignalEditorTemplate(
     fields = html`
       ${renderExpressionEditor(
         exprNode,
-        (newNode: any) =>
-          transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { $expression: newNode })),
+        (newNode: unknown) =>
+          transactDoc(activeTab.value, (t) =>
+            // Expression editors emit JSON expression nodes.
+            mutateUpdateDef(t, name, { $expression: newNode as JsonValue }),
+          ),
         {
-          stateDefs: Object.keys(S.document.state || {}),
           allowEventRef: false,
+          stateDefs: Object.keys(S.document.state || {}),
         },
       )}
     `;
@@ -767,7 +854,7 @@ function renderDataSourceFields(
       )}
       ${signalFieldRow("Version", String(def.version || 1), (v: string) =>
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateDef(t, name, { version: parseInt(v, 10) || 1 }),
+          mutateUpdateDef(t, name, { version: Number.parseInt(v, 10) || 1 }),
         ),
       )}
     `;
@@ -840,7 +927,7 @@ function renderFunctionFields(
             title="Open in code editor"
             @click=${() => {
               ctx.updateSession({
-                ui: { editingFunction: { type: "def", defName: name } },
+                ui: { editingFunction: { defName: name, type: "def" } },
               });
               ctx.renderCanvas();
             }}
@@ -880,9 +967,9 @@ function renderParameterEditorTemplate(
   if (!isAdvanced) {
     // Basic mode: name chips
     return renderFieldRow({
-      prop: "parameters",
-      label: "Parameters",
       hasValue: false,
+      label: "Parameters",
+      prop: "parameters",
       widget: html`
         <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">
           ${params.map(
@@ -896,9 +983,10 @@ function renderParameterEditorTemplate(
                   @click=${() => {
                     transactDoc(activeTab.value, (t) =>
                       mutateUpdateDef(t, name, {
-                        parameters: params.filter((_: unknown, j: number) => j !== i).length
-                          ? params.filter((_: unknown, j: number) => j !== i)
-                          : undefined,
+                        parameters:
+                          params.filter((_: unknown, j: number) => j !== i).length > 0
+                            ? params.filter((_: unknown, j: number) => j !== i)
+                            : undefined,
                       }),
                     );
                   }}
@@ -936,9 +1024,9 @@ function renderParameterEditorTemplate(
 
   // Advanced mode: full rows
   return renderFieldRow({
-    prop: "parameters",
-    label: "Parameters",
     hasValue: false,
+    label: "Parameters",
+    prop: "parameters",
     widget: html`
       <div style="display:flex;flex-direction:column;gap:4px">
         ${params.map(
@@ -962,7 +1050,7 @@ function renderParameterEditorTemplate(
               />
               <input
                 class="field-input"
-                .value=${p.type?.text || ""}
+                .value=${cemTypeText(p.type)}
                 placeholder="type"
                 style="flex:1"
                 @change=${(e: Event) => {
@@ -993,10 +1081,10 @@ function renderParameterEditorTemplate(
               <input
                 type="checkbox"
                 title="optional"
-                .checked=${!!p.optional}
+                .checked=${Boolean(p.optional)}
                 @change=${(e: Event) => {
                   const next = [...params];
-                  const checked = (e.target as HTMLInputElement).checked;
+                  const { checked } = e.target as HTMLInputElement;
                   const { optional: _o, ...rest } = next[i];
                   next[i] = checked ? { ...rest, optional: true } : rest;
                   transactDoc(activeTab.value, (t) =>
@@ -1010,7 +1098,7 @@ function renderParameterEditorTemplate(
                   const next = params.filter((_: unknown, j: number) => j !== i);
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, {
-                      parameters: next.length ? next : undefined,
+                      parameters: next.length > 0 ? next : undefined,
                     }),
                   );
                 }}
@@ -1046,7 +1134,9 @@ function renderParameterEditorTemplate(
 /** Render CEM emits editor for function state entries. */
 function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: SignalDef) {
   const emits = def.emits || ([] as CemEvent[]);
-  if (emits.length === 0 && !isCustomElementDoc(S)) return nothing;
+  if (emits.length === 0 && !isCustomElementDoc(S)) {
+    return nothing;
+  }
 
   return html`
     <div
@@ -1073,7 +1163,7 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
           />
           <input
             class="field-input"
-            .value=${ev.type?.text || ""}
+            .value=${cemTypeText(ev.type)}
             placeholder="type"
             style="flex:1"
             @change=${(e: Event) => {
@@ -1102,9 +1192,10 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             @click=${() => {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, {
-                  emits: emits.filter((_: unknown, j: number) => j !== i).length
-                    ? emits.filter((_: unknown, j: number) => j !== i)
-                    : undefined,
+                  emits:
+                    emits.filter((_: unknown, j: number) => j !== i).length > 0
+                      ? emits.filter((_: unknown, j: number) => j !== i)
+                      : undefined,
                 }),
               );
             }}
@@ -1138,7 +1229,9 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
  * @returns {string[] | undefined}
  */
 function resolveSchemaEnum(enumDef: unknown, parentDef?: Record<string, unknown>) {
-  if (Array.isArray(enumDef)) return enumDef;
+  if (Array.isArray(enumDef)) {
+    return enumDef;
+  }
   if (enumDef && typeof enumDef === "object") {
     const ref = (enumDef as Record<string, unknown>).$ref;
     if (ref === "#/$context/contentTypes") {
@@ -1155,16 +1248,18 @@ function resolveSchemaEnum(enumDef: unknown, parentDef?: Record<string, unknown>
             | undefined;
           const schema = ct?.schema as Record<string, unknown> | undefined;
           const props = schema?.properties as Record<string, unknown> | undefined;
-          if (props) return Object.keys(props);
+          if (props) {
+            return Object.keys(props);
+          }
         }
       }
-      return undefined;
+      return;
     }
   }
   if (enumDef === "$contentTypes") {
     return Object.keys(projectState?.projectConfig?.contentTypes ?? {});
   }
-  return undefined;
+  return;
 }
 
 /**
@@ -1205,7 +1300,7 @@ function renderInlineField(
   if (schema.type === "boolean") {
     return html`<sp-switch
       size="s"
-      ?checked=${!!value}
+      ?checked=${Boolean(value)}
       @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
       >${key}</sp-switch
     >`;
@@ -1219,8 +1314,8 @@ function renderInlineField(
       @change=${(e: Event) => {
         const parsed =
           schema.type === "integer"
-            ? parseInt((e.target as HTMLInputElement).value, 10)
-            : parseFloat((e.target as HTMLInputElement).value);
+            ? Number.parseInt((e.target as HTMLInputElement).value, 10)
+            : Number.parseFloat((e.target as HTMLInputElement).value);
         onChange(isNaN(parsed) ? undefined : parsed);
       }}
     ></sp-number-field>`;
@@ -1245,7 +1340,9 @@ export function renderSchemaFieldsTemplate(
   _S: SignalsPanelState,
   ctx: SignalsPanelCtx | null = null,
 ) {
-  if (!schema?.properties) return nothing;
+  if (!schema?.properties) {
+    return nothing;
+  }
 
   const required = new Set(schema.required ?? []);
 
@@ -1307,8 +1404,8 @@ export function renderSchemaFieldsTemplate(
             debounce = setTimeout(() => {
               const parsed =
                 ps.type === "integer"
-                  ? parseInt((e.target as HTMLInputElement).value, 10)
-                  : parseFloat((e.target as HTMLInputElement).value);
+                  ? Number.parseInt((e.target as HTMLInputElement).value, 10)
+                  : Number.parseFloat((e.target as HTMLInputElement).value);
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, {
                   [prop]: isNaN(parsed) ? undefined : parsed,
@@ -1344,9 +1441,9 @@ export function renderSchemaFieldsTemplate(
               multiline
               size="s"
               style=${styleMap({
-                minHeight: hasValue ? "80px" : "40px",
                 fontFamily: "monospace",
                 fontSize: "11px",
+                minHeight: hasValue ? "80px" : "40px",
               })}
               .value=${currentValue !== undefined ? JSON.stringify(currentValue, null, 2) : ""}
               placeholder=${ps.description ?? "JSON Schema defining the data shape\u2026"}
@@ -1399,7 +1496,7 @@ export function renderSchemaFieldsTemplate(
                       const updated = rows.filter((_: unknown, i: number) => i !== idx);
                       transactDoc(activeTab.value, (t) =>
                         mutateUpdateDef(t, name, {
-                          [prop]: updated.length ? updated : undefined,
+                          [prop]: updated.length > 0 ? updated : undefined,
                         }),
                       );
                       ctx?.renderLeftPanel();
@@ -1417,8 +1514,9 @@ export function renderSchemaFieldsTemplate(
                 e.stopPropagation();
                 const newRow: Record<string, unknown> = {};
                 for (const [k, v] of Object.entries(itemProps)) {
-                  if ((v as Record<string, unknown>).default !== undefined)
+                  if ((v as Record<string, unknown>).default !== undefined) {
                     newRow[k] = (v as Record<string, unknown>).default;
+                  }
                 }
                 transactDoc(activeTab.value, (t) =>
                   mutateUpdateDef(t, name, { [prop]: [...rows, newRow] }),
@@ -1476,9 +1574,9 @@ export function renderSchemaFieldsTemplate(
       }
 
       return renderFieldRow({
-        prop: ps.name || prop,
-        label: labelText,
         hasValue: false,
+        label: labelText,
+        prop: ps.name || prop,
         widget: control,
       });
     });
@@ -1524,7 +1622,9 @@ export function renderExternalPrototypeEditorTemplate(
       fetchPluginSchema(def, {
         ...(S.documentPath != null && { documentPath: S.documentPath }),
       }).then((schema) => {
-        if (schema) ctx.renderLeftPanel();
+        if (schema) {
+          ctx.renderLeftPanel();
+        }
       });
     }
   }

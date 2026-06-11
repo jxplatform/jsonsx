@@ -10,6 +10,7 @@
  */
 
 import type { ProjectState } from "./types";
+import { isRef } from "@jxsuite/schema/guards";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 export type JxPath = (string | number)[];
@@ -63,10 +64,24 @@ interface StudioStackFrame {
 export function getNodeAtPath(doc: JxMutableNode, path: JxPath) {
   let node = doc;
   for (const key of path) {
-    if (node == null) return undefined as unknown as JxMutableNode;
-    node = node[key];
+    if (node == null) {
+      return undefined as unknown as JxMutableNode;
+    }
+    // Paths address nodes by construction; non-node leaves surface as undefined above.
+    node = node[key] as JxMutableNode;
   }
   return node;
+}
+
+/**
+ * The node's children when they are a static array (the edit-mode invariant); an empty array for
+ * mapped-array or absent children.
+ *
+ * @param {JxMutableNode | null | undefined} node
+ * @returns {(JxMutableNode | string)[]}
+ */
+export function childList(node: JxMutableNode | null | undefined): (JxMutableNode | string)[] {
+  return Array.isArray(node?.children) ? node.children : [];
 }
 
 /**
@@ -86,7 +101,7 @@ export function parentElementPath(path: JxPath) {
  * @returns {string | number}
  */
 export function childIndex(path: JxPath) {
-  return path[path.length - 1];
+  return path.at(-1);
 }
 
 /**
@@ -107,8 +122,12 @@ export function pathKey(path: JxPath) {
  * @returns {boolean}
  */
 export function pathsEqual(a: JxPath | null, b: JxPath | null) {
-  if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b || a.length !== b.length) {
+    return false;
+  }
   return a.every((v, i) => v === b[i]);
 }
 
@@ -120,7 +139,9 @@ export function pathsEqual(a: JxPath | null, b: JxPath | null) {
  * @returns {boolean}
  */
 export function isAncestor(path: JxPath, descendant: JxPath) {
-  if (path.length > descendant.length) return false;
+  if (path.length > descendant.length) {
+    return false;
+  }
   return path.every((v, i) => v === descendant[i]);
 }
 
@@ -142,12 +163,12 @@ export function isAncestor(path: JxPath, descendant: JxPath) {
  *   nodeType: string;
  * }[]}
  */
-export type FlatRow = {
+export interface FlatRow {
   node: JxMutableNode | string | number | boolean;
   path: JxPath;
   depth: number;
   nodeType: string;
-};
+}
 
 export function flattenTree(
   doc: JxMutableNode | string | number | boolean,
@@ -156,17 +177,17 @@ export function flattenTree(
 ): FlatRow[] {
   // Text node children: bare primitives get a "text" row
   if (typeof doc === "string" || typeof doc === "number" || typeof doc === "boolean") {
-    return [{ node: doc, path, depth, nodeType: "text" }];
+    return [{ depth, node: doc, nodeType: "text", path }];
   }
 
-  const rows: FlatRow[] = [{ node: doc, path, depth, nodeType: "element" }];
+  const rows: FlatRow[] = [{ depth, node: doc, nodeType: "element", path }];
 
   // Custom component instances without user-authored children are atomic in the layer tree
   if (doc.$props && (doc.tagName || "").includes("-") && !Array.isArray(doc.children)) {
     return rows;
   }
 
-  const children = doc.children;
+  const { children } = doc;
 
   if (Array.isArray(children)) {
     for (let i = 0; i < children.length; i++) {
@@ -180,10 +201,10 @@ export function flattenTree(
   ) {
     // $map — emit the map container, then recurse into the template
     rows.push({
-      node: children as JxMutableNode,
-      path: [...path, "children"],
       depth: depth + 1,
+      node: children as JxMutableNode,
       nodeType: "map",
+      path: [...path, "children"],
     });
     const mapDef = (children as JxMutableNode).map;
     if (mapDef && typeof mapDef === "object") {
@@ -197,17 +218,17 @@ export function flattenTree(
       const casePath = [...path, "cases", caseName];
       if (caseDef && typeof caseDef === "object" && (caseDef as JxMutableNode).$ref) {
         rows.push({
-          node: caseDef as JxMutableNode,
-          path: casePath,
           depth: depth + 1,
+          node: caseDef as JxMutableNode,
           nodeType: "case-ref",
+          path: casePath,
         });
       } else if (caseDef && typeof caseDef === "object") {
         rows.push({
-          node: caseDef as JxMutableNode,
-          path: casePath,
           depth: depth + 1,
+          node: caseDef as JxMutableNode,
           nodeType: "case",
+          path: casePath,
         });
         // Recurse into case children (skip the case node itself — already emitted)
         const caseChildren = flattenTree(caseDef as JxMutableNode, casePath, depth + 2);
@@ -226,14 +247,21 @@ export function flattenTree(
  * @returns {string}
  */
 export function nodeLabel(node: JxMutableNode | null) {
-  if (!node) return "?";
+  if (!node) {
+    return "?";
+  }
   // $map container (Repeater)
   if (node.$prototype === "Array") {
-    const ref = node.items?.$ref || "items";
+    const { items } = node;
+    const ref = (isRef(items) ? items.$ref : undefined) || "items";
     return `Repeater → ${ref}`;
   }
-  if (node.$title) return node.$title;
-  if (node.$id) return node.$id;
+  if (node.$title) {
+    return node.$title;
+  }
+  if (node.$id) {
+    return node.$id;
+  }
   const tag = node.tagName ?? "div";
   const suffix = node.$switch ? " ⇆" : "";
   if (typeof node.textContent === "string" && node.textContent.length > 0) {
@@ -251,47 +279,47 @@ export function nodeLabel(node: JxMutableNode | null) {
 export function createState(doc: JxMutableNode): StudioState {
   const initial = { document: doc, selection: null };
   return {
+    canvas: {
+      error: null, // Error message on failure
+      scope: null, // $defs scope from runtime buildScope
+      status: "idle", // "idle" | "loading" | "ready" | "error"
+    },
+    content: { frontmatter: {} }, // Frontmatter metadata for .md files
+    dirty: false,
     document: doc,
-    selection: null,
-    hover: null,
+    documentPath: null, // Root-relative path, e.g. "examples/markdown/blog.json"
+    documentStack: [], // Frames for component navigation
+    fileHandle: null,
+    handlersSource: null,
     history: [initial],
     historyIndex: 0,
-    dirty: false,
-    fileHandle: null,
-    documentPath: null, // root-relative path, e.g. "examples/markdown/blog.json"
-    documentStack: [], // frames for component navigation
-    handlersSource: null,
+    hover: null,
     mode: "component", // 'component' | 'content'
-    content: { frontmatter: {} }, // frontmatter metadata for .md files
+    selection: null,
     ui: {
-      rightTab: "properties", // 'properties' | 'events' | 'style'
-      zoom: 1,
       activeMedia: null, // '--md' | null (base) — focused canvas/breakpoint
       activeSelector: null, // ':hover' | '.child' | null (base) — nested selector context
+      editingFunction: null, // Null | { type: 'def', defName } | { type: 'event', path, eventKey }
       featureToggles: {}, // { '--dark': true } — non-size media toggles
-      styleSections: {}, // { layout: true, ... } — section open/closed state
-      inspectorSections: {}, // { identity: true, ... } — properties panel section open/closed state
-      styleShorthands: {}, // { padding: true, ... } — shorthand expand/collapse state
-      styleFilter: "", // free-text filter for CSS property names
-      styleFilterActive: false, // true = show only props with values set
-      editingFunction: null, // null | { type: 'def', defName } | { type: 'event', path, eventKey }
-      stylebookSelection: null, // tag name string, e.g. "h1"
-      stylebookTab: "elements", // "elements" | "variables"
-      stylebookFilter: "", // search filter text
-      stylebookCustomizedOnly: false, // show only customized elements
-      settingsTab: "stylebook", // "stylebook" | "definitions" | "contentTypes"
-      gitStatus: null, // { branch, ahead, behind, files: [] }
       gitBranches: null, // { current, branches: [] }
-      gitCommitMessage: "", // commit message input
-      gitLoading: false, // loading indicator during async ops
-      gitError: null, // error message string
+      gitCommitMessage: "", // Commit message input
       gitDiffState: null,
-      pendingInlineEdit: null, // null | { path, mediaName } — deferred inline edit awaiting canvas readiness
-    },
-    canvas: {
-      status: "idle", // "idle" | "loading" | "ready" | "error"
-      scope: null, // $defs scope from runtime buildScope
-      error: null, // error message on failure
+      gitError: null, // Error message string
+      gitLoading: false, // Loading indicator during async ops
+      gitStatus: null, // { branch, ahead, behind, files: [] }
+      inspectorSections: {}, // { identity: true, ... } — properties panel section open/closed state
+      pendingInlineEdit: null, // Null | { path, mediaName } — deferred inline edit awaiting canvas readiness
+      rightTab: "properties", // 'properties' | 'events' | 'style'
+      settingsTab: "stylebook", // "stylebook" | "definitions" | "contentTypes"
+      styleFilter: "", // Free-text filter for CSS property names
+      styleFilterActive: false, // True = show only props with values set
+      styleSections: {}, // { layout: true, ... } — section open/closed state
+      styleShorthands: {}, // { padding: true, ... } — shorthand expand/collapse state
+      stylebookCustomizedOnly: false, // Show only customized elements
+      stylebookFilter: "", // Search filter text
+      stylebookSelection: null, // Tag name string, e.g. "h1"
+      stylebookTab: "elements", // "elements" | "variables"
+      zoom: 1,
     },
   };
 }
@@ -334,26 +362,26 @@ export function fromFlat(S: StudioState) {
   } = S;
   return {
     doc: {
-      document,
+      content,
       dirty,
-      fileHandle,
+      document,
       documentPath,
       documentStack,
+      fileHandle,
       handlersSource,
-      mode,
-      content,
       history,
       historyIndex,
+      mode,
     },
-    session: { selection, hover, ui, canvas },
+    session: { canvas, hover, selection, ui },
   };
 }
 
 // ─── Project state (persists across document switches) ────────────────────────
 //
 // Shape: { root, name, projectRoot, isSiteProject, projectConfig,
-//          dirs: Map<string, DirEntry[]>, expanded: Set<string>,
-//          selectedPath: string|null, searchQuery: string }
+//          Dirs: Map<string, DirEntry[]>, expanded: Set<string>,
+//          SelectedPath: string|null, searchQuery: string }
 // DirEntry: { name, path, type: "file"|"directory", size, modified }
 
 export let projectState: ProjectState | null = null;
@@ -386,8 +414,11 @@ export function requireProjectState() {
  */
 export function updateFrontmatter(state: StudioState, field: string, value: unknown) {
   const fm = { ...state.content?.frontmatter };
-  if (value === undefined || value === null || value === "") delete fm[field];
-  else fm[field] = value;
+  if (value === undefined || value === null || value === "") {
+    delete fm[field];
+  } else {
+    fm[field] = value;
+  }
   return {
     ...state,
     content: { ...state.content, frontmatter: fm },
@@ -427,14 +458,14 @@ export function hoverNode(state: StudioState, path: JxPath | null) {
  */
 export function pushDocument(state: StudioState, doc: JxMutableNode, documentPath: string | null) {
   const frame = {
-    document: state.document,
-    selection: state.selection,
-    fileHandle: state.fileHandle,
-    documentPath: state.documentPath,
     dirty: state.dirty,
+    document: state.document,
+    documentPath: state.documentPath,
+    fileHandle: state.fileHandle,
     history: state.history,
     historyIndex: state.historyIndex,
     mode: state.mode,
+    selection: state.selection,
   };
   const newState = createState(doc);
   newState.documentStack = [...(state.documentStack || []), frame];
@@ -450,7 +481,9 @@ export function pushDocument(state: StudioState, doc: JxMutableNode, documentPat
  * @returns {StudioState}
  */
 export function popDocument(state: StudioState) {
-  if (!state.documentStack || state.documentStack.length === 0) return state;
+  if (!state.documentStack || state.documentStack.length === 0) {
+    return state;
+  }
   const stack = [...state.documentStack];
   const frame = stack.pop();
   return {

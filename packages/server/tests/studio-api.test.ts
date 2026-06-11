@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { handleStudioApi } from "../src/studio-api";
 import { join, resolve } from "node:path";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 /**
  * Test helper — calls handleStudioApi and asserts a response was returned.
@@ -19,7 +19,9 @@ async function callApi(
   activeProjectRoot: string | null = null,
 ) {
   const res = await handleStudioApi(req, url, root, activeProjectRoot);
-  if (!res) throw new Error("handleStudioApi returned null");
+  if (!res) {
+    throw new Error("handleStudioApi returned null");
+  }
   return res;
 }
 
@@ -28,130 +30,130 @@ mkdirSync(FIXTURES, { recursive: true });
 
 // Simple .class.json for direct path resolution
 const simpleClass = {
-  $prototype: "Class",
-  title: "DataSource",
-  description: "A test data source",
   $defs: {
-    parameters: {
-      url: {
-        identifier: "url",
-        type: { type: "string" },
-        description: "API endpoint URL",
-        examples: ["https://api.example.com"],
-      },
-      limit: {
-        identifier: "limit",
-        type: { type: "integer", default: 10 },
-        description: "Max results",
-      },
-      debug: {
-        identifier: "debug",
-        type: { type: "boolean", default: false },
-        description: "Enable debug mode",
-      },
+    constructor: {
+      $prototype: "Function",
+      parameters: [{ $ref: "#/$defs/parameters/url" }],
+      role: "constructor",
     },
     fields: {
       cache: {
-        role: "field",
         access: "public",
-        scope: "instance",
-        identifier: "cache",
-        type: { type: "object" },
         default: {},
         description: "Internal cache",
+        identifier: "cache",
+        role: "field",
+        scope: "instance",
+        type: { type: "object" },
       },
       secret: {
-        role: "field",
         access: "private",
-        scope: "instance",
         identifier: "secret",
+        role: "field",
+        scope: "instance",
       },
     },
-    constructor: {
-      role: "constructor",
-      $prototype: "Function",
-      parameters: [{ $ref: "#/$defs/parameters/url" }],
+    parameters: {
+      debug: {
+        description: "Enable debug mode",
+        identifier: "debug",
+        type: { default: false, type: "boolean" },
+      },
+      limit: {
+        description: "Max results",
+        identifier: "limit",
+        type: { default: 10, type: "integer" },
+      },
+      url: {
+        description: "API endpoint URL",
+        examples: ["https://api.example.com"],
+        identifier: "url",
+        type: { type: "string" },
+      },
     },
   },
+  $prototype: "Class",
+  description: "A test data source",
+  title: "DataSource",
 };
 writeFileSync(join(FIXTURES, "DataSource.class.json"), JSON.stringify(simpleClass), "utf8");
 
 // Parent .class.json for extends testing
 const parentClass = {
-  $prototype: "Class",
-  title: "BaseCollection",
-  description: "Base collection class",
   $defs: {
-    parameters: {
-      src: {
-        identifier: "src",
-        type: { type: "string" },
-        description: "Source path",
-      },
-      sortBy: {
-        identifier: "sortBy",
-        type: { type: "string" },
-        description: "Sort field",
-      },
-    },
     constructor: {
-      role: "constructor",
       $prototype: "Function",
       parameters: [{ $ref: "#/$defs/parameters/src" }],
+      role: "constructor",
+    },
+    parameters: {
+      sortBy: {
+        description: "Sort field",
+        identifier: "sortBy",
+        type: { type: "string" },
+      },
+      src: {
+        description: "Source path",
+        identifier: "src",
+        type: { type: "string" },
+      },
     },
   },
+  $prototype: "Class",
+  description: "Base collection class",
+  title: "BaseCollection",
 };
 writeFileSync(join(FIXTURES, "BaseCollection.class.json"), JSON.stringify(parentClass), "utf8");
 
 // Child .class.json extending parent
 const childClass = {
-  $prototype: "Class",
-  title: "PostCollection",
-  description: "Posts collection",
-  extends: { $ref: "./BaseCollection.class.json" },
   $defs: {
     parameters: {
       category: {
+        description: "Filter by category",
         identifier: "category",
         type: { type: "string" },
-        description: "Filter by category",
       },
     },
   },
+  $prototype: "Class",
+  description: "Posts collection",
+  extends: { $ref: "./BaseCollection.class.json" },
+  title: "PostCollection",
 };
 writeFileSync(join(FIXTURES, "PostCollection.class.json"), JSON.stringify(childClass), "utf8");
 
 // Class with `returns` on resolve method
 const classWithReturns = {
-  $prototype: "Class",
-  title: "ContentCollection",
-  description: "A collection that returns an array",
   $defs: {
-    parameters: {
-      contentType: {
-        identifier: "contentType",
-        type: { type: "string" },
-        description: "Content type to query",
-      },
-    },
     constructor: {
-      role: "constructor",
       $prototype: "Function",
       parameters: [{ $ref: "#/$defs/parameters/contentType" }],
+      role: "constructor",
     },
     methods: {
       resolve: {
-        role: "method",
         $prototype: "Function",
         access: "public",
-        scope: "instance",
+        description: "Query entries",
         identifier: "resolve",
         parameters: [],
         returns: { type: "array" },
-        description: "Query entries",
+        role: "method",
+        scope: "instance",
+      },
+    },
+    parameters: {
+      contentType: {
+        description: "Content type to query",
+        identifier: "contentType",
+        type: { type: "string" },
       },
     },
   },
+  $prototype: "Class",
+  description: "A collection that returns an array",
+  title: "ContentCollection",
 };
 writeFileSync(
   join(FIXTURES, "ContentCollection.class.json"),
@@ -161,29 +163,29 @@ writeFileSync(
 
 // Class with resolve method but NO returns annotation
 const classWithoutReturns = {
-  $prototype: "Class",
-  title: "EventEmitter",
-  description: "Emitter with no declared return type",
   $defs: {
-    parameters: {
-      channel: {
-        identifier: "channel",
-        type: { type: "string" },
-        description: "Channel name",
-      },
-    },
     methods: {
       resolve: {
-        role: "method",
         $prototype: "Function",
         access: "public",
-        scope: "instance",
+        description: "Emit event",
         identifier: "resolve",
         parameters: [],
-        description: "Emit event",
+        role: "method",
+        scope: "instance",
+      },
+    },
+    parameters: {
+      channel: {
+        description: "Channel name",
+        identifier: "channel",
+        type: { type: "string" },
       },
     },
   },
+  $prototype: "Class",
+  description: "Emitter with no declared return type",
+  title: "EventEmitter",
 };
 writeFileSync(
   join(FIXTURES, "EventEmitter.class.json"),
@@ -193,28 +195,28 @@ writeFileSync(
 
 // Class with returns on resolve that has a complex schema
 const classWithComplexReturns = {
-  $prototype: "Class",
-  title: "TypedQuery",
-  description: "Returns items with a schema",
   $defs: {
-    parameters: {
-      query: { identifier: "query", type: { type: "string" } },
-    },
     methods: {
       resolve: {
-        role: "method",
         $prototype: "Function",
         access: "public",
-        scope: "instance",
         identifier: "resolve",
         parameters: [],
         returns: {
+          items: { properties: { id: { type: "string" } }, type: "object" },
           type: "array",
-          items: { type: "object", properties: { id: { type: "string" } } },
         },
+        role: "method",
+        scope: "instance",
       },
     },
+    parameters: {
+      query: { identifier: "query", type: { type: "string" } },
+    },
   },
+  $prototype: "Class",
+  description: "Returns items with a schema",
+  title: "TypedQuery",
 };
 writeFileSync(
   join(FIXTURES, "TypedQuery.class.json"),
@@ -224,65 +226,65 @@ writeFileSync(
 
 // Parent class with returns, to test inheritance
 const parentWithReturns = {
-  $prototype: "Class",
-  title: "BaseQuery",
-  description: "Base query returning array",
   $defs: {
-    parameters: {
-      src: { identifier: "src", type: { type: "string" } },
-    },
     constructor: {
-      role: "constructor",
       $prototype: "Function",
       parameters: [{ $ref: "#/$defs/parameters/src" }],
+      role: "constructor",
     },
     methods: {
       resolve: {
-        role: "method",
         $prototype: "Function",
         identifier: "resolve",
         parameters: [],
         returns: { type: "array" },
+        role: "method",
       },
     },
+    parameters: {
+      src: { identifier: "src", type: { type: "string" } },
+    },
   },
+  $prototype: "Class",
+  description: "Base query returning array",
+  title: "BaseQuery",
 };
 writeFileSync(join(FIXTURES, "BaseQuery.class.json"), JSON.stringify(parentWithReturns), "utf8");
 
 // Child that extends parent with returns but has no own resolve method
 const childNoResolve = {
-  $prototype: "Class",
-  title: "ChildQuery",
-  description: "Child without own resolve",
-  extends: { $ref: "./BaseQuery.class.json" },
   $defs: {
     parameters: {
       filter: { identifier: "filter", type: { type: "string" } },
     },
   },
+  $prototype: "Class",
+  description: "Child without own resolve",
+  extends: { $ref: "./BaseQuery.class.json" },
+  title: "ChildQuery",
 };
 writeFileSync(join(FIXTURES, "ChildQuery.class.json"), JSON.stringify(childNoResolve), "utf8");
 
 // Class with format: "json-schema" type parameter
 const parameterizedClass = {
-  $prototype: "Class",
-  title: "TypedCollection",
   $defs: {
-    parameters: {
-      src: { identifier: "src", type: { type: "string" } },
-      itemSchema: {
-        identifier: "itemSchema",
-        type: { type: "object" },
-        format: "json-schema",
-        description: "Schema for collection items",
-      },
-    },
     constructor: {
-      role: "constructor",
       $prototype: "Function",
       parameters: [{ $ref: "#/$defs/parameters/src" }],
+      role: "constructor",
+    },
+    parameters: {
+      itemSchema: {
+        description: "Schema for collection items",
+        format: "json-schema",
+        identifier: "itemSchema",
+        type: { type: "object" },
+      },
+      src: { identifier: "src", type: { type: "string" } },
     },
   },
+  $prototype: "Class",
+  title: "TypedCollection",
 };
 writeFileSync(
   join(FIXTURES, "TypedCollection.class.json"),
@@ -293,18 +295,18 @@ writeFileSync(
 // Sibling JS module with a companion .class.json
 writeFileSync(join(FIXTURES, "parser.js"), "export class Parser {}", "utf8");
 const siblingClassJson = {
-  $prototype: "Class",
-  title: "Parser",
-  description: "Sibling auto-discovered schema",
   $defs: {
     parameters: {
       input: {
+        description: "Input text",
         identifier: "input",
         type: { type: "string" },
-        description: "Input text",
       },
     },
   },
+  $prototype: "Class",
+  description: "Sibling auto-discovered schema",
+  title: "Parser",
 };
 writeFileSync(join(FIXTURES, "Parser.class.json"), JSON.stringify(siblingClassJson), "utf8");
 
@@ -316,8 +318,12 @@ writeFileSync(join(FIXTURES, "Parser.class.json"), JSON.stringify(siblingClassJs
  */
 function schemaRequest(src: string, prototype?: string, base?: string) {
   const params = new URLSearchParams({ src });
-  if (prototype) params.set("prototype", prototype);
-  if (base) params.set("base", base);
+  if (prototype) {
+    params.set("prototype", prototype);
+  }
+  if (base) {
+    params.set("base", base);
+  }
   const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
   return {
     req: new Request(url, { method: "GET" }),
@@ -334,19 +340,19 @@ describe("plugin-schema — direct .class.json path", () => {
     expect(res).not.toBeNull();
     const { schema } = await res.json();
     expect(schema.properties.url).toEqual({
-      type: "string",
       description: "API endpoint URL",
       examples: ["https://api.example.com"],
+      type: "string",
     });
     expect(schema.properties.limit).toEqual({
-      type: "integer",
       default: 10,
       description: "Max results",
+      type: "integer",
     });
     expect(schema.properties.debug).toEqual({
-      type: "boolean",
       default: false,
       description: "Enable debug mode",
+      type: "boolean",
     });
   });
 
@@ -364,8 +370,8 @@ describe("plugin-schema — direct .class.json path", () => {
     const res = await callApi(req, url, import.meta.dir);
     const { schema } = await res.json();
     expect(schema.required).toContain("url");
-    expect(schema.required).not.toContain("limit"); // has default: 10
-    expect(schema.required).not.toContain("debug"); // has default: false
+    expect(schema.required).not.toContain("limit"); // Has default: 10
+    expect(schema.required).not.toContain("debug"); // Has default: false
   });
 });
 
@@ -394,7 +400,7 @@ describe("plugin-schema — extends inheritance", () => {
     );
     const res = await callApi(req, url, import.meta.dir);
     const { schema } = await res.json();
-    // src is required from parent (no default)
+    // Src is required from parent (no default)
     expect(schema.required).toContain("src");
   });
 });
@@ -467,15 +473,17 @@ writeFileSync(join(PLAIN_DIR, "readme.txt"), "hello", "utf8");
 writeFileSync(
   join(SITE_PROJECT, "components", "my-card.json"),
   JSON.stringify({
+    state: { title: { default: "", type: "string" } },
     tagName: "my-card",
-    state: { title: { type: "string", default: "" } },
   }),
   "utf8",
 );
 
 function projectInfoRequest(dir: string) {
   const params = new URLSearchParams();
-  if (dir) params.set("dir", dir);
+  if (dir) {
+    params.set("dir", dir);
+  }
   const url = new URL(`http://localhost/__studio/project-info?${params}`);
   return { req: new Request(url, { method: "GET" }), url };
 }
@@ -611,7 +619,7 @@ describe("file — read", () => {
 describe("file — write", () => {
   test("writes a file within project root", async () => {
     const url = new URL(`http://localhost/__studio/file?path=write-test.txt`);
-    const req = new Request(url, { method: "PUT", body: "new content" });
+    const req = new Request(url, { body: "new content", method: "PUT" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -620,7 +628,7 @@ describe("file — write", () => {
 
   test("creates parent directories as needed", async () => {
     const url = new URL(`http://localhost/__studio/file?path=sub/deep/new.txt`);
-    const req = new Request(url, { method: "PUT", body: "deep content" });
+    const req = new Request(url, { body: "deep content", method: "PUT" });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
     expect(data.ok).toBe(true);
@@ -628,7 +636,7 @@ describe("file — write", () => {
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/file");
-    const req = new Request(url, { method: "PUT", body: "x" });
+    const req = new Request(url, { body: "x", method: "PUT" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
@@ -664,9 +672,9 @@ describe("file — rename", () => {
     writeFileSync(join(FIXTURES, "old-name.txt"), "content", "utf8");
     const url = new URL("http://localhost/__studio/file/rename");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: "old-name.txt", to: "new-name.txt" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -676,7 +684,7 @@ describe("file — rename", () => {
 
   test("returns 400 for invalid JSON", async () => {
     const url = new URL("http://localhost/__studio/file/rename");
-    const req = new Request(url, { method: "POST", body: "not json" });
+    const req = new Request(url, { body: "not json", method: "POST" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
@@ -684,9 +692,9 @@ describe("file — rename", () => {
   test("returns 400 when from/to missing", async () => {
     const url = new URL("http://localhost/__studio/file/rename");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ from: "only-from.txt" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
@@ -754,9 +762,9 @@ describe("locate endpoint", () => {
     writeFileSync(join(FIXTURES, "findme.txt"), "found", "utf8");
     const url = new URL("http://localhost/__studio/locate");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "findme.txt" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -766,9 +774,9 @@ describe("locate endpoint", () => {
   test("returns null when file not found", async () => {
     const url = new URL("http://localhost/__studio/locate");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "nonexistent-xyz.txt" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -777,7 +785,7 @@ describe("locate endpoint", () => {
 
   test("returns 400 for invalid JSON", async () => {
     const url = new URL("http://localhost/__studio/locate");
-    const req = new Request(url, { method: "POST", body: "bad" });
+    const req = new Request(url, { body: "bad", method: "POST" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
@@ -785,9 +793,9 @@ describe("locate endpoint", () => {
   test("returns 400 when name is missing", async () => {
     const url = new URL("http://localhost/__studio/locate");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
@@ -858,7 +866,7 @@ describe("find-project", () => {
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
     expect(data.path).toBeNull();
-  }, 15000);
+  }, 15_000);
 });
 
 // ─── components — markdown discovery ────────────────────────────────────────
@@ -872,8 +880,8 @@ describe("components — markdown discovery", () => {
   writeFileSync(
     join(MD_DIR, "project.json"),
     JSON.stringify({
-      name: "MD Components",
       imports: { Markdown: "@jxsuite/parser/Markdown.class.json" },
+      name: "MD Components",
     }),
     "utf8",
   );
@@ -920,8 +928,8 @@ describe("components — CEM npm discovery", () => {
   writeFileSync(
     join(CEM_DIR, "package.json"),
     JSON.stringify({
-      name: "cem-test",
       dependencies: { "test-elements": "^1.0.0" },
+      name: "cem-test",
     }),
     "utf8",
   );
@@ -929,9 +937,9 @@ describe("components — CEM npm discovery", () => {
   writeFileSync(
     join(CEM_DIR, "node_modules/test-elements/package.json"),
     JSON.stringify({
+      customElements: "./custom-elements.json",
       name: "test-elements",
       version: "1.0.0",
-      customElements: "./custom-elements.json",
     }),
     "utf8",
   );
@@ -939,31 +947,31 @@ describe("components — CEM npm discovery", () => {
   writeFileSync(
     join(CEM_DIR, "node_modules/test-elements/custom-elements.json"),
     JSON.stringify({
-      schemaVersion: "1.0.0",
       modules: [
         {
-          path: "src/my-button.js",
           declarations: [
             {
-              kind: "class",
-              customElement: true,
-              tagName: "test-button",
-              description: "A test button",
               attributes: [
                 {
+                  default: "primary",
                   name: "variant",
                   type: { text: "string" },
-                  default: "primary",
                 },
               ],
-              members: [{ kind: "field", name: "disabled", privacy: "public" }],
-              slots: [{ name: "", description: "Default slot" }],
-              events: [{ name: "click" }],
               cssProperties: [],
+              customElement: true,
+              description: "A test button",
+              events: [{ name: "click" }],
+              kind: "class",
+              members: [{ kind: "field", name: "disabled", privacy: "public" }],
+              slots: [{ description: "Default slot", name: "" }],
+              tagName: "test-button",
             },
           ],
+          path: "src/my-button.js",
         },
       ],
+      schemaVersion: "1.0.0",
     }),
     "utf8",
   );
@@ -1043,9 +1051,9 @@ describe("packages/add", () => {
   test("returns 400 when name is missing", async () => {
     const url = new URL("http://localhost/__studio/packages/add");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -1055,9 +1063,9 @@ describe("packages/add", () => {
   test("returns 400 when name is not a string", async () => {
     const url = new URL("http://localhost/__studio/packages/add");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: 123 }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -1067,11 +1075,11 @@ describe("packages/add", () => {
   test("returns 500 when bun add fails", async () => {
     const url = new URL("http://localhost/__studio/packages/add");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: "@nonexistent-scope-xyz/nonexistent-pkg-404",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(500);
@@ -1084,9 +1092,9 @@ describe("packages/remove", () => {
   test("returns 400 when name is missing", async () => {
     const url = new URL("http://localhost/__studio/packages/remove");
     const req = new Request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     const res = await callApi(req, url, FIXTURES);
     const data = await res.json();
@@ -1100,7 +1108,7 @@ describe("file — upload", () => {
   test("uploads binary file", async () => {
     const url = new URL(`http://localhost/__studio/file/upload?path=uploaded.bin`);
     const data = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
-    const req = new Request(url, { method: "POST", body: data });
+    const req = new Request(url, { body: data, method: "POST" });
     const res = await callApi(req, url, FIXTURES);
     const result = await res.json();
     expect(result.ok).toBe(true);
@@ -1108,14 +1116,14 @@ describe("file — upload", () => {
 
   test("returns 400 when path is missing", async () => {
     const url = new URL("http://localhost/__studio/file/upload");
-    const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
+    const req = new Request(url, { body: new Uint8Array([1]), method: "POST" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
 
   test("returns 400 for path outside root", async () => {
     const url = new URL(`http://localhost/__studio/file/upload?path=/etc/evil`);
-    const req = new Request(url, { method: "POST", body: new Uint8Array([1]) });
+    const req = new Request(url, { body: new Uint8Array([1]), method: "POST" });
     const res = await callApi(req, url, FIXTURES);
     expect(res.status).toBe(400);
   });
@@ -1140,8 +1148,8 @@ describe("plugin-schema — JS module fallback", () => {
 
   test("returns static schema from JS class", async () => {
     const params = new URLSearchParams({
-      src: "./_studio_fixtures/WithSchema.js",
       prototype: "WithSchema",
+      src: "./_studio_fixtures/WithSchema.js",
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
@@ -1153,8 +1161,8 @@ describe("plugin-schema — JS module fallback", () => {
 
   test("returns null schema when export is not a function", async () => {
     const params = new URLSearchParams({
-      src: "./_studio_fixtures/NotAClass.js",
       prototype: "NotAClass",
+      src: "./_studio_fixtures/NotAClass.js",
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
@@ -1166,8 +1174,8 @@ describe("plugin-schema — JS module fallback", () => {
 
   test("returns error for module import failure", async () => {
     const params = new URLSearchParams({
-      src: "./_studio_fixtures/nonexistent-module.js",
       prototype: "X",
+      src: "./_studio_fixtures/nonexistent-module.js",
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
@@ -1183,9 +1191,9 @@ describe("plugin-schema — JS module fallback", () => {
 describe("plugin-schema — base resolution", () => {
   test("resolves src relative to base URL", async () => {
     const params = new URLSearchParams({
-      src: "./DataSource.class.json",
-      prototype: "DataSource",
       base: "http://localhost/_studio_fixtures/page.json",
+      prototype: "DataSource",
+      src: "./DataSource.class.json",
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
@@ -1197,8 +1205,8 @@ describe("plugin-schema — base resolution", () => {
 
   test("returns error for malformed base URL", async () => {
     const params = new URLSearchParams({
-      src: "./Foo.class.json",
       base: "not-a-url",
+      src: "./Foo.class.json",
     });
     const url = new URL(`http://localhost/__studio/plugin-schema?${params}`);
     const req = new Request(url, { method: "GET" });
@@ -1237,8 +1245,8 @@ describe("plugin-schema — returns annotation", () => {
     const res = await callApi(req, url, import.meta.dir);
     const { schema } = await res.json();
     expect(schema.returns).toEqual({
+      items: { properties: { id: { type: "string" } }, type: "object" },
       type: "array",
-      items: { type: "object", properties: { id: { type: "string" } } },
     });
   });
 
@@ -1297,11 +1305,11 @@ describe("format endpoints", () => {
   writeFileSync(
     join(FMT_DIR, "project.json"),
     JSON.stringify({
-      name: "Format Project",
       imports: {
-        Markdown: "@jxsuite/parser/Markdown.class.json",
         Csv: "@jxsuite/parser/Csv.class.json",
+        Markdown: "@jxsuite/parser/Markdown.class.json",
       },
+      name: "Format Project",
     }),
     "utf8",
   );
@@ -1322,13 +1330,13 @@ describe("format endpoints", () => {
   test("POST /__studio/format parse dispatches through the format class", async () => {
     const url = new URL("http://localhost/__studio/format");
     const req = new Request(url, {
-      method: "POST",
       body: JSON.stringify({
+        action: "parse",
         dir: FMT_DIR,
         format: "Markdown",
-        action: "parse",
         source: "---\ntitle: Hi\n---\n\n# Hello\n",
       }),
+      method: "POST",
     });
     const res = await callApi(req, url, FMT_DIR);
     const data = await res.json();
@@ -1339,17 +1347,17 @@ describe("format endpoints", () => {
   test("POST /__studio/format serialize round-trips a document", async () => {
     const url = new URL("http://localhost/__studio/format");
     const req = new Request(url, {
-      method: "POST",
       body: JSON.stringify({
-        dir: FMT_DIR,
-        format: "Markdown",
         action: "serialize",
+        dir: FMT_DIR,
         doc: {
-          title: "Hi",
           children: [{ tagName: "h1", textContent: "Hello" }],
+          title: "Hi",
         },
+        format: "Markdown",
         options: { mode: "roundtrip" },
       }),
+      method: "POST",
     });
     const res = await callApi(req, url, FMT_DIR);
     const data = await res.json();
@@ -1360,13 +1368,13 @@ describe("format endpoints", () => {
   test("POST /__studio/format rejects unknown formats", async () => {
     const url = new URL("http://localhost/__studio/format");
     const req = new Request(url, {
-      method: "POST",
       body: JSON.stringify({
+        action: "parse",
         dir: FMT_DIR,
         format: "Toml",
-        action: "parse",
         source: "",
       }),
+      method: "POST",
     });
     const res = await callApi(req, url, FMT_DIR);
     expect(res.status).toBe(404);

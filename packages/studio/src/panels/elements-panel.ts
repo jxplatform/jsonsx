@@ -2,9 +2,9 @@
 /** Elements panel — block/component palette with categorized accordion and search filter. */
 
 import { html, nothing } from "lit-html";
-import { getNodeAtPath } from "../store";
+import { childList, getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateInsertNode } from "../tabs/transact";
+import { mutateInsertNode, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { getEffectiveElements } from "../site-context";
 import { componentRegistry } from "../files/components";
@@ -32,16 +32,20 @@ export function renderElementsTemplate(ctx: {
       const filtered = view.elementsFilter
         ? elements.filter((/** @type {{ tag: string }} */ e) => e.tag.includes(view.elementsFilter))
         : elements;
-      if (filtered.length === 0) return nothing;
+      if (filtered.length === 0) {
+        return nothing;
+      }
 
       return html`
         <sp-accordion-item
           label=${category}
           ?open=${!view.elementsCollapsed.has(category)}
           @sp-accordion-item-toggle=${(e: Event) => {
-            if ((e.target as HTMLElement & { open: boolean }).open)
+            if ((e.target as HTMLElement & { open: boolean }).open) {
               view.elementsCollapsed.delete(category);
-            else view.elementsCollapsed.add(category);
+            } else {
+              view.elementsCollapsed.add(category);
+            }
           }}
         >
           ${filtered.map((/** @type {{ tag: string }} */ { tag }) => {
@@ -54,7 +58,7 @@ export function renderElementsTemplate(ctx: {
                   const t = activeTab.value;
                   const parentPath = t?.session.selection || [];
                   const parent = getNodeAtPath(t!.doc.document, parentPath);
-                  const idx = parent?.children ? parent.children.length : 0;
+                  const idx = childList(parent).length;
                   transactDoc(t!, (tr) =>
                     mutateInsertNode(tr, parentPath, idx, structuredClone(def)),
                   );
@@ -73,9 +77,11 @@ export function renderElementsTemplate(ctx: {
   const effectiveEls = getEffectiveElements(
     tab?.doc.document?.$elements as (string | JxElement)[] | undefined,
   );
-  const enabledTags: Set<string> = new Set();
+  const enabledTags = new Set<string>();
   for (const entry of effectiveEls) {
-    if (typeof entry !== "string") continue;
+    if (typeof entry !== "string") {
+      continue;
+    }
     const comp = componentRegistry.find(
       (c: ComponentEntry) =>
         c.source === "npm" && c.modulePath && entry === `${c.package}/${c.modulePath}`,
@@ -84,7 +90,9 @@ export function renderElementsTemplate(ctx: {
       enabledTags.add(comp.tagName);
     } else {
       for (const c of componentRegistry) {
-        if (c.source === "npm" && c.package === entry) enabledTags.add(c.tagName);
+        if (c.source === "npm" && c.package === entry) {
+          enabledTags.add(c.tagName);
+        }
       }
     }
   }
@@ -105,9 +113,11 @@ export function renderElementsTemplate(ctx: {
             label="Components"
             ?open=${!view.elementsCollapsed.has("Components")}
             @sp-accordion-item-toggle=${(e: Event) => {
-              if ((e.target as HTMLElement & { open: boolean }).open)
+              if ((e.target as HTMLElement & { open: boolean }).open) {
                 view.elementsCollapsed.delete("Components");
-              else view.elementsCollapsed.add("Components");
+              } else {
+                view.elementsCollapsed.add("Components");
+              }
             }}
           >
             <div class="components-section">
@@ -123,9 +133,8 @@ export function renderElementsTemplate(ctx: {
                       const t = activeTab.value;
                       const parentPath = t?.session.selection || [];
                       const parent = getNodeAtPath(t!.doc.document, parentPath);
-                      const idx = parent?.children ? parent.children.length : 0;
+                      const idx = childList(parent).length;
                       const instanceDef = {
-                        tagName: comp.tagName,
                         $props: Object.fromEntries(
                           (comp.props || []).map(
                             (/** @type {{ name: string; default?: unknown }} */ p) => [
@@ -134,6 +143,7 @@ export function renderElementsTemplate(ctx: {
                             ],
                           ),
                         ),
+                        tagName: comp.tagName,
                       };
                       transactDoc(t!, (tr) =>
                         mutateInsertNode(tr, parentPath, idx, structuredClone(instanceDef)),

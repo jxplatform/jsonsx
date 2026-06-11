@@ -1,1 +1,1 @@
-{"title":"Point","$prototype":"Class","$defs":{"fields":{"x":{"role":"field","access":"public","scope":"instance","identifier":"x","default":0},"y":{"role":"field","access":"public","scope":"instance","identifier":"y","default":0}}}}
+{"$defs":{"fields":{"x":{"access":"public","default":0,"identifier":"x","role":"field","scope":"instance"},"y":{"access":"public","default":0,"identifier":"y","role":"field","scope":"instance"}}},"$prototype":"Class","title":"Point"}

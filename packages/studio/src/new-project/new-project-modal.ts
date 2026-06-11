@@ -5,6 +5,7 @@
  */
 
 import { html } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -21,11 +22,11 @@ let _handle: ReturnType<typeof openModal> | null = null;
  * }}
  */
 let _form = {
-  name: "",
-  description: "",
-  url: "",
   adapter: "static",
+  description: "",
   directory: "",
+  name: "",
+  url: "",
 };
 
 let _error: string = "";
@@ -45,13 +46,15 @@ export function openNewProjectModal(): Promise<{
   root: string;
   config: ProjectConfig;
 } | null> {
-  if (_handle) return Promise.resolve(null);
+  if (_handle) {
+    return Promise.resolve(null);
+  }
   _form = {
-    name: "",
-    description: "",
-    url: "",
     adapter: "static",
+    description: "",
     directory: "",
+    name: "",
+    url: "",
   };
   _error = "";
   _creating = false;
@@ -63,7 +66,9 @@ export function openNewProjectModal(): Promise<{
 }
 
 export function closeNewProjectModal() {
-  if (!_handle) return;
+  if (!_handle) {
+    return;
+  }
   _handle.close();
   _handle = null;
   if (_resolve) {
@@ -83,10 +88,12 @@ function renderModal() {
       if (_dirDerived && field === "name") {
         _form.directory = _form.name
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
+          .replaceAll(/[^a-z0-9]+/g, "-")
+          .replaceAll(/^-|-$/g, "");
       }
-      if (field === "directory") _dirDerived = false;
+      if (field === "directory") {
+        _dirDerived = false;
+      }
       renderModal();
     };
 
@@ -104,8 +111,8 @@ function renderModal() {
     if (!_form.directory.trim()) {
       _form.directory = _form.name
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
+        .replaceAll(/[^a-z0-9]+/g, "-")
+        .replaceAll(/^-|-$/g, "");
     }
 
     _creating = true;
@@ -124,9 +131,9 @@ function renderModal() {
         _resolve(result);
         _resolve = null;
       }
-    } catch (e) {
+    } catch (error) {
       _creating = false;
-      _error = (e as Error).message;
+      _error = errorMessage(error);
       renderModal();
     }
   };
@@ -136,7 +143,9 @@ function renderModal() {
     <div
       class="new-project-modal"
       @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Escape") closeNewProjectModal();
+        if (e.key === "Escape") {
+          closeNewProjectModal();
+        }
       }}
     >
       <div class="new-project-modal-header">

@@ -1,11 +1,11 @@
 /** Shared project generation logic. Used by both the CLI scaffolder and the Studio server endpoint. */
 
-import { mkdir, writeFile, cp } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { cp, mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 const TEMPLATE_DIR = join(__dirname, "template");
 
 export interface ProjectOptions {
@@ -15,7 +15,7 @@ export interface ProjectOptions {
   adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
 }
 
-const CF_ADAPTERS = ["cloudflare-pages", "cloudflare-workers"];
+const CF_ADAPTERS = new Set(["cloudflare-pages", "cloudflare-workers"]);
 
 /**
  * Generate a new Jx project at the given path.
@@ -38,19 +38,19 @@ export async function generateProject(destPath: string, opts: ProjectOptions) {
   await mkdir(join(destPath, "public"), { recursive: true });
   await mkdir(join(destPath, "content"), { recursive: true });
 
-  const projectJson = buildProjectJson({ name, description, url, adapter });
-  const packageJson = buildPackageJson({ name, description, adapter });
+  const projectJson = buildProjectJson({ adapter, description, name, url });
+  const packageJson = buildPackageJson({ adapter, description, name });
 
   const writes = [
-    writeFile(join(destPath, "project.json"), JSON.stringify(projectJson, null, "\t") + "\n"),
-    writeFile(join(destPath, "package.json"), JSON.stringify(packageJson, null, "  ") + "\n"),
+    writeFile(join(destPath, "project.json"), `${JSON.stringify(projectJson, null, "\t")}\n`),
+    writeFile(join(destPath, "package.json"), `${JSON.stringify(packageJson, null, "  ")}\n`),
     cp(join(TEMPLATE_DIR, "gitignore"), join(destPath, ".gitignore")),
     cp(join(TEMPLATE_DIR, "layouts"), join(destPath, "layouts"), { recursive: true }),
     cp(join(TEMPLATE_DIR, "pages"), join(destPath, "pages"), { recursive: true }),
   ];
 
-  if (adapter && CF_ADAPTERS.includes(adapter)) {
-    const wranglerJsonc = buildWranglerJsonc({ slug: packageJson.name, adapter });
+  if (adapter && CF_ADAPTERS.has(adapter)) {
+    const wranglerJsonc = buildWranglerJsonc({ adapter, slug: packageJson.name });
     writes.push(writeFile(join(destPath, "wrangler.jsonc"), wranglerJsonc));
   }
 
@@ -69,41 +69,39 @@ function buildWranglerJsonc({ slug, adapter }: { slug: string; adapter: string }
   const config =
     adapter === "cloudflare-workers"
       ? {
-          name: slug,
-          main: "./dist/worker.js",
+          assets: { binding: "ASSETS", directory: "./dist" },
           compatibility_date: compatibilityDate,
           compatibility_flags: ["nodejs_compat"],
           assets: { directory: "./dist", binding: "ASSETS" },
         }
       : {
-          name: slug,
           compatibility_date: compatibilityDate,
           compatibility_flags: ["nodejs_compat"],
           pages_build_output_dir: "./dist",
         };
 
-  return JSON.stringify(config, null, "\t") + "\n";
+  return `${JSON.stringify(config, null, "\t")}\n`;
 }
 
 /** @param {ProjectOptions} opts */
 function buildProjectJson({ name, description, url, adapter }: ProjectOptions) {
   const $head = [
     {
+      attributes: { content: "width=device-width, initial-scale=1", name: "viewport" },
       tagName: "meta",
-      attributes: { name: "viewport", content: "width=device-width, initial-scale=1" },
     },
   ];
 
   if (description) {
     $head.push({
+      attributes: { content: description, name: "description" },
       tagName: "meta",
-      attributes: { name: "description", content: description },
     });
   }
 
   const build: { outDir: string; format: string; trailingSlash: string; adapter?: string } = {
-    outDir: "./dist",
     format: "directory",
+    outDir: "./dist",
     trailingSlash: "always",
   };
 
@@ -112,12 +110,6 @@ function buildProjectJson({ name, description, url, adapter }: ProjectOptions) {
   }
 
   return {
-    name,
-    url: url || "https://example.com",
-    defaults: {
-      layout: "./layouts/base.json",
-      lang: "en",
-    },
     $head,
     $media: {
       "--": "1280px",
@@ -125,14 +117,20 @@ function buildProjectJson({ name, description, url, adapter }: ProjectOptions) {
       "--md": "(max-width: 768px)",
       "--sm": "(max-width: 640px)",
     },
+    build,
+    defaults: {
+      lang: "en",
+      layout: "./layouts/base.json",
+    },
+    name,
     style: {
-      margin: "0",
-      padding: "0",
+      color: "#1a1a1a",
       fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       lineHeight: "1.6",
-      color: "#1a1a1a",
+      margin: "0",
+      padding: "0",
     },
-    build,
+    url: url || "https://example.com",
   };
 }
 
@@ -148,8 +146,8 @@ function buildPackageJson({
 }) {
   const slug = name
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
 
   const dependencies: Record<string, string> = {};
   const devDependencies: Record<string, string> = {
@@ -174,10 +172,11 @@ function buildPackageJson({
   }
 
   return {
+    description: description || "",
+    devDependencies,
+    license: "MIT",
     name: slug,
     private: true,
-    description: description || "",
-    license: "MIT",
     scripts,
     ...(Object.keys(dependencies).length > 0 && { dependencies }),
     devDependencies,

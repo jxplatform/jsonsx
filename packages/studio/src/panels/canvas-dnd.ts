@@ -10,13 +10,14 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
-import { elToPath, canvasPanels, getNodeAtPath, VOID_ELEMENTS, isAncestor } from "../store";
+import { VOID_ELEMENTS, canvasPanels, elToPath, getNodeAtPath, isAncestor } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { applyDropInstruction } from "../panels/dnd";
 import { effectiveZoom } from "../canvas/canvas-helpers";
 
 import type { CanvasPanel } from "../types";
+
 export type { CanvasPanel };
 
 import type { JxPath } from "../state";
@@ -43,8 +44,8 @@ export function registerPanelDnD(panel: CanvasPanel) {
   const allEls = canvas.querySelectorAll("*");
 
   // Drop-target callbacks fire on EVERY target in the stack (innermost → outermost),
-  // and every canvas element is a drop target — so the indicator and the drop are
-  // driven from the monitor using only the innermost target.
+  // And every canvas element is a drop target — so the indicator and the drop are
+  // Driven from the monitor using only the innermost target.
   /** Innermost drop target if it belongs to this panel's canvas, else null */
   const innermostCanvasTarget = (location: {
     current: {
@@ -55,21 +56,18 @@ export function registerPanelDnD(panel: CanvasPanel) {
     };
   }) => {
     const target = location.current.dropTargets[0];
-    if (!target) return null;
+    if (!target) {
+      return null;
+    }
     const tEl = target.element as HTMLElement;
     const tPath = target.data.path;
-    if (!canvas.contains(tEl) || !Array.isArray(tPath)) return null;
-    return { el: tEl, path: tPath as JxPath, isLeaf: !!target.data._isVoid };
+    if (!canvas.contains(tEl) || !Array.isArray(tPath)) {
+      return null;
+    }
+    return { el: tEl, isLeaf: Boolean(target.data._isVoid), path: tPath as JxPath };
   };
 
   const monitorCleanup = monitorForElements({
-    onDragStart({ location }) {
-      view.lastDragInput = location.current.input;
-      for (const el of canvas.querySelectorAll("*")) {
-        (el as HTMLElement).style.pointerEvents = "auto";
-      }
-      for (const p of canvasPanels) p.overlayClk.style.pointerEvents = "none";
-    },
     onDrag({ location }) {
       view.lastDragInput = location.current.input;
       const target = innermostCanvasTarget(location);
@@ -81,13 +79,22 @@ export function registerPanelDnD(panel: CanvasPanel) {
         showCanvasDropIndicator(target.el, target.path, target.isLeaf, panel);
       } else if (location.current.dropTargets.length > 0) {
         // Pointer is over a non-canvas target (e.g. a layer row) — hide this panel's
-        // indicator. When over dead space (no targets at all) keep the last indicator
-        // visible so it persists for the whole drag.
+        // Indicator. When over dead space (no targets at all) keep the last indicator
+        // Visible so it persists for the whole drag.
         if (_activeDropEl && canvas.contains(_activeDropEl)) {
           _activeDropEl.classList.remove("canvas-drop-target");
           _activeDropEl = null;
         }
         dropLine.style.display = "none";
+      }
+    },
+    onDragStart({ location }) {
+      view.lastDragInput = location.current.input;
+      for (const el of canvas.querySelectorAll("*")) {
+        (el as HTMLElement).style.pointerEvents = "auto";
+      }
+      for (const p of canvasPanels) {
+        p.overlayClk.style.pointerEvents = "none";
       }
     },
     onDrop({ source, location }) {
@@ -103,13 +110,17 @@ export function registerPanelDnD(panel: CanvasPanel) {
       _activeDropEl?.classList.remove("canvas-drop-target");
       _activeDropEl = null;
       for (const p of canvasPanels) {
-        if (p.dropLine) p.dropLine.style.display = "none";
+        if (p.dropLine) {
+          p.dropLine.style.display = "none";
+        }
       }
       view.lastDragInput = null;
       for (const el of canvas.querySelectorAll("*")) {
         (el as HTMLElement).style.pointerEvents = "none";
       }
-      for (const p of canvasPanels) p.overlayClk.style.pointerEvents = "";
+      for (const p of canvasPanels) {
+        p.overlayClk.style.pointerEvents = "";
+      }
     },
   });
   view.canvasDndCleanups.push(monitorCleanup);
@@ -117,7 +128,9 @@ export function registerPanelDnD(panel: CanvasPanel) {
   const document = activeTab.value?.doc.document;
   for (const el of allEls) {
     const elPath = elToPath.get(el);
-    if (!elPath) continue;
+    if (!elPath) {
+      continue;
+    }
 
     const node = getNodeAtPath(document!, elPath);
     const tag = (node?.tagName || "div").toLowerCase();
@@ -127,14 +140,16 @@ export function registerPanelDnD(panel: CanvasPanel) {
     const isLeaf = VOID_ELEMENTS.has(tag) || !hasElementChildren;
 
     const cleanup = dropTargetForElements({
-      element: /** @type {HTMLElement} */ el,
       canDrop({ source }) {
         const srcPath = source.data.path as JxPath | undefined;
-        if (srcPath && isAncestor(srcPath, elPath)) return false;
+        if (srcPath && isAncestor(srcPath, elPath)) {
+          return false;
+        }
         return true;
       },
+      element: /** @type {HTMLElement} */ el,
       getData() {
-        return { path: elPath, _isVoid: isLeaf };
+        return { _isVoid: isLeaf, path: elPath };
       },
     });
     view.canvasDndCleanups.push(cleanup);
@@ -148,22 +163,24 @@ export function registerPanelDnD(panel: CanvasPanel) {
  * @returns {DropResult}
  */
 function getCanvasDropResult(el: HTMLElement, elPath: JxPath, isLeaf: boolean): DropResult {
-  if (!view.lastDragInput)
+  if (!view.lastDragInput) {
     return {
       instruction: { type: "make-child" },
       referenceEl: el,
       targetPath: elPath,
     };
+  }
   const y = view.lastDragInput.clientY;
 
   if (elPath.length === 0) {
-    const children = Array.from(el.children) as HTMLElement[];
-    if (children.length === 0)
+    const children = [...el.children] as HTMLElement[];
+    if (children.length === 0) {
       return {
         instruction: { type: "make-child" },
         referenceEl: el,
         targetPath: elPath,
       };
+    }
     return nearestChildEdge(children, y, elPath);
   }
 
@@ -176,18 +193,20 @@ function getCanvasDropResult(el: HTMLElement, elPath: JxPath, isLeaf: boolean): 
     return { instruction, referenceEl: el, targetPath: elPath };
   }
 
-  if (relY < 0.25)
+  if (relY < 0.25) {
     return {
       instruction: { type: "reorder-above" },
       referenceEl: el,
       targetPath: elPath,
     };
-  if (relY > 0.75)
+  }
+  if (relY > 0.75) {
     return {
       instruction: { type: "reorder-below" },
       referenceEl: el,
       targetPath: elPath,
     };
+  }
   return {
     instruction: { type: "make-child" },
     referenceEl: el,

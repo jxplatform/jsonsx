@@ -1,14 +1,14 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
+  abbreviateValue,
+  attrLabel,
   camelToKebab,
   camelToLabel,
+  friendlyNameToVar,
+  inferInputType,
   kebabToLabel,
   propLabel,
-  attrLabel,
-  abbreviateValue,
-  inferInputType,
-  friendlyNameToVar,
   varDisplayName,
 } from "../src/utils/studio-utils";
 
@@ -187,18 +187,18 @@ describe("inferInputType", () => {
   });
 
   test("priority: shorthand > button-group > color > number-unit", () => {
-    // shorthand wins over everything
+    // Shorthand wins over everything
     expect(
       inferInputType({
-        $shorthand: true,
         $input: "button-group",
+        $shorthand: true,
         format: "color",
       }),
     ).toBe("shorthand");
-    // button-group wins over color
+    // Button-group wins over color
     expect(inferInputType({ $input: "button-group", format: "color" })).toBe("button-group");
-    // color wins over number-unit
-    expect(inferInputType({ format: "color", $units: ["px"] })).toBe("color");
+    // Color wins over number-unit
+    expect(inferInputType({ $units: ["px"], format: "color" })).toBe("color");
   });
 });
 
@@ -246,7 +246,7 @@ describe("varDisplayName", () => {
   });
 
   test("roundtrips with friendlyNameToVar for single-cased names", () => {
-    // varDisplayName uses Title Case (\b\w), so acronyms like "UI" become "Ui"
+    // VarDisplayName uses Title Case (\b\w), so acronyms like "UI" become "Ui"
     // This is fine — preset matching uses title directly, not reconstructed names
     const names = ["Geometric Humanist", "Old Style", "Classical Humanist"];
     for (const name of names) {

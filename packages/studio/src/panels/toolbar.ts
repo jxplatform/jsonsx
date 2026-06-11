@@ -6,13 +6,13 @@
 
 import { html, render as litRender, nothing } from "lit-html";
 import { updateSession, updateUi } from "../store";
-import { undo as tabUndo, redo as tabRedo } from "../tabs/transact";
+import { redo as tabRedo, undo as tabUndo } from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import type { DocumentStackEntry } from "../types";
 import { getEffectiveMedia } from "../site-context";
 import { mediaDisplayName } from "./shared";
-import { view, applyPanelCollapse } from "../view";
+import { applyPanelCollapse, view } from "../view";
 import { getRecentProjects } from "../recent-projects";
 import { openQuickSearch } from "./quick-search";
 import { getPlatform } from "../platform";
@@ -51,21 +51,21 @@ let _ctx: ToolbarCtx | null = null;
 let _scope: import("@vue/reactivity").EffectScope | null = null;
 
 const toolbarIconMap = {
-  "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
-  "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
-  "sp-icon-back": html`<sp-icon-back slot="icon"></sp-icon-back>`,
-  "sp-icon-undo": html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
-  "sp-icon-redo": html`<sp-icon-redo slot="icon"></sp-icon-redo>`,
-  "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
-  "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
-  "sp-icon-edit": html`<sp-icon-edit slot="icon"></sp-icon-edit>`,
   "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
-  "sp-icon-preview": html`<sp-icon-preview slot="icon"></sp-icon-preview>`,
-  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
+  "sp-icon-back": html`<sp-icon-back slot="icon"></sp-icon-back>`,
   "sp-icon-brush": html`<sp-icon-brush slot="icon"></sp-icon-brush>`,
-  "sp-icon-view-list": html`<sp-icon-view-list slot="icon"></sp-icon-view-list>`,
-  "sp-icon-gears": html`<sp-icon-gears slot="icon"></sp-icon-gears>`,
+  "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
+  "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
   "sp-icon-document": html`<sp-icon-document slot="icon"></sp-icon-document>`,
+  "sp-icon-duplicate": html`<sp-icon-duplicate slot="icon"></sp-icon-duplicate>`,
+  "sp-icon-edit": html`<sp-icon-edit slot="icon"></sp-icon-edit>`,
+  "sp-icon-folder-open": html`<sp-icon-folder-open slot="icon"></sp-icon-folder-open>`,
+  "sp-icon-gears": html`<sp-icon-gears slot="icon"></sp-icon-gears>`,
+  "sp-icon-preview": html`<sp-icon-preview slot="icon"></sp-icon-preview>`,
+  "sp-icon-redo": html`<sp-icon-redo slot="icon"></sp-icon-redo>`,
+  "sp-icon-save-floppy": html`<sp-icon-save-floppy slot="icon"></sp-icon-save-floppy>`,
+  "sp-icon-undo": html`<sp-icon-undo slot="icon"></sp-icon-undo>`,
+  "sp-icon-view-list": html`<sp-icon-view-list slot="icon"></sp-icon-view-list>`,
 } as Record<string, import("lit-html").TemplateResult>;
 
 /**
@@ -128,11 +128,13 @@ export function unmount() {
 }
 
 export function render() {
-  if (!_rootEl || !_ctx) return;
+  if (!_rootEl || !_ctx) {
+    return;
+  }
   try {
     litRender(toolbarTemplate(), _rootEl);
-  } catch (e) {
-    console.error("toolbar render error:", e);
+  } catch (error) {
+    console.error("toolbar render error:", error);
   }
 }
 
@@ -163,7 +165,7 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
           }}
         >
           <sp-menu-item value="__new__">New Project…</sp-menu-item>
-          ${recentProjects.length
+          ${recentProjects.length > 0
             ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
                   (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
                 )}`
@@ -269,19 +271,23 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
 }
 
 const modes = [
-  { key: "edit", label: "Edit", iconTag: "sp-icon-edit" },
-  { key: "design", label: "Design", iconTag: "sp-icon-artboard" },
-  { key: "preview", label: "Preview", iconTag: "sp-icon-preview" },
-  { key: "source", label: "Code", iconTag: "sp-icon-code" },
-  { key: "stylebook", label: "Stylebook", iconTag: "sp-icon-brush" },
+  { iconTag: "sp-icon-edit", key: "edit", label: "Edit" },
+  { iconTag: "sp-icon-artboard", key: "design", label: "Design" },
+  { iconTag: "sp-icon-preview", key: "preview", label: "Preview" },
+  { iconTag: "sp-icon-code", key: "source", label: "Code" },
+  { iconTag: "sp-icon-brush", key: "stylebook", label: "Stylebook" },
 ];
 
 function toolbarTemplate() {
   const tab = activeTab.value;
-  if (!_ctx) return html``;
+  if (!_ctx) {
+    return html``;
+  }
   const ctx = _ctx;
 
-  if (!tab) return minimalToolbarTemplate(ctx);
+  if (!tab) {
+    return minimalToolbarTemplate(ctx);
+  }
 
   const allowedModes = new Set(tab.capabilities.modes);
   const canUndo = tab.history.index > 0;
@@ -289,14 +295,14 @@ function toolbarTemplate() {
   const canSave = tab.doc.dirty;
 
   const S = {
+    dirty: tab.doc.dirty,
     document: tab.doc.document,
-    ui: tab.session.ui,
+    documentPath: tab.documentPath,
+    documentStack: tab.session.documentStack,
+    fileHandle: tab.fileHandle,
     mode: tab.doc.mode,
     selection: tab.session.selection,
-    dirty: tab.doc.dirty,
-    documentPath: tab.documentPath,
-    fileHandle: tab.fileHandle,
-    documentStack: tab.session.documentStack,
+    ui: tab.session.ui,
   };
   const canvasMode = ctx.getCanvasMode();
   const hasStack = S.documentStack && S.documentStack.length > 0;
@@ -333,7 +339,7 @@ function toolbarTemplate() {
                   toggles
                   size="s"
                   title=${query}
-                  ?selected=${!!S.ui.featureToggles[name]}
+                  ?selected=${Boolean(S.ui.featureToggles[name])}
                   @click=${() => {
                     const newToggles = {
                       ...S.ui.featureToggles,
@@ -359,8 +365,12 @@ function toolbarTemplate() {
             ?selected=${canvasMode === m.key}
             ?disabled=${!allowedModes.has(m.key)}
             @click=${() => {
-              if (canvasMode === m.key) return;
-              if (!allowedModes.has(m.key)) return;
+              if (canvasMode === m.key) {
+                return;
+              }
+              if (!allowedModes.has(m.key)) {
+                return;
+              }
               if (S.ui.editingFunction) {
                 if (view.functionEditor) {
                   view.functionEditor.dispose();
@@ -374,7 +384,9 @@ function toolbarTemplate() {
               const uiPatch: { editingFunction: null; rightTab?: string } = {
                 editingFunction: null,
               };
-              if (m.key === "stylebook") uiPatch.rightTab = "style";
+              if (m.key === "stylebook") {
+                uiPatch.rightTab = "style";
+              }
               updateSession({ ui: uiPatch });
               ctx.renderCanvas();
               ctx.safeRenderRightPanel();
@@ -483,7 +495,7 @@ function toolbarTemplate() {
           }}
         >
           <sp-menu-item value="__new__">New Project…</sp-menu-item>
-          ${recentProjects.length
+          ${recentProjects.length > 0
             ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
                   (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
                 )}`

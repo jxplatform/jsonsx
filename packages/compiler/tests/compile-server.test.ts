@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { compileServer, compileSiteServer } from "../src/targets/compile-server";
 
 // ─── compileServer ─────────────────────────────────────────────────────────
@@ -6,8 +6,8 @@ import { compileServer, compileSiteServer } from "../src/targets/compile-server"
 describe("compileServer", () => {
   test("returns null when no server entries exist", async () => {
     const doc = {
-      tagName: "div",
       children: [{ tagName: "p", textContent: "No server entries" }],
+      tagName: "div",
     };
     const result = await compileServer(doc);
     expect(result).toBeNull();
@@ -15,15 +15,15 @@ describe("compileServer", () => {
 
   test("generates Hono handler for server entries", async () => {
     const doc = {
-      tagName: "div",
+      children: [],
       state: {
         getData: {
-          timing: "server",
-          $src: "./api/get-data.js",
           $export: "getData",
+          $src: "./api/get-data.js",
+          timing: "server",
         },
       },
-      children: [],
+      tagName: "div",
     };
     const result = await compileServer(doc);
     expect(result).not.toBeNull();
@@ -37,9 +37,9 @@ describe("compileServer", () => {
     const doc = {
       state: {
         myFunc: {
-          timing: "server",
-          $src: "./handlers.js",
           $export: "myFunc",
+          $src: "./handlers.js",
+          timing: "server",
         },
       },
     };
@@ -51,14 +51,14 @@ describe("compileServer", () => {
     const doc = {
       state: {
         fetchUser: {
-          timing: "server",
-          $src: "./user.js",
           $export: "fetchUser",
+          $src: "./user.js",
+          timing: "server",
         },
         saveUser: {
-          timing: "server",
-          $src: "./user.js",
           $export: "saveUser",
+          $src: "./user.js",
+          timing: "server",
         },
       },
     };
@@ -73,9 +73,9 @@ describe("compileServer", () => {
     const doc = {
       state: {
         handler: {
-          timing: "server",
-          $src: "./api.js",
           $export: "handler",
+          $src: "./api.js",
+          timing: "server",
         },
       },
     };
@@ -88,9 +88,9 @@ describe("compileServer", () => {
     const doc = {
       state: {
         fn: {
-          timing: "server",
-          $src: "./fn.js",
           $export: "fn",
+          $src: "./fn.js",
+          timing: "server",
         },
       },
     };
@@ -104,9 +104,9 @@ describe("compileServer", () => {
     const doc = {
       state: {
         fn: {
-          timing: "server",
-          $src: "./fn.js",
           $export: "fn",
+          $src: "./fn.js",
+          timing: "server",
         },
       },
     };

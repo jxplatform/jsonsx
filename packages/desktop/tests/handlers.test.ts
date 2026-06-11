@@ -1,13 +1,13 @@
-import { describe, test, expect, mock } from "bun:test";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { describe, expect, mock, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { DirEntry, ComponentMeta } from "../src/rpc-schema";
+import type { ComponentMeta, DirEntry } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
 
 mock.module("electrobun/bun", () => ({
-  Utils: { openFileDialog: async () => [] },
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
+  Utils: { openFileDialog: async () => [] },
 }));
 
 const {
@@ -38,7 +38,7 @@ function setup() {
 }
 
 function cleanup() {
-  rmSync(FIXTURES, { recursive: true, force: true });
+  rmSync(FIXTURES, { force: true, recursive: true });
   setProjectRoot(null);
 }
 
@@ -170,7 +170,7 @@ describe("handleWriteFile", () => {
   test("writes file content", async () => {
     setup();
     try {
-      await handleWriteFile({ path: "output.txt", content: "test content" });
+      await handleWriteFile({ content: "test content", path: "output.txt" });
       const content = await handleReadFile({ path: "output.txt" });
       expect(content).toBe("test content");
     } finally {
@@ -181,7 +181,7 @@ describe("handleWriteFile", () => {
   test("creates parent directories", async () => {
     setup();
     try {
-      await handleWriteFile({ path: "a/b/c/deep.txt", content: "deep" });
+      await handleWriteFile({ content: "deep", path: "a/b/c/deep.txt" });
       const content = await handleReadFile({ path: "a/b/c/deep.txt" });
       expect(content).toBe("deep");
     } finally {
@@ -272,14 +272,14 @@ describe("discoverComponents", () => {
       writeFileSync(
         join(FIXTURES, "components", "my-button.json"),
         JSON.stringify({
-          tagName: "my-button",
           $id: "btn-001",
+          children: [],
           state: {
-            label: { type: "string", default: "Click" },
-            count: { type: "number", default: 0 },
+            count: { default: 0, type: "number" },
+            label: { default: "Click", type: "string" },
             onClick: { $prototype: "Function", body: "state.count++" },
           },
-          children: [],
+          tagName: "my-button",
         }),
       );
 
@@ -300,7 +300,7 @@ describe("discoverComponents", () => {
     setup();
     try {
       writeFileSync(join(FIXTURES, "config.json"), JSON.stringify({ name: "My Project" }));
-      writeFileSync(join(FIXTURES, "page.json"), JSON.stringify({ tagName: "div", children: [] }));
+      writeFileSync(join(FIXTURES, "page.json"), JSON.stringify({ children: [], tagName: "div" }));
 
       const components = await discoverComponents({ dir: "." });
       expect(components.find((c: ComponentMeta) => c.tagName === "div")).toBeUndefined();
@@ -315,7 +315,7 @@ describe("discoverComponents", () => {
       mkdirSync(join(FIXTURES, "node_modules", "pkg"), { recursive: true });
       writeFileSync(
         join(FIXTURES, "node_modules", "pkg", "my-ext.json"),
-        JSON.stringify({ tagName: "my-ext", children: [] }),
+        JSON.stringify({ children: [], tagName: "my-ext" }),
       );
 
       const components = await discoverComponents({ dir: "." });
@@ -331,14 +331,14 @@ describe("discoverComponents", () => {
       writeFileSync(
         join(FIXTURES, "with-elements.json"),
         JSON.stringify({
-          tagName: "my-card",
           $elements: [{ $ref: "./icon.json" }],
           children: [],
+          tagName: "my-card",
         }),
       );
       writeFileSync(
         join(FIXTURES, "no-elements.json"),
-        JSON.stringify({ tagName: "my-box", children: [] }),
+        JSON.stringify({ children: [], tagName: "my-box" }),
       );
 
       const components = await discoverComponents({ dir: "." });
@@ -357,12 +357,12 @@ describe("discoverComponents", () => {
       writeFileSync(
         join(FIXTURES, "primitive-state.json"),
         JSON.stringify({
-          tagName: "my-counter",
+          children: [],
           state: {
             count: 5,
             label: "hello",
           },
-          children: [],
+          tagName: "my-counter",
         }),
       );
 
@@ -427,34 +427,34 @@ describe("fetchPluginSchema", () => {
       writeFileSync(
         join(FIXTURES, "Counter.class.json"),
         JSON.stringify({
-          title: "Counter",
-          description: "A counter component",
           $defs: {
-            parameters: {
-              initial: {
-                identifier: "initial",
-                type: { type: "number" },
-                description: "Initial count value",
-              },
-            },
-            fields: {
-              count: {
-                role: "field",
-                identifier: "count",
-                type: { type: "number" },
-                default: 0,
-              },
-              _internal: {
-                role: "field",
-                access: "private",
-                identifier: "_internal",
-                type: { type: "string" },
-              },
-            },
             constructor: {
               parameters: [{ $ref: "#/$defs/parameters/initial" }],
             },
+            fields: {
+              _internal: {
+                access: "private",
+                identifier: "_internal",
+                role: "field",
+                type: { type: "string" },
+              },
+              count: {
+                default: 0,
+                identifier: "count",
+                role: "field",
+                type: { type: "number" },
+              },
+            },
+            parameters: {
+              initial: {
+                description: "Initial count value",
+                identifier: "initial",
+                type: { type: "number" },
+              },
+            },
           },
+          description: "A counter component",
+          title: "Counter",
         }),
       );
 
@@ -491,24 +491,24 @@ describe("fetchPluginSchema", () => {
       writeFileSync(
         join(FIXTURES, "components", "Widget.class.json"),
         JSON.stringify({
-          title: "Widget",
           $defs: {
-            parameters: {},
             fields: {
               size: {
-                role: "field",
-                identifier: "size",
-                type: { type: "string" },
                 default: "md",
+                identifier: "size",
+                role: "field",
+                type: { type: "string" },
               },
             },
+            parameters: {},
           },
+          title: "Widget",
         }),
       );
 
       const schema = (await fetchPluginSchema({
-        src: "./Widget.class.json",
         base: "file:///components/page.json",
+        src: "./Widget.class.json",
       })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.size.default).toBe("md");
@@ -523,34 +523,34 @@ describe("fetchPluginSchema", () => {
       writeFileSync(
         join(FIXTURES, "Base.class.json"),
         JSON.stringify({
-          title: "Base",
           $defs: {
-            parameters: {},
             fields: {
               baseField: {
-                role: "field",
                 identifier: "baseField",
+                role: "field",
                 type: { type: "string" },
               },
             },
+            parameters: {},
           },
+          title: "Base",
         }),
       );
       writeFileSync(
         join(FIXTURES, "Child.class.json"),
         JSON.stringify({
-          title: "Child",
-          extends: { $ref: "./Base.class.json" },
           $defs: {
-            parameters: {},
             fields: {
               childField: {
-                role: "field",
                 identifier: "childField",
+                role: "field",
                 type: { type: "number" },
               },
             },
+            parameters: {},
           },
+          extends: { $ref: "./Base.class.json" },
+          title: "Child",
         }),
       );
 
@@ -571,24 +571,24 @@ describe("fetchPluginSchema", () => {
       writeFileSync(
         join(FIXTURES, "Timer.class.json"),
         JSON.stringify({
-          title: "Timer",
           $defs: {
-            parameters: {},
             fields: {
               interval: {
-                role: "field",
-                identifier: "interval",
-                type: { type: "number" },
                 default: 1000,
+                identifier: "interval",
+                role: "field",
+                type: { type: "number" },
               },
             },
+            parameters: {},
           },
+          title: "Timer",
         }),
       );
 
       const schema = (await fetchPluginSchema({
-        src: "./something.ts",
         prototype: "Timer",
+        src: "./something.ts",
       })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.properties.interval.default).toBe(1000);
@@ -601,8 +601,8 @@ describe("fetchPluginSchema", () => {
     setup();
     try {
       const result = await fetchPluginSchema({
-        src: "./Foo.class.json",
         base: "not-a-url",
+        src: "./Foo.class.json",
       });
       expect(result).toBeNull();
     } finally {
@@ -615,8 +615,8 @@ describe("fetchPluginSchema", () => {
     try {
       writeFileSync(join(FIXTURES, "Broken.class.json"), "not valid json {{{");
       const schema = await fetchPluginSchema({
-        src: "./something.ts",
         prototype: "Broken",
+        src: "./something.ts",
       });
       expect(schema).toBeNull();
     } finally {
@@ -629,8 +629,8 @@ describe("fetchPluginSchema", () => {
     try {
       writeFileSync(join(FIXTURES, "bad-module.ts"), "export syntax error %%%");
       const schema = await fetchPluginSchema({
-        src: "./bad-module.ts",
         prototype: "BadModule",
+        src: "./bad-module.ts",
       });
       expect(schema).toBeNull();
     } finally {
@@ -647,8 +647,8 @@ describe("fetchPluginSchema", () => {
       );
 
       const schema = (await fetchPluginSchema({
-        src: "./MyPlugin.ts",
         prototype: "MyPlugin",
+        src: "./MyPlugin.ts",
       })) as StudioSchema;
       expect(schema).not.toBeNull();
       expect(schema.type).toBe("object");
@@ -662,10 +662,10 @@ describe("fetchPluginSchema", () => {
     try {
       writeFileSync(join(FIXTURES, "plain.ts"), `export function plain() { return 1; }`);
       const result = await fetchPluginSchema({
-        src: "./plain.ts",
         prototype: "plain",
+        src: "./plain.ts",
       });
-      // plain is a function without .schema, so returns null
+      // Plain is a function without .schema, so returns null
       expect(result).toBeNull();
     } finally {
       cleanup();
@@ -680,7 +680,7 @@ describe("handleUploadFile", () => {
     setup();
     try {
       const data = Buffer.from("hello binary").toString("base64");
-      await handleUploadFile({ path: "upload.bin", data });
+      await handleUploadFile({ data, path: "upload.bin" });
       const content = await handleReadFile({ path: "upload.bin" });
       expect(content).toBe("hello binary");
     } finally {
@@ -692,7 +692,7 @@ describe("handleUploadFile", () => {
     setup();
     try {
       const data = Buffer.from("deep upload").toString("base64");
-      await handleUploadFile({ path: "a/b/upload.bin", data });
+      await handleUploadFile({ data, path: "a/b/upload.bin" });
       const content = await handleReadFile({ path: "a/b/upload.bin" });
       expect(content).toBe("deep upload");
     } finally {
@@ -704,7 +704,7 @@ describe("handleUploadFile", () => {
     setup();
     try {
       const data = Buffer.from("hack").toString("base64");
-      await expect(handleUploadFile({ path: "../../evil.bin", data })).rejects.toThrow(
+      await expect(handleUploadFile({ data, path: "../../evil.bin" })).rejects.toThrow(
         "Path outside project root",
       );
     } finally {

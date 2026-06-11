@@ -1,22 +1,22 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  expandDotPaths,
-  expandStylePaths,
+  applyStyleKeyMapping,
   collapseDotPaths,
   collapseStylePaths,
-  applyStyleKeyMapping,
+  expandDotPaths,
+  expandStylePaths,
   isJxMarkdown,
   transpileJxMarkdown,
 } from "../src/md";
 
 import { jxKey, mdKey } from "../src/transpile";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __filename = import.meta.filename;
+const __dirname = import.meta.dirname;
 const EXAMPLES_DIR = join(__dirname, "..", "..", "..", "examples");
 
 // ─── jxKey / mdKey ──────────────────────────────────────────────────────────
@@ -68,37 +68,37 @@ describe("expandDotPaths", () => {
 
   test("expands pseudo-selector dot-paths", () => {
     const result = expandDotPaths({
-      backgroundColor: "blue",
       ":hover.backgroundColor": "darkblue",
       ":hover.cursor": "pointer",
+      backgroundColor: "blue",
     });
     expect(result).toEqual({
-      backgroundColor: "blue",
       ":hover": { backgroundColor: "darkblue", cursor: "pointer" },
+      backgroundColor: "blue",
     });
   });
 
   test("expands media query dot-paths", () => {
     const result = expandDotPaths({
-      gap: "0.5rem",
-      "--md.gap": "1rem",
       "--dark.backgroundColor": "#1a1a1a",
       "--dark.color": "#f0f0f0",
+      "--md.gap": "1rem",
+      gap: "0.5rem",
     });
     expect(result).toEqual({
-      gap: "0.5rem",
-      "--md": { gap: "1rem" },
       "--dark": { backgroundColor: "#1a1a1a", color: "#f0f0f0" },
+      "--md": { gap: "1rem" },
+      gap: "0.5rem",
     });
   });
 
   test("expands deeply nested dot-paths with Jx keyword mapping", () => {
     const result = expandDotPaths({
-      prototype: "Array",
       "items.ref": "#/state/items",
       "map.component": "todo-item",
       "map.props.item.ref": "$map/item",
       "map.props.onToggle.ref": "#/state/toggleItem",
+      prototype: "Array",
     });
     expect(result).toEqual({
       $prototype: "Array",
@@ -120,27 +120,27 @@ describe("expandStylePaths", () => {
   test("maps pseudo-class names to colon prefix", () => {
     const result = expandStylePaths({
       color: "red",
+      "disabled.opacity": "0.5",
       "hover.color": "blue",
       "hover.cursor": "pointer",
-      "disabled.opacity": "0.5",
     });
     expect(result).toEqual({
-      color: "red",
-      ":hover": { color: "blue", cursor: "pointer" },
       ":disabled": { opacity: "0.5" },
+      ":hover": { color: "blue", cursor: "pointer" },
+      color: "red",
     });
   });
 
   test("maps --prefixed keys to @ prefix for media queries", () => {
     const result = expandStylePaths({
-      gap: "0.5rem",
-      "--md.gap": "1rem",
       "--dark.backgroundColor": "#1a1a1a",
+      "--md.gap": "1rem",
+      gap: "0.5rem",
     });
     expect(result).toEqual({
-      gap: "0.5rem",
-      "@--md": { gap: "1rem" },
       "@--dark": { backgroundColor: "#1a1a1a" },
+      "@--md": { gap: "1rem" },
+      gap: "0.5rem",
     });
   });
 
@@ -158,21 +158,21 @@ describe("expandStylePaths", () => {
 describe("collapseDotPaths", () => {
   test("collapses nested objects to dot-paths", () => {
     const result = collapseDotPaths({
-      backgroundColor: "blue",
       ":hover": { backgroundColor: "darkblue", cursor: "pointer" },
+      backgroundColor: "blue",
     });
     expect(result).toEqual({
-      backgroundColor: "blue",
       ":hover.backgroundColor": "darkblue",
       ":hover.cursor": "pointer",
+      backgroundColor: "blue",
     });
   });
 
   test("round-trips with expandDotPaths", () => {
     const original = {
-      gap: "0.5rem",
-      "@--md.gap": "1rem",
       ":hover.color": "red",
+      "@--md.gap": "1rem",
+      gap: "0.5rem",
     };
     expect(collapseDotPaths(expandDotPaths(original))).toEqual(original);
   });
@@ -183,8 +183,8 @@ describe("collapseDotPaths", () => {
 describe("collapseStylePaths", () => {
   test("strips colon prefix from pseudo-class keys", () => {
     const result = collapseStylePaths({
-      color: "red",
       ":hover": { color: "blue", cursor: "pointer" },
+      color: "red",
     });
     expect(result).toEqual({
       color: "red",
@@ -195,19 +195,19 @@ describe("collapseStylePaths", () => {
 
   test("strips @ prefix from media query keys", () => {
     const result = collapseStylePaths({
-      gap: "0.5rem",
       "@--md": { gap: "1rem" },
+      gap: "0.5rem",
     });
     expect(result).toEqual({
-      gap: "0.5rem",
       "--md.gap": "1rem",
+      gap: "0.5rem",
     });
   });
 
   test("round-trips with expandStylePaths", () => {
     const original = {
-      gap: "0.5rem",
       "--md.gap": "1rem",
+      gap: "0.5rem",
       "hover.color": "red",
     };
     expect(collapseStylePaths(expandStylePaths(original))).toEqual(original);
@@ -219,12 +219,12 @@ describe("collapseStylePaths", () => {
 describe("applyStyleKeyMapping", () => {
   test("maps pseudo-class names to colon prefix", () => {
     const result = applyStyleKeyMapping({
-      hover: { color: "red" },
       focus: { outline: "none" },
+      hover: { color: "red" },
     });
     expect(result).toEqual({
-      ":hover": { color: "red" },
       ":focus": { outline: "none" },
+      ":hover": { color: "red" },
     });
   });
 
@@ -311,9 +311,9 @@ style:
 `;
     const doc = transpileJxMarkdown(source) as any;
     expect(doc.style).toEqual({
-      color: "red",
       ":hover": { color: "blue" },
       "@--dark": { color: "white" },
+      color: "red",
     });
   });
 
@@ -331,8 +331,8 @@ Some content here.
     const section = doc.children[0];
     expect(section.tagName).toBe("my-section");
     expect(section.style).toEqual({
-      padding: "1rem",
       backgroundColor: "white",
+      padding: "1rem",
     });
   });
 
@@ -346,8 +346,8 @@ tagName: my-comp
     const doc = transpileJxMarkdown(source) as any;
     const button = doc.children[0];
     expect(button.style).toEqual({
-      color: "red",
       ":hover": { color: "blue", cursor: "pointer" },
+      color: "red",
     });
   });
 
@@ -361,9 +361,9 @@ tagName: my-comp
     const doc = transpileJxMarkdown(source) as any;
     const div = doc.children[0];
     expect(div.style).toEqual({
-      gap: "0.5rem",
-      "@--md": { gap: "1rem" },
       "@--dark": { backgroundColor: "#1a1a1a" },
+      "@--md": { gap: "1rem" },
+      gap: "0.5rem",
     });
   });
 
@@ -443,7 +443,7 @@ Hello world
     const doc = transpileJxMarkdown(source) as any;
     const p = doc.children[0];
     expect(p.tagName).toBe("p");
-    expect(p.style).toEqual({ fontSize: "1.25rem", color: "red" });
+    expect(p.style).toEqual({ color: "red", fontSize: "1.25rem" });
     // Text should be textContent, NOT a nested paragraph
     expect(p.textContent).toBe("Hello world");
     expect(p.children).toBeUndefined();
@@ -487,7 +487,7 @@ Some text
     const doc = transpileJxMarkdown(source) as any;
     const div = doc.children[0];
     expect(div.tagName).toBe("div");
-    // div CAN contain paragraphs, so they should NOT be unwrapped
+    // Div CAN contain paragraphs, so they should NOT be unwrapped
     expect(div.children[0].tagName).toBe("p");
   });
 
@@ -545,7 +545,7 @@ state:
     expect(doc.state.onToggle.$prototype).toBe("Function");
     expect(doc.style).toBeDefined();
     expect(doc.style.display).toBe("flex");
-    expect(doc.children.length).toBe(3); // input, span, button
+    expect(doc.children.length).toBe(3); // Input, span, button
     expect(doc.children[0].tagName).toBe("input");
     expect(doc.children[1].tagName).toBe("span");
     expect(doc.children[2].tagName).toBe("button");

@@ -6,8 +6,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { readFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, basename, extname } from "node:path";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { basename, extname, resolve } from "node:path";
 import { createRequire } from "node:module";
 
 export interface ImageVariant {
@@ -42,9 +43,11 @@ export interface ImageConfig {
 let _sharp: typeof import("sharp") | null = null;
 
 async function getSharp() {
-  if (_sharp) return _sharp;
+  if (_sharp) {
+    return _sharp;
+  }
   // Primary: dynamic import — works in tests (mock.module intercepts it) and in
-  // production installs where @img/sharp-* native packages are adjacent to cli.js.
+  // Production installs where @img/sharp-* native packages are adjacent to cli.js.
   try {
     const sharpMod = await import("sharp");
     _sharp = sharpMod.default as typeof import("sharp");
@@ -53,16 +56,17 @@ async function getSharp() {
     // Fall through to CJS fallback below.
   }
   // Fallback: resolve from the project being compiled. This covers symlinked
-  // monorepo dev environments (e.g. NixOS) where Node.js resolves import.meta.url
-  // to the compiler package's real path, making the @img/sharp-* packages
-  // unreachable via the primary import path.
+  // Monorepo dev environments (e.g. NixOS) where Node.js resolves import.meta.url
+  // To the compiler package's real path, making the @img/sharp-* packages
+  // Unreachable via the primary import path.
   try {
     const req = createRequire(resolve(process.cwd(), "package.json"));
     _sharp = req("sharp") as typeof import("sharp");
     return _sharp;
-  } catch (e) {
+  } catch (error) {
     throw new Error(
-      `Sharp is required for image optimization but failed to load: ${(e as Error).message}`,
+      `Sharp is required for image optimization but failed to load: ${errorMessage(error)}`,
+      { cause: error },
     );
   }
 }
@@ -79,9 +83,9 @@ export async function getImageMetadata(srcPath: string) {
   const sharp = await getSharp();
   const meta = await sharp(srcPath).metadata();
   return {
-    width: meta.width ?? 0,
-    height: meta.height ?? 0,
     format: (meta.format ?? "unknown") as string,
+    height: meta.height ?? 0,
+    width: meta.width ?? 0,
   };
 }
 
@@ -104,9 +108,9 @@ export function contentHash(srcPath: string) {
  */
 export function configHash(config: ImageConfig) {
   const key = JSON.stringify({
-    widths: config.widths,
     formats: config.formats,
     quality: config.quality,
+    widths: config.widths,
   });
   return createHash("md5").update(key).digest("hex").slice(0, 8);
 }
@@ -158,9 +162,11 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
       const outputPath = `/${OPTIMIZED_DIR}/${filename}`;
       const absolutePath = resolve(optimizedDir, filename);
 
-      variants.push({ width, format, outputPath, absolutePath });
+      variants.push({ absolutePath, format, outputPath, width });
 
-      if (existsSync(absolutePath)) continue;
+      if (existsSync(absolutePath)) {
+        continue;
+      }
 
       const quality = config.quality[format as keyof ImageConfig["quality"]] ?? 80;
       const task = sharp(srcPath)
@@ -179,9 +185,9 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
   }
 
   return {
-    original: { width: meta.width, height: meta.height, format: meta.format },
-    variants,
     contentHash: hash8,
+    original: { format: meta.format, height: meta.height, width: meta.width },
+    variants,
   };
 }
 

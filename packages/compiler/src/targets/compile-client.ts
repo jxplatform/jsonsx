@@ -11,41 +11,75 @@
  * state + computed signals), bind (DOM getters), on (event handlers), hydrate()
  */
 
-import { camelToKebab, RESERVED_KEYS } from "@jxsuite/runtime";
+import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
+  DEFAULT_LIT_HTML_SRC,
+  DEFAULT_REACTIVITY_SRC,
+  buildAttrs,
+  compileExpression,
+  compileStyles,
+  createCompileContext,
+  escapeHtml,
+  isMutating,
+  isRefObject,
   isSchemaOnly,
   isTemplateString,
-  isRefObject,
   resolveStaticValue,
-  createCompileContext,
-  buildAttrs,
-  compileStyles,
-  escapeHtml,
-  DEFAULT_REACTIVITY_SRC,
-  DEFAULT_LIT_HTML_SRC,
-  compileExpression,
-  isMutating,
 } from "../shared.ts";
-import type { ExpressionNode } from "../shared.ts";
-import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
+import {
+  isExpandedSignal,
+  isExpressionDef,
+  isFunctionDef,
+  isMappedArray,
+  isPrototypeDef,
+  paramNames,
+} from "@jxsuite/schema/guards";
+import type { CompileContext, ExpressionNode } from "../shared.ts";
+import type {
+  JsonObject,
+  JsonValue,
+  JxDocument,
+  JxMutableNode,
+  JxPrototypeDef,
+  JxStyle,
+} from "@jxsuite/schema/types";
+
+/** A compiled event handler entry: parameter names + function body. */
+interface HandlerDef {
+  args?: string[] | undefined;
+  body?: string | undefined;
+}
 
 /**
  * Compile a Jx document to pre-rendered HTML + reactive JS module.
  *
- * @param {JxMutableNode | Record<string, any>} raw
- * @param {Record<string, unknown>} opts
+ * @param {JxDocument} raw
+ * @param {{
+ *   title?: string;
+ *   reactivitySrc?: string;
+ *   litHtmlSrc?: string;
+ *   modulePath?: string;
+ *   projectStyle?: JxStyle | null;
+ * }} opts
  * @returns {{ html: string; files: { path: string; content: string }[] }}
  */
 export function compileClient(
-  raw: JxMutableNode | Record<string, any>,
-  opts: Record<string, unknown>,
+  raw: JxDocument,
+  opts: {
+    title?: string;
+    reactivitySrc?: string;
+    litHtmlSrc?: string;
+    modulePath?: string;
+    projectStyle?: JxStyle | null;
+    [key: string]: unknown;
+  },
 ) {
   const {
-    title,
+    title = "Jx App",
     reactivitySrc = DEFAULT_REACTIVITY_SRC,
     litHtmlSrc = DEFAULT_LIT_HTML_SRC,
     modulePath = "app.js",
-  } = opts as JxMutableNode;
+  } = opts;
 
   const context = createCompileContext(raw, null, raw.state ?? {}, raw.$media ?? {});
   const styleBlock = compileStyles(
@@ -55,19 +89,19 @@ export function compileClient(
   );
 
   // Collectors for bindings and handlers
-  const counter = { t: 0, s: 0, h: 0, m: 0, sw: 0, l: 0, needsLit: false };
-  const bindings: Map<string, string> = new Map(); // key → expression string
-  const handlers: Map<string, any> = new Map(); // key → { body, args }
+  const counter = { h: 0, l: 0, m: 0, needsLit: false, s: 0, sw: 0, t: 0 };
+  const bindings = new Map<string, string>(); // Key → expression string
+  const handlers = new Map<string, HandlerDef>(); // Key → { body, args }
 
   // Classify state entries into reactive state, computed, bind, on, and init blocks
-  const stateEntries: [string, any][] = []; // [key, initValue]  → reactive({...})
+  const stateEntries: [string, JsonValue | undefined][] = []; // [key, initValue] → reactive({...})
   const computedEntries: [string, string][] = []; // [key, bodyExpr]   → state.key = computed(...)
   const bindEntries: [string, string][] = []; // [key, bodyExpr]   → bind = {...}
-  const onEntries: [string, any][] = []; // [key, { args, body }] → on = {...}
-  const initBlocks: string[] = []; // lines emitted after state for prototype init
+  const onEntries: [string, HandlerDef][] = []; // [key, { args, body }] → on = {...}
+  const initBlocks: string[] = []; // Lines emitted after state for prototype init
 
   // Map $src path → Set of function names to import
-  const srcImportMap: Map<string, Set<string>> = new Map();
+  const srcImportMap = new Map<string, Set<string>>();
 
   const defs = raw.state ?? {};
   for (const [key, def] of Object.entries(defs)) {
@@ -75,28 +109,26 @@ export function compileClient(
       // Naked primitive or array → reactive state
       if (typeof def === "string" && isTemplateString(def)) {
         // Template string → computed on state so other computeds can ref it
-        computedEntries.push([key, "() => `" + def + "`"]);
+        computedEntries.push([key, `() => \`${def}\``]);
       } else {
         stateEntries.push([key, def]);
       }
       continue;
     }
 
-    const d = def as JxMutableNode;
-
     // $expression: Shape 5
-    if ("$expression" in d) {
-      const node = (d as Record<string, unknown>).$expression as ExpressionNode;
+    if (isExpressionDef(def)) {
+      const node = def.$expression as ExpressionNode;
       if (isMutating(node.operator)) {
         const compiled = compileExpression(node, {
-          statePrefix: "state",
           eventParam: "e",
+          statePrefix: "state",
         });
         onEntries.push([key, { args: ["state", "e"], body: compiled }]);
       } else {
         const compiled = compileExpression(node, {
-          statePrefix: "state",
           eventParam: "e",
+          statePrefix: "state",
         });
         computedEntries.push([key, `() => ${compiled}`]);
       }
@@ -104,59 +136,65 @@ export function compileClient(
     }
 
     // $prototype: "Function"
-    if (d.$prototype === "Function") {
-      const args = d.parameters ?? d.arguments;
-      if (d.$src) {
-        if (!srcImportMap.has(d.$src)) srcImportMap.set(d.$src, new Set());
-        (srcImportMap.get(d.$src) as Set<string>).add(key);
+    if (isFunctionDef(def)) {
+      const args = def.parameters ? paramNames(def.parameters) : def.arguments;
+      if (def.$src) {
+        if (!srcImportMap.has(def.$src)) {
+          srcImportMap.set(def.$src, new Set());
+        }
+        (srcImportMap.get(def.$src) as Set<string>).add(key);
 
         // $src functions always produce computed entries (they return values)
-        computedEntries.push([key, "() => { return " + key + "(state); }"]);
-      } else if (d.body && d.body.includes("return")) {
+        computedEntries.push([key, `() => { return ${key}(state); }`]);
+      } else if (def.body && def.body.includes("return")) {
         // Body contains return → computed
-        computedEntries.push([key, "() => { " + d.body + " }"]);
+        computedEntries.push([key, `() => { ${def.body} }`]);
       } else {
         // No return → event handler
-        onEntries.push([key, { args: args ?? ["state"], body: d.body }]);
+        onEntries.push([key, { args: args ?? ["state"], body: def.body }]);
       }
       continue;
     }
 
     // Pure schema-only type def → skip
-    if (isSchemaOnly(d)) continue;
+    if (isSchemaOnly(def)) {
+      continue;
+    }
 
     // Expanded signal with default
-    if ("default" in d && !d.$prototype) {
-      stateEntries.push([key, d.default]);
+    if (isExpandedSignal(def)) {
+      stateEntries.push([key, def.default]);
       continue;
     }
 
-    // $prototype: "LocalStorage" / "SessionStorage"
-    if (d.$prototype === "LocalStorage" || d.$prototype === "SessionStorage") {
-      const storeName = d.$prototype === "LocalStorage" ? "localStorage" : "sessionStorage";
-      const storageKey = d.key ?? key;
-      const defaultVal = d.default ?? null;
-      stateEntries.push([key, null]);
-      initBlocks.push(emitStorageInit(key, storeName, storageKey, defaultVal));
-      continue;
+    if (isPrototypeDef(def)) {
+      // $prototype: "LocalStorage" / "SessionStorage"
+      if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
+        const storeName = def.$prototype === "LocalStorage" ? "localStorage" : "sessionStorage";
+        const storageKey = def.key ?? key;
+        const defaultVal = def.default ?? null;
+        stateEntries.push([key, null]);
+        initBlocks.push(emitStorageInit(key, storeName, storageKey, defaultVal));
+        continue;
+      }
+
+      // $prototype: "Request"
+      if (def.$prototype === "Request") {
+        stateEntries.push([key, null]);
+        initBlocks.push(emitRequestInit(key, def));
+        continue;
+      }
+
+      // $prototype: "Cookie"
+      if (def.$prototype === "Cookie") {
+        stateEntries.push([key, null]);
+        initBlocks.push(emitCookieInit(key, def.name ?? key, def.default ?? null));
+        continue;
+      }
     }
 
-    // $prototype: "Request"
-    if (d.$prototype === "Request") {
-      stateEntries.push([key, null]);
-      initBlocks.push(emitRequestInit(key, d));
-      continue;
-    }
-
-    // $prototype: "Cookie"
-    if (d.$prototype === "Cookie") {
-      stateEntries.push([key, null]);
-      initBlocks.push(emitCookieInit(key, d.name ?? key, d.default ?? null));
-      continue;
-    }
-
-    // Plain object → reactive state
-    stateEntries.push([key, d]);
+    // Plain object → reactive state (parsed JSON, so structurally a JsonObject)
+    stateEntries.push([key, def as JsonObject]);
   }
 
   // Build HTML tree with data-bind markers
@@ -213,7 +251,7 @@ ${importmapEntries.join(",\n")}
 </body>
 </html>`;
 
-  return { html, files: [{ path: modulePath, content: moduleContent }] };
+  return { files: [{ content: moduleContent, path: modulePath }], html };
 }
 
 // ─── HTML tree walker ─────────────────────────────────────────────────────────
@@ -221,9 +259,9 @@ ${importmapEntries.join(",\n")}
 /**
  * @param {JxMutableNode} def
  * @param {JxMutableNode} raw
- * @param {any} context
+ * @param {CompileContext} context
  * @param {Map<string, string>} bindings
- * @param {Map<string, any>} handlers
+ * @param {Map<string, HandlerDef>} handlers
  * @param {{
  *   t: number;
  *   s: number;
@@ -238,9 +276,9 @@ ${importmapEntries.join(",\n")}
 function buildClientNode(
   def: JxMutableNode,
   raw: JxMutableNode,
-  context: any,
+  context: CompileContext,
   bindings: Map<string, string>,
-  handlers: Map<string, any>,
+  handlers: Map<string, HandlerDef>,
   counter: {
     t: number;
     s: number;
@@ -258,7 +296,9 @@ function buildClientNode(
   if (typeof def === "number" || typeof def === "boolean") {
     return escapeHtml(String(def));
   }
-  if (!def || typeof def !== "object") return "";
+  if (!def || typeof def !== "object") {
+    return "";
+  }
 
   const nextContext = createCompileContext(
     raw,
@@ -271,7 +311,7 @@ function buildClientNode(
   const bindAttrs = [];
   let needsBind = false;
 
-  // textContent bindings
+  // TextContent bindings
   if (def.textContent !== undefined) {
     const tc = raw?.textContent ?? (def.textContent as unknown as JxMutableNode);
     if (isRefObject(tc)) {
@@ -282,38 +322,36 @@ function buildClientNode(
     } else if (isTemplateString(tc)) {
       const key = `_t${counter.t++}`;
       bindAttrs.push(`:text-content="${key}"`);
-      bindings.set(key, "() => `" + tc + "`");
+      bindings.set(key, `() => \`${tc}\``);
       needsBind = true;
     }
   }
 
   // Event handlers (onclick, oninput, etc.)
   for (const [prop, val] of Object.entries(def)) {
-    if (!prop.startsWith("on") || prop === "observedAttributes") continue;
+    if (!prop.startsWith("on") || prop === "observedAttributes") {
+      continue;
+    }
     const eventName = prop.slice(2).toLowerCase();
     if (isRefObject(val)) {
-      const key = refToBindingKey((val as JxMutableNode).$ref as string);
+      const key = refToBindingKey(val.$ref);
       bindAttrs.push(`@${eventName}="${key}"`);
       needsBind = true;
-    } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
-      const v = val as JxMutableNode;
+    } else if (isFunctionDef(val)) {
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
       handlers.set(key, {
-        args: v.parameters ?? v.arguments ?? ["state", "event"],
-        body: v.body,
+        args: val.parameters ? paramNames(val.parameters) : (val.arguments ?? ["state", "event"]),
+        body: val.body,
       });
       needsBind = true;
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
+    } else if (isExpressionDef(val)) {
       const key = `_h${counter.h++}`;
       bindAttrs.push(`@${eventName}="${key}"`);
-      const compiled = compileExpression(
-        (val as Record<string, unknown>).$expression as ExpressionNode,
-        {
-          statePrefix: "state",
-          eventParam: "e",
-        },
-      );
+      const compiled = compileExpression(val.$expression as ExpressionNode, {
+        eventParam: "e",
+        statePrefix: "state",
+      });
       handlers.set(key, { args: ["state", "e"], body: compiled });
       needsBind = true;
     }
@@ -328,13 +366,16 @@ function buildClientNode(
         prop.startsWith("&") ||
         prop.startsWith("[") ||
         prop.startsWith("@")
-      )
+      ) {
         continue;
-      if (val === null || typeof val === "object") continue;
+      }
+      if (val === null || typeof val === "object") {
+        continue;
+      }
       if (isTemplateString(val)) {
         const key = `_s${counter.s++}`;
         bindAttrs.push(`:style.${camelToKebab(prop)}="${key}"`);
-        bindings.set(key, "() => `" + val + "`");
+        bindings.set(key, `() => \`${val}\``);
         needsBind = true;
       }
     }
@@ -351,7 +392,7 @@ function buildClientNode(
       } else if (isTemplateString(val)) {
         const key = `_t${counter.t++}`;
         bindAttrs.push(`:attr.${attr}="${key}"`);
-        bindings.set(key, "() => `" + val + "`");
+        bindings.set(key, `() => \`${val}\``);
         needsBind = true;
       }
     }
@@ -371,8 +412,9 @@ function buildClientNode(
       prop === "textContent" ||
       prop === "innerHTML" ||
       prop === "attributes"
-    )
+    ) {
       continue;
+    }
     if (isRefObject(val)) {
       const key = refToBindingKey((val as JxMutableNode).$ref as string);
       bindAttrs.push(`:${camelToKebab(prop)}="${key}"`);
@@ -381,7 +423,7 @@ function buildClientNode(
     } else if (isTemplateString(val)) {
       const key = `_t${counter.t++}`;
       bindAttrs.push(`:${camelToKebab(prop)}="${key}"`);
-      bindings.set(key, "() => `" + val + "`");
+      bindings.set(key, `() => \`${val}\``);
       needsBind = true;
     }
   }
@@ -389,7 +431,7 @@ function buildClientNode(
   // Build static attrs
   const staticAttrs = buildAttrs(def, nextContext.scope);
   const dataBindAttr = needsBind ? " data-bind" : "";
-  const bindAttrStr = bindAttrs.length > 0 ? " " + bindAttrs.join(" ") : "";
+  const bindAttrStr = bindAttrs.length > 0 ? ` ${bindAttrs.join(" ")}` : "";
 
   // Inner content
   let inner = "";
@@ -401,25 +443,20 @@ function buildClientNode(
     const value = resolveStaticValue(source.textContent, nextContext.scope);
     inner = value == null ? "" : escapeHtml(String(value));
   } else if (source.innerHTML) {
-    // resolveStaticValue may return null if innerHTML contains `${` from rendered content
+    // ResolveStaticValue may return null if innerHTML contains `${` from rendered content
     // (e.g., code examples) that isn't an actual template expression. Fall back to raw value.
     inner = (resolveStaticValue(source.innerHTML, nextContext.scope) as string) ?? source.innerHTML;
-  } else if (
-    source.children &&
-    typeof source.children === "object" &&
-    !Array.isArray(source.children) &&
-    (source.children as JxMutableNode).$prototype === "Array"
-  ) {
+  } else if (isMappedArray(source.children)) {
     // ─── Mapped array → lit-html render binding ───
     counter.needsLit = true;
     const listKey = `_list${counter.l++}`;
-    const arrayDef = source.children as JxMutableNode;
+    const arrayDef = source.children;
 
     // Resolve items source expression
     let itemsExpr;
     if (isRefObject(arrayDef.items)) {
       const path = refToBindingKey(arrayDef.items.$ref);
-      itemsExpr = "state." + path;
+      itemsExpr = `state.${path}`;
     } else {
       itemsExpr = JSON.stringify(arrayDef.items);
     }
@@ -428,27 +465,27 @@ function buildClientNode(
     const litTemplate = emitLitMapTemplate(arrayDef.map);
     bindings.set(
       listKey,
-      "() => (" + itemsExpr + " ?? []).map((item, index) => html`" + litTemplate + "`)",
+      `() => (${itemsExpr} ?? []).map((item, index) => html\`${litTemplate}\`)`,
     );
 
     bindAttrs.push(`:render="${listKey}"`);
     needsBind = true;
     // Re-derive the data-bind/attr strings since we added to bindAttrs
     const dataBindAttr2 = " data-bind";
-    const bindAttrStr2 = " " + bindAttrs.join(" ");
+    const bindAttrStr2 = ` ${bindAttrs.join(" ")}`;
     const selfClosing = new Set(["input", "br", "hr", "img", "meta", "link"]);
     if (selfClosing.has(tag)) {
       return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}>`;
     }
     return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}></${tag}>`;
   } else if (Array.isArray(source.children)) {
-    const rawChildren = raw?.children;
+    const rawChildren = Array.isArray(raw?.children) ? raw.children : undefined;
     inner = source.children
       .map((c, i) => {
         const childRaw = rawChildren?.[i] ?? c;
         return buildClientNode(
-          c as unknown as JxMutableNode,
-          childRaw as unknown as JxMutableNode,
+          c as JxMutableNode,
+          childRaw as JxMutableNode,
           nextContext,
           bindings,
           handlers,
@@ -476,26 +513,32 @@ function buildClientNode(
  * @param {JxMutableNode} def
  * @returns {string}
  */
-function emitLitMapTemplate(def: JxMutableNode) {
-  if (!def) return "";
+function emitLitMapTemplate(def: JxMutableNode | undefined) {
+  if (!def) {
+    return "";
+  }
   const tag = def.tagName ?? "div";
   let attrs = "";
 
-  if (def.id) attrs += ' id="' + def.id + '"';
-  if (def.className) attrs += ' class="' + mapRefsToLit(def.className) + '"';
+  if (def.id) {
+    attrs += ` id="${def.id}"`;
+  }
+  if (def.className) {
+    attrs += ` class="${mapRefsToLit(def.className)}"`;
+  }
 
-  // attributes object
+  // Attributes object
   if (def.attributes && typeof def.attributes === "object") {
     for (const [k, v] of Object.entries(def.attributes)) {
       if (typeof v === "string" && isTemplateString(v)) {
-        attrs += " " + k + '="' + mapRefsToLit(v) + '"';
+        attrs += ` ${k}="${mapRefsToLit(v)}"`;
       } else {
-        attrs += " " + k + '="' + escapeHtml(String(v)) + '"';
+        attrs += ` ${k}="${escapeHtml(String(v))}"`;
       }
     }
   }
 
-  // style → inline CSS
+  // Style → inline CSS
   if (def.style && typeof def.style === "object") {
     const parts: string[] = [];
     for (const [k, v] of Object.entries(def.style)) {
@@ -505,46 +548,51 @@ function emitLitMapTemplate(def: JxMutableNode) {
         k.startsWith("&") ||
         k.startsWith("[") ||
         k.startsWith("@")
-      )
+      ) {
         continue;
-      if (v === null || typeof v === "object") continue;
+      }
+      if (v === null || typeof v === "object") {
+        continue;
+      }
       const cssProp = camelToKebab(k);
       if (isTemplateString(String(v))) {
-        parts.push(cssProp + ": " + mapRefsToLit(String(v)));
+        parts.push(`${cssProp}: ${mapRefsToLit(String(v))}`);
       } else {
-        parts.push(cssProp + ": " + v);
+        parts.push(`${cssProp}: ${v}`);
       }
     }
     if (parts.length > 0) {
-      attrs += ' style="' + parts.join("; ") + '"';
+      attrs += ` style="${parts.join("; ")}"`;
     }
   }
 
   // Event handlers in map template
   for (const [prop, val] of Object.entries(def)) {
-    if (!prop.startsWith("on") || prop === "observedAttributes") continue;
+    if (!prop.startsWith("on") || prop === "observedAttributes") {
+      continue;
+    }
     const eventName = prop.slice(2).toLowerCase();
     if (isRefObject(val)) {
       const key = refToBindingKey((val as JxMutableNode).$ref as string);
-      attrs += " @" + eventName + "=${(e) => { state.$map = { item, index }; on." + key + "(e); }}";
+      attrs += ` @${eventName}=\${(e) => { state.$map = { item, index }; on.${key}(e); }}`;
     } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
       const body = mapRefsToLit((val as JxMutableNode).body as string);
-      attrs += " @" + eventName + "=${(e) => { " + body + " }}";
+      attrs += ` @${eventName}=\${(e) => { ${body} }}`;
     } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
       const compiled = compileExpression(
         (val as Record<string, unknown>).$expression as ExpressionNode,
         {
-          statePrefix: "state",
           eventParam: "e",
+          statePrefix: "state",
         },
       );
-      attrs += " @" + eventName + "=${(e) => { state.$map = { item, index }; " + compiled + "; }}";
+      attrs += ` @${eventName}=\${(e) => { state.$map = { item, index }; ${compiled}; }}`;
     }
   }
 
   // Non-reserved properties that render as attributes
   if (def.contentEditable) {
-    attrs += ' contenteditable="' + def.contentEditable + '"';
+    attrs += ` contenteditable="${def.contentEditable}"`;
   }
 
   // Inner content
@@ -555,22 +603,23 @@ function emitLitMapTemplate(def: JxMutableNode) {
       inner = mapRefsToLit(tc);
     } else if (isRefObject(def.textContent)) {
       const path = refToBindingKey((def.textContent as unknown as JxMutableNode).$ref as string);
-      inner = "${state." + path + "}";
+      inner = `\${state.${path}}`;
     } else {
       inner = escapeHtml(tc);
     }
   } else if (def.innerHTML) {
     inner = mapRefsToLit(String(def.innerHTML));
   } else if (Array.isArray(def.children)) {
-    inner =
-      "\n      " +
-      def.children.map((c) => emitLitMapTemplate(c as JxMutableNode)).join("\n      ") +
-      "\n    ";
+    inner = `\n      ${def.children
+      .map((c) => emitLitMapTemplate(c as JxMutableNode))
+      .join("\n      ")}\n    `;
   }
 
   const voidTags = new Set(["input", "br", "hr", "img", "meta", "link"]);
-  if (voidTags.has(tag)) return "<" + tag + attrs + ">";
-  return "<" + tag + attrs + ">" + inner + "</" + tag + ">";
+  if (voidTags.has(tag)) {
+    return `<${tag}${attrs}>`;
+  }
+  return `<${tag}${attrs}>${inner}</${tag}>`;
 }
 
 /**
@@ -580,7 +629,7 @@ function emitLitMapTemplate(def: JxMutableNode) {
  * @returns {string}
  */
 function mapRefsToLit(str: string) {
-  return str.replace(/\$map\./g, "");
+  return str.replaceAll("$map.", "");
 }
 
 // ─── JS module generation ─────────────────────────────────────────────────────
@@ -605,10 +654,10 @@ function mapRefsToLit(str: string) {
  * @returns {string}
  */
 function emitClientModule(
-  stateEntries: [string, any][],
+  stateEntries: [string, JsonValue | undefined][],
   computedEntries: [string, string][],
   bindEntries: [string, string][],
-  onEntries: [string, any][],
+  onEntries: [string, HandlerDef][],
   initBlocks: string[],
   srcImportMap: Map<string, Set<string>>,
   counter: {
@@ -623,32 +672,34 @@ function emitClientModule(
   _reactivitySrc: string,
 ) {
   const lines: string[] = [];
-  const needsLit = counter.needsLit;
+  const { needsLit } = counter;
   const needsComputed = computedEntries.length > 0;
 
   lines.push("// Generated by @jxsuite/compiler — do not edit manually");
 
   // Reactivity imports
   const reactivityImports = ["reactive", "effect"];
-  if (needsComputed) reactivityImports.push("computed");
-  lines.push("import { " + reactivityImports.join(", ") + " } from '@vue/reactivity';");
+  if (needsComputed) {
+    reactivityImports.push("computed");
+  }
+  lines.push(`import { ${reactivityImports.join(", ")} } from '@vue/reactivity';`);
 
-  // lit-html imports (only when arrays are present)
+  // Lit-html imports (only when arrays are present)
   if (needsLit) {
     lines.push("import { html, render } from 'lit-html';");
   }
 
   // $src imports
   for (const [src, names] of srcImportMap) {
-    lines.push("import { " + [...names].join(", ") + " } from '" + src + "';");
+    lines.push(`import { ${[...names].join(", ")} } from '${src}';`);
   }
 
   lines.push("");
 
-  // state — reactive state
+  // State — reactive state
   lines.push("const state = reactive({");
   for (const [key, val] of stateEntries) {
-    lines.push("  " + key + ": " + JSON.stringify(val) + ",");
+    lines.push(`  ${key}: ${JSON.stringify(val)},`);
   }
   lines.push("});");
   lines.push("");
@@ -664,16 +715,16 @@ function emitClientModule(
   // Computed signals on state
   if (computedEntries.length > 0) {
     for (const [key, expr] of computedEntries) {
-      lines.push("state." + key + " = computed(" + expr + ");");
+      lines.push(`state.${key} = computed(${expr});`);
     }
     lines.push("");
   }
 
-  // bind — DOM getters
+  // Bind — DOM getters
   if (bindEntries.length > 0) {
     lines.push("const bind = {");
     for (const [key, expr] of bindEntries) {
-      lines.push("  " + key + ": " + expr + ",");
+      lines.push(`  ${key}: ${expr},`);
     }
     lines.push("};");
   } else {
@@ -681,22 +732,16 @@ function emitClientModule(
   }
   lines.push("");
 
-  // on — event handlers
+  // On — event handlers
   if (onEntries.length > 0) {
     lines.push("const on = {");
     for (const [key, def] of onEntries) {
       const argNames = def.args ?? ["state"];
       const callArgs = argNames.map((a: string) => (a === "state" ? "state" : "e")).join(", ");
       lines.push(
-        "  " +
-          key +
-          ": (e) => { const fn = (" +
-          argNames.join(", ") +
-          ") => { " +
-          def.body +
-          " }; fn(" +
-          callArgs +
-          "); },",
+        `  ${key}: (e) => { const fn = (${argNames.join(", ")}) => { ${def.body} }; fn(${
+          callArgs
+        }); },`,
       );
     }
     lines.push("};");
@@ -746,42 +791,46 @@ function emitClientModule(
  * @param {JxMutableNode} def
  * @returns {string}
  */
-function emitRequestInit(key: string, def: JxMutableNode) {
-  const url = def.url;
+function emitRequestInit(key: string, def: JxPrototypeDef) {
+  const { url } = def;
   const method = def.method ?? "GET";
   const isTemplateUrl = isTemplateString(url);
 
   if (def.manual) {
-    return "// " + key + ": manual Request — fetch triggered by user action";
+    return `// ${key}: manual Request — fetch triggered by user action`;
   }
 
   const lines: string[] = [];
-  lines.push("// " + key + ": auto-fetch from " + (isTemplateUrl ? "(dynamic URL)" : url));
+  lines.push(`// ${key}: auto-fetch from ${isTemplateUrl ? "(dynamic URL)" : url}`);
   lines.push("effect(() => {");
 
   if (isTemplateUrl) {
-    lines.push("  const url = `" + url + "`;");
+    lines.push(`  const url = \`${url}\`;`);
     lines.push('  if (!url || url === "undefined" || url.includes("undefined")) return;');
   } else {
-    lines.push("  const url = " + JSON.stringify(url) + ";");
+    lines.push(`  const url = ${JSON.stringify(url)};`);
   }
 
   const fetchOpts: string[] = [];
-  if (method !== "GET") fetchOpts.push("method: " + JSON.stringify(method));
-  if (def.headers) fetchOpts.push("headers: " + JSON.stringify(def.headers));
+  if (method !== "GET") {
+    fetchOpts.push(`method: ${JSON.stringify(method)}`);
+  }
+  if (def.headers) {
+    fetchOpts.push(`headers: ${JSON.stringify(def.headers)}`);
+  }
   if (def.body) {
     const bodyStr =
       typeof def.body === "object"
         ? JSON.stringify(JSON.stringify(def.body))
         : JSON.stringify(def.body);
-    fetchOpts.push("body: " + bodyStr);
+    fetchOpts.push(`body: ${bodyStr}`);
   }
 
-  const optsStr = fetchOpts.length > 0 ? ", { " + fetchOpts.join(", ") + " }" : "";
-  lines.push("  fetch(url" + optsStr + ")");
+  const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
+  lines.push(`  fetch(url${optsStr})`);
   lines.push("    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))");
-  lines.push("    .then(d => { state." + key + " = d; })");
-  lines.push("    .catch(e => { state." + key + " = { error: String(e) }; });");
+  lines.push(`    .then(d => { state.${key} = d; })`);
+  lines.push(`    .catch(e => { state.${key} = { error: String(e) }; });`);
   lines.push("});");
 
   return lines.join("\n");
@@ -796,22 +845,16 @@ function emitRequestInit(key: string, def: JxMutableNode) {
  */
 function emitStorageInit(key: string, storeName: string, storageKey: string, defaultVal: unknown) {
   const lines: string[] = [];
-  lines.push("// " + key + ": " + storeName + ' (key: "' + storageKey + '")');
+  lines.push(`// ${key}: ${storeName} (key: "${storageKey}")`);
   lines.push("try {");
-  lines.push("  const _s = " + storeName + ".getItem(" + JSON.stringify(storageKey) + ");");
-  lines.push(
-    "  state." + key + " = _s !== null ? JSON.parse(_s) : " + JSON.stringify(defaultVal) + ";",
-  );
-  lines.push("} catch { state." + key + " = " + JSON.stringify(defaultVal) + "; }");
+  lines.push(`  const _s = ${storeName}.getItem(${JSON.stringify(storageKey)});`);
+  lines.push(`  state.${key} = _s !== null ? JSON.parse(_s) : ${JSON.stringify(defaultVal)};`);
+  lines.push(`} catch { state.${key} = ${JSON.stringify(defaultVal)}; }`);
   lines.push("effect(() => {");
-  lines.push("  const v = state." + key + ";");
+  lines.push(`  const v = state.${key};`);
   lines.push("  try {");
-  lines.push(
-    "    if (v === null) " + storeName + ".removeItem(" + JSON.stringify(storageKey) + ");",
-  );
-  lines.push(
-    "    else " + storeName + ".setItem(" + JSON.stringify(storageKey) + ", JSON.stringify(v));",
-  );
+  lines.push(`    if (v === null) ${storeName}.removeItem(${JSON.stringify(storageKey)});`);
+  lines.push(`    else ${storeName}.setItem(${JSON.stringify(storageKey)}, JSON.stringify(v));`);
   lines.push("  } catch {}");
   lines.push("});");
   return lines.join("\n");
@@ -825,19 +868,15 @@ function emitStorageInit(key: string, storeName: string, storageKey: string, def
  */
 function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
   const lines: string[] = [];
-  lines.push("// " + key + ': Cookie (name: "' + cookieName + '")');
+  lines.push(`// ${key}: Cookie (name: "${cookieName}")`);
   lines.push("{");
+  lines.push(`  const _m = document.cookie.match(new RegExp("(?:^|; )${cookieName}=([^;]*)"));`);
   lines.push(
-    '  const _m = document.cookie.match(new RegExp("(?:^|; )' + cookieName + '=([^;]*)"));',
+    `  try { state.${key} = _m ? JSON.parse(decodeURIComponent(_m[1])) : ${JSON.stringify(
+      defaultVal,
+    )}; }`,
   );
-  lines.push(
-    "  try { state." +
-      key +
-      " = _m ? JSON.parse(decodeURIComponent(_m[1])) : " +
-      JSON.stringify(defaultVal) +
-      "; }",
-  );
-  lines.push("  catch { state." + key + " = _m ? _m[1] : " + JSON.stringify(defaultVal) + "; }");
+  lines.push(`  catch { state.${key} = _m ? _m[1] : ${JSON.stringify(defaultVal)}; }`);
   lines.push("}");
   return lines.join("\n");
 }
@@ -850,9 +889,9 @@ function emitCookieInit(key: string, cookieName: string, defaultVal: unknown) {
  */
 function refToBindingKey(ref: string) {
   if (ref.startsWith("#/state/")) {
-    return ref.slice("#/state/".length).replace(/\//g, "_");
+    return ref.slice("#/state/".length).replaceAll("/", "_");
   }
-  return ref.replace(/\//g, "_");
+  return ref.replaceAll("/", "_");
 }
 
 /**
@@ -861,12 +900,14 @@ function refToBindingKey(ref: string) {
  * @param {string} ref
  */
 function addRefBinding(bindings: Map<string, string>, key: string, ref: string) {
-  if (bindings.has(key)) return;
+  if (bindings.has(key)) {
+    return;
+  }
   if (ref.startsWith("#/state/")) {
     const path = ref.slice("#/state/".length);
     const parts = path.split("/");
-    bindings.set(key, "() => state." + parts.join("."));
+    bindings.set(key, `() => state.${parts.join(".")}`);
   } else {
-    bindings.set(key, "() => state." + ref);
+    bindings.set(key, `() => state.${ref}`);
   }
 }

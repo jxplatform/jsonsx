@@ -8,9 +8,10 @@
  */
 
 import elementsMeta from "../../data/elements-meta.json";
-import { toggleInlineFormat, normalizeInlineContent } from "./inline-format";
+import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+
 export interface InlineAction {
   tag: string;
   label: string;
@@ -90,9 +91,13 @@ const EDITABLE_BLOCKS = new Set([
  * @returns {boolean}
  */
 export function isInlineInContext(childTag: string, parentTag: string) {
-  if (!parentTag) return INLINE_TAGS.has(childTag);
+  if (!parentTag) {
+    return INLINE_TAGS.has(childTag);
+  }
   const parentDef = (elementsMeta.$defs as Record<string, ElementDef>)[parentTag];
-  if (!parentDef || !parentDef.$inlineChildren) return false;
+  if (!parentDef || !parentDef.$inlineChildren) {
+    return false;
+  }
   return parentDef.$inlineChildren.includes(childTag);
 }
 
@@ -105,19 +110,23 @@ export function isInlineInContext(childTag: string, parentTag: string) {
  */
 export function getInlineActions(tag: string) {
   const def = (elementsMeta.$defs as Record<string, ElementDef>)[tag];
-  if (!def) return null;
+  if (!def) {
+    return null;
+  }
   let actions = def.$inlineActions;
   if (typeof actions === "string") {
     const refDef = (elementsMeta.$defs as Record<string, ElementDef>)[actions];
     actions = refDef?.$inlineActions ?? undefined;
   }
-  if (!Array.isArray(actions)) return null;
+  if (!Array.isArray(actions)) {
+    return null;
+  }
   return actions;
 }
 
 // ─── Editing state ─────────────────────────────────────────────────────────
 
-let activeEl: HTMLElement | null = null; // currently contenteditable element
+let activeEl: HTMLElement | null = null; // Currently contenteditable element
 let activePath: JxPath | null = null; // JSON path to the active element
 /**
  * @type {((
@@ -133,22 +142,22 @@ let commitFn:
       children: (JxMutableNode | string)[] | null,
       textContent: string | null,
     ) => void)
-  | null = null; // function(path, newChildren, newTextContent) to commit changes
+  | null = null; // Function(path, newChildren, newTextContent) to commit changes
 /**
  * @type {((path: JxPath, beforeChildren: JxContentResult, afterChildren: JxContentResult) => void)
  *   | null}
  */
 let splitFn:
   | ((path: JxPath, beforeChildren: JxContentResult, afterChildren: JxContentResult) => void)
-  | null = null; // function(path, beforeChildren, afterChildren) to split paragraph
+  | null = null; // Function(path, beforeChildren, afterChildren) to split paragraph
 /**
  * @type {((path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void)
  *   | null}
  */
 let insertFn:
   | ((path: JxPath, elementDef: SlashCommand, commitData?: JxContentResult) => void)
-  | null = null; // function(path, elementDef, commitData?) to insert after current block
-let endFn: (() => void) | null = null; // function() called when editing stops
+  | null = null; // Function(path, elementDef, commitData?) to insert after current block
+let endFn: (() => void) | null = null; // Function() called when editing stops
 
 /**
  * Check if an element is a text-bearing editable block.
@@ -169,7 +178,9 @@ export function isEditableBlock(el: HTMLElement) {
  * @returns {boolean}
  */
 export function isInlineElement(node: JxMutableNode, parentNode?: JxMutableNode) {
-  if (!node || typeof node !== "object") return false;
+  if (!node || typeof node !== "object") {
+    return false;
+  }
   const childTag = (node.tagName ?? "div").toLowerCase();
   if (parentNode) {
     const parentTag = (parentNode.tagName ?? "div").toLowerCase();
@@ -216,7 +227,9 @@ export function startEditing(
     onEnd: () => void;
   },
 ) {
-  if (activeEl) stopEditing();
+  if (activeEl) {
+    stopEditing();
+  }
 
   activeEl = el;
   activePath = path;
@@ -251,7 +264,9 @@ export function startEditing(
 
 /** Stop editing and commit changes. */
 export function stopEditing() {
-  if (!activeEl) return;
+  if (!activeEl) {
+    return;
+  }
 
   commitChanges();
   sharedDismissSlashMenu();
@@ -310,7 +325,9 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === "Enter" && !e.shiftKey) {
-    if (isSlashMenuOpen()) return; // shared slash menu captures Enter
+    if (isSlashMenuOpen()) {
+      return;
+    } // Shared slash menu captures Enter
     e.preventDefault();
     e.stopPropagation();
     handleEnterKey();
@@ -335,18 +352,21 @@ function handleKeydown(e: KeyboardEvent) {
   // Rich text shortcuts
   if (e.ctrlKey || e.metaKey) {
     switch (e.key) {
-      case "b":
+      case "b": {
         e.preventDefault();
         toggleInlineFormat("strong", activeEl);
         break;
-      case "i":
+      }
+      case "i": {
         e.preventDefault();
         toggleInlineFormat("em", activeEl);
         break;
-      case "`":
+      }
+      case "`": {
         e.preventDefault();
         toggleInlineFormat("code", activeEl);
         break;
+      }
     }
   }
 
@@ -369,7 +389,9 @@ function handleInput() {
 /** @param {FocusEvent} _e */
 function handleBlur(_e: FocusEvent) {
   // Don't close if focus moved to slash menu
-  if (isSlashMenuOpen()) return;
+  if (isSlashMenuOpen()) {
+    return;
+  }
 
   // Delay to allow click events to fire
   setTimeout(() => {
@@ -390,10 +412,14 @@ function handlePaste(e: ClipboardEvent) {
 // ─── Enter key: split paragraph ────────────────────────────────────────────
 
 function handleEnterKey() {
-  if (!splitFn || !activeEl || !activePath) return;
+  if (!splitFn || !activeEl || !activePath) {
+    return;
+  }
 
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
+  if (!sel || !sel.rangeCount) {
+    return;
+  }
 
   const range = sel.getRangeAt(0);
 
@@ -440,7 +466,9 @@ function handleEnterKey() {
 // ─── Content sync: DOM → Jx ────────────────────────────────────────────
 
 function commitChanges() {
-  if (!commitFn || !activeEl || !activePath) return;
+  if (!commitFn || !activeEl || !activePath) {
+    return;
+  }
 
   normalizeInlineContent(activeEl);
   const result = elementToJx(activeEl);
@@ -455,16 +483,14 @@ function commitChanges() {
  * @returns {JxContentResult}
  */
 export function normalizeChildren(node: { children?: (JxMutableNode | string)[] }) {
-  if (!Array.isArray(node.children) || node.children.length === 0) return { textContent: "" };
+  if (!Array.isArray(node.children) || node.children.length === 0) {
+    return { textContent: "" };
+  }
 
   // Step 1: Merge adjacent text nodes
   const merged = [];
   for (const child of node.children) {
-    if (
-      typeof child === "string" &&
-      merged.length > 0 &&
-      typeof merged[merged.length - 1] === "string"
-    ) {
+    if (typeof child === "string" && merged.length > 0 && typeof merged.at(-1) === "string") {
       merged[merged.length - 1] += child;
     } else {
       merged.push(child);
@@ -490,7 +516,9 @@ function elementToJx(el: HTMLElement): JxContentResult {
   const nodes = el.childNodes;
 
   // If just a single text node, use textContent
-  if (nodes.length === 0) return { textContent: "" };
+  if (nodes.length === 0) {
+    return { textContent: "" };
+  }
   if (nodes.length === 1 && nodes[0].nodeType === Node.TEXT_NODE) {
     return { textContent: nodes[0].textContent };
   }
@@ -499,7 +527,9 @@ function elementToJx(el: HTMLElement): JxContentResult {
   const children: (JxMutableNode | string)[] = [];
   for (const child of nodes) {
     const jsx = domNodeToJx(child);
-    if (jsx !== null && jsx !== undefined) children.push(jsx);
+    if (jsx !== null && jsx !== undefined) {
+      children.push(jsx);
+    }
   }
 
   // Normalize: merge adjacent text nodes + fold all-text to textContent
@@ -515,11 +545,15 @@ function elementToJx(el: HTMLElement): JxContentResult {
 function domNodeToJx(node: Node) {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.textContent;
-    if (!text) return null;
+    if (!text) {
+      return null;
+    }
     return text; // Bare string — text node child
   }
 
-  if (node.nodeType !== Node.ELEMENT_NODE) return null;
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return null;
+  }
 
   const el = node as HTMLElement;
   const tag = el.tagName.toLowerCase();
@@ -532,12 +566,16 @@ function domNodeToJx(node: Node) {
     s: "del",
     strike: "del",
   };
-  if (tagMap[tag]) result.tagName = tagMap[tag];
+  if (tagMap[tag]) {
+    result.tagName = tagMap[tag];
+  }
 
   // Attributes
   if (tag === "a" && (el as HTMLAnchorElement).href) {
-    result.attributes = { href: el.getAttribute("href") };
-    if ((el as HTMLAnchorElement).title) result.attributes.title = (el as HTMLAnchorElement).title;
+    result.attributes = { href: el.getAttribute("href") ?? "" };
+    if ((el as HTMLAnchorElement).title) {
+      result.attributes.title = (el as HTMLAnchorElement).title;
+    }
   }
   if (tag === "code") {
     result.textContent = el.textContent;
@@ -545,7 +583,7 @@ function domNodeToJx(node: Node) {
   }
 
   // Recurse children
-  const childNodes = el.childNodes;
+  const { childNodes } = el;
   if (childNodes.length === 0) {
     result.textContent = "";
   } else if (childNodes.length === 1 && childNodes[0].nodeType === Node.TEXT_NODE) {
@@ -554,7 +592,9 @@ function domNodeToJx(node: Node) {
     result.children = [];
     for (const child of childNodes) {
       const jsx = domNodeToJx(child);
-      if (jsx) result.children.push(/** @type {JxMutableNode} */ jsx);
+      if (jsx) {
+        result.children.push(/** @type {JxMutableNode} */ jsx);
+      }
     }
   }
 
@@ -569,7 +609,9 @@ function domNodeToJx(node: Node) {
  */
 function fragmentToJx(frag: DocumentFragment) {
   const nodes = frag.childNodes;
-  if (nodes.length === 0) return { textContent: "" };
+  if (nodes.length === 0) {
+    return { textContent: "" };
+  }
   if (nodes.length === 1 && nodes[0].nodeType === Node.TEXT_NODE) {
     return { textContent: nodes[0].textContent };
   }
@@ -577,14 +619,16 @@ function fragmentToJx(frag: DocumentFragment) {
   const children: (JxMutableNode | string)[] = [];
   for (const child of nodes) {
     const jsx = domNodeToJx(child);
-    if (jsx) children.push(jsx);
+    if (jsx) {
+      children.push(jsx);
+    }
   }
 
   if (
     children.length === 1 &&
     typeof children[0] !== "string" &&
     children[0].tagName === "span" &&
-    children[0].textContent != null
+    typeof children[0].textContent === "string"
   ) {
     return { textContent: children[0].textContent };
   }
@@ -611,10 +655,14 @@ function getTextBeforeCursor(range: Range) {
 let _slashFilterStart = 0;
 
 function openSlashMenu() {
-  if (!activeEl || !insertFn || !activePath) return;
+  if (!activeEl || !insertFn || !activePath) {
+    return;
+  }
 
   const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return;
+  if (!sel || !sel.rangeCount) {
+    return;
+  }
   const range = sel.getRangeAt(0);
   _slashFilterStart = getTextBeforeCursor(range).length;
 
@@ -622,7 +670,9 @@ function openSlashMenu() {
 }
 
 function updateSlashMenu() {
-  if (!activeEl) return;
+  if (!activeEl) {
+    return;
+  }
 
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) {
@@ -634,7 +684,7 @@ function updateSlashMenu() {
   const fullText = getTextBeforeCursor(range);
   const slashIdx = fullText.lastIndexOf("/");
 
-  if (slashIdx < 0 || fullText.length < _slashFilterStart - 1) {
+  if (slashIdx === -1 || fullText.length < _slashFilterStart - 1) {
     sharedDismissSlashMenu();
     return;
   }
@@ -645,7 +695,9 @@ function updateSlashMenu() {
 
 /** @param {SlashCommand} cmd */
 function handleSlashSelect(cmd: SlashCommand) {
-  if (!activeEl || !insertFn || !activePath) return;
+  if (!activeEl || !insertFn || !activePath) {
+    return;
+  }
 
   // Remove the /command text from the element
   const sel = window.getSelection();
@@ -653,7 +705,7 @@ function handleSlashSelect(cmd: SlashCommand) {
     const range = sel.getRangeAt(0);
     const fullText = getTextBeforeCursor(range);
     const slashIdx = fullText.lastIndexOf("/");
-    if (slashIdx >= 0) {
+    if (slashIdx !== -1) {
       const walker = document.createTreeWalker(activeEl, NodeFilter.SHOW_TEXT);
       let charCount = 0;
       let slashNode: Text | null = null;
@@ -677,7 +729,7 @@ function handleSlashSelect(cmd: SlashCommand) {
   }
 
   // Compute commit data inline instead of calling commitChanges() — avoids a separate
-  // update() call that would race with the insertFn update() (two concurrent async renders).
+  // Update() call that would race with the insertFn update() (two concurrent async renders).
   normalizeInlineContent(activeEl);
   const commitResult = elementToJx(activeEl);
 

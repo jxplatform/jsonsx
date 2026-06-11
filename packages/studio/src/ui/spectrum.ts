@@ -148,7 +148,7 @@ import { JxColorPopover } from "./color-selector";
 import { IconChevron100 } from "@spectrum-web-components/icons-ui/src/elements/IconChevron100.js";
 
 // Register all components. Using defineElement from Spectrum's base package
-// ensures duplicate registration is handled gracefully.
+// Ensures duplicate registration is handled gracefully.
 import { defineElement } from "@spectrum-web-components/base/src/define-element.js";
 
 const components = [
@@ -283,7 +283,9 @@ const components = [
 ];
 
 for (const [tag, ctor] of components as [string, CustomElementConstructor][]) {
-  if (!customElements.get(tag)) defineElement(tag, ctor);
+  if (!customElements.get(tag)) {
+    defineElement(tag, ctor);
+  }
 }
 
 // Register theme fragments (these are also side-effect-only in the original modules)

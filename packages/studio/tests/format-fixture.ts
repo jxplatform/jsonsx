@@ -5,20 +5,14 @@
  */
 import { readFileSync } from "node:fs";
 import { Markdown } from "@jxsuite/parser/markdown";
-import { setFormats, type StudioFormat } from "../src/format/format-host";
+import { setFormats } from "../src/format/format-host";
+import type { StudioFormat } from "../src/format/format-host";
 
 const classDef = JSON.parse(
   readFileSync(new URL(import.meta.resolve("@jxsuite/parser/Markdown.class.json")), "utf8"),
 );
 
 export const MARKDOWN_FORMAT: StudioFormat = {
-  name: "Markdown",
-  extensions: classDef.format.extensions,
-  mediaType: classDef.format.mediaType ?? null,
-  documentKinds: classDef.format.documentKinds ?? [],
-  exportTarget: classDef.format.exportTarget === true,
-  remote: classDef.format.remote === true,
-  studio: classDef.$studio ?? null,
   capabilities: Object.fromEntries(
     Object.entries(classDef.$defs?.methods ?? {})
       .filter(([, m]) => ["parse", "serialize", "discover", "load"].includes((m as any).role))
@@ -30,6 +24,13 @@ export const MARKDOWN_FORMAT: StudioFormat = {
         },
       ]),
   ),
+  documentKinds: classDef.format.documentKinds ?? [],
+  exportTarget: classDef.format.exportTarget === true,
+  extensions: classDef.format.extensions,
+  mediaType: classDef.format.mediaType ?? null,
+  name: "Markdown",
+  remote: classDef.format.remote === true,
+  studio: classDef.$studio ?? null,
 };
 
 /** Seed the format host with the Markdown format. */
@@ -46,8 +47,14 @@ export async function mockFormatAction(payload: Record<string, unknown>) {
     doc?: Record<string, unknown>;
     options?: Record<string, unknown>;
   };
-  if (format !== "Markdown") throw new Error(`Unknown format "${format}"`);
-  if (action === "parse") return Markdown.parse(source ?? "");
-  if (action === "serialize") return Markdown.serialize(doc ?? {}, options);
+  if (format !== "Markdown") {
+    throw new Error(`Unknown format "${format}"`);
+  }
+  if (action === "parse") {
+    return Markdown.parse(source ?? "");
+  }
+  if (action === "serialize") {
+    return Markdown.serialize(doc ?? {}, options);
+  }
   throw new Error(`Unsupported action "${action}"`);
 }

@@ -8,23 +8,24 @@ import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 import {
+  VOID_ELEMENTS,
+  childIndex,
+  childList,
   flattenTree,
   getNodeAtPath,
+  nodeLabel,
+  parentElementPath,
   pathKey,
   pathsEqual,
-  parentElementPath,
-  childIndex,
-  nodeLabel,
-  VOID_ELEMENTS,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
-  transactDoc,
   mutateMoveNode,
   mutateRemoveNode,
   mutateUpdateProperty,
+  transactDoc,
 } from "../tabs/transact";
 import { view } from "../view";
 import { isInlineElement } from "../editor/inline-edit";
@@ -40,14 +41,22 @@ import { panToElement } from "../canvas/canvas-utils";
 export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
   const key = pathKey(path);
   const row = document.querySelector(`.layer-row[data-path="${key}"]`);
-  if (!row) return;
+  if (!row) {
+    return;
+  }
   const label = row.querySelector(".layer-label") as HTMLElement | null;
-  if (!label) return;
+  if (!label) {
+    return;
+  }
 
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
 
   label.style.display = "none";
   const input = document.createElement("input");
@@ -65,7 +74,9 @@ export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
     label.style.display = "";
   };
   const commit = () => {
-    if (committed) return;
+    if (committed) {
+      return;
+    }
     committed = true;
     cleanup();
     const val = input.value.trim();
@@ -73,7 +84,9 @@ export function startLayerTitleEdit(path: JxPath, rerender: () => void) {
     rerender();
   };
   const cancel = () => {
-    if (committed) return;
+    if (committed) {
+      return;
+    }
     committed = true;
     cleanup();
     rerender();
@@ -101,7 +114,9 @@ export function renderLayersTemplate(ctx: {
 }) {
   const tab = activeTab.value;
 
-  for (const fn of view.dndCleanups) fn();
+  for (const fn of view.dndCleanups) {
+    fn();
+  }
   view.dndCleanups = [];
 
   const rows = flattenTree(tab!.doc.document);
@@ -117,12 +132,16 @@ export function renderLayersTemplate(ctx: {
         break;
       }
     }
-    if (hidden) continue;
+    if (hidden) {
+      continue;
+    }
 
-    if (tab?.doc.mode === "content" && path.length === 0) continue;
+    if (tab?.doc.mode === "content" && path.length === 0) {
+      continue;
+    }
 
     if (nodeType === "text") {
-      const textPreview = String(node).length > 40 ? String(node).slice(0, 40) + "…" : String(node);
+      const textPreview = String(node).length > 40 ? `${String(node).slice(0, 40)}…` : String(node);
       layerRows.push(html`
         <div
           class="layer-row"
@@ -136,13 +155,17 @@ export function renderLayersTemplate(ctx: {
     }
 
     // After text-node skip, node is guaranteed to be JxMutableNode (not a primitive)
-    if (typeof node !== "object" || node === null) continue;
+    if (typeof node !== "object" || node === null) {
+      continue;
+    }
     const jxNode: JxMutableNode = node as JxMutableNode;
 
     if (path.length >= 2 && nodeType === "element") {
       const pPath = parentElementPath(path);
       const parentNode = pPath ? getNodeAtPath(tab!.doc.document, pPath) : null;
-      if (parentNode && isInlineElement(jxNode, parentNode)) continue;
+      if (parentNode && isInlineElement(jxNode, parentNode)) {
+        continue;
+      }
     }
 
     const key = pathKey(path);
@@ -173,8 +196,8 @@ export function renderLayersTemplate(ctx: {
       badgeTitle = "Repeater (mapped array)";
     } else if (nodeType === "case" || nodeType === "case-ref") {
       badgeClass = "layer-tag case-tag";
-      badgeText = path[path.length - 1];
-      badgeTitle = `$switch case: ${path[path.length - 1]}`;
+      badgeText = path.at(-1);
+      badgeTitle = `$switch case: ${path.at(-1)}`;
     } else if (jxNode.$switch) {
       badgeClass = "layer-tag switch-tag";
       badgeText = "⇄";
@@ -202,22 +225,33 @@ export function renderLayersTemplate(ctx: {
     const idx = isElement ? (childIndex(path) as number) : 0;
     const parentPath = isElement && !isRoot ? (parentElementPath(path) as JxPath) : null;
     const parentNode = parentPath ? getNodeAtPath(tab!.doc.document, parentPath) : null;
-    const siblingCount = parentNode?.children?.length || 0;
+    const siblingCount = childList(parentNode).length;
     const canMoveUp = isElement && !isRoot && idx > 0;
     const canMoveDown = isElement && !isRoot && idx < siblingCount - 1;
-    const prevSibling = canMoveUp && parentNode ? parentNode.children?.[idx - 1] : null;
+    const prevSibling = canMoveUp && parentNode ? childList(parentNode)[idx - 1] : null;
     const prevIsContainer = (() => {
-      if (!prevSibling || typeof prevSibling !== "object") return false;
-      if (VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase())) return false;
+      if (!prevSibling || typeof prevSibling !== "object") {
+        return false;
+      }
+      if (VOID_ELEMENTS.has((prevSibling.tagName || "div").toLowerCase())) {
+        return false;
+      }
       const ch = prevSibling.children;
-      if (!ch) return false;
+      if (!ch) {
+        return false;
+      }
       if (
         typeof ch === "object" &&
         (ch as unknown as Record<string, unknown>).$prototype === "Array"
-      )
+      ) {
         return true;
-      if (!Array.isArray(ch)) return false;
-      if (ch.length === 0) return true;
+      }
+      if (!Array.isArray(ch)) {
+        return false;
+      }
+      if (ch.length === 0) {
+        return true;
+      }
       return ch.some(
         (c) => typeof c === "object" && c !== null && !isInlineElement(c, prevSibling),
       );
@@ -227,7 +261,7 @@ export function renderLayersTemplate(ctx: {
       isElement && parentPath && parentPath.length >= 2
         ? (parentElementPath(parentPath) as JxPath)
         : null;
-    const canMoveOut = isElement && !isRoot && !!grandparentPath;
+    const canMoveOut = isElement && !isRoot && Boolean(grandparentPath);
 
     layerRows.push(html`
       <div
@@ -314,7 +348,7 @@ export function renderLayersTemplate(ctx: {
                         const pp = parentPath as JxPath;
                         const prevPath = [...pp, idx - 1];
                         const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
-                        const len = prev?.children?.length || 0;
+                        const len = childList(prev).length;
                         transactDoc(activeTab.value!, (t) =>
                           mutateMoveNode(t, path, prevPath, len),
                         );
@@ -366,14 +400,23 @@ export function renderLayersTemplate(ctx: {
         class="layers-tree"
         @click=${(e: MouseEvent) => {
           const toggle = (e.target as HTMLElement).closest(".layer-toggle");
-          if (!toggle) return;
+          if (!toggle) {
+            return;
+          }
           e.stopPropagation();
           const row = toggle.closest(".layer-row");
-          if (!row) return;
+          if (!row) {
+            return;
+          }
           const key = (row as HTMLElement).dataset.path;
-          if (!key) return;
-          if (collapsed.has(key)) collapsed.delete(key);
-          else collapsed.add(key);
+          if (!key) {
+            return;
+          }
+          if (collapsed.has(key)) {
+            collapsed.delete(key);
+          } else {
+            collapsed.add(key);
+          }
           ctx.rerender();
         }}
       >

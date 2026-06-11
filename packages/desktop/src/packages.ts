@@ -4,11 +4,13 @@ import type { PackageInfo } from "./rpc-schema";
 
 export async function addPackage(params: { name: string }): Promise<void> {
   const root = getProjectRoot();
-  if (!root) throw new Error("No project open");
+  if (!root) {
+    throw new Error("No project open");
+  }
   const proc = Bun.spawn(["bun", "add", params.name], {
     cwd: root,
-    stdout: "pipe",
     stderr: "pipe",
+    stdout: "pipe",
   });
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -19,11 +21,13 @@ export async function addPackage(params: { name: string }): Promise<void> {
 
 export async function removePackage(params: { name: string }): Promise<void> {
   const root = getProjectRoot();
-  if (!root) throw new Error("No project open");
+  if (!root) {
+    throw new Error("No project open");
+  }
   const proc = Bun.spawn(["bun", "remove", params.name], {
     cwd: root,
-    stdout: "pipe",
     stderr: "pipe",
+    stdout: "pipe",
   });
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
@@ -34,10 +38,14 @@ export async function removePackage(params: { name: string }): Promise<void> {
 
 export async function listPackages(): Promise<PackageInfo[]> {
   const root = getProjectRoot();
-  if (!root) return [];
+  if (!root) {
+    return [];
+  }
   const pkgPath = resolve(root, "package.json");
   const file = Bun.file(pkgPath);
-  if (!(await file.exists())) return [];
+  if (!(await file.exists())) {
+    return [];
+  }
 
   const pkg = await file.json();
   const deps = pkg.dependencies || {};

@@ -1,17 +1,17 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const mockOpenFileDialog = mock(async () => ["/home/user/projects/project.json"]);
 
 mock.module("electrobun/bun", () => ({
-  Utils: { openFileDialog: mockOpenFileDialog },
-  Updater: {
-    getLocalInfo: () => ({}),
-    checkForUpdate: () => ({}),
-    downloadUpdate: () => {},
-    applyUpdate: () => {},
-  },
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
+  Updater: {
+    applyUpdate: () => {},
+    checkForUpdate: () => ({}),
+    downloadUpdate: () => {},
+    getLocalInfo: () => ({}),
+  },
+  Utils: { openFileDialog: mockOpenFileDialog },
 }));
 
 const { init, openFileDialog } = await import("../src/utils");

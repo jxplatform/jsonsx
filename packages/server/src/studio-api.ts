@@ -7,9 +7,10 @@
  * All paths are relative to the project root. Directory traversal above root is rejected.
  */
 
-import { resolve, relative, basename, dirname, extname, isAbsolute } from "node:path";
-import { readdir, stat, readFile, writeFile, rename, unlink, mkdir } from "node:fs/promises";
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
+import { errorMessage } from "@jxsuite/schema/parse";
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import * as claude from "./claude-session.ts";
@@ -40,7 +41,9 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
     projectConfig = undefined;
   }
   const cached = formatRegistryCache.get(projectRoot);
-  if (cached && cached.mtime === mtime) return cached.registry;
+  if (cached && cached.mtime === mtime) {
+    return cached.registry;
+  }
   const registry = await buildProjectFormatRegistry(projectRoot, projectConfig);
   formatRegistryCache.set(projectRoot, { mtime, registry });
   return registry;
@@ -56,21 +59,25 @@ async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
  */
 function assertAccessible(filePath: string, root: string, activeProjectRoot: string | null) {
   const rel = relative(root, filePath);
-  if (!rel.startsWith("..") && !rel.startsWith("/")) return;
+  if (!rel.startsWith("..") && !rel.startsWith("/")) {
+    return;
+  }
   if (activeProjectRoot) {
     const relActive = relative(activeProjectRoot, filePath);
-    if (!relActive.startsWith("..") && !relActive.startsWith("/")) return;
+    if (!relActive.startsWith("..") && !relActive.startsWith("/")) {
+      return;
+    }
   }
   throw new Error("Path outside project root");
 }
 
 const statusMap: Record<string, string> = {
-  M: "M",
-  T: "T",
   A: "A",
-  D: "D",
-  R: "R",
   C: "C",
+  D: "D",
+  M: "M",
+  R: "R",
+  T: "T",
   U: "U",
 };
 
@@ -95,15 +102,17 @@ export function parseGitStatus(out: string) {
   const files = [];
 
   for (const line of out.split("\n")) {
-    if (!line) continue;
+    if (!line) {
+      continue;
+    }
 
     if (line.startsWith("# branch.head ")) {
       branch = line.slice("# branch.head ".length);
     } else if (line.startsWith("# branch.ab ")) {
       const m = line.match(/\+(\d+) -(\d+)/);
       if (m) {
-        ahead = parseInt(m[1], 10);
-        behind = parseInt(m[2], 10);
+        ahead = Number.parseInt(m[1], 10);
+        behind = Number.parseInt(m[2], 10);
       }
     } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
       const parts = line.split(" ");
@@ -121,23 +130,23 @@ export function parseGitStatus(out: string) {
       if (stagedCode !== ".") {
         files.push({
           path: filePath,
-          status: statusMap[stagedCode] || stagedCode,
           staged: true,
+          status: statusMap[stagedCode] || stagedCode,
         });
       }
       if (unstagedCode !== ".") {
         files.push({
           path: filePath,
-          status: statusMap[unstagedCode] || unstagedCode,
           staged: false,
+          status: statusMap[unstagedCode] || unstagedCode,
         });
       }
     } else if (line.startsWith("? ")) {
-      files.push({ path: line.slice(2), status: "U", staged: false });
+      files.push({ path: line.slice(2), staged: false, status: "U" });
     }
   }
 
-  return { branch, ahead, behind, files };
+  return { ahead, behind, branch, files };
 }
 
 /**
@@ -162,12 +171,12 @@ export async function handleStudioApi(
     try {
       const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
       return Response.json({
-        root,
         name: pkg.name ?? basename(root),
+        root,
         workspaces: pkg.workspaces ?? [],
       });
     } catch {
-      return Response.json({ root, name: basename(root), workspaces: [] });
+      return Response.json({ name: basename(root), root, workspaces: [] });
     }
   }
 
@@ -177,8 +186,8 @@ export async function handleStudioApi(
     const absDir = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(absDir, root, activeProjectRoot);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 400 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 400 });
     }
     try {
       const projectRoot = fwd(absDir);
@@ -195,7 +204,9 @@ export async function handleStudioApi(
       for (const d of conventionalDirs) {
         try {
           const s = await stat(resolve(absDir, d));
-          if (s.isDirectory()) directories.push(d);
+          if (s.isDirectory()) {
+            directories.push(d);
+          }
         } catch {}
       }
 
@@ -210,20 +221,22 @@ export async function handleStudioApi(
       } catch {}
 
       return Response.json({
+        directories,
         isSiteProject,
         projectConfig,
-        directories,
         projectRoot,
       });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Resolve nearest project.json ancestor for a given file path
   if (path === "/__studio/resolve-site" && req.method === "GET") {
     const filePath = url.searchParams.get("path");
-    if (!filePath) return Response.json({ error: "Missing path param" }, { status: 400 });
+    if (!filePath) {
+      return Response.json({ error: "Missing path param" }, { status: 400 });
+    }
     try {
       // Walk up from file's directory looking for project.json
       let dir = dirname(
@@ -239,41 +252,49 @@ export async function handleStudioApi(
             : filePath;
           const fileRelPath = fwd(relative(dir, absFile));
           return Response.json({
-            sitePath: dir,
-            relPath: relPath,
             fileRelPath,
             projectConfig: config,
+            relPath,
+            sitePath: dir,
           });
         }
         const parent = dirname(dir);
-        if (parent === dir) break;
+        if (parent === dir) {
+          break;
+        }
         dir = parent;
       }
       return Response.json({ sitePath: null });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Find a project directory by name — searches $HOME for the first matching directory with a
-  // project.json. Dev-mode workaround for when showDirectoryPicker() can't provide absolute paths.
+  // Project.json. Dev-mode workaround for when showDirectoryPicker() can't provide absolute paths.
   if (path === "/__studio/find-project" && req.method === "GET") {
     const name = url.searchParams.get("name");
-    if (!name) return Response.json({ error: "Missing name" }, { status: 400 });
+    if (!name) {
+      return Response.json({ error: "Missing name" }, { status: 400 });
+    }
     try {
       const home = process.env.HOME || process.env.USERPROFILE || "";
-      if (!home) return Response.json({ path: null });
+      if (!home) {
+        return Response.json({ path: null });
+      }
       const glob = new Bun.Glob(`**/${name}/project.json`);
       try {
         for await (const match of glob.scan({ cwd: home, dot: false })) {
-          if (match.includes("node_modules") || match.includes(".Trash")) continue;
+          if (match.includes("node_modules") || match.includes(".Trash")) {
+            continue;
+          }
           const abs = resolve(home, dirname(match));
           return Response.json({ path: abs });
         }
       } catch {}
       return Response.json({ path: null });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -287,20 +308,21 @@ export async function handleStudioApi(
           match.includes("node_modules") ||
           fwd(match).includes("dist/") ||
           fwd(match).includes(".claude/")
-        )
+        ) {
           continue;
+        }
         const fp = resolve(root, match);
         try {
           const raw = JSON.parse(await readFile(fp, "utf8"));
           if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
             const projectDir = fwd(dirname(fp));
-            sites.push({ path: projectDir, config: raw });
+            sites.push({ config: raw, path: projectDir });
           }
         } catch {}
       }
       return Response.json(sites);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -317,17 +339,17 @@ export async function handleStudioApi(
 
       const { generateProject } = await import("@jxsuite/create/generate");
       await generateProject(destPath, {
-        name,
-        description,
-        url: siteUrl,
         adapter,
+        description,
+        name,
+        url: siteUrl,
       });
 
       const config = JSON.parse(await readFile(resolve(destPath, "project.json"), "utf8"));
       const projectRoot = fwd(relative(root, destPath));
-      return Response.json({ root: projectRoot, config });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+      return Response.json({ config, root: projectRoot });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -338,15 +360,17 @@ export async function handleStudioApi(
     const absDir = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(absDir, root, activeProjectRoot);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 400 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 400 });
     }
 
     /** Report a path relative to the active project root (or server root as fallback). */
     const reportRelative = (fp: string) => {
       if (activeProjectRoot) {
         const rel = relative(activeProjectRoot, fp);
-        if (!rel.startsWith("..")) return fwd(rel);
+        if (!rel.startsWith("..")) {
+          return fwd(rel);
+        }
       }
       return fwd(relative(root, fp));
     };
@@ -361,10 +385,10 @@ export async function handleStudioApi(
             const s = await stat(fp);
             if (!s.isDirectory()) {
               files.push({
+                modified: s.mtime.toISOString(),
                 name: basename(match),
                 path: reportRelative(fp),
                 size: s.size,
-                modified: s.mtime.toISOString(),
               });
             }
           } catch {}
@@ -375,20 +399,22 @@ export async function handleStudioApi(
       const entries = await readdir(absDir, { withFileTypes: true });
       const files = [];
       for (const entry of entries) {
-        if (entry.name.startsWith(".")) continue;
+        if (entry.name.startsWith(".")) {
+          continue;
+        }
         const fp = resolve(absDir, entry.name);
         const s = await stat(fp);
         files.push({
+          modified: s.mtime.toISOString(),
           name: entry.name,
           path: reportRelative(fp),
-          type: entry.isDirectory() ? "directory" : "file",
           size: s.size,
-          modified: s.mtime.toISOString(),
+          type: entry.isDirectory() ? "directory" : "file",
         });
       }
       return Response.json(files);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -398,8 +424,8 @@ export async function handleStudioApi(
     const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       assertAccessible(scanRoot, root, activeProjectRoot);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 400 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 400 });
     }
     try {
       const registry = await getFormatRegistry(scanRoot);
@@ -411,8 +437,9 @@ export async function handleStudioApi(
           match.includes("node_modules") ||
           fwd(match).includes("dist/") ||
           fwd(match).includes(".claude/")
-        )
+        ) {
           continue;
+        }
         const fp = resolve(scanRoot, match);
         try {
           let content;
@@ -420,21 +447,26 @@ export async function handleStudioApi(
             content = JSON.parse(await readFile(fp, "utf8"));
           } else {
             const entry = registry.byExtension(extname(match), "parse");
-            if (!entry) continue;
+            if (!entry) {
+              continue;
+            }
             const source = await readFile(fp, "utf8");
             content = (await entry.call("parse", source)) as Record<string, unknown>;
           }
           if (content.tagName && content.tagName.includes("-")) {
             components.push({
-              tagName: content.tagName,
               $id: content.$id || null,
+              hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
               path: fwd(match),
-              source: "jx",
               props: Object.entries(content.state || {})
                 .filter(([, d]) => {
-                  if (d == null) return false;
+                  if (d == null) {
+                    return false;
+                  }
                   // Shorthand: "key": "value" or "key": 0 etc.
-                  if (typeof d !== "object") return true;
+                  if (typeof d !== "object") {
+                    return true;
+                  }
                   // Full form: skip computed/handler/prototype entries
                   const obj = d as Record<string, unknown>;
                   return !obj.$prototype && !obj.$handler && !obj.$compute;
@@ -442,20 +474,21 @@ export async function handleStudioApi(
                 .map(([name, d]) => {
                   if (typeof d !== "object" || d === null) {
                     // Shorthand: infer type from value
-                    return { name, type: typeof d, default: d };
+                    return { default: d, name, type: typeof d };
                   }
                   const obj = d as Record<string, unknown>;
                   return {
-                    name,
-                    type: obj.type,
                     default: obj.default,
                     format: obj.format,
+                    name,
+                    type: obj.type,
                   };
                 }),
-              hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
+              source: "jx",
+              tagName: content.tagName,
             });
           }
-        } catch {} // skip non-JSON or parse errors
+        } catch {} // Skip non-JSON or parse errors
       }
 
       // Discover CEM-bearing npm packages
@@ -484,49 +517,55 @@ export async function handleStudioApi(
                 : existsSync(fallbackPath)
                   ? fallbackPath
                   : null;
-              if (!actualPath) continue;
+              if (!actualPath) {
+                continue;
+              }
               const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
-              if (!depPkg.customElements) continue;
+              if (!depPkg.customElements) {
+                continue;
+              }
               const cemPath = resolve(dirname(actualPath), depPkg.customElements);
-              if (!existsSync(cemPath)) continue;
+              if (!existsSync(cemPath)) {
+                continue;
+              }
               const cem = JSON.parse(await readFile(cemPath, "utf8"));
               for (const mod of cem.modules || []) {
                 for (const decl of mod.declarations || []) {
                   if (decl.customElement && decl.tagName) {
                     components.push({
-                      tagName: decl.tagName,
                       $id: null,
-                      path: null,
-                      modulePath: mod.path,
-                      source: "npm",
-                      package: name,
+                      cssProperties: decl.cssProperties || [],
                       description: decl.description || null,
-                      props: (decl.attributes || []).map((a: Record<string, unknown>) => ({
-                        name: a.name,
-                        type: (a.type as Record<string, unknown> | undefined)?.text,
-                        default: a.default,
-                        description: a.description || null,
-                      })),
+                      events: decl.events || [],
+                      hasElements: false,
                       members: (decl.members || []).filter(
                         (m: Record<string, unknown>) =>
                           m.kind === "field" && m.privacy !== "private",
                       ),
+                      modulePath: mod.path,
+                      package: name,
+                      path: null,
+                      props: (decl.attributes || []).map((a: Record<string, unknown>) => ({
+                        default: a.default,
+                        description: a.description || null,
+                        name: a.name,
+                        type: (a.type as Record<string, unknown> | undefined)?.text,
+                      })),
                       slots: decl.slots || [],
-                      events: decl.events || [],
-                      cssProperties: decl.cssProperties || [],
-                      hasElements: false,
+                      source: "npm",
+                      tagName: decl.tagName,
                     });
                   }
                 }
               }
-            } catch {} // skip packages without valid CEM
+            } catch {} // Skip packages without valid CEM
           }
         }
-      } catch {} // skip if no project package.json
+      } catch {} // Skip if no project package.json
 
       return Response.json(components);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -538,7 +577,9 @@ export async function handleStudioApi(
     const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
       const pkgPath = resolve(scanRoot, "package.json");
-      if (!existsSync(pkgPath)) return Response.json([]);
+      if (!existsSync(pkgPath)) {
+        return Response.json([]);
+      }
       const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
       /**
@@ -558,27 +599,31 @@ export async function handleStudioApi(
           : existsSync(fallbackPath)
             ? fallbackPath
             : null;
-        if (!actualPath) continue;
+        if (!actualPath) {
+          continue;
+        }
         try {
           const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
           packages.push({
+            customElementsPath: depPkg.customElements || null,
+            hasCem: Boolean(depPkg.customElements),
             name,
             version: /** @type {string} */ version,
-            hasCem: !!depPkg.customElements,
-            customElementsPath: depPkg.customElements || null,
           });
         } catch {}
       }
       return Response.json(packages);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Read CEM from a specific package
   if (path === "/__studio/cem" && req.method === "GET") {
     const pkg = url.searchParams.get("pkg");
-    if (!pkg) return new Response("Missing pkg", { status: 400 });
+    if (!pkg) {
+      return new Response("Missing pkg", { status: 400 });
+    }
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;
     const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
     try {
@@ -589,15 +634,21 @@ export async function handleStudioApi(
         : existsSync(fallbackPath)
           ? fallbackPath
           : null;
-      if (!actualPath) return Response.json({ cem: null });
+      if (!actualPath) {
+        return Response.json({ cem: null });
+      }
       const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
-      if (!depPkg.customElements) return Response.json({ cem: null });
+      if (!depPkg.customElements) {
+        return Response.json({ cem: null });
+      }
       const cemPath = resolve(dirname(actualPath), depPkg.customElements);
-      if (!existsSync(cemPath)) return Response.json({ cem: null });
+      if (!existsSync(cemPath)) {
+        return Response.json({ cem: null });
+      }
       const cem = JSON.parse(await readFile(cemPath, "utf8"));
       return Response.json({ cem });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -605,17 +656,20 @@ export async function handleStudioApi(
   if (path === "/__studio/packages/add" && req.method === "POST") {
     try {
       const body = await req.json();
-      const name = body.name;
-      if (!name || typeof name !== "string")
+      const { name } = body;
+      if (!name || typeof name !== "string") {
         return Response.json({ error: "Missing name" }, { status: 400 });
+      }
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
       const args = ["add", name];
-      if (body.dev) args.splice(1, 0, "-d");
+      if (body.dev) {
+        args.splice(1, 0, "-d");
+      }
       const proc = Bun.spawn(["bun", ...args], {
         cwd,
-        stdout: "pipe",
         stderr: "pipe",
+        stdout: "pipe",
       });
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
@@ -626,8 +680,8 @@ export async function handleStudioApi(
         );
       }
       return Response.json({ ok: true });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -635,15 +689,16 @@ export async function handleStudioApi(
   if (path === "/__studio/packages/remove" && req.method === "POST") {
     try {
       const body = await req.json();
-      const name = body.name;
-      if (!name || typeof name !== "string")
+      const { name } = body;
+      if (!name || typeof name !== "string") {
         return Response.json({ error: "Missing name" }, { status: 400 });
+      }
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
       const proc = Bun.spawn(["bun", "remove", name], {
         cwd,
-        stdout: "pipe",
         stderr: "pipe",
+        stdout: "pipe",
       });
       const exitCode = await proc.exited;
       if (exitCode !== 0) {
@@ -654,20 +709,22 @@ export async function handleStudioApi(
         );
       }
       return Response.json({ ok: true });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Read file
   if (path === "/__studio/file" && req.method === "GET") {
     const fp = url.searchParams.get("path");
-    if (!fp) return new Response("Missing path", { status: 400 });
+    if (!fp) {
+      return new Response("Missing path", { status: 400 });
+    }
     const abs = fp.startsWith("~") ? fp.replace("~", process.env.HOME || "") : fp;
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (e) {
-      return new Response((e as Error).message, { status: 400 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 400 });
     }
     try {
       return Response.json(
@@ -677,69 +734,75 @@ export async function handleStudioApi(
         },
         { headers: { "Cache-Control": "public, max-age=5" } },
       );
-    } catch (e) {
-      return (e as NodeJS.ErrnoException).code === "ENOENT"
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT"
         ? new Response("Not found", { status: 404 })
-        : Response.json({ error: (e as Error).message }, { status: 500 });
+        : Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Write file
   if (path === "/__studio/file" && req.method === "PUT") {
     const fp = url.searchParams.get("path");
-    if (!fp) return new Response("Missing path", { status: 400 });
+    if (!fp) {
+      return new Response("Missing path", { status: 400 });
+    }
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (e) {
-      return new Response((e as Error).message, { status: 400 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 400 });
     }
     try {
       await mkdir(dirname(abs), { recursive: true });
       await writeFile(abs, await req.text(), "utf8");
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Upload binary file
   if (path === "/__studio/file/upload" && req.method === "POST") {
     const fp = url.searchParams.get("path");
-    if (!fp) return new Response("Missing path", { status: 400 });
+    if (!fp) {
+      return new Response("Missing path", { status: 400 });
+    }
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (e) {
-      return new Response((e as Error).message, { status: 400 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 400 });
     }
     try {
       await mkdir(dirname(abs), { recursive: true });
       const buffer = await req.arrayBuffer();
       await Bun.write(abs, new Uint8Array(buffer));
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Delete file
   if (path === "/__studio/file" && req.method === "DELETE") {
     const fp = url.searchParams.get("path");
-    if (!fp) return new Response("Missing path", { status: 400 });
+    if (!fp) {
+      return new Response("Missing path", { status: 400 });
+    }
     const abs = resolve(root, fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
-    } catch (e) {
-      return new Response((e as Error).message, { status: 400 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 400 });
     }
     try {
       await unlink(abs);
       return Response.json({ ok: true, path: fwd(relative(root, abs)) });
-    } catch (e) {
-      return (e as NodeJS.ErrnoException).code === "ENOENT"
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT"
         ? new Response("Not found", { status: 404 })
-        : Response.json({ error: (e as Error).message }, { status: 500 });
+        : Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -752,25 +815,27 @@ export async function handleStudioApi(
       return new Response("Invalid JSON", { status: 400 });
     }
     const { from, to } = body;
-    if (!from || !to) return new Response("Missing from or to", { status: 400 });
+    if (!from || !to) {
+      return new Response("Missing from or to", { status: 400 });
+    }
     const absFrom = resolve(root, from);
     const absTo = resolve(root, to);
     try {
       assertAccessible(absFrom, root, activeProjectRoot);
       assertAccessible(absTo, root, activeProjectRoot);
-    } catch (e) {
-      return new Response((e as Error).message, { status: 400 });
+    } catch (error) {
+      return new Response(errorMessage(error), { status: 400 });
     }
     try {
       await mkdir(dirname(absTo), { recursive: true });
       await rename(absFrom, absTo);
       return Response.json({
-        ok: true,
         from: fwd(relative(root, absFrom)),
+        ok: true,
         to: fwd(relative(root, absTo)),
       });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -783,23 +848,29 @@ export async function handleStudioApi(
       return new Response("Invalid JSON", { status: 400 });
     }
     const { name } = body;
-    if (!name) return new Response("Missing name", { status: 400 });
+    if (!name) {
+      return new Response("Missing name", { status: 400 });
+    }
 
     try {
       const glob = new Bun.Glob(`**/${name}`);
       const matches = [];
       for await (const match of glob.scan({ cwd: root, dot: false })) {
         // Skip node_modules / dist / hidden dirs
-        if (match.includes("node_modules") || fwd(match).includes("dist/")) continue;
+        if (match.includes("node_modules") || fwd(match).includes("dist/")) {
+          continue;
+        }
         matches.push(fwd(match));
       }
-      if (matches.length === 0) return Response.json({ path: null });
+      if (matches.length === 0) {
+        return Response.json({ path: null });
+      }
       return Response.json({
         path: matches[0],
         ...(matches.length > 1 ? { alternatives: matches } : {}),
       });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -839,13 +910,13 @@ export async function handleStudioApi(
           ? await entry.call("parse", source ?? "", options)
           : await entry.call("serialize", doc ?? {}, options);
       return Response.json({ result });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
   // Format registry listing — lets the studio introspect available formats without
-  // fetching each .class.json itself.
+  // Fetching each .class.json itself.
   if (path === "/__studio/formats" && req.method === "GET") {
     const dir = url.searchParams.get("dir") || activeProjectRoot || root;
     const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
@@ -854,18 +925,18 @@ export async function handleStudioApi(
       const registry = await getFormatRegistry(projectRoot);
       return Response.json({
         formats: registry.entries.map((e) => ({
-          name: e.name,
-          extensions: e.extensions,
-          mediaType: e.mediaType,
+          capabilities: e.capabilities,
           documentKinds: e.documentKinds,
           exportTarget: e.exportTarget,
+          extensions: e.extensions,
+          mediaType: e.mediaType,
+          name: e.name,
           remote: e.remote,
           studio: e.studio,
-          capabilities: e.capabilities,
         })),
       });
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 400 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 400 });
     }
   }
 
@@ -873,7 +944,9 @@ export async function handleStudioApi(
     const src = url.searchParams.get("src");
     const prototype = url.searchParams.get("prototype");
     const base = url.searchParams.get("base");
-    if (!src) return new Response("Missing src param", { status: 400 });
+    if (!src) {
+      return new Response("Missing src param", { status: 400 });
+    }
 
     let moduleAbsPath;
     try {
@@ -882,7 +955,7 @@ export async function handleStudioApi(
         if (base) {
           const docUrlPath = new URL(base).pathname;
           const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-          moduleAbsPath = resolve(resolve(root, "." + docDir), src);
+          moduleAbsPath = resolve(resolve(root, `.${docDir}`), src);
         } else {
           moduleAbsPath = resolve(activeProjectRoot || root, src);
           if (!existsSync(moduleAbsPath) && activeProjectRoot) {
@@ -890,7 +963,7 @@ export async function handleStudioApi(
           }
         }
       } else {
-        // npm/bare specifier — use createRequire from project root, fall back to server package
+        // Npm/bare specifier — use createRequire from project root, fall back to server package
         const projectRoot = activeProjectRoot || root;
         const { createRequire } = await import("node:module");
         const projRequire = createRequire(resolve(projectRoot, "package.json"));
@@ -901,10 +974,10 @@ export async function handleStudioApi(
           moduleAbsPath = serverRequire.resolve(src);
         }
       }
-    } catch (e) {
+    } catch (error) {
       return Response.json({
+        error: errorMessage(error),
         schema: null,
-        error: (e as Error).message,
       });
     }
 
@@ -916,10 +989,10 @@ export async function handleStudioApi(
         return Response.json({
           schema: extractStudioSchema(classDef, moduleAbsPath),
         });
-      } catch (e) {
+      } catch (error) {
         return Response.json({
+          error: errorMessage(error),
           schema: null,
-          error: (e as Error).message,
         });
       }
     }
@@ -945,15 +1018,15 @@ export async function handleStudioApi(
       const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
       if (typeof ExportedClass !== "function") {
         return Response.json({
-          schema: null,
           error: `Export "${exportName}" not found`,
+          schema: null,
         });
       }
       return Response.json({ schema: ExportedClass.schema ?? null });
-    } catch (e) {
+    } catch (error) {
       return Response.json({
+        error: errorMessage(error),
         schema: null,
-        error: (e as Error).message,
       });
     }
   }
@@ -967,13 +1040,15 @@ export async function handleStudioApi(
     const runGit = async (args: string[]) => {
       const proc = Bun.spawn(["git", ...args], {
         cwd,
-        stdout: "pipe",
         stderr: "pipe",
+        stdout: "pipe",
       });
       const exitCode = await proc.exited;
       const stdout = await new Response(proc.stdout).text();
       const stderr = await new Response(proc.stderr).text();
-      if (exitCode !== 0) throw new Error(stderr || `git exited with ${exitCode}`);
+      if (exitCode !== 0) {
+        throw new Error(stderr || `git exited with ${exitCode}`);
+      }
       return stdout;
     };
 
@@ -982,17 +1057,17 @@ export async function handleStudioApi(
         // Check if we're in a git repo first
         const checkProc = Bun.spawn(["git", "rev-parse", "--is-inside-work-tree"], {
           cwd,
-          stdout: "pipe",
           stderr: "pipe",
+          stdout: "pipe",
         });
         const checkExit = await checkProc.exited;
         if (checkExit !== 0) {
           return Response.json({
-            isRepo: false,
-            branch: "",
-            files: [],
             ahead: 0,
             behind: 0,
+            branch: "",
+            files: [],
+            isRepo: false,
             remotes: [],
           });
         }
@@ -1017,7 +1092,9 @@ export async function handleStudioApi(
 
       if (gitCmd === "add-remote" && req.method === "POST") {
         const { name, url: remoteUrl } = await req.json();
-        if (!name || !remoteUrl) return new Response("name and url required", { status: 400 });
+        if (!name || !remoteUrl) {
+          return new Response("name and url required", { status: 400 });
+        }
         await runGit(["remote", "add", name, remoteUrl]);
         return Response.json({ ok: true });
       }
@@ -1027,12 +1104,16 @@ export async function handleStudioApi(
         let current = "";
         const branches = [];
         for (const line of out.trim().split("\n")) {
-          if (!line) continue;
+          if (!line) {
+            continue;
+          }
           const [name, head] = line.split("\t");
           branches.push(name);
-          if (head === "*") current = name;
+          if (head === "*") {
+            current = name;
+          }
         }
-        return Response.json({ current, branches });
+        return Response.json({ branches, current });
       }
 
       if (gitCmd === "log" && req.method === "GET") {
@@ -1044,17 +1125,20 @@ export async function handleStudioApi(
           .filter(Boolean)
           .map((line) => {
             const [hash, message, author, date] = line.split("\t");
-            return { hash, message, author, date };
+            return { author, date, hash, message };
           });
         return Response.json(entries);
       }
 
       if (gitCmd === "stage" && req.method === "POST") {
         const { files } = await req.json();
-        if (!Array.isArray(files) || files.length === 0)
+        if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
+        }
         for (const f of files) {
-          if (f.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
+          if (f.includes("..")) {
+            return Response.json({ error: "Invalid path" }, { status: 400 });
+          }
         }
         await runGit(["add", "--", ...files]);
         return Response.json({ ok: true });
@@ -1062,16 +1146,18 @@ export async function handleStudioApi(
 
       if (gitCmd === "unstage" && req.method === "POST") {
         const { files } = await req.json();
-        if (!Array.isArray(files) || files.length === 0)
+        if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
+        }
         await runGit(["restore", "--staged", "--", ...files]);
         return Response.json({ ok: true });
       }
 
       if (gitCmd === "commit" && req.method === "POST") {
         const { message } = await req.json();
-        if (!message || typeof message !== "string")
+        if (!message || typeof message !== "string") {
           return Response.json({ error: "Missing message" }, { status: 400 });
+        }
         const statusOut = await runGit(["status", "--porcelain"]);
         const hasStaged = statusOut
           .split("\n")
@@ -1079,7 +1165,7 @@ export async function handleStudioApi(
         const args = hasStaged ? ["commit", "-m", message] : ["commit", "-a", "-m", message];
         const out = await runGit(args);
         const hashMatch = out.match(/\[[\w/]+ ([a-f0-9]+)\]/);
-        return Response.json({ ok: true, hash: hashMatch?.[1] || "" });
+        return Response.json({ hash: hashMatch?.[1] || "", ok: true });
       }
 
       if (gitCmd === "push" && req.method === "POST") {
@@ -1109,24 +1195,30 @@ export async function handleStudioApi(
 
       if (gitCmd === "checkout" && req.method === "POST") {
         const { branch } = await req.json();
-        if (!branch || typeof branch !== "string")
+        if (!branch || typeof branch !== "string") {
           return Response.json({ error: "Missing branch" }, { status: 400 });
+        }
         await runGit(["checkout", branch]);
         return Response.json({ ok: true });
       }
 
       if (gitCmd === "create-branch" && req.method === "POST") {
         const { name } = await req.json();
-        if (!name || typeof name !== "string")
+        if (!name || typeof name !== "string") {
           return Response.json({ error: "Missing name" }, { status: 400 });
+        }
         await runGit(["checkout", "-b", name]);
         return Response.json({ ok: true });
       }
 
       if (gitCmd === "diff" && req.method === "GET") {
         const fp = url.searchParams.get("path");
-        if (!fp) return Response.json({ error: "Missing path" }, { status: 400 });
-        if (fp.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
+        if (!fp) {
+          return Response.json({ error: "Missing path" }, { status: 400 });
+        }
+        if (fp.includes("..")) {
+          return Response.json({ error: "Invalid path" }, { status: 400 });
+        }
         const diff = await runGit(["diff", "--", fp]);
         return Response.json({ diff });
       }
@@ -1134,18 +1226,25 @@ export async function handleStudioApi(
       if (gitCmd === "show" && req.method === "GET") {
         const fp = url.searchParams.get("path");
         const ref = url.searchParams.get("ref") || "HEAD";
-        if (!fp) return Response.json({ error: "Missing path" }, { status: 400 });
-        if (fp.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
+        if (!fp) {
+          return Response.json({ error: "Missing path" }, { status: 400 });
+        }
+        if (fp.includes("..")) {
+          return Response.json({ error: "Invalid path" }, { status: 400 });
+        }
         const content = await runGit(["show", `${ref}:${fp}`]);
         return Response.json({ content });
       }
 
       if (gitCmd === "discard" && req.method === "POST") {
         const { files } = await req.json();
-        if (!Array.isArray(files) || files.length === 0)
+        if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
+        }
         for (const f of files) {
-          if (f.includes("..")) return Response.json({ error: "Invalid path" }, { status: 400 });
+          if (f.includes("..")) {
+            return Response.json({ error: "Invalid path" }, { status: 400 });
+          }
         }
         await runGit(["checkout", "--", ...files]);
         return Response.json({ ok: true });
@@ -1153,22 +1252,25 @@ export async function handleStudioApi(
 
       if (gitCmd === "clone" && req.method === "POST") {
         const { url } = await req.json();
-        if (!url || typeof url !== "string")
+        if (!url || typeof url !== "string") {
           return Response.json({ error: "Missing url" }, { status: 400 });
+        }
         const repoName = basename(url.replace(/\.git$/, ""));
         const dest = resolve(cwd, repoName);
         const proc = Bun.spawn(["git", "clone", url, dest], {
           cwd,
-          stdout: "pipe",
           stderr: "pipe",
+          stdout: "pipe",
         });
         const exitCode = await proc.exited;
         const stderr = await new Response(proc.stderr).text();
-        if (exitCode !== 0) throw new Error(stderr || `git clone exited with ${exitCode}`);
+        if (exitCode !== 0) {
+          throw new Error(stderr || `git clone exited with ${exitCode}`);
+        }
         return Response.json({ ok: true, root: dest });
       }
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -1187,8 +1289,11 @@ export async function handleStudioApi(
         systemPrompt: body.systemPrompt,
       });
       return Response.json(result);
-    } catch (e) {
-      return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        { status: 500 },
+      );
     }
   }
 
@@ -1211,8 +1316,11 @@ export async function handleStudioApi(
       const body = await req.json();
       claude.sendMessage(id, body.message);
       return Response.json({ ok: true });
-    } catch (e) {
-      return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        { status: 500 },
+      );
     }
   }
 
@@ -1231,7 +1339,9 @@ export async function handleStudioApi(
   if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
     const id = path.split("/")[4];
     const info = claude.getSession(id);
-    if (!info) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!info) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
     return Response.json(info);
   }
 
@@ -1282,31 +1392,52 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string) {
   for (const [key, param] of Object.entries(params)) {
     const id = param.identifier ?? key;
     const prop: Record<string, unknown> = {};
-    if (param.type && typeof param.type === "object") Object.assign(prop, param.type);
-    if (param.description) prop.description = param.description;
-    if (param.examples) prop.examples = param.examples;
-    if (param.format) prop.format = param.format;
+    if (param.type && typeof param.type === "object") {
+      Object.assign(prop, param.type);
+    }
+    if (param.description) {
+      prop.description = param.description;
+    }
+    if (param.examples) {
+      prop.examples = param.examples;
+    }
+    if (param.format) {
+      prop.format = param.format;
+    }
     properties[id] = prop;
   }
 
   // Build properties from fields (config-visible ones only)
   for (const [key, field] of Object.entries(fields)) {
-    if (field.role !== "field") continue;
-    if (field.access === "private") continue;
+    if (field.role !== "field") {
+      continue;
+    }
+    if (field.access === "private") {
+      continue;
+    }
     const id = field.identifier ?? key;
     const prop: Record<string, unknown> = {};
-    if (field.type && typeof field.type === "object") Object.assign(prop, field.type);
-    if (field.description) prop.description = field.description;
-    if (field.default !== undefined) prop.default = field.default;
-    if (field.initializer !== undefined && prop.default === undefined)
+    if (field.type && typeof field.type === "object") {
+      Object.assign(prop, field.type);
+    }
+    if (field.description) {
+      prop.description = field.description;
+    }
+    if (field.default !== undefined) {
+      prop.default = field.default;
+    }
+    if (field.initializer !== undefined && prop.default === undefined) {
       prop.default = field.initializer;
-    if (field.examples) prop.examples = field.examples;
+    }
+    if (field.examples) {
+      prop.examples = field.examples;
+    }
     properties[id] = prop;
   }
 
   // Determine required from constructor parameters that have no default
   const ctorParams = classDef.$defs?.constructor?.parameters ?? [];
-  const requiredSet: Set<string> = new Set(required);
+  const requiredSet = new Set<string>(required);
   for (const p of ctorParams) {
     const name = p.$ref ? p.$ref.split("/").pop() : (p.identifier ?? p.name);
     if (name && properties[name] && properties[name].default === undefined) {
@@ -1317,7 +1448,7 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string) {
   const resolveMethod = classDef.$defs?.methods?.resolve;
 
   // Surface format-extension metadata: the format block, studio hints, and a
-  // capability summary ({ parse: { timing }, serialize: { timing }, ... }).
+  // Capability summary ({ parse: { timing }, serialize: { timing }, ... }).
   const def = classDef as Record<string, unknown>;
   const capabilityRoles = new Set(["parse", "serialize", "discover", "load"]);
   const capabilities: Record<string, { identifier: string; timing: string[] }> = {};

@@ -1,33 +1,33 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
-  isClassJsonSrc,
-  isSchemaOnly,
-  isTemplateString,
-  isDynamic,
-  isNodeDynamic,
-  hasAnyIsland,
+  buildAttrs,
+  buildComponentCSS,
   buildInitialScope,
-  resolveStaticValue,
-  resolveRefValue,
+  buildInner,
+  cloneValue,
+  collectServerEntries,
+  collectSrcImports,
+  compileStyles,
+  createCompileContext,
+  escapeHtml,
   evaluateStaticTemplate,
   getPathValue,
-  cloneValue,
-  escapeHtml,
-  titleToTagName,
-  tagNameToClassName,
-  collectSrcImports,
-  collectServerEntries,
-  isRefObject,
+  hasAnyIsland,
+  isClassJsonSrc,
   isComponentFullyStatic,
-  buildComponentCSS,
-  createCompileContext,
-  buildAttrs,
-  buildInner,
-  compileStyles,
-  renderStaticNode,
+  isDynamic,
+  isNodeDynamic,
+  isRefObject,
+  isSchemaOnly,
+  isTemplateString,
   preRenderComponentHtml,
+  renderStaticNode,
+  resolveRefValue,
+  resolveStaticValue,
+  tagNameToClassName,
+  titleToTagName,
 } from "../src/shared";
-import type { JxStateDefinition, JxMutableNode, JxElement } from "@jxsuite/schema/types";
+import type { JxElement, JxMutableNode, JxStateDefinition } from "@jxsuite/schema/types";
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 
@@ -48,13 +48,13 @@ describe("isClassJsonSrc", () => {
 describe("isSchemaOnly", () => {
   test("returns true for schema-only objects", () => {
     expect(isSchemaOnly({ type: "string" })).toBe(true);
-    expect(isSchemaOnly({ type: "number", minimum: 0, maximum: 100 })).toBe(true);
-    expect(isSchemaOnly({ type: "array", items: {} })).toBe(true);
+    expect(isSchemaOnly({ maximum: 100, minimum: 0, type: "number" })).toBe(true);
+    expect(isSchemaOnly({ items: {}, type: "array" })).toBe(true);
     expect(isSchemaOnly({ description: "A field" })).toBe(true);
   });
 
   test("returns false when non-schema keys present", () => {
-    expect(isSchemaOnly({ type: "string", default: "" })).toBe(false);
+    expect(isSchemaOnly({ default: "", type: "string" })).toBe(false);
     expect(isSchemaOnly({ $prototype: "Function" })).toBe(false);
     expect(isSchemaOnly({ body: "state.count++" })).toBe(false);
   });
@@ -78,7 +78,7 @@ describe("isTemplateString", () => {
   test("returns false for non-strings", () => {
     expect(isTemplateString(42)).toBe(false);
     expect(isTemplateString(null)).toBe(false);
-    expect(isTemplateString(undefined)).toBe(false);
+    expect(isTemplateString()).toBe(false);
   });
 });
 
@@ -98,7 +98,7 @@ describe("isDynamic", () => {
   });
 
   test("returns true for state with default value", () => {
-    expect(isDynamic({ state: { count: { type: "number", default: 0 } } })).toBe(true);
+    expect(isDynamic({ state: { count: { default: 0, type: "number" } } })).toBe(true);
   });
 
   test("returns false for schema-only state entries", () => {
@@ -131,19 +131,19 @@ describe("isDynamic", () => {
   });
 
   test("returns true for template strings in style", () => {
-    expect(isDynamic({ tagName: "div", style: { color: "${state.color}" } })).toBe(true);
+    expect(isDynamic({ style: { color: "${state.color}" }, tagName: "div" })).toBe(true);
   });
 
   test("returns true for template strings in attributes", () => {
-    expect(isDynamic({ tagName: "div", attributes: { "data-x": "${state.x}" } })).toBe(true);
+    expect(isDynamic({ attributes: { "data-x": "${state.x}" }, tagName: "div" })).toBe(true);
   });
 
   test("returns false for purely static node", () => {
     expect(
       isDynamic({
-        tagName: "div",
-        style: { color: "red" },
         children: [{ tagName: "span", textContent: "hello" }],
+        style: { color: "red" },
+        tagName: "div",
       }),
     ).toBe(false);
   });
@@ -151,21 +151,21 @@ describe("isDynamic", () => {
   test("returns true when child is dynamic", () => {
     expect(
       isDynamic({
-        tagName: "div",
         children: [{ tagName: "span", textContent: { $ref: "#/state/label" } }],
+        tagName: "div",
       } as any),
     ).toBe(true);
   });
 
   test("skips $site and $page state entries", () => {
-    expect(isDynamic({ state: { $site: { name: "Test" }, $page: { url: "/" } } })).toBe(false);
+    expect(isDynamic({ state: { $page: { url: "/" }, $site: { name: "Test" } } })).toBe(false);
   });
 
   test("skips timing: compiler entries", () => {
     expect(
       isDynamic({
         state: {
-          data: { timing: "compiler", $src: "./data.js", $export: "getData" },
+          data: { $export: "getData", $src: "./data.js", timing: "compiler" },
         },
       }),
     ).toBe(false);
@@ -176,8 +176,8 @@ describe("isNodeDynamic", () => {
   test("does not recurse into children", () => {
     expect(
       isNodeDynamic({
-        tagName: "div",
         children: [{ tagName: "span", textContent: { $ref: "#/state/x" } }],
+        tagName: "div",
       } as any),
     ).toBe(false);
   });
@@ -189,8 +189,8 @@ describe("isNodeDynamic", () => {
   test("detects template string in attributes as dynamic", () => {
     expect(
       isNodeDynamic({
-        tagName: "div",
         attributes: { "data-id": "${$item.get()}" },
+        tagName: "div",
       }),
     ).toBe(true);
   });
@@ -198,8 +198,8 @@ describe("isNodeDynamic", () => {
   test("attributes without template strings is not dynamic", () => {
     expect(
       isNodeDynamic({
-        tagName: "div",
         attributes: { "data-id": "static-value" },
+        tagName: "div",
       }),
     ).toBe(false);
   });
@@ -213,11 +213,11 @@ describe("hasAnyIsland", () => {
   test("returns true if any descendant is dynamic", () => {
     expect(
       hasAnyIsland({
-        tagName: "div",
         children: [
           { tagName: "p", textContent: "static" },
           { tagName: "span", textContent: { $ref: "#/state/x" } },
         ],
+        tagName: "div",
       } as any),
     ).toBe(true);
   });
@@ -225,8 +225,8 @@ describe("hasAnyIsland", () => {
   test("returns false for fully static tree", () => {
     expect(
       hasAnyIsland({
-        tagName: "div",
         children: [{ tagName: "p", textContent: "hello" }],
+        tagName: "div",
       }),
     ).toBe(false);
   });
@@ -236,14 +236,14 @@ describe("hasAnyIsland", () => {
 
 describe("buildInitialScope", () => {
   test("scalar values are set directly", () => {
-    const scope = buildInitialScope({ count: 0, name: "Alice", active: true });
+    const scope = buildInitialScope({ active: true, count: 0, name: "Alice" });
     expect(scope.count).toBe(0);
     expect(scope.name).toBe("Alice");
     expect(scope.active).toBe(true);
   });
 
   test("objects with default use the default value", () => {
-    const scope = buildInitialScope({ count: { type: "number", default: 42 } });
+    const scope = buildInitialScope({ count: { default: 42, type: "number" } });
     expect(scope.count).toBe(42);
   });
 
@@ -280,7 +280,7 @@ describe("buildInitialScope", () => {
 
   test("schema-only entries are not set", () => {
     const scope = buildInitialScope({
-      MyType: { type: "string", description: "A type" },
+      MyType: { description: "A type", type: "string" },
     });
     expect(scope.MyType).toBeUndefined();
   });
@@ -460,8 +460,8 @@ describe("collectSrcImports", () => {
   test("collects $src from Function $prototype entries", () => {
     const doc = {
       state: {
-        handler: { $prototype: "Function", $src: "./handler.js" },
         count: 0,
+        handler: { $prototype: "Function", $src: "./handler.js" },
       },
     };
     expect(collectSrcImports(doc)).toEqual(["./handler.js"]);
@@ -493,14 +493,14 @@ describe("collectServerEntries", () => {
   test("collects timing: server entries", () => {
     const doc = {
       state: {
-        data: { timing: "server", $src: "./api.js", $export: "getData" },
+        data: { $export: "getData", $src: "./api.js", timing: "server" },
       },
     };
     const entries = collectServerEntries(doc);
     expect(entries).toHaveLength(1);
     expect(entries[0]).toEqual({
-      key: "data",
       exportName: "getData",
+      key: "data",
       src: "./api.js",
     });
   });
@@ -508,7 +508,7 @@ describe("collectServerEntries", () => {
   test("skips entries without $export", () => {
     const doc = {
       state: {
-        data: { timing: "server", $src: "./api.js" },
+        data: { $src: "./api.js", timing: "server" },
       },
     };
     expect(collectServerEntries(doc)).toHaveLength(0);
@@ -518,10 +518,10 @@ describe("collectServerEntries", () => {
     const doc = {
       state: {
         data: {
-          timing: "server",
-          $src: "./api.js",
           $export: "getData",
           $prototype: "Function",
+          $src: "./api.js",
+          timing: "server",
         },
       },
     };
@@ -531,8 +531,8 @@ describe("collectServerEntries", () => {
   test("deduplicates by export name", () => {
     const doc = {
       state: {
-        a: { timing: "server", $src: "./api.js", $export: "getData" },
-        b: { timing: "server", $src: "./api2.js", $export: "getData" },
+        a: { $export: "getData", $src: "./api.js", timing: "server" },
+        b: { $export: "getData", $src: "./api2.js", timing: "server" },
       },
     };
     expect(collectServerEntries(doc)).toHaveLength(1);
@@ -543,14 +543,14 @@ describe("collectServerEntries", () => {
 
 describe("isComponentFullyStatic", () => {
   test("returns true for static node", () => {
-    expect(isComponentFullyStatic({ tagName: "div", children: [{ tagName: "p" }] })).toBe(true);
+    expect(isComponentFullyStatic({ children: [{ tagName: "p" }], tagName: "div" })).toBe(true);
   });
 
   test("returns false for event handlers", () => {
     expect(
       isComponentFullyStatic({
-        tagName: "button",
         onclick: { $ref: "#/state/fn" },
+        tagName: "button",
       }),
     ).toBe(false);
   });
@@ -585,9 +585,9 @@ describe("buildComponentCSS", () => {
 
   test("skips pseudo-selectors from host rules but emits them as CSS rules", () => {
     const css = buildComponentCSS("my-comp", {
-      color: "red",
       ":hover": { color: "blue" },
       "@--md": { fontSize: "20px" },
+      color: "red",
     });
     expect(css).toContain("color: red;");
     expect(css).toContain(":hover");
@@ -601,7 +601,7 @@ describe("buildComponentCSS", () => {
 
   test("returns empty for null/undefined style", () => {
     expect(buildComponentCSS("my-comp", null)).toBe("");
-    expect(buildComponentCSS("my-comp", undefined)).toBe("");
+    expect(buildComponentCSS("my-comp")).toBe("");
   });
 });
 
@@ -629,7 +629,7 @@ describe("buildAttrs", () => {
   });
 
   test("builds title, lang, dir", () => {
-    const result = buildAttrs({ title: "Tip", lang: "en", dir: "ltr" }, null);
+    const result = buildAttrs({ dir: "ltr", lang: "en", title: "Tip" }, null);
     expect(result).toContain('title="Tip"');
     expect(result).toContain('lang="en"');
     expect(result).toContain('dir="ltr"');
@@ -641,7 +641,7 @@ describe("buildAttrs", () => {
   });
 
   test("excludes pseudo-selectors from output", () => {
-    const result = buildAttrs({ style: { color: "red", ":hover": { color: "blue" } } }, null);
+    const result = buildAttrs({ style: { ":hover": { color: "blue" }, color: "red" } }, null);
     expect(result).not.toContain("style=");
     expect(result).not.toContain(":hover");
   });
@@ -650,8 +650,8 @@ describe("buildAttrs", () => {
     const result = buildAttrs(
       {
         style: {
-          fontSize: "14px",
           "@(min-width: 768px)": { fontSize: "18px" },
+          fontSize: "14px",
         },
       },
       null,
@@ -684,7 +684,7 @@ describe("buildAttrs", () => {
   test("resolves scope values in attributes", () => {
     const scope = buildInitialScope({ color: "blue" });
     const result = buildAttrs(
-      { id: "test", attributes: { "data-color": "${state.color}" } },
+      { attributes: { "data-color": "${state.color}" }, id: "test" },
       scope,
     );
     expect(result).toContain('data-color="blue"');
@@ -696,19 +696,19 @@ describe("buildAttrs", () => {
 describe("buildInner", () => {
   test("returns escaped textContent", () => {
     const def = { textContent: "Hello <world>" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { media: {}, scope: null, scopeDefs: {} };
     expect(buildInner(def, null, context, () => "")).toBe("Hello &lt;world&gt;");
   });
 
   test("returns innerHTML directly", () => {
     const def = { innerHTML: "<b>Bold</b>" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { media: {}, scope: null, scopeDefs: {} };
     expect(buildInner(def, null, context, () => "")).toBe("<b>Bold</b>");
   });
 
   test("compiles children with childCompiler", () => {
     const def = { children: [{ tagName: "p" }, { tagName: "span" }] };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { media: {}, scope: null, scopeDefs: {} };
     const compiler = (d: any) => `<${d.tagName}>`;
     const result = buildInner(def, null, context, compiler);
     expect(result).toContain("<p>");
@@ -717,14 +717,14 @@ describe("buildInner", () => {
 
   test("returns empty for no content", () => {
     const def = {} as any;
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { media: {}, scope: null, scopeDefs: {} };
     expect(buildInner(def, null, context, () => "")).toBe("");
   });
 
   test("uses raw node when provided", () => {
     const def = { textContent: "override" };
     const raw = { textContent: "original" };
-    const context = { scope: null, scopeDefs: {}, media: {} };
+    const context = { media: {}, scope: null, scopeDefs: {} };
     expect(buildInner(def, raw, context, () => "")).toBe("original");
   });
 });
@@ -733,19 +733,19 @@ describe("buildInner", () => {
 
 describe("compileStyles", () => {
   test("returns empty for doc with no styles", () => {
-    const result = compileStyles({ tagName: "div", children: [] });
+    const result = compileStyles({ children: [], tagName: "div" });
     expect(result).toBe("");
   });
 
   test("generates media query rules", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "box",
       style: {
-        color: "red",
         "@(min-width: 768px)": { color: "blue" },
+        color: "red",
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("<style>");
@@ -755,13 +755,13 @@ describe("compileStyles", () => {
 
   test("generates pseudo-class rules", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "btn",
       style: {
-        color: "red",
         ":hover": { color: "blue" },
+        color: "red",
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("#btn:hover");
@@ -770,11 +770,11 @@ describe("compileStyles", () => {
 
   test("auto-generates className for elements needing CSS", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       style: {
         "@media (min-width: 1024px)": { display: "flex" },
       },
-      children: [],
+      tagName: "div",
     };
     compileStyles(doc);
     expect((doc as any).className).toMatch(/^jx-\d+$/);
@@ -782,12 +782,12 @@ describe("compileStyles", () => {
 
   test("resolves custom media queries via mediaQueries map", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "test",
       style: {
         "@--md": { fontSize: "20px" },
       },
-      children: [],
+      tagName: "div",
     };
     const mediaQueries = { "--md": "(min-width: 768px)" };
     const result = compileStyles(doc, mediaQueries);
@@ -795,7 +795,7 @@ describe("compileStyles", () => {
   });
 
   test("emits projectStyle custom properties on :root", () => {
-    const doc = { tagName: "div", children: [] };
+    const doc = { children: [], tagName: "div" };
     const projectStyle = { "--bg": "#000", "--fg": "#fff" };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain(":root {");
@@ -804,7 +804,7 @@ describe("compileStyles", () => {
   });
 
   test("emits projectStyle regular properties on body", () => {
-    const doc = { tagName: "div", children: [] };
+    const doc = { children: [], tagName: "div" };
     const projectStyle = { margin: "0", padding: "0" };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain("body {");
@@ -812,7 +812,7 @@ describe("compileStyles", () => {
   });
 
   test("emits projectStyle media blocks on body", () => {
-    const doc = { tagName: "div", children: [] };
+    const doc = { children: [], tagName: "div" };
     const projectStyle = {
       "@(prefers-color-scheme: dark)": { backgroundColor: "#111" },
     };
@@ -822,7 +822,7 @@ describe("compileStyles", () => {
   });
 
   test("emits projectStyle standalone selectors", () => {
-    const doc = { tagName: "div", children: [] };
+    const doc = { children: [], tagName: "div" };
     const projectStyle = { ".dark": { backgroundColor: "#000" } };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain(".dark {");
@@ -830,10 +830,10 @@ describe("compileStyles", () => {
   });
 
   test("emits projectStyle element selectors with object values", () => {
-    const doc = { tagName: "div", children: [] };
+    const doc = { children: [], tagName: "div" };
     const projectStyle = {
-      html: { margin: "0" },
       "*": { boxSizing: "border-box" },
+      html: { margin: "0" },
     };
     const result = compileStyles(doc, {}, projectStyle);
     expect(result).toContain("html {");
@@ -844,13 +844,13 @@ describe("compileStyles", () => {
 
   test("emits base CSS rule for media-overridden properties", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "responsive",
       style: {
-        fontSize: "14px",
         "@(min-width: 768px)": { fontSize: "18px" },
+        fontSize: "14px",
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("font-size: 14px;");
@@ -906,17 +906,17 @@ describe("renderStaticNode", () => {
   });
 
   test("renders innerHTML directly", () => {
-    const node = { tagName: "div", innerHTML: "<b>Bold</b>" };
+    const node = { innerHTML: "<b>Bold</b>", tagName: "div" };
     expect(renderStaticNode(node, null)).toBe("<div><b>Bold</b></div>");
   });
 
   test("renders nested children", () => {
     const node = {
-      tagName: "div",
       children: [
         { tagName: "p", textContent: "Child 1" },
         { tagName: "span", textContent: "Child 2" },
       ],
+      tagName: "div",
     };
     const result = renderStaticNode(node, null);
     expect(result).toContain("<div>");
@@ -941,7 +941,7 @@ describe("renderStaticNode", () => {
   });
 
   test("renders with id and className attributes", () => {
-    const node = { tagName: "div", id: "app", className: "container" };
+    const node = { className: "container", id: "app", tagName: "div" };
     const result = renderStaticNode(node, null);
     expect(result).toContain('id="app"');
     expect(result).toContain('class="container"');
@@ -956,8 +956,8 @@ describe("renderStaticNode", () => {
   test("resolves template strings in children array", () => {
     const scope = buildInitialScope({ status: "idle" });
     const node = {
-      tagName: "button",
       children: ["${state.status === 'submitting' ? 'Sending...' : 'Submit'}"],
+      tagName: "button",
     };
     expect(renderStaticNode(node, scope)).toBe("<button>Submit</button>");
   });
@@ -973,8 +973,8 @@ describe("preRenderComponentHtml", () => {
 
   test("renders children with state", () => {
     const doc = {
-      state: { label: "Click me" },
       children: [{ tagName: "button", textContent: "${state.label}" }],
+      state: { label: "Click me" },
     };
     const result = preRenderComponentHtml(doc);
     expect(result).toBe("<button>Click me</button>");
@@ -982,8 +982,8 @@ describe("preRenderComponentHtml", () => {
 
   test("overrides state with propsOverride", () => {
     const doc = {
-      state: { count: { default: 0 } },
       children: [{ tagName: "span", textContent: "${state.count}" }],
+      state: { count: { default: 0 } },
     };
     const result = preRenderComponentHtml(doc, { count: 42 });
     expect(result).toBe("<span>42</span>");
@@ -991,8 +991,8 @@ describe("preRenderComponentHtml", () => {
 
   test("adds new props from propsOverride", () => {
     const doc = {
-      state: { existing: "hello" },
       children: [{ tagName: "p", textContent: "${state.extra}" }],
+      state: { existing: "hello" },
     };
     const result = preRenderComponentHtml(doc, { extra: "world" });
     expect(result).toBe("<p>world</p>");
@@ -1000,7 +1000,7 @@ describe("preRenderComponentHtml", () => {
 
   test("replaces slot with slotContent", () => {
     const doc = {
-      children: [{ tagName: "div", children: [{ tagName: "slot" }] }],
+      children: [{ children: [{ tagName: "slot" }], tagName: "div" }],
     };
     const result = preRenderComponentHtml(doc, null, "<p>Inserted</p>");
     expect(result).toContain("<p>Inserted</p>");
@@ -1024,15 +1024,15 @@ describe("preRenderComponentHtml", () => {
 describe("compileStyles — non-media at-rules", () => {
   test("@starting-style emits without @media wrapper", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "panel",
       style: {
-        transform: "translateX(100%)",
         "@starting-style": {
           ":popover-open": { transform: "translateX(100%)" },
         },
+        transform: "translateX(100%)",
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("@starting-style");
@@ -1043,15 +1043,15 @@ describe("compileStyles — non-media at-rules", () => {
 
   test("@starting-style with multiple nested selectors", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "menu",
       style: {
         "@starting-style": {
-          ":popover-open": { opacity: "0" },
           "&:popover-open::backdrop": { opacity: "0" },
+          ":popover-open": { opacity: "0" },
         },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("@starting-style { #menu:popover-open { opacity: 0 } }");
@@ -1060,14 +1060,14 @@ describe("compileStyles — non-media at-rules", () => {
 
   test("@starting-style does not emit empty base rule", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "x",
       style: {
         "@starting-style": {
           ":popover-open": { opacity: "1" },
         },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).not.toContain("@starting-style { #x {  } }");
@@ -1076,12 +1076,12 @@ describe("compileStyles — non-media at-rules", () => {
 
   test("@supports emits as-is without @media wrapper", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "s",
       style: {
         "@supports (display: grid)": { display: "grid" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("@supports (display: grid) { #s { display: grid } }");
@@ -1090,12 +1090,12 @@ describe("compileStyles — non-media at-rules", () => {
 
   test("@(condition) shorthand still emits as @media", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "m",
       style: {
         "@(max-width: 600px)": { fontSize: "14px" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("@media (max-width: 600px)");
@@ -1104,12 +1104,12 @@ describe("compileStyles — non-media at-rules", () => {
 
   test("@--breakpoint still resolves from mediaQueries map", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "b",
       style: {
         "@--lg": { fontSize: "20px" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc, { "--lg": "(min-width: 1024px)" });
     expect(result).toContain("@media (min-width: 1024px)");
@@ -1120,12 +1120,12 @@ describe("compileStyles — non-media at-rules", () => {
 describe("compileStyles — :popover-open and ::backdrop pseudo selectors", () => {
   test(":popover-open emits correct selector", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "pop",
       style: {
         ":popover-open": { transform: "translateX(0)" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("#pop:popover-open { transform: translateX(0) }");
@@ -1133,12 +1133,12 @@ describe("compileStyles — :popover-open and ::backdrop pseudo selectors", () =
 
   test("::backdrop emits correct selector", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "pop",
       style: {
         "::backdrop": { backgroundColor: "rgba(0,0,0,0.5)" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("#pop::backdrop { background-color: rgba(0,0,0,0.5) }");
@@ -1146,12 +1146,12 @@ describe("compileStyles — :popover-open and ::backdrop pseudo selectors", () =
 
   test("&:popover-open::backdrop emits compound selector", () => {
     const doc = {
-      tagName: "div",
+      children: [],
       id: "pop",
       style: {
         "&:popover-open::backdrop": { opacity: "1" },
       },
-      children: [],
+      tagName: "div",
     };
     const result = compileStyles(doc);
     expect(result).toContain("#pop:popover-open::backdrop { opacity: 1 }");
@@ -1161,17 +1161,17 @@ describe("compileStyles — :popover-open and ::backdrop pseudo selectors", () =
 describe("buildComponentCSS — $media propagation", () => {
   test("resolves @--md breakpoint from provided mediaQueries", () => {
     const doc = {
-      tagName: "my-nav",
-      style: { display: "block" },
       children: [
         {
-          tagName: "button",
           style: {
-            display: "none",
             "@--md": { display: "block" },
+            display: "none",
           },
+          tagName: "button",
         },
       ],
+      style: { display: "block" },
+      tagName: "my-nav",
     };
     const css = buildComponentCSS("my-nav", doc.style, doc, {
       "--md": "(max-width: 768px)",
@@ -1182,19 +1182,19 @@ describe("buildComponentCSS — $media propagation", () => {
 
   test("handles @starting-style in child elements", () => {
     const doc = {
-      tagName: "my-menu",
-      style: {},
       children: [
         {
-          tagName: "nav",
           id: "flyout",
           style: {
             "@starting-style": {
               ":popover-open": { transform: "translateX(100%)" },
             },
           },
+          tagName: "nav",
         },
       ],
+      style: {},
+      tagName: "my-menu",
     };
     const css = buildComponentCSS("my-menu", doc.style, doc, {});
     expect(css).toContain(

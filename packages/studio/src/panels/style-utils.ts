@@ -7,7 +7,7 @@ import { activeTab } from "../workspace/workspace";
 import { camelToKebab } from "../utils/studio-utils";
 import cssMeta from "../../data/css-meta.json";
 
-let cssInitialMap: Map<string, string> = new Map();
+let cssInitialMap = new Map<string, string>();
 
 /** Initialise cssInitialMap from webdata — call once during bootstrap. */
 export function initCssData(webdata: { cssProps: string[][] }) {
@@ -27,7 +27,9 @@ export function conditionPasses(
   styles: Record<string, unknown>,
 ) {
   const val = (styles[cond.prop] ?? "") as string;
-  if (cond.values.length === 0) return val !== "" && val !== "initial";
+  if (cond.values.length === 0) {
+    return val !== "" && val !== "initial";
+  }
   return cond.values.includes(val);
 }
 
@@ -51,10 +53,14 @@ export function autoOpenSections(node: JxMutableNode, currentSections: Record<st
   const style = node.style || {};
   const result = { ...currentSections };
   for (const prop of Object.keys(style)) {
-    if (typeof style[prop] === "object") continue;
+    if (typeof style[prop] === "object") {
+      continue;
+    }
     const entry = (cssMeta.$defs as Record<string, Record<string, unknown>>)[prop];
     const section = (entry?.$section as string) ?? "other";
-    if (!result[section]) result[section] = true;
+    if (!result[section]) {
+      result[section] = true;
+    }
   }
   return result;
 }
@@ -67,12 +73,12 @@ export function getLonghands(shorthandProp: string) {
   if (entry?.$longhands) {
     return (entry.$longhands as string[])
       .map((name: string) => ({
-        name,
         entry: (cssMeta.$defs as Record<string, Record<string, unknown>>)[name] || {
           $order: 0,
         },
+        name,
       }))
-      .sort(
+      .toSorted(
         (
           /** @type {{ entry: Record<string, unknown> }} */ a,
           /** @type {{ entry: Record<string, unknown> }} */ b,
@@ -81,7 +87,9 @@ export function getLonghands(shorthandProp: string) {
   }
   const result = [];
   for (const [name, e] of Object.entries(cssMeta.$defs) as [string, Record<string, unknown>][]) {
-    if (e.$shorthand === shorthandProp) result.push({ name, entry: e });
+    if (e.$shorthand === shorthandProp) {
+      result.push({ entry: e, name });
+    }
   }
   result.sort((a, b) => (a.entry.$order as number) - (b.entry.$order as number));
   return result;
@@ -92,21 +100,37 @@ export function getLonghands(shorthandProp: string) {
  * TRBL pattern.
  */
 export function expandShorthand(shortVal: string, count: number) {
-  if (!shortVal) return Array(count).fill("");
+  if (!shortVal) {
+    return Array(count).fill("");
+  }
   const parts = shortVal.trim().split(/\s+/);
-  if (count !== 4 || parts.length === 0) return Array(count).fill("");
-  if (parts.length === 1) return [parts[0], parts[0], parts[0], parts[0]];
-  if (parts.length === 2) return [parts[0], parts[1], parts[0], parts[1]];
-  if (parts.length === 3) return [parts[0], parts[1], parts[2], parts[1]];
+  if (count !== 4 || parts.length === 0) {
+    return Array(count).fill("");
+  }
+  if (parts.length === 1) {
+    return [parts[0], parts[0], parts[0], parts[0]];
+  }
+  if (parts.length === 2) {
+    return [parts[0], parts[1], parts[0], parts[1]];
+  }
+  if (parts.length === 3) {
+    return [parts[0], parts[1], parts[2], parts[1]];
+  }
   return [parts[0], parts[1], parts[2], parts[3]];
 }
 
 /** Compress 4 TRBL values back into the shortest valid CSS shorthand string. */
 export function compressShorthand(vals: string[]) {
   const [t, r, b, l] = vals;
-  if (t === r && r === b && b === l) return t;
-  if (t === b && r === l) return `${t} ${r}`;
-  if (r === l) return `${t} ${r} ${b}`;
+  if (t === r && r === b && b === l) {
+    return t;
+  }
+  if (t === b && r === l) {
+    return `${t} ${r}`;
+  }
+  if (r === l) {
+    return `${t} ${r} ${b}`;
+  }
   return `${t} ${r} ${b} ${l}`;
 }
 
@@ -132,21 +156,31 @@ export const BORDER_STYLES = new Set([
  * @returns {string[]}
  */
 export function expandBorderSide(value: string) {
-  if (!value) return ["", "", ""];
+  if (!value) {
+    return ["", "", ""];
+  }
   const tokens = [];
   let current = "";
   let depth = 0;
   for (const ch of value.trim()) {
-    if (ch === "(") depth++;
-    if (ch === ")") depth--;
+    if (ch === "(") {
+      depth++;
+    }
+    if (ch === ")") {
+      depth--;
+    }
     if (ch === " " && depth === 0) {
-      if (current) tokens.push(current);
+      if (current) {
+        tokens.push(current);
+      }
       current = "";
     } else {
       current += ch;
     }
   }
-  if (current) tokens.push(current);
+  if (current) {
+    tokens.push(current);
+  }
 
   let width = "";
   let style = "";
@@ -180,7 +214,9 @@ export function compressBorderSide(vals: string[]) {
 /** Extract --font-* CSS custom properties from the document root style. */
 export function getFontVars() {
   const style = activeTab.value?.doc.document?.style;
-  if (!style) return [];
+  if (!style) {
+    return [];
+  }
   const vars = [];
   for (const [k, v] of Object.entries(style)) {
     if (k.startsWith("--font") && (typeof v === "string" || typeof v === "number")) {
@@ -205,9 +241,13 @@ export function currentFontFamily() {
     ? getNodeAtPath(tab.doc.document, tab.session.selection)
     : null;
   const raw = node?.style?.fontFamily;
-  if (!raw) return "";
+  if (!raw) {
+    return "";
+  }
   const m = typeof raw === "string" && raw.match(/^var\((--[^)]+)\)$/);
-  if (m) return tab?.doc.document?.style?.[m[1]] || "";
+  if (m) {
+    return tab?.doc.document?.style?.[m[1]] || "";
+  }
   return raw;
 }
 

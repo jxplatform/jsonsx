@@ -21,13 +21,16 @@ export async function buildAll(
   for (const entry of builds) {
     const { match: _match, label, ...opts } = entry;
     const result = await Bun.build({
-      target: "browser",
       format: "esm",
       sourcemap: "linked",
+      target: "browser",
       ...opts,
     });
-    if (!result.success) result.logs.forEach((l) => console.error(l));
-    else console.log(`Built → ${entry.outdir}/${label ?? "bundle"}.js`);
+    if (!result.success) {
+      result.logs.forEach((l) => console.error(l));
+    } else {
+      console.log(`Built → ${entry.outdir}/${label ?? "bundle"}.js`);
+    }
   }
 }
 
@@ -55,19 +58,23 @@ export async function rebuild(
   const rebuilt = [];
   let ok = true;
   for (const entry of builds) {
-    if (!entry.match) continue;
+    if (!entry.match) {
+      continue;
+    }
     const matches =
       typeof entry.match === "function"
         ? entry.match(changedFile)
         : entry.match instanceof RegExp
           ? entry.match.test(changedFile)
           : false;
-    if (!matches) continue;
+    if (!matches) {
+      continue;
+    }
     const { match: _match, label, ...opts } = entry;
     const result = await Bun.build({
-      target: "browser",
       format: "esm",
       sourcemap: "linked",
+      target: "browser",
       ...opts,
     });
     if (result.success) {

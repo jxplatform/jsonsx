@@ -1,1 +1,1 @@
-{"tagName":"my-card","state":{"title":{"type":"string","default":""}}}
+{"state":{"title":{"default":"","type":"string"}},"tagName":"my-card"}

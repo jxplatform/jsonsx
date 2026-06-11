@@ -1,11 +1,13 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { serializeJxMarkdown } from "../src/serialize";
 import type { JxDocument, JxElement, JxStateDefinition } from "@jxsuite/schema/types";
 
 // Test-local template hooks mirroring the compiler's shared.ts machinery — the
-// compiler injects its real implementations; these cover the same contract.
+// Compiler injects its real implementations; these cover the same contract.
 function evaluateTemplate(str: string, scope: Record<string, unknown>) {
-  if (!str.includes("${")) return undefined;
+  if (!str.includes("${")) {
+    return;
+  }
   try {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
@@ -76,11 +78,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [
             { tagName: "em", textContent: "italic" },
             { tagName: "strong", textContent: "bold" },
           ],
+          tagName: "p",
         },
       ],
     };
@@ -93,8 +95,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [{ tagName: "code", textContent: "const x = 1" }],
+          tagName: "p",
         },
       ],
     };
@@ -106,14 +108,14 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [
             {
-              tagName: "a",
               attributes: { href: "https://example.com" },
+              tagName: "a",
               textContent: "Example",
             },
           ],
+          tagName: "p",
         },
       ],
     };
@@ -123,7 +125,7 @@ describe("compileMarkdown", () => {
 
   test("converts images", () => {
     const doc = {
-      children: [{ tagName: "img", attributes: { src: "/photo.jpg", alt: "A photo" } }],
+      children: [{ attributes: { alt: "A photo", src: "/photo.jpg" }, tagName: "img" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("![A photo](/photo.jpg)");
@@ -133,8 +135,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "blockquote",
           children: [{ tagName: "p", textContent: "A quote" }],
+          tagName: "blockquote",
         },
       ],
     };
@@ -146,11 +148,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "ul",
           children: [
             { tagName: "li", textContent: "Item 1" },
             { tagName: "li", textContent: "Item 2" },
           ],
+          tagName: "ul",
         },
       ],
     };
@@ -163,11 +165,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "ol",
           children: [
             { tagName: "li", textContent: "First" },
             { tagName: "li", textContent: "Second" },
           ],
+          tagName: "ol",
         },
       ],
     };
@@ -180,14 +182,14 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "pre",
           children: [
             {
-              tagName: "code",
               className: "language-js",
+              tagName: "code",
               textContent: "console.log('hi')",
             },
           ],
+          tagName: "pre",
         },
       ],
     };
@@ -213,33 +215,33 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "table",
           children: [
             {
-              tagName: "thead",
               children: [
                 {
-                  tagName: "tr",
                   children: [
                     { tagName: "th", textContent: "Name" },
                     { tagName: "th", textContent: "Age" },
                   ],
+                  tagName: "tr",
                 },
               ],
+              tagName: "thead",
             },
             {
-              tagName: "tbody",
               children: [
                 {
-                  tagName: "tr",
                   children: [
                     { tagName: "td", textContent: "Alice" },
                     { tagName: "td", textContent: "30" },
                   ],
+                  tagName: "tr",
                 },
               ],
+              tagName: "tbody",
             },
           ],
+          tagName: "table",
         },
       ],
     };
@@ -255,12 +257,12 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           children: [{ tagName: "p", textContent: "Inside div" }],
+          tagName: "div",
         },
         {
-          tagName: "section",
           children: [{ tagName: "p", textContent: "Inside section" }],
+          tagName: "section",
         },
       ],
     };
@@ -283,8 +285,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [{ tagName: "del", textContent: "removed" }],
+          tagName: "p",
         },
       ],
     };
@@ -296,12 +298,12 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [
             { tagName: "span", textContent: "Line 1" },
             { tagName: "br" },
             { tagName: "span", textContent: "Line 2" },
           ],
+          tagName: "p",
         },
       ],
     };
@@ -315,14 +317,14 @@ describe("compileMarkdown", () => {
       [
         "my-card",
         {
-          state: { title: "Default" },
           children: [{ tagName: "h2", textContent: "${state.title}" }],
+          state: { title: "Default" },
         },
       ],
     ]);
 
     const doc = {
-      children: [{ tagName: "my-card", $props: { title: "Custom Title" } }],
+      children: [{ $props: { title: "Custom Title" }, tagName: "my-card" }],
     };
 
     const { content } = compileMarkdown(doc, componentDefs);
@@ -333,8 +335,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "my-widget",
           children: [{ tagName: "p", textContent: "Widget content" }],
+          tagName: "my-widget",
         },
       ],
     };
@@ -344,8 +346,8 @@ describe("compileMarkdown", () => {
 
   test("resolves template strings in text content", () => {
     const doc = {
-      state: { greeting: "Hello" },
       children: [{ tagName: "p", textContent: "${state.greeting} World" }],
+      state: { greeting: "Hello" },
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Hello World");
@@ -353,7 +355,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML content", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p>HTML content</p>" }],
+      children: [{ innerHTML: "<p>HTML content</p>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("HTML content");
@@ -361,7 +363,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with headings", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<h2>Section Title</h2>" }],
+      children: [{ innerHTML: "<h2>Section Title</h2>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("## Section Title");
@@ -371,8 +373,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: '<p><a href="https://test.com">Test</a></p>',
+          tagName: "div",
         },
       ],
     };
@@ -384,8 +386,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p><em>italic</em> and <strong>bold</strong></p>",
+          tagName: "div",
         },
       ],
     };
@@ -396,7 +398,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with inline code", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p>Use <code>npm install</code></p>" }],
+      children: [{ innerHTML: "<p>Use <code>npm install</code></p>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("`npm install`");
@@ -406,8 +408,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: '<pre><code class="language-python">print("hi")</code></pre>',
+          tagName: "div",
         },
       ],
     };
@@ -420,8 +422,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "blockquote",
           children: [{ tagName: "p", textContent: "Quoted" }],
+          tagName: "blockquote",
         },
       ],
     };
@@ -431,7 +433,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with unordered list", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<ul><li>Apple</li><li>Banana</li></ul>" }],
+      children: [{ innerHTML: "<ul><li>Apple</li><li>Banana</li></ul>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("- Apple");
@@ -440,7 +442,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with ordered list", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<ol><li>First</li><li>Second</li></ol>" }],
+      children: [{ innerHTML: "<ol><li>First</li><li>Second</li></ol>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("1. First");
@@ -449,7 +451,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with hr", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p>Above</p><hr /><p>Below</p>" }],
+      children: [{ innerHTML: "<p>Above</p><hr /><p>Below</p>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Above");
@@ -460,9 +462,9 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML:
             "<table><tr><th>Col1</th><th>Col2</th></tr><tr><td>a</td><td>b</td></tr></table>",
+          tagName: "div",
         },
       ],
     };
@@ -473,7 +475,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with br", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p>Line 1<br>Line 2</p>" }],
+      children: [{ innerHTML: "<p>Line 1<br>Line 2</p>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Line 1");
@@ -482,7 +484,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with img", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: '<p><img src="/pic.jpg" alt="Pic"></p>' }],
+      children: [{ innerHTML: '<p><img src="/pic.jpg" alt="Pic"></p>', tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("![Pic](/pic.jpg)");
@@ -492,8 +494,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p>&lt;div&gt; &amp; &quot;test&quot;</p>",
+          tagName: "div",
         },
       ],
     };
@@ -503,7 +505,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with wrapper elements (unwraps)", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<div><p>Nested in div</p></div>" }],
+      children: [{ innerHTML: "<div><p>Nested in div</p></div>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Nested in div");
@@ -513,8 +515,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p><del>deleted</del> and <s>struck</s></p>",
+          tagName: "div",
         },
       ],
     };
@@ -525,7 +527,7 @@ describe("compileMarkdown", () => {
 
   test("handles innerHTML with b/i tags", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<p><b>bold</b> and <i>italic</i></p>" }],
+      children: [{ innerHTML: "<p><b>bold</b> and <i>italic</i></p>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("**bold**");
@@ -534,12 +536,8 @@ describe("compileMarkdown", () => {
 
   test("expands $prototype Array with map template", () => {
     const doc = {
-      state: {
-        items: [{ name: "Apple" }, { name: "Banana" }, { name: "Cherry" }],
-      },
       children: [
         {
-          tagName: "ul",
           children: [
             {
               $prototype: "Array",
@@ -550,8 +548,12 @@ describe("compileMarkdown", () => {
               },
             },
           ],
+          tagName: "ul",
         },
       ],
+      state: {
+        items: [{ name: "Apple" }, { name: "Banana" }, { name: "Cherry" }],
+      },
     };
     const { content } = compileMarkdown(doc as unknown as JxDocument);
     expect(content).toContain("- Apple");
@@ -561,7 +563,7 @@ describe("compileMarkdown", () => {
 
   test("handles number nodes", () => {
     const doc = {
-      children: [{ tagName: "p", children: [42] }],
+      children: [{ children: [42], tagName: "p" }],
     };
     const { content } = compileMarkdown(doc as unknown as JxDocument);
     expect(content).toContain("42");
@@ -579,14 +581,14 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [
             {
-              tagName: "a",
               attributes: { href: "https://x.com", title: "Visit X" },
+              tagName: "a",
               textContent: "X",
             },
           ],
+          tagName: "p",
         },
       ],
     };
@@ -598,8 +600,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
+          attributes: { alt: "Alt", src: "/img.png", title: "Title" },
           tagName: "img",
-          attributes: { src: "/img.png", alt: "Alt", title: "Title" },
         },
       ],
     };
@@ -611,8 +613,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "pre",
           children: [{ tagName: "code", textContent: "plain code" }],
+          tagName: "pre",
         },
       ],
     };
@@ -634,8 +636,8 @@ describe("compileMarkdown", () => {
       [
         "my-layout",
         {
-          state: {},
           children: [{ tagName: "h1", textContent: "Header" }, { tagName: "slot" }],
+          state: {},
         },
       ],
     ]);
@@ -643,8 +645,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "my-layout",
           children: [{ tagName: "p", textContent: "Slotted content" }],
+          tagName: "my-layout",
         },
       ],
     };
@@ -683,11 +685,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "ul",
           children: [
             { tagName: "li", textContent: "Valid" },
             { tagName: "p", textContent: "Not a list item" },
           ],
+          tagName: "ul",
         },
       ],
     };
@@ -699,8 +701,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<ul><li><ul><li>Nested</li></ul></li></ul>",
+          tagName: "div",
         },
       ],
     };
@@ -712,8 +714,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: '<p><a href="/page" title="Go">Click</a></p>',
+          tagName: "div",
         },
       ],
     };
@@ -735,8 +737,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "video",
           children: [{ tagName: "p", textContent: "Fallback text" }],
+          tagName: "video",
         },
       ],
     };
@@ -758,11 +760,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "blockquote",
           children: [
             { tagName: "p", textContent: "First paragraph" },
             { tagName: "p", textContent: "Second paragraph" },
           ],
+          tagName: "blockquote",
         },
       ],
     };
@@ -777,11 +779,11 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [
             { tagName: "code", textContent: "" },
             { tagName: "code", textContent: "valid" },
           ],
+          tagName: "p",
         },
       ],
     };
@@ -795,14 +797,14 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "pre",
           children: [
             {
-              tagName: "code",
               className: "language-rust",
+              tagName: "code",
               textContent: "fn main() {}",
             },
           ],
+          tagName: "pre",
         },
       ],
     };
@@ -817,23 +819,23 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "table",
           children: [
             {
-              tagName: "tr",
               children: [
                 { tagName: "th", textContent: "Header1" },
                 { tagName: "th", textContent: "Header2" },
               ],
+              tagName: "tr",
             },
             {
-              tagName: "tr",
               children: [
                 { tagName: "td", textContent: "Val1" },
                 { tagName: "td", textContent: "Val2" },
               ],
+              tagName: "tr",
             },
           ],
+          tagName: "table",
         },
       ],
     };
@@ -849,19 +851,19 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "table",
           children: [
             {
-              tagName: "tr",
               children: [
                 {
-                  tagName: "td",
                   children: [{ tagName: "strong", textContent: "Bold Cell" }],
+                  tagName: "td",
                 },
                 { tagName: "td", textContent: "Plain" },
               ],
+              tagName: "tr",
             },
           ],
+          tagName: "table",
         },
       ],
     };
@@ -877,19 +879,19 @@ describe("compileMarkdown", () => {
       [
         "link-card",
         {
-          state: { url: "https://default.com", label: "Click" },
           children: [
             {
-              tagName: "p",
               children: [
                 {
-                  tagName: "a",
                   attributes: { href: "${state.url}" },
+                  tagName: "a",
                   textContent: "${state.label}",
                 },
               ],
+              tagName: "p",
             },
           ],
+          state: { label: "Click", url: "https://default.com" },
         },
       ],
     ]);
@@ -897,8 +899,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
+          $props: { label: "Visit", url: "https://example.org" },
           tagName: "link-card",
-          $props: { url: "https://example.org", label: "Visit" },
         },
       ],
     };
@@ -912,8 +914,8 @@ describe("compileMarkdown", () => {
       [
         "html-card",
         {
+          children: [{ innerHTML: "<p>${state.message}</p>", tagName: "div" }],
           state: { message: "Hello from template" },
-          children: [{ tagName: "div", innerHTML: "<p>${state.message}</p>" }],
         },
       ],
     ]);
@@ -931,19 +933,19 @@ describe("compileMarkdown", () => {
       [
         "nested-card",
         {
-          state: { title: "Nested" },
           children: [
             {
-              tagName: "div",
               children: [{ tagName: "h2", textContent: "${state.title}" }],
+              tagName: "div",
             },
           ],
+          state: { title: "Nested" },
         },
       ],
     ]);
 
     const doc = {
-      children: [{ tagName: "nested-card", $props: { title: "Deep Title" } }],
+      children: [{ $props: { title: "Deep Title" }, tagName: "nested-card" }],
     };
 
     const { content } = compileMarkdown(doc, componentDefs);
@@ -957,24 +959,24 @@ describe("compileMarkdown", () => {
       [
         "item-card",
         {
-          state: { name: "default" },
           children: [{ tagName: "p", textContent: "${state.name}" }],
+          state: { name: "default" },
         },
       ],
     ]);
 
     const doc = {
-      state: { things: [{ name: "Alpha" }, { name: "Beta" }] },
       children: [
         {
           $prototype: "Array",
           items: { $ref: "#/state/things" },
           map: {
-            tagName: "item-card",
             $props: { name: { $ref: "$map/item/name" } },
+            tagName: "item-card",
           },
         },
       ],
+      state: { things: [{ name: "Alpha" }, { name: "Beta" }] },
     };
 
     const { content } = compileMarkdown(doc as unknown as JxDocument, componentDefs);
@@ -984,10 +986,8 @@ describe("compileMarkdown", () => {
 
   test("$prototype Array with textContent as $map/ path string", () => {
     const doc = {
-      state: { fruits: [{ label: "Apple" }, { label: "Pear" }] },
       children: [
         {
-          tagName: "ul",
           children: [
             {
               $prototype: "Array",
@@ -998,8 +998,10 @@ describe("compileMarkdown", () => {
               },
             },
           ],
+          tagName: "ul",
         },
       ],
+      state: { fruits: [{ label: "Apple" }, { label: "Pear" }] },
     };
 
     const { content } = compileMarkdown(doc as unknown as JxDocument);
@@ -1009,22 +1011,22 @@ describe("compileMarkdown", () => {
 
   test("$prototype Array with children in map template", () => {
     const doc = {
-      state: { entries: [{ title: "One" }, { title: "Two" }] },
       children: [
         {
           $prototype: "Array",
           items: { $ref: "#/state/entries" },
           map: {
-            tagName: "div",
             children: [
               {
                 tagName: "h3",
                 textContent: { $ref: "$map/item/title" },
               },
             ],
+            tagName: "div",
           },
         },
       ],
+      state: { entries: [{ title: "One" }, { title: "Two" }] },
     };
 
     const { content } = compileMarkdown(doc as unknown as JxDocument);
@@ -1049,7 +1051,6 @@ describe("compileMarkdown", () => {
 
   test("$prototype Array with non-array items ref returns empty", () => {
     const doc = {
-      state: { notArray: "hello" },
       children: [
         {
           $prototype: "Array",
@@ -1057,6 +1058,7 @@ describe("compileMarkdown", () => {
           map: { tagName: "p", textContent: "never" },
         },
       ],
+      state: { notArray: "hello" },
     };
     const { content } = compileMarkdown(doc);
     expect(content.trim()).toBe("");
@@ -1068,8 +1070,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<blockquote>A simple quoted sentence</blockquote>",
+          tagName: "div",
         },
       ],
     };
@@ -1081,8 +1083,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<blockquote>Bare text in blockquote</blockquote>",
+          tagName: "div",
         },
       ],
     };
@@ -1094,8 +1096,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<blockquote><em>Emphasized quote</em></blockquote>",
+          tagName: "div",
         },
       ],
     };
@@ -1107,8 +1109,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<section><p>Inside section</p></section>",
+          tagName: "div",
         },
       ],
     };
@@ -1122,8 +1124,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p>Some <em>unclosed text</p>",
+          tagName: "div",
         },
       ],
     };
@@ -1136,8 +1138,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p><a href='/outer'><a href='/inner'>Inner</a> link</a></p>",
+          tagName: "div",
         },
       ],
     };
@@ -1150,8 +1152,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p>Text <custom>ignored tag</custom> more text</p>",
+          tagName: "div",
         },
       ],
     };
@@ -1164,8 +1166,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: '<p>Before <img src="/x.png" alt="X" /> After</p>',
+          tagName: "div",
         },
       ],
     };
@@ -1179,8 +1181,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<em>just italic</em> and <strong>bold</strong>",
+          tagName: "div",
         },
       ],
     };
@@ -1193,8 +1195,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>",
+          tagName: "div",
         },
       ],
     };
@@ -1212,8 +1214,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: ["   ", "Hello"],
+          tagName: "p",
         },
       ],
     };
@@ -1245,7 +1247,7 @@ describe("compileMarkdown", () => {
       children: [{ tagName: "h1", textContent: "" }],
     };
     const { content } = compileMarkdown(doc);
-    // heading with empty text still generates a heading node with empty text child
+    // Heading with empty text still generates a heading node with empty text child
     expect(content).toContain("#");
   });
 
@@ -1254,13 +1256,13 @@ describe("compileMarkdown", () => {
       [
         "prop-card",
         {
-          state: { title: { default: "Fallback", type: "string" } },
           children: [{ tagName: "h1", textContent: "${state.title}" }],
+          state: { title: { default: "Fallback", type: "string" } },
         },
       ],
     ]);
     const doc = {
-      children: [{ tagName: "prop-card", $props: { title: "Override" } }],
+      children: [{ $props: { title: "Override" }, tagName: "prop-card" }],
     };
     const { content } = compileMarkdown(doc, componentDefs);
     expect(content).toContain("# Override");
@@ -1271,13 +1273,13 @@ describe("compileMarkdown", () => {
       [
         "extra-card",
         {
-          state: { existing: "yes" },
           children: [{ tagName: "p", textContent: "${state.extra}" }],
+          state: { existing: "yes" },
         },
       ],
     ]);
     const doc = {
-      children: [{ tagName: "extra-card", $props: { extra: "new value" } }],
+      children: [{ $props: { extra: "new value" }, tagName: "extra-card" }],
     };
     const { content } = compileMarkdown(doc, componentDefs);
     expect(content).toContain("new value");
@@ -1288,8 +1290,8 @@ describe("compileMarkdown", () => {
       [
         "text-card",
         {
-          state: { word: "World" },
           children: ["Hello ${state.word}"],
+          state: { word: "World" },
         },
       ],
     ]);
@@ -1302,10 +1304,8 @@ describe("compileMarkdown", () => {
 
   test("resolveRef with non-#/state/ prefix (lines 493-494)", () => {
     const doc = {
-      state: { items: [{ name: "Direct" }] },
       children: [
         {
-          tagName: "ul",
           children: [
             {
               $prototype: "Array",
@@ -1313,8 +1313,10 @@ describe("compileMarkdown", () => {
               map: { tagName: "li", textContent: { $ref: "$map/item/name" } },
             },
           ],
+          tagName: "ul",
         },
       ],
+      state: { items: [{ name: "Direct" }] },
     };
     const { content } = compileMarkdown(doc as unknown as JxDocument);
     expect(content).toContain("- Direct");
@@ -1332,8 +1334,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p>First</p>between text<p>Second</p>",
+          tagName: "div",
         },
       ],
     };
@@ -1347,8 +1349,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<hr>",
+          tagName: "div",
         },
       ],
     };
@@ -1360,8 +1362,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<div>inner text only</div>",
+          tagName: "div",
         },
       ],
     };
@@ -1373,8 +1375,8 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
           innerHTML: "<p>text <broken no close</p>",
+          tagName: "div",
         },
       ],
     };
@@ -1387,13 +1389,13 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "p",
           children: [{ tagName: "em", textContent: "" }],
+          tagName: "p",
         },
       ],
     };
     const { content } = compileMarkdown(doc);
-    // em with empty textContent produces emphasis with empty text child
+    // Em with empty textContent produces emphasis with empty text child
     expect(content).toBeDefined();
   });
 
@@ -1401,18 +1403,18 @@ describe("compileMarkdown", () => {
     const doc = {
       children: [
         {
-          tagName: "table",
           children: [
             {
-              tagName: "tr",
               children: [
                 {
-                  tagName: "td",
                   children: [{ tagName: "em", textContent: "italic cell" }],
+                  tagName: "td",
                 },
               ],
+              tagName: "tr",
             },
           ],
+          tagName: "table",
         },
       ],
     };
@@ -1422,7 +1424,7 @@ describe("compileMarkdown", () => {
 
   test("innerHTML with wrapper div unwraps content (line 668)", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<div><p>Wrapped content</p></div>" }],
+      children: [{ innerHTML: "<div><p>Wrapped content</p></div>", tagName: "div" }],
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Wrapped content");

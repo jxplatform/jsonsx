@@ -3,32 +3,33 @@
 
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
-import { getNodeAtPath, debouncedStyleCommit, renderOnly, projectState } from "../store";
-import type { JsonValue, DirEntry } from "../types";
+import { debouncedStyleCommit, getNodeAtPath, projectState, renderOnly } from "../store";
+import { isRef } from "@jxsuite/schema/guards";
+import type { DirEntry, JsonValue } from "../types";
 import {
-  transactDoc,
-  mutateUpdateProperty,
-  mutateUpdateAttribute,
-  mutateUpdateProp,
-  mutateUpdateMedia,
   mutateAddSwitchCase,
   mutateRemoveSwitchCase,
   mutateRenameSwitchCase,
+  mutateUpdateAttribute,
+  mutateUpdateMedia,
+  mutateUpdateProp,
+  mutateUpdateProperty,
+  transactDoc,
 } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { componentRegistry } from "../files/components";
 import { widgetForType } from "./style-inputs";
 import { renderFieldRow } from "../ui/field-row";
-import { spTextField, spTextArea } from "../ui/field-input";
+import { spTextArea, spTextField } from "../ui/field-input";
 import {
   attrLabel,
-  inferInputType,
-  friendlyNameToVar,
   camelToLabel,
+  friendlyNameToVar,
+  inferInputType,
   parseCemType,
 } from "../utils/studio-utils";
-import { isCustomElementDoc, collectCssParts } from "./signals-panel";
+import { collectCssParts, isCustomElementDoc } from "./signals-panel";
 import { mediaDisplayName } from "./shared";
 import { getCssInitialMap } from "./style-utils";
 import { renderMediaPicker } from "../ui/media-picker";
@@ -37,7 +38,7 @@ import { getEffectiveLayoutPath, invalidateLayoutCache } from "../site-context";
 import { getPlatform } from "../platform";
 import htmlMeta from "../../data/html-meta.json";
 
-import type { JxPrototypeDef, JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, JxPrototypeDef } from "@jxsuite/schema/types";
 import type { JxPath } from "../state";
 
 interface SignalOption {
@@ -67,28 +68,50 @@ function friendlyNameToMedia(name: string) {
 
 /** Check if a selection path is inside a $map template (contains [..., "children", "map", ...]). */
 function isInsideMapTemplate(path: JxPath | null) {
-  if (!path) return false;
+  if (!path) {
+    return false;
+  }
   for (let i = 0; i < path.length - 1; i++) {
-    if (path[i] === "children" && path[i + 1] === "map") return true;
+    if (path[i] === "children" && path[i + 1] === "map") {
+      return true;
+    }
   }
   return false;
 }
 
 /**
+ * Render a state entry's default value as the static input text when unbinding.
+ *
+ * @param {import("@jxsuite/schema/types").JxStateDefinition | undefined} def
+ * @returns {string}
+ */
+function defaultAsString(def: import("@jxsuite/schema/types").JxStateDefinition | undefined) {
+  if (!def || typeof def !== "object" || Array.isArray(def)) {
+    return "";
+  }
+  const dv = (def as import("@jxsuite/schema/types").JxStateObject).default;
+  if (dv === undefined) {
+    return "";
+  }
+  return typeof dv === "object" ? JSON.stringify(dv) : String(dv);
+}
+
+/**
  * Field row with binding toggle — allows switching between static value and signal binding.
- * rawValue can be a string/bool (static) or { $ref: "..." } (bound).
+ * rawValue can be a JSON literal (static) or { $ref: "..." } (bound).
  */
 function bindableFieldRow(
   label: string,
   type: string,
-  rawValue: string | number | boolean | { $ref: string } | null | undefined,
+  rawValue: JsonValue | undefined,
   onChange: (v: JsonValue) => void,
   filterFn: ((d: import("./signals-panel.js").SignalDef) => boolean) | null = null,
   extraSignals: SignalOption[] | null = null,
 ) {
   const tab = activeTab.value;
   const defs = tab!.doc.document.state || {};
-  const isBound = typeof rawValue === "object" && rawValue !== null && rawValue.$ref;
+  const boundRef = isRef(rawValue) ? rawValue.$ref : null;
+  const isBound = boundRef !== null;
 
   const signalDefs = Object.entries(defs).filter(([, d]) =>
     filterFn
@@ -104,7 +127,7 @@ function bindableFieldRow(
       ? spTextArea(fieldKey, String(staticVal), (v: string) => onChange(v))
       : type === "checkbox"
         ? html`<sp-checkbox
-            ?checked=${!!staticVal}
+            ?checked=${Boolean(staticVal)}
             @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
           ></sp-checkbox>`
         : spTextField(fieldKey, String(staticVal), (v: string) => onChange(v));
@@ -114,11 +137,13 @@ function bindableFieldRow(
       size="s"
       quiet
       placeholder="— select signal —"
-      value=${isBound && rawValue.$ref ? rawValue.$ref : nothing}
+      value=${boundRef ?? nothing}
       @change=${(e: Event) => {
-        if ((e.target as HTMLInputElement).value)
+        if ((e.target as HTMLInputElement).value) {
           onChange({ $ref: (e.target as HTMLInputElement).value });
-        else onChange(undefined);
+        } else {
+          onChange();
+        }
       }}
     >
       ${signalDefs.map(
@@ -137,14 +162,9 @@ function bindableFieldRow(
   `;
 
   const onToggle = () => {
-    if (isBound) {
-      const ref = rawValue.$ref;
-      const defName = ref.startsWith("#/state/") ? ref.slice(8) : ref;
-      const def = defs[defName];
-      let staticVal = "";
-      if (def && def.default !== undefined)
-        staticVal =
-          typeof def.default === "object" ? JSON.stringify(def.default) : String(def.default);
+    if (boundRef !== null) {
+      const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
+      const staticVal = defaultAsString(defs[defName]);
       onChange(staticVal || undefined);
     } else {
       if (signalDefs.length > 0) {
@@ -202,11 +222,12 @@ function kvRow(
               const el = (e.target as HTMLInputElement)
                 .closest(".kv-row")
                 ?.querySelector(".kv-val");
-              if (el)
+              if (el) {
                 el.setAttribute(
                   "placeholder",
                   getCssInitialMap().get((e.target as HTMLInputElement).value) || "",
                 );
+              }
             }
           : nothing}
       ></sp-textfield>
@@ -327,10 +348,11 @@ function renderSwitchFieldsTemplate(
                 if (
                   (e.target as HTMLInputElement).value &&
                   (e.target as HTMLInputElement).value !== caseName
-                )
+                ) {
                   transactDoc(activeTab.value, (t) =>
                     mutateRenameSwitchCase(t, path, caseName, (e.target as HTMLInputElement).value),
                   );
+                }
               }, 500);
             }}
           />
@@ -376,7 +398,9 @@ function renderComponentPropsFieldsTemplate(
 ) {
   const tab = activeTab.value;
   const comp = componentRegistry.find((c) => c.tagName === node.tagName);
-  if (!comp || !comp.props) return html`<div class="empty-state">Component not found</div>`;
+  if (!comp || !comp.props) {
+    return html`<div class="empty-state">Component not found</div>`;
+  }
   const isNpm = comp.source === "npm";
   const currentVals = isNpm ? node.attributes || {} : node.$props || {};
   const updateFn = isNpm
@@ -400,7 +424,8 @@ function renderComponentPropsFieldsTemplate(
         /** @type {{ name: string; type?: string; format?: string; description?: string }} */ prop,
       ) => {
         const rawValue = currentVals[prop.name];
-        const isBound = typeof rawValue === "object" && rawValue !== null && rawValue.$ref;
+        const boundRef = isRef(rawValue) ? rawValue.$ref : null;
+        const isBound = boundRef !== null;
         const hasVal = rawValue !== undefined && rawValue !== null;
         const parsed = parseCemType(prop.type);
         const onChange = (v: JsonValue) => updateFn(prop.name, v);
@@ -408,18 +433,13 @@ function renderComponentPropsFieldsTemplate(
 
         const clearProp = (e: Event) => {
           e.stopPropagation();
-          updateFn(prop.name, undefined);
+          updateFn(prop.name);
         };
 
         const onToggleBind = () => {
-          if (isBound) {
-            const ref = rawValue.$ref;
-            const defName = ref.startsWith("#/state/") ? ref.slice(8) : ref;
-            const def = defs[defName];
-            let staticVal = "";
-            if (def && def.default !== undefined)
-              staticVal =
-                typeof def.default === "object" ? JSON.stringify(def.default) : String(def.default);
+          if (boundRef !== null) {
+            const defName = boundRef.startsWith("#/state/") ? boundRef.slice(8) : boundRef;
+            const staticVal = defaultAsString(defs[defName]);
             onChange(staticVal || undefined);
           } else {
             if (signalDefs.length > 0) {
@@ -435,11 +455,13 @@ function renderComponentPropsFieldsTemplate(
             size="s"
             quiet
             placeholder="— select signal —"
-            value=${isBound && rawValue.$ref ? rawValue.$ref : nothing}
+            value=${boundRef ?? nothing}
             @change=${(e: Event) => {
-              if ((e.target as HTMLInputElement).value)
+              if ((e.target as HTMLInputElement).value) {
                 onChange({ $ref: (e.target as HTMLInputElement).value });
-              else onChange(undefined);
+              } else {
+                onChange();
+              }
             }}
           >
             ${signalDefs.map(
@@ -477,7 +499,7 @@ function renderComponentPropsFieldsTemplate(
         } else if (parsed.kind === "boolean") {
           widgetTpl = html`<sp-checkbox
             size="s"
-            .checked=${live(!!staticVal)}
+            .checked=${live(Boolean(staticVal))}
             @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked || undefined)}
           ></sp-checkbox>`;
         } else if (parsed.kind === "number") {
@@ -496,8 +518,8 @@ function renderComponentPropsFieldsTemplate(
             size="s"
             placeholder="—"
             .options=${options.map((o) => ({
-              value: o,
               label: camelToLabel(o),
+              value: o,
             }))}
             @change=${(e: Event & { detail?: { value?: string } }) =>
               onChange(e.detail?.value ?? (e.target as HTMLInputElement).value)}
@@ -532,7 +554,7 @@ function renderComponentPropsFieldsTemplate(
     )}
     ${comp.props.length === 0 ? html`<div class="empty-state">No props defined</div>` : nothing}
     ${comp.path
-      ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path)}
+      ? html`<span class="kv-add" @click=${() => navigateToComponent(comp.path!)}
           >→ Edit definition</span
         >`
       : nothing}
@@ -555,14 +577,14 @@ function renderCustomAttrsFieldsTemplate(
         (newAttr: string, newVal: string) => {
           if (newAttr !== attr) {
             transactDoc(activeTab.value, (t) => {
-              mutateUpdateAttribute(t, path, attr, undefined);
+              mutateUpdateAttribute(t, path, attr);
               mutateUpdateAttribute(t, path, newAttr, newVal);
             });
           } else {
             transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, newVal));
           }
         },
-        () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
+        () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
       ),
     )}
     <span
@@ -602,8 +624,7 @@ function renderMediaFieldsTemplate(node: JxMutableNode) {
       ${media["--"]
         ? html`<span
             class="kv-del"
-            @click=${() =>
-              transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--", undefined))}
+            @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, "--"))}
             >✕</span
           >`
         : nothing}
@@ -698,7 +719,9 @@ function mediaBreakpointRowTemplate(name: string, query: string) {
             const newKey = friendlyNameToMedia((e.target as HTMLInputElement).value);
             currentRawLabel = newKey || "";
             const rawEl = (e.target as HTMLElement).parentElement?.querySelector(".bp-raw-label");
-            if (rawEl) rawEl.textContent = currentRawLabel;
+            if (rawEl) {
+              rawEl.textContent = currentRawLabel;
+            }
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
               if (newKey && newKey !== name) {
@@ -706,7 +729,7 @@ function mediaBreakpointRowTemplate(name: string, query: string) {
                   .closest("div[style]")
                   ?.parentElement?.querySelector(".bp-query-input") as HTMLInputElement | null;
                 transactDoc(activeTab.value, (t) => {
-                  mutateUpdateMedia(t, name, undefined);
+                  mutateUpdateMedia(t, name);
                   mutateUpdateMedia(t, newKey, queryEl?.value || query);
                 });
               }
@@ -720,7 +743,7 @@ function mediaBreakpointRowTemplate(name: string, query: string) {
         >
         <span
           class="kv-del"
-          @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name, undefined))}
+          @click=${() => transactDoc(activeTab.value, (t) => mutateUpdateMedia(t, name))}
           >✕</span
         >
       </div>
@@ -771,13 +794,17 @@ export function invalidateLayoutPickerCache() {
 }
 
 function isPageDocument(documentPath: string | undefined | null) {
-  if (!documentPath || !projectState?.isSiteProject) return false;
+  if (!documentPath || !projectState?.isSiteProject) {
+    return false;
+  }
   return documentPath.startsWith("pages/") || documentPath.startsWith("./pages/");
 }
 
 function renderPageSection(node: JxMutableNode) {
   const tab = activeTab.value;
-  if (!isPageDocument(tab!.documentPath)) return nothing;
+  if (!isPageDocument(tab!.documentPath)) {
+    return nothing;
+  }
 
   if (layoutEntries === null) {
     loadLayoutEntries();
@@ -801,9 +828,7 @@ function renderPageSection(node: JxMutableNode) {
                   title="Reset to default"
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, [], "$layout", undefined),
-                    );
+                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
                   }}
                 ></span>`
               : nothing}
@@ -815,9 +840,7 @@ function renderPageSection(node: JxMutableNode) {
             @change=${(e: Event) => {
               const val = (e.target as HTMLInputElement).value;
               if (val === "__default__") {
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateProperty(t, [], "$layout", undefined),
-                );
+                transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout"));
               } else if (val === "__none__") {
                 transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, [], "$layout", false));
               } else {
@@ -906,7 +929,9 @@ export function renderPropertiesPanelTemplate(ctx: {
   navigateToComponent: (path: string) => void;
 }) {
   const tab = activeTab.value;
-  if (!tab) return html`<div class="empty-state">No document loaded</div>`;
+  if (!tab) {
+    return html`<div class="empty-state">No document loaded</div>`;
+  }
 
   // Layout element selected — show read-only info with link to open layout
   if (view.layoutSelection) {
@@ -917,7 +942,9 @@ export function renderPropertiesPanelTemplate(ctx: {
     return html`<div class="empty-state">Select an element to inspect</div>`;
   }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node) return html`<div class="empty-state">Node not found</div>`;
+  if (!node) {
+    return html`<div class="empty-state">Node not found</div>`;
+  }
 
   const path = tab.session.selection;
   const isMapNode = node.$prototype === "Array";
@@ -925,7 +952,7 @@ export function renderPropertiesPanelTemplate(ctx: {
     node.children &&
     typeof node.children === "object" &&
     (node.children as unknown as { $prototype?: string }).$prototype === "Array";
-  const isSwitchNode = !!node.$switch;
+  const isSwitchNode = Boolean(node.$switch);
   const isCustomInstance = (node.tagName || "").includes("-");
   const isRoot = path.length === 0;
   const tagName = node.tagName || "div";
@@ -933,8 +960,8 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   const mapSignals = isInsideMapTemplate(path)
     ? [
-        { value: "$map/item", label: "$map/item" },
-        { value: "$map/index", label: "$map/index" },
+        { label: "$map/item", value: "$map/item" },
+        { label: "$map/index", value: "$map/index" },
       ]
     : null;
 
@@ -944,15 +971,14 @@ export function renderPropertiesPanelTemplate(ctx: {
 
     if (entry.type === "boolean") {
       return renderFieldRow({
-        prop: attr,
-        label: attrLabel(entry, attr),
         hasValue: hasVal,
-        onClear: () =>
-          transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
+        label: attrLabel(entry, attr),
+        onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
+        prop: attr,
         widget: html`
           <sp-checkbox
             size="s"
-            .checked=${live(!!value)}
+            .checked=${live(Boolean(value))}
             @change=${(e: Event) =>
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateAttribute(
@@ -969,11 +995,10 @@ export function renderPropertiesPanelTemplate(ctx: {
     }
 
     return renderFieldRow({
-      prop: attr,
-      label: attrLabel(entry, attr),
       hasValue: hasVal,
-      onClear: () =>
-        transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr, undefined)),
+      label: attrLabel(entry, attr),
+      onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, attr)),
+      prop: attr,
       widget: widgetForType(type, entry, attr, String(value || ""), (v: string) =>
         transactDoc(activeTab.value!, (t) => mutateUpdateAttribute(t, path, attr, v || undefined)),
       ),
@@ -989,10 +1014,14 @@ export function renderPropertiesPanelTemplate(ctx: {
   }
 
   const attrSections: Record<string, { name: string; entry: HtmlMetaEntry }[]> = {};
-  for (const sec of htmlMeta.$sections) attrSections[sec.key] = [];
+  for (const sec of htmlMeta.$sections) {
+    attrSections[sec.key] = [];
+  }
   for (const [attr, entry] of Object.entries(applicableAttrs)) {
     const secKey = entry.$section;
-    if (attrSections[secKey]) attrSections[secKey].push({ name: attr, entry });
+    if (attrSections[secKey]) {
+      attrSections[secKey].push({ entry, name: attr });
+    }
   }
   for (const sec of htmlMeta.$sections) {
     attrSections[sec.key].sort(
@@ -1004,20 +1033,29 @@ export function renderPropertiesPanelTemplate(ctx: {
   const knownAttrNames = new Set(Object.keys(applicableAttrs));
   if (isCustomInstance) {
     const comp = componentRegistry.find((c) => c.tagName === node.tagName);
-    if (comp?.props) for (const p of comp.props) knownAttrNames.add(p.name);
+    if (comp?.props) {
+      for (const p of comp.props) {
+        knownAttrNames.add(p.name);
+      }
+    }
   }
   const customAttrs = Object.entries(attrs).filter(([k]) => !knownAttrNames.has(k));
 
   const autoOpen = new Set();
   for (const [attr] of Object.entries(attrs)) {
     const entry = applicableAttrs[attr];
-    if (entry) autoOpen.add(entry.$section);
+    if (entry) {
+      autoOpen.add(entry.$section);
+    }
   }
-  if (customAttrs.length > 0) autoOpen.add("__custom");
+  if (customAttrs.length > 0) {
+    autoOpen.add("__custom");
+  }
 
   function isSectionOpen(key: string) {
-    if (tab!.session.ui.inspectorSections[key] !== undefined)
+    if (tab!.session.ui.inspectorSections[key] !== undefined) {
       return tab!.session.ui.inspectorSections[key];
+    }
     return autoOpen.has(key);
   }
 
@@ -1067,9 +1105,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                   title="Clear $id"
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, path, "$id", undefined),
-                    );
+                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "$id"));
                   }}
                 ></span>`
               : nothing}
@@ -1089,9 +1125,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                   title="Clear class"
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, path, "className", undefined),
-                    );
+                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "className"));
                   }}
                 ></span>`
               : nothing}
@@ -1114,7 +1148,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                         @click=${(e: Event) => {
                           e.stopPropagation();
                           transactDoc(activeTab.value, (t) =>
-                            mutateUpdateProperty(t, path, "textContent", undefined),
+                            mutateUpdateProperty(t, path, "textContent"),
                           );
                         }}
                       ></span>`
@@ -1140,9 +1174,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                   title="Clear hidden"
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    transactDoc(activeTab.value, (t) =>
-                      mutateUpdateProperty(t, path, "hidden", undefined),
-                    );
+                    transactDoc(activeTab.value, (t) => mutateUpdateProperty(t, path, "hidden"));
                   }}
                 ></span>`
               : nothing}
@@ -1150,7 +1182,7 @@ export function renderPropertiesPanelTemplate(ctx: {
           </div>
           <sp-checkbox
             size="s"
-            .checked=${live(!!node.hidden)}
+            .checked=${live(Boolean(node.hidden))}
             @change=${(e: Event) =>
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateProperty(
@@ -1309,7 +1341,9 @@ export function renderPropertiesPanelTemplate(ctx: {
       ? (() => {
           const style = node.style || {};
           const cssProps = Object.entries(style).filter(([k]) => k.startsWith("--"));
-          if (cssProps.length === 0) return nothing;
+          if (cssProps.length === 0) {
+            return nothing;
+          }
           return html`
             <sp-accordion-item
               label="CSS Properties"
@@ -1337,7 +1371,9 @@ export function renderPropertiesPanelTemplate(ctx: {
     isCustomElementDoc({ document: tab.doc.document }) && isRoot
       ? (() => {
           const parts = collectCssParts(tab.doc.document);
-          if (parts.length === 0) return nothing;
+          if (parts.length === 0) {
+            return nothing;
+          }
           return html`
             <sp-accordion-item
               label="CSS Parts"

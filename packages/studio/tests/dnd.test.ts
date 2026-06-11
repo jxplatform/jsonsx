@@ -1,30 +1,32 @@
 import "./with-dom.js";
-import { describe, test, expect, beforeEach } from "bun:test";
-import { workspace, openTab, closeTab } from "../src/workspace/workspace";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { closeTab, openTab, workspace } from "../src/workspace/workspace";
 import { applyDropInstruction } from "../src/panels/dnd";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 function openDoc(doc: JxMutableNode) {
-  return openTab({ id: "dnd-test", document: doc });
+  return openTab({ document: doc, id: "dnd-test" });
 }
 
 function makeDoc(): JxMutableNode {
   return {
-    tagName: "div",
     children: [
       {
-        tagName: "section",
         children: [{ tagName: "h2", textContent: "title" }],
+        tagName: "section",
       },
       { tagName: "p", textContent: "first" },
       { tagName: "p", textContent: "second" },
     ],
+    tagName: "div",
   };
 }
 
 /** Walk the tree and assert no children array contains undefined/null holes */
 function assertNoHoles(node: JxMutableNode | string | number | boolean) {
-  if (typeof node !== "object" || node === null) return;
+  if (typeof node !== "object" || node === null) {
+    return;
+  }
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
       expect(child).toBeDefined();
@@ -36,12 +38,14 @@ function assertNoHoles(node: JxMutableNode | string | number | boolean) {
 
 describe("applyDropInstruction — tree-node moves", () => {
   beforeEach(() => {
-    for (const id of workspace.tabs.keys()) closeTab(id);
+    for (const id of workspace.tabs.keys()) {
+      closeTab(id);
+    }
   });
 
   test("reorder-above moves node before target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "reorder-above" }, { type: "tree-node", path: ["children", 2] }, [
+    applyDropInstruction({ type: "reorder-above" }, { path: ["children", 2], type: "tree-node" }, [
       "children",
       0,
     ]);
@@ -52,7 +56,7 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("reorder-below moves node after target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "reorder-below" }, { type: "tree-node", path: ["children", 0] }, [
+    applyDropInstruction({ type: "reorder-below" }, { path: ["children", 0], type: "tree-node" }, [
       "children",
       2,
     ]);
@@ -63,7 +67,7 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("make-child appends node into target's children", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "make-child" }, { type: "tree-node", path: ["children", 1] }, [
+    applyDropInstruction({ type: "make-child" }, { path: ["children", 1], type: "tree-node" }, [
       "children",
       0,
     ]);
@@ -76,12 +80,12 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("repeated application with stale paths never corrupts the document", () => {
     // Regression: pragmatic-dnd fires onDrop on every stacked drop target, so the
-    // same drop used to apply once per nested ancestor. After the first move the
-    // source path is stale; subsequent applications spliced undefined into children
-    // and crashed the layers panel. The mutation layer must stay corruption-free
-    // even if called repeatedly with the same (now stale) arguments.
+    // Same drop used to apply once per nested ancestor. After the first move the
+    // Source path is stale; subsequent applications spliced undefined into children
+    // And crashed the layers panel. The mutation layer must stay corruption-free
+    // Even if called repeatedly with the same (now stale) arguments.
     const tab = openDoc(makeDoc());
-    const src = { type: "tree-node", path: ["children", 2] };
+    const src = { path: ["children", 2], type: "tree-node" };
     applyDropInstruction({ type: "make-child" }, src, ["children", 0]);
     // Simulate the outer stacked targets firing with the same stale source path
     applyDropInstruction({ type: "make-child" }, src, ["children", 0, "children", 0]);
@@ -98,8 +102,8 @@ describe("applyDropInstruction — tree-node moves", () => {
   test("reorder around a root-level path is a no-op", () => {
     const tab = openDoc(makeDoc());
     const before = JSON.parse(JSON.stringify(tab.doc.document));
-    // targetPath ["children"] has no parent element and a non-numeric index
-    applyDropInstruction({ type: "reorder-above" }, { type: "tree-node", path: ["children", 1] }, [
+    // TargetPath ["children"] has no parent element and a non-numeric index
+    applyDropInstruction({ type: "reorder-above" }, { path: ["children", 1], type: "tree-node" }, [
       "children",
     ]);
     expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);
@@ -108,14 +112,16 @@ describe("applyDropInstruction — tree-node moves", () => {
 
 describe("applyDropInstruction — block inserts", () => {
   beforeEach(() => {
-    for (const id of workspace.tabs.keys()) closeTab(id);
+    for (const id of workspace.tabs.keys()) {
+      closeTab(id);
+    }
   });
 
   test("reorder-above inserts fragment before target", () => {
     const tab = openDoc(makeDoc());
     applyDropInstruction(
       { type: "reorder-above" },
-      { type: "block", fragment: { tagName: "hr" } },
+      { fragment: { tagName: "hr" }, type: "block" },
       ["children", 1],
     );
     const children = tab.doc.document.children as JxMutableNode[];
@@ -126,7 +132,7 @@ describe("applyDropInstruction — block inserts", () => {
 
   test("make-child appends fragment into target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "make-child" }, { type: "block", fragment: { tagName: "img" } }, [
+    applyDropInstruction({ type: "make-child" }, { fragment: { tagName: "img" }, type: "block" }, [
       "children",
       0,
     ]);
@@ -141,7 +147,7 @@ describe("applyDropInstruction — block inserts", () => {
     const before = JSON.parse(JSON.stringify(tab.doc.document));
     applyDropInstruction(
       { type: "reorder-below" },
-      { type: "block", fragment: { tagName: "hr" } },
+      { fragment: { tagName: "hr" }, type: "block" },
       ["children"],
     );
     expect(JSON.parse(JSON.stringify(tab.doc.document))).toEqual(before);

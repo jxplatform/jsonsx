@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { generateProjectSchema, generateClassSchema, generateSchema } from "../src/schema";
+import { describe, expect, test } from "bun:test";
+import { generateClassSchema, generateProjectSchema, generateSchema } from "../src/schema";
 
 // ─── generateProjectSchema ──────────────────────────────────────────────────
 
@@ -31,19 +31,19 @@ describe("generateProjectSchema", () => {
   });
 
   test("defaults.layout accepts string or null", () => {
-    const layout = schema.properties.defaults.properties.layout;
+    const { layout } = schema.properties.defaults.properties;
     expect(layout.oneOf).toHaveLength(2);
     expect(layout.oneOf[0].type).toBe("string");
     expect(layout.oneOf[1].type).toBe("null");
   });
 
   test("build.format restricts to directory|single", () => {
-    const format = schema.properties.build.properties.format;
+    const { format } = schema.properties.build.properties;
     expect(format.enum).toEqual(["directory", "single"]);
   });
 
   test("build.adapter restricts to known platforms", () => {
-    const adapter = schema.properties.build.properties.adapter;
+    const { adapter } = schema.properties.build.properties;
     expect(adapter.enum).toEqual(["netlify", "vercel", "cloudflare"]);
   });
 
@@ -206,9 +206,9 @@ describe("generateSchema", () => {
 
   test("$ref types include all reference patterns", async () => {
     const schema = (await generateSchema()) as any;
-    expect(schema.$defs.InternalRef.pattern).toBe("^#/\\$defs/");
+    expect(schema.$defs.InternalRef.pattern).toBe(String.raw`^#/\$defs/`);
     expect(schema.$defs.StateRef.pattern).toBe("^#/state/");
-    expect(schema.$defs.MapRef.pattern).toBe("^\\$map/(item|index)(/.*)?$");
+    expect(schema.$defs.MapRef.pattern).toBe(String.raw`^\$map/(item|index)(/.*)?$`);
   });
 
   test("ExpressionEntry is defined in schema $defs", async () => {
@@ -234,7 +234,7 @@ describe("generateSchema", () => {
 
   test("event handlers accept ExpressionEntry inline", async () => {
     const schema = (await generateSchema()) as any;
-    const onclick = schema.$defs.ElementDef.properties.onclick;
+    const { onclick } = schema.$defs.ElementDef.properties;
     const refs = onclick.oneOf.map(/** @param {any} e */ (e: any) => e.$ref);
     expect(refs).toContain("#/$defs/ExpressionEntry");
     expect(refs).toContain("#/$defs/RefObject");

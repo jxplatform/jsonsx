@@ -5,24 +5,24 @@
  */
 
 import {
-  updateUi,
-  renderOnly,
+  canvasPanels,
+  childIndex,
+  elToPath,
   getNodeAtPath,
   parentElementPath,
-  childIndex,
-  canvasPanels,
-  elToPath,
+  renderOnly,
+  updateUi,
 } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type { JxPath } from "../state";
 import {
-  transactDoc,
-  mutateRemoveNode,
   mutateInsertNode,
+  mutateRemoveNode,
   mutateUpdateProperty,
+  transactDoc,
 } from "../tabs/transact";
 import { view } from "../view";
-import { isSlashMenuOpen, showSlashMenu, dismissSlashMenu } from "./slash-menu";
+import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "./slash-menu";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
 
@@ -64,15 +64,27 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
   }
 
   const node = getNodeAtPath(activeTab.value!.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
 
   const tc = node.textContent;
-  if (node.$props && (node.tagName || "").includes("-")) return;
-  if (Array.isArray(node.children) && node.children.length > 0) return;
-  if (node.children && typeof node.children === "object") return;
-  if (tc && typeof tc === "object") return;
+  if (node.$props && (node.tagName || "").includes("-")) {
+    return;
+  }
+  if (Array.isArray(node.children) && node.children.length > 0) {
+    return;
+  }
+  if (node.children && typeof node.children === "object") {
+    return;
+  }
+  if (tc && typeof tc === "object") {
+    return;
+  }
   const voids = new Set(["img", "input", "br", "hr", "video", "audio", "source", "embed", "slot"]);
-  if (voids.has(node.tagName || "")) return;
+  if (voids.has(node.tagName || "")) {
+    return;
+  }
 
   for (const p of canvasPanels) {
     const boxes = p.overlay.querySelectorAll(".overlay-box") as NodeListOf<HTMLElement>;
@@ -94,9 +106,9 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
 
   view.componentInlineEdit = {
     el,
-    path,
-    originalText: rawText,
     mediaName: canvasPanels.find((p) => p.canvas.contains(el))?.mediaName || null,
+    originalText: rawText,
+    path,
   };
 
   el.focus();
@@ -115,20 +127,30 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
       document.removeEventListener("mousedown", outsideHandler, true);
       return;
     }
-    if (view.componentInlineEdit.el.contains(evt.target as Node)) return;
-    if (isSlashMenuOpen()) return;
-    if (view.blockActionBarEl && view.blockActionBarEl.contains(evt.target as Node)) return;
+    if (view.componentInlineEdit.el.contains(evt.target as Node)) {
+      return;
+    }
+    if (isSlashMenuOpen()) {
+      return;
+    }
+    if (view.blockActionBarEl && view.blockActionBarEl.contains(evt.target as Node)) {
+      return;
+    }
     document.removeEventListener("mousedown", outsideHandler, true);
 
     let hitPath: (string | number)[] | null = null,
       hitMedia = null;
     for (const p of canvasPanels) {
       const els = p.canvas.querySelectorAll("*") as NodeListOf<HTMLElement>;
-      for (const el of els) el.style.pointerEvents = "auto";
+      for (const el of els) {
+        el.style.pointerEvents = "auto";
+      }
       p.overlayClk.style.display = "none";
       const found = document.elementsFromPoint(evt.clientX, evt.clientY);
       p.overlayClk.style.display = "";
-      for (const el of els) el.style.pointerEvents = "none";
+      for (const el of els) {
+        el.style.pointerEvents = "none";
+      }
       for (const hit of found) {
         if (p.canvas.contains(hit) && hit !== p.canvas) {
           const path = elToPath.get(hit);
@@ -139,7 +161,9 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
           }
         }
       }
-      if (hitPath) break;
+      if (hitPath) {
+        break;
+      }
     }
 
     const { el: editEl, path: editPath, originalText } = view.componentInlineEdit;
@@ -152,7 +176,7 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
     if (hitPath) {
       let hp = hitPath;
       const media = hitMedia === "base" ? null : (hitMedia ?? null);
-      updateUi("pendingInlineEdit", { path: hp, mediaName: hitMedia });
+      updateUi("pendingInlineEdit", { mediaName: hitMedia, path: hp });
       activeTab.value!.session.ui.activeMedia = media;
       if (isEmpty && pPath) {
         transactDoc(activeTab.value, (t) => {
@@ -167,7 +191,7 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
             hitIdx > removedIdx
           ) {
             hp = [...pPath, "children", hitIdx - 1];
-            updateUi("pendingInlineEdit", { path: hp, mediaName: hitMedia });
+            updateUi("pendingInlineEdit", { mediaName: hitMedia, path: hp });
           }
           t.session.selection = hp;
         });
@@ -201,7 +225,9 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
 /** @param {KeyboardEvent} e */
 function componentInlineKeydown(e: KeyboardEvent) {
   if (isSlashMenuOpen()) {
-    if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) return;
+    if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
+      return;
+    }
   }
 
   if (e.key === "Enter" && !e.shiftKey) {
@@ -215,7 +241,9 @@ function componentInlineKeydown(e: KeyboardEvent) {
 }
 
 function splitParagraph() {
-  if (!view.componentInlineEdit) return;
+  if (!view.componentInlineEdit) {
+    return;
+  }
   const { el, path, mediaName } = view.componentInlineEdit;
 
   const sel = el.ownerDocument.defaultView?.getSelection() as Selection | null;
@@ -235,7 +263,9 @@ function splitParagraph() {
   const tag = "p";
   const pPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
-  if (!pPath) return;
+  if (!pPath) {
+    return;
+  }
 
   const newDef = { tagName: tag, textContent: textAfter };
   const newPath = [...pPath, "children", idx + 1];
@@ -248,11 +278,13 @@ function splitParagraph() {
     t.session.selection = newPath;
   });
 
-  updateUi("pendingInlineEdit", { path: newPath, mediaName });
+  updateUi("pendingInlineEdit", { mediaName, path: newPath });
 }
 
 function _commitComponentInlineEdit() {
-  if (!view.componentInlineEdit) return;
+  if (!view.componentInlineEdit) {
+    return;
+  }
   const { el, path, originalText } = view.componentInlineEdit;
   const newText = (el.textContent ?? "").trim();
 
@@ -272,7 +304,9 @@ function _commitComponentInlineEdit() {
 }
 
 function cancelComponentInlineEdit() {
-  if (!view.componentInlineEdit) return;
+  if (!view.componentInlineEdit) {
+    return;
+  }
   const { el } = view.componentInlineEdit;
   cleanupComponentInlineEdit(el);
   renderOnly("canvas");
@@ -305,7 +339,9 @@ function cleanupComponentInlineEdit(el: HTMLElement) {
 // ─── Component-mode slash commands ──────────────────────────────────────────
 
 function componentInlineInput() {
-  if (!view.componentInlineEdit) return;
+  if (!view.componentInlineEdit) {
+    return;
+  }
   const { el, originalText } = view.componentInlineEdit;
   const text = el.textContent || "";
 
@@ -319,11 +355,15 @@ function componentInlineInput() {
 
 /** @param {{ tag: string; label: string; description: string }} cmd */
 function handleComponentSlashSelect(cmd: { tag: string; label: string; description: string }) {
-  if (!view.componentInlineEdit) return;
+  if (!view.componentInlineEdit) {
+    return;
+  }
   const { el, path, mediaName } = view.componentInlineEdit;
   const pPath = parentElementPath(path);
   const idx = childIndex(path) as number;
-  if (!pPath) return;
+  if (!pPath) {
+    return;
+  }
 
   cleanupComponentInlineEdit(el);
 
@@ -337,5 +377,7 @@ function handleComponentSlashSelect(cmd: { tag: string; label: string; descripti
   });
 
   const hasText = newDef.textContent != null;
-  if (hasText) updateUi("pendingInlineEdit", { path: newPath, mediaName });
+  if (hasText) {
+    updateUi("pendingInlineEdit", { mediaName, path: newPath });
+  }
 }

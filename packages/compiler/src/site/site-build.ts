@@ -9,15 +9,16 @@
  */
 
 import {
-  writeFileSync,
   copyFileSync,
-  mkdirSync,
-  existsSync,
-  rmSync,
   cpSync,
+  existsSync,
+  mkdirSync,
   readdirSync,
+  rmSync,
+  writeFileSync,
 } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
 import { buildProjectFormatRegistry } from "./format-host.ts";
@@ -28,31 +29,33 @@ import { injectContext } from "./context-injection.ts";
 import { compile, compileServer, compileSiteServer } from "../compiler.ts";
 import { compileElement } from "../targets/compile-element.ts";
 import {
-  buildInitialScope,
-  isTemplateString,
-  evaluateStaticTemplate,
-  preRenderComponentHtml,
-  isComponentFullyStatic,
-  buildComponentCSS,
-  collectServerEntries,
-  renderStaticNode,
-  resolveStaticValue,
-  resolveRefValue,
-  DEFAULT_REACTIVITY_SRC,
   DEFAULT_LIT_HTML_SRC,
+  DEFAULT_REACTIVITY_SRC,
+  buildComponentCSS,
+  buildInitialScope,
+  collectServerEntries,
+  evaluateStaticTemplate,
+  isComponentFullyStatic,
+  isTemplateString,
+  preRenderComponentHtml,
+  renderStaticNode,
+  resolveRefValue,
+  resolveStaticValue,
 } from "../shared.ts";
-import { loadContentTypes, loadContentConfig, resolveContentTypeRefs } from "./content-loader.ts";
+import { loadContentConfig, loadContentTypes, resolveContentTypeRefs } from "./content-loader.ts";
 import { resolvePrototypes } from "./prototype-resolver.ts";
 import { transformImageNodes } from "./image-transform.ts";
-import { loadCache, saveCache, getImageCacheDir } from "./image-cache.ts";
+import { getImageCacheDir, loadCache, saveCache } from "./image-cache.ts";
 import type { ImageConfig } from "./image-optimizer.ts";
 import type { ImageMetaCache } from "./image-transform.ts";
 import type {
+  JsonValue,
+  JxAttributeValue,
   JxElement,
-  JxMutableNode,
-  JxStyle,
   JxHeadEntry,
+  JxMutableNode,
   JxStateDefinition,
+  JxStyle,
   ProjectConfig,
 } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
@@ -99,7 +102,7 @@ export async function buildSite(
 
   // ── 2. Clean output directory ───────────────────────────────────────────
   if (clean && existsSync(outDir)) {
-    rmSync(outDir, { recursive: true, force: true });
+    rmSync(outDir, { force: true, recursive: true });
   }
   mkdirSync(outDir, { recursive: true });
 
@@ -133,8 +136,8 @@ export async function buildSite(
   // ── 5. Compile site components ──────────────────────────────────────────
   const componentsDir = resolve(projectRoot, "components");
   const compiledComponentTags: string[] = [];
-  const componentCSS: Map<string, string> = new Map(); // tagName → CSS text
-  const componentDefs: Map<string, JxElement> = new Map(); // tagName → parsed component definition
+  const componentCSS = new Map<string, string>(); // TagName → CSS text
+  const componentDefs = new Map<string, JxElement>(); // TagName → parsed component definition
   if (existsSync(componentsDir)) {
     log("Compiling components...");
     const componentExtensions = [".json", ...formatRegistry.documentExtensions("component")];
@@ -148,13 +151,15 @@ export async function buildSite(
       try {
         const componentPath = resolve(componentsDir, file);
         const result = await compileElement(componentPath, {
-          $media: projectConfig.$media,
+          ...(projectConfig.$media ? { $media: projectConfig.$media } : {}),
           formats: formatRegistry,
         });
         for (const f of result.files) {
           const outName = f.path.includes("/") ? (f.path.split("/").pop() as string) : f.path;
           writeFileSync(resolve(componentOutDir, outName), f.content, "utf8");
-          if (f.tagName) compiledComponentTags.push(f.tagName);
+          if (f.tagName) {
+            compiledComponentTags.push(f.tagName);
+          }
           fileCount++;
         }
 
@@ -169,8 +174,8 @@ export async function buildSite(
             fileCount++;
           }
         }
-      } catch (e) {
-        const err = e as Error;
+      } catch (error) {
+        const err = error as Error;
         errors.push(`Error compiling component ${file}: ${err.message}`);
         console.error(`Error compiling component ${file}: ${err.message}`);
       }
@@ -187,7 +192,7 @@ export async function buildSite(
     for (const [, doc] of componentDefs) {
       const entries = collectServerEntries(doc);
       for (const entry of entries) {
-        const resolvedSrc = "./components/" + entry.src.replace(/^\.\//, "");
+        const resolvedSrc = `./components/${entry.src.replace(/^\.\//, "")}`;
         siteServerEntries.push({
           exportName: entry.exportName,
           src: resolvedSrc,
@@ -225,9 +230,11 @@ export async function buildSite(
       );
 
       // Determine which component tags are fully static (for script omission)
-      const staticTags: Set<string> = new Set();
+      const staticTags = new Set<string>();
       for (const [tag, def] of componentDefs) {
-        if (isComponentFullyStatic(def)) staticTags.add(tag);
+        if (isComponentFullyStatic(def)) {
+          staticTags.add(tag);
+        }
       }
 
       // Inject component CSS and JS scripts
@@ -248,25 +255,29 @@ export async function buildSite(
 
       // Write serialized export sidecars alongside HTML (formats with exportTarget: true)
       for (const fmt of formatRegistry.withCapability("serialize")) {
-        if (!fmt.exportTarget) continue;
+        if (!fmt.exportTarget) {
+          continue;
+        }
         try {
           const content = (await fmt.call("serialize", result.doc, {
-            mode: "export",
-            componentDefs,
-            evaluateTemplate: (value: string, scope: Record<string, unknown>) => {
-              if (!isTemplateString(value)) return undefined;
-              return evaluateStaticTemplate(value, scope) ?? value;
-            },
             buildScope: (state: Record<string, JxStateDefinition>) =>
               buildInitialScope(state, null),
+            componentDefs,
+            evaluateTemplate: (value: string, scope: Record<string, unknown>) => {
+              if (!isTemplateString(value)) {
+                return;
+              }
+              return evaluateStaticTemplate(value, scope) ?? value;
+            },
+            mode: "export",
           })) as string;
           if (content) {
             const sidecarPath = outPath.replace(/\.html$/, fmt.extensions[0]);
             writeFileSync(sidecarPath, content, "utf8");
             fileCount++;
           }
-        } catch (e) {
-          const err = e as Error;
+        } catch (error) {
+          const err = error as Error;
           errors.push(`Error exporting ${fmt.name} for ${route.urlPattern}: ${err.message}`);
         }
       }
@@ -285,8 +296,8 @@ export async function buildSite(
         writeFileSync(serverPath, result.serverHandler, "utf8");
         fileCount++;
       }
-    } catch (e) {
-      const err = e as Error;
+    } catch (error) {
+      const err = error as Error;
       const msg = `Error compiling ${route.urlPattern}: ${err.message}`;
       errors.push(msg);
       console.error(msg);
@@ -310,16 +321,18 @@ export async function buildSite(
 
   // ── 6c. Generate site-wide server worker ────────────────────────────────
   if (projectConfig.build.adapter) {
-    const adapter = projectConfig.build.adapter;
+    const { adapter } = projectConfig.build;
     log("Generating site-wide server worker...");
 
     const deduped = new Map();
     for (const entry of siteServerEntries) {
-      if (!deduped.has(entry.exportName)) deduped.set(entry.exportName, entry);
+      if (!deduped.has(entry.exportName)) {
+        deduped.set(entry.exportName, entry);
+      }
     }
 
     // Cloudflare Pages uses advanced mode (_worker.js inside the build output) — the
-    // functions/ directory convention only works from the project root, not from dist/.
+    // Functions/ directory convention only works from the project root, not from dist/.
     // A static-only Pages site needs no worker at all.
     const skipWorker = adapter === "cloudflare-pages" && deduped.size === 0;
     const workerSource = skipWorker ? null : compileSiteServer([...deduped.values()], { adapter });
@@ -334,7 +347,7 @@ export async function buildSite(
         // Only invoke the worker for server routes; everything else stays static.
         writeFileSync(
           resolve(outDir, "_routes.json"),
-          JSON.stringify({ version: 1, include: ["/_jx/*"], exclude: [] }, null, 2) + "\n",
+          `${JSON.stringify({ exclude: [], include: ["/_jx/*"], version: 1 }, null, 2)}\n`,
           "utf8",
         );
         fileCount++;
@@ -383,7 +396,7 @@ export async function buildSite(
     log(`  ${errors.length} error(s)`);
   }
 
-  return { routes: routes.length, files: fileCount, errors };
+  return { errors, files: fileCount, routes: routes.length };
 }
 
 /**
@@ -409,9 +422,9 @@ async function compilePage(
   route: SiteRoute,
   projectConfig: ProjectConfig,
   projectRoot: string,
-  contentTypes: Map<string, ContentLoaderEntry[]> = new Map(),
+  contentTypes = new Map<string, ContentLoaderEntry[]>(),
   imageCache: import("./image-cache.js").CacheManifest | null = null,
-  componentDefs: Map<string, JxElement> = new Map(),
+  componentDefs = new Map<string, JxElement>(),
   imageMetaCache: ImageMetaCache | null = null,
   formatRegistry?: FormatRegistry,
 ) {
@@ -453,19 +466,21 @@ async function compilePage(
   const resolvedLayoutHead = resolveHeadTemplates(layoutHead, scope);
 
   // Resolve template strings in the document tree (innerHTML, textContent, style, attributes)
-  // so that timing: "compiler" data is baked into the static HTML
+  // So that timing: "compiler" data is baked into the static HTML
   resolveDocTemplates(layoutDoc, scope);
 
   // Expand registered custom elements (apply $props, pre-render, mark static/prerendered)
   expandComponents(layoutDoc, componentDefs);
 
   // Strip resolved timing: "compiler" state entries — they're now baked into the tree
-  // and keeping them would cause isDynamic() to misclassify the page as dynamic.
+  // And keeping them would cause isDynamic() to misclassify the page as dynamic.
   // Also strip resolved content arrays (from ContentCollection) that have been
-  // baked into unrolled map templates.
+  // Baked into unrolled map templates.
   if (layoutDoc.state) {
     for (const [key, def] of Object.entries(layoutDoc.state)) {
-      if (key === "$site" || key === "$page") continue;
+      if (key === "$site" || key === "$page") {
+        continue;
+      }
       if (
         def &&
         typeof def === "object" &&
@@ -485,7 +500,7 @@ async function compilePage(
   // Merge $head from site + layout + page
   const mergedHead = mergeHead(resolvedSiteHead, resolvedLayoutHead, resolvedPageHead, {
     title,
-    charset: projectConfig.defaults?.charset ?? "utf-8",
+    charset: projectConfig.defaults?.charset ?? "utf8",
     ...(projectConfig.name != null && { siteName: projectConfig.name }),
     ...(projectConfig.url != null && { siteUrl: projectConfig.url }),
     pageUrl: route.urlPattern,
@@ -509,9 +524,9 @@ async function compilePage(
 
   // Compile the document using the existing compiler
   const result = await compile(layoutDoc, {
-    title,
     lang: projectConfig.defaults?.lang ?? "en",
     projectStyle: projectConfig.style ?? null,
+    title,
   });
 
   // Post-process: inject merged <head> content into the compiled HTML
@@ -539,10 +554,10 @@ async function compilePage(
   }
 
   return {
-    html: result.html,
-    files: result.files,
-    serverHandler,
     doc: layoutDoc,
+    files: result.files,
+    html: result.html,
+    serverHandler,
   };
 }
 
@@ -555,7 +570,9 @@ async function compilePage(
  */
 function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, unknown>) {
   return headEntries.map((entry: JxHeadEntry) => {
-    if (!entry || typeof entry !== "object") return entry;
+    if (!entry || typeof entry !== "object") {
+      return entry;
+    }
     const resolved = { ...entry };
     if (resolved.attributes) {
       resolved.attributes = { ...resolved.attributes };
@@ -584,7 +601,9 @@ function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, 
  */
 function resolveHeadBareSpecifiers(headEntries: JxHeadEntry[]) {
   return headEntries.map((entry: JxHeadEntry) => {
-    if (!entry || typeof entry !== "object" || !entry.attributes) return entry;
+    if (!entry || typeof entry !== "object" || !entry.attributes) {
+      return entry;
+    }
     const resolved = { ...entry, attributes: { ...entry.attributes } };
     for (const key of ["href", "src"]) {
       const val = resolved.attributes[key];
@@ -615,41 +634,46 @@ function isBareSpecifier(s: string) {
 /**
  * Deep-clone a map template, resolving template strings and $ref values against the given scope.
  *
- * @param {JxMutableNode} template
+ * @param {JxElement} template
  * @param {Record<string, unknown>} scope
- * @returns {JxMutableNode}
+ * @returns {JxElement}
  */
-function expandMapTemplate(template: JxMutableNode, scope: Record<string, unknown>) {
-  if (!template || typeof template !== "object") return template;
-  const node = {} as JxMutableNode;
+function expandMapTemplate(template: JxElement, scope: Record<string, unknown>): JxElement {
+  if (!template || typeof template !== "object") {
+    return template;
+  }
+  const node = {} as JxElement;
   for (const [k, v] of Object.entries(template)) {
     if (k === "children" && Array.isArray(v)) {
       node.children = v.map((child) => {
-        if (typeof child === "string") return child;
+        if (typeof child === "string") {
+          return child;
+        }
         return expandMapTemplate(/** @type {JxMutableNode} */ child, scope);
       });
     } else if (k === "style" && v && typeof v === "object") {
-      const style = { ...v } as Record<string, unknown>;
+      const style: JxStyle = { ...(v as JxStyle) };
       for (const [sk, sv] of Object.entries(style)) {
-        if (typeof sv === "string" && isTemplateString(sv)) {
-          style[sk] = evaluateMapTemplate(sv, scope) ?? sv;
+        if (isTemplateString(sv)) {
+          // Template evaluation yields a substituted scalar for style values.
+          style[sk] = (evaluateMapTemplate(sv, scope) as string | number | undefined) ?? sv;
         }
       }
       node.style = style;
     } else if (k === "attributes" && v && typeof v === "object") {
-      const attrs = { ...v } as Record<string, unknown>;
+      const attrs = { ...(v as Record<string, JxAttributeValue>) };
       for (const [ak, av] of Object.entries(attrs)) {
-        if (typeof av === "string" && isTemplateString(av)) {
-          attrs[ak] = evaluateMapTemplate(av, scope) ?? av;
+        if (isTemplateString(av)) {
+          attrs[ak] = (evaluateMapTemplate(av, scope) as JxAttributeValue | undefined) ?? av;
         }
       }
       node.attributes = attrs;
     } else if (k === "$props" && v && typeof v === "object") {
-      const props = { ...v } as Record<string, unknown>;
+      const props = { ...(v as Record<string, JsonValue>) };
       for (const [pk, pv] of Object.entries(props)) {
-        if (typeof pv === "string" && isTemplateString(pv)) {
-          const resolved = evaluateMapTemplate(pv, scope);
-          // null = evaluation error → keep template string; undefined = missing data → use null
+        if (isTemplateString(pv)) {
+          const resolved = evaluateMapTemplate(pv, scope) as JsonValue | undefined;
+          // Null = evaluation error → keep template string; undefined = missing data → use null
           props[pk] = resolved !== null ? (resolved ?? null) : pv;
         }
       }
@@ -695,14 +719,16 @@ function evaluateMapTemplate(str: string, scope: Record<string, unknown>) {
  * @param {Record<string, unknown>} scope
  */
 function resolveDocTemplates(node: JxElement | string, scope: Record<string, unknown>) {
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
 
   if (typeof node.innerHTML === "string" && isTemplateString(node.innerHTML)) {
     const resolved = evaluateStaticTemplate(node.innerHTML, scope);
     if (resolved != null) {
       // Encode any remaining `${` as HTML entities so the compile phase won't
-      // re-interpret them as template expressions. After resolution, any `${` in the
-      // result is literal content (e.g., code examples), not an intentional template.
+      // Re-interpret them as template expressions. After resolution, any `${` in the
+      // Result is literal content (e.g., code examples), not an intentional template.
       node.innerHTML = String(resolved).replaceAll("${", "&#36;{");
     }
   }
@@ -731,32 +757,26 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
       }
     }
   }
-  const rawChildren = node.children as unknown;
-  if (
-    rawChildren &&
-    typeof rawChildren === "object" &&
-    !Array.isArray(rawChildren) &&
-    (rawChildren as JxMutableNode).$prototype === "Array"
-  ) {
-    const arrayDef = rawChildren as JxMutableNode;
-    const itemsSrc = arrayDef.items;
+  const rawChildren = node.children;
+  if (isMappedArray(rawChildren)) {
+    const itemsSrc = rawChildren.items;
     let items = null;
-    if (itemsSrc && typeof itemsSrc === "object" && (itemsSrc as JxMutableNode).$ref) {
-      const ref = (itemsSrc as JxMutableNode).$ref as string;
-      items = resolveRefValue(ref, scope);
+    if (isRef(itemsSrc)) {
+      items = resolveRefValue(itemsSrc.$ref, scope);
     } else if (Array.isArray(itemsSrc)) {
       items = itemsSrc;
     }
-    if (Array.isArray(items) && arrayDef.map) {
+    const mapTemplate = rawChildren.map;
+    if (Array.isArray(items) && mapTemplate) {
       node.children = items.map((item, index) => {
         const childScope = Object.create(scope);
-        childScope.$map = { item, index };
+        childScope.$map = { index, item };
         childScope["$map/item"] = item;
         childScope["$map/index"] = index;
-        const expanded = expandMapTemplate(arrayDef.map, childScope);
-        resolveDocTemplates(expanded as JxElement, childScope);
+        const expanded = expandMapTemplate(mapTemplate, childScope);
+        resolveDocTemplates(expanded, childScope);
         return expanded;
-      }) as (string | JxElement)[];
+      });
       return;
     }
   }
@@ -799,7 +819,9 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
  * @param {Map<string, JxElement>} componentDefs
  */
 function expandComponents(node: JxElement | string, componentDefs: Map<string, JxElement>) {
-  if (!node || typeof node !== "object") return;
+  if (!node || typeof node !== "object") {
+    return;
+  }
   if (Array.isArray(node)) {
     node.forEach((n) => expandComponents(n, componentDefs));
     return;
@@ -827,17 +849,22 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
 
     // Resolve template-string host styles with props (per-instance values like background-image)
     if (def.style && node.$props) {
-      let stateDefs: Record<string, JxStateDefinition> = { ...def.state };
+      const stateDefs: Record<string, JxStateDefinition> = { ...def.state };
       for (const [key, value] of Object.entries(node.$props)) {
-        if (key in stateDefs) stateDefs[key] = value as JxStateDefinition;
-        else stateDefs[key] = value as JxStateDefinition;
+        if (key in stateDefs) {
+          stateDefs[key] = value as JxStateDefinition;
+        } else {
+          stateDefs[key] = value as JxStateDefinition;
+        }
       }
       const scope = buildInitialScope(stateDefs, null);
       const resolvedStyle: Record<string, unknown> = {};
       for (const [prop, value] of Object.entries(def.style)) {
         if (typeof value === "string" && isTemplateString(value)) {
           const resolved = resolveStaticValue(value, scope);
-          if (resolved != null) resolvedStyle[prop] = resolved;
+          if (resolved != null) {
+            resolvedStyle[prop] = resolved;
+          }
         }
       }
       if (Object.keys(resolvedStyle).length > 0) {
@@ -847,8 +874,11 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
 
     delete node.$props;
 
-    if (isStatic) node.$static = true;
-    else node.$prerendered = true;
+    if (isStatic) {
+      node.$static = true;
+    } else {
+      node.$prerendered = true;
+    }
   }
 }
 
@@ -865,14 +895,16 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
 function injectComponentScripts(
   html: string,
   allComponentTags: string[],
-  cssMap: Map<string, string> = new Map(),
-  staticTags: Set<string> = new Set(),
+  cssMap = new Map<string, string>(),
+  staticTags = new Set<string>(),
 ) {
   // Find which components are actually referenced in this page
   const usedTags = allComponentTags.filter(
-    (tag: string) => html.includes(`<${tag}`), // matches <tag> and <tag ...>
+    (tag: string) => html.includes(`<${tag}`), // Matches <tag> and <tag ...>
   );
-  if (usedTags.length === 0) return html;
+  if (usedTags.length === 0) {
+    return html;
+  }
 
   // Inject CSS links in <head> for ALL components that have CSS sidecars
   const cssLinks = usedTags
@@ -885,7 +917,9 @@ function injectComponentScripts(
 
   // Only inject JS for components that have non-static instances
   const jsTags = usedTags.filter((tag: string) => !staticTags.has(tag));
-  if (jsTags.length === 0) return html;
+  if (jsTags.length === 0) {
+    return html;
+  }
 
   // Build import map (needed for @vue/reactivity and lit-html)
   const importMap = `<script type="importmap">
@@ -942,9 +976,13 @@ function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
   let preservedBlocks = "";
   if (existingMatch) {
     const styles = existingMatch[1].match(/<style>[\s\S]*?<\/style>/gi);
-    if (styles) preservedBlocks += "\n  " + styles.join("\n  ");
+    if (styles) {
+      preservedBlocks += `\n  ${styles.join("\n  ")}`;
+    }
     const scripts = existingMatch[1].match(/<script[\s\S]*?<\/script>/gi);
-    if (scripts) preservedBlocks += "\n  " + scripts.join("\n  ");
+    if (scripts) {
+      preservedBlocks += `\n  ${scripts.join("\n  ")}`;
+    }
   }
   if (headPattern.test(html)) {
     html = html.replace(headPattern, `<head>\n  ${headHtml}${preservedBlocks}\n</head>`);
@@ -984,7 +1022,7 @@ function routeToOutputPath(urlPattern: string, outDir: string, trailingSlash: st
     return join(outDir, segments, "index.html");
   }
 
-  // trailingSlash: "never" or default
+  // TrailingSlash: "never" or default
   return join(outDir, `${segments}.html`);
 }
 
@@ -1034,7 +1072,7 @@ function generateRedirects(
 
   // Write _redirects file (Netlify/Cloudflare format)
   if (redirectLines.length > 0) {
-    writeFileSync(join(outDir, "_redirects"), redirectLines.join("\n") + "\n", "utf8");
+    writeFileSync(join(outDir, "_redirects"), `${redirectLines.join("\n")}\n`, "utf8");
     count++;
   }
 
@@ -1046,7 +1084,7 @@ function generateRedirects(
  * @returns {string}
  */
 function escapeHtml(str: string) {
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 /**
@@ -1054,5 +1092,5 @@ function escapeHtml(str: string) {
  * @returns {string}
  */
 function escapeAttr(str: string) {
-  return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  return String(str).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
 }

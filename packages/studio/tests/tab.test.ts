@@ -2,16 +2,16 @@ import "./with-dom.js";
 import { effect } from "../src/reactivity";
 import { createTab, disposeTab } from "../src/tabs/tab";
 import { seedMarkdownFormat } from "./format-fixture";
-import { test, expect, describe } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 seedMarkdownFormat();
 
 describe("Tab primitive", () => {
   test("createTab returns reactive doc/session/history", () => {
     const tab = createTab({
-      id: "test-1",
+      document: { children: [], tagName: "div" },
       documentPath: "components/button.json",
-      document: { tagName: "div", children: [] },
+      id: "test-1",
     });
 
     expect(tab.id).toBe("test-1");
@@ -29,9 +29,9 @@ describe("Tab primitive", () => {
 
   test("markdown file sets mode to content", () => {
     const tab = createTab({
-      id: "test-md",
-      documentPath: "pages/index.md",
       document: { tagName: "main" },
+      documentPath: "pages/index.md",
+      id: "test-md",
     });
 
     expect(tab.doc.mode).toBe("content");
@@ -40,8 +40,8 @@ describe("Tab primitive", () => {
 
   test("effects track reactive mutations on doc", () => {
     const tab = createTab({
-      id: "test-2",
       document: { tagName: "div" },
+      id: "test-2",
     });
 
     let observed = false;
@@ -59,8 +59,8 @@ describe("Tab primitive", () => {
 
   test("effects track reactive mutations on session", () => {
     const tab = createTab({
-      id: "test-3",
       document: { tagName: "div" },
+      id: "test-3",
     });
 
     let observedSelection: (string | number)[] | null = null;
@@ -78,8 +78,8 @@ describe("Tab primitive", () => {
 
   test("disposeTab stops effects created in tab scope", () => {
     const tab = createTab({
-      id: "test-4",
       document: { tagName: "div" },
+      id: "test-4",
     });
 
     let runs = 0;
@@ -101,8 +101,8 @@ describe("Tab primitive", () => {
   });
 
   test("history snapshot is a deep clone of the document", () => {
-    const doc = { tagName: "div", children: [{ tagName: "p" }] };
-    const tab = createTab({ id: "test-5", document: doc });
+    const doc = { children: [{ tagName: "p" }], tagName: "div" };
+    const tab = createTab({ document: doc, id: "test-5" });
 
     doc.children.push({ tagName: "span" });
     expect(tab.history.snapshots[0].document.children).toHaveLength(1);
@@ -112,10 +112,10 @@ describe("Tab primitive", () => {
 
   test("frontmatter is stored in doc.content", () => {
     const tab = createTab({
-      id: "test-6",
-      documentPath: "pages/about.md",
       document: { tagName: "main" },
-      frontmatter: { title: "About", layout: "default" },
+      documentPath: "pages/about.md",
+      frontmatter: { layout: "default", title: "About" },
+      id: "test-6",
     });
 
     expect(tab.doc.content.frontmatter.title).toBe("About");

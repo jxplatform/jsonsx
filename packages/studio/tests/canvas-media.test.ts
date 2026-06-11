@@ -1,10 +1,10 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
-  parseMediaEntries,
   activeBreakpointsForWidth,
   applyCanvasStyle,
   applyOverridesToCanvas,
+  parseMediaEntries,
 } from "../src/utils/canvas-media";
 
 // ─── parseMediaEntries ──────────────────────────────────────────────────────
@@ -12,14 +12,14 @@ import {
 describe("parseMediaEntries", () => {
   test("returns defaults for null/undefined input", () => {
     expect(parseMediaEntries(null)).toEqual({
-      sizeBreakpoints: [],
-      featureQueries: [],
       baseWidth: 320,
+      featureQueries: [],
+      sizeBreakpoints: [],
     });
-    expect(parseMediaEntries(undefined)).toEqual({
-      sizeBreakpoints: [],
-      featureQueries: [],
+    expect(parseMediaEntries()).toEqual({
       baseWidth: 320,
+      featureQueries: [],
+      sizeBreakpoints: [],
     });
   });
 
@@ -41,28 +41,28 @@ describe("parseMediaEntries", () => {
     expect(result.sizeBreakpoints[0]).toEqual({
       name: "--lg",
       query: "(max-width: 1024px)",
-      width: 1024,
       type: "max",
+      width: 1024,
     });
     expect(result.sizeBreakpoints[1]).toEqual({
       name: "--md",
       query: "(max-width: 768px)",
-      width: 768,
       type: "max",
+      width: 768,
     });
     expect(result.sizeBreakpoints[2]).toEqual({
       name: "--sm",
       query: "(max-width: 640px)",
-      width: 640,
       type: "max",
+      width: 640,
     });
   });
 
   test("classifies min-width entries as size breakpoints", () => {
     const result = parseMediaEntries({
       "--": "320px",
-      "--md": "(min-width: 768px)",
       "--lg": "(min-width: 1024px)",
+      "--md": "(min-width: 768px)",
     });
     expect(result.sizeBreakpoints).toHaveLength(2);
     expect(result.sizeBreakpoints[0].name).toBe("--md");
@@ -72,9 +72,9 @@ describe("parseMediaEntries", () => {
 
   test("sorts max-width breakpoints from largest to smallest", () => {
     const result = parseMediaEntries({
-      "--sm": "(max-width: 640px)",
       "--lg": "(max-width: 1024px)",
       "--md": "(max-width: 768px)",
+      "--sm": "(max-width: 640px)",
     });
     expect(result.sizeBreakpoints.map((b) => b.name)).toEqual(["--lg", "--md", "--sm"]);
   });
@@ -109,9 +109,9 @@ describe("parseMediaEntries", () => {
 
 describe("activeBreakpointsForWidth", () => {
   const maxWidthBreakpoints = [
-    { name: "--lg", query: "(max-width: 1024px)", width: 1024, type: "max" },
-    { name: "--md", query: "(max-width: 768px)", width: 768, type: "max" },
-    { name: "--sm", query: "(max-width: 640px)", width: 640, type: "max" },
+    { name: "--lg", query: "(max-width: 1024px)", type: "max", width: 1024 },
+    { name: "--md", query: "(max-width: 768px)", type: "max", width: 768 },
+    { name: "--sm", query: "(max-width: 640px)", type: "max", width: 640 },
   ];
 
   test("no breakpoints active at base width (wider than all)", () => {
@@ -147,8 +147,8 @@ describe("activeBreakpointsForWidth", () => {
 
   test("min-width breakpoints activate at or above threshold", () => {
     const minWidthBreakpoints = [
-      { name: "--md", query: "(min-width: 768px)", width: 768, type: "min" },
-      { name: "--lg", query: "(min-width: 1024px)", width: 1024, type: "min" },
+      { name: "--md", query: "(min-width: 768px)", type: "min", width: 768 },
+      { name: "--lg", query: "(min-width: 1024px)", type: "min", width: 1024 },
     ];
     expect(activeBreakpointsForWidth(minWidthBreakpoints, 320).size).toBe(0);
     expect(activeBreakpointsForWidth(minWidthBreakpoints, 768).has("--md")).toBe(true);
@@ -182,8 +182,8 @@ describe("applyCanvasStyle", () => {
   test("applies media override when breakpoint is active", () => {
     const el = document.createElement("div");
     const style = {
-      gridTemplateColumns: "1fr 1fr 1fr",
       "@--md": { gridTemplateColumns: "1fr" },
+      gridTemplateColumns: "1fr 1fr 1fr",
     };
     applyCanvasStyle(el, style, new Set(["--md"]), {});
     expect(el.style.gridTemplateColumns).toBe("1fr");
@@ -192,8 +192,8 @@ describe("applyCanvasStyle", () => {
   test("does NOT apply media override when breakpoint is inactive", () => {
     const el = document.createElement("div");
     const style = {
-      gridTemplateColumns: "1fr 1fr 1fr",
       "@--md": { gridTemplateColumns: "1fr" },
+      gridTemplateColumns: "1fr 1fr 1fr",
     };
     applyCanvasStyle(el, style, new Set(), {});
     expect(el.style.gridTemplateColumns).toBe("1fr 1fr 1fr");
@@ -202,8 +202,8 @@ describe("applyCanvasStyle", () => {
   test("applies feature toggle override", () => {
     const el = document.createElement("div");
     const style = {
-      backgroundColor: "white",
       "@--dark": { backgroundColor: "black" },
+      backgroundColor: "white",
     };
     applyCanvasStyle(el, style, new Set(), { "--dark": true });
     expect(el.style.backgroundColor).toBe("black");
@@ -212,8 +212,8 @@ describe("applyCanvasStyle", () => {
   test("does NOT apply feature toggle when toggle is off", () => {
     const el = document.createElement("div");
     const style = {
-      backgroundColor: "white",
       "@--dark": { backgroundColor: "black" },
+      backgroundColor: "white",
     };
     applyCanvasStyle(el, style, new Set(), { "--dark": false });
     expect(el.style.backgroundColor).toBe("white");
@@ -222,11 +222,11 @@ describe("applyCanvasStyle", () => {
   test("media override beats base style (last-write-wins)", () => {
     const el = document.createElement("div");
     const style = {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: "2rem",
       "@--md": { gridTemplateColumns: "1fr" },
       "@--sm": { gap: "1rem" },
+      display: "grid",
+      gap: "2rem",
+      gridTemplateColumns: "1fr 1fr 1fr",
     };
     applyCanvasStyle(el, style, new Set(["--md", "--sm"]), {});
     expect(el.style.gridTemplateColumns).toBe("1fr");
@@ -244,8 +244,8 @@ describe("applyCanvasStyle", () => {
   test("ignores @-- key (base width marker)", () => {
     const el = document.createElement("div");
     const style = {
-      color: "red",
       "@--": { color: "blue" },
+      color: "red",
     };
     applyCanvasStyle(el, style, new Set(["--"]), {});
     expect(el.style.color).toBe("red");
@@ -258,9 +258,9 @@ describe("applyOverridesToCanvas", () => {
   test("applies override properties to matching data-jx elements", () => {
     const canvas = document.createElement("div");
     const child = document.createElement("div");
-    child.setAttribute("data-jx", "jx-abc12");
+    child.dataset.jx = "jx-abc12";
     child.style.gridTemplateColumns = "1fr 1fr 1fr";
-    canvas.appendChild(child);
+    canvas.append(child);
 
     const overrides = new Map();
     overrides.set("jx-abc12", new Map([["grid-template-columns", "1fr"]]));
@@ -273,10 +273,10 @@ describe("applyOverridesToCanvas", () => {
     const canvas = document.createElement("div");
     const el1 = document.createElement("div");
     const el2 = document.createElement("div");
-    el1.setAttribute("data-jx", "jx-same1");
-    el2.setAttribute("data-jx", "jx-same1");
-    canvas.appendChild(el1);
-    canvas.appendChild(el2);
+    el1.dataset.jx = "jx-same1";
+    el2.dataset.jx = "jx-same1";
+    canvas.append(el1);
+    canvas.append(el2);
 
     const overrides = new Map();
     overrides.set("jx-same1", new Map([["color", "red"]]));
@@ -289,9 +289,9 @@ describe("applyOverridesToCanvas", () => {
   test("does not affect elements without matching data-jx", () => {
     const canvas = document.createElement("div");
     const el = document.createElement("div");
-    el.setAttribute("data-jx", "jx-other");
+    el.dataset.jx = "jx-other";
     el.style.color = "blue";
-    canvas.appendChild(el);
+    canvas.append(el);
 
     const overrides = new Map();
     overrides.set("jx-nomatch", new Map([["color", "red"]]));
@@ -303,8 +303,8 @@ describe("applyOverridesToCanvas", () => {
   test("applies multiple properties from one override entry", () => {
     const canvas = document.createElement("div");
     const el = document.createElement("div");
-    el.setAttribute("data-jx", "jx-multi");
-    canvas.appendChild(el);
+    el.dataset.jx = "jx-multi";
+    canvas.append(el);
 
     const overrides = new Map();
     overrides.set(
@@ -325,9 +325,9 @@ describe("applyOverridesToCanvas", () => {
   test("handles empty overrides map gracefully", () => {
     const canvas = document.createElement("div");
     const el = document.createElement("div");
-    el.setAttribute("data-jx", "jx-test1");
+    el.dataset.jx = "jx-test1";
     el.style.color = "blue";
-    canvas.appendChild(el);
+    canvas.append(el);
 
     applyOverridesToCanvas(canvas, new Map());
     expect(el.style.color).toBe("blue");
@@ -336,9 +336,9 @@ describe("applyOverridesToCanvas", () => {
   test("scopes to elements within canvasEl only", () => {
     const canvas = document.createElement("div");
     const outside = document.createElement("div");
-    outside.setAttribute("data-jx", "jx-out1");
+    outside.dataset.jx = "jx-out1";
     outside.style.color = "blue";
-    document.body.appendChild(outside);
+    document.body.append(outside);
 
     const overrides = new Map();
     overrides.set("jx-out1", new Map([["color", "red"]]));
@@ -394,10 +394,10 @@ describe("parseMediaEntries + activeBreakpointsForWidth integration", () => {
   test("services grid renders 3 columns on Base, 1 column on Md", () => {
     const { sizeBreakpoints } = parseMediaEntries(burntRockMedia);
     const servicesStyle = {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
-      gap: "2rem",
       "@--md": { gridTemplateColumns: "1fr" },
+      display: "grid",
+      gap: "2rem",
+      gridTemplateColumns: "1fr 1fr 1fr",
     };
 
     // Base canvas

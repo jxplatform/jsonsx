@@ -50,7 +50,7 @@ export function renderStylebookLayersTemplate(ctx: {
       depth: number = 0,
       parentPath: string = "",
     ): import("lit-html").TemplateResult => {
-      const tag = entry.tag;
+      const { tag } = entry;
       const fullPath = parentPath ? `${parentPath} ${tag}` : tag;
       const uniqueChildren = entry.children
         ? [...new Map(entry.children.map((c: StylebookEntry) => [c.tag, c])).values()]
@@ -109,27 +109,26 @@ export function renderStylebookLayersTemplate(ctx: {
       `,
     );
     return html`${elementRows}${compRows}`;
-  } else {
-    const style = rootStyle;
-    const vars = Object.entries(style).filter(([k]) => k.startsWith("--"));
-    if (vars.length === 0) {
-      return html`<div style="padding:16px;text-align:center;color:var(--fg-dim);font-size:12px">
-        No variables defined
-      </div>`;
-    }
-    return html`${vars.map(
-      ([k, v]) => html`
-        <div class="layer-row">
-          <span class="layer-tag" style="font-size:10px;font-family:'SF Mono','Fira Code',monospace"
-            >var</span
-          >
-          <span class="layer-label">${k}</span>
-          <span
-            style="font-size:11px;color:var(--fg-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px"
-            >${String(v)}</span
-          >
-        </div>
-      `,
-    )}`;
   }
+  const style = rootStyle;
+  const vars = Object.entries(style).filter(([k]) => k.startsWith("--"));
+  if (vars.length === 0) {
+    return html`<div style="padding:16px;text-align:center;color:var(--fg-dim);font-size:12px">
+      No variables defined
+    </div>`;
+  }
+  return html`${vars.map(
+    ([k, v]) => html`
+      <div class="layer-row">
+        <span class="layer-tag" style="font-size:10px;font-family:'SF Mono','Fira Code',monospace"
+          >var</span
+        >
+        <span class="layer-label">${k}</span>
+        <span
+          style="font-size:11px;color:var(--fg-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px"
+          >${String(v)}</span
+        >
+      </div>
+    `,
+  )}`;
 }

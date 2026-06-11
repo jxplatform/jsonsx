@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect, mock, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { registerPlatform } from "../src/platform";
 import type { StudioPlatform } from "../src/types";
 
@@ -79,7 +79,7 @@ describe("fetchPluginSchema", () => {
 
   test("returns null when platform has no fetchPluginSchema", async () => {
     registerPlatform({} as unknown as StudioPlatform);
-    const result = await fetchPluginSchema({ $src: "./foo.js", $prototype: "Foo" }, {});
+    const result = await fetchPluginSchema({ $prototype: "Foo", $src: "./foo.js" }, {});
     expect(result).toBeNull();
     expect(pluginSchemaCache.get("./foo.js::Foo")).toBeNull();
   });
@@ -91,7 +91,7 @@ describe("fetchPluginSchema", () => {
       fetchPluginSchema: mockFn,
     } as unknown as StudioPlatform);
     const result = await fetchPluginSchema(
-      { $src: "./DataSource.class.json", $prototype: "DataSource" },
+      { $prototype: "DataSource", $src: "./DataSource.class.json" },
       { documentPath: "pages/index.json" },
     );
     expect(result).toEqual(schema);
@@ -104,7 +104,7 @@ describe("fetchPluginSchema", () => {
     registerPlatform({
       fetchPluginSchema: mockFn,
     } as unknown as StudioPlatform);
-    const def = { $src: "./cached.js", $prototype: "Cached" };
+    const def = { $prototype: "Cached", $src: "./cached.js" };
     await fetchPluginSchema(def, {});
     await fetchPluginSchema(def, {});
     expect(mockFn).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe("fetchPluginSchema", () => {
     registerPlatform({
       fetchPluginSchema: mockFn,
     } as unknown as StudioPlatform);
-    const def = { $src: "./err.js", $prototype: "Err" };
+    const def = { $prototype: "Err", $src: "./err.js" };
     const result = await fetchPluginSchema(def, {});
     expect(result).toBeNull();
     expect(pluginSchemaCache.get("./err.js::Err")).toBeNull();
@@ -138,11 +138,11 @@ describe("setLintMarkers", () => {
     const editor = { getModel: () => model } as any;
     const diagnostics = [
       {
-        severity: "error",
-        message: "Unused variable",
-        help: "Remove it",
-        labels: [{ span: { line: 5, column: 3, length: 4 } }],
         code: "no-unused-vars",
+        help: "Remove it",
+        labels: [{ span: { column: 3, length: 4, line: 5 } }],
+        message: "Unused variable",
+        severity: "error",
         url: null,
       },
     ] as any;
@@ -163,10 +163,10 @@ describe("setLintMarkers", () => {
     const editor = { getModel: () => ({}) } as any;
     const diagnostics = [
       {
-        severity: "warning",
-        message: "Prefer const",
-        labels: [{ span: { line: 1, column: 1, length: 3 } }],
         code: "prefer-const",
+        labels: [{ span: { column: 1, length: 3, line: 1 } }],
+        message: "Prefer const",
+        severity: "warning",
         url: "https://docs.example.com",
       },
     ];
@@ -180,13 +180,13 @@ describe("setLintMarkers", () => {
   test("filters diagnostics without labels", () => {
     const editor = { getModel: () => ({}) } as any;
     const diagnostics = [
-      { severity: "error", message: "No labels", labels: [] },
-      { severity: "error", message: "Null labels", labels: null },
+      { labels: [], message: "No labels", severity: "error" },
+      { labels: null, message: "Null labels", severity: "error" },
       {
-        severity: "error",
-        message: "With label",
-        labels: [{ span: { line: 1, column: 1, length: 1 } }],
         code: "x",
+        labels: [{ span: { column: 1, length: 1, line: 1 } }],
+        message: "With label",
+        severity: "error",
       },
     ] as any;
     setLintMarkers(editor, diagnostics);
@@ -200,7 +200,7 @@ describe("setLintMarkers", () => {
 
 describe("getFunctionArgs", () => {
   test("returns parameters from state def", () => {
-    const editing = { type: "def", defName: "onClick" };
+    const editing = { defName: "onClick", type: "def" };
     const document = {
       state: { onClick: { parameters: ["state", "event", "el"] } },
     };
@@ -208,22 +208,22 @@ describe("getFunctionArgs", () => {
   });
 
   test("returns default when state def has no parameters", () => {
-    const editing = { type: "def", defName: "handler" };
+    const editing = { defName: "handler", type: "def" };
     const document = { state: { handler: {} } };
     expect(getFunctionArgs(editing, document)).toEqual(["state", "event"]);
   });
 
   test("returns default when state def not found", () => {
-    const editing = { type: "def", defName: "missing" };
+    const editing = { defName: "missing", type: "def" };
     const document = { state: {} };
     expect(getFunctionArgs(editing, document)).toEqual(["state", "event"]);
   });
 
   test("returns parameters from event node", () => {
     const editing = {
-      type: "event",
-      path: ["children", 0],
       eventKey: "onclick",
+      path: ["children", 0],
+      type: "event",
     };
     const document = { children: [{ onclick: { parameters: ["state"] } }] };
     expect(getFunctionArgs(editing, document)).toEqual(["state"]);

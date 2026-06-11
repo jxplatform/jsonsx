@@ -5,12 +5,12 @@
 
 import {
   createSession,
-  sendMessage,
-  streamSession,
-  stopSession,
   deleteSession,
   getAuthStatus,
   getSession,
+  sendMessage,
+  stopSession,
+  streamSession,
 } from "@jxsuite/server/claude-session";
 
 /**
@@ -22,7 +22,9 @@ export async function handleAiRoute(
   path: string,
   projectRoot: string,
 ): Promise<Response | null> {
-  if (!path.startsWith("/studio/ai/")) return null;
+  if (!path.startsWith("/studio/ai/")) {
+    return null;
+  }
 
   if (path === "/studio/ai/auth-status" && req.method === "GET") {
     const status = await getAuthStatus();
@@ -39,9 +41,9 @@ export async function handleAiRoute(
         ...(body.systemPrompt != null && { systemPrompt: body.systemPrompt }),
       });
       return Response.json(result);
-    } catch (err: unknown) {
+    } catch (error: unknown) {
       return Response.json(
-        { error: err instanceof Error ? err.message : String(err) },
+        { error: error instanceof Error ? error.message : String(error) },
         { status: 500 },
       );
     }
@@ -62,9 +64,9 @@ export async function handleAiRoute(
       const body = (await req.json()) as { message: string };
       sendMessage(id, body.message);
       return Response.json({ ok: true });
-    } catch (err: unknown) {
+    } catch (error: unknown) {
       return Response.json(
-        { error: err instanceof Error ? err.message : String(err) },
+        { error: error instanceof Error ? error.message : String(error) },
         { status: 500 },
       );
     }
@@ -85,7 +87,9 @@ export async function handleAiRoute(
   if (path.startsWith("/studio/ai/session/") && req.method === "GET") {
     const id = path.split("/")[4];
     const info = getSession(id);
-    if (!info) return Response.json({ error: "Not found" }, { status: 404 });
+    if (!info) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
     return Response.json(info);
   }
 

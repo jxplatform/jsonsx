@@ -10,10 +10,10 @@ import jxSchema from "@jxsuite/schema/schema.json";
 import projectSchema from "@jxsuite/schema/project-schema.json";
 
 const WORKER_PATHS: Record<string, string> = {
+  editorWorkerService: "/monaco-editor/esm/vs/editor/editor.worker.js",
+  javascript: "/monaco-editor/esm/vs/language/typescript/ts.worker.js",
   json: "/monaco-editor/esm/vs/language/json/json.worker.js",
   typescript: "/monaco-editor/esm/vs/language/typescript/ts.worker.js",
-  javascript: "/monaco-editor/esm/vs/language/typescript/ts.worker.js",
-  editorWorkerService: "/monaco-editor/esm/vs/editor/editor.worker.js",
 };
 
 self.MonacoEnvironment = {
@@ -24,11 +24,9 @@ self.MonacoEnvironment = {
 };
 
 jsonDefaults.setDiagnosticsOptions({
-  validate: true,
   allowComments: false,
   schemas: [
     {
-      uri: "https://jxsuite.com/schema/v1",
       fileMatch: [
         "pages/*.json",
         "pages/**/*.json",
@@ -40,11 +38,13 @@ jsonDefaults.setDiagnosticsOptions({
         "elements/**/*.json",
       ],
       schema: jxSchema,
+      uri: "https://jxsuite.com/schema/v1",
     },
     {
-      uri: "https://jxsuite.com/schema/project/v1",
       fileMatch: ["project.json"],
       schema: projectSchema,
+      uri: "https://jxsuite.com/schema/project/v1",
     },
   ],
+  validate: true,
 });

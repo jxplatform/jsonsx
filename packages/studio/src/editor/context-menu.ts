@@ -3,15 +3,15 @@
 import { html } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { htmlToJx } from "@jxsuite/parser/html-to-jx";
-import { getNodeAtPath, parentElementPath, childIndex } from "../store";
+import { childIndex, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab, workspace } from "../workspace/workspace";
 import {
-  transactDoc,
+  mutateDuplicateNode,
   mutateInsertNode,
   mutateRemoveNode,
-  mutateDuplicateNode,
-  mutateWrapNode,
   mutateReplaceStyle,
+  mutateWrapNode,
+  transactDoc,
 } from "../tabs/transact";
 import { statusMessage } from "../panels/statusbar";
 import { convertToComponent } from "./convert-to-component";
@@ -30,25 +30,33 @@ type JxNode = JxMutableNode;
 const JX_MIME = "web application/jx+json";
 
 /** @param {JxNode | string} node */
-function nodeToHtml(node: JxNode | string) {
-  if (typeof node === "string") return node;
+function nodeToHtml(node: JxNode | string): string {
+  if (typeof node === "string") {
+    return node;
+  }
   const tag = node.tagName || "div";
   let attrs = "";
   if (node.attributes) {
     for (const [k, v] of Object.entries(node.attributes)) {
-      attrs += v === "" ? ` ${k}` : ` ${k}="${v.replace(/"/g, "&quot;")}"`;
+      // Bound ($ref) attribute values have no static HTML representation — skip.
+      if (typeof v === "object") {
+        continue;
+      }
+      attrs += v === "" ? ` ${k}` : ` ${k}="${String(v).replaceAll('"', "&quot;")}"`;
     }
   }
   if (node.style) {
     const css = Object.entries(node.style)
       .map(([k, v]) => `${k}:${v}`)
       .join(";");
-    if (css) attrs += ` style="${css.replace(/"/g, "&quot;")}"`;
+    if (css) {
+      attrs += ` style="${css.replaceAll('"', "&quot;")}"`;
+    }
   }
   let inner = "";
-  if (node.textContent) {
+  if (typeof node.textContent === "string") {
     inner = node.textContent;
-  } else if (node.children) {
+  } else if (Array.isArray(node.children)) {
     inner = node.children.map((c) => nodeToHtml(c)).join("");
   }
   return `<${tag}${attrs}>${inner}</${tag}>`;
@@ -73,7 +81,7 @@ async function writeToClipboard(json: Record<string, unknown>) {
     try {
       await navigator.clipboard.writeText(JSON.stringify(json));
     } catch {
-      // clipboard API unavailable — workspace.clipboard is the fallback
+      // Clipboard API unavailable — workspace.clipboard is the fallback
     }
   }
 }
@@ -99,7 +107,9 @@ async function readFromClipboard() {
         const jxNodes = nodes.map((n) =>
           typeof n === "string" ? { tagName: "p", textContent: n } : n,
         ) as JxNode[];
-        if (jxNodes.length > 0) return jxNodes;
+        if (jxNodes.length > 0) {
+          return jxNodes;
+        }
       }
       if (item.types.includes("text/plain")) {
         const blob = await item.getType("text/plain");
@@ -107,15 +117,19 @@ async function readFromClipboard() {
         // Try parsing as Jx JSON
         try {
           const parsed = JSON.parse(text);
-          if (parsed && parsed.tagName) return [parsed];
+          if (parsed && parsed.tagName) {
+            return [parsed];
+          }
         } catch {
-          // plain text → paragraph node
+          // Plain text → paragraph node
         }
-        if (text.trim()) return [{ tagName: "p", textContent: text.trim() }];
+        if (text.trim()) {
+          return [{ tagName: "p", textContent: text.trim() }];
+        }
       }
     }
   } catch {
-    // clipboard API unavailable — use workspace fallback
+    // Clipboard API unavailable — use workspace fallback
     if (workspace.clipboard) {
       return [JSON.parse(JSON.stringify(workspace.clipboard))];
     }
@@ -127,9 +141,13 @@ async function readFromClipboard() {
 
 export async function copyNode() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) return;
+  if (!tab?.session.selection) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
   const json = JSON.parse(JSON.stringify(node));
   await writeToClipboard(json);
   statusMessage("Copied");
@@ -137,10 +155,14 @@ export async function copyNode() {
 
 export async function cutNode() {
   const tab = activeTab.value;
-  if (!tab?.session.selection || tab.session.selection.length < 2) return;
+  if (!tab?.session.selection || tab.session.selection.length < 2) {
+    return;
+  }
   const sel = tab.session.selection;
   const node = getNodeAtPath(tab.doc.document, sel);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
   const json = JSON.parse(JSON.stringify(node));
   await writeToClipboard(json);
   transactDoc(tab, (t) => mutateRemoveNode(t, sel));
@@ -149,14 +171,20 @@ export async function cutNode() {
 
 export async function pasteNode() {
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
 
   const nodes = await readFromClipboard();
-  if (!nodes || nodes.length === 0) return;
+  if (!nodes || nodes.length === 0) {
+    return;
+  }
 
   const pPath = tab.session.selection || [];
   const parent = getNodeAtPath(tab.doc.document, pPath);
-  if (!parent) return;
+  if (!parent) {
+    return;
+  }
 
   if (tab.session.selection && tab.session.selection.length >= 2) {
     const pp = parentElementPath(tab.session.selection) as JxPath;
@@ -167,7 +195,7 @@ export async function pasteNode() {
       }
     });
   } else {
-    const idx = parent.children ? parent.children.length : 0;
+    const idx = Array.isArray(parent.children) ? parent.children.length : 0;
     transactDoc(tab, (t) => {
       for (let i = 0; i < nodes.length; i++) {
         mutateInsertNode(t, pPath, idx + i, nodes[i]);
@@ -179,17 +207,25 @@ export async function pasteNode() {
 
 export function copyStyles() {
   const tab = activeTab.value;
-  if (!tab?.session.selection) return;
+  if (!tab?.session.selection) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node?.style) return;
+  if (!node?.style) {
+    return;
+  }
   workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
   statusMessage("Styles copied");
 }
 
 export function pasteStyles() {
-  if (!workspace.styleClipboard) return;
+  if (!workspace.styleClipboard) {
+    return;
+  }
   const tab = activeTab.value;
-  if (!tab?.session.selection) return;
+  if (!tab?.session.selection) {
+    return;
+  }
   const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
   const sel = tab.session.selection as JxPath;
   transactDoc(tab, (t) => mutateReplaceStyle(t, sel, style));
@@ -225,9 +261,13 @@ export function showContextMenu(
   dismissContextMenu();
 
   const tab = activeTab.value;
-  if (!tab) return;
+  if (!tab) {
+    return;
+  }
   const node = getNodeAtPath(tab.doc.document, path);
-  if (!node) return;
+  if (!node) {
+    return;
+  }
 
   // Select the node
   tab.session.selection = path;
@@ -235,72 +275,74 @@ export function showContextMenu(
   /** @type {{ label: string; action?: () => void; danger?: boolean }[]} */
   const items = [];
 
-  items.push({ label: "Copy", action: () => copyNode() });
+  items.push({ action: () => copyNode(), label: "Copy" });
   if (path.length >= 2) {
-    items.push({ label: "Cut", action: () => cutNode() });
+    items.push({ action: () => cutNode(), label: "Cut" });
     items.push({
-      label: "Duplicate",
       action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
+      label: "Duplicate",
     });
     if (node.style) {
       items.push({
-        label: "Copy styles",
         action: () => {
           workspace.styleClipboard = JSON.parse(JSON.stringify(node.style));
           statusMessage("Styles copied");
         },
+        label: "Copy styles",
       });
     }
     if (workspace.styleClipboard) {
       items.push({
-        label: "Paste styles",
         action: () => {
-          if (!workspace.styleClipboard) return;
+          if (!workspace.styleClipboard) {
+            return;
+          }
           const style = JSON.parse(JSON.stringify(workspace.styleClipboard));
           transactDoc(activeTab.value, (t) => mutateReplaceStyle(t, path, style));
           statusMessage("Styles pasted");
         },
+        label: "Paste styles",
       });
     }
-    items.push({ label: "—" }); // separator
+    items.push({ label: "—" }); // Separator
     items.push({
+      action: () => {
+        const pp = parentElementPath(path) as JxPath;
+        const idx = childIndex(path) as number;
+        transactDoc(activeTab.value, (t) =>
+          mutateInsertNode(t, pp, idx, { children: [], tagName: "p" }),
+        );
+      },
       label: "Insert before",
+    });
+    items.push({
       action: () => {
         const pp = parentElementPath(path) as JxPath;
         const idx = childIndex(path) as number;
         transactDoc(activeTab.value, (t) =>
-          mutateInsertNode(t, pp, idx, { tagName: "p", children: [] }),
+          mutateInsertNode(t, pp, idx + 1, { children: [], tagName: "p" }),
         );
       },
-    });
-    items.push({
       label: "Insert after",
-      action: () => {
-        const pp = parentElementPath(path) as JxPath;
-        const idx = childIndex(path) as number;
-        transactDoc(activeTab.value, (t) =>
-          mutateInsertNode(t, pp, idx + 1, { tagName: "p", children: [] }),
-        );
-      },
     });
     items.push({
-      label: "Wrap in Div",
       action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
+      label: "Wrap in Div",
     });
     // Don't show Repeat if already inside a repeater (path ends with "children", "map")
-    if (
-      !(path.length >= 2 && path[path.length - 2] === "children" && path[path.length - 1] === "map")
-    ) {
+    if (!(path.length >= 2 && path.at(-2) === "children" && path.at(-1) === "map")) {
       items.push({
-        label: "Repeat...",
         action: () => convertToRepeater(),
+        label: "Repeat...",
       });
     }
     items.push({
-      label: "Set Title",
       action: () => {
-        if (opts.rerender) startLayerTitleEdit(path, opts.rerender);
+        if (opts.rerender) {
+          startLayerTitleEdit(path, opts.rerender);
+        }
       },
+      label: "Set Title",
     });
     if (node.tagName) {
       const isComponent =
@@ -313,31 +355,32 @@ export function showContextMenu(
           (/** @type {{ tagName: string; path: string }} */ c) => c.tagName === node.tagName,
         );
         items.push({
-          label: "Edit Component",
           action: () => opts.onEditComponent?.(comp?.path as string),
+          label: "Edit Component",
         });
       } else if (!isComponent) {
         items.push({
-          label: "Convert to Component",
           action: () => convertToComponent(),
+          label: "Convert to Component",
         });
       }
     }
-    items.push({ label: "—" }); // separator
+    items.push({ label: "—" }); // Separator
     items.push({
-      label: "Delete",
       action: () => transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path)),
       danger: true,
+      label: "Delete",
     });
   }
   if (path.length >= 2) {
     items.push({ label: "—" });
     items.push({
-      label: "Paste inside",
       action: async () => {
         const nodes = await readFromClipboard();
-        if (!nodes || nodes.length === 0) return;
-        const idx = node.children ? node.children.length : 0;
+        if (!nodes || nodes.length === 0) {
+          return;
+        }
+        const idx = Array.isArray(node.children) ? node.children.length : 0;
         transactDoc(activeTab.value, (t) => {
           for (let i = 0; i < nodes.length; i++) {
             mutateInsertNode(t, path, idx + i, nodes[i]);
@@ -345,12 +388,14 @@ export function showContextMenu(
         });
         statusMessage("Pasted");
       },
+      label: "Paste inside",
     });
     items.push({
-      label: "Paste after",
       action: async () => {
         const nodes = await readFromClipboard();
-        if (!nodes || nodes.length === 0) return;
+        if (!nodes || nodes.length === 0) {
+          return;
+        }
         const pp = parentElementPath(path) as JxPath;
         const idx = childIndex(path) as number;
         transactDoc(activeTab.value, (t) => {
@@ -360,6 +405,7 @@ export function showContextMenu(
         });
         statusMessage("Pasted");
       },
+      label: "Paste after",
     });
   }
 
@@ -371,13 +417,18 @@ export function showContextMenu(
       open
       style="position:fixed;z-index:10000;left:${x}px;top:${y}px"
       ${ref((el) => {
-        if (!el) return;
+        if (!el) {
+          return;
+        }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
           const menuRect = popover.getBoundingClientRect();
-          if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4;
-          if (y + menuRect.height > window.innerHeight)
+          if (x + menuRect.width > window.innerWidth) {
+            x = window.innerWidth - menuRect.width - 4;
+          }
+          if (y + menuRect.height > window.innerHeight) {
             y = window.innerHeight - menuRect.height - 4;
+          }
           popover.style.left = `${x}px`;
           popover.style.top = `${y}px`;
         });

@@ -5,15 +5,15 @@ import { html } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { debouncedStyleCommit } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateUpdateStyle } from "../tabs/transact";
+import { mutateUpdateStyle, transactDoc } from "../tabs/transact";
 import { widgetForType as _widgetForType } from "../ui/widgets";
-import { kebabToLabel, friendlyNameToVar, varDisplayName } from "../utils/studio-utils";
+import { friendlyNameToVar, kebabToLabel, varDisplayName } from "../utils/studio-utils";
 import {
   TYPO_PREVIEW_PROPS,
-  currentFontFamily,
-  getFontVars,
-  getCssInitialMap,
   camelToKebab,
+  currentFontFamily,
+  getCssInitialMap,
+  getFontVars,
 } from "./style-utils";
 
 /**
@@ -38,7 +38,7 @@ export function renderKeywordInput(
       ? kebabToLabel(v)
       : v.replace(/^./, (c: string) => c.toUpperCase());
     const style = isTypoPreview ? `${cssProp}: ${v};${font ? ` font-family: ${font}` : ""}` : "";
-    return { value: v, label, style };
+    return { label, style, value: v };
   });
 
   return html`<jx-value-selector
@@ -54,16 +54,17 @@ export function renderKeywordInput(
 }
 
 /**
- * @param {{ enum?: string[] }} entry @param {string} prop @param {string} value @param {(value:
- *   string) => void} onChange
+ * @param {Record<string, unknown>} entry @param {string} prop @param {string | number | undefined}
+ *   value @param {(value: string) => void} onChange
  */
 export function renderSelectInput(
-  entry: { enum?: string[] },
+  entry: Record<string, unknown>,
   prop: string,
-  value: string,
+  value: string | number | undefined,
   onChange: (value: string) => void,
 ) {
-  return renderKeywordInput(entry.enum || [], prop, value, onChange);
+  const options = Array.isArray(entry.enum) ? (entry.enum as string[]) : [];
+  return renderKeywordInput(options, prop, String(value ?? ""), onChange);
 }
 
 /** @param {{ title: string; value: string }} preset @param {(value: string) => void} onChange */
@@ -87,13 +88,17 @@ function handleFontSelection(
   presets: { title: string; value: string }[],
   onChange: (value: string) => void,
 ) {
-  if (!val) return;
+  if (!val) {
+    return;
+  }
   if (val.startsWith("__preset__:")) {
     const title = val.slice("__preset__:".length);
     const preset = presets.find(
       (/** @type {{ title: string; value: string }} */ p) => p.title === title,
     );
-    if (preset) handleFontPresetSelection(preset, onChange);
+    if (preset) {
+      handleFontPresetSelection(preset, onChange);
+    }
     return;
   }
   if (val.startsWith("--")) {
@@ -132,9 +137,9 @@ export function buildFontOptions(
 ) {
   const opts: ({ value: string; label: string; style: string } | { divider: true })[] =
     fontVars.map((fv) => ({
-      value: fv.name,
       label: varDisplayName(fv.name, "--font-"),
       style: `font-family: ${fv.value}`,
+      value: fv.name,
     }));
   const unadded = presets.filter(
     (/** @type {{ title: string; value: string }} */ p) =>
@@ -143,12 +148,14 @@ export function buildFontOptions(
           fv.name === friendlyNameToVar(p.title, "--font-"),
       ),
   );
-  if (unadded.length > 0 && opts.length > 0) opts.push({ divider: true });
+  if (unadded.length > 0 && opts.length > 0) {
+    opts.push({ divider: true });
+  }
   for (const p of unadded) {
     opts.push({
-      value: "__preset__:" + p.title,
       label: p.title,
       style: `font-family: ${p.value}`,
+      value: `__preset__:${p.title}`,
     });
   }
   return opts;
@@ -163,19 +170,18 @@ export function buildFontOptions(
  * @param {string} prop @param {string} value @param {(value: string) => void} onChange
  */
 export function renderComboboxInput(
-  entry: {
-    enum?: string[];
-    examples?: string[];
-    presets?: { title: string; value: string }[];
-  },
+  entry: Record<string, unknown>,
   prop: string,
-  value: string,
+  rawValue: string | number | undefined,
   onChange: (value: string) => void,
 ) {
+  const value = String(rawValue ?? "");
   const cssInitialMap = getCssInitialMap();
   const fontVars = prop === "fontFamily" ? getFontVars() : [];
-  const presets = entry.presets || [];
-  const examples = entry.examples || [];
+  const presets = Array.isArray(entry.presets)
+    ? (entry.presets as { title: string; value: string }[])
+    : [];
+  const examples = Array.isArray(entry.examples) ? (entry.examples as string[]) : [];
 
   if (prop === "fontFamily") {
     const varMatch = typeof value === "string" && value.match(/^var\((--[^)]+)\)$/);
@@ -225,7 +231,7 @@ export function widgetForType(
   const cssInitialMap = getCssInitialMap();
   return _widgetForType(type, entry, prop, value, onCommit as (val: string | number) => void, {
     placeholder: opts.placeholder || cssInitialMap.get(prop) || "",
-    renderSelect: renderSelectInput,
     renderCombobox: renderComboboxInput,
+    renderSelect: renderSelectInput,
   });
 }

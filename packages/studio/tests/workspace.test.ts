@@ -1,14 +1,14 @@
 import "./with-dom.js";
 import { effect } from "../src/reactivity";
 import {
-  workspace,
-  activeTab,
-  openTab,
-  closeTab,
   activateTab,
+  activeTab,
+  closeTab,
+  openTab,
   renameTab,
+  workspace,
 } from "../src/workspace/workspace";
-import { test, expect, describe, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 
 describe("Workspace primitive", () => {
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe("Workspace primitive", () => {
   });
 
   test("openTab creates and activates a tab", () => {
-    const tab = openTab({ id: "t1", document: { tagName: "div" } });
+    const tab = openTab({ document: { tagName: "div" }, id: "t1" });
 
     expect(workspace.tabs.has("t1")).toBe(true);
     expect(workspace.activeTabId).toBe("t1");
@@ -27,18 +27,18 @@ describe("Workspace primitive", () => {
   });
 
   test("multiple tabs maintain order", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
-    openTab({ id: "t2", document: { tagName: "span" } });
-    openTab({ id: "t3", document: { tagName: "p" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
+    openTab({ document: { tagName: "span" }, id: "t2" });
+    openTab({ document: { tagName: "p" }, id: "t3" });
 
     expect(workspace.tabOrder).toEqual(["t1", "t2", "t3"]);
     expect(workspace.activeTabId).toBe("t3");
   });
 
   test("closeTab removes tab and activates last remaining", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
-    openTab({ id: "t2", document: { tagName: "span" } });
-    openTab({ id: "t3", document: { tagName: "p" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
+    openTab({ document: { tagName: "span" }, id: "t2" });
+    openTab({ document: { tagName: "p" }, id: "t3" });
 
     closeTab("t3");
 
@@ -48,8 +48,8 @@ describe("Workspace primitive", () => {
   });
 
   test("closeTab on non-active tab doesn't change activeTabId", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
-    openTab({ id: "t2", document: { tagName: "span" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
+    openTab({ document: { tagName: "span" }, id: "t2" });
 
     closeTab("t1");
 
@@ -58,7 +58,7 @@ describe("Workspace primitive", () => {
   });
 
   test("closing last tab sets activeTabId to null", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
     closeTab("t1");
 
     expect(workspace.activeTabId).toBe(null);
@@ -66,8 +66,8 @@ describe("Workspace primitive", () => {
   });
 
   test("activateTab switches active tab", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
-    openTab({ id: "t2", document: { tagName: "span" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
+    openTab({ document: { tagName: "span" }, id: "t2" });
 
     activateTab("t1");
     expect(workspace.activeTabId).toBe("t1");
@@ -75,17 +75,17 @@ describe("Workspace primitive", () => {
   });
 
   test("activateTab with invalid id is a no-op", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
     activateTab("nonexistent");
     expect(workspace.activeTabId).toBe("t1");
   });
 
   test("activeTab computed updates reactively on tab switch", () => {
-    openTab({ id: "t1", document: { tagName: "div" }, documentPath: "a.json" });
+    openTab({ document: { tagName: "div" }, documentPath: "a.json", id: "t1" });
     openTab({
-      id: "t2",
       document: { tagName: "span" },
       documentPath: "b.json",
+      id: "t2",
     });
 
     let observedPath: string | null = null;
@@ -101,8 +101,8 @@ describe("Workspace primitive", () => {
   });
 
   test("effect on activeTab.doc re-runs on tab switch", () => {
-    openTab({ id: "t1", document: { tagName: "div" } });
-    openTab({ id: "t2", document: { tagName: "span" } });
+    openTab({ document: { tagName: "div" }, id: "t1" });
+    openTab({ document: { tagName: "span" }, id: "t2" });
 
     let observedTag: string | null = null;
     const stop = effect(() => {
@@ -117,7 +117,7 @@ describe("Workspace primitive", () => {
   });
 
   test("disposeTab stops effects within the tab scope", () => {
-    const tab = openTab({ id: "t1", document: { tagName: "div" } });
+    const tab = openTab({ document: { tagName: "div" }, id: "t1" });
 
     let runs = 0;
     tab.scope.run(() => {
@@ -139,14 +139,16 @@ describe("Workspace primitive", () => {
 
 describe("renameTab", () => {
   beforeEach(() => {
-    for (const id of workspace.tabs.keys()) closeTab(id);
+    for (const id of workspace.tabs.keys()) {
+      closeTab(id);
+    }
   });
 
   test("re-keys tab in the tabs map", () => {
     openTab({
-      id: "pages/old.md",
       document: { tagName: "div" },
       documentPath: "pages/old.md",
+      id: "pages/old.md",
     });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
@@ -160,9 +162,9 @@ describe("renameTab", () => {
 
   test("preserves document content and dirty state", () => {
     const tab = openTab({
-      id: "pages/old.md",
-      document: { tagName: "div", children: [{ tagName: "p" }] },
+      document: { children: [{ tagName: "p" }], tagName: "div" },
       documentPath: "pages/old.md",
+      id: "pages/old.md",
     });
     tab.doc.dirty = true;
 
@@ -175,19 +177,19 @@ describe("renameTab", () => {
 
   test("updates tabOrder preserving position", () => {
     openTab({
-      id: "a.json",
       document: { tagName: "div" },
       documentPath: "a.json",
+      id: "a.json",
     });
     openTab({
-      id: "pages/old.md",
       document: { tagName: "p" },
       documentPath: "pages/old.md",
+      id: "pages/old.md",
     });
     openTab({
-      id: "c.json",
       document: { tagName: "span" },
       documentPath: "c.json",
+      id: "c.json",
     });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
@@ -197,9 +199,9 @@ describe("renameTab", () => {
 
   test("updates activeTabId when renaming the active tab", () => {
     openTab({
-      id: "pages/old.md",
       document: { tagName: "div" },
       documentPath: "pages/old.md",
+      id: "pages/old.md",
     });
     expect(workspace.activeTabId).toBe("pages/old.md");
 
@@ -211,14 +213,14 @@ describe("renameTab", () => {
 
   test("does not change activeTabId when renaming a non-active tab", () => {
     openTab({
-      id: "pages/old.md",
       document: { tagName: "div" },
       documentPath: "pages/old.md",
+      id: "pages/old.md",
     });
     openTab({
-      id: "active.json",
       document: { tagName: "span" },
       documentPath: "active.json",
+      id: "active.json",
     });
 
     renameTab("pages/old.md", "pages/new.md", "pages/new.md");
@@ -228,9 +230,9 @@ describe("renameTab", () => {
 
   test("no-op for nonexistent tab id", () => {
     openTab({
-      id: "a.json",
       document: { tagName: "div" },
       documentPath: "a.json",
+      id: "a.json",
     });
 
     renameTab("nonexistent", "new-id", "new-path");
@@ -241,9 +243,9 @@ describe("renameTab", () => {
 
   test("handles moving into a subdirectory", () => {
     openTab({
-      id: "index.md",
       document: { tagName: "div" },
       documentPath: "index.md",
+      id: "index.md",
     });
 
     renameTab("index.md", "pages/index.md", "pages/index.md");

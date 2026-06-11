@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { injectContext } from "../src/site/context-injection";
 import { resolvePrototypes } from "../src/site/prototype-resolver";
 import type { SiteRoute } from "../src/types";
@@ -45,8 +45,8 @@ describe("injectContext", () => {
   test("includes route path params", () => {
     const doc: Record<string, any> = {};
     const route = {
-      urlPattern: "/blog/:slug",
       _pathParams: { slug: "hello-world" },
+      urlPattern: "/blog/:slug",
     };
     injectContext(doc, baseProject, route);
     expect(doc.state.$page.params).toEqual({ slug: "hello-world" });
@@ -62,7 +62,7 @@ describe("injectContext", () => {
 
   test("does not overwrite $site/$page with project state", () => {
     const doc: Record<string, any> = {};
-    const project = { ...baseProject, state: { $site: "bad", $page: "bad" } };
+    const project = { ...baseProject, state: { $page: "bad", $site: "bad" } };
     injectContext(doc, project, baseRoute);
     expect(doc.state.$site).not.toBe("bad");
     expect(doc.state.$page).not.toBe("bad");
@@ -168,8 +168,8 @@ describe("injectContext", () => {
       imports: { Utils: "./lib/utils.class.json" },
     };
     const route = {
-      urlPattern: "/blog/post",
       sourcePath: "/project/pages/blog/post.json",
+      urlPattern: "/blog/post",
     };
     injectContext(doc, project, route, new Map(), "/project");
     expect(doc.imports.Utils).toContain("utils.class.json");
@@ -200,7 +200,7 @@ describe("injectContext", () => {
         },
       },
     };
-    const contentTypes = new Map([["posts", [{ id: "x", data: {} }]]]) as any;
+    const contentTypes = new Map([["posts", [{ data: {}, id: "x" }]]]) as any;
     injectContext(doc, baseProject, baseRoute, contentTypes);
     await resolvePrototypes(doc, baseRoute, import.meta.dir, {
       config: baseProject,

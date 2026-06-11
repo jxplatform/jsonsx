@@ -1,12 +1,12 @@
-import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
-import { writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
-const TMP = resolve(tmpdir(), "jx-img-transform-test-" + Date.now());
+const TMP = resolve(tmpdir(), `jx-img-transform-test-${Date.now()}`);
 
 function setup() {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
   mkdirSync(TMP, { recursive: true });
   mkdirSync(join(TMP, "public/images"), { recursive: true });
   mkdirSync(join(TMP, "out"), { recursive: true });
@@ -16,61 +16,63 @@ function setup() {
 }
 
 function teardown() {
-  rmSync(TMP, { recursive: true, force: true });
+  rmSync(TMP, { force: true, recursive: true });
 }
 
 // Mock dependencies
 const mockManifest = {
-  original: { width: 1200, height: 800, format: "png" },
+  contentHash: "abcd1234",
+  original: { format: "png", height: 800, width: 1200 },
   variants: [
     {
-      width: 640,
+      absolutePath: "/tmp/fake-640.avif",
       format: "avif",
       outputPath: "/_optimized/hero-640-abc.avif",
-      absolutePath: "/tmp/fake-640.avif",
+      width: 640,
     },
     {
-      width: 1200,
+      absolutePath: "/tmp/fake-1200.avif",
       format: "avif",
       outputPath: "/_optimized/hero-1200-abc.avif",
-      absolutePath: "/tmp/fake-1200.avif",
+      width: 1200,
     },
     {
-      width: 640,
+      absolutePath: "/tmp/fake-640.webp",
       format: "webp",
       outputPath: "/_optimized/hero-640-abc.webp",
-      absolutePath: "/tmp/fake-640.webp",
+      width: 640,
     },
     {
-      width: 1200,
+      absolutePath: "/tmp/fake-1200.webp",
       format: "webp",
       outputPath: "/_optimized/hero-1200-abc.webp",
-      absolutePath: "/tmp/fake-1200.webp",
+      width: 1200,
     },
   ],
-  contentHash: "abcd1234",
 };
 
 mock.module("../src/site/image-optimizer.js", () => ({
-  processImage: mock(async () => mockManifest),
   buildSrcset: mock((variants: any[], format: string) => {
     const filtered = variants.filter((v: any) => v.format === format);
-    if (filtered.length === 0) return "";
+    if (filtered.length === 0) {
+      return "";
+    }
     return filtered.map((v: any) => `${v.outputPath} ${v.width}w`).join(", ");
   }),
-  contentHash: mock(() => "abcd1234"),
   configHash: mock(() => "cfg12345"),
+  contentHash: mock(() => "abcd1234"),
   getImageMetadata: mock(async () => ({
-    width: 1200,
-    height: 800,
     format: "png",
+    height: 800,
+    width: 1200,
   })),
+  processImage: mock(async () => mockManifest),
 }));
 
 mock.module("../src/site/image-cache.js", () => ({
   getCached: mock(() => null),
+  getImageCacheDir: mock((root: string) => `${root}/.cache/images`),
   setCached: mock(() => {}),
-  getImageCacheDir: mock((root: string) => root + "/.cache/images"),
 }));
 
 const { transformImageNodes } = await import("../src/site/image-transform.js");
@@ -79,12 +81,12 @@ const { processImage, buildSrcset, getImageMetadata }: any =
 const { getCached, setCached }: any = await import("../src/site/image-cache.js");
 
 const defaultConfig = {
-  optimize: true,
-  widths: [640, 1200],
   formats: ["avif", "webp"],
+  lazyLoad: true,
+  optimize: true,
   quality: { avif: 60, webp: 75 },
   sizes: "(max-width: 768px) 100vw, 50vw",
-  lazyLoad: true,
+  widths: [640, 1200],
 };
 
 describe("image-transform", () => {
@@ -105,11 +107,11 @@ describe("image-transform", () => {
   describe("transformImageNodes", () => {
     test("returns empty imageRefs when config.optimize is false", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
       const config = { ...defaultConfig, optimize: false };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       const result = await transformImageNodes(doc, config, TMP, cache);
       expect(result.imageRefs.size).toBe(0);
@@ -117,10 +119,10 @@ describe("image-transform", () => {
 
     test("transforms an img node with srcset, sizes, dimensions, and lazy loading", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       const result = await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -136,10 +138,10 @@ describe("image-transform", () => {
 
     test("does not override existing width/height attributes", async () => {
       const doc: any = {
+        attributes: { height: "300", src: "/images/hero.png", width: "400" },
         tagName: "img",
-        attributes: { src: "/images/hero.png", width: "400", height: "300" },
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -149,10 +151,10 @@ describe("image-transform", () => {
 
     test("does not add lazy loading when loading is eager", async () => {
       const doc: any = {
+        attributes: { loading: "eager", src: "/images/hero.png" },
         tagName: "img",
-        attributes: { src: "/images/hero.png", loading: "eager" },
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -162,11 +164,11 @@ describe("image-transform", () => {
 
     test("does not add lazy loading when config.lazyLoad is false", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
       const config = { ...defaultConfig, lazyLoad: false };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, config, TMP, cache);
 
@@ -176,10 +178,10 @@ describe("image-transform", () => {
 
     test("skips images with data-no-optimize", async () => {
       const doc: any = {
+        attributes: { "data-no-optimize": "", src: "/images/hero.png" },
         tagName: "img",
-        attributes: { src: "/images/hero.png", "data-no-optimize": "" },
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -188,10 +190,10 @@ describe("image-transform", () => {
 
     test("skips non-existent images", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/nonexistent.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -204,29 +206,29 @@ describe("image-transform", () => {
       writeFileSync(variantPath, "fake");
 
       const cachedManifest = {
-        original: { width: 800, height: 600, format: "png" },
+        contentHash: "abcd1234",
+        original: { format: "png", height: 600, width: 800 },
         variants: [
           {
-            width: 640,
+            absolutePath: variantPath,
             format: "avif",
             outputPath: "/_optimized/x.avif",
-            absolutePath: variantPath,
+            width: 640,
           },
         ],
-        contentHash: "abcd1234",
       };
 
       getCached.mockReturnValue(cachedManifest);
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      // processImage should not have been called since cache hit
+      // ProcessImage should not have been called since cache hit
       expect(processImage).not.toHaveBeenCalled();
       expect(doc.attributes.width).toBe("800");
       expect(doc.attributes.height).toBe("600");
@@ -235,30 +237,30 @@ describe("image-transform", () => {
     test("calls processImage when cached variants are missing from disk", async () => {
       // Return a cached manifest with a non-existent absolutePath
       const cachedManifest = {
-        original: { width: 800, height: 600, format: "png" },
+        contentHash: "abcd1234",
+        original: { format: "png", height: 600, width: 800 },
         variants: [
           {
-            width: 640,
+            absolutePath: "/nonexistent/path.avif",
             format: "avif",
             outputPath: "/_optimized/x.avif",
-            absolutePath: "/nonexistent/path.avif",
+            width: 640,
           },
         ],
-        contentHash: "abcd1234",
       };
 
       getCached.mockReturnValue(cachedManifest);
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
       // Since cached variant doesn't exist on disk, processImage should NOT be called
-      // because the code only calls processImage when `!cached` (line 42)
+      // Because the code only calls processImage when `!cached` (line 42)
       // When cached exists but files are missing, it falls through without re-processing
       // Actually re-reading: line 40 checks allExist - if not allExist it falls through
       // Line 42: if (!cached) logs; then lines 43-45 run unconditionally
@@ -269,17 +271,17 @@ describe("image-transform", () => {
 
     test("reuses manifest from imageRefs for duplicate images", async () => {
       const doc: any = {
-        tagName: "div",
         children: [
-          { tagName: "img", attributes: { src: "/images/hero.png" } },
-          { tagName: "img", attributes: { src: "/images/hero.png" } },
+          { attributes: { src: "/images/hero.png" }, tagName: "img" },
+          { attributes: { src: "/images/hero.png" }, tagName: "img" },
         ],
+        tagName: "div",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
-      // processImage should only be called once for the same absolute path
+      // ProcessImage should only be called once for the same absolute path
       expect(processImage).toHaveBeenCalledTimes(1);
       // Both img nodes should be transformed
       expect(doc.children[0].attributes.srcset).toBeDefined();
@@ -292,10 +294,10 @@ describe("image-transform", () => {
       writeFileSync(join(TMP, "images/photo.jpg"), "fake-jpg-data");
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "images/photo.jpg" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -307,10 +309,10 @@ describe("image-transform", () => {
     test("uses first format when avif is not in formats list", async () => {
       const config = { ...defaultConfig, formats: ["webp"] };
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, config, TMP, cache);
 
@@ -323,10 +325,10 @@ describe("image-transform", () => {
       buildSrcset.mockReturnValueOnce("");
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -335,10 +337,10 @@ describe("image-transform", () => {
 
     test("preserves existing sizes attribute on img node", async () => {
       const doc: any = {
+        attributes: { sizes: "100vw", src: "/images/hero.png" },
         tagName: "img",
-        attributes: { src: "/images/hero.png", sizes: "100vw" },
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -347,15 +349,15 @@ describe("image-transform", () => {
 
     test("walks children recursively", async () => {
       const doc: any = {
-        tagName: "div",
         children: [
           {
+            children: [{ attributes: { src: "/images/hero.png" }, tagName: "img" }],
             tagName: "section",
-            children: [{ tagName: "img", attributes: { src: "/images/hero.png" } }],
           },
         ],
+        tagName: "div",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -364,10 +366,10 @@ describe("image-transform", () => {
 
     test("transforms img tags embedded in innerHTML strings", async () => {
       const doc: any = {
-        tagName: "div",
         innerHTML: '<img src="/images/hero.png">',
+        tagName: "div",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -381,11 +383,11 @@ describe("image-transform", () => {
 
     test("handles img node with src on node directly (not in attributes)", async () => {
       const doc: any = {
-        tagName: "img",
-        src: "/images/hero.png",
         attributes: {},
+        src: "/images/hero.png",
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
 
@@ -397,10 +399,10 @@ describe("image-transform", () => {
     test("skips SVG images", async () => {
       writeFileSync(join(TMP, "public/images/icon.svg"), "<svg></svg>");
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/icon.svg" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -409,10 +411,10 @@ describe("image-transform", () => {
     test("skips GIF images", async () => {
       writeFileSync(join(TMP, "public/images/anim.gif"), "GIF89a");
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/anim.gif" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -420,10 +422,10 @@ describe("image-transform", () => {
 
     test("skips external URLs", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "https://example.com/img.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -431,10 +433,10 @@ describe("image-transform", () => {
 
     test("skips template literal expressions", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/${name}.png" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -442,10 +444,10 @@ describe("image-transform", () => {
 
     test("skips data: URIs", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "data:image/png;base64,abc" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, defaultConfig, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -453,9 +455,9 @@ describe("image-transform", () => {
 
     test("skips img node with empty src — does not call processImage", async () => {
       // Regression: empty ![]() in markdown produces src="" which previously resolved
-      // to the project root directory, causing EISDIR when processImage tried to read it.
-      const doc: any = { tagName: "img", attributes: { src: "" } };
-      const cache = { version: 1, entries: {} };
+      // To the project root directory, causing EISDIR when processImage tried to read it.
+      const doc: any = { attributes: { src: "" }, tagName: "img" };
+      const cache = { entries: {}, version: 1 };
 
       await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
       expect(processImage).not.toHaveBeenCalled();
@@ -464,12 +466,12 @@ describe("image-transform", () => {
 
     test("skips innerHTML <img> with empty src — does not call processImage", async () => {
       // Same regression via the innerHTML path: a pre-rendered component containing
-      // an <img src=""> must not attempt to read the project root as an image.
+      // An <img src=""> must not attempt to read the project root as an image.
       const doc: any = {
-        tagName: "div",
         innerHTML: '<img src="" alt="placeholder">',
+        tagName: "div",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
       expect(processImage).not.toHaveBeenCalled();
@@ -483,16 +485,16 @@ describe("image-transform", () => {
     beforeEach(() => {
       getImageMetadata.mockReset();
       getImageMetadata.mockResolvedValue({
-        width: 1200,
-        height: 800,
         format: "png",
+        height: 800,
+        width: 1200,
       });
     });
 
     test("builds srcset of /cdn-cgi/image transform URLs without calling processImage", async () => {
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
@@ -512,14 +514,14 @@ describe("image-transform", () => {
 
     test("excludes widths larger than the original image", async () => {
       getImageMetadata.mockResolvedValue({
-        width: 800,
-        height: 600,
         format: "png",
+        height: 600,
+        width: 800,
       });
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
@@ -531,14 +533,14 @@ describe("image-transform", () => {
 
     test("sets no srcset when the image is narrower than every configured width", async () => {
       getImageMetadata.mockResolvedValue({
-        width: 320,
-        height: 240,
         format: "png",
+        height: 240,
+        width: 320,
       });
 
       const doc: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
@@ -552,11 +554,11 @@ describe("image-transform", () => {
 
     test("memoizes metadata across duplicate references", async () => {
       const doc: any = {
-        tagName: "div",
         children: [
-          { tagName: "img", attributes: { src: "/images/hero.png" } },
-          { tagName: "img", attributes: { src: "/images/hero.png" } },
+          { attributes: { src: "/images/hero.png" }, tagName: "img" },
+          { attributes: { src: "/images/hero.png" }, tagName: "img" },
         ],
+        tagName: "div",
       };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
@@ -590,12 +592,12 @@ describe("image-transform", () => {
     test("shares the metadata cache across calls when provided", async () => {
       const metaCache = new Map();
       const docA: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
       const docB: any = {
-        tagName: "img",
         attributes: { src: "/images/hero.png" },
+        tagName: "img",
       };
 
       await transformImageNodes(docA, cfConfig, TMP, null, metaCache);
@@ -606,8 +608,8 @@ describe("image-transform", () => {
 
     test("rewrites innerHTML img tags to transform URLs", async () => {
       const doc: any = {
-        tagName: "div",
         innerHTML: '<img src="/images/hero.png" alt="Hero">',
+        tagName: "div",
       };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
@@ -624,7 +626,7 @@ describe("image-transform", () => {
 
     test("skips innerHTML img tags that already have srcset", async () => {
       const html = '<img src="/images/hero.png" srcset="/x.avif 640w">';
-      const doc: any = { tagName: "div", innerHTML: html };
+      const doc: any = { innerHTML: html, tagName: "div" };
 
       await transformImageNodes(doc, cfConfig, TMP, null, new Map());
 
@@ -636,12 +638,12 @@ describe("image-transform", () => {
       const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
       const remoteSrc =
         "https://drive.usercontent.google.com/download?id=abc123&export=download/photo.jpg";
-      const doc: any = { tagName: "img", attributes: { src: remoteSrc } };
+      const doc: any = { attributes: { src: remoteSrc }, tagName: "img" };
 
       await transformImageNodes(doc, config, TMP, null, new Map());
 
       // Remote sources go in as the full URL after the options segment, with no cache-busting
-      // hash (original bytes aren't available at build time)
+      // Hash (original bytes aren't available at build time)
       expect(doc.attributes.srcset).toBe(
         `/cdn-cgi/image/width=640,quality=75,fit=scale-down,format=auto/${remoteSrc} 640w, ` +
           `/cdn-cgi/image/width=1200,quality=75,fit=scale-down,format=auto/${remoteSrc} 1200w`,
@@ -659,8 +661,8 @@ describe("image-transform", () => {
     test("leaves remote sources from non-allowlisted hosts untouched", async () => {
       const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
       const doc: any = {
-        tagName: "img",
         attributes: { src: "https://evil.example.com/img.jpg" },
+        tagName: "img",
       };
 
       await transformImageNodes(doc, config, TMP, null, new Map());
@@ -673,10 +675,10 @@ describe("image-transform", () => {
         remoteDomains: ["drive.usercontent.google.com"],
       };
       const doc: any = {
-        tagName: "img",
         attributes: { src: "https://drive.usercontent.google.com/download?id=x/p.jpg" },
+        tagName: "img",
       };
-      const cache = { version: 1, entries: {} };
+      const cache = { entries: {}, version: 1 };
 
       await transformImageNodes(doc, config, TMP, cache);
       expect(doc.attributes.srcset).toBeUndefined();
@@ -686,12 +688,12 @@ describe("image-transform", () => {
       const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
       const docs: any[] = [
         {
-          tagName: "img",
           attributes: { src: "https://drive.usercontent.google.com/icon.svg" },
+          tagName: "img",
         },
         {
-          tagName: "img",
           attributes: { src: "https://drive.usercontent.google.com/${id}.jpg" },
+          tagName: "img",
         },
       ];
       for (const doc of docs) {
@@ -703,9 +705,9 @@ describe("image-transform", () => {
     test("rewrites entity-escaped remote img tags in innerHTML", async () => {
       const config = { ...cfConfig, remoteDomains: ["drive.usercontent.google.com"] };
       const doc: any = {
-        tagName: "div",
         innerHTML:
           '<img src="https://drive.usercontent.google.com/download?id=abc&amp;export=download/p.jpg" alt="P">',
+        tagName: "div",
       };
 
       await transformImageNodes(doc, config, TMP, null, new Map());
@@ -721,14 +723,14 @@ describe("image-transform", () => {
     test("honors existing skip rules", async () => {
       writeFileSync(join(TMP, "public/images/icon.svg"), "<svg></svg>");
       const docs: any[] = [
-        { tagName: "img", attributes: { src: "https://example.com/img.png" } },
-        { tagName: "img", attributes: { src: "/images/icon.svg" } },
-        { tagName: "img", attributes: { src: "/images/${name}.png" } },
+        { attributes: { src: "https://example.com/img.png" }, tagName: "img" },
+        { attributes: { src: "/images/icon.svg" }, tagName: "img" },
+        { attributes: { src: "/images/${name}.png" }, tagName: "img" },
         {
+          attributes: { "data-no-optimize": "", src: "/images/hero.png" },
           tagName: "img",
-          attributes: { src: "/images/hero.png", "data-no-optimize": "" },
         },
-        { tagName: "img", attributes: { src: "/images/nonexistent.png" } },
+        { attributes: { src: "/images/nonexistent.png" }, tagName: "img" },
       ];
 
       for (const doc of docs) {

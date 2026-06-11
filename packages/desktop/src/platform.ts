@@ -7,9 +7,7 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 
 export function createDesktopPlatform() {
   const rpc = Electroview.defineRPC<StudioRPC>({
-    maxRequestTime: 300000,
     handlers: {
-      requests: {},
       messages: {
         fileChanged: (payload) => {
           console.log("[desktop] File changed:", payload.path);
@@ -18,7 +16,9 @@ export function createDesktopPlatform() {
           showUpdateToast(payload.version, rpc);
         },
       },
+      requests: {},
     },
+    maxRequestTime: 300_000,
   });
 
   new Electroview({ rpc });
@@ -40,7 +40,7 @@ export function createDesktopPlatform() {
     // views:// protocol these would otherwise resolve to a missing view resource.
     let pathname = url;
     try {
-      pathname = new URL(url, location.href).pathname;
+      ({ pathname } = new URL(url, location.href));
     } catch {}
     if (pathname === "/__jx_resolve__" || pathname === "/__jx_server__") {
       const body = init?.body != null ? String(init.body) : "{}";
@@ -49,13 +49,13 @@ export function createDesktopPlatform() {
       try {
         const { status, body: resBody } = await handler({ body });
         return new Response(resBody, {
+          headers: { "content-type": "application/json" },
           status,
-          headers: { "content-type": "application/json" },
         });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: String(e) }), {
-          status: 500,
+      } catch (error) {
+        return new Response(JSON.stringify({ error: String(error) }), {
           headers: { "content-type": "application/json" },
+          status: 500,
         });
       }
     }
@@ -67,8 +67,8 @@ export function createDesktopPlatform() {
         const ext = path.split(".").pop() || "";
         const mime = ext === "json" ? "application/json" : "text/plain";
         return new Response(content as string, {
-          status: 200,
           headers: { "content-type": mime },
+          status: 200,
         });
       } catch {
         try {
@@ -78,8 +78,8 @@ export function createDesktopPlatform() {
           const ext = path.split(".").pop() || "";
           const mime = ext === "json" ? "application/json" : "text/plain";
           return new Response(content as string, {
-            status: 200,
             headers: { "content-type": mime },
+            status: 200,
           });
         } catch {
           return new Response("Not Found", { status: 404 });
@@ -91,13 +91,17 @@ export function createDesktopPlatform() {
 
   // ─── Global MutationObserver: resolve relative asset URLs everywhere ────────
   // Catches <img src>, <video src>, <source src>, <video poster> in any part of
-  // the DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
+  // The DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
   const resolving = new WeakSet<Element>();
 
   function resolveElementAssets(el: Element) {
-    if (resolving.has(el)) return;
+    if (resolving.has(el)) {
+      return;
+    }
     const tag = el.tagName;
-    if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") return;
+    if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") {
+      return;
+    }
 
     for (const attr of ["src", "poster"]) {
       const val = el.getAttribute(attr);
@@ -114,7 +118,9 @@ export function createDesktopPlatform() {
         rpc.request
           .readFileAsDataUrl({ path })
           .then((dataUrl: string) => {
-            if (dataUrl) el.setAttribute(attr, dataUrl);
+            if (dataUrl) {
+              el.setAttribute(attr, dataUrl);
+            }
           })
           .catch(() => {})
           .finally(() => resolving.delete(el));
@@ -124,18 +130,28 @@ export function createDesktopPlatform() {
 
   function resolveBackgroundImage(el: Element) {
     const htmlEl = el as HTMLElement;
-    if (!htmlEl.style) return;
+    if (!htmlEl.style) {
+      return;
+    }
     const bg = htmlEl.style.backgroundImage;
-    if (!bg) return;
+    if (!bg) {
+      return;
+    }
     const match = bg.match(/url\(["']?([^"')]+)["']?\)/);
-    if (!match) return;
+    if (!match) {
+      return;
+    }
     const val = match[1];
-    if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) return;
+    if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) {
+      return;
+    }
     const path = val.replace(/^\.?\//, "");
     rpc.request
       .readFileAsDataUrl({ path })
       .then((dataUrl: string) => {
-        if (dataUrl) htmlEl.style.backgroundImage = `url(${dataUrl})`;
+        if (dataUrl) {
+          htmlEl.style.backgroundImage = `url(${dataUrl})`;
+        }
       })
       .catch(() => {});
   }
@@ -155,7 +171,9 @@ export function createDesktopPlatform() {
     for (const mutation of mutations) {
       if (mutation.type === "childList") {
         for (const node of mutation.addedNodes) {
-          if (node.nodeType !== 1) continue;
+          if (node.nodeType !== 1) {
+            continue;
+          }
           resolveAllAssets(node as Element);
         }
       } else if (mutation.type === "attributes") {
@@ -170,10 +188,10 @@ export function createDesktopPlatform() {
   });
 
   observer.observe(document.documentElement, {
+    attributeFilter: ["src", "poster", "style"],
+    attributes: true,
     childList: true,
     subtree: true,
-    attributes: true,
-    attributeFilter: ["src", "poster", "style"],
   });
 
   return {
@@ -182,7 +200,7 @@ export function createDesktopPlatform() {
     projectRoot: "",
 
     async activate() {
-      /* no-op */
+      /* No-op */
     },
 
     async openProject() {
@@ -195,21 +213,21 @@ export function createDesktopPlatform() {
         const content = await rpc.request.readFile({ path: "project.json" });
         const config = JSON.parse(content as string) as ProjectConfig;
         return {
-          meta: { root: ".", name: config.name || "project" },
           info: {
+            directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config,
-            directories: [] as string[],
           },
+          meta: { name: config.name || "project", root: "." },
         };
       } catch {
         return {
-          meta: { root: ".", name: "project" },
           info: {
+            directories: [] as string[],
             isSiteProject: false as const,
             projectConfig: null,
-            directories: [] as string[],
           },
+          meta: { name: "project", root: "." },
         };
       }
     },
@@ -235,11 +253,11 @@ export function createDesktopPlatform() {
     },
 
     async writeFile(path: string, content: string) {
-      return rpc.request.writeFile({ path, content });
+      return rpc.request.writeFile({ content, path });
     },
 
     async uploadFile(path: string, data: string) {
-      return rpc.request.uploadFile({ path, data });
+      return rpc.request.uploadFile({ data, path });
     },
 
     async deleteFile(path: string) {
@@ -379,20 +397,20 @@ export function createDesktopPlatform() {
     },
 
     updater: {
-      getLocalInfo: () => rpc.request.updaterGetLocalInfo(),
+      applyUpdate: () => rpc.request.updaterApplyUpdate(),
       checkForUpdate: () => rpc.request.updaterCheckForUpdate(),
       downloadUpdate: () => rpc.request.updaterDownloadUpdate(),
-      applyUpdate: () => rpc.request.updaterApplyUpdate(),
+      getLocalInfo: () => rpc.request.updaterGetLocalInfo(),
       getStatus: () => rpc.request.updaterGetStatus(),
     },
 
     windowControls: {
-      minimize: () => rpc.request.windowMinimize(),
-      maximize: () => rpc.request.windowMaximize(),
       close: () => rpc.request.windowClose(),
       getFrame: () => rpc.request.windowGetFrame(),
+      maximize: () => rpc.request.windowMaximize(),
+      minimize: () => rpc.request.windowMinimize(),
       setFrame: (x: number, y: number, w: number, h: number) =>
-        rpc.request.windowSetFrame({ x, y, width: w, height: h }),
+        rpc.request.windowSetFrame({ height: h, width: w, x, y }),
     },
 
     // AI Assistant
@@ -438,5 +456,5 @@ function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: 
     `,
     container,
   );
-  document.body.appendChild(container);
+  document.body.append(container);
 }

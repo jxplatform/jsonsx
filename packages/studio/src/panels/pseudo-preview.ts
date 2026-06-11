@@ -5,15 +5,16 @@
  */
 
 import { getNodeAtPath } from "../store";
+import { getNestedStyle } from "@jxsuite/schema/guards";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { getActivePanel, findCanvasElement } from "../canvas/canvas-helpers";
+import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 
 import type { JxStyle } from "@jxsuite/schema/types";
 
 const pseudoStyleHost = document.createElement("div");
 pseudoStyleHost.style.display = "contents";
-(document.querySelector("sp-theme") || document.body).appendChild(pseudoStyleHost);
+(document.querySelector("sp-theme") || document.body).append(pseudoStyleHost);
 
 export function updateForcedPseudoPreview() {
   if (view.forcedStyleTag) {
@@ -21,39 +22,54 @@ export function updateForcedPseudoPreview() {
     view.forcedStyleTag = null;
   }
   if (view.forcedAttrEl) {
-    view.forcedAttrEl.removeAttribute("data-studio-forced");
+    delete view.forcedAttrEl.dataset.studioForced;
     view.forcedAttrEl = null;
   }
 
   const tab = activeTab.value;
   const sel = tab?.session.ui?.activeSelector;
-  if (!sel || !sel.startsWith(":") || !tab?.session.selection) return;
+  if (!sel || !sel.startsWith(":") || !tab?.session.selection) {
+    return;
+  }
 
   const panel = getActivePanel();
-  if (!panel) return;
+  if (!panel) {
+    return;
+  }
   const el = findCanvasElement(tab.session.selection, panel.canvas);
-  if (!el) return;
+  if (!el) {
+    return;
+  }
 
   const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-  if (!node?.style) return;
-  const activeMedia = tab.session.ui.activeMedia;
-  const ctx: JxStyle = activeMedia ? node.style[`@${activeMedia}`] || {} : node.style;
-  const rules = ctx[sel];
-  if (!rules || typeof rules !== "object") return;
+  if (!node?.style) {
+    return;
+  }
+  const { activeMedia } = tab.session.ui;
+  const ctx: JxStyle = activeMedia
+    ? (getNestedStyle(node.style, `@${activeMedia}`) ?? {})
+    : node.style;
+  const rules = getNestedStyle(ctx, sel);
+  if (!rules) {
+    return;
+  }
 
   const cssProps = Object.entries(rules)
     .filter(([k]) => typeof rules[k] === "string" || typeof rules[k] === "number")
     .map(
-      ([k, v]) => `${k.replace(/[A-Z]/g, (c: string) => `-${c.toLowerCase()}`)}: ${v} !important`,
+      ([k, v]) =>
+        `${k.replaceAll(/[A-Z]/g, (c: string) => `-${c.toLowerCase()}`)}: ${v} !important`,
     )
     .join("; ");
-  if (!cssProps) return;
+  if (!cssProps) {
+    return;
+  }
 
-  el.setAttribute("data-studio-forced", "1");
+  el.dataset.studioForced = "1";
   view.forcedAttrEl = el;
 
   const tag = document.createElement("style");
   tag.textContent = `[data-studio-forced] { ${cssProps} }`;
-  pseudoStyleHost.appendChild(tag);
+  pseudoStyleHost.append(tag);
   view.forcedStyleTag = tag;
 }

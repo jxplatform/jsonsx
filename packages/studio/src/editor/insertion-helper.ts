@@ -8,7 +8,7 @@
 
 import { showSlashMenu } from "./slash-menu";
 import { activeTab } from "../workspace/workspace";
-import { transactDoc, mutateInsertNode } from "../tabs/transact";
+import { mutateInsertNode, transactDoc } from "../tabs/transact";
 import type { CanvasPanel } from "../types";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -26,7 +26,7 @@ interface InsertionHelperContext {
   getCanvasMode: () => string; // Returns the active canvas mode.
   withPanelPointerEvents: (fn: () => unknown) => unknown; // Executes fn with pointer-events
   effectiveZoom: () => number; // Returns the current zoom scale factor.
-  defaultDef: (tag: string) => object; // Creates a default element definition for a tag.
+  defaultDef: (tag: string) => JxMutableNode; // Creates a default element definition for a tag.
   parentElementPath: (path: JxPath) => JxPath | null; // Returns the parent element path,
   childIndex: (path: JxPath) => string | number; // Returns the child index within the
   getNodeAtPath: (doc: JxMutableNode, path: JxPath) => JxMutableNode | null; // Retrieves
@@ -82,7 +82,7 @@ export function mount(ctx: InsertionHelperContext) {
   _helper.addEventListener("mouseleave", () => {
     scheduleHide();
   });
-  panel.viewport.appendChild(_helper);
+  panel.viewport.append(_helper);
 
   _abort = new AbortController();
 
@@ -105,7 +105,9 @@ export function unmount() {
   _abort?.abort();
   _abort = null;
   cancelHide();
-  if (_helper?.parentElement) _helper.remove();
+  if (_helper?.parentElement) {
+    _helper.remove();
+  }
   clearAnchor();
   _helper = null;
   _ctx = null;
@@ -116,7 +118,9 @@ export function unmount() {
 
 /** @param {MouseEvent} e */
 function onMouseMove(e: MouseEvent) {
-  if (!_ctx || !_helper) return;
+  if (!_ctx || !_helper) {
+    return;
+  }
 
   const { getCanvasMode } = _ctx;
   const mode = getCanvasMode();
@@ -161,7 +165,7 @@ function onMouseMove(e: MouseEvent) {
   }
 
   const parentStyle = getComputedStyle(parent);
-  const display = parentStyle.display;
+  const { display } = parentStyle;
   const isFlex = display === "flex" || display === "inline-flex";
   const isGrid = display === "grid" || display === "inline-grid";
   const isRow =
@@ -208,7 +212,9 @@ function onMouseMove(e: MouseEvent) {
  * @param {number} idx
  */
 function showAt(el: HTMLElement, edge: string, path: JxPath, parentPath: JxPath, idx: number) {
-  if (!_helper) return;
+  if (!_helper) {
+    return;
+  }
 
   // Set CSS anchor on target element
   if (_currentAnchor !== el) {
@@ -219,7 +225,7 @@ function showAt(el: HTMLElement, edge: string, path: JxPath, parentPath: JxPath,
 
   _helper.dataset.edge = edge;
   _helper.classList.add("visible");
-  _insertionPoint = { edge, path, parentPath, idx };
+  _insertionPoint = { edge, idx, parentPath, path };
   cancelHide();
 }
 
@@ -241,7 +247,9 @@ function hide() {
 
 function hideNow() {
   _hideTimer = null;
-  if (!_helper) return;
+  if (!_helper) {
+    return;
+  }
   _helper.classList.remove("visible");
   clearAnchor();
   _insertionPoint = null;
@@ -260,12 +268,14 @@ function onHelperClick(e: MouseEvent) {
   e.stopPropagation();
   e.preventDefault();
 
-  if (!_ctx || !_helper || !_insertionPoint) return;
+  if (!_ctx || !_helper || !_insertionPoint) {
+    return;
+  }
 
   const captured = _insertionPoint;
   showSlashMenu(_helper, "", {
-    showFilter: true,
     onSelect: (cmd) => onSlashSelect(cmd, captured),
+    showFilter: true,
   });
 }
 
@@ -277,7 +287,9 @@ function onSlashSelect(
   cmd: { label: string; tag: string; description?: string },
   point: { edge: string; path: JxPath; parentPath: JxPath; idx: number },
 ) {
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
 
   const { defaultDef } = _ctx;
   const { parentPath, idx, edge } = point;

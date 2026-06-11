@@ -31,7 +31,9 @@ let mounted = false;
 
 export function mountResizeEdges() {
   const wc = g.__jxPlatform?.windowControls;
-  if (!wc || !wc.getFrame || mounted) return;
+  if (!wc || !wc.getFrame || mounted) {
+    return;
+  }
   mounted = true;
 
   const container = document.createElement("div");
@@ -41,10 +43,10 @@ export function mountResizeEdges() {
     const el = document.createElement("div");
     el.className = `resize-edge ${edge}`;
     el.addEventListener("mousedown", (e) => startResize(e, edge, wc));
-    container.appendChild(el);
+    container.append(el);
   }
 
-  document.body.appendChild(container);
+  document.body.append(container);
 }
 
 /**
@@ -88,7 +90,7 @@ async function startResize(
     }
     if (edge.includes("left")) {
       const newW = Math.max(MIN_WIDTH, width - dx);
-      x = x + (width - newW);
+      x += width - newW;
       width = newW;
     }
     if (edge.includes("bottom")) {
@@ -96,7 +98,7 @@ async function startResize(
     }
     if (edge.includes("top")) {
       const newH = Math.max(MIN_HEIGHT, height - dy);
-      y = y + (height - newH);
+      y += height - newH;
       height = newH;
     }
 

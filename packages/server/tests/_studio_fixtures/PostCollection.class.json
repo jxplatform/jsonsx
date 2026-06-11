@@ -1,1 +1,1 @@
-{"$prototype":"Class","title":"PostCollection","description":"Posts collection","extends":{"$ref":"./BaseCollection.class.json"},"$defs":{"parameters":{"category":{"identifier":"category","type":{"type":"string"},"description":"Filter by category"}}}}
+{"$defs":{"parameters":{"category":{"description":"Filter by category","identifier":"category","type":{"type":"string"}}}},"$prototype":"Class","description":"Posts collection","extends":{"$ref":"./BaseCollection.class.json"},"title":"PostCollection"}

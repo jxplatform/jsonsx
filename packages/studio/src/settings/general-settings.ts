@@ -20,7 +20,9 @@ export function renderGeneralSettings(container: HTMLElement) {
     input.accept = "image/*,.ico,.svg";
     input.onchange = async () => {
       const file = input.files?.[0];
-      if (!file) return;
+      if (!file) {
+        return;
+      }
       const platform = getPlatform();
       await platform.uploadFile("public/favicon.ico", file);
       await updateSiteConfig({ favicon: "/favicon.ico" });
@@ -53,7 +55,9 @@ export function renderGeneralSettings(container: HTMLElement) {
   const onMediaNameChange = (oldKey: string) => (e: Event) => {
     const rawName = (e.target as HTMLInputElement).value.trim();
     const newKey = rawName.startsWith("--") ? rawName : `--${rawName}`;
-    if (newKey === oldKey) return;
+    if (newKey === oldKey) {
+      return;
+    }
     const updated = {} as Record<string, string>;
     for (const [k, v] of Object.entries(media)) {
       updated[k === oldKey ? newKey : k] = v;

@@ -12,8 +12,9 @@
  * prefix)
  */
 
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve, relative, extname, join } from "node:path";
+import { readFileSync, readdirSync } from "node:fs";
+import { parseJxDocument } from "@jxsuite/schema/parse";
+import { extname, join, relative, resolve } from "node:path";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { ContentLoaderEntry } from "@jxsuite/parser/types";
@@ -43,7 +44,7 @@ export async function readPageDocument(
 ): Promise<JxDocument> {
   const source = readFileSync(filePath, "utf8");
   if (filePath.endsWith(".json")) {
-    return JSON.parse(source);
+    return parseJxDocument(source, filePath);
   }
   const ext = extname(filePath).toLowerCase();
   const entry = registry?.byExtension(ext, "parse");
@@ -71,8 +72,12 @@ export async function discoverPages(pagesDir: string, registry?: FormatRegistry)
 
   // Sort: static routes first, then by specificity (more segments = more specific)
   routes.sort((a, b) => {
-    if (a.isDynamic !== b.isDynamic) return a.isDynamic ? 1 : -1;
-    if (a.isCatchAll !== b.isCatchAll) return a.isCatchAll ? 1 : -1;
+    if (a.isDynamic !== b.isDynamic) {
+      return a.isDynamic ? 1 : -1;
+    }
+    if (a.isCatchAll !== b.isCatchAll) {
+      return a.isCatchAll ? 1 : -1;
+    }
     return a.urlPattern.localeCompare(b.urlPattern);
   });
 
@@ -102,21 +107,29 @@ async function walkDir(
 
     if (entry.isDirectory()) {
       // Skip underscore-prefixed directories
-      if (entry.name.startsWith("_")) continue;
+      if (entry.name.startsWith("_")) {
+        continue;
+      }
       await walkDir(fullPath, pagesRoot, routes, pageExtensions, registry);
       continue;
     }
 
     // Only process .json and registered page-format files
     const ext = extname(entry.name).toLowerCase();
-    if (!pageExtensions.has(ext)) continue;
+    if (!pageExtensions.has(ext)) {
+      continue;
+    }
 
     // Skip underscore-prefixed files (local components, not routes)
-    if (entry.name.startsWith("_")) continue;
+    if (entry.name.startsWith("_")) {
+      continue;
+    }
 
     const relativePath = relative(pagesRoot, fullPath);
     const route = await fileToRoute(relativePath, fullPath, registry);
-    if (route) routes.push(route);
+    if (route) {
+      routes.push(route);
+    }
   }
 }
 
@@ -136,7 +149,7 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   // Normalize path separators
   urlPath = urlPath.split("\\").join("/");
 
-  // index files map to their parent directory
+  // Index files map to their parent directory
   if (urlPath.endsWith("/index")) {
     urlPath = urlPath.slice(0, -6) || "/";
   } else if (urlPath === "index") {
@@ -144,7 +157,9 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   }
 
   // Ensure leading slash
-  if (!urlPath.startsWith("/")) urlPath = "/" + urlPath;
+  if (!urlPath.startsWith("/")) {
+    urlPath = `/${urlPath}`;
+  }
 
   // Extract parameters from bracket syntax
   const params: string[] = [];
@@ -152,7 +167,7 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   let isCatchAll = false;
 
   // Convert [param] → :param and [...param] → *
-  const urlPattern = urlPath.replace(
+  const urlPattern = urlPath.replaceAll(
     /\[\.\.\.(\w+)\]|\[(\w+)\]/g,
     (match: string, spread: string, named: string) => {
       if (spread) {
@@ -173,20 +188,20 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   try {
     const doc = await readPageDocument(absolutePath, registry);
     if (typeof doc.$layout === "string") {
-      $layout = doc.$layout;
+      ({ $layout } = doc);
     }
   } catch {
     // Skip unreadable files — will error during compilation
   }
 
   return {
-    urlPattern,
-    sourcePath: absolutePath,
-    relativePath,
-    isDynamic,
-    isCatchAll,
-    params,
     $layout,
+    isCatchAll,
+    isDynamic,
+    params,
+    relativePath,
+    sourcePath: absolutePath,
+    urlPattern,
   };
 }
 
@@ -200,14 +215,15 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
  *
  * @param {Route[]} routes - Discovered route table
  * @param {string} projectRoot - Project root for resolving $ref paths
- * @param {Map<string, any[]>} [contentTypes] - Loaded content types (from content-loader)
+ * @param {Map<string, ContentLoaderEntry[]>} [contentTypes] - Loaded content types (from
+ *   content-loader)
  * @param {FormatRegistry} [registry] - Format registry for reading non-JSON dynamic pages
  * @returns {Promise<Route[]>} Expanded routes with concrete paths
  */
 export async function expandDynamicRoutes(
   routes: Route[],
   projectRoot: string,
-  contentTypes: Map<string, any[]> = new Map(),
+  contentTypes = new Map<string, ContentLoaderEntry[]>(),
   registry?: FormatRegistry,
 ) {
   const expanded: Route[] = [];
@@ -237,18 +253,20 @@ export async function expandDynamicRoutes(
 
     for (const pathEntry of pathEntries) {
       let concreteUrl = route.urlPattern;
+      const params: Record<string, string> = {};
       for (const [param, value] of Object.entries(pathEntry)) {
-        concreteUrl = concreteUrl.replace(`:${param}`, value as string);
-        concreteUrl = concreteUrl.replace("*", value as string);
+        params[param] = String(value);
+        concreteUrl = concreteUrl.replace(`:${param}`, params[param]);
+        concreteUrl = concreteUrl.replace("*", params[param]);
       }
 
       expanded.push({
         ...route,
-        urlPattern: concreteUrl,
-        isDynamic: false,
+        _pathParams: params,
         isCatchAll: false,
+        isDynamic: false,
         params: [],
-        _pathParams: pathEntry,
+        urlPattern: concreteUrl,
       });
     }
   }
@@ -259,19 +277,23 @@ export async function expandDynamicRoutes(
 /**
  * Resolve $paths into an array of param objects.
  *
- * @param {any} $paths - The $paths declaration
+ * @param {import("@jxsuite/schema/types").JxPathsDef} $paths - The $paths declaration
  * @param {string} projectRoot
- * @param {Map<string, any[]>} contentTypes
- * @returns {Record<string, any>[]} Array of { paramName: value } objects
+ * @param {Map<string, ContentLoaderEntry[]>} contentTypes
+ * @returns {Record<string, unknown>[]} Array of { paramName: value } objects
  */
-function resolvePathEntries($paths: any, projectRoot: string, contentTypes: Map<string, any[]>) {
+function resolvePathEntries(
+  $paths: import("@jxsuite/schema/types").JxPathsDef,
+  projectRoot: string,
+  contentTypes: Map<string, ContentLoaderEntry[]>,
+): Record<string, unknown>[] {
   // Legacy: array of param objects
   if (Array.isArray($paths)) {
     return $paths;
   }
 
   // Content type-based: { contentType: "blog", param: "slug", field: "id" }
-  if ($paths.contentType) {
+  if ("contentType" in $paths && $paths.contentType) {
     const entries = contentTypes.get($paths.contentType);
     if (!entries || entries.length === 0) {
       console.warn(
@@ -289,20 +311,20 @@ function resolvePathEntries($paths: any, projectRoot: string, contentTypes: Map<
   }
 
   // Explicit values: { values: ["en", "fr"], param: "lang" }
-  if (Array.isArray($paths.values)) {
+  if ("values" in $paths && Array.isArray($paths.values)) {
     const param = $paths.param ?? "value";
-    return $paths.values.map((v: string) => ({ [param]: v }));
+    return $paths.values.map((v) => ({ [param]: v }));
   }
 
   // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" }
-  if ($paths.$ref) {
+  if ("$ref" in $paths && $paths.$ref) {
     const filePath = resolve(projectRoot, $paths.$ref);
     /** @type {Record<string, unknown>[]} */
     let data;
     try {
       data = JSON.parse(readFileSync(filePath, "utf8"));
-    } catch (e) {
-      const err = e as Error;
+    } catch (error) {
+      const err = error as Error;
       console.warn(`Warning: $paths.$ref could not load "${$paths.$ref}": ${err.message}`);
       return [];
     }

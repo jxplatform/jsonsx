@@ -1,13 +1,13 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { compileStaticPage } from "../src/targets/compile-static";
 
 // ─── compileStaticPage ─────────────────────────────────────────────────────
 
 describe("compileStaticPage", () => {
   const baseOpts = {
-    title: "Test Page",
-    reactivitySrc: "https://esm.sh/@vue/reactivity",
     litHtmlSrc: "https://esm.sh/lit-html",
+    reactivitySrc: "https://esm.sh/@vue/reactivity",
+    title: "Test Page",
   };
 
   test("generates valid HTML document", () => {
@@ -34,12 +34,12 @@ describe("compileStaticPage", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
-          id: "app",
           children: [
             { tagName: "h1", textContent: "Title" },
             { tagName: "p", textContent: "Content" },
           ],
+          id: "app",
+          tagName: "div",
         },
       ],
     };
@@ -62,10 +62,10 @@ describe("compileStaticPage", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
-          id: "styled",
-          style: { color: "red", "@(min-width: 768px)": { color: "blue" } },
           children: [],
+          id: "styled",
+          style: { "@(min-width: 768px)": { color: "blue" }, color: "red" },
+          tagName: "div",
         },
       ],
     };
@@ -78,9 +78,9 @@ describe("compileStaticPage", () => {
     const doc = {
       children: [
         {
-          tagName: "div",
-          state: { count: 0 },
           onclick: { $ref: "#/state/fn" },
+          state: { count: 0 },
+          tagName: "div",
           textContent: "Dynamic",
         },
       ],
@@ -95,8 +95,8 @@ describe("compileStaticPage", () => {
     const doc = {
       children: [
         {
-          tagName: "button",
           onclick: { $ref: "#/state/fn" },
+          tagName: "button",
           textContent: "Click",
         },
       ],
@@ -120,7 +120,7 @@ describe("compileStaticPage", () => {
 
   test("handles innerHTML content", () => {
     const doc = {
-      children: [{ tagName: "div", innerHTML: "<b>Bold</b>" }],
+      children: [{ innerHTML: "<b>Bold</b>", tagName: "div" }],
     };
     const { html } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("<b>Bold</b>");
@@ -128,8 +128,8 @@ describe("compileStaticPage", () => {
 
   test("state with template triggers island compilation", () => {
     const doc = {
-      state: { name: "World" },
       children: [{ tagName: "p", textContent: "${state.name}" }],
+      state: { name: "World" },
     };
     const { html, files } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("jx-island-");
@@ -138,7 +138,7 @@ describe("compileStaticPage", () => {
 
   test("handles string children", () => {
     const doc = {
-      children: [{ tagName: "p", children: ["Hello ", "World"] }],
+      children: [{ children: ["Hello ", "World"], tagName: "p" }],
     };
     const { html } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("Hello");
@@ -147,8 +147,8 @@ describe("compileStaticPage", () => {
 
   test("handles numeric and boolean children", () => {
     const doc = {
-      children: [{ tagName: "p", children: [42, true] }],
-    };
+      children: [{ children: [42, true], tagName: "p" }],
+    } as unknown as import("@jxsuite/schema/types").JxDocument;
     const { html } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("42");
     expect(html).toContain("true");

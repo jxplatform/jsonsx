@@ -6,15 +6,15 @@
  * shortcuts on the canvas / document.
  */
 
-import { getNodeAtPath, parentElementPath, childIndex, canvasWrap } from "../store";
-import { activeTab, workspace, closeTab } from "../workspace/workspace";
+import { canvasWrap, childIndex, childList, getNodeAtPath, parentElementPath } from "../store";
+import { activeTab, closeTab, workspace } from "../workspace/workspace";
 import {
-  transactDoc,
+  mutateDuplicateNode,
   mutateInsertNode,
   mutateRemoveNode,
-  mutateDuplicateNode,
-  undo as tabUndo,
   redo as tabRedo,
+  undo as tabUndo,
+  transactDoc,
 } from "../tabs/transact";
 import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
@@ -59,9 +59,13 @@ export function initShortcuts(
     (e: WheelEvent) => {
       const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
       // Edit (content) mode: let the scroll container handle scrolling natively
-      if (canvasMode === "edit") return;
+      if (canvasMode === "edit") {
+        return;
+      }
       // Manage mode: browse table handles its own scrolling
-      if (canvasMode === "manage") return;
+      if (canvasMode === "manage") {
+        return;
+      }
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom towards cursor
@@ -70,7 +74,7 @@ export function initShortcuts(
         const cursorY = e.clientY - rect.top;
         const oldZoom = activeTab.value?.session.ui.zoom ?? 1;
         const delta = -e.deltaY * 0.005;
-        const newZoom = Math.min(5.0, Math.max(0.05, oldZoom * (1 + delta)));
+        const newZoom = Math.min(5, Math.max(0.05, oldZoom * (1 + delta)));
         const ratio = newZoom / oldZoom;
         // Adjust pan so the point under cursor stays stationary
         setPan(cursorX - (cursorX - panX) * ratio, cursorY - (cursorY - panY) * ratio);
@@ -90,8 +94,12 @@ export function initShortcuts(
   // Middle-mouse drag panning
   canvasWrap.addEventListener("pointerdown", (e: PointerEvent) => {
     const ctx = getContext();
-    if (ctx.canvasMode === "edit") return; // no panning in edit mode
-    if (e.button !== 1) return; // middle button only
+    if (ctx.canvasMode === "edit") {
+      return;
+    } // No panning in edit mode
+    if (e.button !== 1) {
+      return;
+    } // Middle button only
     e.preventDefault();
     canvasWrap.setPointerCapture(e.pointerId);
     let lastX = e.clientX,
@@ -169,7 +177,7 @@ export function initShortcuts(
 
     if (mod) {
       switch (e.key) {
-        case "w":
+        case "w": {
           e.preventDefault();
           if (workspace.activeTabId && workspace.tabOrder.length > 1) {
             const tab = workspace.tabs.get(workspace.activeTabId);
@@ -180,86 +188,111 @@ export function initShortcuts(
                 `"${name}" has unsaved changes. Close without saving?`,
                 { confirmLabel: "Close", destructive: true },
               ).then((confirmed) => {
-                if (confirmed && workspace.activeTabId) closeTab(workspace.activeTabId);
+                if (confirmed && workspace.activeTabId) {
+                  closeTab(workspace.activeTabId);
+                }
               });
             } else {
               closeTab(workspace.activeTabId);
             }
           }
           break;
-        case "o":
+        }
+        case "o": {
           e.preventDefault();
           openProject();
           break;
-        case "p":
+        }
+        case "p": {
           e.preventDefault();
           openQuickSearch();
           break;
-        case "s":
+        }
+        case "s": {
           e.preventDefault();
           saveFile();
           break;
-        case "z":
+        }
+        case "z": {
           e.preventDefault();
-          if (e.shiftKey) tabRedo(activeTab.value!);
-          else tabUndo(activeTab.value!);
+          if (e.shiftKey) {
+            tabRedo(activeTab.value!);
+          } else {
+            tabUndo(activeTab.value!);
+          }
           break;
-        case "d":
+        }
+        case "d": {
           e.preventDefault();
           if (tab?.session.selection) {
             const sel = tab.session.selection;
             transactDoc(tab, (t) => mutateDuplicateNode(t, sel));
           }
           break;
-        case "c":
+        }
+        case "c": {
           e.preventDefault();
           copyNode();
           break;
-        case "x":
+        }
+        case "x": {
           e.preventDefault();
           cutNode();
           break;
-        case "v":
+        }
+        case "v": {
           e.preventDefault();
           pasteNode();
           break;
-        case "0":
-          if (canvasMode === "edit") break;
+        }
+        case "0": {
+          if (canvasMode === "edit") {
+            break;
+          }
           e.preventDefault();
           activeTab.value!.session.ui.zoom = 1;
           setPan(16, 16);
           applyTransform();
           break;
+        }
         case "=":
-        case "+":
-          if (canvasMode === "edit") break;
+        case "+": {
+          if (canvasMode === "edit") {
+            break;
+          }
           e.preventDefault();
-          activeTab.value!.session.ui.zoom = Math.min(5.0, (tab?.session.ui.zoom ?? 1) * 1.2);
+          activeTab.value!.session.ui.zoom = Math.min(5, (tab?.session.ui.zoom ?? 1) * 1.2);
           applyTransform();
           break;
-        case "-":
-          if (canvasMode === "edit") break;
+        }
+        case "-": {
+          if (canvasMode === "edit") {
+            break;
+          }
           e.preventDefault();
           activeTab.value!.session.ui.zoom = Math.max(0.05, (tab?.session.ui.zoom ?? 1) / 1.2);
           applyTransform();
           break;
+        }
       }
       return;
     }
 
     switch (e.key) {
       case "Delete":
-      case "Backspace":
+      case "Backspace": {
         if (tab?.session.selection && tab.session.selection.length >= 2) {
           e.preventDefault();
           const sel = tab.session.selection;
           transactDoc(tab, (t) => mutateRemoveNode(t, sel));
         }
         break;
-      case "Escape":
+      }
+      case "Escape": {
         activeTab.value!.session.selection = null;
         break;
-      case "Enter":
+      }
+      case "Enter": {
         if (tab?.session.selection && tab.session.selection.length >= 2) {
           e.preventDefault();
           const pp = parentElementPath(tab.session.selection) as JxPath;
@@ -272,29 +305,34 @@ export function initShortcuts(
           enterEditOnPath(newPath);
         }
         break;
-      case "ArrowUp":
+      }
+      case "ArrowUp": {
         e.preventDefault();
         navigateSelection(-1);
         break;
-      case "ArrowDown":
+      }
+      case "ArrowDown": {
         e.preventDefault();
         navigateSelection(1);
         break;
-      case "ArrowLeft":
+      }
+      case "ArrowLeft": {
         e.preventDefault();
         if (tab?.session.selection && tab.session.selection.length >= 2) {
           activeTab.value!.session.selection = parentElementPath(tab.session.selection);
         }
         break;
-      case "ArrowRight":
+      }
+      case "ArrowRight": {
         e.preventDefault();
         if (tab?.session.selection) {
           const node = getNodeAtPath(tab.doc.document, tab.session.selection);
-          if ((node?.children?.length ?? 0) > 0) {
+          if (childList(node).length > 0) {
             activeTab.value!.session.selection = [...tab.session.selection, "children", 0];
           }
         }
         break;
+      }
     }
   });
 
@@ -317,7 +355,9 @@ function navigateSelection(direction: number = -1) {
     activeTab.value!.session.selection = [];
     return;
   }
-  if (tab.session.selection.length < 2) return;
+  if (tab.session.selection.length < 2) {
+    return;
+  }
 
   const parent = getNodeAtPath(
     tab.doc.document,
@@ -325,7 +365,7 @@ function navigateSelection(direction: number = -1) {
   );
   const idx = childIndex(tab.session.selection) as number;
   const newIdx = idx + direction;
-  if (parent?.children && newIdx >= 0 && newIdx < parent.children.length) {
+  if (newIdx >= 0 && newIdx < childList(parent).length) {
     activeTab.value!.session.selection = [
       ...(parentElementPath(tab.session.selection) as JxPath),
       "children",

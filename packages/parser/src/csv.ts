@@ -39,14 +39,20 @@ export function parseCSV(csv: string): Record<string, string>[] {
     } else if ((ch === "\n" || (ch === "\r" && csv[i + 1] === "\n")) && !inQuotes) {
       lines.push(current);
       current = "";
-      if (ch === "\r") i++;
+      if (ch === "\r") {
+        i++;
+      }
     } else {
       current += ch;
     }
   }
-  if (current.trim()) lines.push(current);
+  if (current.trim()) {
+    lines.push(current);
+  }
 
-  if (lines.length === 0) return [];
+  if (lines.length === 0) {
+    return [];
+  }
 
   const parseRow = (line: string) => {
     const fields: string[] = [];
@@ -107,13 +113,15 @@ export function coerceCSVRows(
     const data: Record<string, unknown> = { ...row };
     if (schema?.properties) {
       for (const [key, def] of Object.entries(schema.properties)) {
-        if (!(key in data)) continue;
+        if (!(key in data)) {
+          continue;
+        }
         if (def.type === "number") {
           const raw = String(data[key] ?? "").trim();
           if (raw === "") {
             data[key] = null;
           } else {
-            const cleaned = raw.replace(/[$€£¥,\s]/g, "");
+            const cleaned = raw.replaceAll(/[$€£¥,\s]/g, "");
             const n = Number(cleaned);
             data[key] = isNaN(n) ? null : n;
           }
@@ -138,7 +146,7 @@ export function coerceCSVRows(
       (data.slug as string | undefined) ??
       (data.Slug as string | undefined) ??
       String(i);
-    return { id, data, body: null };
+    return { body: null, data, id };
   });
 }
 
@@ -193,7 +201,7 @@ export class Csv {
       return Csv.parse(await response.text(), options);
     }
     const { readFileSync } = await import("node:fs");
-    return Csv.parse(readFileSync(path, "utf-8"), options);
+    return Csv.parse(readFileSync(path, "utf8"), options);
   }
 
   /** Runtime on-demand access: load the configured source. */

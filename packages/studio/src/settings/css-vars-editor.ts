@@ -32,15 +32,23 @@ export function renderCssVarsEditor(container: HTMLElement) {
     font: [string, string | number][];
     size: [string, string | number][];
     other: [string, string | number][];
-  } = { color: [], font: [], size: [], other: [] };
+  } = { color: [], font: [], other: [], size: [] };
   for (const [k, v] of Object.entries(rootStyle)) {
-    if (!k.startsWith("--")) continue;
-    if (typeof v !== "string" && typeof v !== "number") continue;
-    if (k.startsWith("--color")) groups.color.push([k, v]);
-    else if (k.startsWith("--font")) groups.font.push([k, v]);
-    else if (k.startsWith("--size") || k.startsWith("--spacing") || k.startsWith("--radius"))
+    if (!k.startsWith("--")) {
+      continue;
+    }
+    if (typeof v !== "string" && typeof v !== "number") {
+      continue;
+    }
+    if (k.startsWith("--color")) {
+      groups.color.push([k, v]);
+    } else if (k.startsWith("--font")) {
+      groups.font.push([k, v]);
+    } else if (k.startsWith("--size") || k.startsWith("--spacing") || k.startsWith("--radius")) {
       groups.size.push([k, v]);
-    else groups.other.push([k, v]);
+    } else {
+      groups.other.push([k, v]);
+    }
   }
 
   const mediaNames = media ? Object.keys(media).filter((m) => m !== "--") : [];
@@ -62,7 +70,9 @@ export function renderCssVarsEditor(container: HTMLElement) {
 
   const addVar = (prefix: string, friendlyName: string, val: string) => {
     const varName = friendlyNameToVar(friendlyName, prefix);
-    if (!varName || !val) return;
+    if (!varName || !val) {
+      return;
+    }
     rootStyle[varName] = val;
     save();
     renderCssVarsEditor(container);
@@ -268,7 +278,9 @@ function renderMediaOverrides(varName: string, rootStyle: JxStyle, mediaNames: s
     }
   }
 
-  if (overrides.length === 0) return nothing;
+  if (overrides.length === 0) {
+    return nothing;
+  }
 
   return html`
     <div class="css-var-media-overrides">
@@ -280,7 +292,9 @@ function renderMediaOverrides(varName: string, rootStyle: JxStyle, mediaNames: s
               size="s"
               .value=${String(o.value)}
               @change=${(e: Event) => {
-                if (!rootStyle[`@${o.mediaName}`]) rootStyle[`@${o.mediaName}`] = {};
+                if (!rootStyle[`@${o.mediaName}`]) {
+                  rootStyle[`@${o.mediaName}`] = {};
+                }
                 (rootStyle[`@${o.mediaName}`] as Record<string, unknown>)[varName] = (
                   e.target as HTMLInputElement
                 ).value;
@@ -316,14 +330,18 @@ function renderAddRow(
         size="s"
         placeholder=${placeholder}
         ${ref((el) => {
-          if (el) nameEl = el as HTMLInputElement;
+          if (el) {
+            nameEl = el as HTMLInputElement;
+          }
         })}
       ></sp-textfield>
       <sp-textfield
         size="s"
         placeholder=${valuePlaceholder}
         ${ref((el) => {
-          if (el) valEl = el as HTMLInputElement;
+          if (el) {
+            valEl = el as HTMLInputElement;
+          }
         })}
       ></sp-textfield>
       <sp-action-button

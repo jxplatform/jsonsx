@@ -1,4 +1,5 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
+
 try {
   GlobalRegistrator.register();
 } catch {}
@@ -28,13 +29,13 @@ describe("buildScope", () => {
 describe("Jx", () => {
   test("calls onMount if present in scope via $src", async () => {
     const target = document.createElement("div");
-    const srcUrl = new URL("./_test_handlers.js", import.meta.url).href;
+    const srcUrl = new URL("_test_handlers.js", import.meta.url).href;
     await Jx(
       {
-        tagName: "div",
         state: {
           onMount: { $prototype: "Function", $src: srcUrl },
         },
+        tagName: "div",
       },
       target,
     );
@@ -47,8 +48,8 @@ describe("Jx", () => {
     const doc = { tagName: "article" };
     global.fetch = mock(() =>
       Promise.resolve({
-        ok: true,
         json: () => Promise.resolve(doc),
+        ok: true,
       }),
     ) as any;
     const target = document.createElement("div");

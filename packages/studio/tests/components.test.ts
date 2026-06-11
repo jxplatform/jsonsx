@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { computeRelativePath } from "../src/files/components";
 
 // ─── computeRelativePath ────────────────────────────────────────────────────
@@ -42,7 +42,9 @@ describe("computeRelativePath", () => {
   });
 
   test("handles backslashes (Windows paths)", () => {
-    expect(computeRelativePath("pages\\index.json", "pages\\button.json")).toBe("./button.json");
+    expect(computeRelativePath(String.raw`pages\index.json`, String.raw`pages\button.json`)).toBe(
+      "./button.json",
+    );
   });
 
   test("common prefix is computed correctly", () => {

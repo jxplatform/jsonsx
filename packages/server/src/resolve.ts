@@ -1,11 +1,12 @@
 /** Resolve.js — Generic $src module proxy + timing: "server" function proxy */
 
-import { resolve, relative, dirname } from "node:path";
-import { readFileSync, existsSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
+import { errorMessage, parseClassDef } from "@jxsuite/schema/parse";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { loadContentTypes } from "@jxsuite/compiler/content-loader";
 import type { DynamicClass } from "@jxsuite/runtime/types";
-import type { ClassJsonDef } from "./types.ts";
+import type { JxClassDef } from "@jxsuite/schema/types";
 
 /**
  * Lazy-load project context (project.json + content types) for class instantiation.
@@ -19,7 +20,9 @@ import type { ClassJsonDef } from "./types.ts";
  */
 async function loadProjectContext(projectRoot: string) {
   const projectJsonPath = resolve(projectRoot, "project.json");
-  if (!existsSync(projectJsonPath)) return null;
+  if (!existsSync(projectJsonPath)) {
+    return null;
+  }
   try {
     const config = JSON.parse(readFileSync(projectJsonPath, "utf8"));
     const contentTypes = config.contentTypes
@@ -51,7 +54,9 @@ export async function handleResolve(
   }
 
   const { $src, $prototype, $export: xport, $base, ...config } = body;
-  if (!$src) return new Response("Missing $src", { status: 400 });
+  if (!$src) {
+    return new Response("Missing $src", { status: 400 });
+  }
 
   let moduleAbsPath;
   try {
@@ -60,12 +65,12 @@ export async function handleResolve(
       if ($base) {
         const docUrlPath = new URL($base).pathname;
         const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-        moduleAbsPath = resolve(resolve(root, "." + docDir), $src);
+        moduleAbsPath = resolve(resolve(root, `.${docDir}`), $src);
       } else {
         moduleAbsPath = resolve(activeProjectRoot || root, $src);
       }
     } else {
-      // npm/bare specifier — use createRequire from project root, fall back to server package
+      // Npm/bare specifier — use createRequire from project root, fall back to server package
       const projectRoot = activeProjectRoot || root;
       const projRequire = createRequire(resolve(projectRoot, "package.json"));
       try {
@@ -75,18 +80,18 @@ export async function handleResolve(
         moduleAbsPath = serverRequire.resolve($src);
       }
     }
-  } catch (e) {
-    return new Response(`Cannot resolve $src "${$src}": ${(e as Error).message}`, { status: 400 });
+  } catch (error) {
+    return new Response(`Cannot resolve $src "${$src}": ${errorMessage(error)}`, { status: 400 });
   }
 
   // Rebase relative config paths from doc-relative to CWD-relative
   if ($base) {
     const docUrlPath = new URL($base).pathname;
     const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-    const docAbsDir = resolve(root, "." + docDir);
+    const docAbsDir = resolve(root, `.${docDir}`);
     for (const [k, v] of Object.entries(config)) {
       if (typeof v === "string" && (v.startsWith("./") || v.startsWith("../"))) {
-        config[k] = "./" + relative(process.cwd(), resolve(docAbsDir, v)).split("\\").join("/");
+        config[k] = `./${relative(process.cwd(), resolve(docAbsDir, v)).split("\\").join("/")}`;
       }
     }
   }
@@ -95,7 +100,7 @@ export async function handleResolve(
   if (moduleAbsPath.endsWith(".class.json")) {
     try {
       const content = readFileSync(moduleAbsPath, "utf8");
-      const classDef = JSON.parse(content);
+      const classDef = parseClassDef(content, moduleAbsPath);
 
       // Inject project context for classes that need it
       const projectRoot = activeProjectRoot || root;
@@ -139,8 +144,8 @@ export async function handleResolve(
             ? instance.value
             : instance;
       return Response.json(value);
-    } catch (e) {
-      return Response.json({ error: (e as Error).message }, { status: 500 });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 
@@ -168,19 +173,21 @@ export async function handleServerFunction(req: Request, root: string) {
   }
 
   const { $src, $export: xport, $base, arguments: args = {} } = body;
-  if (!$src || !xport) return new Response("Missing $src or $export", { status: 400 });
+  if (!$src || !xport) {
+    return new Response("Missing $src or $export", { status: 400 });
+  }
 
   let moduleAbsPath;
   try {
     if ($base) {
       const docUrlPath = new URL($base).pathname;
       const docDir = docUrlPath.slice(0, docUrlPath.lastIndexOf("/") + 1);
-      moduleAbsPath = resolve(resolve(root, "." + docDir), $src);
+      moduleAbsPath = resolve(resolve(root, `.${docDir}`), $src);
     } else {
       moduleAbsPath = resolve(root, $src);
     }
-  } catch (e) {
-    return new Response(`Cannot resolve $src: ${(e as Error).message}`, {
+  } catch (error) {
+    return new Response(`Cannot resolve $src: ${errorMessage(error)}`, {
       status: 400,
     });
   }
@@ -188,8 +195,8 @@ export async function handleServerFunction(req: Request, root: string) {
   let mod;
   try {
     mod = await import(moduleAbsPath);
-  } catch (e) {
-    return new Response(`Failed to import "${$src}": ${(e as Error).message}`, {
+  } catch (error) {
+    return new Response(`Failed to import "${$src}": ${errorMessage(error)}`, {
       status: 500,
     });
   }
@@ -204,8 +211,8 @@ export async function handleServerFunction(req: Request, root: string) {
   try {
     const result = await fn(args);
     return Response.json(result ?? null);
-  } catch (e) {
-    return Response.json({ error: (e as Error).message }, { status: 500 });
+  } catch (error) {
+    return Response.json({ error: errorMessage(error) }, { status: 500 });
   }
 }
 
@@ -213,11 +220,13 @@ export async function handleServerFunction(req: Request, root: string) {
  * Dynamically construct a class from a .class.json schema definition. Server-side variant — no
  * private field limitations.
  *
- * @param {ClassJsonDef} classDef
+ * @param {JxClassDef} classDef
  */
-function classFromSchema(classDef: ClassJsonDef) {
+function classFromSchema(classDef: JxClassDef) {
   const fields = classDef.$defs?.fields ?? {};
-  const ctor = classDef.$defs?.constructor;
+  // JSON objects inherit Object.prototype.constructor — only an own object value counts.
+  const rawCtor = classDef.$defs?.constructor;
+  const ctor = typeof rawCtor === "object" ? rawCtor : undefined;
   const methods = classDef.$defs?.methods ?? {};
 
   class DynClass {
@@ -226,10 +235,15 @@ function classFromSchema(classDef: ClassJsonDef) {
       const cfg = config as Record<string, unknown>;
       for (const [key, field] of Object.entries(fields)) {
         const id = field.identifier ?? key;
-        if (cfg[id] !== undefined) self[id] = cfg[id];
-        else if (field.initializer !== undefined) self[id] = field.initializer;
-        else if (field.default !== undefined) self[id] = structuredClone(field.default);
-        else self[id] = null;
+        if (cfg[id] !== undefined) {
+          self[id] = cfg[id];
+        } else if (field.initializer !== undefined) {
+          self[id] = field.initializer;
+        } else if (field.default !== undefined) {
+          self[id] = structuredClone(field.default);
+        } else {
+          self[id] = null;
+        }
       }
       if (ctor?.body) {
         const bodyStr = Array.isArray(ctor.body) ? ctor.body.join("\n") : ctor.body;
@@ -241,17 +255,22 @@ function classFromSchema(classDef: ClassJsonDef) {
   for (const [key, method] of Object.entries(methods)) {
     const name = method.identifier ?? key;
     const params = (method.parameters ?? []).map((p) => {
-      if (p.$ref) return p.$ref.split("/").pop() ?? "arg";
-      return p.identifier ?? p.name ?? "arg";
+      if (p.$ref) {
+        return p.$ref.split("/").pop() ?? "arg";
+      }
+      const n = p.identifier ?? p.name;
+      return typeof n === "string" ? n : "arg";
     });
     const bodyStr = Array.isArray(method.body) ? method.body.join("\n") : (method.body ?? "");
 
     if (method.role === "accessor") {
       const descriptor: PropertyDescriptor = {};
-      if (method.getter) descriptor.get = new Function(method.getter.body) as () => unknown;
+      if (method.getter) {
+        descriptor.get = new Function(method.getter.body ?? "") as () => unknown;
+      }
       if (method.setter) {
         const sp = (method.setter.parameters ?? []).map((p) => p.$ref?.split("/").pop() ?? "v");
-        descriptor.set = new Function(...sp, method.setter.body) as (v: unknown) => void;
+        descriptor.set = new Function(...sp, method.setter.body ?? "") as (v: unknown) => void;
       }
       Object.defineProperty(DynClass.prototype, name, {
         ...descriptor,
@@ -265,8 +284,8 @@ function classFromSchema(classDef: ClassJsonDef) {
   }
 
   Object.defineProperty(DynClass, "name", {
-    value: classDef.title,
     configurable: true,
+    value: classDef.title,
   });
   return DynClass;
 }

@@ -1,85 +1,87 @@
 import {
-  setProjectRoot,
-  openProject,
-  listDirectory,
-  handleReadFile,
-  handleWriteFile,
-  handleDeleteFile,
-  handleRenameFile,
-  handleCreateDirectory,
-  handleUploadFile,
-  handleResolveSiteContext,
-  discoverComponents,
   codeService,
-  locateFile,
+  discoverComponents,
   fetchPluginSchema,
+  handleCreateDirectory,
+  handleDeleteFile,
+  handleReadFile,
+  handleRenameFile,
+  handleResolveSiteContext,
+  handleUploadFile,
+  handleWriteFile,
+  listDirectory,
+  locateFile,
+  openProject,
+  setProjectRoot,
 } from "../src/handlers";
 import {
-  gitStatus,
   gitBranches,
-  gitLog,
-  gitStage,
-  gitUnstage,
-  gitCommit,
-  gitPush,
-  gitPull,
-  gitFetch,
   gitCheckout,
+  gitCommit,
   gitCreateBranch,
   gitDiff,
   gitDiscard,
+  gitFetch,
+  gitLog,
+  gitPull,
+  gitPush,
+  gitStage,
+  gitStatus,
+  gitUnstage,
 } from "../src/git";
-import { addPackage, removePackage, listPackages } from "../src/packages";
+import { addPackage, listPackages, removePackage } from "../src/packages";
 
 const projectRoot = process.argv[2] || process.cwd();
 setProjectRoot(projectRoot);
 
 const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
-  openProject: () => openProject(),
-  listDirectory: (params) => listDirectory(params as { dir: string }),
-  readFile: (params) => handleReadFile(params as { path: string }),
-  writeFile: (params) => handleWriteFile(params as { path: string; content: string }),
-  deleteFile: (params) => handleDeleteFile(params as { path: string }),
-  renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
-  createDirectory: (params) => handleCreateDirectory(params as { path: string }),
-  uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
-  resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
-  discoverComponents: (params) => discoverComponents(params as { dir?: string }),
+  addPackage: (params) => addPackage(params as { name: string }),
   codeService: (params) => codeService(params),
-  locateFile: (params) => locateFile(params as { name: string }),
+  createDirectory: (params) => handleCreateDirectory(params as { path: string }),
+  deleteFile: (params) => handleDeleteFile(params as { path: string }),
+  discoverComponents: (params) => discoverComponents(params as { dir?: string }),
   fetchPluginSchema: (params) =>
     fetchPluginSchema(params as { src: string; prototype?: string; base?: string }),
-  gitStatus: () => gitStatus(),
   gitBranches: () => gitBranches(),
-  gitLog: (params) => gitLog(params as { limit?: number }),
-  gitStage: (params) => gitStage(params as { files: string[] }),
-  gitUnstage: (params) => gitUnstage(params as { files: string[] }),
-  gitCommit: (params) => gitCommit(params as { message: string }),
-  gitPush: () => gitPush(),
-  gitPull: () => gitPull(),
-  gitFetch: () => gitFetch(),
   gitCheckout: (params) => gitCheckout(params as { branch: string }),
+  gitCommit: (params) => gitCommit(params as { message: string }),
   gitCreateBranch: (params) => gitCreateBranch(params as { name: string }),
   gitDiff: (params) => gitDiff(params as { path?: string }),
   gitDiscard: (params) => gitDiscard(params as { files: string[] }),
-  addPackage: (params) => addPackage(params as { name: string }),
-  removePackage: (params) => removePackage(params as { name: string }),
+  gitFetch: () => gitFetch(),
+  gitLog: (params) => gitLog(params as { limit?: number }),
+  gitPull: () => gitPull(),
+  gitPush: () => gitPush(),
+  gitStage: (params) => gitStage(params as { files: string[] }),
+  gitStatus: () => gitStatus(),
+  gitUnstage: (params) => gitUnstage(params as { files: string[] }),
+  listDirectory: (params) => listDirectory(params as { dir: string }),
   listPackages: () => listPackages(),
+  locateFile: (params) => locateFile(params as { name: string }),
+  openProject: () => openProject(),
+  readFile: (params) => handleReadFile(params as { path: string }),
+  removePackage: (params) => removePackage(params as { name: string }),
+  renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
+  resolveSiteContext: (params) => handleResolveSiteContext(params as { filePath: string }),
+  uploadFile: (params) => handleUploadFile(params as { path: string; data: string }),
+  writeFile: (params) => handleWriteFile(params as { path: string; content: string }),
 };
 
 const server = Bun.serve({
-  port: 0,
   async fetch(req, server) {
-    if (server.upgrade(req)) return;
+    if (server.upgrade(req)) {
+      return;
+    }
     return new Response("Not Found", { status: 404 });
   },
+  port: 0,
   websocket: {
     async message(ws, raw) {
       let msg: { id: number; method: string; params?: unknown };
       try {
         msg = JSON.parse(raw as string);
       } catch {
-        ws.send(JSON.stringify({ id: 0, error: "Invalid JSON" }));
+        ws.send(JSON.stringify({ error: "Invalid JSON", id: 0 }));
         return;
       }
 
@@ -88,8 +90,8 @@ const server = Bun.serve({
         await Bun.sleep(0);
         ws.send(
           JSON.stringify({
-            id: msg.id,
             error: `Unknown method: ${msg.method}`,
+            id: msg.id,
           }),
         );
         return;
@@ -98,12 +100,12 @@ const server = Bun.serve({
       try {
         const result = await handler(msg.params);
         ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
-      } catch (err: unknown) {
+      } catch (error: unknown) {
         await Bun.sleep(0);
         ws.send(
           JSON.stringify({
+            error: error instanceof Error ? error.message : String(error),
             id: msg.id,
-            error: err instanceof Error ? err.message : String(err),
           }),
         );
       }

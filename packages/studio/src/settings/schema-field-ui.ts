@@ -45,7 +45,9 @@ export const FORMAT_OPTIONS = ["", "image", "date", "color"];
  * @returns {string}
  */
 export function detectFieldType(schema: SchemaProperty) {
-  if (schema.$ref) return "reference";
+  if (schema.$ref) {
+    return "reference";
+  }
   return schema.type || "string";
 }
 
@@ -56,7 +58,9 @@ export function detectFieldType(schema: SchemaProperty) {
  * @returns {string}
  */
 export function detectFieldFormat(schema: SchemaProperty) {
-  if (schema.type === "array" && schema.items?.format) return schema.items.format;
+  if (schema.type === "array" && schema.items?.format) {
+    return schema.items.format;
+  }
   return schema.format || "";
 }
 
@@ -99,12 +103,17 @@ export function fieldCardTpl(
           @change=${(e: Event) => {
             const target = e.target as HTMLInputElement;
             const newName = target.value.trim();
-            if (newName && newName !== fieldName) handlers.onRename(fieldName, newName);
-            else target.value = fieldName;
+            if (newName && newName !== fieldName) {
+              handlers.onRename(fieldName, newName);
+            } else {
+              target.value = fieldName;
+            }
           }}
           @keydown=${(e: KeyboardEvent) => {
             const target = e.target as HTMLInputElement;
-            if (e.key === "Enter") target.blur();
+            if (e.key === "Enter") {
+              target.blur();
+            }
             if (e.key === "Escape") {
               target.value = fieldName;
               target.blur();
@@ -114,7 +123,9 @@ export function fieldCardTpl(
         ${typePickerTpl(type, (newType) => handlers.onChangeType(fieldName, newType))}
         ${type === "string" || type === "array"
           ? formatPickerTpl(format, (f) => {
-              if (handlers.onChangeFormat) handlers.onChangeFormat(fieldName, f);
+              if (handlers.onChangeFormat) {
+                handlers.onChangeFormat(fieldName, f);
+              }
             })
           : nothing}
         <sp-switch
@@ -133,7 +144,7 @@ export function fieldCardTpl(
           <sp-icon-delete slot="icon"></sp-icon-delete>
         </sp-action-button>
       </div>
-      ${isRef && contentTypeNames.length
+      ${isRef && contentTypeNames.length > 0
         ? html`
             <div class="schema-field-ref-target">
               <sp-picker
@@ -141,8 +152,9 @@ export function fieldCardTpl(
                 label="Target"
                 value=${refTarget}
                 @change=${(e: Event) => {
-                  if (handlers.onChangeRefTarget)
+                  if (handlers.onChangeRefTarget) {
                     handlers.onChangeRefTarget(fieldName, (e.target as HTMLInputElement).value);
+                  }
                 }}
               >
                 ${contentTypeNames.map((n) => html`<sp-menu-item value=${n}>${n}</sp-menu-item>`)}
@@ -210,7 +222,9 @@ function nestedFieldCardTpl(
           }}
           @keydown=${(e: KeyboardEvent) => {
             const target = e.target as HTMLInputElement;
-            if (e.key === "Enter") target.blur();
+            if (e.key === "Enter") {
+              target.blur();
+            }
             if (e.key === "Escape") {
               target.value = childName;
               target.blur();
@@ -218,21 +232,24 @@ function nestedFieldCardTpl(
           }}
         ></sp-textfield>
         ${typePickerTpl(type, (newType) => {
-          if (handlers.onChangeNestedType)
+          if (handlers.onChangeNestedType) {
             handlers.onChangeNestedType(parentName, childName, newType);
+          }
         })}
         ${type === "string" || type === "array"
           ? formatPickerTpl(format, (f) => {
-              if (handlers.onChangeNestedFormat)
+              if (handlers.onChangeNestedFormat) {
                 handlers.onChangeNestedFormat(parentName, childName, f);
+              }
             })
           : nothing}
         <sp-switch
           size="s"
           ?checked=${isRequired}
           @change=${() => {
-            if (handlers.onToggleNestedRequired)
+            if (handlers.onToggleNestedRequired) {
               handlers.onToggleNestedRequired(parentName, childName);
+            }
           }}
         >
           Req
@@ -242,7 +259,9 @@ function nestedFieldCardTpl(
           quiet
           title="Delete field"
           @click=${() => {
-            if (handlers.onDeleteNested) handlers.onDeleteNested(parentName, childName);
+            if (handlers.onDeleteNested) {
+              handlers.onDeleteNested(parentName, childName);
+            }
           }}
         >
           <sp-icon-delete slot="icon"></sp-icon-delete>
@@ -276,8 +295,8 @@ function nestedAddFieldTpl(parentName: string, handlers: FieldHandlers) {
             if (name && handlers.onAddNestedField) {
               handlers.onAddNestedField(parentName, {
                 name,
-                type,
                 required: false,
+                type,
               });
               target.value = "";
             }
@@ -301,10 +320,12 @@ function nestedAddFieldTpl(parentName: string, handlers: FieldHandlers) {
           if (name && handlers.onAddNestedField) {
             handlers.onAddNestedField(parentName, {
               name,
-              type,
               required: false,
+              type,
             });
-            if (nameInput) nameInput.value = "";
+            if (nameInput) {
+              nameInput.value = "";
+            }
           }
         }}
       >
@@ -381,8 +402,12 @@ export function addFieldFormTpl(
         .value=${state.name}
         @input=${(e: Event) => handlers.onInput("name", (e.target as HTMLInputElement).value)}
         @keydown=${(e: KeyboardEvent) => {
-          if (e.key === "Enter") handlers.onConfirm();
-          if (e.key === "Escape") handlers.onCancel();
+          if (e.key === "Enter") {
+            handlers.onConfirm();
+          }
+          if (e.key === "Escape") {
+            handlers.onCancel();
+          }
         }}
       ></sp-textfield>
       ${typePickerTpl(state.type, (t) => handlers.onInput("type", t))}
@@ -412,20 +437,26 @@ export function addFieldFormTpl(
  */
 export function schemaForType(type: string, format?: string) {
   switch (type) {
-    case "number":
+    case "number": {
       return { type: "number" };
-    case "boolean":
+    }
+    case "boolean": {
       return { type: "boolean" };
-    case "array":
+    }
+    case "array": {
       return format
-        ? { type: "array", items: { type: "string", format } }
-        : { type: "array", items: { type: "string" } };
-    case "object":
-      return { type: "object", properties: {}, required: [] };
-    case "reference":
+        ? { items: { format, type: "string" }, type: "array" }
+        : { items: { type: "string" }, type: "array" };
+    }
+    case "object": {
+      return { properties: {}, required: [], type: "object" };
+    }
+    case "reference": {
       return { $ref: "#/contentTypes/" };
-    default:
-      return format ? { type: "string", format } : { type: "string" };
+    }
+    default: {
+      return format ? { format, type: "string" } : { type: "string" };
+    }
   }
 }
 
@@ -437,18 +468,27 @@ export function schemaForType(type: string, format?: string) {
  * @returns {string}
  */
 export function yamlDefault(type: string, format?: string) {
-  if (format === "date") return new Date().toISOString().split("T")[0];
-  if (format === "image") return '""';
+  if (format === "date") {
+    return new Date().toISOString().split("T")[0];
+  }
+  if (format === "image") {
+    return '""';
+  }
   switch (type) {
-    case "boolean":
+    case "boolean": {
       return "false";
-    case "number":
+    }
+    case "number": {
       return "0";
-    case "array":
+    }
+    case "array": {
       return "[]";
-    case "object":
+    }
+    case "object": {
       return "{}";
-    default:
+    }
+    default: {
       return '""';
+    }
   }
 }

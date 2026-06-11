@@ -4,8 +4,8 @@
  * These are all side-effect-free functions used by style/properties/events panels.
  */
 
-import { formatByName, defaultContentFormat } from "../format/format-host";
-import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
+import { defaultContentFormat, formatByName } from "../format/format-host";
+import type { ContentTypeDef, ProjectConfig } from "@jxsuite/schema/types";
 
 /**
  * CamelCase → kebab-case for inline style attributes
@@ -14,7 +14,7 @@ import type { ProjectConfig, ContentTypeDef } from "@jxsuite/schema/types";
  * @returns {string}
  */
 export function camelToKebab(str: string) {
-  return str.replace(/[A-Z]/g, (c: string) => "-" + c.toLowerCase());
+  return str.replaceAll(/[A-Z]/g, (c: string) => `-${c.toLowerCase()}`);
 }
 
 /**
@@ -25,12 +25,12 @@ export function camelToKebab(str: string) {
  * @returns {string}
  */
 export function camelToLabel(prop: string) {
-  return prop.replace(/([A-Z])/g, " $1").replace(/^./, (c: string) => c.toUpperCase());
+  return prop.replaceAll(/([A-Z])/g, " $1").replace(/^./, (c: string) => c.toUpperCase());
 }
 
 export function toCamelCase(str: string): string {
   return str
-    .replace(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+    .replaceAll(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
     .replace(/^[A-Z]/, (c) => c.toLowerCase());
 }
 
@@ -42,7 +42,7 @@ export function toCamelCase(str: string): string {
  * @returns {string}
  */
 export function kebabToLabel(val: string) {
-  return val.replace(
+  return val.replaceAll(
     /(^|-)(\w)/g,
     (_: string, sep: string, c: string) => (sep ? " " : "") + c.toUpperCase(),
   );
@@ -73,12 +73,15 @@ export function attrLabel(
   entry: { $label?: string; [key: string]: unknown } | null | undefined,
   attr: string,
 ) {
-  if (entry?.$label) return entry.$label;
-  if (attr.includes("-"))
-    return attr.replace(
+  if (entry?.$label) {
+    return entry.$label;
+  }
+  if (attr.includes("-")) {
+    return attr.replaceAll(
       /(^|-)(\w)/g,
       (_: string, sep: string, c: string) => (sep ? " " : "") + c.toUpperCase(),
     );
+  }
   return camelToLabel(attr);
 }
 
@@ -90,25 +93,25 @@ export function attrLabel(
  */
 export function abbreviateValue(val: string) {
   const map: Record<string, string> = {
+    baseline: "base",
+    column: "col",
+    "column-reverse": "col-r",
+    contents: "cnt",
+    "flex-end": "end",
+    "flex-start": "start",
+    "flow-root": "flow",
     inline: "inl",
     "inline-block": "i-blk",
     "inline-flex": "i-flx",
     "inline-grid": "i-grd",
-    contents: "cnt",
-    "flow-root": "flow",
+    normal: "norm",
     nowrap: "no-wr",
-    "wrap-reverse": "wr-rev",
-    "flex-start": "start",
-    "flex-end": "end",
-    "space-between": "betw",
+    "row-reverse": "row-r",
     "space-around": "arnd",
+    "space-between": "betw",
     "space-evenly": "even",
     stretch: "str",
-    baseline: "base",
-    normal: "norm",
-    "row-reverse": "row-r",
-    "column-reverse": "col-r",
-    column: "col",
+    "wrap-reverse": "wr-rev",
   };
   return map[val] || val;
 }
@@ -120,15 +123,33 @@ export function abbreviateValue(val: string) {
  * @returns {string}
  */
 export function inferInputType(entry: Record<string, unknown>) {
-  if (entry.$shorthand === true) return "shorthand";
-  if (entry.$input === "button-group") return "button-group";
-  if (entry.$input === "media") return "media";
-  if (entry.format === "color") return "color";
-  if (entry.format === "uri-reference") return "media";
-  if (entry.$units !== undefined) return "number-unit";
-  if (entry.type === "number") return "number";
-  if (Array.isArray(entry.enum)) return "select";
-  if (Array.isArray(entry.examples) || Array.isArray(entry.presets)) return "combobox";
+  if (entry.$shorthand === true) {
+    return "shorthand";
+  }
+  if (entry.$input === "button-group") {
+    return "button-group";
+  }
+  if (entry.$input === "media") {
+    return "media";
+  }
+  if (entry.format === "color") {
+    return "color";
+  }
+  if (entry.format === "uri-reference") {
+    return "media";
+  }
+  if (entry.$units !== undefined) {
+    return "number-unit";
+  }
+  if (entry.type === "number") {
+    return "number";
+  }
+  if (Array.isArray(entry.enum)) {
+    return "select";
+  }
+  if (Array.isArray(entry.examples) || Array.isArray(entry.presets)) {
+    return "combobox";
+  }
   return "text";
 }
 
@@ -144,15 +165,19 @@ export function findContentTypeSchema(
   documentPath: string | null,
   projectConfig: ProjectConfig | null | undefined,
 ) {
-  if (!documentPath || !projectConfig?.contentTypes) return null;
+  if (!documentPath || !projectConfig?.contentTypes) {
+    return null;
+  }
   for (const [name, def] of Object.entries(
     projectConfig.contentTypes as Record<string, ContentTypeDef>,
   )) {
-    if (!def.source || !def.schema) continue;
+    if (!def.source || !def.schema) {
+      continue;
+    }
     const src = def.source.replace(/^\.\//, "").replace(/\/$/, "");
     const hasExt = src.includes(".") && !src.endsWith("/");
     if (hasExt) {
-      if (documentPath === src || documentPath.endsWith("/" + src)) {
+      if (documentPath === src || documentPath.endsWith(`/${src}`)) {
         return { name, schema: def.schema };
       }
     } else {
@@ -162,7 +187,7 @@ export function findContentTypeSchema(
           : (formatByName(def.format)?.extensions[0] ??
             defaultContentFormat()?.extensions[0] ??
             ".json");
-      if (documentPath.startsWith(src + "/") && documentPath.endsWith(ext)) {
+      if (documentPath.startsWith(`${src}/`) && documentPath.endsWith(ext)) {
         return { name, schema: def.schema };
       }
     }
@@ -182,11 +207,13 @@ export function friendlyNameToVar(name: string, prefix: string) {
   const slug = name
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  if (!slug) return "";
+    .replaceAll(/[^a-z0-9\s-]/g, "")
+    .replaceAll(/\s+/g, "-")
+    .replaceAll(/-+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+  if (!slug) {
+    return "";
+  }
   return `${prefix}${slug}`;
 }
 
@@ -201,10 +228,10 @@ export function friendlyNameToVar(name: string, prefix: string) {
 export function varDisplayName(varName: string, prefix: string) {
   return (
     varName
-      .replace(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), "")
+      .replace(new RegExp(`^${prefix.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)}`), "")
       .replace(/^--/, "")
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (c: string) => c.toUpperCase()) || varName
+      .replaceAll("-", " ")
+      .replaceAll(/\b\w/g, (c: string) => c.toUpperCase()) || varName
   );
 }
 
@@ -218,13 +245,19 @@ export function varDisplayName(varName: string, prefix: string) {
  *   | { kind: "text" }}
  */
 export function parseCemType(typeText: string | undefined | null) {
-  if (!typeText) return { kind: "text" };
+  if (!typeText) {
+    return { kind: "text" };
+  }
   const t = typeText
     .trim()
-    .replace(/\s*\|\s*undefined\b/g, "")
+    .replaceAll(/\s*\|\s*undefined\b/g, "")
     .trim();
-  if (t === "boolean") return { kind: "boolean" };
-  if (t === "number") return { kind: "number" };
+  if (t === "boolean") {
+    return { kind: "boolean" };
+  }
+  if (t === "number") {
+    return { kind: "number" };
+  }
   // Detect enum: "'a' | 'b' | 'c'" — pipe-separated quoted literals
   const enumMatch = t.match(/^'[^']*'(\s*\|\s*'[^']*')+$/);
   if (enumMatch) {

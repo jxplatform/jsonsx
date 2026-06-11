@@ -8,11 +8,11 @@ import { html, render as litRender, nothing } from "lit-html";
 import { projectState } from "../store";
 import { updateSiteConfig } from "../site-context";
 import {
-  isGoogleFontEntry,
-  extractFontFamily,
   buildGoogleFontUrl,
-  ensureGoogleFontPreconnects,
   cleanupGoogleFontPreconnects,
+  ensureGoogleFontPreconnects,
+  extractFontFamily,
+  isGoogleFontEntry,
 } from "../utils/google-fonts";
 
 import type { JxHeadEntry, ProjectConfig } from "@jxsuite/schema/types";
@@ -28,7 +28,7 @@ export function renderHeadEditor(container: HTMLElement) {
 
   const addEntry = (tag: string) => {
     const attrs: Record<string, string | boolean> = {};
-    const entry: JxHeadEntry = { tagName: tag, attributes: attrs };
+    const entry: JxHeadEntry = { attributes: attrs, tagName: tag };
     if (tag === "link") {
       attrs.rel = "stylesheet";
       attrs.href = "";
@@ -56,7 +56,9 @@ export function renderHeadEditor(container: HTMLElement) {
     if (key === "content" && (entry.tagName === "script" || entry.tagName === "style")) {
       entry.textContent = val;
     } else {
-      if (!entry.attributes) entry.attributes = {};
+      if (!entry.attributes) {
+        entry.attributes = {};
+      }
       entry.attributes[key] = val;
     }
     save();
@@ -126,7 +128,7 @@ function renderEntryFields(
   const attrs = entry.attributes || {};
 
   switch (entry.tagName) {
-    case "link":
+    case "link": {
       return html`
         <div class="settings-field-row">
           <sp-textfield
@@ -144,7 +146,8 @@ function renderEntryFields(
           ></sp-textfield>
         </div>
       `;
-    case "meta":
+    }
+    case "meta": {
       return html`
         <div class="settings-field-row">
           <sp-textfield
@@ -162,7 +165,8 @@ function renderEntryFields(
           ></sp-textfield>
         </div>
       `;
-    case "script":
+    }
+    case "script": {
       return html`
         <div class="settings-field-row">
           <sp-textfield
@@ -189,7 +193,8 @@ function renderEntryFields(
             `
           : nothing}
       `;
-    case "style":
+    }
+    case "style": {
       return html`
         <div class="head-entry-body">
           <label class="settings-field-label">Style body</label>
@@ -202,8 +207,10 @@ function renderEntryFields(
           ></textarea>
         </div>
       `;
-    default:
+    }
+    default: {
       return nothing;
+    }
   }
 }
 
@@ -224,8 +231,8 @@ function renderGoogleFontsSection(
   const addFont = (family: string) => {
     ensureGoogleFontPreconnects(headEntries);
     headEntries.push({
+      attributes: { href: buildGoogleFontUrl(family), rel: "stylesheet" },
       tagName: "link",
-      attributes: { rel: "stylesheet", href: buildGoogleFontUrl(family) },
     });
     save();
     rerender();
@@ -233,7 +240,9 @@ function renderGoogleFontsSection(
 
   const removeFont = (entry: JxHeadEntry) => {
     const idx = headEntries.indexOf(entry);
-    if (idx >= 0) headEntries.splice(idx, 1);
+    if (idx !== -1) {
+      headEntries.splice(idx, 1);
+    }
     const cleaned = cleanupGoogleFontPreconnects(headEntries);
     if (cleaned !== headEntries) {
       headEntries.length = 0;
@@ -266,9 +275,13 @@ function renderGoogleFontsSection(
         placeholder="Font family name…"
         style="flex:1"
         @keydown=${(e: KeyboardEvent) => {
-          if (e.key !== "Enter") return;
+          if (e.key !== "Enter") {
+            return;
+          }
           const family = (e.target as HTMLInputElement).value?.trim();
-          if (!family) return;
+          if (!family) {
+            return;
+          }
           (e.target as HTMLInputElement).value = "";
           addFont(family);
         }}
@@ -278,7 +291,9 @@ function renderGoogleFontsSection(
         @click=${(e: MouseEvent) => {
           const input = (e.target as HTMLElement).closest("div")?.querySelector("sp-textfield");
           const family = (input as HTMLInputElement | null)?.value?.trim();
-          if (!family) return;
+          if (!family) {
+            return;
+          }
           (input as HTMLInputElement).value = "";
           addFont(family);
         }}

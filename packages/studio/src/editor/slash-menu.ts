@@ -21,21 +21,21 @@ interface SlashCommand {
 // ─── Commands ─────────────────────────────────────────────────────────────────
 
 const SLASH_COMMANDS = [
-  { label: "Heading 1", tag: "h1", description: "Large heading" },
-  { label: "Heading 2", tag: "h2", description: "Medium heading" },
-  { label: "Heading 3", tag: "h3", description: "Small heading" },
-  { label: "Paragraph", tag: "p", description: "Plain text" },
-  { label: "Bulleted List", tag: "ul", description: "Unordered list" },
-  { label: "Numbered List", tag: "ol", description: "Numbered list" },
-  { label: "Blockquote", tag: "blockquote", description: "Quote block" },
-  { label: "Image", tag: "img", description: "Insert image" },
-  { label: "Horizontal Rule", tag: "hr", description: "Divider line" },
-  { label: "Button", tag: "button", description: "Button element" },
-  { label: "Link", tag: "a", description: "Anchor link" },
-  { label: "Code Block", tag: "pre", description: "Preformatted code" },
-  { label: "Table", tag: "table", description: "Insert table" },
-  { label: "Div", tag: "div", description: "Container" },
-  { label: "Section", tag: "section", description: "Section container" },
+  { description: "Large heading", label: "Heading 1", tag: "h1" },
+  { description: "Medium heading", label: "Heading 2", tag: "h2" },
+  { description: "Small heading", label: "Heading 3", tag: "h3" },
+  { description: "Plain text", label: "Paragraph", tag: "p" },
+  { description: "Unordered list", label: "Bulleted List", tag: "ul" },
+  { description: "Numbered list", label: "Numbered List", tag: "ol" },
+  { description: "Quote block", label: "Blockquote", tag: "blockquote" },
+  { description: "Insert image", label: "Image", tag: "img" },
+  { description: "Divider line", label: "Horizontal Rule", tag: "hr" },
+  { description: "Button element", label: "Button", tag: "button" },
+  { description: "Anchor link", label: "Link", tag: "a" },
+  { description: "Preformatted code", label: "Code Block", tag: "pre" },
+  { description: "Insert table", label: "Table", tag: "table" },
+  { description: "Container", label: "Div", tag: "div" },
+  { description: "Section container", label: "Section", tag: "section" },
 ];
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ export function showSlashMenu(
       )
     : source;
 
-  if (!filteredItems.length && !cbs.showFilter) {
+  if (filteredItems.length === 0 && !cbs.showFilter) {
     dismissSlashMenu();
     return;
   }
@@ -107,7 +107,7 @@ export function showSlashMenu(
 
   if (!open) {
     open = true;
-    document.addEventListener("keydown", onKeydown, true); // capture phase
+    document.addEventListener("keydown", onKeydown, true); // Capture phase
     requestAnimationFrame(() => {
       document.addEventListener("mousedown", onOutsideClick, true);
     });
@@ -115,13 +115,17 @@ export function showSlashMenu(
 
   if (cbs.showFilter) {
     requestAnimationFrame(() => {
-      if (_filterEl) _filterEl.focus();
+      if (_filterEl) {
+        _filterEl.focus();
+      }
     });
   }
 }
 
 export function dismissSlashMenu() {
-  if (!open) return;
+  if (!open) {
+    return;
+  }
   open = false;
   callbacks = null;
   _anchorEl = null;
@@ -167,7 +171,7 @@ function render(anchorEl: HTMLElement, showFilter: boolean) {
             />`
           : nothing}
         <sp-menu style="min-width:220px">
-          ${filteredItems.length
+          ${filteredItems.length > 0
             ? filteredItems.map(
                 (cmd, i) => html`
                   <sp-menu-item
@@ -220,7 +224,9 @@ function onFilterInput(e: Event) {
     : source;
 
   activeIdx = 0;
-  if (_anchorEl) render(_anchorEl, true);
+  if (_anchorEl) {
+    render(_anchorEl, true);
+  }
 
   // Re-focus input after re-render
   requestAnimationFrame(() => {
@@ -233,14 +239,18 @@ function onFilterInput(e: Event) {
 
 /** @param {KeyboardEvent} e */
 function onKeydown(e: KeyboardEvent) {
-  if (!open) return;
+  if (!open) {
+    return;
+  }
 
   const items = getHost().querySelectorAll("sp-menu-item:not([disabled])") as NodeListOf<Element>;
 
   if (e.key === "ArrowDown") {
     e.preventDefault();
     e.stopPropagation();
-    if (!items.length) return;
+    if (items.length === 0) {
+      return;
+    }
     items[activeIdx]?.removeAttribute("focused");
     activeIdx = (activeIdx + 1) % items.length;
     items[activeIdx]?.setAttribute("focused", "");
@@ -248,7 +258,9 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
     e.stopPropagation();
-    if (!items.length) return;
+    if (items.length === 0) {
+      return;
+    }
     items[activeIdx]?.removeAttribute("focused");
     activeIdx = (activeIdx - 1 + items.length) % items.length;
     items[activeIdx]?.setAttribute("focused", "");
@@ -257,7 +269,9 @@ function onKeydown(e: KeyboardEvent) {
     e.preventDefault();
     e.stopPropagation();
     const cmd = filteredItems[activeIdx];
-    if (cmd) select(cmd);
+    if (cmd) {
+      select(cmd);
+    }
   } else if (e.key === "Escape") {
     e.preventDefault();
     e.stopPropagation();

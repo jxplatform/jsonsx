@@ -5,16 +5,17 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
+import type { CanvasPanel } from "../types";
 import { ref } from "lit-html/directives/ref.js";
 import { classMap } from "lit-html/directives/class-map.js";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
 
-import { renderOnly, updateUi, canvasWrap, canvasPanels } from "../store";
+import { canvasPanels, canvasWrap, renderOnly, updateUi } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getLayerSlot } from "../ui/layers";
-import { getActivePanel, findCanvasElement } from "./canvas-helpers";
+import { findCanvasElement, getActivePanel } from "./canvas-helpers";
 
 let _ctx: {
   getCanvasMode: () => string;
@@ -57,34 +58,28 @@ export function canvasPanelTemplate(
   label: string | null,
   fullWidth: boolean,
   width: number | null = null,
-) {
-  const panel: {
-    mediaName: string;
-    element: HTMLElement | null;
-    canvas: HTMLElement | null;
-    overlay: HTMLElement | null;
-    overlayClk: HTMLElement | null;
-    viewport: HTMLElement | null;
-    scrollContainer: HTMLElement | null;
-    dropLine: HTMLElement | null;
-    _width: number | null;
-  } = {
-    mediaName: mediaName || "",
-    element: null,
+): { tpl: import("lit-html").TemplateResult; panel: CanvasPanel } {
+  // The DOM fields start null and are wired by the template's ref() directives,
+  // Which lit runs synchronously during render — before any consumer reads them.
+  const panel = {
+    _width: width || null,
     canvas: null,
+    dropLine: null,
+    element: null,
+    mediaName: mediaName || "",
     overlay: null,
     overlayClk: null,
-    viewport: null,
     scrollContainer: null,
-    dropLine: null,
-    _width: width || null,
-  };
+    viewport: null,
+  } as unknown as CanvasPanel;
   const tpl = html`
     <div
       class=${classMap({ "canvas-panel": true, "full-width": fullWidth })}
       data-media=${ifDefined(mediaName !== null ? mediaName : undefined)}
       ${ref((el) => {
-        if (el) panel.element = el as HTMLElement;
+        if (el) {
+          panel.element = el as HTMLElement;
+        }
       })}
     >
       ${label
@@ -103,45 +98,57 @@ export function canvasPanelTemplate(
         class="canvas-panel-viewport"
         style=${styleMap({ width: width && !fullWidth ? `${width}px` : "" })}
         ${ref((el) => {
-          if (el) panel.viewport = el as HTMLElement;
+          if (el) {
+            panel.viewport = el as HTMLElement;
+          }
         })}
       >
         <div
           class="canvas-panel-canvas"
           style=${styleMap({ width: width ? `${width}px` : "" })}
           ${ref((el) => {
-            if (el) panel.canvas = el as HTMLElement;
+            if (el) {
+              panel.canvas = el as HTMLElement;
+            }
           })}
         ></div>
         <div
           class="canvas-panel-overlay"
           ${ref((el) => {
-            if (el) panel.overlay = el as HTMLElement;
+            if (el) {
+              panel.overlay = el as HTMLElement;
+            }
           })}
         >
           <div
             class="canvas-drop-indicator"
             style="display:none"
             ${ref((el) => {
-              if (el) panel.dropLine = el as HTMLElement;
+              if (el) {
+                panel.dropLine = el as HTMLElement;
+              }
             })}
           ></div>
         </div>
         <div
           class="canvas-panel-click"
           ${ref((el) => {
-            if (el) panel.overlayClk = el as HTMLElement;
+            if (el) {
+              panel.overlayClk = el as HTMLElement;
+            }
           })}
         ></div>
       </div>
     </div>
   `;
-  return { tpl, panel };
+  return { panel, tpl };
 }
 
 /** Center canvas horizontally in viewport, top-aligned vertically. */
 export function centerCanvas() {
-  if (!view.panzoomWrap) return;
+  if (!view.panzoomWrap) {
+    return;
+  }
   const wrapWidth = canvasWrap.clientWidth;
   const contentWidth = view.panzoomWrap.scrollWidth;
   const zoom = _ctx.getZoom();
@@ -159,7 +166,9 @@ export function observeCenterUntilStable() {
     view.centerObserver.disconnect();
     view.centerObserver = null;
   }
-  if (!view.panzoomWrap) return;
+  if (!view.panzoomWrap) {
+    return;
+  }
   view.needsCenter = true;
   view.centerObserver = new ResizeObserver(() => {
     if (!view.needsCenter) {
@@ -176,17 +185,23 @@ export function observeCenterUntilStable() {
 
 /** Apply the current zoom + pan transform to the panzoom wrapper. */
 export function applyTransform() {
-  if (!view.panzoomWrap) return;
+  if (!view.panzoomWrap) {
+    return;
+  }
   const zoom = _ctx.getZoom();
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
   renderZoomIndicator();
   renderOnly("overlays");
-  if (_ctx.getCanvasMode() === "stylebook") _ctx.renderStylebookOverlays();
+  if (_ctx.getCanvasMode() === "stylebook") {
+    _ctx.renderStylebookOverlays();
+  }
 }
 
 /** Calculate zoom + pan to fit all panels within the viewport. */
 export function fitToScreen() {
-  if (!view.panzoomWrap) return;
+  if (!view.panzoomWrap) {
+    return;
+  }
   const wrapWidth = canvasWrap.clientWidth;
   const wrapHeight = canvasWrap.clientHeight;
   const gap = 24;
@@ -204,7 +219,7 @@ export function fitToScreen() {
 
   const fitZoomW = wrapWidth / totalPanelWidth;
   const fitZoomH = wrapHeight / maxPanelHeight;
-  const fitZoom = Math.min(5.0, Math.max(0.05, Math.min(fitZoomW, fitZoomH)));
+  const fitZoom = Math.min(5, Math.max(0.05, Math.min(fitZoomW, fitZoomH)));
 
   _ctx.setZoomDirect(fitZoom);
 
@@ -217,7 +232,9 @@ export function fitToScreen() {
 
 /** Reset zoom to 100% and re-center horizontally. */
 export function resetZoom() {
-  if (!view.panzoomWrap) return;
+  if (!view.panzoomWrap) {
+    return;
+  }
   _ctx.setZoomDirect(1);
   centerCanvas();
   applyTransform();
@@ -244,8 +261,8 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
 
   if (panel?.scrollContainer) {
     panel.scrollContainer.scrollTo({
-      top: panel.scrollContainer.scrollTop - offsetY,
       behavior: "smooth",
+      top: panel.scrollContainer.scrollTop - offsetY,
     });
   } else {
     const startY = view.panY;
@@ -257,7 +274,9 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
       const ease = t * (2 - t);
       view.panY = startY + (targetY - startY) * ease;
       applyTransform();
-      if (t < 1) requestAnimationFrame(step);
+      if (t < 1) {
+        requestAnimationFrame(step);
+      }
     }
     requestAnimationFrame(step);
   }
@@ -270,9 +289,13 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
  */
 export function panToElement(path: (string | number)[]) {
   const panel = getActivePanel();
-  if (!panel?.canvas) return;
+  if (!panel?.canvas) {
+    return;
+  }
   const el = findCanvasElement(path, panel.canvas);
-  if (!el) return;
+  if (!el) {
+    return;
+  }
   _panToEl(el, panel);
 }
 
@@ -337,7 +360,9 @@ export function renderZoomIndicator() {
 
 /** Position the zoom indicator relative to canvas-wrap bounds. */
 export function positionZoomIndicator() {
-  if (!_zoomIndicatorEl) return;
+  if (!_zoomIndicatorEl) {
+    return;
+  }
   const rect = canvasWrap.getBoundingClientRect();
   _zoomIndicatorEl.style.left = `${rect.left + rect.width / 2}px`;
   _zoomIndicatorEl.style.top = `${rect.bottom - 32}px`;

@@ -15,24 +15,30 @@ import type { JxStyle } from "@jxsuite/schema/types";
  * }}
  */
 export function parseMediaEntries(mediaDef: Record<string, string> | null | undefined) {
-  if (!mediaDef) return { sizeBreakpoints: [], featureQueries: [], baseWidth: 320 };
+  if (!mediaDef) {
+    return { baseWidth: 320, featureQueries: [], sizeBreakpoints: [] };
+  }
   const sizes = [],
     features = [];
   let baseWidth = 320;
   for (const [name, query] of Object.entries(mediaDef)) {
     if (name === "--") {
       const wm = String(query).match(/^(\d+)\s*px$/);
-      baseWidth = wm ? parseFloat(wm[1]) : 320;
+      baseWidth = wm ? Number.parseFloat(wm[1]) : 320;
       continue;
     }
     const minMatch = query.match(/min-width:\s*([\d.]+)px/);
     const maxMatch = query.match(/max-width:\s*([\d.]+)px/);
-    if (minMatch) sizes.push({ name, query, width: parseFloat(minMatch[1]), type: "min" });
-    else if (maxMatch) sizes.push({ name, query, width: parseFloat(maxMatch[1]), type: "max" });
-    else features.push({ name, query });
+    if (minMatch) {
+      sizes.push({ name, query, type: "min", width: Number.parseFloat(minMatch[1]) });
+    } else if (maxMatch) {
+      sizes.push({ name, query, type: "max", width: Number.parseFloat(maxMatch[1]) });
+    } else {
+      features.push({ name, query });
+    }
   }
   sizes.sort((a, b) => (a.type === "min" ? a.width - b.width : b.width - a.width));
-  return { sizeBreakpoints: sizes, featureQueries: features, baseWidth };
+  return { baseWidth, featureQueries: features, sizeBreakpoints: sizes };
 }
 
 /**
@@ -48,8 +54,11 @@ export function activeBreakpointsForWidth(
 ) {
   const active = new Set<string>();
   for (const bp of sizeBreakpoints) {
-    if (bp.type === "min" && canvasWidth >= bp.width) active.add(bp.name);
-    else if (bp.type === "max" && canvasWidth <= bp.width) active.add(bp.name);
+    if (bp.type === "min" && canvasWidth >= bp.width) {
+      active.add(bp.name);
+    } else if (bp.type === "max" && canvasWidth <= bp.width) {
+      active.add(bp.name);
+    }
   }
   return active;
 }
@@ -69,25 +78,37 @@ export function applyCanvasStyle(
   activeBreakpoints: Set<string>,
   featureToggles: Record<string, boolean>,
 ) {
-  if (!styleDef || typeof styleDef !== "object") return;
+  if (!styleDef || typeof styleDef !== "object") {
+    return;
+  }
   for (const [prop, val] of Object.entries(styleDef)) {
     if (typeof val === "string" || typeof val === "number") {
       try {
-        if (prop.startsWith("--")) el.style.setProperty(prop, String(val));
-        else (el.style as unknown as Record<string, unknown>)[prop] = val;
+        if (prop.startsWith("--")) {
+          el.style.setProperty(prop, String(val));
+        } else {
+          (el.style as unknown as Record<string, unknown>)[prop] = val;
+        }
       } catch {}
     }
   }
   for (const [key, val] of Object.entries(styleDef)) {
-    if (!key.startsWith("@") || typeof val !== "object" || val === null) continue;
+    if (!key.startsWith("@") || typeof val !== "object" || val === null) {
+      continue;
+    }
     const mediaName = key.slice(1);
-    if (mediaName === "--") continue;
+    if (mediaName === "--") {
+      continue;
+    }
     if (activeBreakpoints.has(mediaName) || featureToggles[mediaName]) {
       for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
         if (typeof v === "string" || typeof v === "number") {
           try {
-            if (prop.startsWith("--")) el.style.setProperty(prop, String(v));
-            else (el.style as unknown as Record<string, unknown>)[prop] = v;
+            if (prop.startsWith("--")) {
+              el.style.setProperty(prop, String(v));
+            } else {
+              (el.style as unknown as Record<string, unknown>)[prop] = v;
+            }
           } catch {}
         }
       }
@@ -109,8 +130,10 @@ export function collectMediaOverrides(
   styleSheets: Iterable<CSSStyleSheet>,
   activeBreakpoints: Set<string>,
 ) {
-  const overrides: Map<string, Map<string, string>> = new Map();
-  if (!activeBreakpoints.size) return overrides;
+  const overrides = new Map<string, Map<string, string>>();
+  if (activeBreakpoints.size === 0) {
+    return overrides;
+  }
 
   for (const sheet of styleSheets) {
     /** @type {CSSRuleList | null} */
@@ -120,19 +143,31 @@ export function collectMediaOverrides(
     } catch {
       continue;
     }
-    if (!rules) continue;
+    if (!rules) {
+      continue;
+    }
     for (let ri = 0; ri < rules.length; ri++) {
       const rule = rules[ri];
-      if (!(rule instanceof CSSMediaRule)) continue;
-      if (!activeBreakpoints.has(rule.conditionText)) continue;
+      if (!(rule instanceof CSSMediaRule)) {
+        continue;
+      }
+      if (!activeBreakpoints.has(rule.conditionText)) {
+        continue;
+      }
       for (let mi = 0; mi < rule.cssRules.length; mi++) {
         const mediaRule = rule.cssRules[mi];
-        if (!(mediaRule instanceof CSSStyleRule)) continue;
+        if (!(mediaRule instanceof CSSStyleRule)) {
+          continue;
+        }
         const selector = mediaRule.selectorText;
         const jxMatch = selector.match(/\[data-jx="([^"]+)"\]/);
-        if (!jxMatch) continue;
+        if (!jxMatch) {
+          continue;
+        }
         const uid = jxMatch[1];
-        if (!overrides.has(uid)) overrides.set(uid, new Map());
+        if (!overrides.has(uid)) {
+          overrides.set(uid, new Map());
+        }
         const props = overrides.get(uid) as Map<string, string>;
         for (let i = 0; i < mediaRule.style.length; i++) {
           const prop = mediaRule.style[i];

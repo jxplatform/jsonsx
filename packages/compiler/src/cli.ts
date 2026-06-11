@@ -37,7 +37,7 @@ if (command === "build") {
 
   try {
     const { buildSite } = await import("./site/site-build.ts");
-    const result = await buildSite(projectRoot, { verbose, clean });
+    const result = await buildSite(projectRoot, { clean, verbose });
 
     if (result.errors.length > 0) {
       console.error(`\nBuild completed with ${result.errors.length} error(s):`);
@@ -48,8 +48,8 @@ if (command === "build") {
     }
 
     console.log(`\nDone: ${result.routes} routes → ${result.files} files`);
-  } catch (e) {
-    const err = e as Error;
+  } catch (error) {
+    const err = error as Error;
     console.error(`Build failed: ${err.message}`);
     process.exit(1);
   }

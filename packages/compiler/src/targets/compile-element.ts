@@ -5,67 +5,99 @@
  * state and lit-html for rendering.
  */
 
-import { camelToKebab, RESERVED_KEYS } from "@jxsuite/runtime";
+import { RESERVED_KEYS, camelToKebab } from "@jxsuite/runtime";
 import {
-  escapeHtml,
-  tagNameToClassName,
-  isSchemaOnly,
   collectStyles,
   compileExpression,
+  escapeHtml,
   isMutating,
+  isSchemaOnly,
+  tagNameToClassName,
 } from "../shared.ts";
+import {
+  isExpressionDef,
+  isFunctionDef,
+  isMappedArray,
+  isRef,
+  paramNames,
+} from "@jxsuite/schema/guards";
+import { parseJxDocument } from "@jxsuite/schema/parse";
 import type { ExpressionNode } from "../shared.ts";
-import type { JxStyle, JxMutableNode } from "@jxsuite/schema/types";
+import type {
+  JxDocument,
+  JxExpressionDef,
+  JxFunctionDef,
+  JxMappedArray,
+  JxMutableNode,
+  JxStyle,
+} from "@jxsuite/schema/types";
+
+/** Options accepted by compileElement. */
+export interface CompileElementOptions {
+  /** Resolve an `$elements` ref path to its emitted JS module path. */
+  resolveElementPath?: (refPath: string, currentDir: string | null) => string;
+  $media?: Record<string, string>;
+  formats?: import("@jxsuite/schema/format-registry").FormatRegistry;
+  basePath?: string | null;
+  [key: string]: unknown;
+}
 
 /**
  * Compile a Jx custom element document to a JS module string.
  *
- * @param {string | any} sourcePath - Path to .json file or raw object
- * @param {Record<string, unknown>} [opts]
+ * @param {string | JxDocument} sourcePath - Path to .json file or raw object
+ * @param {CompileElementOptions} [opts]
  * @returns {Promise<{ files: { path: string; content: string; tagName: string }[] }>}
  */
-export async function compileElement(sourcePath: string | any, opts: Record<string, unknown> = {}) {
-  const { resolveElementPath, $media: optsMedia, formats } = opts as JxMutableNode;
+export async function compileElement(
+  sourcePath: string | JxDocument,
+  opts: CompileElementOptions = {},
+) {
+  const { resolveElementPath, $media: optsMedia, formats } = opts;
   /** @type {{ path: string; content: string; tagName: string }[]} */
   const files: { path: string; content: string; tagName: string }[] = [];
-  const visited: Set<string> = new Set();
+  const visited = new Set<string>();
 
   /**
-   * @param {string | any} srcPath
+   * @param {string | JxDocument} srcPath
    * @param {string | null} parentDir
    */
-  async function processElement(srcPath: string | any, parentDir: string | null) {
-    /** @type {JxMutableNode} */
-    let doc;
-    /** @type {string | null} */
-    let filePath;
+  async function processElement(srcPath: string | JxDocument, parentDir: string | null) {
+    let doc: JxDocument;
+    let filePath: string | null;
     if (typeof srcPath === "string") {
       const { readFileSync } = await import("node:fs");
       const { resolve } = await import("node:path");
       filePath = parentDir ? resolve(parentDir, srcPath) : resolve(srcPath);
-      if (visited.has(filePath)) return;
+      if (visited.has(filePath)) {
+        return;
+      }
       visited.add(filePath);
       if (filePath.endsWith(".json")) {
-        doc = JSON.parse(readFileSync(filePath, "utf8"));
+        doc = parseJxDocument(readFileSync(filePath, "utf8"), filePath);
       } else {
         const { extname } = await import("node:path");
         const ext = extname(filePath).toLowerCase();
-        const registry = formats as import("@jxsuite/schema/format-registry").FormatRegistry;
-        const entry = registry?.byExtension?.(ext, "parse");
+        const entry = formats?.byExtension?.(ext, "parse");
         if (!entry) {
           const { unknownFormatError } = await import("../site/format-host.ts");
           throw unknownFormatError(filePath, ext);
         }
-        doc = (await entry.call("parse", readFileSync(filePath, "utf8"))) as JxMutableNode;
+        // Format plugins contractually parse source text into a Jx document.
+        doc = (await entry.call("parse", readFileSync(filePath, "utf8"))) as JxDocument;
       }
     } else {
       doc = srcPath;
       filePath = null;
-      if (visited.has(doc.tagName as string)) return;
-      visited.add(doc.tagName as string);
+      if (doc.tagName && visited.has(doc.tagName)) {
+        return;
+      }
+      if (doc.tagName) {
+        visited.add(doc.tagName);
+      }
     }
 
-    const tagName = doc.tagName;
+    const { tagName } = doc;
     if (!tagName || !tagName.includes("-")) {
       throw new Error(`compileElement: tagName "${tagName}" must contain a hyphen`);
     }
@@ -77,8 +109,10 @@ export async function compileElement(sourcePath: string | any, opts: Record<stri
     const elementImports: string[] = [];
     if (Array.isArray(doc.$elements)) {
       for (const elRef of doc.$elements) {
-        const refPath = (elRef as JxMutableNode).$ref ?? elRef;
-        if (typeof refPath !== "string") continue;
+        const refPath = isRef(elRef) ? elRef.$ref : elRef;
+        if (typeof refPath !== "string") {
+          continue;
+        }
 
         if (currentDir) {
           await processElement(refPath, currentDir);
@@ -101,10 +135,10 @@ export async function compileElement(sourcePath: string | any, opts: Record<stri
     }
     const jsContent = emitElementModule(doc, className, elementImports);
     const outputPath = filePath ? filePath.replace(/\.json$/, ".js") : `${tagName}.js`;
-    files.push({ path: outputPath, content: jsContent, tagName });
+    files.push({ content: jsContent, path: outputPath, tagName });
   }
 
-  await processElement(sourcePath, (opts.basePath ?? null) as string | null);
+  await processElement(sourcePath, opts.basePath ?? null);
   return { files };
 }
 
@@ -120,17 +154,22 @@ export async function compileElement(sourcePath: string | any, opts: Record<stri
  * }>}
  */
 export async function compileElementPage(
-  sourcePath: string | any,
-  opts: Record<string, unknown> = {},
+  sourcePath: string | JxDocument,
+  opts: {
+    title?: string;
+    reactivitySrc?: string;
+    litHtmlSrc?: string;
+    [key: string]: unknown;
+  } = {},
 ) {
   const {
     title = "Jx App",
     reactivitySrc = "https://esm.sh/@vue/reactivity@3.5.13",
     litHtmlSrc = "https://esm.sh/lit-html@3.3.0",
-  } = opts as JxMutableNode;
+  } = opts;
 
   const result = await compileElement(sourcePath, opts);
-  const root = result.files[result.files.length - 1];
+  const root = result.files.at(-1);
 
   const { basename } = await import("node:path");
   const rootScript = basename(root.path);
@@ -156,7 +195,7 @@ export async function compileElementPage(
 </body>
 </html>`;
 
-  return { html: htmlContent, files: result.files };
+  return { files: result.files, html: htmlContent };
 }
 
 // ─── Element code generation helpers ──────────────────────────────────────────
@@ -179,7 +218,7 @@ function extractInitialValue(def: JxMutableNode) {
   }
   // Pure schema-only type definitions — skip (no runtime value)
   if (isSchemaOnly(def)) {
-    return undefined; // caller should skip this entry
+    return; // Caller should skip this entry
   }
   // $prototype entries (LocalStorage, SessionStorage, Request, etc.)
   if (def.$prototype === "LocalStorage" || def.$prototype === "SessionStorage") {
@@ -195,33 +234,33 @@ function extractInitialValue(def: JxMutableNode) {
 /**
  * Generate a complete ES module string for a custom element.
  *
- * @param {JxMutableNode | Record<string, any>} doc
+ * @param {JxDocument} doc
  * @param {string} className
  * @param {string[]} elementImports
  * @returns {string}
  */
-export function emitElementModule(
-  doc: JxMutableNode | Record<string, any>,
-  className: string,
-  elementImports: string[],
-) {
+export function emitElementModule(doc: JxDocument, className: string, elementImports: string[]) {
   const lines: string[] = [];
 
   lines.push("// Generated by @jxsuite/compiler — do not edit manually");
-  if (doc.$id) lines.push(`// Source: ${doc.$id}`);
+  if (doc.$id) {
+    lines.push(`// Source: ${doc.$id}`);
+  }
 
   for (const imp of elementImports) {
     lines.push(`import '${imp}';`);
   }
 
   // Collect $src imports from state entries before emitting other imports
-  const srcImportMap: Map<string, string[]> = new Map();
+  const srcImportMap = new Map<string, string[]>();
   const defs = doc.state ?? {};
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
     if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function" && d.$src) {
       const srcPath = d.$src;
-      if (!srcImportMap.has(srcPath)) srcImportMap.set(srcPath, []);
+      if (!srcImportMap.has(srcPath)) {
+        srcImportMap.set(srcPath, []);
+      }
       (srcImportMap.get(srcPath) as string[]).push(key);
     }
   }
@@ -241,19 +280,19 @@ export function emitElementModule(
   lines.push("    super();");
 
   const stateEntries: [string, string][] = [];
-  const computedEntries: [string, any][] = [];
-  const functionEntries: [string, any][] = [];
+  const computedEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
+  const functionEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
 
   for (const [key, def] of Object.entries(defs)) {
     const d = def as JxMutableNode;
-    if (d && typeof d === "object" && !Array.isArray(d) && "$expression" in d) {
-      const node = (d as Record<string, unknown>).$expression as ExpressionNode;
+    if (isExpressionDef(d)) {
+      const node = d.$expression as ExpressionNode;
       if (isMutating(node.operator)) {
         functionEntries.push([key, d]);
       } else {
         computedEntries.push([key, d]);
       }
-    } else if (d && typeof d === "object" && !Array.isArray(d) && d.$prototype === "Function") {
+    } else if (isFunctionDef(d)) {
       if (typeof d.body === "string" && d.body.includes("return")) {
         computedEntries.push([key, d]);
       } else {
@@ -278,22 +317,22 @@ export function emitElementModule(
   // Emit functions: this.state.fnName = (state) => { body } or imported $src function
   for (const [key, def] of functionEntries) {
     lines.push("");
-    if ("$expression" in def) {
-      const compiled = compileExpression(def.$expression, {
-        statePrefix: "s",
+    if (isExpressionDef(def)) {
+      const compiled = compileExpression(def.$expression as ExpressionNode, {
         eventParam: "e",
+        statePrefix: "s",
       });
       lines.push(`    this.state.${key} = (s, e) => { ${compiled}; };`);
     } else if (def.$src) {
       // $src function — wrap imported function so it receives state
-      const args = def.parameters ?? def.arguments ?? ["state"];
+      const args = def.parameters ? paramNames(def.parameters) : (def.arguments ?? ["state"]);
       const paramList = args.join(", ");
       lines.push(`    this.state.${key} = (${paramList}) => ${key}(${paramList});`);
     } else {
-      const args = def.parameters ?? def.arguments ?? ["state"];
+      const args = def.parameters ? paramNames(def.parameters) : (def.arguments ?? ["state"]);
       const paramList = args.join(", ");
       lines.push(`    this.state.${key} = (${paramList}) => {`);
-      lines.push(`      ${def.body}`);
+      lines.push(`      ${def.body ?? ""}`);
       lines.push("    };");
     }
   }
@@ -301,23 +340,23 @@ export function emitElementModule(
   // Emit computed signals — $src or inline body
   for (const [key, def] of computedEntries) {
     lines.push("");
-    if ("$expression" in def) {
-      const compiled = compileExpression(def.$expression, {
-        statePrefix: "this.state",
+    if (isExpressionDef(def)) {
+      const compiled = compileExpression(def.$expression as ExpressionNode, {
         eventParam: "e",
+        statePrefix: "this.state",
       });
       lines.push(`    this.state.${key} = computed(() => ${compiled});`);
     } else if (def.$src) {
       lines.push(`    this.state.${key} = computed(() => ${key}(this.state));`);
     } else {
       lines.push(`    this.state.${key} = computed(() => {`);
-      const body = def.body.replace(/state\./g, "this.state.");
+      const body = (def.body ?? "").replaceAll("state.", "this.state.");
       lines.push(`      ${body}`);
       lines.push("    });");
     }
   }
 
-  lines.push("  }"); // end constructor
+  lines.push("  }"); // End constructor
   lines.push("");
 
   // Collect CSS rules from children tree (assigns .jx-N classes to defs)
@@ -338,7 +377,7 @@ export function emitElementModule(
   lines.push("  }");
   lines.push("");
 
-  // connectedCallback
+  // ConnectedCallback
   lines.push("  connectedCallback() {");
   // Read $props from data-jx-props attribute (set by compiler for pre-rendered instances)
   lines.push("    const _pa = this.getAttribute('data-jx-props');");
@@ -367,9 +406,12 @@ export function emitElementModule(
         prop.startsWith("&") ||
         prop.startsWith("[") ||
         prop.startsWith("@")
-      )
+      ) {
         continue;
-      if (value === null || typeof value === "object") continue;
+      }
+      if (value === null || typeof value === "object") {
+        continue;
+      }
       const cssProp = camelToKebab(prop);
       if (typeof value === "string" && value.includes("${")) {
         dynamicStyles.push([cssProp, value]);
@@ -378,9 +420,9 @@ export function emitElementModule(
     if (dynamicStyles.length > 0) {
       lines.push("    effect(() => {");
       for (const [cssProp, value] of dynamicStyles) {
-        const expr = value.replace(
+        const expr = value.replaceAll(
           /\$\{([^}]+)\}/g,
-          (_: string, e: string) => "${" + e.replace(/state\./g, "this.state.") + "}",
+          (_: string, e: string) => `\${${e.replaceAll("state.", "this.state.")}}`,
         );
         lines.push(`      this.style['${cssProp}'] = \`${expr}\`;`);
       }
@@ -410,7 +452,7 @@ export function emitElementModule(
   lines.push("  }");
   lines.push("");
 
-  // disconnectedCallback
+  // DisconnectedCallback
   lines.push("  disconnectedCallback() {");
   lines.push("    if (this.#dispose) { this.#dispose(); this.#dispose = null; }");
   lines.push("  }");
@@ -426,23 +468,27 @@ export function emitElementModule(
 /**
  * Convert Jx children to lit-html template content.
  *
- * @param {(JxMutableNode | string)[] | JxMutableNode | undefined} children
- * @param {JxStyle | Record<string, any> | null | undefined} parentStyle
+ * @param {JxMutableNode["children"]} children
+ * @param {JxStyle | null | undefined} parentStyle
  * @param {string} indent
  * @returns {string}
  */
 function emitLitChildren(
-  children: (JxMutableNode | string)[] | JxMutableNode | undefined,
-  parentStyle: JxStyle | Record<string, any> | null | undefined,
+  children: JxMutableNode["children"],
+  parentStyle: JxStyle | null | undefined,
   indent: string,
 ) {
-  if (!children) return "";
-
-  if ((children as JxMutableNode).$prototype === "Array") {
-    return emitMappedArray(/** @type {JxMutableNode} */ children, indent);
+  if (!children) {
+    return "";
   }
 
-  if (!Array.isArray(children)) return "";
+  if (isMappedArray(children)) {
+    return emitMappedArray(children, indent);
+  }
+
+  if (!Array.isArray(children)) {
+    return "";
+  }
 
   return children.map((child: JxMutableNode | string) => emitLitNode(child, indent)).join("\n");
 }
@@ -455,13 +501,17 @@ function emitLitChildren(
 function emitLitNode(def: JxMutableNode | string, indent: string) {
   // String children are text nodes
   if (typeof def === "string") {
-    if (def.includes("${")) return `${indent}${toLitTextContent(def)}`;
+    if (def.includes("${")) {
+      return `${indent}${toLitTextContent(def)}`;
+    }
     return `${indent}${escapeHtml(def)}`;
   }
   if (typeof def === "number" || typeof def === "boolean") {
     return `${indent}${escapeHtml(String(def))}`;
   }
-  if (!def || typeof def !== "object") return "";
+  if (!def || typeof def !== "object") {
+    return "";
+  }
 
   const tag = def.tagName ?? "div";
 
@@ -477,8 +527,12 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
     }
   }
 
-  if (def.id) parts.push(`id="${def.id}"`);
-  if (def.className) parts.push(`class="${def.className}"`);
+  if (def.id) {
+    parts.push(`id="${def.id}"`);
+  }
+  if (def.className) {
+    parts.push(`class="${def.className}"`);
+  }
 
   for (const [key, val] of Object.entries(def)) {
     if (
@@ -493,8 +547,9 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
       key === "textContent" ||
       key === "innerHTML" ||
       key === "attributes"
-    )
+    ) {
       continue;
+    }
 
     if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
       parts.push(`.${key}="\${${refToExpr((val as JxMutableNode).$ref as string)}}"`);
@@ -514,7 +569,9 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
   }
 
   for (const [key, val] of Object.entries(def)) {
-    if (!key.startsWith("on") || key === "observedAttributes") continue;
+    if (!key.startsWith("on") || key === "observedAttributes") {
+      continue;
+    }
     const eventName = key.slice(2).toLowerCase();
     if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
       parts.push(
@@ -524,22 +581,22 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
       const compiled = compileExpression(
         (val as Record<string, unknown>).$expression as ExpressionNode,
         {
-          statePrefix: "s",
           eventParam: "e",
+          statePrefix: "s",
         },
       );
       parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
-    } else if (val && typeof val === "object" && (val as JxMutableNode).$prototype === "Function") {
-      parts.push(
-        `@${eventName}="\${(e) => { ${inlineHandlerBody(/** @type {JxMutableNode} */ val)} }}"`,
-      );
+    } else if (isFunctionDef(val)) {
+      parts.push(`@${eventName}="\${(e) => { ${inlineHandlerBody(val)} }}"`);
     }
   }
 
   const styleStr = emitStyleString(def.style);
-  if (styleStr) parts.push(`style="${styleStr}"`);
+  if (styleStr) {
+    parts.push(`style="${styleStr}"`);
+  }
 
-  const attrsStr = parts.length > 0 ? "\n" + indent + "  " + parts.join("\n" + indent + "  ") : "";
+  const attrsStr = parts.length > 0 ? `\n${indent}  ${parts.join(`\n${indent}  `)}` : "";
 
   const selfClosing = new Set(["input", "br", "hr", "img", "meta", "link"]);
   if (selfClosing.has(tag)) {
@@ -552,30 +609,32 @@ function emitLitNode(def: JxMutableNode | string, indent: string) {
   } else if (def.innerHTML !== undefined) {
     inner = def.innerHTML;
   } else if (def.children) {
-    inner = "\n" + emitLitChildren(def.children, def.style, indent + "  ") + "\n" + indent;
+    inner = `\n${emitLitChildren(def.children, def.style, `${indent}  `)}\n${indent}`;
   }
 
   return `${indent}<${tag}${attrsStr}\n${indent}>${inner}</${tag}>`;
 }
 
 /**
- * @param {JxMutableNode} arrayDef
+ * @param {JxMappedArray} arrayDef
  * @param {string} indent
  * @returns {string}
  */
-function emitMappedArray(arrayDef: JxMutableNode, indent: string) {
-  const itemsExpr = arrayDef.items?.$ref ? refToExpr(arrayDef.items.$ref) : "ITEMS";
+function emitMappedArray(arrayDef: JxMappedArray, indent: string) {
+  const itemsExpr = isRef(arrayDef.items) ? refToExpr(arrayDef.items.$ref) : "ITEMS";
   const mapDef = arrayDef.map;
 
-  if (!mapDef) return "";
+  if (!mapDef) {
+    return "";
+  }
 
   const tag = mapDef.tagName ?? "div";
   const parts: string[] = [];
 
   if (mapDef.$props) {
     for (const [key, val] of Object.entries(mapDef.$props)) {
-      if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
-        parts.push(`.${key}="\${${mapRefToExpr((val as JxMutableNode).$ref as string)}}"`);
+      if (isRef(val)) {
+        parts.push(`.${key}="\${${mapRefToExpr(val.$ref)}}"`);
       } else {
         parts.push(`.${key}="\${${JSON.stringify(val)}}"`);
       }
@@ -583,36 +642,33 @@ function emitMappedArray(arrayDef: JxMutableNode, indent: string) {
   }
 
   const styleStr = emitStyleString(mapDef.style);
-  if (styleStr) parts.push(`style="${styleStr}"`);
+  if (styleStr) {
+    parts.push(`style="${styleStr}"`);
+  }
 
   for (const [key, val] of Object.entries(mapDef)) {
-    if (!key.startsWith("on")) continue;
+    if (!key.startsWith("on")) {
+      continue;
+    }
     const eventName = key.slice(2).toLowerCase();
-    if (val && typeof val === "object" && (val as JxMutableNode).$ref) {
-      parts.push(
-        `@${eventName}="\${(e) => ${refToExpr((val as JxMutableNode).$ref as string)}(s, e)}"`,
-      );
-    } else if (val && typeof val === "object" && "$expression" in /** @type {any} */ val) {
-      const compiled = compileExpression(
-        (val as Record<string, unknown>).$expression as ExpressionNode,
-        {
-          statePrefix: "s",
-          eventParam: "e",
-        },
-      );
+    if (isRef(val)) {
+      parts.push(`@${eventName}="\${(e) => ${refToExpr(val.$ref)}(s, e)}"`);
+    } else if (isExpressionDef(val)) {
+      const compiled = compileExpression(val.$expression as ExpressionNode, {
+        eventParam: "e",
+        statePrefix: "s",
+      });
       parts.push(`@${eventName}="\${(e) => { ${compiled}; }}"`);
     }
   }
 
-  const attrsStr =
-    parts.length > 0 ? "\n" + indent + "    " + parts.join("\n" + indent + "    ") : "";
+  const attrsStr = parts.length > 0 ? `\n${indent}    ${parts.join(`\n${indent}    `)}` : "";
 
   let inner = "";
   if (mapDef.textContent !== undefined) {
     inner = toLitTextContent(mapDef.textContent);
   } else if (mapDef.children) {
-    inner =
-      "\n" + emitLitChildren(mapDef.children, null, indent + "      ") + "\n" + indent + "    ";
+    inner = `\n${emitLitChildren(mapDef.children, null, `${indent}      `)}\n${indent}    `;
   }
 
   return `${indent}\${${itemsExpr}.map((item, index) => html\`\n${indent}  <${tag}${attrsStr}\n${indent}  >${inner}</${tag}>\n${indent}\`)}`;
@@ -627,13 +683,13 @@ function emitMappedArray(arrayDef: JxMutableNode, indent: string) {
 function refToExpr(ref: string) {
   if (ref.startsWith("#/state/")) {
     const path = ref.slice("#/state/".length);
-    return "s." + path.replace(/\//g, ".");
+    return `s.${path.replaceAll("/", ".")}`;
   }
   if (ref.startsWith("$map/")) {
     const path = ref.slice("$map/".length);
-    return path.replace(/\//g, ".");
+    return path.replaceAll("/", ".");
   }
-  return "s." + ref;
+  return `s.${ref}`;
 }
 
 /**
@@ -642,7 +698,7 @@ function refToExpr(ref: string) {
  */
 function mapRefToExpr(ref: string) {
   if (ref.startsWith("$map/")) {
-    return ref.slice("$map/".length).replace(/\//g, ".");
+    return ref.slice("$map/".length).replaceAll("/", ".");
   }
   return refToExpr(ref);
 }
@@ -652,7 +708,7 @@ function mapRefToExpr(ref: string) {
  * @returns {string}
  */
 function toLitExpr(str: string) {
-  return str.replace(/state\./g, "s.");
+  return str.replaceAll("state.", "s.");
 }
 
 /**
@@ -678,20 +734,22 @@ function toLitTextContent(value: unknown) {
 }
 
 /**
- * @param {JxMutableNode} def
+ * @param {import("@jxsuite/schema/types").JxFunctionDef} def
  * @returns {string}
  */
-function inlineHandlerBody(def: JxMutableNode) {
+function inlineHandlerBody(def: import("@jxsuite/schema/types").JxFunctionDef) {
   const body = def.body ?? "";
-  return body.replace(/(?<!this\.)state\./g, "s.").replace(/(?<!this\.)state(?!\.)/g, "s");
+  return body.replaceAll(/(?<!this\.)state\./g, "s.").replaceAll(/(?<!this\.)state(?!\.)/g, "s");
 }
 
 /**
- * @param {JxStyle | Record<string, any> | null | undefined} styleDef
+ * @param {JxStyle | null | undefined} styleDef
  * @returns {string}
  */
-function emitStyleString(styleDef: JxStyle | Record<string, any> | null | undefined) {
-  if (!styleDef || typeof styleDef !== "object") return "";
+function emitStyleString(styleDef: JxStyle | null | undefined) {
+  if (!styleDef || typeof styleDef !== "object") {
+    return "";
+  }
 
   const parts: string[] = [];
   for (const [prop, value] of Object.entries(styleDef)) {
@@ -701,10 +759,13 @@ function emitStyleString(styleDef: JxStyle | Record<string, any> | null | undefi
       prop.startsWith("&") ||
       prop.startsWith("[") ||
       prop.startsWith("@")
-    )
+    ) {
       continue;
+    }
 
-    if (value === null || typeof value === "object") continue;
+    if (value === null || typeof value === "object") {
+      continue;
+    }
 
     if (typeof value === "string" && value.includes("${")) {
       const cssProp = camelToKebab(prop);
@@ -718,15 +779,23 @@ function emitStyleString(styleDef: JxStyle | Record<string, any> | null | undefi
 /**
  * Check if a children tree contains a `<slot>` element.
  *
- * @param {(JxMutableNode | string)[] | undefined} children
+ * @param {JxMutableNode["children"]} children
  * @returns {boolean}
  */
-function treeHasSlot(children: (JxMutableNode | string)[] | undefined) {
-  if (!Array.isArray(children)) return false;
+function treeHasSlot(children: JxMutableNode["children"]): boolean {
+  if (!Array.isArray(children)) {
+    return false;
+  }
   for (const child of children) {
-    if (!child || typeof child !== "object") continue;
-    if (child.tagName === "slot") return true;
-    if (treeHasSlot(child.children)) return true;
+    if (!child || typeof child !== "object") {
+      continue;
+    }
+    if (child.tagName === "slot") {
+      return true;
+    }
+    if (treeHasSlot(child.children)) {
+      return true;
+    }
   }
   return false;
 }

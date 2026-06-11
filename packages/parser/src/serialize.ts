@@ -19,22 +19,28 @@
  */
 
 import { unified } from "unified";
+import { isRef } from "@jxsuite/schema/guards";
 import remarkStringify from "remark-stringify";
 import remarkDirective from "remark-directive";
 import remarkGfm from "remark-gfm";
 import { stringify as stringifyYaml } from "yaml";
 import { htmlToJx } from "./html-to-jx.ts";
 import type {
-  JxElement,
   JxDocument,
-  JxStateDefinition,
+  JxElement,
   JxMutableNode,
+  JxStateDefinition,
 } from "@jxsuite/schema/types";
 import type { MdastNode } from "./types.ts";
 
+/** Static text content of a node — bound (`$ref`) text has no serializable form. */
+function textOf(el: JxElement | undefined): string | undefined {
+  return el && typeof el.textContent === "string" ? el.textContent : undefined;
+}
+
 // ─── Markdown element sets ──────────────────────────────────────────────────
 // Source of truth for the `$studio.elements` block in Markdown.class.json — a parser
-// test asserts the two stay in sync.
+// Test asserts the two stay in sync.
 
 export const MD_ELEMENTS = {
   block: [
@@ -59,33 +65,33 @@ export const MD_ELEMENTS = {
     "td",
   ],
   inline: ["em", "strong", "del", "code", "a", "img", "br"],
-  void: ["hr", "br", "img"],
-  textOnly: ["code"],
   nesting: {
-    _root: { block: true, inline: false, directive: true },
-    h1: { block: false, inline: true, directive: false },
-    h2: { block: false, inline: true, directive: false },
-    h3: { block: false, inline: true, directive: false },
-    h4: { block: false, inline: true, directive: false },
-    h5: { block: false, inline: true, directive: false },
-    h6: { block: false, inline: true, directive: false },
-    p: { block: false, inline: true, directive: true },
-    blockquote: { block: true, inline: false, directive: true },
-    ul: { only: ["li"] },
+    _root: { block: true, directive: true, inline: false },
+    a: { block: false, directive: false, inline: true },
+    blockquote: { block: true, directive: true, inline: false },
+    del: { block: false, directive: false, inline: true },
+    em: { block: false, directive: false, inline: true },
+    h1: { block: false, directive: false, inline: true },
+    h2: { block: false, directive: false, inline: true },
+    h3: { block: false, directive: false, inline: true },
+    h4: { block: false, directive: false, inline: true },
+    h5: { block: false, directive: false, inline: true },
+    h6: { block: false, directive: false, inline: true },
+    li: { block: true, directive: true, inline: true },
     ol: { only: ["li"] },
-    li: { block: true, inline: true, directive: true },
+    p: { block: false, directive: true, inline: true },
     pre: { only: ["code"] },
+    strong: { block: false, directive: false, inline: true },
     table: { only: ["thead", "tbody"] },
-    thead: { only: ["tr"] },
     tbody: { only: ["tr"] },
+    td: { block: false, directive: false, inline: true },
+    th: { block: false, directive: false, inline: true },
+    thead: { only: ["tr"] },
     tr: { only: ["th", "td"] },
-    th: { block: false, inline: true, directive: false },
-    td: { block: false, inline: true, directive: false },
-    em: { block: false, inline: true, directive: false },
-    strong: { block: false, inline: true, directive: false },
-    del: { block: false, inline: true, directive: false },
-    a: { block: false, inline: true, directive: false },
+    ul: { only: ["li"] },
   } as Record<string, { block?: boolean; inline?: boolean; directive?: boolean; only?: string[] }>,
+  textOnly: ["code"],
+  void: ["hr", "br", "img"],
 } as const;
 
 /** Markdown-native block tags. */
@@ -103,33 +109,33 @@ export const MD_TEXT_ONLY: ReadonlySet<string> = new Set(MD_ELEMENTS.textOnly);
 
 /** Jx tagName → mdast node-type. */
 const TAG_MDAST_MAP: Record<string, string> = {
+  a: "link",
+  blockquote: "blockquote",
+  br: "break",
+  code: "inlineCode",
+  del: "delete",
+  em: "emphasis",
   h1: "heading",
   h2: "heading",
   h3: "heading",
   h4: "heading",
   h5: "heading",
   h6: "heading",
-  p: "paragraph",
-  span: "text",
-  em: "emphasis",
-  strong: "strong",
-  del: "delete",
-  code: "inlineCode",
-  a: "link",
-  img: "image",
-  blockquote: "blockquote",
-  ul: "list",
-  ol: "list",
-  li: "listItem",
-  pre: "code",
   hr: "thematicBreak",
-  br: "break",
+  img: "image",
+  li: "listItem",
+  ol: "list",
+  p: "paragraph",
+  pre: "code",
+  span: "text",
+  strong: "strong",
   table: "table",
-  thead: "thead",
   tbody: "tbody",
-  tr: "tableRow",
-  th: "tableCell",
   td: "tableCell",
+  th: "tableCell",
+  thead: "thead",
+  tr: "tableRow",
+  ul: "list",
 };
 
 /** Wrapper tags unwrapped in export mode — their children are promoted. */
@@ -205,24 +211,24 @@ export interface SerializeOptions {
 
 /** Mdast node-type → Jx tagName mapping (canvas-targeted; text → span). */
 const MDAST_TAG_MAP: Record<string, (n: MdastNode) => string> = {
-  heading: (n) => `h${n.depth}`,
-  paragraph: () => "p",
-  text: () => "span",
-  emphasis: () => "em",
-  strong: () => "strong",
+  blockquote: () => "blockquote",
+  break: () => "br",
+  code: () => "pre",
   delete: () => "del",
+  emphasis: () => "em",
+  heading: (n) => `h${n.depth}`,
+  image: () => "img",
   inlineCode: () => "code",
   link: () => "a",
-  image: () => "img",
-  blockquote: () => "blockquote",
   list: (n) => (n.ordered ? "ol" : "ul"),
   listItem: () => "li",
-  code: () => "pre",
-  thematicBreak: () => "hr",
+  paragraph: () => "p",
+  strong: () => "strong",
   table: () => "table",
-  tableRow: () => "tr",
   tableCell: (n) => (n.isHeader ? "th" : "td"),
-  break: () => "br",
+  tableRow: () => "tr",
+  text: () => "span",
+  thematicBreak: () => "hr",
 };
 
 /**
@@ -242,7 +248,9 @@ export function mdastToJx(mdast: MdastNode): JxElement {
 }
 
 function convertMdastNode(node: MdastNode): JxElement | null {
-  if (!node) return null;
+  if (!node) {
+    return null;
+  }
 
   if (
     node.type === "containerDirective" ||
@@ -253,13 +261,17 @@ function convertMdastNode(node: MdastNode): JxElement | null {
   }
 
   if (node.type === "html") {
-    if (!node.value) return null;
+    if (!node.value) {
+      return null;
+    }
     const nodes = htmlToJx(node.value);
-    return nodes.length === 1 ? (nodes[0] as JxElement) : { tagName: "div", children: nodes };
+    return nodes.length === 1 ? (nodes[0] as JxElement) : { children: nodes, tagName: "div" };
   }
 
   const tagFn = MDAST_TAG_MAP[node.type];
-  if (!tagFn) return null;
+  if (!tagFn) {
+    return null;
+  }
 
   const tag = tagFn(node);
   const el: JxElement = { tagName: tag };
@@ -280,40 +292,54 @@ function convertMdastNode(node: MdastNode): JxElement | null {
     case "emphasis":
     case "strong":
     case "delete":
-    case "tableCell":
+    case "tableCell": {
       flattenOrChildren();
       break;
+    }
 
     case "text":
-    case "inlineCode":
+    case "inlineCode": {
       el.textContent = node.value ?? null;
       break;
+    }
 
-    case "link":
+    case "link": {
       el.attributes = { href: node.url ?? "" };
-      if (node.title) el.attributes.title = node.title;
+      if (node.title) {
+        el.attributes.title = node.title;
+      }
       flattenOrChildren();
       break;
+    }
 
-    case "image":
-      el.attributes = { src: node.url ?? "", alt: node.alt ?? "" };
-      if (node.title) el.attributes.title = node.title;
+    case "image": {
+      el.attributes = { alt: node.alt ?? "", src: node.url ?? "" };
+      if (node.title) {
+        el.attributes.title = node.title;
+      }
       break;
+    }
 
     case "blockquote":
     case "listItem":
-    case "tableRow":
-      if (node.children?.length) el.children = childNodes();
+    case "tableRow": {
+      if (node.children?.length) {
+        el.children = childNodes();
+      }
       break;
+    }
 
-    case "list":
-      if (node.children?.length) el.children = childNodes();
+    case "list": {
+      if (node.children?.length) {
+        el.children = childNodes();
+      }
       if (node.start != null && node.start !== 1) {
         el.attributes = { start: String(node.start) };
       }
       break;
+    }
 
-    case "code":
+    case "code": {
       el.children = [
         {
           tagName: "code",
@@ -322,22 +348,24 @@ function convertMdastNode(node: MdastNode): JxElement | null {
         },
       ];
       break;
+    }
 
     case "thematicBreak":
-    case "break":
+    case "break": {
       break;
+    }
 
     case "table": {
       const rows = childNodes() as JxElement[];
       const thead =
         rows.length > 0
-          ? { tagName: "thead", children: [rows[0]] as (JxElement | string)[] }
+          ? { children: [rows[0]] as (JxElement | string)[], tagName: "thead" }
           : null;
       const tbody =
         rows.length > 1
           ? {
-              tagName: "tbody",
               children: rows.slice(1) as (JxElement | string)[],
+              tagName: "tbody",
             }
           : null;
       el.children = [thead, tbody].filter(Boolean) as (JxElement | string)[];
@@ -381,11 +409,13 @@ export function jxToMdast(jx: JxElement, opts: SerializeOptions = {}): MdastNode
     .map((child) => convertJxNode(child, true, allowlist))
     .filter(Boolean) as MdastNode[];
 
-  return { type: "root", children };
+  return { children, type: "root" };
 }
 
 function normalizeAllowlist(allowlist?: ReadonlySet<string> | string[]): ReadonlySet<string> {
-  if (!allowlist) return MD_ALL;
+  if (!allowlist) {
+    return MD_ALL;
+  }
   return allowlist instanceof Set ? allowlist : new Set(allowlist);
 }
 
@@ -398,8 +428,9 @@ function hasJxProps(el: JxElement) {
       key === "textContent" ||
       key === "innerHTML" ||
       key === "attributes"
-    )
+    ) {
       continue;
+    }
     return true;
   }
   return false;
@@ -413,7 +444,9 @@ function convertJxNode(
   if (typeof el === "string" || typeof el === "number") {
     return { type: "text", value: String(el) };
   }
-  if (!el || typeof el !== "object") return null;
+  if (!el || typeof el !== "object") {
+    return null;
+  }
 
   const tag = el.tagName ?? "div";
 
@@ -423,10 +456,14 @@ function convertJxNode(
   }
 
   const mdastType = TAG_MDAST_MAP[tag];
-  if (!mdastType) return null;
+  if (!mdastType) {
+    return null;
+  }
 
   const inline = (e: JxElement): MdastNode[] => {
-    if (e.textContent != null) return [{ type: "text", value: String(e.textContent) }];
+    if (e.textContent != null) {
+      return [{ type: "text", value: String(e.textContent) }];
+    }
     return ((e.children ?? []) as (JxElement | string)[])
       .map((c) => convertJxNode(c, false, allowlist))
       .filter(Boolean) as MdastNode[];
@@ -435,8 +472,8 @@ function convertJxNode(
     if (e.textContent != null) {
       return [
         {
-          type: "paragraph",
           children: [{ type: "text", value: String(e.textContent) }],
+          type: "paragraph",
         },
       ];
     }
@@ -446,107 +483,125 @@ function convertJxNode(
   };
 
   switch (mdastType) {
-    case "heading":
+    case "heading": {
       return {
-        type: "heading",
-        depth: parseInt(tag.slice(1), 10),
         children: inline(el),
+        depth: Number.parseInt(tag.slice(1), 10),
+        type: "heading",
       };
+    }
 
-    case "paragraph":
-      return { type: "paragraph", children: inline(el) };
+    case "paragraph": {
+      return { children: inline(el), type: "paragraph" };
+    }
 
-    case "text":
-      return { type: "text", value: el.textContent ?? "" };
+    case "text": {
+      return { type: "text", value: textOf(el) ?? "" };
+    }
 
     case "emphasis":
     case "strong":
-    case "delete":
-      return { type: mdastType, children: inline(el) };
+    case "delete": {
+      return { children: inline(el), type: mdastType };
+    }
 
-    case "inlineCode":
-      return { type: "inlineCode", value: el.textContent ?? "" };
+    case "inlineCode": {
+      return { type: "inlineCode", value: textOf(el) ?? "" };
+    }
 
-    case "link":
+    case "link": {
       return {
+        children: inline(el),
+        title: (el.attributes?.title as string | null) ?? null,
         type: "link",
         url: (el.attributes?.href as string) ?? "",
-        title: (el.attributes?.title as string | null) ?? null,
-        children: inline(el),
       };
+    }
 
-    case "image":
+    case "image": {
       return {
-        type: "image",
-        url: (el.attributes?.src as string) ?? "",
         alt: (el.attributes?.alt as string) ?? "",
         title: (el.attributes?.title as string | null) ?? null,
+        type: "image",
+        url: (el.attributes?.src as string) ?? "",
       };
+    }
 
-    case "blockquote":
-      return { type: "blockquote", children: block(el) };
+    case "blockquote": {
+      return { children: block(el), type: "blockquote" };
+    }
 
-    case "list":
+    case "list": {
       return {
-        type: "list",
-        ordered: tag === "ol",
-        start: tag === "ol" ? parseInt(el.attributes?.start as string, 10) || 1 : null,
-        spread: false,
         children: ((el.children ?? []) as (JxElement | string)[])
           .map((c) => convertJxNode(c, true, allowlist))
           .filter(Boolean) as MdastNode[],
+        ordered: tag === "ol",
+        spread: false,
+        start: tag === "ol" ? Number.parseInt(el.attributes?.start as string, 10) || 1 : null,
+        type: "list",
       };
+    }
 
-    case "listItem":
-      return { type: "listItem", spread: false, children: block(el) };
+    case "listItem": {
+      return { children: block(el), spread: false, type: "listItem" };
+    }
 
     case "code": {
       const codeChild = Array.isArray(el.children)
         ? (el.children[0] as JxElement | undefined)
         : undefined;
       return {
-        type: "code",
         lang: codeLang(codeChild),
-        value: codeChild?.textContent ?? el.textContent ?? "",
+        type: "code",
+        value: textOf(codeChild) ?? textOf(el) ?? "",
       };
     }
 
-    case "thematicBreak":
+    case "thematicBreak": {
       return { type: "thematicBreak" };
+    }
 
-    case "break":
+    case "break": {
       return { type: "break" };
+    }
 
     case "table": {
       // Flatten thead/tbody back to rows
       const rows: MdastNode[] = [];
       for (const section of (el.children ?? []) as (JxElement | string)[]) {
-        if (typeof section === "string") continue;
+        if (typeof section === "string") {
+          continue;
+        }
         if (section.tagName === "thead" || section.tagName === "tbody") {
           for (const row of (section.children ?? []) as (JxElement | string)[]) {
             const mdRow = convertJxNode(row, true, allowlist);
             if (mdRow) {
               if (section.tagName === "thead") {
-                for (const cell of mdRow.children ?? []) cell.isHeader = true;
+                for (const cell of mdRow.children ?? []) {
+                  cell.isHeader = true;
+                }
               }
               rows.push(mdRow);
             }
           }
         }
       }
-      return { type: "table", children: rows };
+      return { children: rows, type: "table" };
     }
 
-    case "tableRow":
+    case "tableRow": {
       return {
-        type: "tableRow",
         children: ((el.children ?? []) as (JxElement | string)[])
           .map((c) => convertJxNode(c, false, allowlist))
           .filter(Boolean) as MdastNode[],
+        type: "tableRow",
       };
+    }
 
-    case "tableCell":
-      return { type: "tableCell", children: inline(el) };
+    case "tableCell": {
+      return { children: inline(el), type: "tableCell" };
+    }
   }
 
   return null;
@@ -592,8 +647,9 @@ function collectDirectiveAttrs(el: JxElement) {
   const propsObj: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(el)) {
-    if (key === "tagName" || key === "textContent" || key === "innerHTML" || key === "attributes")
+    if (key === "tagName" || key === "textContent" || key === "innerHTML" || key === "attributes") {
       continue;
+    }
     if (key === "children") {
       if (value && typeof value === "object" && !Array.isArray(value)) {
         propsObj.children = value;
@@ -622,8 +678,6 @@ function convertToDirective(
 
   if (!isBlock) {
     return {
-      type: "textDirective",
-      name: tag,
       attributes: attrs,
       children:
         el.textContent != null
@@ -631,6 +685,8 @@ function convertToDirective(
           : (((el.children ?? []) as (JxElement | string)[])
               .map((c) => convertJxNode(c, false, allowlist))
               .filter(Boolean) as MdastNode[]),
+      name: tag,
+      type: "textDirective",
     };
   }
 
@@ -642,10 +698,10 @@ function convertToDirective(
     : (rawChildren as (JxElement | string)[] | undefined);
   if (!childArray?.length && el.textContent == null) {
     return {
-      type: "leafDirective",
-      name: tag,
       attributes: attrs,
       children: [],
+      name: tag,
+      type: "leafDirective",
     };
   }
 
@@ -653,8 +709,8 @@ function convertToDirective(
   if (el.textContent != null) {
     directiveChildren = [
       {
-        type: "paragraph",
         children: [{ type: "text", value: String(el.textContent) }],
+        type: "paragraph",
       },
     ];
   } else if (INLINE_CONTENT_TAGS.has(tag)) {
@@ -663,7 +719,7 @@ function convertToDirective(
       .map((c) => convertJxNode(c, false, allowlist))
       .filter(Boolean) as MdastNode[];
     directiveChildren =
-      inlineNodes.length > 0 ? [{ type: "paragraph", children: inlineNodes }] : [];
+      inlineNodes.length > 0 ? [{ children: inlineNodes, type: "paragraph" }] : [];
   } else {
     directiveChildren = ((el.children ?? []) as (JxElement | string)[])
       .map((c) => convertJxNode(c, true, allowlist))
@@ -671,10 +727,10 @@ function convertToDirective(
   }
 
   return {
-    type: "containerDirective",
-    name: tag,
     attributes: attrs,
     children: directiveChildren,
+    name: tag,
+    type: "containerDirective",
   };
 }
 
@@ -739,7 +795,9 @@ function nodeToMdast(
   if (typeof node === "number") {
     return [{ type: "text", value: String(node) }];
   }
-  if (!node || typeof node !== "object") return [];
+  if (!node || typeof node !== "object") {
+    return [];
+  }
 
   // Array descriptor — expand mapped arrays
   if (node.$prototype === "Array") {
@@ -749,10 +807,12 @@ function nodeToMdast(
   const tag = node.tagName ?? "div";
   const text = resolveText(node.textContent, ctx, scope);
 
-  // innerHTML — convert HTML content to mdast
+  // InnerHTML — convert HTML content to mdast
   if (typeof node.innerHTML === "string" && node.innerHTML.trim()) {
     const htmlNodes = htmlToMdast(node.innerHTML);
-    if (htmlNodes.length > 0) return htmlNodes;
+    if (htmlNodes.length > 0) {
+      return htmlNodes;
+    }
   }
 
   // Custom elements — inline component content
@@ -763,7 +823,7 @@ function nodeToMdast(
   // Wrapper tags — unwrap, promote children
   if (WRAPPER_TAGS.has(tag)) {
     if (text != null) {
-      return text.trim() ? [{ type: "paragraph", children: [{ type: "text", value: text }] }] : [];
+      return text.trim() ? [{ children: [{ type: "text", value: text }], type: "paragraph" }] : [];
     }
     return exportChildren(node, ctx, scope);
   }
@@ -771,24 +831,26 @@ function nodeToMdast(
   const mdastType = TAG_MDAST_MAP[tag];
   if (!mdastType) {
     if (text != null) {
-      return text.trim() ? [{ type: "paragraph", children: [{ type: "text", value: text }] }] : [];
+      return text.trim() ? [{ children: [{ type: "text", value: text }], type: "paragraph" }] : [];
     }
     return exportChildren(node, ctx, scope);
   }
 
   switch (mdastType) {
     case "heading": {
-      const depth = parseInt(tag.slice(1), 10);
+      const depth = Number.parseInt(tag.slice(1), 10);
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
-      return [{ type: "heading", depth, children }];
+      return [{ children, depth, type: "heading" }];
     }
 
     case "paragraph": {
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
-      if (children.length === 0) return [];
-      return [{ type: "paragraph", children }];
+      if (children.length === 0) {
+        return [];
+      }
+      return [{ children, type: "paragraph" }];
     }
 
     case "emphasis":
@@ -796,88 +858,96 @@ function nodeToMdast(
     case "delete": {
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
-      return [{ type: mdastType, children }];
+      return [{ children, type: mdastType }];
     }
 
-    case "inlineCode":
+    case "inlineCode": {
       return [{ type: "inlineCode", value: text ?? "" }];
+    }
 
     case "link": {
       const href = String(node.attributes?.href ?? "");
       const title = (node.attributes?.title as string | null) ?? null;
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
-      return [{ type: "link", url: href, title, children }];
+      return [{ children, title, type: "link", url: href }];
     }
 
     case "image": {
       const src = String(node.attributes?.src ?? "");
       const alt = String(node.attributes?.alt ?? "");
       const title = (node.attributes?.title as string | null) ?? null;
-      return [{ type: "image", url: src, alt, title }];
+      return [{ alt, title, type: "image", url: src }];
     }
 
     case "blockquote": {
       const children = exportChildren(node, ctx, scope);
       const wrapped = children.map((c) =>
-        c.type === "text" ? { type: "paragraph", children: [c] } : c,
+        c.type === "text" ? { children: [c], type: "paragraph" } : c,
       );
-      return [{ type: "blockquote", children: wrapped }];
+      return [{ children: wrapped, type: "blockquote" }];
     }
 
     case "list": {
       const ordered = tag === "ol";
       const children = exportChildren(node, ctx, scope);
       const items = children.filter((c) => c.type === "listItem");
-      if (items.length === 0) return [];
-      return [{ type: "list", ordered, spread: false, children: items }];
+      if (items.length === 0) {
+        return [];
+      }
+      return [{ children: items, ordered, spread: false, type: "list" }];
     }
 
     case "listItem": {
       let children = exportChildren(node, ctx, scope);
       if (children.length > 0 && children.every((c) => c.type === "text" || isInlineType(c.type))) {
-        children = [{ type: "paragraph", children }];
+        children = [{ children, type: "paragraph" }];
       }
-      return [{ type: "listItem", spread: false, children }];
+      return [{ children, spread: false, type: "listItem" }];
     }
 
     case "code": {
       const codeChild = Array.isArray(node.children)
         ? node.children.find((c: JxElement | string) => (c as JxMutableNode)?.tagName === "code")
         : null;
-      const value = (codeChild as JxElement | undefined)?.textContent ?? text ?? "";
+      const value = textOf(codeChild as JxElement | undefined) ?? text ?? "";
       return [
         {
-          type: "code",
           lang: codeLang(codeChild as JxElement | undefined),
+          type: "code",
           value,
         },
       ];
     }
 
-    case "thematicBreak":
+    case "thematicBreak": {
       return [{ type: "thematicBreak" }];
+    }
 
-    case "break":
+    case "break": {
       return [{ type: "break" }];
+    }
 
     case "table": {
       const rows = exportChildren(node, ctx, scope).filter((c) => c.type === "tableRow");
-      if (rows.length === 0) return [];
-      return [{ type: "table", children: rows }];
+      if (rows.length === 0) {
+        return [];
+      }
+      return [{ children: rows, type: "table" }];
     }
 
     case "thead":
-    case "tbody":
+    case "tbody": {
       // Unwrap — promote rows
       return exportChildren(node, ctx, scope);
+    }
 
     case "tableRow": {
       const cells = exportChildren(node, ctx, scope);
       return [
         {
-          type: "tableRow",
           children: cells.filter((c) => c.type === "tableCell"),
+          type: "tableRow",
         },
       ];
     }
@@ -885,7 +955,7 @@ function nodeToMdast(
     case "tableCell": {
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
-      return [{ type: "tableCell", children }];
+      return [{ children, type: "tableCell" }];
     }
   }
 
@@ -899,10 +969,14 @@ function exportChildren(
 ): MdastNode[] {
   if (node.textContent != null) {
     const text = resolveText(node.textContent, ctx, scope);
-    if (text) return [{ type: "text", value: text }];
+    if (text) {
+      return [{ type: "text", value: text }];
+    }
     return [];
   }
-  if (!Array.isArray(node.children)) return [];
+  if (!Array.isArray(node.children)) {
+    return [];
+  }
   return node.children.flatMap((c: JxElement | string) => nodeToMdast(c, ctx, scope));
 }
 
@@ -937,7 +1011,9 @@ function inlineComponent(node: JxElement, tag: string, ctx: ExportContext): Mdas
 
   const scope = ctx.buildScope?.(stateDefs) ?? null;
 
-  if (!Array.isArray(def.children)) return [];
+  if (!Array.isArray(def.children)) {
+    return [];
+  }
 
   const resolved = deepResolve(def.children, scope ?? {}, ctx);
 
@@ -956,7 +1032,9 @@ function deepResolve(
   scope: Record<string, unknown>,
   ctx: ExportContext,
 ) {
-  if (!Array.isArray(nodes)) return [];
+  if (!Array.isArray(nodes)) {
+    return [];
+  }
   return nodes.map((node) => resolveNode(node, scope, ctx));
 }
 
@@ -969,24 +1047,35 @@ function resolveNode(
     const evaluated = ctx.evaluateTemplate?.(node, scope);
     return evaluated !== undefined ? String(evaluated) : node;
   }
-  if (!node || typeof node !== "object") return node;
+  if (!node || typeof node !== "object") {
+    return node;
+  }
 
   const result = { ...node };
 
   if (typeof result.textContent === "string") {
     const evaluated = ctx.evaluateTemplate?.(result.textContent, scope);
-    if (evaluated !== undefined) result.textContent = String(evaluated);
+    if (evaluated !== undefined) {
+      result.textContent = String(evaluated);
+    }
   }
   if (typeof result.innerHTML === "string") {
     const evaluated = ctx.evaluateTemplate?.(result.innerHTML, scope);
-    if (evaluated !== undefined) result.innerHTML = String(evaluated);
+    if (evaluated !== undefined) {
+      result.innerHTML = String(evaluated);
+    }
   }
   if (result.attributes) {
     result.attributes = { ...result.attributes };
     for (const [k, v] of Object.entries(result.attributes)) {
       if (typeof v === "string") {
-        const evaluated = ctx.evaluateTemplate?.(v, scope);
-        if (evaluated !== undefined) result.attributes[k] = evaluated;
+        // Template evaluation yields a substituted scalar for attribute values.
+        const evaluated = ctx.evaluateTemplate?.(v, scope) as
+          | import("@jxsuite/schema/types").JxAttributeValue
+          | undefined;
+        if (evaluated !== undefined) {
+          result.attributes[k] = evaluated;
+        }
       }
     }
   }
@@ -1004,14 +1093,21 @@ function expandArray(
   ctx: ExportContext,
   scope?: Record<string, unknown> | null,
 ): MdastNode[] {
-  const itemsRef = (arrayDef as JxMutableNode).items?.$ref;
-  if (!itemsRef || !scope) return [];
+  const itemsValue = (arrayDef as JxMutableNode).items;
+  const itemsRef = isRef(itemsValue) ? itemsValue.$ref : undefined;
+  if (!itemsRef || !scope) {
+    return [];
+  }
 
   const items = resolveRef(itemsRef, scope);
-  if (!Array.isArray(items)) return [];
+  if (!Array.isArray(items)) {
+    return [];
+  }
 
   const mapTemplate = (arrayDef as JxMutableNode).map;
-  if (!mapTemplate) return [];
+  if (!mapTemplate) {
+    return [];
+  }
 
   return items.flatMap((item: JxMutableNode): MdastNode[] => {
     const resolved = resolveMapNode(mapTemplate, item);
@@ -1020,8 +1116,12 @@ function expandArray(
 }
 
 function resolveMapNode(node: JxMutableNode, item: Record<string, unknown>) {
-  if (typeof node === "string") return node;
-  if (!node || typeof node !== "object") return node;
+  if (typeof node === "string") {
+    return node;
+  }
+  if (!node || typeof node !== "object") {
+    return node;
+  }
 
   const result = { ...node };
 
@@ -1039,7 +1139,10 @@ function resolveMapNode(node: JxMutableNode, item: Record<string, unknown>) {
   }
 
   if (result.$props) {
-    result.$props = resolveMapNode(result.$props, item);
+    result.$props = resolveMapNode(
+      result.$props as unknown as JxMutableNode,
+      item,
+    ) as unknown as Record<string, import("@jxsuite/schema/types").JsonValue>;
   }
 
   if (typeof result.textContent === "string" && result.textContent.startsWith("$map/")) {
@@ -1061,8 +1164,11 @@ function resolvePath(obj: unknown, path: string) {
   const parts = path.split(/[/.]/);
   let current = obj as JxMutableNode;
   for (const part of parts) {
-    if (current == null) return undefined;
-    current = current[part];
+    if (current == null) {
+      return;
+    }
+    // Paths address nodes by construction; non-node leaves surface as undefined above.
+    current = current[part] as JxMutableNode;
   }
   return current;
 }
@@ -1079,11 +1185,15 @@ function resolveText(
   ctx: ExportContext,
   scope?: Record<string, unknown> | null,
 ): string | null {
-  if (value == null) return null;
+  if (value == null) {
+    return null;
+  }
   if (typeof value === "string") {
     if (scope) {
       const evaluated = ctx.evaluateTemplate?.(value, scope);
-      if (evaluated !== undefined) return String(evaluated);
+      if (evaluated !== undefined) {
+        return String(evaluated);
+      }
     }
     return value;
   }
@@ -1098,9 +1208,13 @@ function htmlToMdast(html: string) {
   const parts = splitHtmlBlocks(html);
   for (const part of parts) {
     const trimmed = part.trim();
-    if (!trimmed) continue;
+    if (!trimmed) {
+      continue;
+    }
     const parsed = parseHtmlElement(trimmed);
-    if (parsed) nodes.push(...parsed);
+    if (parsed) {
+      nodes.push(...parsed);
+    }
   }
 
   return nodes;
@@ -1117,14 +1231,18 @@ function splitHtmlBlocks(html: string) {
   while ((m = pattern.exec(trimmed)) !== null) {
     if (m.index > lastIdx) {
       const between = trimmed.slice(lastIdx, m.index).trim();
-      if (between) blocks.push(between);
+      if (between) {
+        blocks.push(between);
+      }
     }
     blocks.push(m[0]);
     lastIdx = pattern.lastIndex;
   }
   if (lastIdx < trimmed.length) {
     const tail = trimmed.slice(lastIdx).trim();
-    if (tail) blocks.push(tail);
+    if (tail) {
+      blocks.push(tail);
+    }
   }
 
   return blocks;
@@ -1133,16 +1251,18 @@ function splitHtmlBlocks(html: string) {
 function parseHtmlElement(html: string) {
   const hMatch = html.match(/^<(h[1-6])(?:\s[^>]*)?>(.+?)<\/\1>$/is);
   if (hMatch) {
-    const depth = parseInt(hMatch[1].slice(1), 10);
+    const depth = Number.parseInt(hMatch[1].slice(1), 10);
     const children = parseInlineHtml(hMatch[2]);
-    return [{ type: "heading", depth, children }];
+    return [{ children, depth, type: "heading" }];
   }
 
   const pMatch = html.match(/^<p(?:\s[^>]*)?>(.+?)<\/p>$/is);
   if (pMatch) {
     const children = parseInlineHtml(pMatch[1]);
-    if (children.length === 0) return null;
-    return [{ type: "paragraph", children }];
+    if (children.length === 0) {
+      return null;
+    }
+    return [{ children, type: "paragraph" }];
   }
 
   if (/^<hr\s*\/?>$/i.test(html)) {
@@ -1155,30 +1275,34 @@ function parseHtmlElement(html: string) {
   if (preMatch) {
     const lang = preMatch[1] ?? null;
     const value = decodeHtmlEntities(preMatch[2]);
-    return [{ type: "code", lang, value }];
+    return [{ lang, type: "code", value }];
   }
 
   const bqMatch = html.match(/^<blockquote(?:\s[^>]*)?>([^]*?)<\/blockquote>$/is);
   if (bqMatch) {
     const inner = htmlToMdast(bqMatch[1]);
     const children = inner.map((c) =>
-      c.type === "text" ? { type: "paragraph", children: [c] } : c,
+      c.type === "text" ? { children: [c], type: "paragraph" } : c,
     );
-    return [{ type: "blockquote", children }];
+    return [{ children, type: "blockquote" }];
   }
 
   const ulMatch = html.match(/^<ul(?:\s[^>]*)?>([^]*?)<\/ul>$/is);
   if (ulMatch) {
     const items = parseListItems(ulMatch[1]);
-    if (items.length === 0) return null;
-    return [{ type: "list", ordered: false, spread: false, children: items }];
+    if (items.length === 0) {
+      return null;
+    }
+    return [{ children: items, ordered: false, spread: false, type: "list" }];
   }
 
   const olMatch = html.match(/^<ol(?:\s[^>]*)?>([^]*?)<\/ol>$/is);
   if (olMatch) {
     const items = parseListItems(olMatch[1]);
-    if (items.length === 0) return null;
-    return [{ type: "list", ordered: true, spread: false, children: items }];
+    if (items.length === 0) {
+      return null;
+    }
+    return [{ children: items, ordered: true, spread: false, type: "list" }];
   }
 
   const tableMatch = html.match(/^<table(?:\s[^>]*)?>([^]*?)<\/table>$/is);
@@ -1194,7 +1318,9 @@ function parseHtmlElement(html: string) {
   }
 
   const text = stripHtmlTags(html).trim();
-  if (text) return [{ type: "paragraph", children: parseInlineHtml(html) }];
+  if (text) {
+    return [{ children: parseInlineHtml(html), type: "paragraph" }];
+  }
 
   return null;
 }
@@ -1207,13 +1333,17 @@ function parseInlineHtml(html: string) {
     const tagStart = html.indexOf("<", pos);
     if (tagStart === -1) {
       const text = decodeHtmlEntities(html.slice(pos));
-      if (text.trim()) nodes.push({ type: "text", value: text });
+      if (text.trim()) {
+        nodes.push({ type: "text", value: text });
+      }
       break;
     }
 
     if (tagStart > pos) {
       const text = decodeHtmlEntities(html.slice(pos, tagStart));
-      if (text.trim()) nodes.push({ type: "text", value: text });
+      if (text.trim()) {
+        nodes.push({ type: "text", value: text });
+      }
     }
 
     const brMatch = html.slice(tagStart).match(/^<br\s*\/?>/i);
@@ -1229,9 +1359,9 @@ function parseInlineHtml(html: string) {
       const src = attrs.match(/src="([^"]*)"/)?.[1] ?? "";
       const alt = attrs.match(/alt="([^"]*)"/)?.[1] ?? "";
       nodes.push({
+        alt: decodeHtmlEntities(alt),
         type: "image",
         url: decodeHtmlEntities(src),
-        alt: decodeHtmlEntities(alt),
       });
       pos = tagStart + imgMatch[0].length;
       continue;
@@ -1256,31 +1386,36 @@ function parseInlineHtml(html: string) {
           const href = attrs.match(/href="([^"]*)"/)?.[1] ?? "";
           const title = attrs.match(/title="([^"]*)"/)?.[1] ?? null;
           const children = parseInlineHtml(inner);
-          if (children.length === 0)
+          if (children.length === 0) {
             children.push({ type: "text", value: decodeHtmlEntities(inner) });
+          }
           nodes.push({
+            children,
+            title,
             type: "link",
             url: decodeHtmlEntities(href),
-            title,
-            children,
           });
           break;
         }
         case "em":
-        case "i":
-          nodes.push({ type: "emphasis", children: parseInlineHtml(inner) });
+        case "i": {
+          nodes.push({ children: parseInlineHtml(inner), type: "emphasis" });
           break;
+        }
         case "strong":
-        case "b":
-          nodes.push({ type: "strong", children: parseInlineHtml(inner) });
+        case "b": {
+          nodes.push({ children: parseInlineHtml(inner), type: "strong" });
           break;
+        }
         case "del":
-        case "s":
-          nodes.push({ type: "delete", children: parseInlineHtml(inner) });
+        case "s": {
+          nodes.push({ children: parseInlineHtml(inner), type: "delete" });
           break;
-        case "code":
+        }
+        case "code": {
           nodes.push({ type: "inlineCode", value: decodeHtmlEntities(inner) });
           break;
+        }
       }
       continue;
     }
@@ -1307,15 +1442,19 @@ function findMatchingClose(html: string, start: number, tag: string) {
     const openMatch = openRe.exec(html);
     const closeMatch = closeRe.exec(html);
 
-    if (!closeMatch) return -1;
+    if (!closeMatch) {
+      return -1;
+    }
 
     if (openMatch && openMatch.index < closeMatch.index) {
       depth++;
       openRe.lastIndex = openMatch.index + openMatch[0].length;
-      closeRe.lastIndex = closeMatch.index; // re-check this close
+      closeRe.lastIndex = closeMatch.index; // Re-check this close
     } else {
       depth--;
-      if (depth === 0) return closeMatch.index;
+      if (depth === 0) {
+        return closeMatch.index;
+      }
     }
   }
   return -1;
@@ -1329,8 +1468,8 @@ function parseListItems(html: string) {
     const inner = m[1].trim();
     const innerNodes = /<(?:p|ul|ol|blockquote|pre)[\s>]/i.test(inner)
       ? htmlToMdast(inner)
-      : [{ type: "paragraph", children: parseInlineHtml(inner) }];
-    items.push({ type: "listItem", spread: false, children: innerNodes });
+      : [{ children: parseInlineHtml(inner), type: "paragraph" }];
+    items.push({ children: innerNodes, spread: false, type: "listItem" });
   }
   return items;
 }
@@ -1344,27 +1483,31 @@ function parseHtmlTable(html: string) {
     const cells: MdastNode[] = [];
     let c;
     while ((c = cellPattern.exec(m[1])) !== null) {
-      cells.push({ type: "tableCell", children: parseInlineHtml(c[1]) });
+      cells.push({ children: parseInlineHtml(c[1]), type: "tableCell" });
     }
-    if (cells.length > 0) rows.push({ type: "tableRow", children: cells });
+    if (cells.length > 0) {
+      rows.push({ children: cells, type: "tableRow" });
+    }
   }
-  if (rows.length === 0) return [];
-  return [{ type: "table", children: rows }];
+  if (rows.length === 0) {
+    return [];
+  }
+  return [{ children: rows, type: "table" }];
 }
 
 function stripHtmlTags(html: string) {
-  return html.replace(/<[^>]+>/g, "");
+  return html.replaceAll(/<[^>]+>/g, "");
 }
 
 function decodeHtmlEntities(str: string) {
   return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#36;/g, "$")
-    .replace(/&nbsp;/g, " ");
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&#36;", "$")
+    .replaceAll("&nbsp;", " ");
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1393,7 +1536,9 @@ function serializeRoundtrip(doc: JxDocument, opts: SerializeOptions): string {
   if (opts.frontmatter !== false) {
     const frontmatter: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(doc)) {
-      if (key === "children") continue;
+      if (key === "children") {
+        continue;
+      }
       frontmatter[key] = value;
     }
 
@@ -1416,12 +1561,10 @@ function serializeRoundtrip(doc: JxDocument, opts: SerializeOptions): string {
     lines.push(md as string);
   }
 
-  return (
-    lines
-      .join("\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim() + "\n"
-  );
+  return `${lines
+    .join("\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
+    .trim()}\n`;
 }
 
 function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
@@ -1430,9 +1573,9 @@ function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
   }
 
   const ctx: ExportContext = {
+    buildScope: opts.buildScope,
     componentDefs: opts.componentDefs ?? new Map(),
     evaluateTemplate: opts.evaluateTemplate,
-    buildScope: opts.buildScope,
   };
 
   // Build scope from resolved state for any remaining template expressions
@@ -1448,7 +1591,7 @@ function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
 
   const flushInline = () => {
     if (inlineBuf.length > 0) {
-      cleaned.push({ type: "paragraph", children: inlineBuf });
+      cleaned.push({ children: inlineBuf, type: "paragraph" });
       inlineBuf = [];
     }
   };
@@ -1464,8 +1607,8 @@ function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
   flushInline();
 
   const mdast = {
-    type: "root",
     children: cleaned,
+    type: "root",
   } as unknown as import("mdast").Root;
 
   const md = unified()
@@ -1473,10 +1616,10 @@ function serializeExport(doc: JxDocument, opts: SerializeOptions): string {
     .use(remarkStringify, {
       bullet: "-",
       emphasis: "*",
-      strong: "*",
       setext: false,
+      strong: "*",
     })
     .stringify(mdast);
 
-  return md.replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  return `${md.replaceAll(/\n{3,}/g, "\n\n").trim()}\n`;
 }

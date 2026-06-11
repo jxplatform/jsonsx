@@ -1,34 +1,34 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import {
-  getNodeAtPath,
-  parentElementPath,
   childIndex,
+  createState,
+  flattenTree,
+  getNodeAtPath,
+  hoverNode,
+  isAncestor,
+  nodeLabel,
+  parentElementPath,
   pathKey,
   pathsEqual,
-  isAncestor,
-  flattenTree,
-  nodeLabel,
-  createState,
-  selectNode,
-  hoverNode,
-  pushDocument,
   popDocument,
+  pushDocument,
+  selectNode,
 } from "../src/state";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeDoc() {
   return {
-    tagName: "div",
     children: [
       { tagName: "h1", textContent: "Hello" },
       {
-        tagName: "section",
         children: [{ tagName: "p", textContent: "Paragraph" }, { tagName: "span" }],
+        tagName: "section",
       },
     ],
+    tagName: "div",
   };
 }
 
@@ -167,7 +167,7 @@ describe("flattenTree", () => {
   test("flattens static children", () => {
     const doc = makeDoc();
     const rows = flattenTree(doc);
-    expect(rows.length).toBe(5); // root + h1 + section + p + span
+    expect(rows.length).toBe(5); // Root + h1 + section + p + span
     expect(rows[0].nodeType).toBe("element");
     expect(rows[0].depth).toBe(0);
     expect((rows[1].node as JxMutableNode).tagName).toBe("h1");
@@ -176,12 +176,12 @@ describe("flattenTree", () => {
 
   test("flattens $map children", () => {
     const doc = {
-      tagName: "ul",
       children: {
         $prototype: "Array",
         items: { $ref: "#/$defs/list" },
         map: { tagName: "li", textContent: "item" },
       },
+      tagName: "ul",
     };
     const rows = flattenTree(doc as unknown as JxMutableNode);
     expect(rows.some((r) => r.nodeType === "map")).toBe(true);
@@ -196,12 +196,12 @@ describe("flattenTree", () => {
 
   test("flattens $switch cases", () => {
     const doc = {
-      tagName: "div",
       $switch: "${route}",
       cases: {
-        home: { tagName: "main", textContent: "Home" },
         about: { tagName: "main", textContent: "About" },
+        home: { tagName: "main", textContent: "Home" },
       },
+      tagName: "div",
     };
     const rows = flattenTree(doc);
     const caseRows = rows.filter((r) => r.nodeType === "case");
@@ -211,11 +211,11 @@ describe("flattenTree", () => {
 
   test("emits case-ref for $ref cases", () => {
     const doc = {
-      tagName: "div",
       $switch: "${route}",
       cases: {
         home: { $ref: "#/components/home" },
       },
+      tagName: "div",
     };
     const rows = flattenTree(doc);
     const refRows = rows.filter((r) => r.nodeType === "case-ref");
@@ -224,8 +224,8 @@ describe("flattenTree", () => {
 
   test("stops recursion for custom component instances without children array", () => {
     const doc = {
-      tagName: "my-card",
       $props: { title: "Hi" },
+      tagName: "my-card",
     };
     const rows = flattenTree(doc);
     // Should only have the root — no children to recurse
@@ -234,9 +234,9 @@ describe("flattenTree", () => {
 
   test("recurses into children of custom components with slotted content", () => {
     const doc = {
-      tagName: "my-card",
       $props: { title: "Hi" },
       children: [{ tagName: "p" }],
+      tagName: "my-card",
     };
     const rows = flattenTree(doc);
     // Should have the root + the slotted p child
@@ -283,7 +283,7 @@ describe("nodeLabel", () => {
   });
 
   test("$switch suffix", () => {
-    expect(nodeLabel({ tagName: "div", $switch: "${x}" })).toBe("div ⇆");
+    expect(nodeLabel({ $switch: "${x}", tagName: "div" })).toBe("div ⇆");
   });
 
   test("defaults to div when no tagName", () => {

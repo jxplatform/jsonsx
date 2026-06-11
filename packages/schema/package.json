@@ -9,6 +9,8 @@
     ".": "./src/schema.ts",
     "./format-registry": "./src/format-registry.ts",
     "./types": "./types.ts",
+    "./guards": "./src/guards.ts",
+    "./parse": "./src/parse.ts",
     "./defs": "./defs/index.ts",
     "./schema.json": "./schema.json",
     "./project-schema.json": "./project-schema.json"

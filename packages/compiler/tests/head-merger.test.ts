@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mergeHead, renderHead } from "../src/site/head-merger";
 
 // ─── mergeHead ──────────────────────────────────────────────────────────────
@@ -7,7 +7,7 @@ describe("mergeHead", () => {
   test("auto-injects charset and viewport defaults", () => {
     const result = mergeHead() as any[];
     const charsetEntry = result.find(
-      (e) => e.tagName === "meta" && e.attributes?.charset === "utf-8",
+      (e) => e.tagName === "meta" && e.attributes?.charset === "utf8",
     );
     const viewportEntry = result.find((e) => e.attributes?.name === "viewport");
     expect(charsetEntry).toBeDefined();
@@ -30,15 +30,15 @@ describe("mergeHead", () => {
   test("later layers override earlier ones (page > layout > site)", () => {
     const site = [
       {
+        attributes: { content: "Site desc", name: "description" },
         tagName: "meta",
-        attributes: { name: "description", content: "Site desc" },
       },
     ];
     const layout: any[] = [];
     const page = [
       {
+        attributes: { content: "Page desc", name: "description" },
         tagName: "meta",
-        attributes: { name: "description", content: "Page desc" },
       },
     ];
     const result = mergeHead(site, layout, page) as any[];
@@ -47,8 +47,8 @@ describe("mergeHead", () => {
   });
 
   test("deduplicates <meta charset>", () => {
-    const site = [{ tagName: "meta", attributes: { charset: "utf-8" } }];
-    const page = [{ tagName: "meta", attributes: { charset: "utf-16" } }];
+    const site = [{ attributes: { charset: "utf8" }, tagName: "meta" }];
+    const page = [{ attributes: { charset: "utf-16" }, tagName: "meta" }];
     const result = mergeHead(site, [], page) as any[];
     const charsets = result.filter((e) => e.attributes?.charset);
     expect(charsets).toHaveLength(1);
@@ -58,14 +58,14 @@ describe("mergeHead", () => {
   test("deduplicates <link> by rel+href", () => {
     const site = [
       {
+        attributes: { href: "/style.css", rel: "stylesheet" },
         tagName: "link",
-        attributes: { rel: "stylesheet", href: "/style.css" },
       },
     ];
     const page = [
       {
+        attributes: { href: "/style.css", rel: "stylesheet" },
         tagName: "link",
-        attributes: { rel: "stylesheet", href: "/style.css" },
       },
     ];
     const result = mergeHead(site, [], page) as any[];
@@ -74,8 +74,8 @@ describe("mergeHead", () => {
   });
 
   test("deduplicates <script> by src", () => {
-    const site = [{ tagName: "script", attributes: { src: "/app.js" } }];
-    const page = [{ tagName: "script", attributes: { src: "/app.js" } }];
+    const site = [{ attributes: { src: "/app.js" }, tagName: "script" }];
+    const page = [{ attributes: { src: "/app.js" }, tagName: "script" }];
     const result = mergeHead(site, [], page) as any[];
     const scripts = result.filter((e) => e.tagName === "script" && e.attributes?.src === "/app.js");
     expect(scripts).toHaveLength(1);
@@ -84,14 +84,14 @@ describe("mergeHead", () => {
   test("deduplicates <meta property> (Open Graph)", () => {
     const site = [
       {
+        attributes: { content: "Site Title", property: "og:title" },
         tagName: "meta",
-        attributes: { property: "og:title", content: "Site Title" },
       },
     ];
     const page = [
       {
+        attributes: { content: "Page Title", property: "og:title" },
         tagName: "meta",
-        attributes: { property: "og:title", content: "Page Title" },
       },
     ];
     const result = mergeHead(site, [], page) as any[];
@@ -128,24 +128,24 @@ describe("mergeHead", () => {
   });
 
   test("deduplicates <style> tags by content", () => {
-    const site = [{ tagName: "style", children: ["body { color: red; }"] }];
-    const page = [{ tagName: "style", children: ["body { color: red; }"] }];
+    const site = [{ children: ["body { color: red; }"], tagName: "style" }];
+    const page = [{ children: ["body { color: red; }"], tagName: "style" }];
     const result = mergeHead(site, [], page) as any[];
     const styles = result.filter((e) => e.tagName === "style");
     expect(styles).toHaveLength(1);
   });
 
   test("keeps distinct <style> tags with different content", () => {
-    const site = [{ tagName: "style", children: ["body { color: red; }"] }];
-    const page = [{ tagName: "style", children: [".card { padding: 1rem; }"] }];
+    const site = [{ children: ["body { color: red; }"], tagName: "style" }];
+    const page = [{ children: [".card { padding: 1rem; }"], tagName: "style" }];
     const result = mergeHead(site, [], page) as any[];
     const styles = result.filter((e) => e.tagName === "style");
     expect(styles).toHaveLength(2);
   });
 
   test("deduplicates unknown/custom tags by full JSON key", () => {
-    const site = [{ tagName: "custom-tag", attributes: { foo: "bar" } }];
-    const page = [{ tagName: "custom-tag", attributes: { foo: "bar" } }];
+    const site = [{ attributes: { foo: "bar" }, tagName: "custom-tag" }];
+    const page = [{ attributes: { foo: "bar" }, tagName: "custom-tag" }];
     const result = mergeHead(site, [], page) as any[];
     const custom = result.filter((e) => e.tagName === "custom-tag");
     expect(custom).toHaveLength(1);
@@ -156,28 +156,28 @@ describe("mergeHead", () => {
 
 describe("renderHead", () => {
   test("renders void elements without closing tags", () => {
-    const html = renderHead([{ tagName: "meta", attributes: { charset: "utf-8" } }]);
-    expect(html).toContain('<meta charset="utf-8">');
+    const html = renderHead([{ attributes: { charset: "utf8" }, tagName: "meta" }]);
+    expect(html).toContain('<meta charset="utf8">');
     expect(html).not.toContain("</meta>");
   });
 
   test("renders elements with content", () => {
-    const html = renderHead([{ tagName: "title", children: ["My Page"] }]);
+    const html = renderHead([{ children: ["My Page"], tagName: "title" }]);
     expect(html).toContain("<title>My Page</title>");
   });
 
   test("renders link elements", () => {
     const html = renderHead([
       {
+        attributes: { href: "/style.css", rel: "stylesheet" },
         tagName: "link",
-        attributes: { rel: "stylesheet", href: "/style.css" },
       },
     ]);
-    expect(html).toContain('<link rel="stylesheet" href="/style.css">');
+    expect(html).toContain('<link href="/style.css" rel="stylesheet">');
   });
 
   test("renders script elements with src", () => {
-    const html = renderHead([{ tagName: "script", attributes: { src: "/app.js" } }]);
+    const html = renderHead([{ attributes: { src: "/app.js" }, tagName: "script" }]);
     expect(html).toContain('<script src="/app.js"></script>');
   });
 
@@ -189,15 +189,15 @@ describe("renderHead", () => {
   test("escapes attribute values", () => {
     const html = renderHead([
       {
+        attributes: { content: 'value with "quotes"', name: "test" },
         tagName: "meta",
-        attributes: { name: "test", content: 'value with "quotes"' },
       },
     ]);
     expect(html).toContain("&quot;");
   });
 
   test("handles boolean attributes", () => {
-    const html = renderHead([{ tagName: "script", attributes: { async: true, src: "/app.js" } }]);
+    const html = renderHead([{ attributes: { async: true, src: "/app.js" }, tagName: "script" }]);
     expect(html).toContain("async");
   });
 });

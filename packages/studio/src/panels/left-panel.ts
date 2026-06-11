@@ -11,11 +11,13 @@ import { html, render as litRender, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 import { leftPanel, updateSession } from "../store";
 import { effect, effectScope } from "../reactivity";
-import { createPanelScheduler, type PanelScheduler } from "./panel-scheduler";
+import { createPanelScheduler } from "./panel-scheduler";
+import type { PanelScheduler } from "./panel-scheduler";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { transact, mutateUpdateFrontmatter } from "../tabs/transact";
+import { mutateUpdateFrontmatter, transact } from "../tabs/transact";
 import type { GitDiffState, JsonValue } from "../types";
+import type { JxHeadEntry, JxMutableNode } from "@jxsuite/schema/types";
 
 import { renderLayersTemplate } from "./layers-panel";
 import { renderStylebookLayersTemplate } from "./stylebook-layers-panel";
@@ -25,12 +27,14 @@ import { selectStylebookTag, stylebookMeta } from "./stylebook-panel";
 interface LeftPanelCtx {
   getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
-  renderImportsTemplate: (...args: any[]) => TemplateResult;
-  renderFilesTemplate: (...args: any[]) => TemplateResult;
-  renderSignalsTemplate: (...args: any[]) => TemplateResult;
-  renderDataExplorerTemplate: (...args: any[]) => TemplateResult;
-  renderHeadTemplate: (...args: any[]) => TemplateResult;
-  renderGitPanel: (...args: any[]) => TemplateResult;
+  // Renderers injected from studio.ts (dependency inversion avoids circular imports);
+  // Typed against their implementations so call sites stay checked.
+  renderImportsTemplate: typeof import("./imports-panel").renderImportsTemplate;
+  renderFilesTemplate: () => TemplateResult;
+  renderSignalsTemplate: typeof import("./signals-panel").renderSignalsTemplate;
+  renderDataExplorerTemplate: typeof import("./data-explorer").renderDataExplorerTemplate;
+  renderHeadTemplate: typeof import("./head-panel").renderHeadTemplate;
+  renderGitPanel: typeof import("./git-panel").renderGitPanel;
   renderCanvas: () => void;
   defCategory: (def: unknown) => string;
   defBadgeLabel: (def: unknown) => string;
@@ -59,7 +63,7 @@ let _scheduler: PanelScheduler | null = null;
  */
 export function mount(ctx: LeftPanelCtx) {
   _ctx = ctx;
-  _scheduler = createPanelScheduler({ root: leftPanel, render: _doRender });
+  _scheduler = createPanelScheduler({ render: _doRender, root: leftPanel });
   _scheduler.bindFocus();
   _scope = effectScope();
   _scope.run(() => {
@@ -98,25 +102,40 @@ export function render() {
 
 /** Actual DOM paint, invoked by the scheduler. Includes a Lit-marker-corruption recovery retry. */
 function _doRender() {
-  if (!_ctx) return;
+  if (!_ctx) {
+    return;
+  }
   try {
     _render();
-  } catch (e) {
-    console.error("left-panel render error:", e);
+  } catch (error) {
+    console.error("left-panel render error:", error);
     try {
       leftPanel.textContent = "";
-      // @ts-ignore — clear Lit's internal state to recover from marker corruption
+      // @ts-expect-error — clear Lit's internal state to recover from marker corruption
       delete leftPanel["_$litPart$"];
       _render();
-    } catch (e2) {
-      console.error("left-panel retry failed:", e2);
+    } catch (error) {
+      console.error("left-panel retry failed:", error);
     }
   }
 
   if (view.leftTab === "layers") {
     const sel = leftPanel.querySelector(".layer-row.selected");
-    if (sel) sel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (sel) {
+      sel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }
+}
+
+/** Overlay content-mode frontmatter title/$head onto the document for the head panel. */
+function buildHeadDoc(doc: JxMutableNode, fm: Record<string, unknown>): JxMutableNode {
+  const title = fm.title as string | undefined;
+  const $head = fm.$head as JxHeadEntry[] | undefined;
+  return {
+    ...doc,
+    ...(title !== undefined ? { title } : {}),
+    ...($head !== undefined ? { $head } : {}),
+  };
 }
 
 function _render() {
@@ -128,23 +147,25 @@ function _render() {
   if (tab === "files") {
     litRender(html`<div class="panel-body">${ctx.renderFilesTemplate()}</div>`, leftPanel);
     const tree = leftPanel.querySelector(".file-tree") as HTMLElement | null;
-    if (tree) ctx.setupTreeKeyboard(tree);
+    if (tree) {
+      ctx.setupTreeKeyboard(tree);
+    }
     ctx.registerFileTreeDnD({ renderLeftPanel: render });
     return;
   }
 
   if (tab === "git") {
     const aTab = activeTab.value;
-    const S = aTab ? { ui: aTab.session.ui } : { ui: {} };
-    litRender(html`<div class="panel-body">${ctx.renderGitPanel(S, ctx)}</div>`, leftPanel);
+    const ui: Parameters<LeftPanelCtx["renderGitPanel"]>[0]["ui"] = aTab ? aTab.session.ui : {};
+    litRender(html`<div class="panel-body">${ctx.renderGitPanel({ ui }, ctx)}</div>`, leftPanel);
     return;
   }
 
   if (tab === "blocks") {
     const content = renderElementsTemplate({
-      webdata: ctx.webdata,
       defaultDef: ctx.defaultDef,
       rerender: render,
+      webdata: ctx.webdata,
     } as Parameters<typeof renderElementsTemplate>[0]);
     litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
     ctx.registerElementsDnD();
@@ -171,18 +192,18 @@ function _render() {
    *   documentPath?: string;
    * }}
    */ {
-    ui: aTab.session.ui,
-    document: aTab.doc.document,
-    mode: aTab.doc.mode,
-    selection: aTab.session.selection,
     canvas: aTab.session.canvas,
     content: aTab.doc.content,
+    document: aTab.doc.document,
     documentPath: aTab.documentPath,
+    mode: aTab.doc.mode,
+    selection: aTab.session.selection,
+    ui: aTab.session.ui,
   };
 
   /** @type {TemplateResult | typeof nothing} */
   let content;
-  if (tab === "layers")
+  if (tab === "layers") {
     content =
       ctx.getCanvasMode() === "stylebook"
         ? renderStylebookLayersTemplate({
@@ -193,59 +214,65 @@ function _render() {
             navigateToComponent: ctx.navigateToComponent,
             rerender: render,
           });
-  else if (tab === "imports")
+  } else if (tab === "imports") {
     content = ctx.renderImportsTemplate({
-      renderLeftPanel: render,
-      documentPath: S.documentPath,
-      documentElements: S.document.$elements || [],
-      applyMutation: (fn: (doc: object) => void) => {
+      applyMutation: (fn: (doc: JxMutableNode) => void) => {
         transact(activeTab.value, fn);
       },
-    });
-  else if (tab === "state")
-    content = ctx.renderSignalsTemplate(S, {
+      documentElements: S.document.$elements || [],
+      documentPath: S.documentPath,
       renderLeftPanel: render,
+    });
+  } else if (tab === "state") {
+    content = ctx.renderSignalsTemplate(S, {
       renderCanvas: ctx.renderCanvas,
+      renderLeftPanel: render,
       updateSession,
     });
-  else if (tab === "data")
-    content = ctx.renderDataExplorerTemplate(S.document.state, S.canvas?.scope ?? null, {
+  } else if (tab === "data") {
+    content = ctx.renderDataExplorerTemplate(S.document.state ?? {}, S.canvas?.scope ?? null, {
+      defBadgeLabel: ctx.defBadgeLabel,
+      defCategory: ctx.defCategory,
       renderCanvas: ctx.renderCanvas,
       renderLeftPanel: render,
-      defCategory: ctx.defCategory,
-      defBadgeLabel: ctx.defBadgeLabel,
     });
-  else if (tab === "head") {
+  } else if (tab === "head") {
     const isContent = S.mode === "content";
     const fm = S.content?.frontmatter ?? {};
-    const headDoc = isContent ? { ...S.document, title: fm.title, $head: fm.$head } : S.document;
+    const headDoc = isContent ? buildHeadDoc(S.document, fm) : S.document;
     content = ctx.renderHeadTemplate({
-      document: headDoc,
       applyMutation: isContent
-        ? (fn: (doc: object) => void) => {
+        ? (fn: (doc: JxMutableNode) => void) => {
             const tab = activeTab.value!;
             const fm = (tab.doc.content?.frontmatter ?? {}) as Record<string, unknown>;
-            const fmHead = fm.$head as unknown[] | undefined;
-            const tmp = {
-              title: fm.title,
-              $head: fmHead ? [...fmHead] : undefined,
+            const fmHead = fm.$head as JxHeadEntry[] | undefined;
+            const tmp: JxMutableNode = {
+              ...(typeof fm.title === "string" ? { title: fm.title } : {}),
+              ...(fmHead ? { $head: [...fmHead] } : {}),
             };
             fn(tmp);
-            if (tmp.title !== fm.title)
+            if (tmp.title !== fm.title) {
               mutateUpdateFrontmatter(tab, "title", tmp.title as JsonValue);
+            }
             const newHead = tmp.$head && tmp.$head.length > 0 ? tmp.$head : undefined;
-            mutateUpdateFrontmatter(tab, "$head", /** @type {JsonValue} */ newHead);
+            // JxHeadEntry[] is JSON document content by construction.
+            mutateUpdateFrontmatter(tab, "$head", newHead as JsonValue);
             render();
           }
-        : (fn: (doc: object) => void) => {
+        : (fn: (doc: JxMutableNode) => void) => {
             transact(activeTab.value, fn);
           },
+      document: headDoc,
       renderLeftPanel: render,
     });
-  } else content = nothing;
+  } else {
+    content = nothing;
+  }
 
   litRender(html`<div class="panel-body">${content}</div>`, leftPanel);
 
   // Post-render side effects
-  if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") ctx.registerLayersDnD();
+  if (tab === "layers" && ctx.getCanvasMode() !== "stylebook") {
+    ctx.registerLayersDnD();
+  }
 }

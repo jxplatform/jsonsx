@@ -2,6 +2,7 @@
 /** Publish a local project to GitHub — creates a new repo and pushes. */
 
 import { html } from "lit-html";
+import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import { showDialog } from "../ui/layers";
 import { authenticateGithub } from "./github-auth";
@@ -18,7 +19,9 @@ import { statusMessage } from "../panels/statusbar";
  */
 export async function publishToGithub({ projectName }: { projectName: string }) {
   const token = await authenticateGithub();
-  if (!token) return false;
+  if (!token) {
+    return false;
+  }
 
   const repoOpts = await showDialog<{
     name: string;
@@ -37,9 +40,9 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
         cancel-label="Cancel"
         @confirm=${() => {
           done({
-            name: _nameInput?.value || projectName,
             description: _descInput?.value || "",
             isPrivate: _privateToggle?.checked ?? true,
+            name: _nameInput?.value || projectName,
           });
         }}
         @cancel=${() => done(null)}
@@ -81,23 +84,25 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
     `;
   });
 
-  if (!repoOpts) return false;
+  if (!repoOpts) {
+    return false;
+  }
 
   statusMessage("Creating GitHub repository…");
 
   const createRes = await fetch("https://api.github.com/user/repos", {
-    method: "POST",
+    body: JSON.stringify({
+      auto_init: false,
+      description: repoOpts.description,
+      name: repoOpts.name,
+      private: repoOpts.isPrivate,
+    }),
     headers: {
-      Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      name: repoOpts.name,
-      description: repoOpts.description,
-      private: repoOpts.isPrivate,
-      auto_init: false,
-    }),
+    method: "POST",
   });
 
   if (!createRes.ok) {
@@ -117,8 +122,8 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
   statusMessage("Pushing to GitHub…");
   try {
     await platform.gitPush({ setUpstream: true });
-  } catch (e) {
-    statusMessage(`Push failed: ${(e as Error).message}`);
+  } catch (error) {
+    statusMessage(`Push failed: ${errorMessage(error)}`);
     return false;
   }
 

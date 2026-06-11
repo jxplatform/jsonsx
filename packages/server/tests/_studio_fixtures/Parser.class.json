@@ -1,1 +1,1 @@
-{"$prototype":"Class","title":"Parser","description":"Sibling auto-discovered schema","$defs":{"parameters":{"input":{"identifier":"input","type":{"type":"string"},"description":"Input text"}}}}
+{"$defs":{"parameters":{"input":{"description":"Input text","identifier":"input","type":{"type":"string"}}}},"$prototype":"Class","description":"Sibling auto-discovered schema","title":"Parser"}

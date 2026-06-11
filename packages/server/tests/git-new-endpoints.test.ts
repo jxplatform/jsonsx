@@ -1,11 +1,11 @@
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { handleStudioApi } from "../src/studio-api";
 import { join, resolve } from "node:path";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const GIT_FIXTURE = resolve(import.meta.dir, "_git_new_endpoints_fixture");
-const NON_GIT_FIXTURE = resolve("/tmp", "_jx_non_git_fixture_" + process.pid);
+const NON_GIT_FIXTURE = resolve("/tmp", `_jx_non_git_fixture_${process.pid}`);
 
 /**
  * @param {string} path
@@ -27,7 +27,9 @@ async function studioGitReq(
     init.headers = { "Content-Type": "application/json" };
   }
   const res = await handleStudioApi(new Request(urlStr, init), new URL(urlStr), cwd);
-  if (!res) throw new Error(`No response from handleStudioApi for ${method} ${path}`);
+  if (!res) {
+    throw new Error(`No response from handleStudioApi for ${method} ${path}`);
+  }
   return res;
 }
 
@@ -42,10 +44,10 @@ function git(cmd: string, cwd: string = GIT_FIXTURE) {
     encoding: "utf8",
     env: {
       ...process.env,
-      GIT_AUTHOR_NAME: "Test",
       GIT_AUTHOR_EMAIL: "test@test.com",
-      GIT_COMMITTER_NAME: "Test",
+      GIT_AUTHOR_NAME: "Test",
       GIT_COMMITTER_EMAIL: "test@test.com",
+      GIT_COMMITTER_NAME: "Test",
     },
   });
 }
@@ -54,7 +56,7 @@ function git(cmd: string, cwd: string = GIT_FIXTURE) {
 
 describe("git/status — isRepo and remotes fields", () => {
   beforeAll(() => {
-    rmSync(GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(GIT_FIXTURE, { force: true, recursive: true });
     mkdirSync(GIT_FIXTURE, { recursive: true });
     git("init -b main");
     git("config user.email test@test.com");
@@ -65,7 +67,7 @@ describe("git/status — isRepo and remotes fields", () => {
   });
 
   afterAll(() => {
-    rmSync(GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(GIT_FIXTURE, { force: true, recursive: true });
   });
 
   test("returns isRepo=true for a git repository", async () => {
@@ -103,13 +105,13 @@ describe("git/status — isRepo and remotes fields", () => {
 
 describe("git/status — non-git directory", () => {
   beforeAll(() => {
-    rmSync(NON_GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(NON_GIT_FIXTURE, { force: true, recursive: true });
     mkdirSync(NON_GIT_FIXTURE, { recursive: true });
     writeFileSync(join(NON_GIT_FIXTURE, "file.txt"), "not a git repo");
   });
 
   afterAll(() => {
-    rmSync(NON_GIT_FIXTURE, { recursive: true, force: true });
+    rmSync(NON_GIT_FIXTURE, { force: true, recursive: true });
   });
 
   test("returns isRepo=false for a non-git directory", async () => {
@@ -130,13 +132,13 @@ describe("git/init endpoint", () => {
   const INIT_FIXTURE = resolve(import.meta.dir, "_git_init_fixture");
 
   beforeAll(() => {
-    rmSync(INIT_FIXTURE, { recursive: true, force: true });
+    rmSync(INIT_FIXTURE, { force: true, recursive: true });
     mkdirSync(INIT_FIXTURE, { recursive: true });
     writeFileSync(join(INIT_FIXTURE, "project.json"), '{"name":"test"}');
   });
 
   afterAll(() => {
-    rmSync(INIT_FIXTURE, { recursive: true, force: true });
+    rmSync(INIT_FIXTURE, { force: true, recursive: true });
   });
 
   test("initializes a git repository", async () => {
@@ -164,7 +166,7 @@ describe("git/add-remote endpoint", () => {
   const REMOTE_FIXTURE = resolve(import.meta.dir, "_git_remote_fixture");
 
   beforeAll(() => {
-    rmSync(REMOTE_FIXTURE, { recursive: true, force: true });
+    rmSync(REMOTE_FIXTURE, { force: true, recursive: true });
     mkdirSync(REMOTE_FIXTURE, { recursive: true });
     execSync("git init -b main", { cwd: REMOTE_FIXTURE });
     execSync("git config user.email test@test.com", { cwd: REMOTE_FIXTURE });
@@ -174,7 +176,7 @@ describe("git/add-remote endpoint", () => {
   });
 
   afterAll(() => {
-    rmSync(REMOTE_FIXTURE, { recursive: true, force: true });
+    rmSync(REMOTE_FIXTURE, { force: true, recursive: true });
   });
 
   test("adds a remote", async () => {
@@ -233,8 +235,8 @@ describe("git/push — setUpstream option", () => {
   const BARE_FIXTURE = resolve(import.meta.dir, "_git_push_bare");
 
   beforeAll(() => {
-    rmSync(PUSH_FIXTURE, { recursive: true, force: true });
-    rmSync(BARE_FIXTURE, { recursive: true, force: true });
+    rmSync(PUSH_FIXTURE, { force: true, recursive: true });
+    rmSync(BARE_FIXTURE, { force: true, recursive: true });
 
     mkdirSync(BARE_FIXTURE, { recursive: true });
     execSync("git init --bare", { cwd: BARE_FIXTURE });
@@ -249,8 +251,8 @@ describe("git/push — setUpstream option", () => {
   });
 
   afterAll(() => {
-    rmSync(PUSH_FIXTURE, { recursive: true, force: true });
-    rmSync(BARE_FIXTURE, { recursive: true, force: true });
+    rmSync(PUSH_FIXTURE, { force: true, recursive: true });
+    rmSync(BARE_FIXTURE, { force: true, recursive: true });
   });
 
   test("push with setUpstream=true sets upstream and pushes", async () => {
@@ -277,10 +279,10 @@ describe("git/push — setUpstream option", () => {
       cwd: PUSH_FIXTURE,
       env: {
         ...process.env,
-        GIT_AUTHOR_NAME: "Test",
         GIT_AUTHOR_EMAIL: "test@test.com",
-        GIT_COMMITTER_NAME: "Test",
+        GIT_AUTHOR_NAME: "Test",
         GIT_COMMITTER_EMAIL: "test@test.com",
+        GIT_COMMITTER_NAME: "Test",
       },
     });
 

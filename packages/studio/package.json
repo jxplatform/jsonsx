@@ -70,7 +70,7 @@
     "@spectrum-web-components/toast": "^1.12.1",
     "@spectrum-web-components/tooltip": "^1.12.1",
     "@spectrum-web-components/underlay": "^1.12.1",
-    "@vue/reactivity": "3.5.35",
+    "@vue/reactivity": "3.5.38",
     "lit": "^3.3.3",
     "lit-html": "^3.3.3",
     "monaco-editor": "^0.55.1",

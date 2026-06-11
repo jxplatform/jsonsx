@@ -1,5 +1,5 @@
 import "./with-dom.js";
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { getConvertTargets } from "../src/editor/convert-targets";
 
 describe("getConvertTargets", () => {
