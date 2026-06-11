@@ -891,6 +891,20 @@ export function collectStyles(
       collectStyles(c, rules, mediaQueries, selector, counter, prefix);
     }
   }
+
+  // $switch case nodes render in place of the container's content — collect their styles too
+  if (def.cases && typeof def.cases === "object") {
+    for (const c of Object.values(def.cases)) {
+      collectStyles(
+        c as JxElement | JxMutableNode | string,
+        rules,
+        mediaQueries,
+        selector,
+        counter,
+        prefix,
+      );
+    }
+  }
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -1063,6 +1077,24 @@ export function renderStaticNode(
   // Skip mapped arrays — can't pre-render dynamic lists
   if (node.$prototype === "Array") {
     return "";
+  }
+
+  // $switch/cases — resolve the key statically and render the matched case inside a container
+  // Element (mirrors the runtime's renderSwitch DOM shape). External $ref cases can't be fetched
+  // At compile time, so they render the empty container.
+  if (node.$switch) {
+    const switchTag = node.tagName ?? "div";
+    const attrs = buildAttrs(node, scope);
+    const key = resolveStaticValue(node.$switch, scope);
+    const caseDef =
+      key == null
+        ? undefined
+        : (node.cases as Record<string, JxElement | string> | undefined)?.[String(key)];
+    const inner =
+      caseDef !== undefined && !isRefObject(caseDef)
+        ? renderStaticNode(caseDef, scope, slotContent)
+        : "";
+    return `<${switchTag}${attrs}>${inner}</${switchTag}>`;
   }
 
   const tag = node.tagName ?? "div";

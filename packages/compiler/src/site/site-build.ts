@@ -34,6 +34,7 @@ import {
   buildComponentCSS,
   buildInitialScope,
   collectServerEntries,
+  collectStyles,
   evaluateStaticTemplate,
   isComponentFullyStatic,
   isTemplateString,
@@ -470,8 +471,15 @@ async function compilePage(
   // So that timing: "compiler" data is baked into the static HTML
   resolveDocTemplates(layoutDoc, scope);
 
-  // Expand registered custom elements (apply $props, pre-render, mark static/prerendered)
-  expandComponents(layoutDoc, componentDefs);
+  // Expand registered custom elements (apply $props, pre-render, mark static/prerendered).
+  // Slot children are serialized to HTML strings during expansion — before compileStyles can walk
+  // Them — so their static styles are collected here and injected as a page style block below.
+  const slotCss: SlotCssCollector = {
+    counter: { n: 0 },
+    media: { ...projectConfig.$media, ...layoutDoc.$media },
+    rules: [],
+  };
+  expandComponents(layoutDoc, componentDefs, slotCss);
 
   // Strip resolved timing: "compiler" state entries — they're now baked into the tree
   // And keeping them would cause isDynamic() to misclassify the page as dynamic.
@@ -529,6 +537,14 @@ async function compilePage(
     projectStyle: projectConfig.style ?? null,
     title,
   });
+
+  // Inject CSS rules collected from component slot content
+  if (slotCss.rules.length > 0) {
+    result.html = result.html.replace(
+      "</head>",
+      `<style>\n${slotCss.rules.join("\n")}\n</style>\n</head>`,
+    );
+  }
 
   // Post-process: inject merged <head> content into the compiled HTML
   result.html = injectHead(result.html, mergedHead, projectConfig.defaults?.lang ?? "en");
@@ -812,20 +828,33 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
   }
 }
 
+/** Collector for CSS rules extracted from component slot content during expansion. */
+interface SlotCssCollector {
+  rules: string[];
+  counter: { n: number };
+  media: Record<string, string>;
+}
+
 /**
  * Walk the document tree and expand registered custom elements in-place. Applies $props via
- * preRenderComponentHtml, marks static/prerendered.
+ * preRenderComponentHtml, marks static/prerendered. Slot children get their static styles collected
+ * into `slotCss` (assigning jxs-N classes) before being serialized to HTML.
  *
  * @param {JxElement | string} node
  * @param {Map<string, JxElement>} componentDefs
+ * @param {SlotCssCollector} [slotCss]
  */
-function expandComponents(node: JxElement | string, componentDefs: Map<string, JxElement>) {
+function expandComponents(
+  node: JxElement | string,
+  componentDefs: Map<string, JxElement>,
+  slotCss?: SlotCssCollector,
+) {
   if (!node || typeof node !== "object") {
     return;
   }
   if (Array.isArray(node)) {
     for (const n of node) {
-      expandComponents(n, componentDefs);
+      expandComponents(n, componentDefs, slotCss);
     }
     return;
   }
@@ -833,7 +862,7 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
   // Recurse into children first (bottom-up expansion)
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      expandComponents(child, componentDefs);
+      expandComponents(child, componentDefs, slotCss);
     }
   }
 
@@ -841,7 +870,14 @@ function expandComponents(node: JxElement | string, componentDefs: Map<string, J
   if (def) {
     const slotContent =
       Array.isArray(node.children) && node.children.length > 0
-        ? node.children.map((c: JxElement | string) => renderStaticNode(c, {}, null)).join("\n")
+        ? node.children
+            .map((c: JxElement | string) => {
+              if (slotCss && c && typeof c === "object") {
+                collectStyles(c, slotCss.rules, slotCss.media, "", slotCss.counter, "jxs");
+              }
+              return renderStaticNode(c, {}, null);
+            })
+            .join("\n")
         : null;
 
     const innerHTML = preRenderComponentHtml(def, node.$props || null, slotContent);
