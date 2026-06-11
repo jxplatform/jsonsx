@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/compiler",
-  "version": "0.28.4",
+  "version": "0.28.5",
   "description": "Jx static HTML compiler, island detector, and site builder",
   "license": "MIT",
   "repository": {
