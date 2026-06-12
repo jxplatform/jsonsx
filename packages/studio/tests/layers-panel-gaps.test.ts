@@ -233,18 +233,18 @@ describe("renderLayersTemplate — move and delete actions", () => {
     expect(children[1]!.tagName).toBe("section");
   });
 
-  test("move into previous sibling is currently a no-op (prevPath misses 'children')", async () => {
-    // BUG (documented): the handler builds prevPath = [...parentPath, idx - 1] without the
-    // "children" segment, so getNodeAtPath resolves nothing and mutateMoveNode early-returns.
+  test("move into previous sibling appends the node to that sibling's children", async () => {
     await renderLayers();
     const btn = buttons(["children", 1])["Move into previous sibling"];
     expect(btn).toBeDefined();
     btn!.click();
     const children = activeTab.value!.doc.document.children as JxMutableNode[];
-    expect(children.length).toBe(5);
-    expect(children[1]!.textContent).toBe("First");
+    expect(children.length).toBe(4);
     const section = children[0] as JxMutableNode;
-    expect((section.children as JxMutableNode[]).length).toBe(2);
+    const sectionChildren = section.children as JxMutableNode[];
+    expect(sectionChildren.length).toBe(3);
+    expect(sectionChildren[2]!.textContent).toBe("First");
+    expect(children.map((c) => c.textContent)).not.toContain("First");
   });
 
   test("move-in is unavailable when previous sibling is not a container", async () => {

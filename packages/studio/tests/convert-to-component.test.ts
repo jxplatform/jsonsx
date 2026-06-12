@@ -20,18 +20,9 @@ globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
   return 0;
 }) as typeof requestAnimationFrame;
 
-// ExtractComponentDef structuredClones the selected node, which is a @vue/reactivity proxy —
-// StructuredClone cannot serialize proxies (DataCloneError). Substitute a JSON deep clone so the
-// Rest of the conversion flow is testable. (Likely a latent src bug: should toRaw() first.)
-const realStructuredClone = globalThis.structuredClone;
-globalThis.structuredClone = (<T>(value: T): T => {
-  try {
-    return realStructuredClone(value);
-  } catch {
-    // oxlint-disable-next-line unicorn/prefer-structured-clone -- structuredClone is what failed
-    return JSON.parse(JSON.stringify(value)) as T;
-  }
-}) as typeof structuredClone;
+// ExtractComponentDef must clone the selected node even though it is a @vue/reactivity proxy
+// (structuredClone rejects proxies with DataCloneError; src uses jsonClone). No stubs here —
+// These tests exercise the real clone path against reactive tab state.
 
 let tab: Tab;
 let platformState: MockPlatformState;
