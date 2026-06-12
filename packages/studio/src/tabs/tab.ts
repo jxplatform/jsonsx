@@ -10,6 +10,7 @@ import type {
   InlineEditDef,
 } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxDocOp } from "./patch-ops";
 
 export interface TabUi {
   rightTab: string;
@@ -39,8 +40,16 @@ export interface TabUi {
 }
 
 interface HistorySnapshot {
-  document: Record<string, unknown>;
+  /** Full document at this state (checkpoint), or null when the ops describe the transition. */
+  document: Record<string, unknown> | null;
+  /** Selection after this state's transaction. */
   selection: (string | number)[] | null;
+  /** Selection before this state's transaction (restored on surgical undo). */
+  selectionBefore?: (string | number)[] | null;
+  /** Replayable ops transforming the previous state into this one. */
+  forwardOps?: JxDocOp[] | null;
+  /** Replayable ops transforming this state back into the previous one. */
+  inverseOps?: JxDocOp[] | null;
 }
 
 export interface Tab {

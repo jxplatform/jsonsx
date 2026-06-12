@@ -26,3 +26,5 @@ export {
   isReactive,
   isRef,
 } from "@vue/reactivity";
+
+export type { EffectScope } from "@vue/reactivity";

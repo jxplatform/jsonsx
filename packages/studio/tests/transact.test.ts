@@ -117,19 +117,17 @@ describe("undo/redo", () => {
     disposeTab(tab);
   });
 
-  test("undo restores selection", () => {
+  test("undo restores the selection from just before the undone edit", () => {
     const tab = makeTab();
     tab.session.selection = ["children", 0];
     transactDoc(tab, (t) => mutateInsertNode(t, [], 1, { tagName: "span" }));
-    // Snapshot 1 captured selection as ["children", 0]
     tab.session.selection = ["children", 1];
     transactDoc(tab, (t) => mutateUpdateProperty(t, ["children", 1], "textContent", "world"));
-    // Snapshot 2 captured selection as ["children", 1]
 
-    undo(tab); // Restores snapshot 1 → selection ["children", 0]
+    undo(tab); // Selection as it was before the text edit
+    expect(tab.session.selection).toEqual(["children", 1]);
+    undo(tab); // Selection as it was before the insert
     expect(tab.session.selection).toEqual(["children", 0]);
-    undo(tab); // Restores snapshot 0 → selection null
-    expect(tab.session.selection).toBeNull();
   });
 });
 

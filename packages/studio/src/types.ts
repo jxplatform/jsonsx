@@ -146,6 +146,27 @@ export interface CanvasPanel {
   scrollContainer: HTMLElement;
   dropLine: HTMLElement;
   _width: number | null;
+  /** True when the panel's DOM reflects the current document via a successful live render. */
+  ready: boolean;
+  /** Breakpoints active for this panel's width (persisted for surgical patch re-application). */
+  activeBreakpoints: Set<string> | null;
+  /** Render context captured from the last successful live render (null until then). */
+  liveCtx: PanelLiveCtx | null;
+  /**
+   * Effect scope owning the reactive effects created while rendering this panel's content
+   * (including child scopes from surgical subtree renders). Stopped when panels are rebuilt.
+   */
+  renderScope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null;
+}
+
+/** Per-panel context persisted by a successful live render so patches can re-render subtrees. */
+export interface PanelLiveCtx {
+  scope: Record<string, unknown>;
+  canvasMode: string;
+  layoutWrapped: boolean;
+  pageContentPrefix: (string | number)[] | null;
+  mapParentPaths: Set<unknown>;
+  pathMapper: (created: Node, path: (string | number)[], def: unknown) => void;
 }
 
 export interface DocumentStackEntry {

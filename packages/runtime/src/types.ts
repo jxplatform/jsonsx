@@ -15,7 +15,16 @@ export type JxEventHandler = (scope: JxScope, event: Event) => unknown;
 
 export interface JxRenderOptions {
   _path?: JxPath;
-  onNodeCreated?: (el: HTMLElement | Text, path: JxPath, def: JxElement | string) => void;
+  /**
+   * Called for each created node. `state` is the local scope the node's children render with —
+   * callers can capture it to re-render a subtree in isolation later.
+   */
+  onNodeCreated?: (
+    el: HTMLElement | Text,
+    path: JxPath,
+    def: JxElement | string,
+    state?: JxScope,
+  ) => void;
 }
 
 export interface DynamicClass {

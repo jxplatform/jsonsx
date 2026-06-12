@@ -54,6 +54,18 @@ export function initShellRefs() {
 
 export const elToPath = new WeakMap<Element, JxPath>();
 
+/**
+ * Canvas element → the runtime scope its children render with. Captured during live renders so the
+ * canvas patcher can re-render a subtree in isolation with the same prototype-chained scope.
+ */
+export const elToScope = new WeakMap<Element, Record<string, unknown>>();
+
+/**
+ * Subtree root element → the effect scope created for its surgical render. Stopped when the subtree
+ * is replaced or removed so render-time reactive effects don't accumulate.
+ */
+export const elToRenderScope = new WeakMap<Element, { stop: () => void }>();
+
 export const canvasPanels: CanvasPanel[] = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────

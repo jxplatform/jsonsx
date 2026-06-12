@@ -29,11 +29,19 @@ import { effect } from "./reactivity";
 import { view } from "./view";
 
 import { isEditableBlock, isEditing } from "./editor/inline-edit";
-import { initComponentInlineEdit } from "./editor/component-inline-edit";
+import { enterComponentInlineEdit, initComponentInlineEdit } from "./editor/component-inline-edit";
 import { enterInlineEdit } from "./editor/content-inline-edit";
 import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
 import { findCanvasElement, getActivePanel, initCanvasHelpers } from "./canvas/canvas-helpers";
-import { initCanvasRender, renderCanvas } from "./canvas/canvas-render";
+import {
+  applyCanvasMediaOverrides,
+  initCanvasRender,
+  renderCanvas,
+  renderOverlays,
+  scheduleCanvasRender,
+} from "./canvas/canvas-render";
+import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
+import { registerSubtreeDnD } from "./panels/canvas-dnd";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
   mountStatusbar,
@@ -366,6 +374,15 @@ initPanelEvents({
 initCanvasLiveRender({
   getCanvasMode,
 });
+initCanvasPatcher({
+  applyCanvasMediaOverrides,
+  enterComponentInlineEdit,
+  getCanvasMode,
+  registerSubtreeDnD,
+  renderOverlays,
+  scheduleCanvasRender,
+  updateForcedPseudoPreview,
+});
 initCanvasRender({
   closeFunctionEditor: () => closeFunctionEditor(),
   exportFile,
@@ -392,13 +409,25 @@ initWelcome({
   openRecentProject: (root: string) => openRecentProject(root),
 });
 
-// Effect-driven canvas rendering: auto-triggers renderCanvas when reactive deps change.
-// Uses double-RAF so the canvas render yields to higher-priority panel paints first.
-let _canvasRafId = 0;
+// Effect-driven canvas rendering, split into two triggers so document changes can be
+// Distinguished from mode/UI changes:
+// - doc-effect: tracks only the document root reference. Document mutations that were
+//   Consumed surgically by the canvas patcher skip the full render here.
+// - ui-effect: tracks canvas mode and UI flags; always schedules a full render.
+// Scheduling is deduped inside scheduleCanvasRender (double-RAF).
 effect(() => {
   const tab = activeTab.value;
   if (tab) {
-    void tab.doc.document;
+    const doc = tab.doc.document;
+    if (doc && consumePatchedDocument(doc)) {
+      return;
+    }
+  }
+  scheduleCanvasRender();
+});
+effect(() => {
+  const tab = activeTab.value;
+  if (tab) {
     void tab.doc.mode;
     void tab.session.ui.canvasMode;
     void tab.session.ui.editingFunction;
@@ -408,18 +437,7 @@ effect(() => {
     void tab.session.ui.stylebookFilter;
     void tab.session.ui.stylebookCustomizedOnly;
   }
-  if (!_canvasRafId) {
-    _canvasRafId = requestAnimationFrame(() => {
-      _canvasRafId = requestAnimationFrame(() => {
-        _canvasRafId = 0;
-        try {
-          renderCanvas();
-        } catch (error) {
-          console.error("renderCanvas error:", error);
-        }
-      });
-    });
-  }
+  scheduleCanvasRender();
 });
 
 rightPanelMod.mount({

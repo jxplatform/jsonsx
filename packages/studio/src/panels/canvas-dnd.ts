@@ -125,34 +125,63 @@ export function registerPanelDnD(panel: CanvasPanel) {
   });
   view.canvasDndCleanups.push(monitorCleanup);
 
-  const document = activeTab.value?.doc.document;
   for (const el of allEls) {
-    const elPath = elToPath.get(el);
-    if (!elPath) {
+    if (!elToPath.get(el)) {
       continue;
     }
+    registerElementDropTarget(el);
+  }
+}
 
-    const node = getNodeAtPath(document!, elPath);
-    const tag = (node?.tagName || "div").toLowerCase();
-    const hasElementChildren =
-      Array.isArray(node?.children) &&
-      node.children.some((c: unknown) => c != null && typeof c === "object");
-    const isLeaf = VOID_ELEMENTS.has(tag) || !hasElementChildren;
+/**
+ * Register one canvas element as a drop target. Path and leaf-ness are read live from elToPath and
+ * the current document at drag time, so surgical patches that remap sibling paths never leave stale
+ * closures behind.
+ *
+ * @param {Element} el
+ */
+function registerElementDropTarget(el: Element) {
+  const cleanup = dropTargetForElements({
+    canDrop({ source }) {
+      const elPath = elToPath.get(el);
+      if (!elPath) {
+        return false;
+      }
+      const srcPath = source.data.path as JxPath | undefined;
+      if (srcPath && isAncestor(srcPath, elPath)) {
+        return false;
+      }
+      return true;
+    },
+    element: /** @type {HTMLElement} */ el,
+    getData() {
+      const elPath = elToPath.get(el) ?? [];
+      const document = activeTab.value?.doc.document;
+      const node = document ? getNodeAtPath(document, elPath) : undefined;
+      const tag = (node?.tagName || "div").toLowerCase();
+      const hasElementChildren =
+        Array.isArray(node?.children) &&
+        node.children.some((c: unknown) => c != null && typeof c === "object");
+      return { _isVoid: VOID_ELEMENTS.has(tag) || !hasElementChildren, path: elPath };
+    },
+  });
+  view.canvasDndCleanups.push(cleanup);
+}
 
-    const cleanup = dropTargetForElements({
-      canDrop({ source }) {
-        const srcPath = source.data.path as JxPath | undefined;
-        if (srcPath && isAncestor(srcPath, elPath)) {
-          return false;
-        }
-        return true;
-      },
-      element: /** @type {HTMLElement} */ el,
-      getData() {
-        return { _isVoid: isLeaf, path: elPath };
-      },
-    });
-    view.canvasDndCleanups.push(cleanup);
+/**
+ * Register drop targets for a freshly patched-in subtree (root plus descendants). Cleanups join
+ * view.canvasDndCleanups and are released by the next full render like all canvas DnD handlers.
+ *
+ * @param {HTMLElement} rootEl
+ */
+export function registerSubtreeDnD(rootEl: HTMLElement) {
+  if (elToPath.get(rootEl)) {
+    registerElementDropTarget(rootEl);
+  }
+  for (const el of rootEl.querySelectorAll("*")) {
+    if (elToPath.get(el)) {
+      registerElementDropTarget(el);
+    }
   }
 }
 

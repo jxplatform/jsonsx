@@ -507,7 +507,7 @@ export function renderNode(
   const el = document.createElement(tagName);
 
   if (options?.onNodeCreated) {
-    options.onNodeCreated(el, path, def);
+    options.onNodeCreated(el, path, def, localState);
   }
 
   applyProperties(el, def, localState);
@@ -781,7 +781,40 @@ export function applyStyle(
 
   const tag = document.createElement("style");
   tag.textContent = css;
+  tag.dataset.jxOwner = uid;
   document.head.append(tag);
+  elementStyleTags.set(el, tag);
+}
+
+/**
+ * Scoped <style> tags emitted per element by applyStyle (latest wins). Lets callers replace an
+ * element's emitted styles instead of accumulating orphaned tags.
+ */
+export const elementStyleTags = new WeakMap<HTMLElement, HTMLStyleElement>();
+
+/**
+ * Re-apply an element's style definition in place: removes the previously emitted scoped <style>
+ * tag (if any), clears inline styles, and applies the new definition.
+ *
+ * @param {HTMLElement} el
+ * @param {JxStyle | undefined} styleDef
+ * @param {Record<string, string>} [mediaQueries]
+ * @param {JxScope} [state]
+ */
+export function reapplyStyle(
+  el: HTMLElement,
+  styleDef: JxStyle | undefined,
+  mediaQueries: Record<string, string> = {},
+  state: JxScope = {},
+) {
+  const prev = elementStyleTags.get(el);
+  if (prev) {
+    prev.remove();
+    elementStyleTags.delete(el);
+  }
+  el.style.cssText = "";
+  delete el.dataset.jx;
+  applyStyle(el, styleDef ?? {}, mediaQueries, state);
 }
 
 /**
@@ -820,7 +853,7 @@ function renderMappedArray(
   const container = document.createElement(def.tagName ?? "div");
 
   if (options?.onNodeCreated) {
-    options.onNodeCreated(container, path, def);
+    options.onNodeCreated(container, path, def, state);
   }
 
   applyProperties(container, def, state);
@@ -878,7 +911,7 @@ function renderSwitch(def: JxElement, state: JxScope, options?: JxRenderOptions)
   const container = document.createElement(def.tagName ?? "div");
 
   if (options?.onNodeCreated) {
-    options.onNodeCreated(container, path, def);
+    options.onNodeCreated(container, path, def, state);
   }
 
   applyProperties(container, def, state);
@@ -2037,7 +2070,7 @@ function renderCustomElementWithProps(
   const el = document.createElement(def.tagName ?? "div");
 
   if (options?.onNodeCreated) {
-    options.onNodeCreated(el, path ?? [], def);
+    options.onNodeCreated(el, path ?? [], def, state);
   }
 
   // Set JS properties from $props (before connection)

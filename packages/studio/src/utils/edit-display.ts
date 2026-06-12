@@ -11,6 +11,89 @@ const mediaTags = new Set(["img", "video", "source", "iframe", "audio"]);
 const TRANSPARENT_PX =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
+const textTags = new Set([
+  "p",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "blockquote",
+  "li",
+  "dt",
+  "dd",
+  "th",
+  "td",
+  "span",
+  "strong",
+  "em",
+  "small",
+  "mark",
+  "code",
+  "abbr",
+  "q",
+  "sub",
+  "sup",
+  "time",
+  "a",
+  "button",
+  "label",
+  "legend",
+  "caption",
+  "summary",
+  "pre",
+  "option",
+]);
+
+const containerTags = new Set([
+  "div",
+  "section",
+  "article",
+  "aside",
+  "header",
+  "footer",
+  "main",
+  "nav",
+  "figure",
+  "figcaption",
+  "details",
+  "fieldset",
+  "form",
+  "ul",
+  "ol",
+  "dl",
+  "table",
+]);
+
+/** All placeholder classes prepareForEditMode may add to an empty element. */
+export const EMPTY_PLACEHOLDER_CLASSES = [
+  "empty-text-placeholder",
+  "empty-container-placeholder",
+] as const;
+
+/**
+ * The empty-placeholder class prepareForEditMode would add for this node, or null. Used by the
+ * canvas patcher to keep placeholder classes in sync when patching text without a full render.
+ *
+ * @param {JxMutableNode} node
+ */
+export function computeEmptyPlaceholderClass(node: JxMutableNode): string | null {
+  if (!node.tagName || node.textContent || node.innerHTML) {
+    return null;
+  }
+  if (Array.isArray(node.children) && node.children.length > 0) {
+    return null;
+  }
+  if (textTags.has(node.tagName)) {
+    return "empty-text-placeholder";
+  }
+  if (containerTags.has(node.tagName)) {
+    return "empty-container-placeholder";
+  }
+  return null;
+}
+
 /**
  * Convert a template string to a displayable expression for edit mode. Replaces ${expr} with ❮ expr
  * ❯ so the runtime renders it as literal text.
@@ -216,73 +299,9 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   }
 
   // Mark empty elements with placeholder classes for design-mode visibility
-  if (out.tagName && !out.textContent && !out.innerHTML) {
-    const hasChildren = Array.isArray(out.children) && out.children.length > 0;
-    if (!hasChildren) {
-      const tag = out.tagName as string;
-      const textTags = new Set([
-        "p",
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "blockquote",
-        "li",
-        "dt",
-        "dd",
-        "th",
-        "td",
-        "span",
-        "strong",
-        "em",
-        "small",
-        "mark",
-        "code",
-        "abbr",
-        "q",
-        "sub",
-        "sup",
-        "time",
-        "a",
-        "button",
-        "label",
-        "legend",
-        "caption",
-        "summary",
-        "pre",
-        "option",
-      ]);
-      const containerTags = new Set([
-        "div",
-        "section",
-        "article",
-        "aside",
-        "header",
-        "footer",
-        "main",
-        "nav",
-        "figure",
-        "figcaption",
-        "details",
-        "fieldset",
-        "form",
-        "ul",
-        "ol",
-        "dl",
-        "table",
-      ]);
-      if (textTags.has(tag)) {
-        out.className = out.className
-          ? `${out.className} empty-text-placeholder`
-          : "empty-text-placeholder";
-      } else if (containerTags.has(tag)) {
-        out.className = out.className
-          ? `${out.className} empty-container-placeholder`
-          : "empty-container-placeholder";
-      }
-    }
+  const placeholderClass = computeEmptyPlaceholderClass(out as JxMutableNode);
+  if (placeholderClass) {
+    out.className = out.className ? `${out.className} ${placeholderClass}` : placeholderClass;
   }
 
   // Media elements with missing/dynamic src get a placeholder class

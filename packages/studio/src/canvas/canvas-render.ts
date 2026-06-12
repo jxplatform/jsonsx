@@ -33,6 +33,7 @@ import {
 } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
 import { renderCanvasLive } from "./canvas-live-render";
+import { canvasPerf } from "./canvas-perf";
 import { renderCanvasNode } from "../panels/preview-render";
 import { registerPanelDnD } from "../panels/canvas-dnd";
 import { registerPanelEvents } from "../panels/panel-events";
@@ -100,6 +101,25 @@ async function sourceContent(tab: Tab, lang: string) {
   return JSON.stringify(tab.doc.document, null, 2);
 }
 
+// Double-RAF scheduling so the canvas render yields to higher-priority panel paints first.
+// Concurrent schedule requests within the same frame are deduped.
+let _canvasRafId = 0;
+export function scheduleCanvasRender() {
+  if (_canvasRafId) {
+    return;
+  }
+  _canvasRafId = requestAnimationFrame(() => {
+    _canvasRafId = requestAnimationFrame(() => {
+      _canvasRafId = 0;
+      try {
+        renderCanvas();
+      } catch (error) {
+        console.error("renderCanvas error:", error);
+      }
+    });
+  });
+}
+
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) {
@@ -120,6 +140,7 @@ export function renderCanvas() {
 
   // Advance render generation so stale async renders from the previous cycle bail out
   view.renderGeneration += 1;
+  canvasPerf.fullRenders += 1;
 
   // Detect whether this is a mode transition or a content-only re-render
   const modeChanged = canvasMode !== view.prevCanvasMode;
@@ -199,6 +220,12 @@ export function renderCanvas() {
 
   // Panel JS objects are cheap — always clear and repopulate from templates.
   // The actual DOM elements are preserved by Lit's diffing on content-only re-renders.
+  // Stop each outgoing panel's render effect scope (and its surgical-subtree child scopes)
+  // So render-time reactive effects don't accumulate across renders.
+  for (const p of canvasPanels) {
+    p.renderScope?.stop();
+    p.renderScope = null;
+  }
   canvasPanels.length = 0;
 
   if (modeChanged) {
@@ -615,7 +642,12 @@ function renderCanvasIntoPanel(
   const docToRender = docOverride || (tab?.doc.document as JxMutableNode);
   const canvas = panel.canvas as HTMLElement;
 
-  renderCanvasLive(gen, docToRender, canvas)
+  canvasPerf.panelRenders += 1;
+  panel.ready = false;
+  panel.liveCtx = null;
+  panel.activeBreakpoints = activeBreakpoints;
+
+  renderCanvasLive(gen, docToRender, canvas, panel)
     .then((scope: Record<string, unknown> | null) => {
       // Skip post-render setup if a newer render has started
       if (gen !== view.renderGeneration) {
@@ -625,6 +657,9 @@ function renderCanvasIntoPanel(
         updateCanvas({ error: null, scope, status: "ready" });
         applyCanvasMediaOverrides(canvas, activeBreakpoints);
         statusMessage("Runtime render OK", 1500);
+        // Panel is patchable only when the live runtime path rendered the real document
+        panel.ready = !docOverride;
+        scheduleStyleTagSweep();
 
         // Apply diff highlighting if in git-diff mode
         if (gitDiffState && docOverride) {
@@ -741,7 +776,7 @@ function applyDiffHighlightToCanvas(
  * @param {Element} canvasEl
  * @param {Set<string>} activeBreakpoints
  */
-function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: Set<string>) {
+export function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: Set<string>) {
   if (activeBreakpoints.size === 0) {
     return;
   }
@@ -763,4 +798,25 @@ function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: Set<str
 
 export function renderOverlays() {
   overlaysPanel.render();
+}
+
+// ─── Style-tag hygiene ────────────────────────────────────────────────────────
+
+let _sweepTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Remove scoped <style> tags whose owner elements are no longer in the document. The runtime emits
+ * one tag per styled element (nested selectors / media rules) and full re-renders orphan the
+ * previous tree's tags. Debounced so in-flight panel renders finish attaching first.
+ */
+function scheduleStyleTagSweep() {
+  clearTimeout(_sweepTimer);
+  _sweepTimer = setTimeout(() => {
+    for (const tag of document.head.querySelectorAll("style[data-jx-owner]")) {
+      const uid = (tag as HTMLElement).dataset.jxOwner;
+      if (uid && !document.querySelector(`[data-jx="${uid}"]`)) {
+        tag.remove();
+      }
+    }
+  }, 250);
 }

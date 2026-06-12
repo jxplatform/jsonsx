@@ -6,11 +6,11 @@
  * mapping ($map remapping), site-level style injection, and $head element injection.
  */
 
-import { elToPath, projectState, stripEventHandlers } from "../store";
+import { elToPath, elToScope, projectState, stripEventHandlers } from "../store";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { toRaw } from "../reactivity";
+import { effectScope, toRaw } from "../reactivity";
 import {
   buildScope,
   defineElement,
@@ -33,6 +33,8 @@ import { buildNestedSiteCSS } from "./nested-site-style";
 
 import type { JxDocument, JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
+import type { CanvasPanel } from "../types";
+import type { EffectScope } from "../reactivity";
 
 export { buildNestedSiteCSS } from "./nested-site-style";
 
@@ -131,6 +133,85 @@ export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
   _ctx = ctx;
 }
 
+/** Context needed to map runtime render paths back to document paths. */
+export interface PathMapperCtx {
+  canvasMode: string;
+  layoutWrapped: boolean;
+  pageContentPrefix: (string | number)[] | null;
+  mapParentPaths: Set<unknown>;
+}
+
+/**
+ * Build the onNodeCreated callback that records each rendered element's document path in elToPath.
+ * Handles layout-prefix stripping and $map wrapper/template remapping. Shared by full panel renders
+ * and isolated subtree re-renders so path bookkeeping stays consistent.
+ */
+export function makePathMapper(ctx: PathMapperCtx) {
+  const { canvasMode, layoutWrapped, pageContentPrefix, mapParentPaths } = ctx;
+  return function onNodeCreated(
+    created: Node,
+    path: (string | number)[],
+    def: unknown,
+    state?: Record<string, unknown>,
+  ) {
+    if (!(created instanceof HTMLElement)) {
+      return;
+    }
+    if (state) {
+      elToScope.set(created, state);
+    }
+    // Track layout-originated elements — don't store in elToPath to avoid
+    // Path collisions with remapped page content paths
+    if (layoutWrapped && typeof def === "object" && (def as JxMutableNode)?.$__layout) {
+      layoutElements.add(created);
+      created.dataset.jxLayout = "";
+      return;
+    }
+
+    // Remap layout-wrapped paths: strip the layout prefix so paths are
+    // Relative to the original page document (which is what S.document holds)
+    let mappedPath = path;
+    if (layoutWrapped && pageContentPrefix) {
+      const pfx = pageContentPrefix;
+      if (
+        path.length >= pfx.length &&
+        pfx.every((seg: string | number, i: number) => path[i] === seg)
+      ) {
+        mappedPath = ["children", ...path.slice(pfx.length)];
+      }
+    }
+
+    // Remap $map paths: wrapper and template children → real document paths
+    // PrepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
+    // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
+    if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
+      for (let i = 0; i < mappedPath.length - 1; i++) {
+        if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
+          const parentKey = mappedPath.slice(0, i).join("/");
+          if (mapParentPaths.has(parentKey)) {
+            if (mappedPath.length === i + 2) {
+              mappedPath = mappedPath.slice(0, i + 1);
+            } else if (
+              mappedPath.length >= i + 4 &&
+              mappedPath[i + 2] === "children" &&
+              mappedPath[i + 3] === 0
+            ) {
+              mappedPath = [
+                ...mappedPath.slice(0, i),
+                "children",
+                "map",
+                ...mappedPath.slice(i + 4),
+              ];
+            }
+            break;
+          }
+        }
+      }
+    }
+    elToPath.set(created, mappedPath);
+  };
+}
+
 /**
  * Render a Jx document into a canvas element using the real runtime. Populates elToPath for each
  * created element via onNodeCreated callback. Returns the live state scope on success, null on
@@ -139,8 +220,14 @@ export function initCanvasLiveRender(ctx: { getCanvasMode: () => string }) {
  * @param {number} gen - Render generation for staleness detection
  * @param {JxMutableNode} doc
  * @param {HTMLElement} canvasEl
+ * @param {CanvasPanel | null} [panel] - Panel to persist render context on (for surgical patches)
  */
-export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl: HTMLElement) {
+export async function renderCanvasLive(
+  gen: number,
+  doc: JxMutableNode,
+  canvasEl: HTMLElement,
+  panel: CanvasPanel | null = null,
+) {
   const tab = activeTab.value;
   const S = {
     document: tab?.doc.document,
@@ -201,6 +288,7 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
   // In edit mode, collect paths where $map templates were inlined as children[0]
   // So we can remap runtime paths (children,0,...) → (children,map,...)
   const mapParentPaths = new Set();
+  let renderScope: EffectScope | null = null;
   if (canvasMode === "design" || canvasMode === "edit") {
     (function findMapParents(node: JxMutableNode, path: (string | number)[]) {
       if (!node || typeof node !== "object") {
@@ -433,67 +521,21 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
     if (gen !== view.renderGeneration) {
       return null;
     }
-    const el = /** @type {HTMLElement} */ runtimeRenderNode(renderDoc, $defs, {
-      _path: [],
-      onNodeCreated(
-        created: HTMLElement | Text,
-        path: (string | number)[],
-        def: JxElement | string,
-      ) {
-        if (!(created instanceof HTMLElement)) {
-          return;
-        }
-        // Track layout-originated elements — don't store in elToPath to avoid
-        // Path collisions with remapped page content paths
-        if (layoutWrapped && typeof def === "object" && def?.$__layout) {
-          layoutElements.add(created);
-          created.dataset.jxLayout = "";
-          return;
-        }
-
-        // Remap layout-wrapped paths: strip the layout prefix so paths are
-        // Relative to the original page document (which is what S.document holds)
-        let mappedPath = path;
-        if (layoutWrapped && pageContentPrefix) {
-          const pfx = pageContentPrefix;
-          if (
-            path.length >= pfx.length &&
-            pfx.every((seg: string | number, i: number) => path[i] === seg)
-          ) {
-            mappedPath = ["children", ...path.slice(pfx.length)];
-          }
-        }
-
-        // Remap $map paths: wrapper and template children → real document paths
-        // PrepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
-        // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
-        if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
-          for (let i = 0; i < mappedPath.length - 1; i++) {
-            if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
-              const parentKey = mappedPath.slice(0, i).join("/");
-              if (mapParentPaths.has(parentKey)) {
-                if (mappedPath.length === i + 2) {
-                  mappedPath = mappedPath.slice(0, i + 1);
-                } else if (
-                  mappedPath.length >= i + 4 &&
-                  mappedPath[i + 2] === "children" &&
-                  mappedPath[i + 3] === 0
-                ) {
-                  mappedPath = [
-                    ...mappedPath.slice(0, i),
-                    "children",
-                    "map",
-                    ...mappedPath.slice(i + 4),
-                  ];
-                }
-                break;
-              }
-            }
-          }
-        }
-        elToPath.set(created, mappedPath);
-      },
+    const pathMapper = makePathMapper({
+      canvasMode,
+      layoutWrapped,
+      mapParentPaths,
+      pageContentPrefix,
     });
+    // Render inside a detached effect scope so the tree's reactive effects (template bindings,
+    // $map/$switch containers) can be disposed when the panel is rebuilt, instead of leaking.
+    renderScope = effectScope(true);
+    const el = /** @type {HTMLElement} */ renderScope.run(() =>
+      runtimeRenderNode(renderDoc, $defs, {
+        _path: [],
+        onNodeCreated: pathMapper,
+      }),
+    )!;
     if ((canvasMode === "design" || canvasMode === "edit") && el instanceof HTMLElement) {
       // Disable pointer events on all rendered elements for edit mode
       el.style.pointerEvents = "none";
@@ -533,8 +575,21 @@ export async function renderCanvasLive(gen: number, doc: JxMutableNode, canvasEl
         }
       });
     }
+    if (panel) {
+      panel.renderScope?.stop();
+      panel.renderScope = renderScope;
+      panel.liveCtx = {
+        canvasMode,
+        layoutWrapped,
+        mapParentPaths,
+        pageContentPrefix,
+        pathMapper,
+        scope: $defs as Record<string, unknown>,
+      };
+    }
     return $defs;
   } catch (error) {
+    renderScope?.stop();
     console.warn("renderCanvasLive failed:", errorMessage(error), error);
     return null;
   }

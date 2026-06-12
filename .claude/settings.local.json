@@ -1,5 +1,4 @@
 {
-  "enableWorkflows": true,
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -19,7 +18,9 @@
       "PowerShell(*)",
       "WebFetch(*)",
       "WebSearch",
-      "Write"
+      "Write",
+      "mcp__chrome-devtools-nixos__press_key"
     ]
-  }
+  },
+  "enableWorkflows": true
 }
