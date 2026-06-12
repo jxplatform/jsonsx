@@ -10,7 +10,8 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { basename, extname, resolve } from "node:path";
 import { createRequire } from "node:module";
-import type { FormatEnum } from "sharp";
+// Sharp 0.35 only has a default export (function merged with a types namespace).
+import type SharpNS from "sharp";
 
 export interface ImageVariant {
   width: number; // Pixel width of the variant
@@ -41,8 +42,7 @@ export interface ImageConfig {
   remoteDomains?: string[];
 }
 
-// oxlint-disable-next-line typescript/consistent-type-imports -- sharp is an optional native dep loaded lazily; its `export =` module type is only nameable via import()
-type SharpModule = typeof import("sharp");
+type SharpModule = typeof SharpNS;
 
 let _sharp: SharpModule | null = null;
 
@@ -175,7 +175,7 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
       const quality = config.quality[format as keyof ImageConfig["quality"]] ?? 80;
       const task = sharp(srcPath)
         .resize(width)
-        .toFormat(format as keyof FormatEnum, { quality })
+        .toFormat(format as keyof SharpNS.FormatEnum, { quality })
         .toFile(absolutePath)
         .then(() => {});
 

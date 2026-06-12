@@ -36,6 +36,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.10.2",
     "@jxsuite/server": "workspace:^",
     "rcedit": "^5.0.2"
   }

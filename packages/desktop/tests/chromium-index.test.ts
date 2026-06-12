@@ -1,0 +1,432 @@
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+// In-process import of src/chromium/index.ts, a launcher with import-time side effects.
+// Collaborators are mocked so tests can drive the embedded HTTP + WebSocket RPC server.
+// The chromium process lifecycle is exercised deterministically via a fake child process.
+
+// ─── Fixtures ───────────────────────────────────────────────────────────────
+
+const FIXTURES = join(import.meta.dir, "_fixtures_chromium_index");
+const STUDIO_ASSETS = join(FIXTURES, "_studio_assets");
+
+mkdirSync(join(FIXTURES, "public"), { recursive: true });
+mkdirSync(STUDIO_ASSETS, { recursive: true });
+writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
+writeFileSync(join(FIXTURES, "public", "pub.css"), "body { margin: 0 }");
+writeFileSync(join(STUDIO_ASSETS, "index.html"), "<html>studio-shell</html>");
+
+// ─── Mocked collaborator modules ────────────────────────────────────────────
+
+let projectRootValue = FIXTURES;
+
+const handlerMocks = {
+  codeService: mock((params: unknown) => Promise.resolve({ echoed: params })),
+  discoverComponents: mock(() => Promise.resolve([{ path: "btn.json", tagName: "my-btn" }])),
+  fetchPluginSchema: mock(() => Promise.resolve({ type: "object" })),
+  formatAction: mock(() => Promise.resolve({ doc: { ok: true } })),
+  getProjectRoot: mock(() => projectRootValue),
+  handleCreateDirectory: mock(() => Promise.resolve()),
+  handleDeleteFile: mock(() => Promise.resolve()),
+  handleReadFile: mock((p: { path: string }) => Promise.resolve(`read:${p.path}`)),
+  handleRenameFile: mock(() => Promise.resolve()),
+  handleResolveSiteContext: mock(() => Promise.resolve({ sitePath: "." })),
+  handleUploadFile: mock(() => Promise.resolve()),
+  handleWriteFile: mock(() => Promise.resolve()),
+  listDirectory: mock(() => Promise.resolve([{ name: "hello.txt", type: "file" }])),
+  listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
+  locateFile: mock(() => Promise.resolve("located/file.json")),
+  openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
+  setFileDialog: mock(() => {}),
+  setProjectRoot: mock(() => {}),
+};
+
+const gitMocks = {
+  gitAddRemote: mock(() => Promise.resolve()),
+  gitBranches: mock(() => Promise.resolve({ branches: ["main"], current: "main" })),
+  gitCheckout: mock(() => Promise.resolve()),
+  gitCommit: mock(() => Promise.resolve()),
+  gitCreateBranch: mock(() => Promise.resolve()),
+  gitDiff: mock(() => Promise.resolve("diff --git a/x")),
+  gitDiscard: mock(() => Promise.resolve()),
+  // Rejects with a non-Error value to exercise the String(error) branch
+  // oxlint-disable-next-line prefer-promise-reject-errors -- deliberate non-Error rejection
+  gitFetch: mock(() => Promise.reject("fetch-blew-up")),
+  gitInit: mock(() => Promise.resolve()),
+  gitLog: mock(() => Promise.resolve([{ hash: "abc", message: "init" }])),
+  // Rejects with an Error to exercise the error.message branch
+  gitPull: mock(() => Promise.reject(new Error("pull failed"))),
+  gitPush: mock(() => Promise.resolve()),
+  gitStage: mock(() => Promise.resolve()),
+  gitStatus: mock(() => Promise.resolve({ branch: "main", files: [] })),
+  gitUnstage: mock(() => Promise.resolve()),
+};
+
+const packageMocks = {
+  addPackage: mock(() => Promise.resolve({ added: true })),
+  listPackages: mock(() => Promise.resolve([{ name: "left-pad" }])),
+  removePackage: mock(() => Promise.resolve({ removed: true })),
+};
+
+const openFileDialogMock = mock(() => Promise.resolve("/picked/project.json"));
+
+const handleAiRouteMock = mock((_req: Request, path: string, _root: string) =>
+  Promise.resolve(path === "/studio/ai/auth-status" ? Response.json({ ok: true }) : null),
+);
+
+mock.module("../src/handlers", () => handlerMocks);
+mock.module("../src/git", () => gitMocks);
+mock.module("../src/packages", () => packageMocks);
+mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
+mock.module("../src/ai", () => ({ handleAiRoute: handleAiRouteMock }));
+
+// ─── Fake chromium child process ────────────────────────────────────────────
+
+class FakeChrome {
+  kill = mock(() => true);
+  private handlers = new Map<string, ((...args: unknown[]) => void)[]>();
+
+  on(event: string, handler: (...args: unknown[]) => void): this {
+    const list = this.handlers.get(event) ?? [];
+    list.push(handler);
+    this.handlers.set(event, list);
+    return this;
+  }
+
+  emit(event: string, ...args: unknown[]): void {
+    for (const handler of this.handlers.get(event) ?? []) {
+      handler(...args);
+    }
+  }
+}
+const fakeChrome = new FakeChrome();
+const spawnCalls: { bin: string; args: string[] }[] = [];
+const spawnMock = mock((bin: string, args: string[], _opts: unknown) => {
+  spawnCalls.push({ args, bin });
+  return fakeChrome;
+});
+mock.module("node:child_process", () => ({ spawn: spawnMock }));
+
+// ─── Environment + globals for the import-time side effects ────────────────
+
+process.argv[2] = FIXTURES;
+process.env.JX_STUDIO_ASSETS = STUDIO_ASSETS;
+process.env.CHROMIUM_BIN = "sh"; // Resolvable via `which` everywhere
+process.env.WAYLAND_DISPLAY ||= "wayland-test";
+
+const exitCalls: number[] = [];
+const realExit = process.exit;
+process.exit = ((code?: number) => {
+  exitCalls.push(code ?? 0);
+}) as unknown as typeof process.exit;
+
+const sigintBefore = new Set(process.listeners("SIGINT"));
+const sigtermBefore = new Set(process.listeners("SIGTERM"));
+
+const realServe = Bun.serve.bind(Bun);
+let server: ReturnType<typeof Bun.serve> | undefined;
+(Bun as unknown as { serve: (opts: unknown) => unknown }).serve = (opts: unknown) => {
+  server = realServe(opts as Parameters<typeof Bun.serve>[0]);
+  return server;
+};
+
+const logs: string[] = [];
+const realLog = console.log;
+console.log = (...args: unknown[]) => {
+  logs.push(args.map(String).join(" "));
+};
+
+await import("../src/chromium/index");
+
+console.log = realLog;
+(Bun as unknown as { serve: typeof Bun.serve }).serve = realServe;
+
+const sigintHandlers = process
+  .listeners("SIGINT")
+  .filter((listener) => !sigintBefore.has(listener));
+const sigtermHandlers = process
+  .listeners("SIGTERM")
+  .filter((listener) => !sigtermBefore.has(listener));
+
+const baseUrl = `http://localhost:${server!.port}`;
+
+afterAll(() => {
+  process.exit = realExit;
+  for (const listener of sigintHandlers) {
+    process.removeListener("SIGINT", listener);
+  }
+  for (const listener of sigtermHandlers) {
+    process.removeListener("SIGTERM", listener);
+  }
+  server?.stop(true);
+  rmSync(FIXTURES, { force: true, recursive: true });
+});
+
+// ─── WebSocket RPC helper ───────────────────────────────────────────────────
+
+let ws: WebSocket;
+
+function rpc(method: string, params?: Record<string, unknown>): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const id = Math.floor(Math.random() * 1_000_000);
+    const handler = (event: MessageEvent) => {
+      const msg = JSON.parse(event.data as string);
+      if (msg.id !== id) {
+        return;
+      }
+      ws.removeEventListener("message", handler);
+      if (msg.error) {
+        reject(new Error(msg.error));
+      } else {
+        resolve(msg.result);
+      }
+    };
+    ws.addEventListener("message", handler);
+    ws.send(JSON.stringify({ id, method, params }));
+  });
+}
+
+beforeAll(async () => {
+  ws = await new Promise<WebSocket>((resolve, reject) => {
+    const socket = new WebSocket(`ws://localhost:${server!.port}`);
+    socket.addEventListener("open", () => resolve(socket));
+    socket.addEventListener("error", reject);
+  });
+});
+
+afterAll(() => {
+  ws?.close();
+});
+
+// ─── Startup behavior ───────────────────────────────────────────────────────
+
+describe("chromium launcher startup", () => {
+  test("registers project root and file dialog with the handlers module", () => {
+    expect(handlerMocks.setProjectRoot).toHaveBeenCalledWith(FIXTURES);
+    expect(handlerMocks.setFileDialog).toHaveBeenCalledWith(openFileDialogMock);
+  });
+
+  test("logs the server URL and project root", () => {
+    expect(logs.some((line) => line.includes(`Studio server at ${baseUrl}`))).toBe(true);
+    expect(logs.some((line) => line.includes(`Project root: ${FIXTURES}`))).toBe(true);
+  });
+
+  test("spawns the resolved chromium binary in app mode", () => {
+    expect(spawnCalls).toHaveLength(1);
+    const [{ args, bin }] = spawnCalls;
+    expect(bin.endsWith("/sh")).toBe(true);
+    expect(args[0]).toBe(`--app=${baseUrl}/studio/index.html`);
+    expect(args).toContain("--no-first-run");
+    expect(args.some((a) => a.includes(".jx/chromium-profile"))).toBe(true);
+  });
+
+  test("adds wayland flags when WAYLAND_DISPLAY is set", () => {
+    const [{ args }] = spawnCalls;
+    expect(args).toContain("--ozone-platform=wayland");
+    expect(args).toContain("--enable-features=UseOzonePlatform");
+  });
+});
+
+// ─── WebSocket RPC dispatch ─────────────────────────────────────────────────
+
+describe("chromium launcher RPC dispatch", () => {
+  test("readFile dispatches to handleReadFile with params", async () => {
+    const result = await rpc("readFile", { path: "hello.txt" });
+    expect(result).toBe("read:hello.txt");
+    expect(handlerMocks.handleReadFile).toHaveBeenCalledWith({ path: "hello.txt" });
+  });
+
+  test("void handlers resolve with null (?? null normalization)", async () => {
+    expect(await rpc("writeFile", { content: "x", path: "a.txt" })).toBeNull();
+    expect(await rpc("deleteFile", { path: "a.txt" })).toBeNull();
+    expect(await rpc("renameFile", { from: "a", to: "b" })).toBeNull();
+    expect(await rpc("createDirectory", { path: "dir" })).toBeNull();
+    expect(await rpc("uploadFile", { data: "aGk=", path: "u.bin" })).toBeNull();
+    expect(handlerMocks.handleWriteFile).toHaveBeenCalledWith({ content: "x", path: "a.txt" });
+    expect(handlerMocks.handleRenameFile).toHaveBeenCalledWith({ from: "a", to: "b" });
+  });
+
+  test("file and project queries return handler results", async () => {
+    expect(await rpc("listDirectory", { dir: "." })).toEqual([{ name: "hello.txt", type: "file" }]);
+    expect(await rpc("discoverComponents", { dir: "." })).toEqual([
+      { path: "btn.json", tagName: "my-btn" },
+    ]);
+    expect(await rpc("locateFile", { name: "file.json" })).toBe("located/file.json");
+    expect(await rpc("openProject")).toEqual({ config: { name: "P" }, handle: { root: "." } });
+    expect(await rpc("resolveSiteContext", { filePath: "x.json" })).toEqual({ sitePath: "." });
+    expect(await rpc("fetchPluginSchema", { src: "./P.ts" })).toEqual({ type: "object" });
+    expect(await rpc("codeService", { action: "lint" })).toEqual({
+      echoed: { action: "lint" },
+    });
+    expect(await rpc("listFormats")).toEqual([{ format: "markdown" }]);
+    expect(await rpc("formatAction", { action: "parse", format: "markdown" })).toEqual({
+      doc: { ok: true },
+    });
+    expect(handlerMocks.formatAction).toHaveBeenCalledWith({
+      action: "parse",
+      format: "markdown",
+    });
+  });
+
+  test("git query methods return results", async () => {
+    expect(await rpc("gitStatus")).toEqual({ branch: "main", files: [] });
+    expect(await rpc("gitBranches")).toEqual({ branches: ["main"], current: "main" });
+    expect(await rpc("gitLog", { limit: 5 })).toEqual([{ hash: "abc", message: "init" }]);
+    expect(gitMocks.gitLog).toHaveBeenCalledWith({ limit: 5 });
+    expect(await rpc("gitDiff", { path: "x" })).toBe("diff --git a/x");
+  });
+
+  test("git mutation methods dispatch with params and resolve null", async () => {
+    expect(await rpc("gitStage", { files: ["a"] })).toBeNull();
+    expect(await rpc("gitUnstage", { files: ["a"] })).toBeNull();
+    expect(await rpc("gitCommit", { message: "msg" })).toBeNull();
+    expect(await rpc("gitPush", { setUpstream: true })).toBeNull();
+    expect(await rpc("gitCheckout", { branch: "dev" })).toBeNull();
+    expect(await rpc("gitCreateBranch", { name: "feat" })).toBeNull();
+    expect(await rpc("gitDiscard", { files: ["a"] })).toBeNull();
+    expect(await rpc("gitInit")).toBeNull();
+    expect(await rpc("gitAddRemote", { name: "origin", url: "git@host:r.git" })).toBeNull();
+    expect(gitMocks.gitCommit).toHaveBeenCalledWith({ message: "msg" });
+    expect(gitMocks.gitPush).toHaveBeenCalledWith({ setUpstream: true });
+    expect(gitMocks.gitAddRemote).toHaveBeenCalledWith({ name: "origin", url: "git@host:r.git" });
+  });
+
+  test("package methods dispatch to the packages module", async () => {
+    expect(await rpc("addPackage", { name: "left-pad" })).toEqual({ added: true });
+    expect(await rpc("removePackage", { name: "left-pad" })).toEqual({ removed: true });
+    expect(await rpc("listPackages")).toEqual([{ name: "left-pad" }]);
+    expect(packageMocks.addPackage).toHaveBeenCalledWith({ name: "left-pad" });
+  });
+
+  test("Error rejections are reported via error.message", async () => {
+    await expect(rpc("gitPull")).rejects.toThrow("pull failed");
+  });
+
+  test("non-Error rejections are stringified", async () => {
+    await expect(rpc("gitFetch")).rejects.toThrow("fetch-blew-up");
+  });
+
+  test("unknown methods get an error response", async () => {
+    await expect(rpc("definitelyNotAMethod")).rejects.toThrow(
+      "Unknown method: definitelyNotAMethod",
+    );
+  });
+
+  test("invalid JSON gets an error response with id 0", async () => {
+    const response = await new Promise<{ id: number; error?: string }>((resolve) => {
+      const handler = (event: MessageEvent) => {
+        const msg = JSON.parse(event.data as string);
+        if (msg.id !== 0) {
+          return;
+        }
+        ws.removeEventListener("message", handler);
+        resolve(msg);
+      };
+      ws.addEventListener("message", handler);
+      ws.send("{{{not json");
+    });
+    expect(response.error).toBe("Invalid JSON");
+  });
+});
+
+// ─── HTTP static serving ────────────────────────────────────────────────────
+
+describe("chromium launcher HTTP server", () => {
+  test("serves studio assets under /studio/", async () => {
+    const res = await fetch(`${baseUrl}/studio/index.html`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("studio-shell");
+  });
+
+  test("delegates /studio/ai/ routes to handleAiRoute", async () => {
+    const res = await fetch(`${baseUrl}/studio/ai/auth-status`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(handleAiRouteMock).toHaveBeenCalled();
+  });
+
+  test("falls through to 404 when handleAiRoute returns null", async () => {
+    const res = await fetch(`${baseUrl}/studio/ai/not-a-route`);
+    expect(res.status).toBe(404);
+  });
+
+  test("serves absolute paths under the project root", async () => {
+    const res = await fetch(`${baseUrl}${FIXTURES}/hello.txt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("Hello Index");
+  });
+
+  test("falls through when an absolute path under the root does not exist", async () => {
+    const res = await fetch(`${baseUrl}${FIXTURES}/missing-abs.txt`);
+    expect(res.status).toBe(404);
+  });
+
+  test("serves relative paths from the project root", async () => {
+    const res = await fetch(`${baseUrl}/hello.txt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("Hello Index");
+  });
+
+  test("collapses leading double slashes", async () => {
+    const res = await fetch(`${baseUrl}//hello.txt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("Hello Index");
+  });
+
+  test("serves files from the public/ subdirectory", async () => {
+    const res = await fetch(`${baseUrl}/pub.css`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("margin: 0");
+  });
+
+  test("returns 404 for missing files", async () => {
+    const res = await fetch(`${baseUrl}/definitely-missing.xyz`);
+    expect(res.status).toBe(404);
+  });
+
+  test("returns 404 for everything when no project root is set", async () => {
+    projectRootValue = "";
+    try {
+      const res = await fetch(`${baseUrl}/hello.txt`);
+      expect(res.status).toBe(404);
+    } finally {
+      projectRootValue = FIXTURES;
+    }
+  });
+});
+
+// ─── Process lifecycle ──────────────────────────────────────────────────────
+
+describe("chromium launcher lifecycle", () => {
+  test("SIGINT kills chromium and exits", () => {
+    expect(sigintHandlers).toHaveLength(1);
+    const before = fakeChrome.kill.mock.calls.length;
+    (sigintHandlers[0] as () => void)();
+    expect(fakeChrome.kill.mock.calls.length).toBe(before + 1);
+    expect(exitCalls).toContain(0);
+  });
+
+  test("SIGTERM kills chromium and exits", () => {
+    expect(sigtermHandlers).toHaveLength(1);
+    const before = fakeChrome.kill.mock.calls.length;
+    (sigtermHandlers[0] as () => void)();
+    expect(fakeChrome.kill.mock.calls.length).toBe(before + 1);
+  });
+
+  test("browser close logs the exit code and exits the launcher", () => {
+    const exitsBefore = exitCalls.length;
+    const captured: string[] = [];
+    const saved = console.log;
+    console.log = (...args: unknown[]) => {
+      captured.push(args.map(String).join(" "));
+    };
+    try {
+      fakeChrome.emit("close", 7);
+    } finally {
+      console.log = saved;
+    }
+    expect(captured.some((line) => line.includes("Browser closed (code 7)"))).toBe(true);
+    expect(exitCalls.length).toBe(exitsBefore + 1);
+  });
+});

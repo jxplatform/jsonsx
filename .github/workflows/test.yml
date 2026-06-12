@@ -1,0 +1,48 @@
+name: Test
+permissions:
+  contents: read
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - compiler
+          - create
+          - desktop
+          - parser
+          - runtime
+          - schema
+          - server
+          - studio
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Pinned: coverage instrumentation shifts between Bun versions and
+          # would silently move the coverageThreshold ratchet. Bump this
+          # together with re-baselining packages/*/bunfig.toml thresholds.
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - run: bun test --isolate --coverage
+        working-directory: packages/${{ matrix.package }}
+      - run: bun scripts/check-coverage-manifest.ts packages/${{ matrix.package }}
+
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
