@@ -347,7 +347,7 @@ export function renderLayersTemplate(ctx: {
                         e.stopPropagation();
                         (e.currentTarget as HTMLElement).blur();
                         const pp = parentPath as JxPath;
-                        const prevPath = [...pp, idx - 1];
+                        const prevPath = [...pp, "children", idx - 1];
                         const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
                         const len = childList(prev).length;
                         transactDoc(activeTab.value!, (t) =>

@@ -1,0 +1,196 @@
+/**
+ * Ui/layers — showDialog/showConfirmDialog resolution, openModal handle, renderPopover dismissal
+ * (outside click, layer targeting), and named layer slots.
+ */
+import { flush } from "./harness";
+import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { html } from "lit-html";
+import {
+  clearLayerSlot,
+  getLayerSlot,
+  initLayers,
+  openModal,
+  renderPopover,
+  showConfirmDialog,
+  showDialog,
+} from "../src/ui/layers";
+
+function layer(id: string): HTMLElement {
+  return document.querySelector(`#layer-${id}`) as HTMLElement;
+}
+
+describe("getLayerSlot before initLayers", () => {
+  test("falls back to document.body when layers are not initialized", () => {
+    document.body.innerHTML = "";
+    const slot = getLayerSlot("popover", "pre-init");
+    expect(slot.parentElement).toBe(document.body);
+    clearLayerSlot("popover", "pre-init");
+    expect(slot.parentElement).toBeNull();
+  });
+});
+
+describe("layers after init", () => {
+  beforeAll(() => {
+    document.body.innerHTML = `
+      <div id="layer-popover"></div>
+      <div id="layer-modal"></div>
+      <div id="layer-dialog"></div>
+    `;
+    initLayers();
+  });
+
+  describe("showDialog", () => {
+    test("resolves with the done() value and removes the slot", async () => {
+      const promise = showDialog<string>(
+        (done) => html`<button
+          id="dlg-btn"
+          @click=${() => {
+            done("picked");
+          }}
+        >
+          pick
+        </button>`,
+      );
+      expect(layer("dialog").querySelector("#dlg-btn")).not.toBeNull();
+      (layer("dialog").querySelector("#dlg-btn") as HTMLElement).click();
+      expect(await promise).toBe("picked");
+      expect(layer("dialog").querySelector("#dlg-btn")).toBeNull();
+    });
+
+    test("second done() call is ignored", async () => {
+      let doneFn: ((v: number) => void) | null = null;
+      const promise = showDialog<number>((done) => {
+        doneFn = done;
+        return html`<span>x</span>`;
+      });
+      doneFn!(1);
+      doneFn!(2);
+      expect(await promise).toBe(1);
+    });
+  });
+
+  describe("showConfirmDialog", () => {
+    test("confirm resolves true with custom labels", async () => {
+      const promise = showConfirmDialog("Delete?", "Sure?", {
+        cancelLabel: "Keep",
+        confirmLabel: "Nuke",
+        destructive: true,
+      });
+      const dlg = layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+      expect(dlg.getAttribute("headline")).toBe("Delete?");
+      expect(dlg.getAttribute("confirm-label")).toBe("Nuke");
+      expect(dlg.getAttribute("cancel-label")).toBe("Keep");
+      expect(dlg.classList.contains("dialog-destructive")).toBe(true);
+      dlg.dispatchEvent(new Event("confirm"));
+      expect(await promise).toBe(true);
+    });
+
+    test("close event resolves false; defaults are non-destructive", async () => {
+      const promise = showConfirmDialog("Hm", "really?");
+      const dlg = layer("dialog").querySelector("sp-dialog-wrapper") as HTMLElement;
+      expect(dlg.getAttribute("confirm-label")).toBe("Confirm");
+      expect(dlg.classList.contains("dialog-destructive")).toBe(false);
+      dlg.dispatchEvent(new Event("close"));
+      expect(await promise).toBe(false);
+    });
+  });
+
+  describe("openModal", () => {
+    test("renders into the modal layer, updates, and closes", () => {
+      const handle = openModal(html`<div id="modal-a">one</div>`);
+      expect(layer("modal").querySelector("#modal-a")).not.toBeNull();
+      expect(handle.host.style.pointerEvents).toBe("auto");
+      handle.update(html`<div id="modal-b">two</div>`);
+      expect(layer("modal").querySelector("#modal-a")).toBeNull();
+      expect(layer("modal").querySelector("#modal-b")).not.toBeNull();
+      handle.close();
+      expect(layer("modal").querySelector("#modal-b")).toBeNull();
+      expect(handle.host.parentElement).toBeNull();
+    });
+  });
+
+  describe("renderPopover", () => {
+    test("defaults to the popover layer and dismisses on outside mousedown", async () => {
+      const onDismiss = mock(() => {});
+      renderPopover(html`<div id="pop-a">pop</div>`, { onDismiss });
+      expect(layer("popover").querySelector("#pop-a")).not.toBeNull();
+      // Outside-click handler attaches on the next animation frame.
+      await flush();
+      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(layer("popover").querySelector("#pop-a")).toBeNull();
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    test("mousedown inside the popover does not dismiss", async () => {
+      const handle = renderPopover(html`<div id="pop-in">pop</div>`);
+      await flush();
+      const inner = layer("popover").querySelector("#pop-in") as HTMLElement;
+      inner.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(layer("popover").querySelector("#pop-in")).not.toBeNull();
+      handle.dismiss();
+      expect(layer("popover").querySelector("#pop-in")).toBeNull();
+    });
+
+    test("dismissOnOutsideClick:false leaves the popover; update() swaps content", async () => {
+      const handle = renderPopover(html`<div id="pop-stay">stay</div>`, {
+        dismissOnOutsideClick: false,
+      });
+      await flush();
+      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(layer("popover").querySelector("#pop-stay")).not.toBeNull();
+      handle.update(html`<div id="pop-stay2">two</div>`);
+      expect(layer("popover").querySelector("#pop-stay2")).not.toBeNull();
+      handle.dismiss();
+    });
+
+    test("layer option targets modal and dialog layers", () => {
+      const m = renderPopover(html`<div id="pop-m"></div>`, {
+        dismissOnOutsideClick: false,
+        layer: "modal",
+      });
+      const d = renderPopover(html`<div id="pop-d"></div>`, {
+        dismissOnOutsideClick: false,
+        layer: "dialog",
+      });
+      expect(layer("modal").querySelector("#pop-m")).not.toBeNull();
+      expect(layer("dialog").querySelector("#pop-d")).not.toBeNull();
+      m.dismiss();
+      d.dismiss();
+    });
+
+    test("dismiss before the rAF tick does not attach a stale listener", async () => {
+      const handle = renderPopover(html`<div id="pop-fast"></div>`);
+      handle.dismiss();
+      await flush();
+      // No listener should remain; an outside mousedown must not throw or re-dismiss.
+      document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      expect(layer("popover").querySelector("#pop-fast")).toBeNull();
+    });
+  });
+
+  describe("named layer slots", () => {
+    test("getLayerSlot creates once and reuses while attached", () => {
+      const slot1 = getLayerSlot("popover", "zoom");
+      const slot2 = getLayerSlot("popover", "zoom");
+      expect(slot1).toBe(slot2);
+      expect(slot1.parentElement).toBe(layer("popover"));
+    });
+
+    test("recreates the slot if it was detached", () => {
+      const slot = getLayerSlot("modal", "thing");
+      slot.remove();
+      const fresh = getLayerSlot("modal", "thing");
+      expect(fresh).not.toBe(slot);
+      expect(fresh.parentElement).toBe(layer("modal"));
+    });
+
+    test("dialog layer slots and clearLayerSlot removal", () => {
+      const slot = getLayerSlot("dialog", "confirm");
+      expect(slot.parentElement).toBe(layer("dialog"));
+      clearLayerSlot("dialog", "confirm");
+      expect(slot.parentElement).toBeNull();
+      // Clearing again is a no-op
+      clearLayerSlot("dialog", "confirm");
+    });
+  });
+});

@@ -1,0 +1,1172 @@
+/**
+ * Canvas render orchestrator tests. Heavy collaborators (monaco, the live runtime renderer, DnD,
+ * panel events, stylebook, editors, statusbar, overlays) are mocked via mock.module so the tests
+ * can drive every renderCanvas dispatch path deterministically and assert the produced DOM.
+ */
+import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { canvasPanels, canvasWrap, elToPath, initShellRefs, setProjectState } from "../src/store";
+import { closeAllTabs } from "../src/workspace/workspace";
+import { view } from "../src/view";
+import { setFormats } from "../src/format/format-host";
+import { initCanvasUtils } from "../src/canvas/canvas-utils";
+import { initCanvasHelpers } from "../src/canvas/canvas-helpers";
+import { MARKDOWN_FORMAT } from "./format-fixture";
+import type { CanvasPanel } from "../src/types";
+import type { JxMutableNode } from "@jxsuite/schema/types";
+
+// ─── Controllable mock behavior ───────────────────────────────────────────────
+
+type LiveRender = (
+  gen: number,
+  doc: JxMutableNode,
+  canvas: HTMLElement,
+  panel: unknown,
+) => Promise<Record<string, unknown> | null>;
+let liveImpl: LiveRender = async () => null;
+
+const renderWelcome = mock((host: HTMLElement) => {
+  host.textContent = "welcome";
+});
+const renderFunctionEditor = mock((_close: () => void) => {});
+const statusMessage = mock((_msg: string, _duration?: number) => {});
+const overlaysRender = mock(() => {});
+const registerPanelDnD = mock((_panel: unknown) => {});
+const registerPanelEvents = mock((_panel: unknown) => {});
+const updateForcedPseudoPreview = mock(() => {});
+const enterComponentInlineEdit = mock((_el: HTMLElement, _path: unknown) => {});
+const renderStylebookMode = mock((_helpers: unknown) => {});
+const refreshStylebookStyles = mock(() => {});
+const parseSourceForPathMock = mock(async (_path: string, _source: string) => ({
+  document: { children: [{ tagName: "p", textContent: "parsed-md" }], tagName: "article" },
+  format: MARKDOWN_FORMAT,
+  frontmatter: { title: "Parsed" },
+}));
+const serializeDocumentMock = mock(async () => "# markdown source");
+
+interface FakeModel {
+  _value: string;
+  lang: string;
+  uri: unknown;
+  dispose: ReturnType<typeof mock>;
+  getValue: () => string;
+  setValue: (v: string) => void;
+}
+interface FakeEditor {
+  _changeHandlers: (() => void)[];
+  _focused: boolean;
+  _ignoreNextChange: boolean;
+  _model: FakeModel | null;
+  dispose: ReturnType<typeof mock>;
+  getModel: () => FakeModel | null;
+  getValue: () => string;
+  hasTextFocus: () => boolean;
+  onDidChangeModelContent: (cb: () => void) => void;
+  setValue: (v: string) => void;
+}
+const createdModels: FakeModel[] = [];
+const createdEditors: FakeEditor[] = [];
+
+mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+  MarkerSeverity: { Error: 8, Warning: 4 },
+  Uri: { parse: (s: string) => ({ toString: () => s }) },
+  editor: {
+    create: (_el: HTMLElement, opts: { model?: FakeModel }) => {
+      const ed: FakeEditor = {
+        _changeHandlers: [],
+        _focused: false,
+        _ignoreNextChange: false,
+        _model: opts?.model ?? null,
+        dispose: mock(() => {}),
+        getModel: () => ed._model,
+        getValue: () => ed._model?._value ?? "",
+        hasTextFocus: () => ed._focused,
+        onDidChangeModelContent: (cb: () => void) => {
+          ed._changeHandlers.push(cb);
+        },
+        setValue: (v: string) => {
+          if (ed._model) {
+            ed._model._value = v;
+          }
+        },
+      };
+      createdEditors.push(ed);
+      return ed;
+    },
+    createModel: (value: string, lang: string, uri: unknown) => {
+      const m: FakeModel = {
+        _value: value,
+        dispose: mock(() => {}),
+        getValue: () => m._value,
+        lang,
+        setValue: (v: string) => {
+          m._value = v;
+        },
+        uri,
+      };
+      createdModels.push(m);
+      return m;
+    },
+    setModelMarkers: () => {},
+  },
+}));
+
+mock.module("../src/canvas/canvas-live-render.js", () => ({
+  activeLayoutPath: null,
+  buildNestedSiteCSS: () => "",
+  initCanvasLiveRender: () => {},
+  layoutElements: new WeakSet(),
+  makePathMapper: () => () => null,
+  renderCanvasLive: (gen: number, doc: JxMutableNode, canvas: HTMLElement, panel: unknown) =>
+    liveImpl(gen, doc, canvas, panel),
+}));
+
+mock.module("../src/panels/welcome-screen.js", () => ({
+  initWelcome: () => {},
+  renderWelcome,
+}));
+
+mock.module("../src/panels/editors.js", () => ({
+  registerFunctionCompletions: () => {},
+  renderFunctionEditor,
+}));
+
+mock.module("../src/panels/statusbar.js", () => ({
+  mountStatusbar: () => {},
+  renderStatusbar: () => {},
+  setStatusbarRenderer: () => {},
+  statusMessage,
+  unmountStatusbar: () => {},
+}));
+
+mock.module("../src/panels/overlays.js", () => ({
+  mount: () => {},
+  render: overlaysRender,
+  unmount: () => {},
+}));
+
+mock.module("../src/panels/canvas-dnd.js", () => ({
+  registerPanelDnD,
+  registerSubtreeDnD: () => {},
+}));
+
+mock.module("../src/panels/panel-events.js", () => ({
+  initPanelEvents: () => {},
+  registerPanelEvents,
+}));
+
+mock.module("../src/panels/pseudo-preview.js", () => ({
+  updateForcedPseudoPreview,
+}));
+
+mock.module("../src/editor/component-inline-edit.js", () => ({
+  enterComponentInlineEdit,
+  initComponentInlineEdit: () => {},
+}));
+
+mock.module("../src/panels/stylebook-panel.js", () => ({
+  refreshStylebookStyles,
+  renderStylebookMode,
+}));
+
+mock.module("../src/files/file-ops.js", () => ({
+  parseSourceForPath: parseSourceForPathMock,
+  serializeDocument: serializeDocumentMock,
+}));
+
+const {
+  applyCanvasMediaOverrides,
+  initCanvasRender,
+  renderCanvas,
+  renderOverlays,
+  scheduleCanvasRender,
+} = await import("../src/canvas/canvas-render");
+
+// ─── Test context ─────────────────────────────────────────────────────────────
+
+let canvasMode = "design";
+let canvasModeFn = () => canvasMode;
+let zoom = 1;
+
+const ctx = {
+  closeFunctionEditor: mock(() => {}),
+  exportFile: mock(() => {}),
+  getCanvasMode: () => canvasModeFn(),
+  gitDiffState: null as Record<string, unknown> | null,
+  openFileFromTree: mock(() => {}),
+  setCanvasMode: mock((m: string) => {
+    canvasMode = m;
+  }),
+  setGitDiffState: mock(() => {}),
+};
+
+function setupShell() {
+  document.body.innerHTML = "";
+  for (const el of document.head.querySelectorAll("style[data-jx-owner]")) {
+    el.remove();
+  }
+  for (const id of [
+    "canvas-wrap",
+    "activity-bar",
+    "left-panel",
+    "right-panel",
+    "toolbar",
+    "statusbar",
+  ]) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+  initShellRefs();
+}
+
+/**
+ * Run fn with long debounce/sweep timers (>=200ms) intercepted so they can be flushed
+ * deterministically via the returned runPending callback.
+ */
+async function withFastTimers(fn: (runPending: () => Promise<void>) => Promise<void>) {
+  const origSetTimeout = globalThis.setTimeout;
+  const origClearTimeout = globalThis.clearTimeout;
+  const pending: (() => unknown)[] = [];
+  globalThis.setTimeout = ((cb: () => unknown, ms?: number, ...args: unknown[]) => {
+    if (typeof ms === "number" && ms >= 200) {
+      pending.push(cb);
+      return { __fake: true } as unknown as ReturnType<typeof setTimeout>;
+    }
+    return origSetTimeout(cb as () => void, ms, ...(args as []));
+  }) as typeof setTimeout;
+  globalThis.clearTimeout = ((handle: unknown) => {
+    if (handle && typeof handle === "object" && (handle as { __fake?: boolean }).__fake) {
+      return;
+    }
+    origClearTimeout(handle as ReturnType<typeof setTimeout>);
+  }) as typeof clearTimeout;
+  try {
+    await fn(async () => {
+      for (const cb of pending.splice(0)) {
+        cb();
+      }
+      await flush();
+    });
+  } finally {
+    globalThis.setTimeout = origSetTimeout;
+    globalThis.clearTimeout = origClearTimeout;
+  }
+}
+
+function fireModelChange(editor: FakeEditor) {
+  for (const cb of editor._changeHandlers) {
+    cb();
+  }
+}
+
+const rafTurn = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+
+beforeEach(() => {
+  setupShell();
+  resetStudioState();
+  closeAllTabs();
+  setFormats([]);
+  canvasMode = "design";
+  canvasModeFn = () => canvasMode;
+  zoom = 1;
+  ctx.gitDiffState = null;
+  liveImpl = async () => null;
+  for (const m of [
+    renderWelcome,
+    renderFunctionEditor,
+    statusMessage,
+    overlaysRender,
+    registerPanelDnD,
+    registerPanelEvents,
+    updateForcedPseudoPreview,
+    enterComponentInlineEdit,
+    renderStylebookMode,
+    refreshStylebookStyles,
+    parseSourceForPathMock,
+    serializeDocumentMock,
+    ctx.setCanvasMode,
+    ctx.exportFile,
+    ctx.closeFunctionEditor,
+  ]) {
+    m.mockClear();
+  }
+  createdModels.length = 0;
+  createdEditors.length = 0;
+  canvasPanels.length = 0;
+  view.prevCanvasMode = null;
+  view.panzoomWrap = null;
+  view.monacoEditor = null;
+  view.functionEditor = null;
+  view.centerObserver = null;
+  view.canvasDndCleanups = [];
+  view.canvasEventCleanups = [];
+  view.renderGeneration = 0;
+  initCanvasHelpers({ getCanvasMode: () => canvasModeFn(), getZoom: () => zoom });
+  initCanvasUtils({
+    getCanvasMode: () => canvasModeFn(),
+    getZoom: () => zoom,
+    renderStylebookOverlays: () => {},
+    setZoomDirect: (z: number) => {
+      zoom = z;
+    },
+  });
+  initCanvasRender(ctx as never);
+});
+
+afterEach(() => {
+  closeAllTabs();
+});
+
+// ─── No tab: welcome screen ───────────────────────────────────────────────────
+
+describe("renderCanvas without a tab", () => {
+  test("renders the welcome screen when no project is loaded", () => {
+    setProjectState(null);
+    renderCanvas();
+    expect(renderWelcome).toHaveBeenCalledWith(canvasWrap);
+  });
+
+  test("clears the canvas when a project is loaded but no tab is open", () => {
+    canvasWrap.textContent = "leftover";
+    renderCanvas();
+    expect(renderWelcome).not.toHaveBeenCalled();
+    expect(canvasWrap.textContent).toBe("");
+  });
+});
+
+// ─── Function editor ──────────────────────────────────────────────────────────
+
+describe("function editor dispatch", () => {
+  test("renders the function editor while editingFunction is set", () => {
+    const tab = resetWorkspaceWithTab();
+    tab.session.ui.editingFunction = { path: ["children", 0], prop: "onclick" } as never;
+    renderCanvas();
+    expect(renderFunctionEditor).toHaveBeenCalledWith(ctx.closeFunctionEditor);
+    expect(canvasPanels.length).toBe(0);
+  });
+
+  test("disposes a leftover function editor when switching away", () => {
+    resetWorkspaceWithTab();
+    const dispose = mock(() => {});
+    view.functionEditor = { dispose } as never;
+    renderCanvas();
+    expect(dispose).toHaveBeenCalled();
+    expect(view.functionEditor).toBeNull();
+  });
+});
+
+// ─── Source mode ──────────────────────────────────────────────────────────────
+
+describe("source mode", () => {
+  test("creates a monaco editor with the document JSON", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    expect(canvasWrap.querySelector(".source-wrap")).not.toBeNull();
+    expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
+    expect(view.monacoEditor).toBe(createdEditors[0] as never);
+    await flush();
+    expect(createdModels[0]._value).toBe(JSON.stringify(tab.doc.document, null, 2));
+    expect(createdModels[0].lang).toBe("json");
+    expect(createdEditors[0]._ignoreNextChange).toBe(true);
+  });
+
+  test("export toolbar button invokes ctx.exportFile", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    const btn = canvasWrap.querySelector("sp-action-button") as HTMLElement;
+    btn.click();
+    expect(ctx.exportFile).toHaveBeenCalled();
+  });
+
+  test("debounced edits sync valid JSON back into the document", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      editor._model!._value = JSON.stringify({ children: [], tagName: "main" });
+      fireModelChange(editor);
+      await runPending();
+      expect(tab.doc.document.tagName).toBe("main");
+      expect(tab.doc.dirty).toBe(true);
+    });
+  });
+
+  test("invalid JSON edits do not touch the document", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      editor._model!._value = "{ not json";
+      fireModelChange(editor);
+      await runPending();
+      expect(tab.doc.document.tagName).toBe("div");
+      expect(tab.doc.dirty).toBe(false);
+    });
+  });
+
+  test("programmatic buffer updates are swallowed via _ignoreNextChange", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = true;
+      editor._model!._value = JSON.stringify({ tagName: "main" });
+      fireModelChange(editor);
+      await runPending();
+      expect(editor._ignoreNextChange).toBe(false);
+      expect(tab.doc.document.tagName).toBe("div");
+      expect(tab.doc.dirty).toBe(false);
+    });
+  });
+
+  test("javascript files use the document toString and only mark dirty", async () => {
+    closeAllTabs();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/handlers.js" });
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      expect(createdModels[0].lang).toBe("javascript");
+      expect(createdModels[0]._value).toBe(String(tab.doc.document));
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      fireModelChange(editor);
+      await runPending();
+      expect(tab.doc.dirty).toBe(true);
+    });
+  });
+
+  test("format documents serialize to source and parse edits back", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      expect(createdModels[0].lang).toBe("markdown");
+      expect(serializeDocumentMock).toHaveBeenCalled();
+      expect(createdModels[0]._value).toBe("# markdown source");
+
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      editor._model!._value = "# Edited";
+      fireModelChange(editor);
+      await runPending();
+      expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# Edited");
+      expect(tab.doc.document.tagName).toBe("article");
+      expect(tab.doc.content.frontmatter).toEqual({ title: "Parsed" });
+      expect(tab.doc.dirty).toBe(true);
+    });
+  });
+
+  test("unparseable format source leaves the document untouched", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    canvasMode = "source";
+    parseSourceForPathMock.mockImplementationOnce(async () => {
+      throw new Error("bad source");
+    });
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      fireModelChange(editor);
+      await runPending();
+      expect(tab.doc.document.tagName).toBe("div");
+      expect(tab.doc.dirty).toBe(false);
+    });
+  });
+
+  test("re-render in source mode updates the buffer without recreating the editor", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    expect(createdEditors.length).toBe(1);
+    const [editor] = createdEditors;
+    editor._ignoreNextChange = false;
+
+    tab.doc.document.tagName = "section";
+    renderCanvas();
+    await flush();
+    expect(createdEditors.length).toBe(1);
+    expect(editor.getValue()).toBe(JSON.stringify(tab.doc.document, null, 2));
+    expect(editor._ignoreNextChange).toBe(true);
+  });
+
+  test("re-render does not clobber the buffer while the editor has focus", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    const [editor] = createdEditors;
+    editor._focused = true;
+    editor._model!._value = "user-typing";
+    tab.doc.document.tagName = "section";
+    renderCanvas();
+    await flush();
+    expect(editor.getValue()).toBe("user-typing");
+  });
+
+  test("stale buffer updates are dropped when the editor was replaced mid-flight", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    const [editor] = createdEditors;
+    editor._ignoreNextChange = false;
+    editor._model!._value = "stale-buffer";
+
+    tab.doc.document.tagName = "section";
+    renderCanvas(); // Fast path kicks off an async buffer refresh…
+    view.monacoEditor = null; // …but the editor goes away before it lands
+    await flush();
+    expect(editor.getValue()).toBe("stale-buffer");
+  });
+
+  test("change events fired after editor teardown are ignored", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      editor._model!._value = JSON.stringify({ tagName: "main" });
+      view.monacoEditor = null;
+      fireModelChange(editor);
+      await runPending();
+      expect(tab.doc.document.tagName).toBe("div");
+    });
+  });
+
+  test("debounced sync bails when the tab was closed in the meantime", async () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "source";
+    await withFastTimers(async (runPending) => {
+      renderCanvas();
+      await flush();
+      const [editor] = createdEditors;
+      editor._ignoreNextChange = false;
+      editor._model!._value = JSON.stringify({ tagName: "main" });
+      fireModelChange(editor);
+      closeAllTabs();
+      await runPending();
+      expect(tab.doc.document.tagName).toBe("div");
+    });
+  });
+
+  test("serialization failure on a fresh render leaves the buffer empty", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    canvasMode = "source";
+    serializeDocumentMock.mockImplementationOnce(async () => {
+      throw new Error("format service unreachable");
+    });
+    renderCanvas();
+    await flush();
+    expect(createdModels[0]._value).toBe("");
+  });
+
+  test("serialization failure on a re-render keeps the current buffer", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    closeAllTabs();
+    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    tab.doc.sourceFormat = "Markdown";
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    expect(createdModels[0]._value).toBe("# markdown source");
+
+    serializeDocumentMock.mockImplementationOnce(async () => {
+      throw new Error("format service unreachable");
+    });
+    renderCanvas();
+    await flush();
+    expect(createdModels[0]._value).toBe("# markdown source");
+  });
+
+  test("switching modes disposes the monaco editor and its model", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    const [editor] = createdEditors;
+    const [model] = createdModels;
+
+    canvasMode = "design";
+    renderCanvas();
+    expect(editor.dispose).toHaveBeenCalled();
+    expect(model.dispose).toHaveBeenCalled();
+    expect(view.monacoEditor).toBeNull();
+  });
+});
+
+// ─── Git diff mode ────────────────────────────────────────────────────────────
+
+describe("git-diff mode", () => {
+  test("falls back to design mode when no diff state is set", () => {
+    resetWorkspaceWithTab();
+    canvasMode = "git-diff";
+    canvasModeFn = () => canvasMode;
+    renderCanvas();
+    expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
+    expect(canvasPanels.length).toBe(1);
+  });
+
+  test("renders Original and Current panels side by side", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      currentContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "new text" }],
+        tagName: "div",
+      }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "old text" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+
+    const headers = [...canvasWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+      h.textContent?.trim(),
+    );
+    expect(headers).toEqual(["Original", "Current"]);
+    expect(canvasPanels.length).toBe(2);
+    const [orig, curr] = canvasPanels as unknown as CanvasPanel[];
+    expect(orig.canvas?.textContent).toContain("old text");
+    expect(curr.canvas?.textContent).toContain("new text");
+    // Diff panels are never live-patchable
+    expect(orig.ready).toBe(false);
+    expect(curr.ready).toBe(false);
+  });
+
+  test("applies diff highlight classes when the live renderer provides elToPath", async () => {
+    resetWorkspaceWithTab();
+    liveImpl = async (_gen, _doc, canvas) => {
+      canvas.innerHTML = "";
+      const root = document.createElement("div");
+      root.append(document.createElement("p"));
+      canvas.append(root);
+      return { elToPath: new WeakMap() };
+    };
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      currentContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "changed" }],
+        tagName: "div",
+      }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "Hello" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+
+    const highlighted = canvasWrap.querySelectorAll(
+      ".element-diff-modified, .element-diff-added, .element-diff-removed",
+    );
+    expect(highlighted.length).toBeGreaterThan(0);
+  });
+
+  test("marks removed elements with the removed diff class", async () => {
+    resetWorkspaceWithTab(); // Tab doc has one paragraph child
+    liveImpl = async (_gen, _doc, canvas) => {
+      // The diff walker treats the canvas itself as the root, so children sit at children/N
+      canvas.innerHTML = "";
+      canvas.append(document.createElement("p"));
+      return { elToPath: new WeakMap() };
+    };
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      // Current document dropped the paragraph → children/0 is "removed"
+      currentContent: JSON.stringify({ children: [], tagName: "div" }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "Hello" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".element-diff-removed")).not.toBeNull();
+  });
+
+  test("marks added elements with the added diff class", async () => {
+    resetWorkspaceWithTab();
+    liveImpl = async (_gen, _doc, canvas) => {
+      canvas.innerHTML = "";
+      canvas.append(document.createElement("p"), document.createElement("p"));
+      return { elToPath: new WeakMap() };
+    };
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      // Current document gained a second paragraph → children/1 is "added"
+      currentContent: JSON.stringify({
+        children: [
+          { tagName: "p", textContent: "Hello" },
+          { tagName: "p", textContent: "Extra" },
+        ],
+        tagName: "div",
+      }),
+      filePath: "/project/index.json",
+      originalContent: JSON.stringify({
+        children: [{ tagName: "p", textContent: "Hello" }],
+        tagName: "div",
+      }),
+    };
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".element-diff-added")).not.toBeNull();
+  });
+
+  test("unparseable JSON falls back to a parse-failure document", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      currentContent: "also not json",
+      filePath: "/project/index.json",
+      originalContent: "not json {",
+    };
+    renderCanvas();
+    await flush();
+    expect(canvasPanels[0].canvas?.textContent).toContain("Failed to parse");
+  });
+
+  test("format files parse diff content through the format host", async () => {
+    setFormats([MARKDOWN_FORMAT]);
+    resetWorkspaceWithTab();
+    canvasMode = "git-diff";
+    ctx.gitDiffState = {
+      currentContent: "# new",
+      filePath: "/project/post.md",
+      originalContent: "# old",
+    };
+    renderCanvas();
+    await flush();
+    expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# old");
+    expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# new");
+    expect(canvasPanels[0].canvas?.textContent).toContain("parsed-md");
+  });
+});
+
+// ─── Edit (content) mode ──────────────────────────────────────────────────────
+
+describe("edit mode", () => {
+  test("renders a centered column with the structural preview fallback", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+
+    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    expect(column).not.toBeNull();
+    expect(column.getAttribute("style")).toContain("max-width:320px");
+    expect(canvasWrap.querySelector(".content-edit-canvas")).not.toBeNull();
+    expect(canvasPanels.length).toBe(1);
+
+    const panel = canvasPanels[0] as unknown as CanvasPanel;
+    expect(panel.scrollContainer?.classList.contains("content-edit-canvas")).toBe(true);
+    expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
+    expect(registerPanelDnD).toHaveBeenCalled();
+    expect(registerPanelEvents).toHaveBeenCalled();
+    expect(overlaysRender).toHaveBeenCalled();
+    expect(updateForcedPseudoPreview).toHaveBeenCalled();
+  });
+
+  test("uses the document base width for the content column", async () => {
+    resetWorkspaceWithTab({
+      $media: { "--": "600px" },
+      children: [{ tagName: "p", textContent: "Hi" }],
+      tagName: "div",
+    } as never);
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+    const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
+    expect(column.getAttribute("style")).toContain("max-width:600px");
+  });
+});
+
+// ─── Live render success / failure ────────────────────────────────────────────
+
+describe("live render pipeline", () => {
+  test("successful live render marks the panel ready and stores the scope", async () => {
+    const tab = resetWorkspaceWithTab();
+    const scope = { elToPath: new WeakMap() };
+    liveImpl = async (_gen, _doc, canvas) => {
+      canvas.innerHTML = "<div><p>live</p></div>";
+      return scope;
+    };
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+
+    expect(tab.session.canvas.status).toBe("ready");
+    // The session tree is reactive, so the stored scope is a proxy wrapping the original
+    expect(tab.session.canvas.scope?.elToPath).toBeInstanceOf(WeakMap);
+    expect(tab.session.canvas.error).toBeNull();
+    expect(statusMessage).toHaveBeenCalledWith("Runtime render OK", 1500);
+    expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(true);
+  });
+
+  test("rejected live render falls back to the structural preview", async () => {
+    const tab = resetWorkspaceWithTab();
+    liveImpl = async () => {
+      throw new Error("runtime exploded");
+    };
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      canvasMode = "edit";
+      renderCanvas();
+      await flush();
+      expect(tab.session.canvas.status).toBe("ready");
+      expect(tab.session.canvas.scope).toBeNull();
+      const panel = canvasPanels[0] as unknown as CanvasPanel;
+      expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
+      expect(registerPanelEvents).toHaveBeenCalled();
+      expect(updateForcedPseudoPreview).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("registerPanelDnD failures in the fallback path are also caught", async () => {
+    resetWorkspaceWithTab();
+    liveImpl = async () => {
+      throw new Error("runtime exploded");
+    };
+    registerPanelDnD.mockImplementationOnce(() => {
+      throw new Error("dnd boom");
+    });
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      canvasMode = "edit";
+      renderCanvas();
+      await flush();
+      expect(warn.mock.calls.some((c) => String(c[0]).includes("registerPanelDnD failed"))).toBe(
+        true,
+      );
+      expect(registerPanelEvents).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("registerPanelDnD failures are caught and rendering continues", async () => {
+    resetWorkspaceWithTab();
+    registerPanelDnD.mockImplementationOnce(() => {
+      throw new Error("dnd boom");
+    });
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      canvasMode = "edit";
+      renderCanvas();
+      await flush();
+      expect(warn.mock.calls.some((c) => String(c[0]).includes("registerPanelDnD failed"))).toBe(
+        true,
+      );
+      expect(registerPanelEvents).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("stale successful renders bail without touching state", async () => {
+    const tab = resetWorkspaceWithTab();
+    let resolveLive: (v: Record<string, unknown> | null) => void = () => {};
+    liveImpl = () =>
+      new Promise((resolve) => {
+        resolveLive = resolve;
+      });
+    canvasMode = "edit";
+    renderCanvas();
+    view.renderGeneration += 1; // A newer render started
+    resolveLive({});
+    await flush();
+    expect(tab.session.canvas.status).toBe("idle");
+    expect(statusMessage).not.toHaveBeenCalled();
+    expect(registerPanelEvents).not.toHaveBeenCalled();
+  });
+
+  test("stale rejected renders bail without falling back", async () => {
+    resetWorkspaceWithTab();
+    let rejectLive: (e: Error) => void = () => {};
+    liveImpl = () =>
+      new Promise((_resolve, reject) => {
+        rejectLive = reject;
+      });
+    canvasMode = "edit";
+    renderCanvas();
+    view.renderGeneration += 1;
+    rejectLive(new Error("stale"));
+    await flush();
+    expect((canvasPanels[0] as unknown as CanvasPanel).canvas?.children.length).toBe(0);
+    expect(registerPanelEvents).not.toHaveBeenCalled();
+  });
+
+  test("processes a pending inline edit once the canvas is ready", async () => {
+    const tab = resetWorkspaceWithTab();
+    let target: HTMLElement | null = null;
+    liveImpl = async (_gen, _doc, canvas) => {
+      canvas.innerHTML = "";
+      const root = document.createElement("div");
+      target = document.createElement("p");
+      root.append(target);
+      canvas.append(root);
+      elToPath.set(target, ["children", 0]);
+      return { elToPath: new WeakMap() };
+    };
+    tab.session.ui.pendingInlineEdit = { mediaName: "", path: ["children", 0] } as never;
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+    expect(enterComponentInlineEdit).toHaveBeenCalledWith(target, ["children", 0]);
+    expect(tab.session.ui.pendingInlineEdit).toBeNull();
+  });
+
+  test("sweeps orphaned scoped style tags after a live render", async () => {
+    resetWorkspaceWithTab();
+    liveImpl = async () => ({ elToPath: new WeakMap() });
+
+    const orphan = document.createElement("style");
+    orphan.dataset.jxOwner = "orphan-uid";
+    document.head.append(orphan);
+    const live = document.createElement("style");
+    live.dataset.jxOwner = "live-uid";
+    document.head.append(live);
+    const owner = document.createElement("div");
+    owner.dataset.jx = "live-uid";
+    document.body.append(owner);
+
+    await withFastTimers(async (runPending) => {
+      canvasMode = "edit";
+      renderCanvas();
+      await flush();
+      await runPending();
+      expect(orphan.isConnected).toBe(false);
+      expect(live.isConnected).toBe(true);
+    });
+  });
+});
+
+// ─── Design / preview mode ────────────────────────────────────────────────────
+
+describe("design mode", () => {
+  test("renders a single full-width panel without media", async () => {
+    resetWorkspaceWithTab();
+    renderCanvas();
+    await flush();
+    expect(view.panzoomWrap).not.toBeNull();
+    expect(canvasPanels.length).toBe(1);
+    const panel = canvasPanels[0] as unknown as CanvasPanel;
+    expect(panel.element?.classList.contains("full-width")).toBe(true);
+    expect(canvasWrap.querySelector(".canvas-panel-header")).toBeNull();
+    expect(view.panzoomWrap?.style.transform).toContain("scale(1)");
+    expect(document.querySelector(".zoom-indicator")).not.toBeNull();
+    expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
+  });
+
+  test("renders a labeled base panel when a custom base width is set", async () => {
+    resetWorkspaceWithTab({
+      $media: { "--": "600px" },
+      children: [{ tagName: "p", textContent: "Hello" }],
+      tagName: "div",
+    } as never);
+    renderCanvas();
+    await flush();
+    const panel = canvasPanels[0] as unknown as CanvasPanel;
+    expect(panel.mediaName).toBe("base");
+    expect(panel.element?.querySelector(".canvas-panel-header")?.textContent?.trim()).toBe(
+      "Base (600px)",
+    );
+    expect(panel.viewport?.style.width).toBe("600px");
+  });
+
+  test("renders one panel per breakpoint plus base", async () => {
+    resetWorkspaceWithTab({
+      $media: { "--": "320px", md: "(min-width: 768px)" },
+      children: [{ tagName: "p", textContent: "Hello" }],
+      tagName: "div",
+    } as never);
+    renderCanvas();
+    await flush();
+
+    expect(canvasPanels.length).toBe(2);
+    const headers = [...canvasWrap.querySelectorAll(".canvas-panel-header")].map((h) =>
+      h.textContent?.trim(),
+    );
+    expect(headers).toEqual(["Base (320px)", "Md (768px)"]);
+    // Base panel header is highlighted when activeMedia is null
+    expect(
+      canvasPanels[0].element?.querySelector(".canvas-panel-header")?.classList.contains("active"),
+    ).toBe(true);
+    // Both panels rendered content (second one via deferred setTimeout)
+    for (const panel of canvasPanels as unknown as CanvasPanel[]) {
+      expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
+    }
+    expect((canvasPanels[1] as unknown as CanvasPanel).activeBreakpoints?.has("md")).toBe(true);
+  });
+
+  test("mode transitions run cleanup callbacks and stop panel scopes", () => {
+    resetWorkspaceWithTab();
+    const dndCleanup = mock(() => {});
+    const eventCleanup = mock(() => {});
+    const stop = mock(() => {});
+    const disconnect = mock(() => {});
+    view.canvasDndCleanups = [dndCleanup];
+    view.canvasEventCleanups = [eventCleanup];
+    view.centerObserver = { disconnect } as never;
+    canvasPanels.push({ renderScope: { stop } } as never);
+
+    renderCanvas();
+    expect(dndCleanup).toHaveBeenCalled();
+    expect(eventCleanup).toHaveBeenCalled();
+    expect(stop).toHaveBeenCalled();
+    expect(disconnect).toHaveBeenCalled();
+    expect(view.canvasDndCleanups).toEqual([]);
+    expect(view.canvasEventCleanups).toEqual([]);
+  });
+});
+
+// ─── Stylebook mode ───────────────────────────────────────────────────────────
+
+describe("stylebook mode", () => {
+  test("first render delegates to renderStylebookMode with canvas helpers", () => {
+    resetWorkspaceWithTab();
+    canvasMode = "stylebook";
+    renderCanvas();
+    expect(renderStylebookMode).toHaveBeenCalledTimes(1);
+    const helpers = renderStylebookMode.mock.calls[0][0] as Record<string, unknown>;
+    for (const key of [
+      "applyTransform",
+      "canvasPanelTemplate",
+      "effectiveZoom",
+      "observeCenterUntilStable",
+      "overlayBoxDescriptor",
+      "renderZoomIndicator",
+      "updateActivePanelHeaders",
+    ]) {
+      expect(typeof helpers[key]).toBe("function");
+    }
+  });
+
+  test("re-render with unchanged filters takes the style-refresh fast path", () => {
+    resetWorkspaceWithTab();
+    canvasMode = "stylebook";
+    renderCanvas();
+    renderCanvas();
+    expect(refreshStylebookStyles).toHaveBeenCalledTimes(1);
+    expect(renderStylebookMode).toHaveBeenCalledTimes(1);
+  });
+
+  test("filter changes force a full stylebook re-render", () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "stylebook";
+    renderCanvas();
+    tab.session.ui.stylebookFilter = "head";
+    renderCanvas();
+    expect(renderStylebookMode).toHaveBeenCalledTimes(2);
+    expect(refreshStylebookStyles).not.toHaveBeenCalled();
+  });
+
+  test("customized-only toggle also forces a full re-render", () => {
+    const tab = resetWorkspaceWithTab();
+    canvasMode = "stylebook";
+    renderCanvas();
+    tab.session.ui.stylebookCustomizedOnly = true;
+    renderCanvas();
+    expect(renderStylebookMode).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ─── scheduleCanvasRender ─────────────────────────────────────────────────────
+
+describe("scheduleCanvasRender", () => {
+  test("dedupes concurrent schedule requests into one render", async () => {
+    setProjectState(null);
+    scheduleCanvasRender();
+    scheduleCanvasRender();
+    await rafTurn();
+    await flush();
+    expect(renderWelcome).toHaveBeenCalledTimes(1);
+  });
+
+  test("catches renderCanvas errors inside the frame callback", async () => {
+    resetWorkspaceWithTab();
+    canvasModeFn = () => {
+      throw new Error("mode lookup failed");
+    };
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      scheduleCanvasRender();
+      await rafTurn();
+      await flush();
+      expect(error.mock.calls.some((c) => String(c[0]).includes("renderCanvas error"))).toBe(true);
+    } finally {
+      error.mockRestore();
+    }
+  });
+});
+
+// ─── applyCanvasMediaOverrides / renderOverlays ───────────────────────────────
+
+describe("applyCanvasMediaOverrides", () => {
+  test("no-op when no breakpoints are active", () => {
+    resetWorkspaceWithTab();
+    const el = document.createElement("div");
+    expect(() => applyCanvasMediaOverrides(el, new Set())).not.toThrow();
+  });
+
+  test("no-op when there is no active tab", () => {
+    closeAllTabs();
+    const el = document.createElement("div");
+    expect(() => applyCanvasMediaOverrides(el, new Set(["md"]))).not.toThrow();
+  });
+
+  test("collects conditions for active breakpoints from the document media map", () => {
+    resetWorkspaceWithTab({
+      $media: { md: "(min-width: 768px)" },
+      children: [],
+      tagName: "div",
+    } as never);
+    const el = document.createElement("div");
+    expect(() => applyCanvasMediaOverrides(el, new Set(["md", "unknown"]))).not.toThrow();
+  });
+});
+
+describe("renderOverlays", () => {
+  test("delegates to the overlays panel renderer", () => {
+    renderOverlays();
+    expect(overlaysRender).toHaveBeenCalled();
+  });
+});

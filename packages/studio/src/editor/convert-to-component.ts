@@ -8,6 +8,7 @@ import { activeTab } from "../workspace/workspace";
 import { transact } from "../tabs/transact";
 import { componentRegistry, computeRelativePath, loadComponentRegistry } from "../files/components";
 import { getPlatform } from "../platform";
+import { jsonClone } from "../utils/studio-utils";
 import { statusMessage } from "../panels/statusbar";
 import { showDialog } from "../ui/layers";
 
@@ -102,7 +103,9 @@ function deriveDefaultName(node: JxMutableNode) {
  * @returns {JxMutableNode}
  */
 function extractComponentDef(node: JxMutableNode) {
-  const clone = structuredClone(node);
+  // JsonClone, not structuredClone: the selected node is a @vue/reactivity proxy,
+  // Which structuredClone rejects with DataCloneError.
+  const clone = jsonClone(node);
   delete clone.$id;
   delete clone.$layout;
   delete clone.$paths;

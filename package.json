@@ -37,6 +37,7 @@
     "test": "bun test --isolate",
     "test:workspaces": "bun run --workspaces test --isolate",
     "test:coverage": "bun test --isolate --coverage",
+    "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsgo",
     "typecheck:legacy": "tsc",
     "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces upgrade"
