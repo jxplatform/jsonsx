@@ -120,13 +120,80 @@ export function scheduleCanvasRender() {
   });
 }
 
+/**
+ * Eject canvasWrap's DOM and Lit render part together. Setting textContent/innerHTML removes the
+ * comment nodes Lit uses as a ChildPart's markers; if the private `_$litPart$` reference is left
+ * behind, the next litRender() reuses a part whose markers are detached from the DOM and throws
+ * "This `ChildPart` has no `parentNode`…". Always eject the markers through this helper so the two
+ * operations can never drift apart.
+ */
+function hardClearCanvasWrap() {
+  canvasWrap.textContent = "";
+  // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
+  delete canvasWrap["_$litPart$"];
+}
+
+/**
+ * Tear the canvas all the way back down to a pristine state. Invoked whenever there is no active
+ * tab (e.g. every tab was closed) so the canvas can never get wedged in a half-initialized state:
+ * open editors and observers are disposed, outgoing panel scopes stopped, pending cleanups run, the
+ * Lit render part is ejected cleanly, inline style overrides reset, and `prevCanvasMode` cleared so
+ * the very next render is treated as a fresh mode transition and rebuilds the surface from
+ * scratch.
+ */
+function resetCanvasView() {
+  if (view.functionEditor) {
+    view.functionEditor.dispose();
+    view.functionEditor = null;
+  }
+  if (view.monacoEditor) {
+    view.monacoEditor.getModel()?.dispose();
+    view.monacoEditor.dispose();
+    view.monacoEditor = null;
+  }
+  if (view.centerObserver) {
+    view.centerObserver.disconnect();
+    view.centerObserver = null;
+  }
+  for (const fn of view.canvasDndCleanups) {
+    fn();
+  }
+  view.canvasDndCleanups = [];
+  for (const fn of view.canvasEventCleanups) {
+    fn();
+  }
+  view.canvasEventCleanups = [];
+  for (const p of canvasPanels) {
+    p.renderScope?.stop();
+    p.renderScope = null;
+  }
+  canvasPanels.length = 0;
+
+  hardClearCanvasWrap();
+
+  view.panzoomWrap = null;
+  canvasWrap.style.padding = "";
+  canvasWrap.style.alignItems = "";
+  canvasWrap.style.flexDirection = "";
+  canvasWrap.style.display = "";
+  canvasWrap.style.overflow = "";
+  resetZoomIndicator();
+  dismissBlockActionBar();
+  dismissLinkPopover();
+  dismissContextMenu();
+  dismissSlashMenu();
+  view.prevCanvasMode = null;
+}
+
 export function renderCanvas() {
   const tab = activeTab.value;
   if (!tab) {
+    // No active tab — reset every piece of canvas view state so reopening a file can never inherit
+    // A stale Lit part, a dead Monaco editor, or a mismatched prevCanvasMode (the toxic states that
+    // Previously left the canvas unrenderable until a full reload).
+    resetCanvasView();
     if (!projectState) {
       renderWelcome(canvasWrap);
-    } else {
-      canvasWrap.textContent = "";
     }
     return;
   }
@@ -151,9 +218,7 @@ export function renderCanvas() {
   // RenderCanvasLive uses atomic clear (innerHTML = "" right before appendChild).
   // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
   if (modeChanged && canvasWrap["_$litPart$"]) {
-    canvasWrap.textContent = "";
-    // @ts-expect-error -- _$litPart$ is Lit's private render-part marker, not in the DOM types
-    delete canvasWrap["_$litPart$"];
+    hardClearCanvasWrap();
   }
 
   // Function editor mode: editing a function body in Monaco (JS)

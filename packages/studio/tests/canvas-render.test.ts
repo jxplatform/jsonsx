@@ -340,6 +340,92 @@ describe("renderCanvas without a tab", () => {
   });
 });
 
+// ─── Close-all / reopen lifecycle (toxic-state regression) ────────────────────
+
+describe("tab close/reopen lifecycle", () => {
+  /** Read Lit's private render-part marker without tripping noImplicitAny. */
+  const litPart = () => (canvasWrap as unknown as Record<string, unknown>)["_$litPart$"];
+
+  test("reopening after closing all tabs re-renders without a dangling Lit part", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+    expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
+    // CanvasWrap now owns a Lit render part
+    expect(litPart()).toBeDefined();
+
+    // Closing every tab must eject the part along with the DOM — not just the DOM. Leaving the part
+    // Behind is what previously made the next litRender throw "ChildPart has no parentNode".
+    closeAllTabs();
+    renderCanvas();
+    expect(canvasWrap.textContent).toBe("");
+    expect(litPart()).toBeUndefined();
+    expect(view.prevCanvasMode).toBeNull();
+
+    // Reopening must render cleanly rather than crashing the canvas into an unusable state.
+    resetWorkspaceWithTab();
+    canvasMode = "edit";
+    expect(() => renderCanvas()).not.toThrow();
+    await flush();
+    expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
+  });
+
+  test("closing all tabs while in source mode disposes the monaco editor", async () => {
+    resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    const [editor] = createdEditors;
+    const [model] = createdModels;
+    expect(view.monacoEditor).toBe(editor as never);
+
+    closeAllTabs();
+    renderCanvas();
+    expect(editor.dispose).toHaveBeenCalled();
+    expect(model.dispose).toHaveBeenCalled();
+    expect(view.monacoEditor).toBeNull();
+
+    // Reopening source mode builds a fresh editor instead of writing into the dead, detached one.
+    resetWorkspaceWithTab();
+    canvasMode = "source";
+    renderCanvas();
+    await flush();
+    expect(createdEditors.length).toBe(2);
+    expect(view.monacoEditor).toBe(createdEditors[1] as never);
+  });
+
+  test("clearing to the no-tab state disposes observers, editors, scopes, and cleanups", () => {
+    resetWorkspaceWithTab();
+    const dndCleanup = mock(() => {});
+    const eventCleanup = mock(() => {});
+    const stop = mock(() => {});
+    const disconnect = mock(() => {});
+    const fnDispose = mock(() => {});
+    view.canvasDndCleanups = [dndCleanup];
+    view.canvasEventCleanups = [eventCleanup];
+    view.centerObserver = { disconnect } as never;
+    view.functionEditor = { dispose: fnDispose } as never;
+    view.prevCanvasMode = "design";
+    canvasPanels.push({ renderScope: { stop } } as never);
+
+    closeAllTabs();
+    renderCanvas();
+
+    expect(dndCleanup).toHaveBeenCalled();
+    expect(eventCleanup).toHaveBeenCalled();
+    expect(stop).toHaveBeenCalled();
+    expect(disconnect).toHaveBeenCalled();
+    expect(fnDispose).toHaveBeenCalled();
+    expect(view.functionEditor).toBeNull();
+    expect(view.centerObserver).toBeNull();
+    expect(view.canvasDndCleanups).toEqual([]);
+    expect(view.canvasEventCleanups).toEqual([]);
+    expect(canvasPanels.length).toBe(0);
+    expect(view.prevCanvasMode).toBeNull();
+  });
+});
+
 // ─── Function editor ──────────────────────────────────────────────────────────
 
 describe("function editor dispatch", () => {

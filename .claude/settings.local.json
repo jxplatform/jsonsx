@@ -1,9 +1,10 @@
 {
+  "enableWorkflows": true,
   "permissions": {
     "allow": [
       "Bash(*)",
       "Edit",
-      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools-nixos__new_page",
       "mcp__chrome-devtools-nixos__click",
       "mcp__chrome-devtools-nixos__drag",
       "mcp__chrome-devtools-nixos__evaluate_script",
@@ -15,12 +16,24 @@
       "mcp__chrome-devtools-nixos__resize_page",
       "mcp__chrome-devtools-nixos__take_screenshot",
       "mcp__chrome-devtools-nixos__take_snapshot",
+      "mcp__chrome-devtools-nixos__press_key",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__drag",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__press_key",
       "PowerShell(*)",
       "WebFetch(*)",
       "WebSearch",
-      "Write",
-      "mcp__chrome-devtools-nixos__press_key"
+      "Write"
     ]
-  },
-  "enableWorkflows": true
+  }
 }
