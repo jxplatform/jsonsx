@@ -1,11 +1,22 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f package.json ] && grep -q '\"nano-staged\"' package.json; then bun .claude/hooks/pre-bash.js; fi"
+          }
+        ]
+      }
+    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f package.json ] && grep -q '\"nano-staged\"' package.json; then bunx nano-staged --unstaged --quiet --bail || exit 2; fi"
+            "command": "if [ -f package.json ] && grep -q '\"nano-staged\"' package.json; then bunx nano-staged --unstaged --quiet || exit 2; fi"
           }
         ]
       }
