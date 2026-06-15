@@ -1,0 +1,26 @@
+{
+  "$layout": "./base.json",
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "padding": "1rem", "backgroundColor": "#eee", "borderBottom": "1px solid #ddd" },
+      "children": [
+        {
+          "tagName": "span",
+          "textContent": "${$site.name}",
+          "style": { "fontWeight": "bold", "marginRight": "1rem" }
+        },
+        {
+          "tagName": "span",
+          "textContent": " > ${$page.title}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "padding": "2rem" },
+      "children": [{ "tagName": "slot" }]
+    }
+  ]
+}

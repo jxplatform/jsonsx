@@ -1,0 +1,53 @@
+{
+  "$schema": "../../packages/schema/schema.json",
+  "$id": "UserProfile",
+  "$defs": {
+    "Address": {
+      "type": "object",
+      "properties": {
+        "city": { "type": "string" },
+        "country": { "type": "string" }
+      },
+      "required": ["city", "country"]
+    },
+    "ProfileData": {
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "address": { "$ref": "#/$defs/Address" }
+      },
+      "required": ["username", "email"]
+    }
+  },
+  "state": {
+    "profile": {
+      "type": { "$ref": "#/$defs/ProfileData" },
+      "default": {
+        "username": "alice",
+        "email": "alice@example.com",
+        "address": { "city": "New York", "country": "USA" }
+      }
+    }
+  },
+  "tagName": "div",
+  "style": {
+    "padding": "1.5em",
+    "border": "1px solid #ccc",
+    "borderRadius": "6px"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "textContent": "User: ${state.profile.username}"
+    },
+    {
+      "tagName": "p",
+      "textContent": "Email: ${state.profile.email}"
+    },
+    {
+      "tagName": "p",
+      "textContent": "Location: ${state.profile.address.city}, ${state.profile.address.country}"
+    }
+  ]
+}

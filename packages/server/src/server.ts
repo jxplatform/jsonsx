@@ -19,6 +19,7 @@ import { createWatcher, injectSSE } from "./watch.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { handleStudioApi } from "./studio-api.ts";
 import { handleCodeApi } from "./code-api.ts";
+import { handleAiApi } from "./ai-api.js";
 import { existsSync, readFileSync } from "node:fs";
 
 /**
@@ -250,6 +251,12 @@ export async function createDevServer(options: {
           // Always store as absolute path
           activeProjectRoot = raw ? resolve(absRoot, raw) : null;
           return Response.json({ ok: true, root: activeProjectRoot });
+        }
+
+        // AI proxy endpoints (/__studio/ai/chat, /__studio/ai/models)
+        const aiRes = await handleAiApi(req, url);
+        if (aiRes) {
+          return aiRes;
         }
 
         const codeRes = await handleCodeApi(req, url);

@@ -1,0 +1,50 @@
+{
+  "title": "${state.post.frontmatter.title} — Jx Examples",
+  "$layout": "../../layouts/example.json",
+  "imports": {
+    "Markdown": "../../packages/parser/Markdown.class.json"
+  },
+  "$paths": {
+    "contentType": "posts",
+    "param": "slug"
+  },
+  "state": {
+    "post": {
+      "$prototype": "Markdown",
+      "src": "../../content/posts/${$params.slug}.md"
+    }
+  },
+  "children": [
+    {
+      "tagName": "article",
+      "style": { "maxWidth": "800px", "margin": "0 auto", "padding": "2rem" },
+      "children": [
+        {
+          "tagName": "a",
+          "href": "/advanced/markdown-blog",
+          "textContent": "← Back to Blog List",
+          "style": {
+            "display": "inline-block",
+            "marginBottom": "1rem",
+            "color": "#0066cc",
+            "textDecoration": "none"
+          }
+        },
+        {
+          "tagName": "h1",
+          "textContent": "${state.post.frontmatter.title}",
+          "style": { "fontSize": "2.5rem", "marginBottom": "0.5rem" }
+        },
+        {
+          "tagName": "time",
+          "textContent": "Published on ${state.post.frontmatter.date}",
+          "style": { "color": "#666", "display": "block", "marginBottom": "2rem" }
+        },
+        {
+          "tagName": "div",
+          "children": "${state.post.$children ?? []}"
+        }
+      ]
+    }
+  ]
+}

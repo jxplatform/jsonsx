@@ -511,6 +511,10 @@ export function createDesktopPlatform() {
     async aiDeleteSession(id: string) {
       await rpc.request.aiDeleteSession({ id });
     },
+    // Stack B: same-origin proxy mounted by the Electrobun local AI server (handleAiApi).
+    aiChatUrl() {
+      return "/__studio/ai/chat";
+    },
   };
 }
 

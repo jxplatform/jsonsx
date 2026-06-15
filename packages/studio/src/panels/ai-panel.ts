@@ -10,6 +10,20 @@ import { ref } from "lit-html/directives/ref.js";
 import quikchat from "quikchat/md";
 import { getPlatform } from "../platform";
 import { reloadFileInTab } from "../files/files";
+import { effect, effectScope } from "../reactivity";
+import { createDocumentAssistant } from "../services/document-assistant";
+import {
+  getBaseUrl,
+  getOpenAiKey,
+  hasOpenAiKey,
+  setBaseUrl,
+  setOpenAiKey,
+} from "../services/ai-settings";
+
+import type { EffectScope } from "@vue/reactivity";
+
+/** Which agent backs the panel. "assistant" (Stack B, canonical) is the default. */
+type AiMode = "assistant" | "dev-agent";
 
 // ─── State (module-level, persists across tab switches) ─────────────────────
 
@@ -58,6 +72,22 @@ let currentStreamMsgId = null as number | null;
 let streamStarted = false;
 const pendingFileReloads = new Set<string>();
 
+// ─── Mode (Stack B "assistant" default, Stack A "dev-agent" optional) ───────
+
+let mode: AiMode = "assistant";
+
+/** Whether the OpenAI key form is showing (gate when no key, or re-edit via the toolbar). */
+let keyEditing = false;
+let keyDraft = "";
+let baseUrlDraft = "";
+
+/** Stack B (document AST assistant) session — created lazily, persists across tab switches. */
+const assistant = createDocumentAssistant();
+let assistantScope: EffectScope | null = null;
+let assistantRenderedCount = 0;
+let assistantStreamingMsgId = null as number | null;
+let assistantStreamedLen = 0;
+
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 export function mountAiPanel() {
@@ -98,7 +128,11 @@ export function mountQuikChat() {
   chatInstance = new QuikChat(
     container,
     (_chat: unknown, msg: string) => {
-      void handleUserSend(msg);
+      if (mode === "assistant") {
+        handleAssistantSend(msg);
+      } else {
+        void handleUserSend(msg);
+      }
     },
     {
       messagesArea: { alternating: false },
@@ -109,11 +143,239 @@ export function mountQuikChat() {
   );
   chatContainerEl = container;
 
+  if (mode === "assistant") {
+    assistantRenderedCount = 0;
+    assistantStreamingMsgId = null;
+    assistantStreamedLen = 0;
+    replayAssistantMessages();
+    watchAssistant();
+    if (assistant.chatState.status === "streaming") {
+      chatInstance?.inputAreaSetEnabled(false);
+    }
+    return;
+  }
+
   replayMessages();
 
   if (streaming) {
     chatInstance?.inputAreaSetEnabled(false);
   }
+}
+
+/**
+ * Switch between the Stack B document assistant and the Stack A dev agent. Tears down the current
+ * QuikChat instance so the next mount wires up the right send handler and history.
+ *
+ * @param {AiMode} next
+ */
+function setMode(next: AiMode) {
+  if (mode === next) {
+    return;
+  }
+  mode = next;
+  chatInstance = null;
+  chatContainerEl = null;
+  assistantScope?.stop();
+  assistantScope = null;
+  rerenderPanel();
+}
+
+// ─── OpenAI key settings (Stack B) ──────────────────────────────────────────
+
+/** Open the key form, pre-filled with the current settings. */
+function startEditApiKey() {
+  keyDraft = getOpenAiKey();
+  baseUrlDraft = getBaseUrl();
+  keyEditing = true;
+  rerenderPanel();
+}
+
+/** Persist the drafted key + endpoint and return to the chat. */
+function saveApiKey() {
+  setOpenAiKey(keyDraft);
+  setBaseUrl(baseUrlDraft);
+  keyDraft = "";
+  baseUrlDraft = "";
+  keyEditing = false;
+  rerenderPanel();
+}
+
+/** Dismiss the key form without saving (only offered when a key already exists). */
+function cancelEditApiKey() {
+  keyDraft = "";
+  baseUrlDraft = "";
+  keyEditing = false;
+  rerenderPanel();
+}
+
+/** The OpenAI (or compatible) key + endpoint settings form, shown as a gate when no key is set. */
+function renderKeyGate() {
+  const haveKey = hasOpenAiKey();
+  return html`
+    <div class="ai-tab-body">
+      <div class="ai-status-center" style="gap:10px;max-width:320px;text-align:left">
+        <div style="font-weight:600;align-self:center">AI provider key</div>
+        <div style="font-size:11px;color:var(--spectrum-global-color-gray-600)">
+          Any OpenAI-compatible key works. Stored locally in this browser; sent only to the Studio
+          proxy (never to a third party except your chosen endpoint).
+        </div>
+        <input
+          type="password"
+          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+          placeholder="sk-… or any compatible key"
+          .value=${keyDraft}
+          @input=${(e: Event) => {
+            keyDraft = (e.target as HTMLInputElement).value;
+          }}
+        />
+        <input
+          type="text"
+          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+          placeholder="Endpoint (optional, e.g. http://localhost:11434/v1)"
+          .value=${baseUrlDraft}
+          @input=${(e: Event) => {
+            baseUrlDraft = (e.target as HTMLInputElement).value;
+          }}
+        />
+        <div style="display:flex;gap:8px;align-self:flex-end">
+          ${haveKey
+            ? html`<sp-button size="s" variant="secondary" @click=${cancelEditApiKey}
+                >Cancel</sp-button
+              >`
+            : nothing}
+          <sp-button size="s" variant="primary" @click=${saveApiKey}>Save</sp-button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Stack B (document assistant) rendering ─────────────────────────────────
+
+/** Send a message through the Stack B document assistant agent loop. */
+function handleAssistantSend(text: string) {
+  if (!text.trim() || assistant.chatState.status === "streaming") {
+    return;
+  }
+  chatInstance?.inputAreaSetEnabled(false);
+  void assistant.sendMessage(text);
+}
+
+/** Render a single finalized chat-state message into QuikChat. */
+function renderAssistantMessage(msg: {
+  role: string;
+  content: string;
+  toolCalls?: { name: string; arguments: string }[];
+}) {
+  if (!chatInstance) {
+    return;
+  }
+  if (msg.role === "user") {
+    chatInstance.messageAddNew(msg.content, "You", "right", "user");
+    return;
+  }
+  if (msg.role === "tool") {
+    // Raw tool results are hidden from the user (spec §3.1).
+    return;
+  }
+  if (msg.content) {
+    chatInstance.messageAddNew(msg.content, "", "left", "assistant");
+  }
+  for (const tc of msg.toolCalls ?? []) {
+    chatInstance.messageAddNew(formatAssistantToolLabel(tc), "", "left", "tool");
+  }
+}
+
+/** Replay the assistant's existing history into a freshly mounted QuikChat instance. */
+function replayAssistantMessages() {
+  assistantRenderedCount = 0;
+  assistantStreamingMsgId = null;
+  assistantStreamedLen = 0;
+  const msgs = assistant.chatState.messages;
+  const isStreaming = assistant.chatState.status === "streaming";
+  // Render every message except a still-streaming trailing assistant message.
+  const lastIdx = msgs.length - 1;
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (isStreaming && i === lastIdx && m.role === "assistant") {
+      break;
+    }
+    renderAssistantMessage(m);
+    assistantRenderedCount = i + 1;
+  }
+}
+
+/**
+ * Reactively sync the assistant's chat-state into QuikChat. Newly-finalized messages are appended;
+ * the in-progress streaming message is updated incrementally so text flows token-by-token.
+ */
+function watchAssistant() {
+  assistantScope?.stop();
+  assistantScope = effectScope();
+  assistantScope.run(() => {
+    effect(() => {
+      const cs = assistant.chatState;
+      const msgs = cs.messages;
+      const { status } = cs;
+      if (!chatInstance) {
+        return;
+      }
+
+      const lastIdx = msgs.length - 1;
+      for (let i = assistantRenderedCount; i < msgs.length; i++) {
+        const m = msgs[i];
+        const isStreamingTail = status === "streaming" && i === lastIdx && m.role === "assistant";
+        if (isStreamingTail) {
+          // Stream this message's text into a live bubble rather than finalizing it.
+          if (assistantStreamingMsgId == null) {
+            assistantStreamingMsgId = chatInstance.messageAddNew(
+              m.content || "",
+              "",
+              "left",
+              "assistant",
+            );
+            assistantStreamedLen = (m.content || "").length;
+          } else if ((m.content || "").length > assistantStreamedLen) {
+            chatInstance.messageAppendContent(
+              assistantStreamingMsgId,
+              m.content.slice(assistantStreamedLen),
+            );
+            assistantStreamedLen = m.content.length;
+          }
+          break;
+        }
+        renderAssistantMessage(m);
+        assistantRenderedCount = i + 1;
+        assistantStreamingMsgId = null;
+        assistantStreamedLen = 0;
+      }
+
+      if (status !== "streaming") {
+        assistantStreamingMsgId = null;
+        assistantStreamedLen = 0;
+        chatInstance.inputAreaSetEnabled(true);
+        if (cs.error) {
+          chatInstance.messageAddNew(`Error: ${cs.error}`, "", "left", "assistant");
+        }
+      }
+    });
+  });
+}
+
+/** @param {{ name: string; arguments: string }} tc */
+function formatAssistantToolLabel(tc: { name: string; arguments: string }) {
+  let detail = "";
+  try {
+    const args = tc.arguments ? JSON.parse(tc.arguments) : {};
+    if (Array.isArray(args.path)) {
+      detail = `: ${JSON.stringify(args.path)}`;
+    } else if (Array.isArray(args.parentPath)) {
+      detail = `: ${JSON.stringify(args.parentPath)}`;
+    }
+  } catch {
+    /* Partial/unparsed args — show name only */
+  }
+  return `🔧 ${tc.name}${detail}`;
 }
 
 function replayMessages() {
@@ -201,6 +463,10 @@ async function handleUserSend(text: string) {
 }
 
 function stop() {
+  if (mode === "assistant") {
+    assistant.stop();
+    return;
+  }
   if (!sessionId) {
     return;
   }
@@ -210,6 +476,18 @@ function stop() {
 }
 
 function newChat() {
+  if (mode === "assistant") {
+    assistant.newChat();
+    assistantRenderedCount = 0;
+    assistantStreamingMsgId = null;
+    assistantStreamedLen = 0;
+    if (chatInstance) {
+      chatInstance.historyImport([]);
+      chatInstance.inputAreaSetEnabled(true);
+    }
+    rerenderPanel();
+    return;
+  }
   if (sessionId) {
     const plat = getPlatform();
     void plat.aiDeleteSession(sessionId);
@@ -445,13 +723,15 @@ function truncate(s: string, max: number) {
 
 /** @returns {import("lit-html").TemplateResult} */
 export function renderAiPanelTemplate() {
-  if (authStatus === "checking" || authStatus === "unknown") {
+  // The Claude auth gate only applies to the Stack A "dev-agent" mode; the Stack B document
+  // Assistant authenticates via the AI proxy (OpenAI key), not Claude login.
+  if (mode === "dev-agent" && (authStatus === "checking" || authStatus === "unknown")) {
     return html`<div class="ai-tab-body">
       <div class="ai-status-center">Checking authentication...</div>
     </div>`;
   }
 
-  if (authStatus === "unauthenticated") {
+  if (mode === "dev-agent" && authStatus === "unauthenticated") {
     return html`
       <div class="ai-tab-body">
         <div class="ai-status-center">
@@ -472,16 +752,39 @@ export function renderAiPanelTemplate() {
     `;
   }
 
+  // Stack B gate: the document assistant needs an OpenAI-compatible key (or the server env var).
+  if (mode === "assistant" && (!hasOpenAiKey() || keyEditing)) {
+    return renderKeyGate();
+  }
+
+  const busy = mode === "assistant" ? assistant.chatState.status === "streaming" : streaming;
+
   return html`
     <div class="ai-tab-body">
       <div class="ai-toolbar">
-        ${streaming
-          ? html`<sp-action-button size="xs" @click=${stop}>Stop</sp-action-button>`
-          : nothing}
+        <sp-action-group size="xs" selects="single" compact>
+          <sp-action-button ?selected=${mode === "assistant"} @click=${() => setMode("assistant")}>
+            Assistant
+          </sp-action-button>
+          <sp-action-button ?selected=${mode === "dev-agent"} @click=${() => setMode("dev-agent")}>
+            Dev Agent
+          </sp-action-button>
+        </sp-action-group>
+        ${busy ? html`<sp-action-button size="xs" @click=${stop}>Stop</sp-action-button>` : nothing}
         <sp-action-button size="xs" quiet @click=${newChat}>
           <sp-icon-add slot="icon"></sp-icon-add>
           New Chat
         </sp-action-button>
+        ${mode === "assistant"
+          ? html`<sp-action-button
+              size="xs"
+              quiet
+              title="API key & endpoint"
+              @click=${startEditApiKey}
+            >
+              🔑
+            </sp-action-button>`
+          : nothing}
       </div>
       <div
         id="ai-quikchat"

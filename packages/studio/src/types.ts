@@ -220,6 +220,8 @@ export interface StudioPlatform {
   aiStreamUrl: (id: string) => string | Promise<string>;
   aiStopSession: (id: string) => Promise<void>;
   aiDeleteSession: (id: string) => Promise<void>;
+  /** Stack B (canonical document assistant): URL of the OpenAI-compatible SSE chat proxy. */
+  aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
   /** Open a project in a new window, focusing an existing window if it is already open. */
   openProjectInNewWindow?: (root: string) => Promise<void>;

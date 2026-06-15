@@ -842,5 +842,12 @@ export function createDevServerPlatform() {
     async aiDeleteSession(id: string) {
       await fetch(`/__studio/ai/session/${id}`, { method: "DELETE" });
     },
+
+    // ─── Stack B (document assistant) ──────────────────────────────────────
+
+    /** Same-origin OpenAI-compatible SSE chat proxy mounted by @jxsuite/server. */
+    aiChatUrl() {
+      return "/__studio/ai/chat";
+    },
   };
 }

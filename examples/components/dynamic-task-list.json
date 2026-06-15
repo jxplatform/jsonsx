@@ -1,0 +1,33 @@
+{
+  "$schema": "../../packages/schema/schema.json",
+  "$id": "DynamicTaskList",
+  "tagName": "dynamic-task-list",
+  "$elements": [{ "$ref": "./task-item.json" }],
+  "state": {
+    "tasks": [
+      { "id": 1, "text": "Task A", "done": false },
+      { "id": 2, "text": "Task B", "done": true }
+    ]
+  },
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "h2",
+      "textContent": "My Dynamic Task List"
+    },
+    {
+      "tagName": "div",
+      "children": {
+        "$prototype": "Array",
+        "items": { "$ref": "#/state/tasks" },
+        "map": {
+          "$component": "task-item",
+          "$props": {
+            "task": { "$ref": "$map/item" },
+            "tasks": { "$ref": "#/state/tasks" }
+          }
+        }
+      }
+    }
+  ]
+}

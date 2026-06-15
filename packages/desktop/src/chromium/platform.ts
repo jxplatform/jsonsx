@@ -297,5 +297,9 @@ export function createDesktopPlatform(): StudioPlatform {
     async aiDeleteSession(id: string) {
       await fetch(`/studio/ai/session/${id}`, { method: "DELETE" });
     },
+    // Stack B: same-origin OpenAI-compatible chat proxy.
+    aiChatUrl() {
+      return "/studio/ai/chat";
+    },
   };
 }
