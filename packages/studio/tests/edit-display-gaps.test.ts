@@ -65,6 +65,18 @@ describe("computeEmptyPlaceholderClass", () => {
     expect(computeEmptyPlaceholderClass({ tagName: "img" } as JxMutableNode)).toBeNull();
   });
 
+  test("layout-originated empty text tag returns null", () => {
+    expect(
+      computeEmptyPlaceholderClass({ $__layout: true, tagName: "span" } as JxMutableNode),
+    ).toBeNull();
+  });
+
+  test("layout-originated empty container tag returns null", () => {
+    expect(
+      computeEmptyPlaceholderClass({ $__layout: true, tagName: "div" } as JxMutableNode),
+    ).toBeNull();
+  });
+
   test("exported placeholder class list matches the two classes", () => {
     expect([...EMPTY_PLACEHOLDER_CLASSES]).toEqual([
       "empty-text-placeholder",
@@ -343,5 +355,28 @@ describe("prepareForEditMode empty placeholders", () => {
   test("empty container without className gets bare placeholder class", () => {
     const out = prep({ tagName: "section" });
     expect(out.className).toBe("empty-container-placeholder");
+  });
+
+  test("layout-marked empty elements get no placeholder class", () => {
+    // Regression: decorative hamburger-bar spans in a page's layout shell rendered
+    // Overlapping "Click here to add text..." placeholders.
+    const out = prep({
+      $__layout: true,
+      children: [
+        { $__layout: true, style: { height: "3px" }, tagName: "span" },
+        { $__layout: true, style: { height: "3px" }, tagName: "span" },
+        { $__layout: true, style: { height: "3px" }, tagName: "span" },
+      ],
+      tagName: "button",
+    });
+    for (const bar of out.children) {
+      expect(bar.className).toBeUndefined();
+      expect(bar.$__layout).toBe(true);
+    }
+  });
+
+  test("identical non-layout empty span still gets text placeholder", () => {
+    const out = prep({ style: { height: "3px" }, tagName: "span" });
+    expect(out.className).toBe("empty-text-placeholder");
   });
 });
