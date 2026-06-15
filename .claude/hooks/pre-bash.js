@@ -9,10 +9,10 @@ const input = JSON.parse(
 const cmd = input.tool_input?.command ?? "";
 
 if (cmd.includes("git push")) {
-  const { execSync } = await import("child_process");
+  const { execSync } = await import("node:child_process");
   try {
     execSync("bun run all-the-things", { stdio: "inherit" });
   } catch {
-    process.exit(1); // block the push
+    process.exit(1); // Block the push
   }
 }
