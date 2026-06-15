@@ -82,6 +82,11 @@ export function computeEmptyPlaceholderClass(node: JxMutableNode): string | null
   if (!node.tagName || node.textContent || node.innerHTML) {
     return null;
   }
+  // Layout-originated nodes ($__layout, set by markLayoutNodes) are read-only in page context;
+  // Edit affordances like "Click here to add text" don't apply to them.
+  if (node.$__layout) {
+    return null;
+  }
   if (Array.isArray(node.children) && node.children.length > 0) {
     return null;
   }
