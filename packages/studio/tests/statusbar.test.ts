@@ -77,6 +77,32 @@ describe("renderStatusbar", () => {
     expect(statusbarEl.querySelectorAll(".sb-path-sep").length).toBe(1);
   });
 
+  test("repeater path shows a Repeater crumb instead of a bare [index]", () => {
+    const tab = resetWorkspaceWithTab({
+      children: [
+        {
+          children: [
+            {
+              $prototype: "Array",
+              items: { $ref: "#/state/projects" },
+              map: { tagName: "article", textContent: "Card" },
+            },
+          ],
+          tagName: "section",
+        },
+      ],
+      tagName: "div",
+    } as any);
+    // Selecting the repeater template: the lone "map" segment must not break the pairing.
+    tab.session.selection = ["children", 0, "children", 0, "map"];
+    renderStatusbar();
+    const segs = [...statusbarEl.querySelectorAll(".sb-path-seg")] as HTMLElement[];
+    expect(segs.map((s) => s.textContent)).toEqual(["section", "Repeater", "article"]);
+    // The Repeater crumb targets the array node's own path (clickable → selects the array).
+    expect(segs[1].dataset.path).toBe(JSON.stringify(["children", 0, "children", 0]));
+    expect(segs[2].dataset.path).toBe(JSON.stringify(["children", 0, "children", 0, "map"]));
+  });
+
   test("segment label falls back to tag then [index]", () => {
     const tab = resetWorkspaceWithTab({
       children: [{ tag: "h2", textContent: "Styled" }, { textContent: "Anon" }],
