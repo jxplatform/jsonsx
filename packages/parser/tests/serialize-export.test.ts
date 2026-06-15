@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { serializeJxMarkdown } from "../src/serialize";
+import { jxToMdast, mdastToJx, serializeJxMarkdown } from "../src/serialize";
 import type { JxDocument, JxElement, JxStateDefinition } from "@jxsuite/schema/types";
 
 // Test-local template hooks mirroring the compiler's shared.ts machinery — the
@@ -1427,5 +1427,50 @@ describe("compileMarkdown", () => {
     };
     const { content } = compileMarkdown(doc);
     expect(content).toContain("Wrapped content");
+  });
+});
+
+// ─── Prototype directive round-trip (:::Array) ──────────────────────────────
+
+describe("prototype directive round-trip", () => {
+  test("a tagName-less Array node serializes to a :::Array directive", () => {
+    const doc = {
+      children: [
+        { tagName: "h1", textContent: "List" },
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { tagName: "p", textContent: "${$map.item.name}" },
+        },
+      ],
+    };
+    const md = serializeJxMarkdown(doc as JxDocument);
+    // Directive named after the prototype, with items as an attribute and the map as the body.
+    expect(md).toContain(':::Array{items.ref="#/state/rows"}');
+    expect(md).toContain("${$map.item.name}");
+    // No throwaway div wrapper / dot-path blob.
+    expect(md).not.toContain("map.tagName");
+  });
+
+  test("jxToMdast → mdastToJx preserves an Array member among siblings", () => {
+    const jx: JxElement = {
+      tagName: "ul",
+      children: [
+        { tagName: "li", textContent: "header" },
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          filter: { $ref: "#/state/byDate" },
+          map: { tagName: "li", textContent: "row" },
+        },
+      ],
+    };
+    const back = mdastToJx(jxToMdast(jx)) as JxElement;
+    const [, arr] = back.children as JxElement[];
+    expect(arr.$prototype).toBe("Array");
+    expect(arr.tagName).toBeUndefined();
+    expect(arr.items).toEqual({ $ref: "#/state/rows" });
+    expect(arr.filter).toEqual({ $ref: "#/state/byDate" });
+    expect((arr.map as JxElement).tagName).toBe("li");
   });
 });

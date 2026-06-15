@@ -200,12 +200,31 @@ describe("prepareForEditMode children", () => {
     expect(out.children[0].children[0].textContent).toBe("❪ item ❫");
   });
 
-  test("mapped-array children without a template become empty", () => {
+  test("mapped-array children without a template still emit one (empty) perimeter", () => {
+    // One DOM node per array keeps the 1:1 sibling-index correspondence the patcher relies on.
     const out = prep({
       children: { $prototype: "Array" },
       tagName: "ul",
     });
-    expect(out.children).toEqual([]);
+    expect(out.children).toHaveLength(1);
+    expect(out.children[0].className).toBe("repeater-perimeter");
+    expect(out.children[0].children).toEqual([]);
+  });
+
+  test("array pseudo-element among siblings becomes one perimeter in place", () => {
+    const out = prep({
+      children: [
+        { tagName: "li", textContent: "header" },
+        { $prototype: "Array", map: { tagName: "li", textContent: "${item}" } },
+        { tagName: "li", textContent: "footer" },
+      ],
+      tagName: "ul",
+    });
+    expect(out.children).toHaveLength(3);
+    expect(out.children[0].textContent).toBe("header");
+    expect(out.children[1].className).toBe("repeater-perimeter");
+    expect(out.children[1].children[0].textContent).toBe("❪ item ❫");
+    expect(out.children[2].textContent).toBe("footer");
   });
 
   test("single object children recurse", () => {

@@ -101,43 +101,45 @@
         "border": "1px solid #e6e6e6",
         "borderTop": "none"
       },
-      "children": {
-        "$prototype": "Array",
-        "items": { "$ref": "#/state/items" },
-        "map": {
-          "tagName": "li",
-          "style": {
-            "display": "flex",
-            "alignItems": "center",
-            "padding": "0.85rem 1.25rem",
-            "borderBottom": "1px solid #ededed",
-            ":last-child": { "borderBottom": "none" }
-          },
-          "children": [
-            {
-              "tagName": "input",
-              "attributes": { "type": "checkbox" },
-              "onclick": { "$ref": "#/state/toggleItem" },
-              "style": {
-                "width": "1.1rem",
-                "height": "1.1rem",
-                "marginRight": "0.85rem",
-                "cursor": "pointer",
-                "accentColor": "#007bff"
-              }
+      "children": [
+        {
+          "$prototype": "Array",
+          "items": { "$ref": "#/state/items" },
+          "map": {
+            "tagName": "li",
+            "style": {
+              "display": "flex",
+              "alignItems": "center",
+              "padding": "0.85rem 1.25rem",
+              "borderBottom": "1px solid #ededed",
+              ":last-child": { "borderBottom": "none" }
             },
-            {
-              "tagName": "span",
-              "textContent": "${$map.item.text}",
-              "style": {
-                "flex": "1",
-                "fontSize": "1.1rem",
-                "color": "#4d4d4d"
+            "children": [
+              {
+                "tagName": "input",
+                "attributes": { "type": "checkbox" },
+                "onclick": { "$ref": "#/state/toggleItem" },
+                "style": {
+                  "width": "1.1rem",
+                  "height": "1.1rem",
+                  "marginRight": "0.85rem",
+                  "cursor": "pointer",
+                  "accentColor": "#007bff"
+                }
+              },
+              {
+                "tagName": "span",
+                "textContent": "${$map.item.text}",
+                "style": {
+                  "flex": "1",
+                  "fontSize": "1.1rem",
+                  "color": "#4d4d4d"
+                }
               }
-            }
-          ]
+            ]
+          }
         }
-      }
+      ]
     },
     {
       "tagName": "footer",

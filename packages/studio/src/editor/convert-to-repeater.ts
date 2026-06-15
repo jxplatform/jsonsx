@@ -68,10 +68,9 @@ export async function convertToRepeater() {
       repeater.sort = config.sort;
     }
 
-    (parent.children as (string | JxMutableNode)[])[idx] = {
-      children: repeater as unknown as (string | JxMutableNode)[],
-      tagName: "div",
-    };
+    // Replace the selected element in place with the array pseudo-element — no wrapper div. The
+    // Repeated items render directly among the original parent's children.
+    (parent.children as (string | JxMutableNode)[])[idx] = repeater as unknown as JxMutableNode;
   });
 }
 

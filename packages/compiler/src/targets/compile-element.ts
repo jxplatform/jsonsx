@@ -482,6 +482,7 @@ function emitLitChildren(
     return "";
   }
 
+  // Legacy whole-children repeater: the array IS the children slot.
   if (isMappedArray(children)) {
     return emitMappedArray(children, indent);
   }
@@ -490,7 +491,12 @@ function emitLitChildren(
     return "";
   }
 
-  return children.map((child: JxMutableNode | string) => emitLitNode(child, indent)).join("\n");
+  // Mixed children: elements/text plus array pseudo-elements expanded inline among siblings.
+  return children
+    .map((child: JxMutableNode | string) =>
+      isMappedArray(child) ? emitMappedArray(child, indent) : emitLitNode(child, indent),
+    )
+    .join("\n");
 }
 
 /**

@@ -1,6 +1,7 @@
 /// <reference lib="dom" />
 import { effectScope, reactive } from "../reactivity";
 import { formatByName, formatForPath } from "../format/format-host";
+import { normalizeArrayChildren } from "../state";
 import type {
   DocumentStackEntry,
   FunctionEditDef,
@@ -153,6 +154,10 @@ export function createTab({
   capabilities?: { modes?: string[] };
 }) {
   const scope = effectScope();
+
+  // Normalize legacy whole-children repeaters to the canonical array-member form before the doc
+  // (and its first history checkpoint) are stored.
+  normalizeArrayChildren(document);
 
   const resolvedModes = capabilities?.modes ?? inferModes(documentPath, sourceFormat);
 

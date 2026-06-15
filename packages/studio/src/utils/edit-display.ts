@@ -121,6 +121,27 @@ export function restoreTemplateExpressions(el: HTMLElement) {
 }
 
 /**
+ * Build the edit-mode visual for a mapped array: a `<div class="repeater-perimeter">` wrapping a
+ * single prepared instance of the map template. Always one element (an empty perimeter when the
+ * template is missing) so the array keeps a 1:1 DOM node at its sibling index. The perimeter is an
+ * edit-only device — it is never compiled or rendered in preview.
+ *
+ * @param {JxMutableNode} arrayObj
+ * @returns {Record<string, unknown>}
+ */
+function arrayToPerimeter(arrayObj: JxMutableNode): Record<string, unknown> {
+  const template = arrayObj.map;
+  return {
+    children:
+      template && typeof template === "object"
+        ? [prepareForEditMode(template as JxMutableNode)]
+        : [],
+    className: "repeater-perimeter",
+    tagName: "div",
+  };
+}
+
+/**
  * Prepare a document for edit-mode rendering. Replaces template strings with readable literal text,
  * $prototype:Array with placeholders, and $ref bindings with display labels. Preserves state so the
  * runtime can still initialise scope.
@@ -135,6 +156,12 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   if (Array.isArray(node)) {
     // Arrays of nodes round-trip element-wise; the array itself is not a node.
     return node.map((n) => prepareForEditMode(n)) as unknown as JxMutableNode;
+  }
+
+  // A mapped-array node itself → its edit-mode perimeter (e.g. when the patcher re-renders an
+  // Array node directly). Members inside a children array funnel here via the children branch.
+  if ((node as Record<string, unknown>).$prototype === "Array") {
+    return arrayToPerimeter(node) as unknown as JxMutableNode;
   }
 
   const /** @type {Record<string, unknown>} */ obj = node as Record<string, unknown>;
@@ -178,25 +205,16 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       out[k] = propsOut;
     } else if (k === "children") {
       if (Array.isArray(v)) {
-        out.children = v.map((c) => prepareForEditMode(c));
+        // Each member recurses; array pseudo-elements become a single repeater-perimeter element
+        // (via the top-level array case) so they stay a 1:1 DOM node among their siblings.
+        out.children = v.map((c) => prepareForEditMode(c as JxMutableNode));
       } else if (
         v &&
         typeof v === "object" &&
         (v as Record<string, unknown>).$prototype === "Array"
       ) {
-        // Wrap the map template in a visual repeater perimeter
-        const vObj = v as Record<string, unknown>;
-        const template = vObj.map;
-        out.children =
-          template && typeof template === "object"
-            ? [
-                {
-                  children: [prepareForEditMode(template as JxMutableNode)],
-                  className: "repeater-perimeter",
-                  tagName: "div",
-                },
-              ]
-            : [];
+        // Legacy whole-children repeater → a single perimeter as the sole child.
+        out.children = [prepareForEditMode(v as JxMutableNode)];
       } else {
         out.children = prepareForEditMode(v as JxMutableNode);
       }

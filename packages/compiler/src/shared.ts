@@ -9,8 +9,10 @@
 import { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
 import { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import {
+  childrenContainArray,
   isExpressionDef,
   isFunctionDef,
+  isMappedArray,
   isPrototypeDef,
   isRef,
   isSchemaOnlyDef as isSchemaOnly,
@@ -22,7 +24,6 @@ import type { ExpressionNode } from "@jxsuite/runtime/expression";
 import type {
   JsonValue,
   JxElement,
-  JxMappedArray,
   JxMutableNode,
   JxPrototypeDef,
   JxRef,
@@ -110,10 +111,7 @@ export function isDynamic(def: JxElement | JxMutableNode | string) {
   if (def.$switch) {
     return true;
   }
-  if (
-    !Array.isArray(def.children) &&
-    (def.children as JxMappedArray | undefined)?.$prototype === "Array"
-  ) {
+  if (isMappedArray(def) || childrenContainArray(def.children)) {
     return true;
   }
 
@@ -170,10 +168,7 @@ export function isNodeDynamic(def: JxElement | JxMutableNode | string) {
   if (def.$switch) {
     return true;
   }
-  if (
-    !Array.isArray(def.children) &&
-    (def.children as JxMappedArray | undefined)?.$prototype === "Array"
-  ) {
+  if (isMappedArray(def) || childrenContainArray(def.children)) {
     return true;
   }
 

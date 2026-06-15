@@ -89,12 +89,12 @@ beforeEach(() => {
     liveCtx: {
       canvasMode: "design",
       layoutWrapped: false,
-      mapParentPaths: new Set(),
+      arrayPaths: new Set(),
       pageContentPrefix: null,
       pathMapper: makePathMapper({
         canvasMode: "design",
         layoutWrapped: false,
-        mapParentPaths: new Set(),
+        arrayPaths: new Set(),
         pageContentPrefix: null,
       }),
       scope: {},

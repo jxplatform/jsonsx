@@ -39,6 +39,7 @@ import type {
   JsonObject,
   JsonValue,
   JxDocument,
+  JxMappedArray,
   JxMutableNode,
   JxPrototypeDef,
   JxStyle,
@@ -481,6 +482,22 @@ function buildClientNode(
       return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}>`;
     }
     return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}></${tag}>`;
+  } else if (Array.isArray(source.children) && source.children.some((c) => isMappedArray(c))) {
+    // ─── Children mix static nodes with array pseudo-elements ───
+    // Render the whole children region via one lit binding on this element (wrapper-less, one
+    // Lit part per element so multiple arrays among siblings don't collide), with each array
+    // Member expanded inline as a `.map()` hole.
+    counter.needsLit = true;
+    const listKey = `_children${counter.l}`;
+    counter.l += 1;
+    const childrenTpl = source.children
+      .map((c) => emitChildLit(c as JxMutableNode))
+      .join("\n      ");
+    bindings.set(listKey, `() => html\`\n      ${childrenTpl}\n    \``);
+    bindAttrs.push(`:render="${listKey}"`);
+    needsBind = true;
+    const bindAttrStr2 = ` ${bindAttrs.join(" ")}`;
+    return `<${tag}${staticAttrs} data-bind${bindAttrStr2}></${tag}>`;
   } else if (Array.isArray(source.children)) {
     const rawChildren = Array.isArray(raw?.children) ? raw.children : undefined;
     inner = source.children
@@ -611,10 +628,11 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     }
   } else if (def.innerHTML) {
     inner = mapRefsToLit(String(def.innerHTML));
+  } else if (isMappedArray(def.children)) {
+    // Legacy whole-children repeater nested inside a map template.
+    inner = `\n      ${emitArrayHole(def.children)}\n    `;
   } else if (Array.isArray(def.children)) {
-    inner = `\n      ${def.children
-      .map((c) => emitLitMapTemplate(c as JxMutableNode))
-      .join("\n      ")}\n    `;
+    inner = `\n      ${def.children.map((c) => emitChildLit(c)).join("\n      ")}\n    `;
   }
 
   const voidTags = new Set(["input", "br", "hr", "img", "meta", "link"]);
@@ -622,6 +640,42 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     return `<${tag}${attrs}>`;
   }
   return `<${tag}${attrs}>${inner}</${tag}>`;
+}
+
+/**
+ * Emit one child of a lit template: a string text node, an array pseudo-element (expanded inline
+ * via a `.map()` hole), or a nested element.
+ *
+ * @param {JxMutableNode | string} c
+ * @returns {string}
+ */
+function emitChildLit(c: JxMutableNode | string): string {
+  if (typeof c === "string") {
+    return isTemplateString(c) ? mapRefsToLit(c) : escapeHtml(c);
+  }
+  if (typeof c === "number" || typeof c === "boolean") {
+    return escapeHtml(String(c));
+  }
+  if (isMappedArray(c)) {
+    return emitArrayHole(c);
+  }
+  return emitLitMapTemplate(c);
+}
+
+/**
+ * Emit a lit-html `${(items ?? []).map(...)}` hole for a mapped array, expanding its template
+ * inline among sibling nodes (wrapper-less).
+ *
+ * @param {JxMappedArray} arrayDef
+ * @returns {string}
+ */
+function emitArrayHole(arrayDef: JxMappedArray): string {
+  const { items } = arrayDef;
+  const itemsExpr = isRefObject(items)
+    ? `state.${refToBindingKey((items as { $ref: string }).$ref)}`
+    : JSON.stringify(items ?? []);
+  const tpl = emitLitMapTemplate(arrayDef.map);
+  return `\${(${itemsExpr} ?? []).map((item, index) => html\`${tpl}\`)}`;
 }
 
 /**

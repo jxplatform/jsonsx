@@ -107,14 +107,18 @@ describe("renderLayersTemplate — rows and badges", () => {
     expect(rowByKey(["children", 0, "children", 1, "children", 1])).toBeNull();
   });
 
-  test("map container renders repeater badge and template child", async () => {
+  test("map node renders repeater badge and template child", async () => {
     await renderLayers();
-    const mapRow = rowByKey(["children", 2, "children"]);
+    // The repeater is now a first-class member of the <ul>'s children (normalized on load).
+    const mapRow = rowByKey(["children", 2, "children", 0]);
     expect(mapRow).not.toBeNull();
     expect(mapRow!.querySelector(".map-tag")!.textContent).toBe("↻");
     expect(mapRow!.querySelector(".layer-label")!.textContent).toContain("Repeater");
-    // The map template li renders as a normal element row
-    expect(rowByKey(["children", 2, "children", "map"])).not.toBeNull();
+    // The map node is draggable/structural like any element.
+    expect(mapRow!.dataset.dndRow).toBe(pathKey(["children", 2, "children", 0]));
+    expect(mapRow!.querySelector(".layer-drag-handle")).not.toBeNull();
+    // The map template li renders as a normal element row.
+    expect(rowByKey(["children", 2, "children", 0, "map"])).not.toBeNull();
   });
 
   test("$switch node gets switch badge; cases get case and case-ref badges", async () => {

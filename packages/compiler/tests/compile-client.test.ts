@@ -361,6 +361,56 @@ describe("compileClient — mapped arrays", () => {
     expect(js).toContain(".map((item, index)");
   });
 
+  test("mapped array as a member among sibling children (wrapper-less)", () => {
+    const doc = {
+      children: [
+        {
+          children: [
+            { tagName: "li", textContent: "header" },
+            {
+              $prototype: "Array",
+              items: { $ref: "#/state/items" },
+              map: { tagName: "li", textContent: "${$map.item.name}" },
+            },
+            { tagName: "li", textContent: "footer" },
+          ],
+          tagName: "ul",
+        },
+      ],
+      state: { items: [{ name: "A" }] },
+      tagName: "div",
+    };
+    const { files, html } = compileClient(asDoc(doc), { title: "Test" });
+    const js = files[0].content;
+    // Whole children region rendered via one lit binding on the <ul>, no extra wrapper element.
+    expect(js).toContain("import { html, render } from 'lit-html'");
+    expect(js).toContain(".map((item, index)");
+    expect(js).toContain("header");
+    expect(js).toContain("footer");
+    // The <ul> itself carries the render binding — no extra wrapper element is introduced.
+    expect(html).toContain('<ul data-bind :render="_children0"></ul>');
+  });
+
+  test("two mapped arrays as siblings under one parent", () => {
+    const doc = {
+      children: [
+        {
+          children: [
+            { $prototype: "Array", items: { $ref: "#/state/a" }, map: { tagName: "i" } },
+            { $prototype: "Array", items: { $ref: "#/state/b" }, map: { tagName: "b" } },
+          ],
+          tagName: "div",
+        },
+      ],
+      state: { a: [], b: [] },
+      tagName: "div",
+    };
+    const { files } = compileClient(asDoc(doc), { title: "Test" });
+    const js = files[0].content;
+    // Both arrays live in a single lit children binding (one part per parent — no collision).
+    expect(js.match(/\.map\(\(item, index\)/g)?.length).toBe(2);
+  });
+
   test("mapped array with static items array", () => {
     const doc = {
       children: [

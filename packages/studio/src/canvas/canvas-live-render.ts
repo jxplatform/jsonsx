@@ -138,16 +138,17 @@ export interface PathMapperCtx {
   canvasMode: string;
   layoutWrapped: boolean;
   pageContentPrefix: (string | number)[] | null;
-  mapParentPaths: Set<unknown>;
+  /** Document paths of every mapped-array node, used to remap edit-mode repeater perimeters. */
+  arrayPaths: Set<string>;
 }
 
 /**
  * Build the onNodeCreated callback that records each rendered element's document path in elToPath.
- * Handles layout-prefix stripping and $map wrapper/template remapping. Shared by full panel renders
- * and isolated subtree re-renders so path bookkeeping stays consistent.
+ * Handles layout-prefix stripping and repeater-perimeter/template remapping. Shared by full panel
+ * renders and isolated subtree re-renders so path bookkeeping stays consistent.
  */
 export function makePathMapper(ctx: PathMapperCtx) {
-  const { canvasMode, layoutWrapped, pageContentPrefix, mapParentPaths } = ctx;
+  const { canvasMode, layoutWrapped, pageContentPrefix, arrayPaths } = ctx;
   return function onNodeCreated(
     created: Node,
     path: (string | number)[],
@@ -181,28 +182,24 @@ export function makePathMapper(ctx: PathMapperCtx) {
       }
     }
 
-    // Remap $map paths: wrapper and template children → real document paths
-    // PrepareForEditMode wraps $map template in: children[0] (wrapper) > children[0] (template)
-    // Real paths: wrapper → ['children'] ($map container), template → ['children', 'map']
-    if ((canvasMode === "design" || canvasMode === "edit") && mapParentPaths.size > 0) {
-      for (let i = 0; i < mappedPath.length - 1; i++) {
-        if (mappedPath[i] === "children" && mappedPath[i + 1] === 0) {
-          const parentKey = mappedPath.slice(0, i).join("/");
-          if (mapParentPaths.has(parentKey)) {
-            if (mappedPath.length === i + 2) {
-              mappedPath = mappedPath.slice(0, i + 1);
-            } else if (
-              mappedPath.length >= i + 4 &&
-              mappedPath[i + 2] === "children" &&
-              mappedPath[i + 3] === 0
-            ) {
-              mappedPath = [
-                ...mappedPath.slice(0, i),
-                "children",
-                "map",
-                ...mappedPath.slice(i + 4),
-              ];
-            }
+    // Remap repeater perimeters: prepareForEditMode renders each mapped-array node as a
+    // `<div class="repeater-perimeter">` at the array's own child index, with the map template as
+    // Its single child[0]. The perimeter's render path already equals the array's document path,
+    // So only the template hop needs collapsing: for any array document path P, a render path of
+    // `[...P, "children", 0, ...rest]` maps to `[...P, "map", ...rest]`. Looping handles nested
+    // Repeaters (an array whose template contains another array).
+    if ((canvasMode === "design" || canvasMode === "edit") && arrayPaths.size > 0) {
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (let i = 1; i < mappedPath.length - 1; i++) {
+          if (
+            mappedPath[i] === "children" &&
+            mappedPath[i + 1] === 0 &&
+            arrayPaths.has(mappedPath.slice(0, i).join("/"))
+          ) {
+            mappedPath = [...mappedPath.slice(0, i), "map", ...mappedPath.slice(i + 2)];
+            changed = true;
             break;
           }
         }
@@ -285,21 +282,23 @@ export async function renderCanvasLive(
     }
   }
 
-  // In edit mode, collect paths where $map templates were inlined as children[0]
-  // So we can remap runtime paths (children,0,...) → (children,map,...)
-  const mapParentPaths = new Set();
+  // In edit mode, collect the document path of every mapped-array node so the path mapper can
+  // Remap their edit-mode perimeters (and templates) back to document paths.
+  const arrayPaths = new Set<string>();
   let renderScope: EffectScope | null = null;
   if (canvasMode === "design" || canvasMode === "edit") {
-    (function findMapParents(node: JxMutableNode, path: (string | number)[]) {
+    (function findArrayPaths(node: JxMutableNode, path: (string | number)[]) {
       if (!node || typeof node !== "object") {
         return;
       }
-      if (
-        node.children &&
-        typeof node.children === "object" &&
-        (node.children as unknown as { $prototype?: string }).$prototype === "Array"
-      ) {
-        mapParentPaths.add(path.join("/"));
+      // The node itself is a mapped array (reached as a member or whole-children slot).
+      if ((node as unknown as { $prototype?: string }).$prototype === "Array") {
+        arrayPaths.add(path.join("/"));
+        const mapDef = (node as JxMutableNode).map;
+        if (mapDef && typeof mapDef === "object") {
+          findArrayPaths(mapDef, [...path, "map"]);
+        }
+        return;
       }
       if (Array.isArray(node.children)) {
         for (let i = 0; i < node.children.length; i++) {
@@ -307,12 +306,19 @@ export async function renderCanvasLive(
           if (typeof child === "string") {
             continue;
           }
-          findMapParents(child, [...path, "children", i]);
+          findArrayPaths(child, [...path, "children", i]);
         }
+      } else if (
+        node.children &&
+        typeof node.children === "object" &&
+        (node.children as unknown as { $prototype?: string }).$prototype === "Array"
+      ) {
+        // Legacy whole-children repeater.
+        findArrayPaths(node.children as JxMutableNode, [...path, "children"]);
       }
       if (node.$switch && node.cases) {
         for (const [k, v] of Object.entries(node.cases)) {
-          findMapParents(v, [...path, "cases", k]);
+          findArrayPaths(v, [...path, "cases", k]);
         }
       }
     })(doc, []);
@@ -522,9 +528,9 @@ export async function renderCanvasLive(
       return null;
     }
     const pathMapper = makePathMapper({
+      arrayPaths,
       canvasMode,
       layoutWrapped,
-      mapParentPaths,
       pageContentPrefix,
     });
     // Render inside a detached effect scope so the tree's reactive effects (template bindings,
@@ -579,9 +585,9 @@ export async function renderCanvasLive(
       panel.renderScope?.stop();
       panel.renderScope = renderScope;
       panel.liveCtx = {
+        arrayPaths,
         canvasMode,
         layoutWrapped,
-        mapParentPaths,
         pageContentPrefix,
         pathMapper,
         scope: $defs as Record<string, unknown>,

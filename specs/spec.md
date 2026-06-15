@@ -111,14 +111,14 @@ Every Jx document is a JSON object with the following top-level fields:
 }
 ```
 
-| Field      | Required    | Description                                                                                |
-| ---------- | ----------- | ------------------------------------------------------------------------------------------ |
-| `$schema`  | Recommended | URI identifying the Jx dialect version                                                     |
-| `$id`      | Recommended | Component identifier, used by tooling                                                      |
-| `$defs`    | Optional    | Pure JSON Schema type definitions — tooling only, no runtime artifacts                     |
-| `state`    | Optional    | Reactive state: signals, computed values, functions, and data sources                      |
-| `tagName`  | Required    | HTML tag name for the root element                                                         |
-| `children` | Optional    | Array of child element definitions and/or text nodes (strings/numbers), or Array namespace |
+| Field      | Required    | Description                                                                                                                                                                                                     |
+| ---------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$schema`  | Recommended | URI identifying the Jx dialect version                                                                                                                                                                          |
+| `$id`      | Recommended | Component identifier, used by tooling                                                                                                                                                                           |
+| `$defs`    | Optional    | Pure JSON Schema type definitions — tooling only, no runtime artifacts                                                                                                                                          |
+| `state`    | Optional    | Reactive state: signals, computed values, functions, and data sources                                                                                                                                           |
+| `tagName`  | Required    | HTML tag name for the root element                                                                                                                                                                              |
+| `children` | Optional    | Array of child element definitions, text nodes (strings/numbers), and/or Array namespaces (repeaters) mixed freely. A bare Array namespace (the whole children slot is one repeater) is also accepted. See §10. |
 
 ### 3.2 JSON Schema Dialect
 
@@ -822,21 +822,32 @@ Within any `style` object, `@--name` keys reference named breakpoints. `@(condit
 
 ### 10.1 Array Namespace Syntax
 
-Dynamic lists are declared by setting `children` to an object with `$prototype: "Array"`:
+A dynamic list is an array **pseudo-element** — an object with `$prototype: "Array"` that sits as a
+**member of a `children` array**, nestled among sibling elements or as the sole child. It renders
+**wrapper-less**: its mapped items become direct children of the array's parent (no intervening
+container).
 
 ```json
 {
   "tagName": "ul",
-  "children": {
-    "$prototype": "Array",
-    "items": { "$ref": "#/state/todoList" },
-    "map": {
-      "tagName": "li",
-      "textContent": { "$ref": "$map/item" }
+  "children": [
+    { "tagName": "li", "textContent": "Header" },
+    {
+      "$prototype": "Array",
+      "items": { "$ref": "#/state/todoList" },
+      "map": {
+        "tagName": "li",
+        "textContent": { "$ref": "$map/item" }
+      }
     }
-  }
+  ]
 }
 ```
+
+> **Backward compatibility.** The legacy form where `children` is _itself_ the Array object
+> (`"children": { "$prototype": "Array", … }`) is still accepted: the runtime and compiler render its
+> items directly into the parent element, and the studio normalizes it to a single array member on
+> load.
 
 ### 10.2 Iteration Context
 
@@ -857,7 +868,8 @@ Dynamic lists are declared by setting `children` to an object with `$prototype: 
 }
 ```
 
-> **Status: Implemented.** Runtime `renderMappedArray()` handles items, filter, sort, `$map/item`, and `$map/index`.
+> **Status: Implemented.** The runtime renders array members inline (wrapper-less) via
+> `renderMappedArrayInto()`, handling items, filter, sort, `$map/item`, and `$map/index`.
 
 ---
 

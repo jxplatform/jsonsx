@@ -235,15 +235,6 @@ describe("element section", () => {
     expect((docNow().children as JxMutableNode[])[0].hidden).toBeUndefined();
   });
 
-  test("a node whose children are a mapped array shows the repeater note", async () => {
-    openDoc({
-      children: { $prototype: "Array", items: [], map: { tagName: "li" } },
-      tagName: "ul",
-    });
-    const c = await renderPanel();
-    expect(c.textContent).toContain("Children: Repeater");
-  });
-
   test("accordion toggle event flips the section state in session ui", async () => {
     const tab = openDoc({ children: [{ tagName: "p" }], tagName: "div" }, ["children", 0]);
     let c = await renderPanel();
@@ -276,7 +267,7 @@ function repeaterDoc(extra: Record<string, unknown> = {}) {
 
 describe("repeater section", () => {
   test("map node shows the Repeater section and suppresses element rows", async () => {
-    openDoc(repeaterDoc(), ["children"]);
+    openDoc(repeaterDoc(), ["children", 0]);
     const c = await renderPanel();
     expect(section(c, "Repeater")).not.toBeNull();
     expect(section(c, "Element")).toBeNull();
@@ -285,14 +276,14 @@ describe("repeater section", () => {
   });
 
   test("add filter / add sort links seed $ref values", async () => {
-    openDoc(repeaterDoc(), ["children"]);
+    openDoc(repeaterDoc(), ["children", 0]);
     let c = await renderPanel();
     pointer(kvAdd(c, "+ Add filter")!, "click");
-    expect((docNow().children as any).filter).toEqual({ $ref: "#/state/" });
+    expect((docNow().children as any[])[0].filter).toEqual({ $ref: "#/state/" });
 
     c = await renderPanel();
     pointer(kvAdd(c, "+ Add sort")!, "click");
-    expect((docNow().children as any).sort).toEqual({ $ref: "#/state/" });
+    expect((docNow().children as any[])[0].sort).toEqual({ $ref: "#/state/" });
 
     // Once present, the add links disappear and rows render instead
     c = await renderPanel();
@@ -303,14 +294,14 @@ describe("repeater section", () => {
   });
 
   test("Edit template button moves the selection into the map node", async () => {
-    const tab = openDoc(repeaterDoc(), ["children"]);
+    const tab = openDoc(repeaterDoc(), ["children", 0]);
     const c = await renderPanel();
     pointer(actionButtonByText(c, "Edit template")!, "click");
-    expect(tab.session.selection).toEqual(["children", "map"]);
+    expect(tab.session.selection).toEqual(["children", 0, "map"]);
   });
 
   test("bound Items row offers an unbind toggle that restores the signal default", async () => {
-    openDoc(repeaterDoc(), ["children"]);
+    openDoc(repeaterDoc(), ["children", 0]);
     const c = await renderPanel();
     const row = fieldRowByLabel(c, "Items")!;
     const toggle = row.querySelector("sp-action-button") as HTMLElement;
@@ -319,32 +310,32 @@ describe("repeater section", () => {
 
     pointer(toggle, "click");
     // Default is an array → JSON stringified static value
-    expect((docNow().children as any).items).toBe('["a"]');
+    expect((docNow().children as any[])[0].items).toBe('["a"]');
   });
 
   test("static Items row binds to the first available signal on toggle", async () => {
-    openDoc(repeaterDoc({ items: "static" }), ["children"]);
+    openDoc(repeaterDoc({ items: "static" }), ["children", 0]);
     const c = await renderPanel();
     const row = fieldRowByLabel(c, "Items")!;
     const toggle = row.querySelector("sp-action-button") as HTMLElement;
     expect(toggle.getAttribute("title")).toContain("Bind to signal");
     pointer(toggle, "click");
-    expect((docNow().children as any).items).toEqual({ $ref: "#/state/posts" });
+    expect((docNow().children as any[])[0].items).toEqual({ $ref: "#/state/posts" });
   });
 
   test("signal picker change rebinds; empty value clears the property", async () => {
-    openDoc(repeaterDoc(), ["children"]);
+    openDoc(repeaterDoc(), ["children", 0]);
     let c = await renderPanel();
     let picker = fieldRowByLabel(c, "Items")!.querySelector("sp-picker") as HTMLInputElement;
     picker.value = "#/state/posts";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any).items).toEqual({ $ref: "#/state/posts" });
+    expect((docNow().children as any[])[0].items).toEqual({ $ref: "#/state/posts" });
 
     c = await renderPanel();
     picker = fieldRowByLabel(c, "Items")!.querySelector("sp-picker") as HTMLInputElement;
     picker.value = "";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any).items).toBeUndefined();
+    expect((docNow().children as any[])[0].items).toBeUndefined();
   });
 
   test("handler and Function state entries are excluded from signal options", async () => {
@@ -358,7 +349,7 @@ describe("repeater section", () => {
         },
         tagName: "ul",
       },
-      ["children"],
+      ["children", 0],
     );
     const c = await renderPanel();
     const items = [...fieldRowByLabel(c, "Items")!.querySelectorAll("sp-menu-item")].map((m) =>
@@ -368,20 +359,20 @@ describe("repeater section", () => {
   });
 
   test("filter and sort rows commit edits and clear when emptied", async () => {
-    openDoc(repeaterDoc({ filter: "a > 1", sort: "name" }), ["children"]);
+    openDoc(repeaterDoc({ filter: "a > 1", sort: "name" }), ["children", 0]);
     let c = await renderPanel();
     const filterField = fieldRowByLabel(c, "Filter")!.querySelector(
       "sp-textfield",
     ) as HTMLInputElement;
     filterField.value = "a > 2";
     filterField.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any).filter).toBe("a > 2");
+    expect((docNow().children as any[])[0].filter).toBe("a > 2");
 
     c = await renderPanel();
     const sortField = fieldRowByLabel(c, "Sort")!.querySelector("sp-textfield") as HTMLInputElement;
     sortField.value = "";
     sortField.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as any).sort).toBeUndefined();
+    expect((docNow().children as any[])[0].sort).toBeUndefined();
   });
 
   test("unbinding from a scalar (non-object) state def clears the value", async () => {
@@ -391,11 +382,11 @@ describe("repeater section", () => {
         state: { n: 5 },
         tagName: "ul",
       },
-      ["children"],
+      ["children", 0],
     );
     const c = await renderPanel();
     pointer(fieldRowByLabel(c, "Items")!.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as any).items).toBeUndefined();
+    expect((docNow().children as any[])[0].items).toBeUndefined();
   });
 
   test("unbinding with no default falls back to clearing the property", async () => {
@@ -405,11 +396,11 @@ describe("repeater section", () => {
         state: { posts: {} },
         tagName: "ul",
       },
-      ["children"],
+      ["children", 0],
     );
     const c = await renderPanel();
     pointer(fieldRowByLabel(c, "Items")!.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as any).items).toBeUndefined();
+    expect((docNow().children as any[])[0].items).toBeUndefined();
   });
 });
 
@@ -432,7 +423,7 @@ function switchDoc() {
 
 describe("switch section", () => {
   test("renders the expression row and case list", async () => {
-    openDoc(switchDoc(), ["children", "map"]);
+    openDoc(switchDoc(), ["children", 0, "map"]);
     const c = await renderPanel();
     const sw = section(c, "Switch")!;
     expect(sw).not.toBeNull();
@@ -444,31 +435,31 @@ describe("switch section", () => {
   });
 
   test("edit-case arrow navigates the selection to the case", async () => {
-    const tab = openDoc(switchDoc(), ["children", "map"]);
+    const tab = openDoc(switchDoc(), ["children", 0, "map"]);
     const c = await renderPanel();
     pointer(c.querySelector('[title="Edit case"]')!, "click");
-    expect(tab.session.selection).toEqual(["children", "map", "cases", "alpha"]);
+    expect(tab.session.selection).toEqual(["children", 0, "map", "cases", "alpha"]);
   });
 
   test("✕ removes a case and + Add case appends a numbered one", async () => {
-    openDoc(switchDoc(), ["children", "map"]);
+    openDoc(switchDoc(), ["children", 0, "map"]);
     let c = await renderPanel();
     const remove = [...c.querySelectorAll("span")].find((s) => s.textContent === "✕");
     pointer(remove!, "click");
-    expect(Object.keys((docNow().children as any).map.cases)).toEqual(["beta"]);
+    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta"]);
 
     c = await renderPanel();
     pointer(kvAdd(c, "+ Add case")!, "click");
-    expect(Object.keys((docNow().children as any).map.cases)).toEqual(["beta", "case2"]);
+    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta", "case2"]);
   });
 
   test("inside a map template, binding the expression offers $map signals", async () => {
-    openDoc(switchDoc(), ["children", "map"]);
+    openDoc(switchDoc(), ["children", 0, "map"]);
     let c = await renderPanel();
     const row = fieldRowByLabel(section(c, "Switch")!, "Expression")!;
     // No state defs → toggle falls through to the extra $map signals
     pointer(row.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as any).map.$switch).toEqual({ $ref: "$map/item" });
+    expect((docNow().children as any[])[0].map.$switch).toEqual({ $ref: "$map/item" });
 
     c = await renderPanel();
     const picker = fieldRowByLabel(section(c, "Switch")!, "Expression")!.querySelector(
@@ -678,12 +669,12 @@ describe("component props section", () => {
     registerCard();
     openDoc(
       { children: { $prototype: "Array", items: [], map: { tagName: "my-card" } }, tagName: "div" },
-      ["children", "map"],
+      ["children", 0, "map"],
     );
     let c = await renderPanel();
     let row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
     pointer(row.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as any).map.$props.title).toEqual({ $ref: "$map/item" });
+    expect((docNow().children as any[])[0].map.$props.title).toEqual({ $ref: "$map/item" });
 
     c = await renderPanel();
     row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
@@ -1200,13 +1191,13 @@ describe("debounced edits", () => {
   });
 
   test("switch case rename commits after its 500ms debounce", async () => {
-    openDoc(switchDoc(), ["children", "map"]);
+    openDoc(switchDoc(), ["children", 0, "map"]);
     const c = await renderPanel();
     const input = section(c, "Switch")!.querySelector("input.field-input") as HTMLInputElement;
     input.value = "gamma";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     await sleep(560);
-    expect(Object.keys((docNow().children as any).map.cases)).toEqual(["beta", "gamma"]);
+    expect(Object.keys((docNow().children as any[])[0].map.cases)).toEqual(["beta", "gamma"]);
   });
 
   test("number prop commits after the number-field debounce", async () => {

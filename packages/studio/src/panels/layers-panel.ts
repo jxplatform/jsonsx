@@ -183,7 +183,10 @@ export function renderLayersTemplate(ctx: {
       Object.keys(jxNode.cases).length > 0;
     const isExpandable =
       hasChildren || hasMapChildren || hasCases || (nodeType === "map" && jxNode.map);
-    const isVoidEl = VOID_ELEMENTS.has((jxNode.tagName || "div").toLowerCase());
+    // Array nodes can't accept dropped children (their content is the single map template), so they
+    // Block the make-child drop instruction like void elements do.
+    const isVoidEl =
+      VOID_ELEMENTS.has((jxNode.tagName || "div").toLowerCase()) || nodeType === "map";
 
     /** @type {string} */
     let badgeClass;
@@ -221,14 +224,18 @@ export function renderLayersTemplate(ctx: {
       labelItalic = false;
     }
 
-    const isElement = nodeType === "element";
+    // Array (repeater) nodes are first-class structural nodes — movable/draggable/deletable like
+    // Elements. Both sit at a numeric child index; templates (path tail "map") and case nodes do
+    // Not, so they stay selectable/editable but not structurally manipulable.
+    const isStructural =
+      (nodeType === "element" || nodeType === "map") && typeof childIndex(path) === "number";
     const isRoot = tab?.doc.mode === "content" ? path.length === 0 : path.length < 2;
-    const idx = isElement ? (childIndex(path) as number) : 0;
-    const parentPath = isElement && !isRoot ? (parentElementPath(path) as JxPath) : null;
+    const idx = isStructural ? (childIndex(path) as number) : 0;
+    const parentPath = isStructural && !isRoot ? (parentElementPath(path) as JxPath) : null;
     const parentNode = parentPath ? getNodeAtPath(tab!.doc.document, parentPath) : null;
     const siblingCount = childList(parentNode).length;
-    const canMoveUp = isElement && !isRoot && idx > 0;
-    const canMoveDown = isElement && !isRoot && idx < siblingCount - 1;
+    const canMoveUp = isStructural && !isRoot && idx > 0;
+    const canMoveDown = isStructural && !isRoot && idx < siblingCount - 1;
     const prevSibling = canMoveUp && parentNode ? childList(parentNode)[idx - 1] : null;
     const prevIsContainer = (() => {
       if (!prevSibling || typeof prevSibling !== "object") {
@@ -257,32 +264,32 @@ export function renderLayersTemplate(ctx: {
         (c) => typeof c === "object" && c !== null && !isInlineElement(c, prevSibling),
       );
     })();
-    const canMoveIn = isElement && !isRoot && prevIsContainer;
+    const canMoveIn = isStructural && !isRoot && prevIsContainer;
     const grandparentPath =
-      isElement && parentPath && parentPath.length >= 2
+      isStructural && parentPath && parentPath.length >= 2
         ? (parentElementPath(parentPath) as JxPath)
         : null;
-    const canMoveOut = isElement && !isRoot && Boolean(grandparentPath);
+    const canMoveOut = isStructural && !isRoot && Boolean(grandparentPath);
 
     layerRows.push(html`
       <div
         class=${classMap({ "layer-row": true, selected: isSelected })}
         data-path=${key}
-        data-dnd-row=${isElement ? key : nothing}
-        data-dnd-depth=${isElement ? depth : nothing}
-        data-dnd-void=${isElement && isVoidEl ? "" : nothing}
-        data-dnd-expanded=${isElement && isExpandable && !collapsed.has(key) ? "" : nothing}
+        data-dnd-row=${isStructural ? key : nothing}
+        data-dnd-depth=${isStructural ? depth : nothing}
+        data-dnd-void=${isStructural && isVoidEl ? "" : nothing}
+        data-dnd-expanded=${isStructural && isExpandable && !collapsed.has(key) ? "" : nothing}
         @click=${() => {
           activeTab.value!.session.selection = path;
           panToElement(path);
         }}
-        @dblclick=${isElement
+        @dblclick=${isStructural
           ? (e: MouseEvent) => {
               e.stopPropagation();
               startLayerTitleEdit(path, ctx.rerender);
             }
           : nothing}
-        @contextmenu=${isElement
+        @contextmenu=${isStructural
           ? (e: MouseEvent) =>
               showContextMenu(e, path, {
                 onEditComponent: ctx.navigateToComponent,
@@ -304,7 +311,7 @@ export function renderLayersTemplate(ctx: {
         <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
           >${labelText}</span
         >
-        ${isElement && !isRoot
+        ${isStructural && !isRoot
           ? html`
               <span class="layer-actions">
                 <span class="layer-drag-handle" title="Drag to reorder">⠿</span>

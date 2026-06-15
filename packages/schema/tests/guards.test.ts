@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   SCHEMA_KEYWORDS,
+  childrenContainArray,
   ensureNestedStyle,
   getEventBinding,
   getNestedStyle,
@@ -176,6 +177,28 @@ describe("isMappedArray", () => {
     expect(isMappedArray({ $prototype: "Class" })).toBe(false);
     expect(isMappedArray([])).toBe(false);
     expect(isMappedArray({})).toBe(false);
+  });
+});
+
+describe("childrenContainArray", () => {
+  const arr = { $prototype: "Array", items: { $ref: "#/x" }, map: { tagName: "li" } };
+
+  test("true for a bare whole-children mapped array (legacy form)", () => {
+    expect(childrenContainArray(arr)).toBe(true);
+  });
+
+  test("true when a mapped array is a member among siblings", () => {
+    expect(childrenContainArray([{ tagName: "li" }, arr, "text"])).toBe(true);
+  });
+
+  test("false for a plain children array with no mapped arrays", () => {
+    expect(childrenContainArray([{ tagName: "li" }, "text"])).toBe(false);
+  });
+
+  test("false for absent/non-array children", () => {
+    expect(childrenContainArray()).toBe(false);
+    expect(childrenContainArray(null)).toBe(false);
+    expect(childrenContainArray("text")).toBe(false);
   });
 });
 

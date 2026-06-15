@@ -438,16 +438,28 @@ describe("showContextMenu", () => {
     expect(menuItems().length).toBe(0);
   });
 
-  test("hides Repeat... for nodes already inside a repeater", () => {
+  test("hides Repeat... on an array node and its template; array node stays deletable", () => {
     resetWorkspaceWithTab({
       children: [
-        { children: { map: { tagName: "li", textContent: "i" } } as never, tagName: "ul" },
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/rows" },
+          map: { tagName: "li", textContent: "i" },
+        } as never,
       ],
+      state: { rows: { default: [], type: "array" } },
       tagName: "div",
     });
-    rightClick(["children", 0, "children", "map"]);
+    // The array node itself: no Repeat (can't repeat a repeater), but it is a first-class,
+    // Deletable structural node.
+    rightClick(["children", 0]);
     expect(menuLabels()).not.toContain("Repeat...");
     expect(menuLabels()).toContain("Delete");
+
+    // The template node (path tail "map") is not structurally manipulable — Copy only, no Repeat.
+    rightClick(["children", 0, "map"]);
+    expect(menuLabels()).not.toContain("Repeat...");
+    expect(menuLabels()).not.toContain("Delete");
   });
 
   test("Delete marks the item with the danger color", () => {

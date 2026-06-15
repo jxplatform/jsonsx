@@ -109,18 +109,19 @@ function isActiveTab(tab: Tab) {
 
 /**
  * $switch cases render as a substituted first-case placeholder in edit mode, so their element paths
- * don't correspond to document paths — edits through "cases" escalate to a full render. ($map
- * template paths DO correspond: the path mapper remaps the inlined template to [..., "children",
- * "map", ...], so map-path edits patch like any others.)
+ * don't correspond to document paths — edits through "cases" escalate to a full render. (Non-
+ * structural edits to a repeater template — text/style/prop on a `…/map` path — DO patch, since the
+ * template renders as a single 1:1 instance inside its perimeter; structural edits inside a
+ * template escalate via {@link containerVerdict}.)
  */
 function pathHasDynamicSegment(path: JxPath) {
   return path.includes("cases");
 }
 
 /**
- * Whether a children array at parentPath can be structurally patched: no $map/$switch segments, no
- * custom-element ancestors (slot redistribution breaks doc↔DOM child correspondence), no innerHTML
- * on the parent, and a real children array.
+ * Whether a children array at parentPath can be structurally patched: no $switch/template segments,
+ * no custom-element ancestors (slot redistribution breaks doc↔DOM child correspondence), no
+ * innerHTML on the parent, and a real children array.
  *
  * @param {Tab} tab
  * @param {JxPath} parentPath
@@ -128,6 +129,11 @@ function pathHasDynamicSegment(path: JxPath) {
 function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): string | null {
   if (pathHasDynamicSegment(parentPath)) {
     return "structure-on-cases-path";
+  }
+  // Structural edits inside a repeater template (a "map" segment) escalate: the edit-mode perimeter
+  // Holds one template instance, so changing the template's child count can't be spliced 1:1.
+  if (parentPath.includes("map")) {
+    return "structure-on-map-path";
   }
   const doc = tab.doc.document;
   for (let i = 0; i <= parentPath.length; i += 2) {
@@ -143,8 +149,8 @@ function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): st
   if (parent.innerHTML) {
     return "structure-with-innerhtml";
   }
-  // Index-based splicing needs a real children array; replace-in-place does not ($map templates
-  // Sit at [..., "children", "map"], whose parent's children is the mapped-array object).
+  // Index-based splicing needs a real children array. An array (repeater) node itself has no
+  // Children array (its content is the `map` template), so inserts/moves targeting it escalate.
   if (requireArray && !Array.isArray(parent.children)) {
     return "structure-children-not-array";
   }

@@ -77,12 +77,9 @@ function isInsideMapTemplate(path: JxPath | null) {
   if (!path) {
     return false;
   }
-  for (let i = 0; i < path.length - 1; i++) {
-    if (path[i] === "children" && path[i + 1] === "map") {
-      return true;
-    }
-  }
-  return false;
+  // A "map" segment addresses a repeater template (`[…, "children", i, "map", …]`, or the legacy
+  // `[…, "children", "map", …]`), so anything at or below it is inside a map template.
+  return path.includes("map");
 }
 
 /**
@@ -949,10 +946,6 @@ export function renderPropertiesPanelTemplate(ctx: {
 
   const path = tab.session.selection;
   const isMapNode = node.$prototype === "Array";
-  const isMapParent =
-    node.children &&
-    typeof node.children === "object" &&
-    (node.children as unknown as { $prototype?: string }).$prototype === "Array";
   const isSwitchNode = Boolean(node.$switch);
   const isCustomInstance = (node.tagName || "").includes("-");
   const isRoot = path.length === 0;
@@ -1196,13 +1189,6 @@ export function renderPropertiesPanelTemplate(ctx: {
           >
           </sp-checkbox>
         </div>
-        ${isMapParent
-          ? html`
-              <div style="font-size:10px;color:var(--fg-dim);padding:4px 0;font-style:italic">
-                Children: Repeater (select in layers to configure)
-              </div>
-            `
-          : nothing}
       </div>
     </sp-accordion-item>
   `;

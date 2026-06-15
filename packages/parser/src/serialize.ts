@@ -25,6 +25,7 @@ import remarkDirective from "remark-directive";
 import remarkGfm from "remark-gfm";
 import { stringify as stringifyYaml } from "yaml";
 import { htmlToJx } from "./html-to-jx.ts";
+import { expandDotPaths } from "./transpile.ts";
 import type {
   JsonValue,
   JxAttributeValue,
@@ -386,6 +387,11 @@ function convertMdastNode(node: MdastNode): JxElement | null {
 }
 
 function convertDirective(node: MdastNode): JxElement {
+  // Prototype directive (e.g. `:::Array`) → `{ $prototype: name, ... }`, tagName dropped.
+  if (node.name && PROTOTYPE_DIRECTIVE_NAMES.has(node.name)) {
+    return prototypeDirectiveToJx(node);
+  }
+
   const el: JxElement = { tagName: node.name ?? "div" };
   if (node.attributes && Object.keys(node.attributes).length > 0) {
     el.attributes = { ...node.attributes };
@@ -404,6 +410,34 @@ function convertDirective(node: MdastNode): JxElement {
       | JxElement
       | string
     )[];
+  }
+  return el;
+}
+
+/**
+ * Roundtrip md → Jx for a prototype directive (e.g. `:::Array`): name → `$prototype` (tagName
+ * dropped), dot-path attributes expanded (items/filter/sort), single nested child → `map`.
+ */
+function prototypeDirectiveToJx(node: MdastNode): JxElement {
+  const el: JxElement = { $prototype: node.name as string };
+  if (node.attributes && Object.keys(node.attributes).length > 0) {
+    const expanded = expandDotPaths(node.attributes);
+    for (const [key, value] of Object.entries(expanded)) {
+      if (key === "$prototype") {
+        continue;
+      }
+      el[key] = value as JsonValue;
+    }
+  }
+  if (node.children?.length) {
+    const children = node.children.flatMap((n) => convertMdastNode(n)).filter(Boolean) as (
+      | JxElement
+      | string
+    )[];
+    const template = children.find((c) => c != null && typeof c === "object");
+    if (template) {
+      el.map = template as JxElement;
+    }
   }
   return el;
 }
@@ -656,6 +690,12 @@ const JX_DOLLAR_KEYS = new Set([
   "$elements",
 ]);
 
+/**
+ * `$prototype` element types that serialize as a directive named after the prototype (no tagName),
+ * e.g. `:::Array`. Mirrors the set in transpile.ts.
+ */
+const PROTOTYPE_DIRECTIVE_NAMES = new Set(["Array"]);
+
 const JX_ANNOTATION_KEYS = new Set(["$title", "$description"]);
 
 function collectDirectiveAttrs(el: JxElement) {
@@ -688,6 +728,16 @@ function convertToDirective(
   isBlock: boolean,
   allowlist: ReadonlySet<string>,
 ): MdastNode {
+  // Prototype pseudo-element (e.g. Array repeater) with no tagName → directive named after the
+  // Prototype; the `map` template is the directive body, items/filter/sort are attributes.
+  if (
+    !el.tagName &&
+    typeof el.$prototype === "string" &&
+    PROTOTYPE_DIRECTIVE_NAMES.has(el.$prototype)
+  ) {
+    return prototypeToDirective(el, isBlock, allowlist);
+  }
+
   const tag = (el.tagName as string) ?? "div";
   const attrs = collectDirectiveAttrs(el);
 
@@ -746,6 +796,35 @@ function convertToDirective(
     children: directiveChildren,
     name: tag,
     type: "containerDirective",
+  };
+}
+
+/**
+ * Serialize a tagName-less `$prototype` node (e.g. an Array repeater) to a directive named after
+ * its prototype. items/filter/sort (and any other scalar props) become attributes; the `map`
+ * template is the single nested child. `$prototype` (carried by the name) and `map` (the body) are
+ * omitted from the attributes.
+ */
+function prototypeToDirective(
+  el: JxElement,
+  isBlock: boolean,
+  allowlist: ReadonlySet<string>,
+): MdastNode {
+  const propsObj: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(el)) {
+    if (key === "$prototype" || key === "map" || key === "tagName") {
+      continue;
+    }
+    propsObj[key] = value;
+  }
+  const attrs = collapsePropsToAttrMap(propsObj);
+  const mapNode = el.map ? convertJxNode(el.map as JxElement, isBlock, allowlist) : null;
+  const children = mapNode ? [mapNode] : [];
+  return {
+    attributes: attrs,
+    children,
+    name: el.$prototype as string,
+    type: isBlock ? "containerDirective" : "textDirective",
   };
 }
 

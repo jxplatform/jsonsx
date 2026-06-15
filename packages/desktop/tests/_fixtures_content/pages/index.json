@@ -14,14 +14,16 @@
     },
     {
       "tagName": "ul",
-      "children": {
-        "$prototype": "Array",
-        "$map": "$docs",
-        "$template": {
-          "tagName": "li",
-          "children": ["${item.data.title}"]
+      "children": [
+        {
+          "$prototype": "Array",
+          "$map": "$docs",
+          "$template": {
+            "tagName": "li",
+            "children": ["${item.data.title}"]
+          }
         }
-      }
+      ]
     }
   ]
 }

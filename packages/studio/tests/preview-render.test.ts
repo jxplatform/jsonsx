@@ -172,6 +172,23 @@ describe("renderCanvasNode children", () => {
     expect(elToPath.get(li)).toEqual(["children", "map"]);
   });
 
+  test("array pseudo-element member renders as a perimeter at its own child index", () => {
+    const { parent } = renderNode({
+      children: [
+        { tagName: "li", textContent: "header" },
+        { $prototype: "Array", map: { tagName: "li", textContent: "item" } },
+      ],
+      tagName: "ul",
+    });
+    const ul = parent.firstElementChild as HTMLElement;
+    expect(ul.children.length).toBe(2);
+    expect(elToPath.get(ul.children[0])).toEqual(["children", 0]);
+    const perimeter = ul.children[1] as HTMLElement;
+    expect(perimeter.className).toBe("repeater-perimeter");
+    expect(elToPath.get(perimeter)).toEqual(["children", 1]);
+    expect(elToPath.get(perimeter.firstElementChild!)).toEqual(["children", 1, "map"]);
+  });
+
   test("mapped-array without template renders no wrapper", () => {
     const { parent } = renderNode({
       children: { $prototype: "Array" },

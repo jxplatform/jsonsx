@@ -197,6 +197,36 @@ This expands to:
 }
 ```
 
+### Prototype Directives (`:::Array`)
+
+An array pseudo-element (repeater) has no `tagName`, so it serializes as a directive **named after
+its `$prototype`** — e.g. `:::Array`. The directive's attributes carry `items`/`filter`/`sort`
+(dot-path encoded), and its nested block content is the `map` template. On parse, the synthetic
+tagName is dropped and `$prototype` is restored. Because it is an ordinary block directive, a
+repeater can sit among sibling blocks:
+
+```markdown
+# Recent posts
+
+:::Array{items.ref="#/state/posts"}
+:li{children.0="${$map/item/title}"}
+:::
+```
+
+Expands to:
+
+```json
+{
+  "$prototype": "Array",
+  "items": { "$ref": "#/state/posts" },
+  "map": { "tagName": "li", "children": ["${$map/item/title}"] }
+}
+```
+
+This is the canonical, round-trippable encoding. The older dot-path form
+(`children.prototype="Array" …` on the parent directive) is still accepted on parse for backward
+compatibility.
+
 ### HTML Attributes
 
 Attributes matching `aria-*`, `data-*`, or `slot` are routed to the `attributes` sub-object. All other attributes become top-level DOM properties.
