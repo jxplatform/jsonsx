@@ -165,6 +165,7 @@ export interface PanelLiveCtx {
   canvasMode: string;
   layoutWrapped: boolean;
   pageContentPrefix: (string | number)[] | null;
+  pageContentOffset: number;
   arrayPaths: Set<string>;
   pathMapper: (created: Node, path: (string | number)[], def: unknown) => void;
 }

@@ -162,6 +162,25 @@ describe("makePathMapper", () => {
     expect(elToPath.get(outside)).toEqual(["children", 0]);
   });
 
+  test("subtracts the slot-container offset for layout siblings before the slot", () => {
+    // Layout <main> = [<noscript>, <slot>] → page content starts at container index 1.
+    const mapper = makePathMapper({
+      ...baseCtx,
+      layoutWrapped: true,
+      pageContentOffset: 1,
+      pageContentPrefix: ["children", 1, "children"],
+    });
+    // First page child renders at container index 1 but is page-document children/0.
+    const first = document.createElement("section");
+    mapper(first, ["children", 1, "children", 1], {});
+    expect(elToPath.get(first)).toEqual(["children", 0]);
+
+    // Second page child → children/1, with a nested descendant preserved.
+    const nested = document.createElement("p");
+    mapper(nested, ["children", 1, "children", 2, "children", 0], {});
+    expect(elToPath.get(nested)).toEqual(["children", 1, "children", 0]);
+  });
+
   test("remaps repeater perimeter template paths to document paths", () => {
     const mapper = makePathMapper({ ...baseCtx, arrayPaths: new Set(["children/1"]) });
     // The perimeter's render path already equals the array's document path — no remap.

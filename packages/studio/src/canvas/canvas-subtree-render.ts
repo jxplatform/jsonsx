@@ -83,7 +83,12 @@ export function renderSubtree(
  */
 function docPathToRenderPath(docPath: JxPath, liveCtx: PanelLiveCtx): (string | number)[] {
   if (liveCtx.layoutWrapped && liveCtx.pageContentPrefix && docPath[0] === "children") {
-    return [...liveCtx.pageContentPrefix, ...docPath.slice(1)];
+    // Re-apply the slot-container offset stripped by makePathMapper: page child index N renders at
+    // Container index N + offset (offset = leading layout siblings before the <slot>).
+    const [, idx] = docPath;
+    return typeof idx === "number"
+      ? [...liveCtx.pageContentPrefix, idx + (liveCtx.pageContentOffset ?? 0), ...docPath.slice(2)]
+      : [...liveCtx.pageContentPrefix, ...docPath.slice(1)];
   }
   return docPath;
 }

@@ -59,26 +59,31 @@ const _failedElements = new Set();
 let _failedElementsDocPath: string | null = null;
 
 /**
- * Walk the merged document tree to find the path prefix where page children were distributed into
- * the layout slot. Returns the path to the container whose children are the page content (first
- * non-$__layout children array).
+ * Walk the merged document tree to find where page children were distributed into the layout slot.
+ * Returns the `prefix` path to the container whose children hold the page content (first container
+ * with a non-$__layout child), plus the `offset` — the index of the first page-content child within
+ * that container's children array. The offset is non-zero when the layout places sibling nodes
+ * (e.g. a `<noscript>`) before the `<slot>`, which shifts every page child's render index relative
+ * to its page-document index. The path mapper subtracts this offset so canvas paths line up with
+ * the page document (and thus the layers panel).
  *
  * @param {JxMutableNode} node
  * @param {(string | number)[]} [path]
- * @returns {(string | number)[] | null}
+ * @returns {{ prefix: (string | number)[]; offset: number } | null}
  */
 function findPageContentPrefix(
   node: JxMutableNode,
   path: (string | number)[] = [],
-): (string | number)[] | null {
+): { prefix: (string | number)[]; offset: number } | null {
   if (!node || typeof node !== "object") {
     return null;
   }
   if (Array.isArray(node.children)) {
-    for (const child of node.children) {
-      if (child && typeof child === "object" && !child.$__layout) {
-        return [...path, "children"];
-      }
+    const firstPageIdx = node.children.findIndex(
+      (child) => child && typeof child === "object" && !child.$__layout,
+    );
+    if (firstPageIdx !== -1) {
+      return { offset: firstPageIdx, prefix: [...path, "children"] };
     }
     for (let i = 0; i < node.children.length; i++) {
       const child = node.children[i];
@@ -138,6 +143,8 @@ export interface PathMapperCtx {
   canvasMode: string;
   layoutWrapped: boolean;
   pageContentPrefix: (string | number)[] | null;
+  /** Index of the first page-content child within the slot container (leading layout siblings). */
+  pageContentOffset?: number;
   /** Document paths of every mapped-array node, used to remap edit-mode repeater perimeters. */
   arrayPaths: Set<string>;
 }
@@ -148,7 +155,7 @@ export interface PathMapperCtx {
  * renders and isolated subtree re-renders so path bookkeeping stays consistent.
  */
 export function makePathMapper(ctx: PathMapperCtx) {
-  const { canvasMode, layoutWrapped, pageContentPrefix, arrayPaths } = ctx;
+  const { canvasMode, layoutWrapped, pageContentPrefix, pageContentOffset, arrayPaths } = ctx;
   return function onNodeCreated(
     created: Node,
     path: (string | number)[],
@@ -178,7 +185,15 @@ export function makePathMapper(ctx: PathMapperCtx) {
         path.length >= pfx.length &&
         pfx.every((seg: string | number, i: number) => path[i] === seg)
       ) {
-        mappedPath = ["children", ...path.slice(pfx.length)];
+        // Page children render at container indices [offset, offset+1, …] when the layout places
+        // Sibling nodes before the <slot>. Subtract the offset so they map back to the page
+        // Document's 0-based child indices (what flattenTree / the layers panel use).
+        const rest = path.slice(pfx.length);
+        const [containerIdx] = rest;
+        mappedPath =
+          typeof containerIdx === "number"
+            ? ["children", containerIdx - (pageContentOffset ?? 0), ...rest.slice(1)]
+            : ["children", ...rest];
       }
     }
 
@@ -261,6 +276,8 @@ export async function renderCanvasLive(
 
   /** @type {(string | number)[] | null} Path prefix in merged doc where page children live */
   let pageContentPrefix = null;
+  /** Index of the first page child within the slot container (offset by leading layout siblings). */
+  let pageContentOffset = 0;
 
   if (isPage) {
     const layoutPath = getEffectiveLayoutPath(doc.$layout);
@@ -277,7 +294,9 @@ export async function renderCanvasLive(
         renderDoc =
           canvasMode === "preview" ? merged : prepareForEditMode(stripEventHandlers(merged));
         layoutWrapped = true;
-        pageContentPrefix = findPageContentPrefix(merged);
+        const pageContent = findPageContentPrefix(merged);
+        pageContentPrefix = pageContent?.prefix ?? null;
+        pageContentOffset = pageContent?.offset ?? 0;
       }
     }
   }
@@ -531,6 +550,7 @@ export async function renderCanvasLive(
       arrayPaths,
       canvasMode,
       layoutWrapped,
+      pageContentOffset,
       pageContentPrefix,
     });
     // Render inside a detached effect scope so the tree's reactive effects (template bindings,
@@ -588,6 +608,7 @@ export async function renderCanvasLive(
         arrayPaths,
         canvasMode,
         layoutWrapped,
+        pageContentOffset,
         pageContentPrefix,
         pathMapper,
         scope: $defs as Record<string, unknown>,
