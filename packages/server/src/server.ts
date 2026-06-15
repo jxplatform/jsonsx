@@ -332,7 +332,11 @@ export async function createDevServer(options: {
         return new Response("Not found", { status: 404 });
       }
 
-      if (handleSSE && path.endsWith(".html")) {
+      // Inject the live-reload script into served HTML — but NOT into the Studio editor.
+      // Studio manages its own state (open tabs, undo history, chat) and refreshes
+      // Edited files in-place; a blanket location.reload() would destroy that, e.g. when
+      // The AI assistant writes a file matching a build glob inside the watched root.
+      if (handleSSE && path.endsWith(".html") && !path.startsWith("/packages/studio/")) {
         const html = await file.text();
         return new Response(injectSSE(html), {
           headers: { "Content-Type": "text/html; charset=utf-8" },
