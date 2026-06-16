@@ -7,6 +7,7 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
+import { repeat } from "lit-html/directives/repeat.js";
 import {
   VOID_ELEMENTS,
   childIndex,
@@ -123,7 +124,7 @@ export function renderLayersTemplate(ctx: {
   const rows = flattenTree(tab!.doc.document);
   const collapsed = (view._layersCollapsed ||= new Set());
 
-  const layerRows: TemplateResult[] = [];
+  const layerRows: { key: string; tpl: TemplateResult }[] = [];
   for (const { node, path, depth, nodeType } of rows) {
     let hidden = false;
     for (let d = 1; d <= path.length; d++) {
@@ -143,15 +144,18 @@ export function renderLayersTemplate(ctx: {
 
     if (nodeType === "text") {
       const textPreview = String(node).length > 40 ? `${String(node).slice(0, 40)}…` : String(node);
-      layerRows.push(html`
-        <div
-          class="layer-row"
-          style="padding-left:${depth * 16 + 8}px; opacity: 0.6; font-style: italic;"
-        >
-          <span class="layer-tag" style="background: #64748b; font-size: 0.65rem;">text</span>
-          <span class="layer-label">${textPreview}</span>
-        </div>
-      `);
+      layerRows.push({
+        key: pathKey(path),
+        tpl: html`
+          <div
+            class="layer-row"
+            style="padding-left:${depth * 16 + 8}px; opacity: 0.6; font-style: italic;"
+          >
+            <span class="layer-tag" style="background: #64748b; font-size: 0.65rem;">text</span>
+            <span class="layer-label">${textPreview}</span>
+          </div>
+        `,
+      });
       continue;
     }
 
@@ -271,135 +275,142 @@ export function renderLayersTemplate(ctx: {
         : null;
     const canMoveOut = isStructural && !isRoot && Boolean(grandparentPath);
 
-    layerRows.push(html`
-      <div
-        class=${classMap({ "layer-row": true, selected: isSelected })}
-        data-path=${key}
-        data-dnd-row=${isStructural ? key : nothing}
-        data-dnd-depth=${isStructural ? depth : nothing}
-        data-dnd-void=${isStructural && isVoidEl ? "" : nothing}
-        data-dnd-expanded=${isStructural && isExpandable && !collapsed.has(key) ? "" : nothing}
-        @click=${() => {
-          activeTab.value!.session.selection = path;
-          panToElement(path);
-        }}
-        @dblclick=${isStructural
-          ? (e: MouseEvent) => {
-              e.stopPropagation();
-              startLayerTitleEdit(path, ctx.rerender);
-            }
-          : nothing}
-        @contextmenu=${isStructural
-          ? (e: MouseEvent) =>
-              showContextMenu(e, path, {
-                onEditComponent: ctx.navigateToComponent,
-                rerender: ctx.rerender,
-              })
-          : nothing}
-      >
-        <span class="layer-indent" style="width:${depth * 16}px"></span>
-        <span class="layer-toggle"
-          >${isExpandable
+    layerRows.push({
+      key,
+      tpl: html`
+        <div
+          class=${classMap({ "layer-row": true, selected: isSelected })}
+          data-path=${key}
+          data-dnd-row=${isStructural ? key : nothing}
+          data-dnd-depth=${isStructural ? depth : nothing}
+          data-dnd-void=${isStructural && isVoidEl ? "" : nothing}
+          data-dnd-expanded=${isStructural && isExpandable && !collapsed.has(key) ? "" : nothing}
+          @click=${() => {
+            activeTab.value!.session.selection = path;
+            panToElement(path);
+          }}
+          @dblclick=${isStructural
+            ? (e: MouseEvent) => {
+                e.stopPropagation();
+                startLayerTitleEdit(path, ctx.rerender);
+              }
+            : nothing}
+          @contextmenu=${isStructural
+            ? (e: MouseEvent) =>
+                showContextMenu(e, path, {
+                  onEditComponent: ctx.navigateToComponent,
+                  rerender: ctx.rerender,
+                })
+            : nothing}
+        >
+          <span class="layer-indent" style="width:${depth * 16}px"></span>
+          <span class="layer-toggle"
+            >${isExpandable
+              ? html`
+                  ${collapsed.has(key)
+                    ? html`<sp-icon-chevron-right></sp-icon-chevron-right>`
+                    : html`<sp-icon-chevron-down></sp-icon-chevron-down>`}
+                `
+              : nothing}</span
+          >
+          <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
+          <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
+            >${labelText}</span
+          >
+          ${isStructural && !isRoot
             ? html`
-                ${collapsed.has(key)
-                  ? html`<sp-icon-chevron-right></sp-icon-chevron-right>`
-                  : html`<sp-icon-chevron-down></sp-icon-chevron-down>`}
+                <span class="layer-actions">
+                  <span class="layer-drag-handle" title="Drag to reorder">⠿</span>
+                  ${canMoveUp
+                    ? html`<sp-action-button
+                        quiet
+                        size="xs"
+                        title="Move up"
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          (e.currentTarget as HTMLElement).blur();
+                          const pp = parentPath as JxPath;
+                          transactDoc(activeTab.value!, (t) =>
+                            mutateMoveNode(t, path, pp, idx - 1),
+                          );
+                        }}
+                      >
+                        <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
+                      </sp-action-button>`
+                    : nothing}
+                  ${canMoveDown
+                    ? html`<sp-action-button
+                        quiet
+                        size="xs"
+                        title="Move down"
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          (e.currentTarget as HTMLElement).blur();
+                          const pp = parentPath as JxPath;
+                          transactDoc(activeTab.value!, (t) =>
+                            mutateMoveNode(t, path, pp, idx + 2),
+                          );
+                        }}
+                      >
+                        <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
+                      </sp-action-button>`
+                    : nothing}
+                  ${canMoveIn
+                    ? html`<sp-action-button
+                        quiet
+                        size="xs"
+                        title="Move into previous sibling"
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          (e.currentTarget as HTMLElement).blur();
+                          const pp = parentPath as JxPath;
+                          const prevPath = [...pp, "children", idx - 1];
+                          const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
+                          const len = childList(prev).length;
+                          transactDoc(activeTab.value!, (t) =>
+                            mutateMoveNode(t, path, prevPath, len),
+                          );
+                        }}
+                      >
+                        <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
+                      </sp-action-button>`
+                    : nothing}
+                  ${canMoveOut
+                    ? html`<sp-action-button
+                        quiet
+                        size="xs"
+                        title="Move out of parent"
+                        @click=${(e: MouseEvent) => {
+                          e.stopPropagation();
+                          (e.currentTarget as HTMLElement).blur();
+                          const gp = grandparentPath as JxPath;
+                          const parentIdx = childIndex(parentPath!) as number;
+                          transactDoc(activeTab.value!, (t) =>
+                            mutateMoveNode(t, path, gp, parentIdx + 1),
+                          );
+                        }}
+                      >
+                        <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
+                      </sp-action-button>`
+                    : nothing}
+                  <sp-action-button
+                    quiet
+                    size="xs"
+                    class="layer-delete"
+                    title="Delete"
+                    @click=${(e: MouseEvent) => {
+                      e.stopPropagation();
+                      transactDoc(activeTab.value!, (t) => mutateRemoveNode(t, path));
+                    }}
+                  >
+                    <sp-icon-close slot="icon"></sp-icon-close>
+                  </sp-action-button>
+                </span>
               `
-            : nothing}</span
-        >
-        <span class=${badgeClass} title=${ifDefined(badgeTitle ?? undefined)}>${badgeText}</span>
-        <span class="layer-label" style=${labelItalic ? "font-style:italic" : nothing}
-          >${labelText}</span
-        >
-        ${isStructural && !isRoot
-          ? html`
-              <span class="layer-actions">
-                <span class="layer-drag-handle" title="Drag to reorder">⠿</span>
-                ${canMoveUp
-                  ? html`<sp-action-button
-                      quiet
-                      size="xs"
-                      title="Move up"
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        (e.currentTarget as HTMLElement).blur();
-                        const pp = parentPath as JxPath;
-                        transactDoc(activeTab.value!, (t) => mutateMoveNode(t, path, pp, idx - 1));
-                      }}
-                    >
-                      <sp-icon-arrow-up slot="icon"></sp-icon-arrow-up>
-                    </sp-action-button>`
-                  : nothing}
-                ${canMoveDown
-                  ? html`<sp-action-button
-                      quiet
-                      size="xs"
-                      title="Move down"
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        (e.currentTarget as HTMLElement).blur();
-                        const pp = parentPath as JxPath;
-                        transactDoc(activeTab.value!, (t) => mutateMoveNode(t, path, pp, idx + 2));
-                      }}
-                    >
-                      <sp-icon-arrow-down slot="icon"></sp-icon-arrow-down>
-                    </sp-action-button>`
-                  : nothing}
-                ${canMoveIn
-                  ? html`<sp-action-button
-                      quiet
-                      size="xs"
-                      title="Move into previous sibling"
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        (e.currentTarget as HTMLElement).blur();
-                        const pp = parentPath as JxPath;
-                        const prevPath = [...pp, "children", idx - 1];
-                        const prev = getNodeAtPath(activeTab.value!.doc.document, prevPath);
-                        const len = childList(prev).length;
-                        transactDoc(activeTab.value!, (t) =>
-                          mutateMoveNode(t, path, prevPath, len),
-                        );
-                      }}
-                    >
-                      <sp-icon-arrow-right slot="icon"></sp-icon-arrow-right>
-                    </sp-action-button>`
-                  : nothing}
-                ${canMoveOut
-                  ? html`<sp-action-button
-                      quiet
-                      size="xs"
-                      title="Move out of parent"
-                      @click=${(e: MouseEvent) => {
-                        e.stopPropagation();
-                        (e.currentTarget as HTMLElement).blur();
-                        const gp = grandparentPath as JxPath;
-                        const parentIdx = childIndex(parentPath!) as number;
-                        transactDoc(activeTab.value!, (t) =>
-                          mutateMoveNode(t, path, gp, parentIdx + 1),
-                        );
-                      }}
-                    >
-                      <sp-icon-arrow-left slot="icon"></sp-icon-arrow-left>
-                    </sp-action-button>`
-                  : nothing}
-                <sp-action-button
-                  quiet
-                  size="xs"
-                  class="layer-delete"
-                  title="Delete"
-                  @click=${(e: MouseEvent) => {
-                    e.stopPropagation();
-                    transactDoc(activeTab.value!, (t) => mutateRemoveNode(t, path));
-                  }}
-                >
-                  <sp-icon-close slot="icon"></sp-icon-close>
-                </sp-action-button>
-              </span>
-            `
-          : nothing}
-      </div>
-    `);
+            : nothing}
+        </div>
+      `,
+    });
   }
 
   return html`
@@ -428,7 +439,11 @@ export function renderLayersTemplate(ctx: {
           ctx.rerender();
         }}
       >
-        ${layerRows}
+        ${repeat(
+          layerRows,
+          (r) => r.key,
+          (r) => r.tpl,
+        )}
       </div>
     </div>
   `;

@@ -306,6 +306,18 @@ describe("showLayerDropGap / clearLayerDropGap", () => {
     expect(rows[3].style.transform).toBe("");
     expect(view._currentDropTargetRow).toBeNull();
   });
+
+  test("clearLayerDropGap restores display hidden by hideDescendantRows", async () => {
+    const { container, rows } = await setupLayers();
+    // Simulate hideDescendantRows hiding the dragged subtree during a drag.
+    rows[1].style.display = "none";
+    rows[1].style.transform = "translateY(24px)";
+    dnd.clearLayerDropGap(container);
+    // Without the display reset, lit would reuse this node (display:none) for whatever row lands
+    // On it after the post-drop re-render — silently hiding an unrelated sibling.
+    expect(rows[1].style.display).toBe("");
+    expect(rows[1].style.transform).toBe("");
+  });
 });
 
 describe("registerLayersDnD — monitor", () => {

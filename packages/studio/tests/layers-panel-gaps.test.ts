@@ -357,3 +357,48 @@ describe("startLayerTitleEdit", () => {
     expect(document.querySelector(".layer-title-input")).toBeNull();
   });
 });
+
+describe("renderLayersTemplate — keyed rows", () => {
+  test("a stale display:none does not leak to a stable-key sibling after a structural move", async () => {
+    // Two sibling containers: `wrap` holds a repeater, `target` holds a paragraph. Mirrors the
+    // Real bug: dragging the repeater into `target` left `display:none` on the dragged subtree,
+    // Which — under positional (unkeyed) reuse — leaked onto `target`'s paragraph row.
+    resetWorkspaceWithTab({
+      children: [
+        {
+          $props: {},
+          children: [
+            {
+              $prototype: "Array",
+              items: { $ref: "#/state/things" },
+              map: { tagName: "li", textContent: "item" },
+            },
+          ],
+          tagName: "wrap",
+        },
+        { $props: {}, children: [{ tagName: "p", textContent: "keep me" }], tagName: "target" },
+      ],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+
+    await renderLayers();
+    // Simulate hideDescendantRows leaving display:none on the dragged repeater's template row.
+    const template = rowByKey(["children", 0, "children", 0, "map"]);
+    expect(template).not.toBeNull();
+    template!.style.display = "none";
+
+    // Move the Array node into `target` (append) — the repeater's key changes, but the paragraph's
+    // Key (children/1/children/0) stays stable, so its keyed DOM node is reused untouched.
+    const doc = activeTab.value!.doc.document as unknown as {
+      children: { children: unknown[] }[];
+    };
+    const [arr] = doc.children[0].children.splice(0, 1);
+    doc.children[1].children.push(arr);
+    await renderLayers();
+
+    const para = rowByKey(["children", 1, "children", 0]);
+    expect(para).not.toBeNull();
+    expect(para!.textContent).toContain("keep me");
+    expect(para!.style.display).not.toBe("none");
+  });
+});
