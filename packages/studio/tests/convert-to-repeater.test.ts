@@ -110,16 +110,16 @@ describe("guards", () => {
 // ─── Existing array source ────────────────────────────────────────────────────
 
 describe("existing array defs", () => {
-  test("confirm wraps the element in an Array repeater bound to the first array def", async () => {
+  test("confirm replaces the element in place with an Array repeater (no wrapper div)", async () => {
     const done = convertToRepeater();
     await flush();
     expect(dialog()).not.toBeNull();
     confirmDialog();
     await done;
 
-    const node = child0();
-    expect(node.tagName).toBe("div");
-    const repeater = node.children as Record<string, unknown>;
+    // The selected element becomes the array node directly — no throwaway <div> wrapper.
+    const repeater = child0();
+    expect(repeater.tagName).toBeUndefined();
     expect(repeater.$prototype).toBe("Array");
     expect(repeater.items).toEqual({ $ref: "#/state/rows" });
     expect((repeater.map as Record<string, unknown>).tagName).toBe("li");
@@ -144,7 +144,7 @@ describe("existing array defs", () => {
     setPicker("Items source", "extra");
     confirmDialog();
     await done;
-    expect((child0().children as Record<string, unknown>).items).toEqual({
+    expect((child0() as Record<string, unknown>).items).toEqual({
       $ref: "#/state/extra",
     });
   });
@@ -161,7 +161,7 @@ describe("existing array defs", () => {
     confirmDialog();
     await done;
 
-    const repeater = child0().children as Record<string, unknown>;
+    const repeater = child0() as Record<string, unknown>;
     expect(repeater.filter).toEqual({ $ref: "#/state/byDate" });
     expect(repeater.sort).toEqual({ $ref: "#/state/byDate" });
   });
@@ -176,7 +176,7 @@ describe("existing array defs", () => {
     await flush();
     confirmDialog();
     await done;
-    expect((child0().children as Record<string, unknown>).items).toEqual({
+    expect((child0() as Record<string, unknown>).items).toEqual({
       $ref: "#/state/feed",
     });
   });
@@ -244,7 +244,7 @@ describe("create new definition", () => {
       default: [],
       type: "array",
     });
-    expect((child0().children as Record<string, unknown>).items).toEqual({
+    expect((child0() as Record<string, unknown>).items).toEqual({
       $ref: "#/state/myList",
     });
   });
@@ -260,7 +260,7 @@ describe("create new definition", () => {
     setNewName("fresh");
     confirmDialog();
     await done;
-    expect((child0().children as Record<string, unknown>).items).toEqual({
+    expect((child0() as Record<string, unknown>).items).toEqual({
       $ref: "#/state/fresh",
     });
   });

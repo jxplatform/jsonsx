@@ -37,6 +37,21 @@ export function renderCanvasNode(
     return;
   }
 
+  // Array pseudo-element: render as a repeater perimeter at the array's own path, with a single
+  // Template instance inside (matches the edit-mode visual).
+  if (isMappedArray(node)) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "repeater-perimeter";
+    elToPath.set(wrapper, path);
+    const template = node.map;
+    if (template && typeof template === "object") {
+      renderCanvasNode(template, [...path, "map"], wrapper, activeBreakpoints, featureToggles);
+    }
+    wrapper.style.pointerEvents = "none";
+    parent.append(wrapper);
+    return wrapper;
+  }
+
   const tag = node.tagName || "div";
   const el = document.createElement(tag);
 

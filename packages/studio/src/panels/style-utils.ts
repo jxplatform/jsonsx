@@ -4,7 +4,6 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 
 import { getNodeAtPath } from "../store";
 import { activeTab } from "../workspace/workspace";
-import { camelToKebab } from "../utils/studio-utils";
 import cssMeta from "../../data/css-meta.json";
 
 let cssInitialMap = new Map<string, string>();
@@ -251,4 +250,5 @@ export function currentFontFamily() {
   return raw;
 }
 
-export { cssMeta, camelToKebab };
+export { default as cssMeta } from "../../data/css-meta.json";
+export { camelToKebab } from "../utils/studio-utils";

@@ -245,6 +245,21 @@ describe("findCanvasElement", () => {
     expect(findCanvasElement(["children", "map"], canvas)).toBe(item);
   });
 
+  test("resolves an array member node (perimeter) and its template via the 'map' hop", () => {
+    const canvas = document.createElement("div");
+    const root = document.createElement("div");
+    const p0 = document.createElement("p");
+    const perimeter = document.createElement("div"); // Array member at children[1]
+    const item = document.createElement("li"); // Template
+    perimeter.append(item);
+    root.append(p0, perimeter);
+    canvas.append(root);
+    elToPath.set(perimeter, ["children", 1]);
+    elToPath.set(item, ["children", 1, "map"]);
+    expect(findCanvasElement(["children", 1], canvas)).toBe(perimeter);
+    expect(findCanvasElement(["children", 1, "map"], canvas)).toBe(item);
+  });
+
   test("falls back to a full scan when the direct walk dead-ends", () => {
     const { canvas, p1 } = buildCanvas();
     // Walk to children[5] fails, but p1 is registered under that path

@@ -146,61 +146,63 @@
         {
           "tagName": "ul",
           "style": { "listStyle": "none", "padding": "0", "margin": "0" },
-          "children": {
-            "$prototype": "Array",
-            "items": { "$ref": "#/state/items" },
-            "map": {
-              "tagName": "li",
-              "style": {
-                "display": "flex",
-                "alignItems": "center",
-                "padding": "0.1em 0.5em 0.1em 0.75em",
-                "margin": "0.4em 0",
-                "backgroundColor": "white",
-                "border": "1px solid #dee2e6",
-                "borderRadius": "5px",
-                ":hover": { "borderColor": "#adb5bd" }
-              },
-              "children": [
-                {
-                  "tagName": "span",
-                  "textContent": "${$map.item}",
-                  "contentEditable": "true",
-                  "onblur": { "$ref": "#/state/saveEdit" },
-                  "onkeydown": { "$ref": "#/state/editKeydown" },
-                  "style": {
-                    "flex": "1",
-                    "padding": "0.55em 0.35em",
-                    "color": "#333",
-                    "outline": "none",
-                    "borderRadius": "3px",
-                    "cursor": "text",
-                    ":focus": {
-                      "background": "#f0f7ff",
-                      "boxShadow": "0 0 0 2px rgba(0,123,255,0.2)"
+          "children": [
+            {
+              "$prototype": "Array",
+              "items": { "$ref": "#/state/items" },
+              "map": {
+                "tagName": "li",
+                "style": {
+                  "display": "flex",
+                  "alignItems": "center",
+                  "padding": "0.1em 0.5em 0.1em 0.75em",
+                  "margin": "0.4em 0",
+                  "backgroundColor": "white",
+                  "border": "1px solid #dee2e6",
+                  "borderRadius": "5px",
+                  ":hover": { "borderColor": "#adb5bd" }
+                },
+                "children": [
+                  {
+                    "tagName": "span",
+                    "textContent": "${$map.item}",
+                    "contentEditable": "true",
+                    "onblur": { "$ref": "#/state/saveEdit" },
+                    "onkeydown": { "$ref": "#/state/editKeydown" },
+                    "style": {
+                      "flex": "1",
+                      "padding": "0.55em 0.35em",
+                      "color": "#333",
+                      "outline": "none",
+                      "borderRadius": "3px",
+                      "cursor": "text",
+                      ":focus": {
+                        "background": "#f0f7ff",
+                        "boxShadow": "0 0 0 2px rgba(0,123,255,0.2)"
+                      }
+                    }
+                  },
+                  {
+                    "tagName": "button",
+                    "textContent": "\u00d7",
+                    "onclick": { "$ref": "#/state/removeItem" },
+                    "style": {
+                      "marginLeft": "0.5em",
+                      "padding": "0.25em 0.5em",
+                      "fontSize": "1em",
+                      "lineHeight": "1",
+                      "backgroundColor": "transparent",
+                      "border": "1px solid transparent",
+                      "borderRadius": "3px",
+                      "color": "#adb5bd",
+                      "cursor": "pointer",
+                      ":hover": { "borderColor": "#dc3545", "color": "#dc3545" }
                     }
                   }
-                },
-                {
-                  "tagName": "button",
-                  "textContent": "\u00d7",
-                  "onclick": { "$ref": "#/state/removeItem" },
-                  "style": {
-                    "marginLeft": "0.5em",
-                    "padding": "0.25em 0.5em",
-                    "fontSize": "1em",
-                    "lineHeight": "1",
-                    "backgroundColor": "transparent",
-                    "border": "1px solid transparent",
-                    "borderRadius": "3px",
-                    "color": "#adb5bd",
-                    "cursor": "pointer",
-                    ":hover": { "borderColor": "#dc3545", "color": "#dc3545" }
-                  }
-                }
-              ]
+                ]
+              }
             }
-          }
+          ]
         }
       ]
     }

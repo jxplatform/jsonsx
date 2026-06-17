@@ -15,11 +15,19 @@ export const arrayNamespaceSchema = {
 } as const;
 
 export const childrenValueSchema = {
-  description: "Static array of child definitions, or an Array namespace for dynamic lists.",
+  description:
+    "Array of child definitions — elements, text, or Array namespaces (dynamic lists) mixed " +
+    "freely. A bare Array namespace (the whole children slot is one dynamic list) is also " +
+    "accepted for backward compatibility.",
   oneOf: [
     {
       items: {
-        oneOf: [{ $ref: "#/$defs/ElementDef" }, { type: "string" }, { type: "number" }],
+        oneOf: [
+          { $ref: "#/$defs/ElementDef" },
+          { $ref: "#/$defs/ArrayNamespace" },
+          { type: "string" },
+          { type: "number" },
+        ],
       },
       type: "array",
     },

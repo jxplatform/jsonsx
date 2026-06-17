@@ -44,34 +44,36 @@
             {
               "tagName": "ul",
               "style": { "listStyle": "none", "padding": "0", "margin": "0" },
-              "children": {
-                "$prototype": "Array",
-                "items": { "$ref": "#/state/posts" },
-                "map": {
-                  "tagName": "li",
-                  "style": { "marginBottom": "1rem" },
-                  "children": [
-                    {
-                      "tagName": "a",
-                      "style": {
-                        "textDecoration": "none",
-                        "color": "#0066cc",
-                        "fontWeight": "600",
-                        "cursor": "pointer",
-                        ":hover": { "textDecoration": "underline" }
+              "children": [
+                {
+                  "$prototype": "Array",
+                  "items": { "$ref": "#/state/posts" },
+                  "map": {
+                    "tagName": "li",
+                    "style": { "marginBottom": "1rem" },
+                    "children": [
+                      {
+                        "tagName": "a",
+                        "style": {
+                          "textDecoration": "none",
+                          "color": "#0066cc",
+                          "fontWeight": "600",
+                          "cursor": "pointer",
+                          ":hover": { "textDecoration": "underline" }
+                        },
+                        "textContent": "${$map.item?.frontmatter?.title ?? ''}",
+                        "attributes": { "data-slug": "${$map.item?.slug ?? ''}" },
+                        "onclick": { "$ref": "#/state/selectPost" }
                       },
-                      "textContent": "${$map.item?.frontmatter?.title ?? ''}",
-                      "attributes": { "data-slug": "${$map.item?.slug ?? ''}" },
-                      "onclick": { "$ref": "#/state/selectPost" }
-                    },
-                    {
-                      "tagName": "time",
-                      "style": { "display": "block", "fontSize": "0.8rem", "color": "#888" },
-                      "textContent": "${$map.item?.frontmatter?.date ?? ''}"
-                    }
-                  ]
+                      {
+                        "tagName": "time",
+                        "style": { "display": "block", "fontSize": "0.8rem", "color": "#888" },
+                        "textContent": "${$map.item?.frontmatter?.date ?? ''}"
+                      }
+                    ]
+                  }
                 }
-              }
+              ]
             }
           ]
         },

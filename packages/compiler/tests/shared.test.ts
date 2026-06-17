@@ -117,6 +117,30 @@ describe("isDynamic", () => {
     ).toBe(true);
   });
 
+  test("returns true for an Array pseudo-element among sibling children", () => {
+    expect(
+      isDynamic({
+        children: [
+          { tagName: "li", textContent: "static" },
+          { $prototype: "Array", items: { $ref: "#/state/list" }, map: { tagName: "li" } },
+        ],
+        tagName: "ul",
+      }),
+    ).toBe(true);
+  });
+
+  test("returns true for an Array pseudo-element with literal items among siblings", () => {
+    expect(
+      isDynamic({
+        children: [
+          { tagName: "li" },
+          { $prototype: "Array", items: [1, 2], map: { tagName: "li" } },
+        ],
+        tagName: "ul",
+      }),
+    ).toBe(true);
+  });
+
   test("returns true for $ref bindings", () => {
     expect(
       isDynamic({
@@ -202,6 +226,24 @@ describe("isNodeDynamic", () => {
         tagName: "div",
       }),
     ).toBe(false);
+  });
+
+  test("detects a node that is itself an Array pseudo-element", () => {
+    expect(
+      isNodeDynamic({ $prototype: "Array", items: { $ref: "#/state/x" }, map: { tagName: "li" } }),
+    ).toBe(true);
+  });
+
+  test("detects an Array pseudo-element among children", () => {
+    expect(
+      isNodeDynamic({
+        children: [
+          { tagName: "li" },
+          { $prototype: "Array", items: { $ref: "#/state/x" }, map: { tagName: "li" } },
+        ],
+        tagName: "ul",
+      }),
+    ).toBe(true);
   });
 });
 

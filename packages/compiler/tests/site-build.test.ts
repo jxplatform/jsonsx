@@ -1690,3 +1690,70 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
     expect(matches?.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+// ── Static expansion of array repeaters (whole-children + member among siblings) ──
+
+describe("buildSite — static repeater expansion", () => {
+  const REP_TMP = resolve(import.meta.dir, "__test-site-repeater__");
+
+  beforeAll(() => {
+    rmSync(REP_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(REP_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(REP_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Repeater Test" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(REP_TMP, "pages/index.json"),
+      JSON.stringify({
+        children: [
+          {
+            // Whole-children repeater (legacy form) — items resolve at build time.
+            children: {
+              $prototype: "Array",
+              items: { $ref: "#/state/fruit" },
+              map: { tagName: "li", textContent: "${$map.item}" },
+            },
+            tagName: "ul",
+          },
+          {
+            // Array member nestled between static siblings.
+            children: [
+              { tagName: "li", textContent: "header" },
+              {
+                $prototype: "Array",
+                items: { $ref: "#/state/nums" },
+                map: { tagName: "li", textContent: "${$map.item}" },
+              },
+              { tagName: "li", textContent: "footer" },
+            ],
+            tagName: "ol",
+          },
+        ],
+        state: { fruit: { default: ["apple", "pear"] }, nums: { default: [1, 2, 3] } },
+        title: "Repeaters",
+      }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(REP_TMP, { force: true, recursive: true });
+  });
+
+  it("statically expands whole-children and member repeaters, wrapper-less", async () => {
+    const result = await buildSite(REP_TMP);
+    expect(result.errors).toHaveLength(0);
+    const html = readFileSync(resolve(REP_TMP, "dist/index.html"), "utf8");
+    // Whole-children repeater items render directly inside <ul> (no wrapper).
+    expect(html).toContain("apple");
+    expect(html).toContain("pear");
+    // Member repeater items render between the static siblings inside <ol>.
+    const ol = html.slice(html.indexOf("<ol"), html.indexOf("</ol>"));
+    expect(ol.indexOf("header")).toBeLessThan(ol.indexOf("1"));
+    expect(ol.indexOf("3")).toBeLessThan(ol.indexOf("footer"));
+    // No throwaway wrapper div around the repeated items.
+    expect(html).not.toContain("repeater-perimeter");
+  });
+});

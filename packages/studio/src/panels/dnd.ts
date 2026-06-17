@@ -336,6 +336,11 @@ export function clearLayerDropGap(container: HTMLElement) {
   const rows = container.querySelectorAll(".layers-tree .layer-row");
   for (const r of rows) {
     (r as HTMLElement).style.transform = "";
+    // Also clear `display:none` left by hideDescendantRows. The `.layer-row` div has no `style`
+    // Lit binding and rows aren't keyed, so lit reuses these DOM nodes positionally on the
+    // Post-drop re-render — a stale `display:none` would otherwise hide whichever row lands on the
+    // Reused node (e.g. a sibling of the moved subtree).
+    (r as HTMLElement).style.display = "";
   }
 }
 

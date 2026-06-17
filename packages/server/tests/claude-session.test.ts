@@ -456,6 +456,7 @@ describe("streamSession", () => {
     const responseB = streamSession(id) as Response;
 
     controlled.push({ session_id: "s", text: "first", type: "assistant" });
+    // oxlint-disable-next-line unicorn/prefer-single-call -- controlled.push() is a queue helper taking one message, not Array#push
     controlled.push({ session_id: "s", text: "second", type: "assistant" });
     controlled.end();
     await waitForStatus(id, "idle");

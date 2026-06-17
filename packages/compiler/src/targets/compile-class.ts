@@ -128,16 +128,16 @@ export function compileClassJson(classDef: JxClassDef, _opts: Record<string, unk
     if (m.role === "accessor") {
       // Getter
       if (m.getter) {
-        lines.push(`  ${staticPrefix}get ${prefix}${name}() {`);
-        lines.push(`    ${m.getter.body}`);
-        lines.push("  }");
+        lines.push(`  ${staticPrefix}get ${prefix}${name}() {`, `    ${m.getter.body}`, "  }");
       }
       // Setter
       if (m.setter) {
         const setterParams = resolveParams(m.setter.parameters ?? []);
-        lines.push(`  ${staticPrefix}set ${prefix}${name}(${setterParams}) {`);
-        lines.push(`    ${m.setter.body}`);
-        lines.push("  }");
+        lines.push(
+          `  ${staticPrefix}set ${prefix}${name}(${setterParams}) {`,
+          `    ${m.setter.body}`,
+          "  }",
+        );
       }
     } else {
       lines.push(`  ${staticPrefix}${asyncPrefix}${prefix}${name}(${params}) {`);
@@ -148,11 +148,7 @@ export function compileClassJson(classDef: JxClassDef, _opts: Record<string, unk
     }
   }
 
-  lines.push("}");
-  lines.push("");
-  lines.push(`export { ${className} };`);
-  lines.push(`export default ${className};`);
-  lines.push("");
+  lines.push("}", "", `export { ${className} };`, `export default ${className};`, "");
 
   return lines.join("\n");
 }

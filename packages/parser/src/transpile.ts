@@ -21,7 +21,7 @@ import { htmlToJx } from "./html-to-jx.ts";
 import type { MdastNode } from "./types.ts";
 import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
 
-export { htmlToJx };
+export { htmlToJx } from "./html-to-jx.ts";
 
 // ─── Dot-path expansion ─────────────────────────────────────────────────────
 
@@ -30,6 +30,12 @@ export { htmlToJx };
  * DOM/HTML property collision.
  */
 const JX_DOLLAR_KEYS = new Set(["prototype", "ref", "component", "props", "switch", "elements"]);
+
+/**
+ * `$prototype` element types that serialize as a directive named after the prototype (no tagName),
+ * e.g. `:::Array`. On parse the synthetic tagName is dropped and `$prototype` is restored.
+ */
+const PROTOTYPE_DIRECTIVE_NAMES = new Set(["Array"]);
 
 /**
  * Annotation keys written as `--key` in markdown directives, mapped to `$key` in JX JSON. These use
@@ -472,6 +478,11 @@ export function mdastNodeToJx(node: MdastNode) {
  * @returns {JxElement}
  */
 function directiveToJx(node: MdastNode) {
+  // Prototype directive (e.g. `:::Array`) → `{ $prototype: name, ... }` with no tagName.
+  if (PROTOTYPE_DIRECTIVE_NAMES.has(node.name as string)) {
+    return prototypeDirectiveToJx(node);
+  }
+
   const el: JxElement = { tagName: node.name as string };
 
   if (node.attributes && Object.keys(node.attributes).length > 0) {
@@ -592,6 +603,36 @@ function directiveToJx(node: MdastNode) {
     }
   }
 
+  return el;
+}
+
+/**
+ * Convert a prototype directive (e.g. `:::Array`) to a tagName-less `$prototype` node. Attributes
+ * (items/filter/sort, dot-path expanded) become element-level props; the single nested child is the
+ * `map` template.
+ *
+ * @param {MdastNode} node
+ * @returns {JxElement}
+ */
+function prototypeDirectiveToJx(node: MdastNode) {
+  const el: JxElement = { $prototype: node.name as string };
+
+  if (node.attributes && Object.keys(node.attributes).length > 0) {
+    const expanded = expandDotPaths(node.attributes);
+    for (const [key, value] of Object.entries(expanded)) {
+      // The prototype is carried by the directive name; ignore any redundant attribute form.
+      if (key === "$prototype") {
+        continue;
+      }
+      el[key] = value as JsonValue;
+    }
+  }
+
+  const children = convertChildren(node.children ?? []);
+  const template = children.find((c) => c != null && typeof c === "object");
+  if (template) {
+    el.map = template as JxElement;
+  }
   return el;
 }
 

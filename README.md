@@ -114,17 +114,23 @@ Template strings work anywhere — element properties, styles, attributes:
 
 ### Dynamic lists
 
+A repeater is an array pseudo-element — a `$prototype: "Array"` object placed as a member of a
+`children` array (among siblings or alone). Its items render directly into the parent, with no
+wrapper element:
+
 ```json
 {
   "tagName": "ul",
-  "children": {
-    "$prototype": "Array",
-    "items": { "$ref": "#/state/todos" },
-    "map": {
-      "tagName": "li",
-      "textContent": "${$map.item.text}"
+  "children": [
+    {
+      "$prototype": "Array",
+      "items": { "$ref": "#/state/todos" },
+      "map": {
+        "tagName": "li",
+        "textContent": "${$map.item.text}"
+      }
     }
-  }
+  ]
 }
 ```
 

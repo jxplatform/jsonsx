@@ -1394,6 +1394,142 @@ describe("computed $src + Array map integration", () => {
   });
 });
 
+// ─── Array pseudo-elements among siblings (wrapper-less) ──────────────────────
+
+describe("Array members in a children array", () => {
+  test("array member renders items in place between static siblings, no wrapper", () => {
+    const state = reactive({ list: [{ v: "a" }, { v: "b" }] });
+    const el = renderNode(
+      {
+        children: [
+          { tagName: "h1", textContent: "head" },
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/list" },
+            map: { tagName: "li", textContent: "${$map.item.v}" },
+          },
+          { tagName: "footer", textContent: "foot" },
+        ],
+        tagName: "div",
+      },
+      state,
+    );
+    // No extra wrapper: h1 + 2×li + footer are all direct children of <div>.
+    const tags = [...el.children].map((c) => c.tagName.toLowerCase());
+    expect(tags).toEqual(["h1", "li", "li", "footer"]);
+    expect(el.children[1].textContent).toBe("a");
+    expect(el.children[2].textContent).toBe("b");
+  });
+
+  test("array member as the sole child renders items directly into the parent", () => {
+    const state = reactive({ list: [1, 2, 3] });
+    const el = renderNode(
+      {
+        children: [
+          { $prototype: "Array", items: { $ref: "#/state/list" }, map: { tagName: "li" } },
+        ],
+        tagName: "ul",
+      },
+      state,
+    );
+    expect([...el.children].map((c) => c.tagName.toLowerCase())).toEqual(["li", "li", "li"]);
+  });
+
+  test("array member re-renders only its own items, leaving siblings intact", async () => {
+    const state = reactive({ list: [{ v: "a" }, { v: "b" }] });
+    const el = renderNode(
+      {
+        children: [
+          { tagName: "h1", textContent: "head" },
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/list" },
+            map: { tagName: "li", textContent: "${$map.item.v}" },
+          },
+        ],
+        tagName: "div",
+      },
+      state,
+    );
+    expect(el.children.length).toBe(3);
+    state.list = [{ v: "x" }];
+    await wait();
+    const tags = [...el.children].map((c) => c.tagName.toLowerCase());
+    expect(tags).toEqual(["h1", "li"]);
+    expect(el.children[0].textContent).toBe("head");
+    expect(el.children[1].textContent).toBe("x");
+  });
+
+  test("two array members as siblings keep their relative order", () => {
+    const state = reactive({ a: ["a1", "a2"], b: ["b1"] });
+    const el = renderNode(
+      {
+        children: [
+          { $prototype: "Array", items: { $ref: "#/state/a" }, map: { tagName: "i" } },
+          { $prototype: "Array", items: { $ref: "#/state/b" }, map: { tagName: "b" } },
+        ],
+        tagName: "div",
+      },
+      state,
+    );
+    expect([...el.children].map((c) => c.tagName.toLowerCase())).toEqual(["i", "i", "b"]);
+  });
+
+  test("nested array (array template containing an array) renders and disposes cleanly", async () => {
+    const state = reactive({ groups: [{ items: ["x", "y"] }, { items: ["z"] }] });
+    const el = renderNode(
+      {
+        children: [
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/groups" },
+            map: {
+              children: [
+                {
+                  $prototype: "Array",
+                  items: { $ref: "$map/item/items" },
+                  map: { tagName: "span" },
+                },
+              ],
+              tagName: "section",
+            },
+          },
+        ],
+        tagName: "div",
+      },
+      state,
+    );
+    const sections = el.querySelectorAll("section");
+    expect(sections.length).toBe(2);
+    expect(sections[0].querySelectorAll("span").length).toBe(2);
+    expect(sections[1].querySelectorAll("span").length).toBe(1);
+    // Replacing the outer list disposes the old generation's inner arrays and rebuilds.
+    state.groups = [{ items: ["only"] }];
+    await wait();
+    expect(el.querySelectorAll("section").length).toBe(1);
+    expect(el.querySelectorAll("span").length).toBe(1);
+  });
+
+  test("empty items array renders no item nodes but keeps siblings", async () => {
+    const state = reactive({ list: [] as number[] });
+    const el = renderNode(
+      {
+        children: [
+          { tagName: "h1" },
+          { $prototype: "Array", items: { $ref: "#/state/list" }, map: { tagName: "li" } },
+        ],
+        tagName: "div",
+      },
+      state,
+    );
+    expect(el.querySelectorAll("li").length).toBe(0);
+    expect(el.children.length).toBe(1);
+    state.list = [1, 2];
+    await wait();
+    expect(el.querySelectorAll("li").length).toBe(2);
+  });
+});
+
 // ─── Jx (top-level mount) ─────────────────────────────────────────────────
 
 describe("Jx", () => {

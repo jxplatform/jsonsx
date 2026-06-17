@@ -70,19 +70,28 @@ export function renderStatusbar() {
     const node = getNodeAtPath(tab.doc.document, sel);
     parts.push(`Selected: ${esc(nodeLabel(node))}`);
 
+    // Walk the path one structural step at a time. Most steps are `["children", index]` or
+    // `["cases", name]` pairs, but a repeater template is reached by a lone `"map"` segment — so the
+    // Step width varies. Emitting a crumb per node keeps the array pseudo-element ("Repeater") and
+    // Its template both visible instead of collapsing the array into a bare `[index]`.
     const pathSegments = [];
-    for (let i = 0; i < sel.length; i += 2) {
-      const subPath = sel.slice(0, i + 2);
+    for (let i = 0; i < sel.length; ) {
+      const seg = sel[i];
+      const step = seg === "map" ? 1 : 2;
+      const subPath = sel.slice(0, i + step);
       const childNode = getNodeAtPath(tab.doc.document, subPath);
       const fallbackTag = childNode?.tag;
       const label =
-        childNode?.tagName ||
-        (typeof fallbackTag === "string" ? fallbackTag : "") ||
-        `[${sel[i + 1]}]`;
+        childNode?.$prototype === "Array"
+          ? "Repeater"
+          : childNode?.tagName ||
+            (typeof fallbackTag === "string" ? fallbackTag : "") ||
+            (seg === "cases" ? String(sel[i + 1]) : `[${sel[i + 1]}]`);
       const dataPath = JSON.stringify(subPath);
       pathSegments.push(
         `<span class="sb-path-seg" data-path='${esc(dataPath)}'>${esc(label)}</span>`,
       );
+      i += step;
     }
     parts.push(`Path: ${pathSegments.join(' <span class="sb-path-sep">&gt;</span> ')}`);
   } else if (tab?.session.ui.stylebookSelection) {

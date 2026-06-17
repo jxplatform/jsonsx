@@ -174,17 +174,19 @@
     {
       "tagName": "div",
       "style": { "backgroundColor": "white" },
-      "children": {
-        "$prototype": "Array",
-        "items": { "$ref": "#/state/filteredTasks" },
-        "map": {
-          "tagName": "task-item",
-          "$props": {
-            "task": { "$ref": "$map/item" },
-            "tasks": { "$ref": "#/state/tasks" }
+      "children": [
+        {
+          "$prototype": "Array",
+          "items": { "$ref": "#/state/filteredTasks" },
+          "map": {
+            "tagName": "task-item",
+            "$props": {
+              "task": { "$ref": "$map/item" },
+              "tasks": { "$ref": "#/state/tasks" }
+            }
           }
         }
-      }
+      ]
     },
 
     {

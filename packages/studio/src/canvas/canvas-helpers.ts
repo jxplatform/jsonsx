@@ -107,14 +107,26 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
     return el;
   }
 
-  for (let i = 0; i < path.length; i += 2) {
-    if (path[i] !== "children" && path[i] !== "cases") {
+  let i = 0;
+  while (i < path.length) {
+    const seg = path[i];
+    // A lone "map" segment steps into a repeater perimeter's single template child.
+    if (seg === "map") {
+      el = el.children[0] as HTMLElement | undefined;
+      i += 1;
+      if (!el) {
+        break;
+      }
+      continue;
+    }
+    if (seg !== "children" && seg !== "cases") {
       return null;
     }
     const idx = path[i + 1];
     if (idx === undefined) {
       el = el.children[0] as HTMLElement | undefined;
     } else if (idx === "map") {
+      // Legacy whole-children template `[..., "children", "map"]`: perimeter at child[0].
       el = el.children[0]?.children[0] as HTMLElement | undefined;
     } else {
       el = el.children[idx as number] as HTMLElement | undefined;
@@ -122,6 +134,7 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
     if (!el) {
       break;
     }
+    i += 2;
   }
 
   if (el) {

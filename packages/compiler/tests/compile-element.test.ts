@@ -276,6 +276,29 @@ describe("compileElement — templates", () => {
     expect(content).toContain("s.items");
   });
 
+  test("mapped array as a member among sibling children (wrapper-less)", async () => {
+    const result = await compileElement({
+      children: [
+        { tagName: "h2", textContent: "Items" },
+        {
+          $prototype: "Array",
+          items: { $ref: "#/state/items" },
+          map: { tagName: "li", textContent: "${$map.item}" },
+        },
+        { tagName: "footer", textContent: "end" },
+      ],
+      state: { items: [1, 2, 3] },
+      tagName: "test-mixed-map",
+    });
+
+    const [{ content }] = result.files;
+    // The array expands inline among siblings — no wrapper element, siblings preserved.
+    expect(content).toContain("<h2");
+    expect(content).toContain("<footer");
+    expect(content).toContain(".map((item, index)");
+    expect(content).toContain("s.items");
+  });
+
   test("always clears innerHTML before render (no duplicate content on hydration)", async () => {
     const result = await compileElement({
       children: [{ tagName: "span", textContent: "${state.name}" }],

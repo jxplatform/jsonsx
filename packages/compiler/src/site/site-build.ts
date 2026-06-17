@@ -54,6 +54,7 @@ import type {
   JxAttributeValue,
   JxElement,
   JxHeadEntry,
+  JxMappedArray,
   JxMutableNode,
   JxStateDefinition,
   JxStyle,
@@ -775,25 +776,11 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
     }
   }
   const rawChildren = node.children;
+  // Legacy whole-children repeater: expand the items into the node's static children.
   if (isMappedArray(rawChildren)) {
-    const itemsSrc = rawChildren.items;
-    let items = null;
-    if (isRef(itemsSrc)) {
-      items = resolveRefValue(itemsSrc.$ref, scope);
-    } else if (Array.isArray(itemsSrc)) {
-      items = itemsSrc;
-    }
-    const mapTemplate = rawChildren.map;
-    if (Array.isArray(items) && mapTemplate) {
-      node.children = items.map((item, index) => {
-        const childScope = Object.create(scope);
-        childScope.$map = { index, item };
-        childScope["$map/item"] = item;
-        childScope["$map/index"] = index;
-        const expanded = expandMapTemplate(mapTemplate, childScope);
-        resolveDocTemplates(expanded, childScope);
-        return expanded;
-      });
+    const expanded = expandMappedArrayStatic(rawChildren, scope);
+    if (expanded) {
+      node.children = expanded;
       return;
     }
   }
@@ -822,10 +809,53 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
           continue;
         }
       }
+      // Array pseudo-element among siblings: expand its items in place.
+      if (isMappedArray(child)) {
+        const expanded = expandMappedArrayStatic(child, scope);
+        if (expanded) {
+          node.children.splice(i, 1, ...expanded);
+          i += expanded.length;
+          continue;
+        }
+      }
       resolveDocTemplates(child, scope);
       i += 1;
     }
   }
+}
+
+/**
+ * Statically expand a mapped array to its resolved item nodes when `items` resolves to an array at
+ * build time, or null otherwise (leave the array node for client-side rendering).
+ *
+ * @param {JxMappedArray} arrayDef
+ * @param {Record<string, unknown>} scope
+ * @returns {(JxElement | string)[] | null}
+ */
+function expandMappedArrayStatic(
+  arrayDef: JxMappedArray,
+  scope: Record<string, unknown>,
+): (JxElement | string)[] | null {
+  const itemsSrc = arrayDef.items;
+  let items = null;
+  if (isRef(itemsSrc)) {
+    items = resolveRefValue(itemsSrc.$ref, scope);
+  } else if (Array.isArray(itemsSrc)) {
+    items = itemsSrc;
+  }
+  const mapTemplate = arrayDef.map;
+  if (!Array.isArray(items) || !mapTemplate) {
+    return null;
+  }
+  return items.map((item, index) => {
+    const childScope = Object.create(scope);
+    childScope.$map = { index, item };
+    childScope["$map/item"] = item;
+    childScope["$map/index"] = index;
+    const expanded = expandMapTemplate(mapTemplate, childScope);
+    resolveDocTemplates(expanded, childScope);
+    return expanded;
+  });
 }
 
 /** Collector for CSS rules extracted from component slot content during expansion. */

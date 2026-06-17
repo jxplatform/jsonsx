@@ -126,6 +126,18 @@ export function isMappedArray(value: unknown): value is JxMappedArray {
   return isJsonObject(value) && value.$prototype === "Array";
 }
 
+/**
+ * Whether a node's `children` holds at least one mapped array — either as the bare whole-children
+ * slot (legacy) or as a member of the children array. Used by renderers and the compiler to decide
+ * if a children list needs inline repeater expansion.
+ */
+export function childrenContainArray(children?: unknown): boolean {
+  if (isMappedArray(children)) {
+    return true;
+  }
+  return Array.isArray(children) && children.some((c) => isMappedArray(c));
+}
+
 /** A .class.json schema-defined class document — `{ $prototype: "Class" }`. */
 export function isClassDef(value: unknown): value is JxClassDef {
   return isJsonObject(value) && value.$prototype === "Class";

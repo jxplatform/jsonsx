@@ -244,6 +244,52 @@ describe("mdastNodeToJx edge cases", () => {
   });
 });
 
+// ─── Prototype directives (:::Array) ────────────────────────────────────────
+
+describe("prototype directives", () => {
+  test(":::Array directive transpiles to a tagName-less $prototype node", () => {
+    const md = [':::Array{items.ref="#/state/rows"}', "${$map.item.name}", ":::", ""].join("\n");
+    const doc = transpileJxMarkdown(md);
+    const [node] = doc.children as JxElement[];
+    expect(node.$prototype).toBe("Array");
+    expect(node.tagName).toBeUndefined();
+    expect(node.items).toEqual({ $ref: "#/state/rows" });
+    expect((node.map as JxElement).tagName).toBe("p");
+    expect((node.map as JxElement).textContent).toBe("${$map.item.name}");
+  });
+
+  test(":::Array nestled among sibling blocks keeps order", () => {
+    const md = [
+      "# Title",
+      "",
+      ':::Array{items.ref="#/state/rows"}',
+      ":span{}",
+      ":::",
+      "",
+      "End",
+      "",
+    ].join("\n");
+    const doc = transpileJxMarkdown(md);
+    const kids = doc.children as JxElement[];
+    expect(kids[0].tagName).toBe("h1");
+    expect(kids[1].$prototype).toBe("Array");
+    // Trailing paragraph "End" remains a sibling after the array.
+    expect(kids.at(-1)?.textContent ?? (kids.at(-1)?.children as unknown[])?.[0]).toBeDefined();
+  });
+
+  test(":::Array with filter and sort attributes", () => {
+    const md = [
+      ':::Array{items.ref="#/state/rows" filter.ref="#/state/byDate" sort.ref="#/state/asc"}',
+      ":li{}",
+      ":::",
+      "",
+    ].join("\n");
+    const [node] = transpileJxMarkdown(md).children as JxElement[];
+    expect(node.filter).toEqual({ $ref: "#/state/byDate" });
+    expect(node.sort).toEqual({ $ref: "#/state/asc" });
+  });
+});
+
 // ─── mdastNodeToJx: standard node kinds ─────────────────────────────────────
 
 describe("mdastNodeToJx standard nodes", () => {

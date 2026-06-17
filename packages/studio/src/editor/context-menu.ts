@@ -272,16 +272,23 @@ export function showContextMenu(
   // Select the node
   tab.session.selection = path;
 
+  // Index-based structural actions (cut/duplicate/insert/wrap/delete) require a numeric child
+  // Index. Repeater templates (path tail "map") and the document root don't have one — they get
+  // Copy only — so we never splice with a non-numeric index.
+  const idxIsNumber = typeof childIndex(path) === "number";
+
   const items: { label: string; action?: () => void | Promise<void>; danger?: boolean }[] = [
     { action: () => copyNode(), label: "Copy" },
   ];
 
-  if (path.length >= 2) {
-    items.push({ action: () => cutNode(), label: "Cut" });
-    items.push({
-      action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
-      label: "Duplicate",
-    });
+  if (path.length >= 2 && idxIsNumber) {
+    items.push(
+      { action: () => cutNode(), label: "Cut" },
+      {
+        action: () => transactDoc(activeTab.value, (t) => mutateDuplicateNode(t, path)),
+        label: "Duplicate",
+      },
+    );
     if (node.style) {
       const nodeStyle = node.style;
       items.push({
@@ -305,33 +312,36 @@ export function showContextMenu(
         label: "Paste styles",
       });
     }
-    items.push({ label: "—" }); // Separator
-    items.push({
-      action: () => {
-        const pp = parentElementPath(path) as JxPath;
-        const idx = childIndex(path) as number;
-        transactDoc(activeTab.value, (t) =>
-          mutateInsertNode(t, pp, idx, { children: [], tagName: "p" }),
-        );
+    // Separator
+    items.push(
+      { label: "—" },
+      {
+        action: () => {
+          const pp = parentElementPath(path) as JxPath;
+          const idx = childIndex(path) as number;
+          transactDoc(activeTab.value, (t) =>
+            mutateInsertNode(t, pp, idx, { children: [], tagName: "p" }),
+          );
+        },
+        label: "Insert before",
       },
-      label: "Insert before",
-    });
-    items.push({
-      action: () => {
-        const pp = parentElementPath(path) as JxPath;
-        const idx = childIndex(path) as number;
-        transactDoc(activeTab.value, (t) =>
-          mutateInsertNode(t, pp, idx + 1, { children: [], tagName: "p" }),
-        );
+      {
+        action: () => {
+          const pp = parentElementPath(path) as JxPath;
+          const idx = childIndex(path) as number;
+          transactDoc(activeTab.value, (t) =>
+            mutateInsertNode(t, pp, idx + 1, { children: [], tagName: "p" }),
+          );
+        },
+        label: "Insert after",
       },
-      label: "Insert after",
-    });
-    items.push({
-      action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
-      label: "Wrap in Div",
-    });
-    // Don't show Repeat if already inside a repeater (path ends with "children", "map")
-    if (!(path.length >= 2 && path.at(-2) === "children" && path.at(-1) === "map")) {
+      {
+        action: () => transactDoc(activeTab.value, (t) => mutateWrapNode(t, path)),
+        label: "Wrap in Div",
+      },
+    );
+    // Don't offer Repeat on a repeater template (path tail "map") or on an array node itself.
+    if (path.at(-1) !== "map" && (node as JxMutableNode).$prototype !== "Array") {
       items.push({
         action: () => convertToRepeater(),
         label: "Repeat...",
@@ -368,48 +378,56 @@ export function showContextMenu(
         });
       }
     }
-    items.push({ label: "—" }); // Separator
-    items.push({
-      action: () => transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path)),
-      danger: true,
-      label: "Delete",
-    });
+    // Separator
+    items.push(
+      { label: "—" },
+      {
+        action: () => transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path)),
+        danger: true,
+        label: "Delete",
+      },
+    );
   }
-  if (path.length >= 2) {
-    items.push({ label: "—" });
-    items.push({
-      action: async () => {
-        const nodes = await readFromClipboard();
-        if (!nodes || nodes.length === 0) {
-          return;
-        }
-        const idx = Array.isArray(node.children) ? node.children.length : 0;
-        transactDoc(activeTab.value, (t) => {
-          for (let i = 0; i < nodes.length; i++) {
-            mutateInsertNode(t, path, idx + i, nodes[i]);
+  // Paste targets — never into/after an array node (its content is the single map template).
+  if (path.length >= 2 && (node as JxMutableNode).$prototype !== "Array") {
+    items.push(
+      { label: "—" },
+      {
+        action: async () => {
+          const nodes = await readFromClipboard();
+          if (!nodes || nodes.length === 0) {
+            return;
           }
-        });
-        statusMessage("Pasted");
+          const idx = Array.isArray(node.children) ? node.children.length : 0;
+          transactDoc(activeTab.value, (t) => {
+            for (let i = 0; i < nodes.length; i++) {
+              mutateInsertNode(t, path, idx + i, nodes[i]);
+            }
+          });
+          statusMessage("Pasted");
+        },
+        label: "Paste inside",
       },
-      label: "Paste inside",
-    });
-    items.push({
-      action: async () => {
-        const nodes = await readFromClipboard();
-        if (!nodes || nodes.length === 0) {
-          return;
-        }
-        const pp = parentElementPath(path) as JxPath;
-        const idx = childIndex(path) as number;
-        transactDoc(activeTab.value, (t) => {
-          for (let i = 0; i < nodes.length; i++) {
-            mutateInsertNode(t, pp, idx + 1 + i, nodes[i]);
+    );
+    if (idxIsNumber) {
+      items.push({
+        action: async () => {
+          const nodes = await readFromClipboard();
+          if (!nodes || nodes.length === 0) {
+            return;
           }
-        });
-        statusMessage("Pasted");
-      },
-      label: "Paste after",
-    });
+          const pp = parentElementPath(path) as JxPath;
+          const idx = childIndex(path) as number;
+          transactDoc(activeTab.value, (t) => {
+            for (let i = 0; i < nodes.length; i++) {
+              mutateInsertNode(t, pp, idx + 1 + i, nodes[i]);
+            }
+          });
+          statusMessage("Pasted");
+        },
+        label: "Paste after",
+      });
+    }
   }
 
   let x = e.clientX,

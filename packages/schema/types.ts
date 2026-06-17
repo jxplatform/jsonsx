@@ -198,6 +198,13 @@ export interface JxElement {
   tagName?: string;
   textContent?: string | null | JxRef;
   innerHTML?: string;
+  /**
+   * Child nodes. A repeater (`{ $prototype: "Array", … }`) may appear as a member of the array —
+   * nestled among siblings or as the sole child — and is structurally a `JxElement` (its
+   * `items`/`map`/`filter`/`sort` are absorbed by the open index signature; narrow with
+   * `isMappedArray`). The bare `| JxMappedArray` form (whole children slot is one repeater) is
+   * retained for backward compatibility with legacy docs.
+   */
   children?: (JxElement | string)[] | JxMappedArray;
   style?: JxStyle;
   attributes?: Record<string, JxAttributeValue>;
@@ -471,6 +478,12 @@ export interface JxMutableNode {
   tagName?: string;
   textContent?: string | null | JxRef;
   innerHTML?: string;
+  /**
+   * Child nodes. The editor models a mapped-array (repeater) member as a `JxMutableNode` carrying
+   * `$prototype: "Array"` (plus `items`/`map`/`filter`/`sort` below), so members stay assignable
+   * here. The bare `| JxMappedArray` form (whole children slot is one repeater) is retained for
+   * backward compatibility.
+   */
   children?: (JxMutableNode | string)[] | JxMappedArray;
   style?: JxStyle;
   attributes?: Record<string, JxAttributeValue>;

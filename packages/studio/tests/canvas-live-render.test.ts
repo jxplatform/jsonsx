@@ -119,9 +119,9 @@ afterEach(async () => {
 
 describe("makePathMapper", () => {
   const baseCtx = {
+    arrayPaths: new Set<string>(),
     canvasMode: "design",
     layoutWrapped: false,
-    mapParentPaths: new Set<unknown>(),
     pageContentPrefix: null,
   };
 
@@ -162,31 +162,70 @@ describe("makePathMapper", () => {
     expect(elToPath.get(outside)).toEqual(["children", 0]);
   });
 
-  test("remaps $map wrapper and template paths to document paths", () => {
-    const mapper = makePathMapper({ ...baseCtx, mapParentPaths: new Set(["children/1"]) });
-    const wrapper = document.createElement("div");
-    mapper(wrapper, ["children", 1, "children", 0], {});
-    expect(elToPath.get(wrapper)).toEqual(["children", 1, "children"]);
+  test("subtracts the slot-container offset for layout siblings before the slot", () => {
+    // Layout <main> = [<noscript>, <slot>] → page content starts at container index 1.
+    const mapper = makePathMapper({
+      ...baseCtx,
+      layoutWrapped: true,
+      pageContentOffset: 1,
+      pageContentPrefix: ["children", 1, "children"],
+    });
+    // First page child renders at container index 1 but is page-document children/0.
+    const first = document.createElement("section");
+    mapper(first, ["children", 1, "children", 1], {});
+    expect(elToPath.get(first)).toEqual(["children", 0]);
 
-    const template = document.createElement("li");
-    mapper(template, ["children", 1, "children", 0, "children", 0], {});
-    expect(elToPath.get(template)).toEqual(["children", 1, "children", "map"]);
-
-    const deep = document.createElement("em");
-    mapper(deep, ["children", 1, "children", 0, "children", 0, "children", 2], {});
-    expect(elToPath.get(deep)).toEqual(["children", 1, "children", "map", "children", 2]);
+    // Second page child → children/1, with a nested descendant preserved.
+    const nested = document.createElement("p");
+    mapper(nested, ["children", 1, "children", 2, "children", 0], {});
+    expect(elToPath.get(nested)).toEqual(["children", 1, "children", 0]);
   });
 
-  test("leaves non-template shapes and preview-mode paths unmapped", () => {
-    const mapper = makePathMapper({ ...baseCtx, mapParentPaths: new Set(["children/1"]) });
+  test("remaps repeater perimeter template paths to document paths", () => {
+    const mapper = makePathMapper({ ...baseCtx, arrayPaths: new Set(["children/1"]) });
+    // The perimeter's render path already equals the array's document path — no remap.
+    const perimeter = document.createElement("div");
+    mapper(perimeter, ["children", 1], {});
+    expect(elToPath.get(perimeter)).toEqual(["children", 1]);
+
+    // The template (perimeter's child[0]) collapses [...arrayPath, "children", 0] → [...arrayPath, "map"].
+    const template = document.createElement("li");
+    mapper(template, ["children", 1, "children", 0], {});
+    expect(elToPath.get(template)).toEqual(["children", 1, "map"]);
+
+    const deep = document.createElement("em");
+    mapper(deep, ["children", 1, "children", 0, "children", 2], {});
+    expect(elToPath.get(deep)).toEqual(["children", 1, "map", "children", 2]);
+  });
+
+  test("remaps nested repeater perimeters", () => {
+    // Outer array at children/1, inner array at its template's children/0.
+    const mapper = makePathMapper({
+      ...baseCtx,
+      arrayPaths: new Set(["children/1", "children/1/map/children/0"]),
+    });
+    // Inner perimeter render path = outer template > inner perimeter.
+    const innerPerimeter = document.createElement("div");
+    mapper(innerPerimeter, ["children", 1, "children", 0, "children", 0], {});
+    expect(elToPath.get(innerPerimeter)).toEqual(["children", 1, "map", "children", 0]);
+
+    // Inner template = inner perimeter > child[0].
+    const innerTemplate = document.createElement("span");
+    mapper(innerTemplate, ["children", 1, "children", 0, "children", 0, "children", 0], {});
+    expect(elToPath.get(innerTemplate)).toEqual(["children", 1, "map", "children", 0, "map"]);
+  });
+
+  test("leaves non-array shapes and preview-mode paths unmapped", () => {
+    const mapper = makePathMapper({ ...baseCtx, arrayPaths: new Set(["children/1"]) });
+    // Children/0 is not an array path → no remap.
     const sibling = document.createElement("li");
-    mapper(sibling, ["children", 1, "children", 0, "children", 3], {});
-    expect(elToPath.get(sibling)).toEqual(["children", 1, "children", 0, "children", 3]);
+    mapper(sibling, ["children", 0, "children", 3], {});
+    expect(elToPath.get(sibling)).toEqual(["children", 0, "children", 3]);
 
     const previewMapper = makePathMapper({
       ...baseCtx,
+      arrayPaths: new Set(["children/1"]),
       canvasMode: "preview",
-      mapParentPaths: new Set(["children/1"]),
     });
     const el = document.createElement("div");
     previewMapper(el, ["children", 1, "children", 0], {});
@@ -330,7 +369,7 @@ describe("renderCanvasLive", () => {
     expect(typeof panel.liveCtx?.pathMapper).toBe("function");
   });
 
-  test("collects $map parents and remaps repeater paths in the rendered DOM", async () => {
+  test("collects array paths and remaps repeater perimeter paths in the rendered DOM", async () => {
     const panel = {
       activeBreakpoints: null,
       liveCtx: null,
@@ -342,11 +381,14 @@ describe("renderCanvasLive", () => {
       {
         children: [
           {
-            children: {
-              $prototype: "Array",
-              items: ["a", "b"],
-              map: { tagName: "li", textContent: "item" },
-            },
+            // Array as a member of the <ul>'s children (canonical form).
+            children: [
+              {
+                $prototype: "Array",
+                items: ["a", "b"],
+                map: { tagName: "li", textContent: "item" },
+              },
+            ],
             tagName: "ul",
           },
           { $switch: "${mode}", cases: { a: { tagName: "i", textContent: "A" } }, tagName: "span" },
@@ -361,9 +403,10 @@ describe("renderCanvasLive", () => {
     expect(perimeter.className).toContain("repeater-perimeter");
     const li = perimeter.firstElementChild as HTMLElement;
     expect(li.tagName).toBe("LI");
-    expect(elToPath.get(perimeter)).toEqual(["children", 0, "children"]);
-    expect(elToPath.get(li)).toEqual(["children", 0, "children", "map"]);
-    expect(panel.liveCtx?.mapParentPaths.has("children/0")).toBe(true);
+    // Array node lives at ul.children[0] → doc path ["children",0,"children",0]; template adds "map".
+    expect(elToPath.get(perimeter)).toEqual(["children", 0, "children", 0]);
+    expect(elToPath.get(li)).toEqual(["children", 0, "children", 0, "map"]);
+    expect(panel.liveCtx?.arrayPaths.has("children/0/children/0")).toBe(true);
   });
 
   test("returns null and warns when rendering throws, leaving the canvas intact", async () => {

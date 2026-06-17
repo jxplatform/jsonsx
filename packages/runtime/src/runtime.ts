@@ -13,7 +13,15 @@
  * @module jx
  */
 
-import { computed, effect, isRef, onEffectCleanup, reactive, ref } from "@vue/reactivity";
+import {
+  computed,
+  effect,
+  effectScope,
+  isRef,
+  onEffectCleanup,
+  reactive,
+  ref,
+} from "@vue/reactivity";
 import { evaluateExpression, isMutating } from "./expression.ts";
 import type { DynamicClass, JxEventHandler, JxPath, JxRenderOptions, JxScope } from "./types.ts";
 import {
@@ -500,9 +508,6 @@ export function renderNode(
   if (def.$switch) {
     return renderSwitch(def, localState, options);
   }
-  if (isMappedArray(def.children)) {
-    return renderMappedArray(def, def.children, localState, options);
-  }
 
   const el = document.createElement(tagName);
 
@@ -519,10 +524,23 @@ export function renderNode(
   );
   applyAttributes(el, def.attributes ?? {}, localState);
 
-  const children = Array.isArray(def.children) ? def.children : [];
-  for (let i = 0; i < children.length; i++) {
-    const childOpts = options ? { ...options, _path: [...path, "children", i] } : undefined;
-    el.append(renderNode(children[i], localState, childOpts));
+  const kids = def.children;
+  if (isMappedArray(kids)) {
+    // Legacy whole-children repeater: the items render directly into `el` (which keeps its own
+    // TagName, e.g. <ul>), with no extra wrapper element.
+    const arrOpts = options ? { ...options, _path: [...path, "children"] } : undefined;
+    renderMappedArrayInto(el, kids, localState, arrOpts);
+  } else if (Array.isArray(kids)) {
+    for (let i = 0; i < kids.length; i++) {
+      const child = kids[i];
+      const childOpts = options ? { ...options, _path: [...path, "children", i] } : undefined;
+      if (isMappedArray(child)) {
+        // Array pseudo-element among siblings: expand inline, no wrapper.
+        renderMappedArrayInto(el, child, localState, childOpts);
+      } else {
+        el.append(renderNode(child, localState, childOpts));
+      }
+    }
   }
 
   return el;
@@ -837,65 +855,72 @@ function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue
 // ─── Array mapping ────────────────────────────────────────────────────────────
 
 /**
- * @param {JxElement} def
+ * Render a mapped array (repeater) wrapper-less: its item instances are inserted directly into
+ * `parentEl`, in place, ahead of an anchor comment that marks the array's position among the
+ * parent's other children. Re-renders reactively when `items` (or the filter/sort sources) change;
+ * each generation's item renders live in their own detached effect scope so nested arrays and
+ * template bindings are disposed — not leaked or double-fired — on the next change.
+ *
+ * `options._path` is the array node's own document path (`[…, "children", i]`, or `[…, "children"]`
+ * for a legacy whole-children repeater); item instances render at `[…that…, "map", index]`.
+ *
+ * @param {HTMLElement} parentEl
  * @param {import("@jxsuite/schema/types").JxMappedArray} arrayDef
  * @param {JxScope} state
  * @param {JxRenderOptions} [options]
- * @returns {HTMLElement}
  */
-function renderMappedArray(
-  def: JxElement,
+function renderMappedArrayInto(
+  parentEl: HTMLElement,
   arrayDef: JxMappedArray,
   state: JxScope,
   options?: JxRenderOptions,
 ) {
   const path = options?._path ?? [];
-  const container = document.createElement(def.tagName ?? "div");
-
-  if (options?.onNodeCreated) {
-    options.onNodeCreated(container, path, def, state);
-  }
-
-  applyProperties(container, def, state);
-  applyStyle(container, def.style ?? {}, (state["$media"] as Record<string, string>) ?? {}, state);
-  applyAttributes(container, def.attributes ?? {}, state);
+  const anchor = document.createComment("jx-array");
+  parentEl.append(anchor);
   const { items: itemsSrc, map: mapDef, filter: filterRef, sort: sortRef } = arrayDef;
 
   effect(() => {
-    container.innerHTML = "";
-    let items: unknown;
-    items = isRefObj(itemsSrc) ? resolveRef(itemsSrc.$ref, state) : itemsSrc;
-    if (!Array.isArray(items)) {
-      return;
-    }
-    if (isRefObj(filterRef)) {
+    let items: unknown = isRefObj(itemsSrc) ? resolveRef(itemsSrc.$ref, state) : itemsSrc;
+    if (Array.isArray(items) && isRefObj(filterRef)) {
       const fn = resolveRef(filterRef.$ref, state);
       if (typeof fn === "function") {
         items = items.filter(fn as (v: unknown) => boolean);
       }
     }
-    if (isRefObj(sortRef)) {
+    if (Array.isArray(items) && isRefObj(sortRef)) {
       const fn = resolveRef(sortRef.$ref, state);
       if (typeof fn === "function") {
         items = [...(items as unknown[])].toSorted(fn as (a: unknown, b: unknown) => number);
       }
     }
-
-    for (const [index, item] of (items as unknown[]).entries()) {
-      const child = Object.create(state);
-      child.$map = { index, item };
-      child["$map/item"] = item;
-      child["$map/index"] = index;
-      const childOpts = options
-        ? { ...options, _path: [...path, "children", "map", index] }
-        : undefined;
-      if (mapDef) {
-        container.append(renderNode(mapDef, child, childOpts));
-      }
+    if (!Array.isArray(items) || !mapDef) {
+      return;
     }
-  });
 
-  return container;
+    // Render this generation's items inside a detached scope; the cleanup (run before the next
+    // Re-render and when the enclosing render scope stops) tears it down and removes its nodes.
+    const scope = effectScope(true);
+    const nodes: ChildNode[] = [];
+    scope.run(() => {
+      for (const [index, item] of (items as unknown[]).entries()) {
+        const child = Object.create(state);
+        child.$map = { index, item };
+        child["$map/item"] = item;
+        child["$map/index"] = index;
+        const childOpts = options ? { ...options, _path: [...path, "map", index] } : undefined;
+        const node = renderNode(mapDef, child, childOpts);
+        anchor.before(node);
+        nodes.push(node);
+      }
+    });
+    onEffectCleanup(() => {
+      scope.stop();
+      for (const n of nodes) {
+        n.remove();
+      }
+    });
+  });
 }
 
 // ─── $switch ──────────────────────────────────────────────────────────────────

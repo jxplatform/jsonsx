@@ -39,6 +39,7 @@ import type {
   JsonObject,
   JsonValue,
   JxDocument,
+  JxMappedArray,
   JxMutableNode,
   JxPrototypeDef,
   JxStyle,
@@ -481,6 +482,22 @@ function buildClientNode(
       return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}>`;
     }
     return `<${tag}${staticAttrs}${dataBindAttr2}${bindAttrStr2}></${tag}>`;
+  } else if (Array.isArray(source.children) && source.children.some((c) => isMappedArray(c))) {
+    // ─── Children mix static nodes with array pseudo-elements ───
+    // Render the whole children region via one lit binding on this element (wrapper-less, one
+    // Lit part per element so multiple arrays among siblings don't collide), with each array
+    // Member expanded inline as a `.map()` hole.
+    counter.needsLit = true;
+    const listKey = `_children${counter.l}`;
+    counter.l += 1;
+    const childrenTpl = source.children
+      .map((c) => emitChildLit(c as JxMutableNode))
+      .join("\n      ");
+    bindings.set(listKey, `() => html\`\n      ${childrenTpl}\n    \``);
+    bindAttrs.push(`:render="${listKey}"`);
+    needsBind = true;
+    const bindAttrStr2 = ` ${bindAttrs.join(" ")}`;
+    return `<${tag}${staticAttrs} data-bind${bindAttrStr2}></${tag}>`;
   } else if (Array.isArray(source.children)) {
     const rawChildren = Array.isArray(raw?.children) ? raw.children : undefined;
     inner = source.children
@@ -611,10 +628,11 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     }
   } else if (def.innerHTML) {
     inner = mapRefsToLit(String(def.innerHTML));
+  } else if (isMappedArray(def.children)) {
+    // Legacy whole-children repeater nested inside a map template.
+    inner = `\n      ${emitArrayHole(def.children)}\n    `;
   } else if (Array.isArray(def.children)) {
-    inner = `\n      ${def.children
-      .map((c) => emitLitMapTemplate(c as JxMutableNode))
-      .join("\n      ")}\n    `;
+    inner = `\n      ${def.children.map((c) => emitChildLit(c)).join("\n      ")}\n    `;
   }
 
   const voidTags = new Set(["input", "br", "hr", "img", "meta", "link"]);
@@ -622,6 +640,42 @@ function emitLitMapTemplate(def: JxMutableNode | undefined) {
     return `<${tag}${attrs}>`;
   }
   return `<${tag}${attrs}>${inner}</${tag}>`;
+}
+
+/**
+ * Emit one child of a lit template: a string text node, an array pseudo-element (expanded inline
+ * via a `.map()` hole), or a nested element.
+ *
+ * @param {JxMutableNode | string} c
+ * @returns {string}
+ */
+function emitChildLit(c: JxMutableNode | string): string {
+  if (typeof c === "string") {
+    return isTemplateString(c) ? mapRefsToLit(c) : escapeHtml(c);
+  }
+  if (typeof c === "number" || typeof c === "boolean") {
+    return escapeHtml(String(c));
+  }
+  if (isMappedArray(c)) {
+    return emitArrayHole(c);
+  }
+  return emitLitMapTemplate(c);
+}
+
+/**
+ * Emit a lit-html `${(items ?? []).map(...)}` hole for a mapped array, expanding its template
+ * inline among sibling nodes (wrapper-less).
+ *
+ * @param {JxMappedArray} arrayDef
+ * @returns {string}
+ */
+function emitArrayHole(arrayDef: JxMappedArray): string {
+  const { items } = arrayDef;
+  const itemsExpr = isRefObject(items)
+    ? `state.${refToBindingKey((items as { $ref: string }).$ref)}`
+    : JSON.stringify(items ?? []);
+  const tpl = emitLitMapTemplate(arrayDef.map);
+  return `\${(${itemsExpr} ?? []).map((item, index) => html\`${tpl}\`)}`;
 }
 
 /**
@@ -696,15 +750,12 @@ function emitClientModule(
     lines.push(`import { ${[...names].join(", ")} } from '${src}';`);
   }
 
-  lines.push("");
-
   // State — reactive state
-  lines.push("const state = reactive({");
+  lines.push("", "const state = reactive({");
   for (const [key, val] of stateEntries) {
     lines.push(`  ${key}: ${JSON.stringify(val)},`);
   }
-  lines.push("});");
-  lines.push("");
+  lines.push("});", "");
 
   // Prototype init blocks (Request fetch, LocalStorage read, etc.)
   if (initBlocks.length > 0) {
@@ -750,38 +801,43 @@ function emitClientModule(
   } else {
     lines.push("const on = {};");
   }
-  lines.push("");
-
   // Hydration function
-  lines.push("function hydrate(root) {");
-  lines.push("  root.querySelectorAll('[data-bind]').forEach(el => {");
-  lines.push("    [...el.attributes].forEach(a => {");
-  lines.push("      if (a.name.startsWith(':')) {");
-  lines.push("        const parts = a.name.slice(1).split('.');");
-  lines.push("        const key = a.value;");
+  lines.push(
+    "",
+    "function hydrate(root) {",
+    "  root.querySelectorAll('[data-bind]').forEach(el => {",
+    "    [...el.attributes].forEach(a => {",
+    "      if (a.name.startsWith(':')) {",
+    "        const parts = a.name.slice(1).split('.');",
+    "        const key = a.value;",
+  );
   if (needsLit) {
-    lines.push("        if (parts[0] === 'render') {");
-    lines.push("          effect(() => { render(bind[key](), el); });");
-    lines.push("        } else if (parts[0] === 'style' && parts.length > 1) {");
+    lines.push(
+      "        if (parts[0] === 'render') {",
+      "          effect(() => { render(bind[key](), el); });",
+      "        } else if (parts[0] === 'style' && parts.length > 1) {",
+    );
   } else {
     lines.push("        if (parts[0] === 'style' && parts.length > 1) {");
   }
-  lines.push("          effect(() => { el.style[parts[1]] = bind[key](); });");
-  lines.push("        } else if (parts[0] === 'attr' && parts.length > 1) {");
-  lines.push("          effect(() => { el.setAttribute(parts[1], bind[key]()); });");
-  lines.push("        } else {");
-  lines.push("          const prop = parts[0].replace(/-([a-z])/g, (_, c) => c.toUpperCase());");
-  lines.push("          effect(() => { el[prop] = bind[key](); });");
-  lines.push("        }");
-  lines.push("      } else if (a.name.startsWith('@')) {");
-  lines.push("        el.addEventListener(a.name.slice(1), on[a.value]);");
-  lines.push("      }");
-  lines.push("    });");
-  lines.push("  });");
-  lines.push("}");
-  lines.push("");
-  lines.push("hydrate(document);");
-  lines.push("");
+  lines.push(
+    "          effect(() => { el.style[parts[1]] = bind[key](); });",
+    "        } else if (parts[0] === 'attr' && parts.length > 1) {",
+    "          effect(() => { el.setAttribute(parts[1], bind[key]()); });",
+    "        } else {",
+    "          const prop = parts[0].replace(/-([a-z])/g, (_, c) => c.toUpperCase());",
+    "          effect(() => { el[prop] = bind[key](); });",
+    "        }",
+    "      } else if (a.name.startsWith('@')) {",
+    "        el.addEventListener(a.name.slice(1), on[a.value]);",
+    "      }",
+    "    });",
+    "  });",
+    "}",
+    "",
+    "hydrate(document);",
+    "",
+  );
 
   return lines.join("\n");
 }
@@ -808,8 +864,10 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
   ];
 
   if (isTemplateUrl) {
-    lines.push(`  const url = \`${url}\`;`);
-    lines.push('  if (!url || url === "undefined" || url.includes("undefined")) return;');
+    lines.push(
+      `  const url = \`${url}\`;`,
+      '  if (!url || url === "undefined" || url.includes("undefined")) return;',
+    );
   } else {
     lines.push(`  const url = ${JSON.stringify(url)};`);
   }
@@ -830,11 +888,13 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
   }
 
   const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
-  lines.push(`  fetch(url${optsStr})`);
-  lines.push("    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))");
-  lines.push(`    .then(d => { state.${key} = d; })`);
-  lines.push(`    .catch(e => { state.${key} = { error: String(e) }; });`);
-  lines.push("});");
+  lines.push(
+    `  fetch(url${optsStr})`,
+    "    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))",
+    `    .then(d => { state.${key} = d; })`,
+    `    .catch(e => { state.${key} = { error: String(e) }; });`,
+    "});",
+  );
 
   return lines.join("\n");
 }

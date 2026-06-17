@@ -22,13 +22,9 @@ import {
   isDynamic,
   tagNameToClassName,
 } from "./shared.ts";
-import { compileServer, compileSiteServer } from "./targets/compile-server.ts";
+import { compileServer } from "./targets/compile-server.ts";
 
-import {
-  compileElement,
-  compileElementPage,
-  emitElementModule,
-} from "./targets/compile-element.ts";
+import { emitElementModule } from "./targets/compile-element.ts";
 import { compileStaticPage } from "./targets/compile-static.ts";
 import { compileClient } from "./targets/compile-client.ts";
 import { isClassDef } from "@jxsuite/schema/guards";
@@ -37,14 +33,10 @@ import type { JxDocument, JxStyle } from "@jxsuite/schema/types";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 
 // Re-exports for consumers
-export {
-  isDynamic,
-  compileServer,
-  compileSiteServer,
-  compileElement,
-  compileElementPage,
-  compileClient,
-};
+export { isDynamic } from "./shared.ts";
+export { compileServer, compileSiteServer } from "./targets/compile-server.ts";
+export { compileElement, compileElementPage } from "./targets/compile-element.ts";
+export { compileClient } from "./targets/compile-client.ts";
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
 

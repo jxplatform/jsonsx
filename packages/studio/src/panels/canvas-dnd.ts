@@ -20,7 +20,7 @@ import type { CanvasPanel } from "../types";
 
 import type { JxPath } from "../state";
 
-export type { CanvasPanel };
+export type { CanvasPanel } from "../types";
 
 interface DropInstruction {
   type: "reorder-above" | "reorder-below" | "make-child";

@@ -98,12 +98,12 @@ beforeEach(() => {
     liveCtx: {
       canvasMode: "design",
       layoutWrapped: false,
-      mapParentPaths: new Set(),
+      arrayPaths: new Set(),
       pageContentPrefix: null,
       pathMapper: makePathMapper({
         canvasMode: "design",
         layoutWrapped: false,
-        mapParentPaths: new Set(),
+        arrayPaths: new Set(),
         pageContentPrefix: null,
       }),
       scope: {},
@@ -216,6 +216,32 @@ describe("classifyOps", () => {
     applyPatchBatch(tab, [{ op: "set-style", path: mapPath }]);
     expect(li.style.color).toBe("green");
     expect(perimeter.children[0]).toBe(li);
+  });
+
+  test("array member node: structural ops on it patch; structural ops inside its template escalate", () => {
+    // Array pseudo-element as a member at children[3].
+    (doc().children as JxMutableNode[]).push({
+      $prototype: "Array",
+      items: ["a", "b"],
+      map: { children: [{ tagName: "span" }], tagName: "li" },
+    } as unknown as JxMutableNode);
+
+    // Removing/moving the array node itself is a normal sibling splice → patchable.
+    expect(classifyOps(tab, [{ op: "remove", path: ["children", 3] }]).patchable).toBe(true);
+    expect(
+      classifyOps(tab, [{ fromPath: ["children", 3], op: "move", toIndex: 0, toParentPath: [] }])
+        .patchable,
+    ).toBe(true);
+    // Inserting a sibling next to the array (parent is the root children array) → patchable.
+    expect(classifyOps(tab, [{ index: 3, op: "insert", parentPath: [] }]).patchable).toBe(true);
+
+    // Structural edits *inside* the repeater template escalate (the perimeter holds one instance).
+    expect(
+      classifyOps(tab, [{ index: 1, op: "insert", parentPath: ["children", 3, "map"] }]).reason,
+    ).toBe("structure-on-map-path");
+    expect(
+      classifyOps(tab, [{ op: "remove", path: ["children", 3, "map", "children", 0] }]).reason,
+    ).toBe("structure-on-map-path");
   });
 
   test("rejects text ops on nodes with children, innerHTML, or custom-element tags", () => {

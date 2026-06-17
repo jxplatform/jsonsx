@@ -268,16 +268,17 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
     lines.push(`import { ${names.join(", ")} } from '${srcPath}';`);
   }
 
-  lines.push(`import { reactive, computed, effect } from '@vue/reactivity';`);
-  lines.push(`import { render, html } from 'lit-html';`);
-  lines.push("");
-  lines.push(`class ${className} extends HTMLElement {`);
-  lines.push("  #dispose = null;");
-  lines.push("");
-
-  // Constructor: build reactive state
-  lines.push("  constructor() {");
-  lines.push("    super();");
+  lines.push(
+    `import { reactive, computed, effect } from '@vue/reactivity';`,
+    `import { render, html } from 'lit-html';`,
+    "",
+    `class ${className} extends HTMLElement {`,
+    "  #dispose = null;",
+    "",
+    // Constructor: build reactive state
+    "  constructor() {",
+    "    super();",
+  );
 
   const stateEntries: [string, string][] = [];
   const computedEntries: [string, JxExpressionDef | JxFunctionDef][] = [];
@@ -330,9 +331,11 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
         // $src function — wrap imported function so it receives state
         lines.push(`    this.state.${key} = (${paramList}) => ${key}(${paramList});`);
       } else {
-        lines.push(`    this.state.${key} = (${paramList}) => {`);
-        lines.push(`      ${def.body ?? ""}`);
-        lines.push("    };");
+        lines.push(
+          `    this.state.${key} = (${paramList}) => {`,
+          `      ${def.body ?? ""}`,
+          "    };",
+        );
       }
     }
   }
@@ -351,13 +354,11 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
     } else {
       lines.push(`    this.state.${key} = computed(() => {`);
       const body = (def.body ?? "").replaceAll("state.", "this.state.");
-      lines.push(`      ${body}`);
-      lines.push("    });");
+      lines.push(`      ${body}`, "    });");
     }
   }
 
-  lines.push("  }"); // End constructor
-  lines.push("");
+  lines.push("  }", ""); // End constructor
 
   // Collect CSS rules from children tree (assigns .jx-N classes to defs)
   const cssRules: string[] = [];
@@ -368,35 +369,36 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
     }
   }
 
-  // Template method
-  lines.push("  template() {");
-  lines.push("    const s = this.state;");
-  lines.push("    return html`");
-  lines.push(emitLitChildren(doc.children, doc.style, "      "));
-  lines.push("    `;");
-  lines.push("  }");
-  lines.push("");
-
-  // ConnectedCallback
-  lines.push("  connectedCallback() {");
-  // Read $props from data-jx-props attribute (set by compiler for pre-rendered instances)
-  lines.push("    const _pa = this.getAttribute('data-jx-props');");
-  lines.push("    if (_pa) {");
-  lines.push("      try {");
-  lines.push("        const _p = JSON.parse(_pa);");
-  lines.push("        for (const [k, v] of Object.entries(_p)) {");
-  lines.push("          if (k in this.state) this.state[k] = v;");
-  lines.push("        }");
-  lines.push("      } catch {}");
-  lines.push("      this.removeAttribute('data-jx-props');");
-  lines.push("    }");
-  // Merge JS properties set before connection (by parent runtime).
-  // Only check own properties to avoid inherited DOM properties like `title`.
-  lines.push("    for (const key of Object.keys(this.state)) {");
-  lines.push("      if (this.hasOwnProperty(key) && this[key] !== undefined) {");
-  lines.push("        this.state[key] = this[key];");
-  lines.push("      }");
-  lines.push("    }");
+  lines.push(
+    // Template method
+    "  template() {",
+    "    const s = this.state;",
+    "    return html`",
+    emitLitChildren(doc.children, doc.style, "      "),
+    "    `;",
+    "  }",
+    "",
+    // ConnectedCallback
+    "  connectedCallback() {",
+    // Read $props from data-jx-props attribute (set by compiler for pre-rendered instances)
+    "    const _pa = this.getAttribute('data-jx-props');",
+    "    if (_pa) {",
+    "      try {",
+    "        const _p = JSON.parse(_pa);",
+    "        for (const [k, v] of Object.entries(_p)) {",
+    "          if (k in this.state) this.state[k] = v;",
+    "        }",
+    "      } catch {}",
+    "      this.removeAttribute('data-jx-props');",
+    "    }",
+    // Merge JS properties set before connection (by parent runtime).
+    // Only check own properties to avoid inherited DOM properties like `title`.
+    "    for (const key of Object.keys(this.state)) {",
+    "      if (this.hasOwnProperty(key) && this[key] !== undefined) {",
+    "        this.state[key] = this[key];",
+    "      }",
+    "    }",
+  );
   if (doc.style && typeof doc.style === "object") {
     const dynamicStyles: [string, string][] = [];
     for (const [prop, value] of Object.entries(doc.style)) {
@@ -436,31 +438,35 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
       "    const _slotted = Array.from(this.childNodes).filter(n => n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim()));",
     );
   }
-  lines.push("    if (this.hasAttribute('data-jx-prerendered')) {");
-  lines.push("      this.removeAttribute('data-jx-prerendered');");
-  lines.push("    }");
-  lines.push("    this.innerHTML = '';");
-  lines.push("    this.#dispose = effect(() => render(this.template(), this));");
+  lines.push(
+    "    if (this.hasAttribute('data-jx-prerendered')) {",
+    "      this.removeAttribute('data-jx-prerendered');",
+    "    }",
+    "    this.innerHTML = '';",
+    "    this.#dispose = effect(() => render(this.template(), this));",
+  );
   if (hasSlot) {
     // Replace <slot> placeholder with saved slotted content
-    lines.push("    const _slot = this.querySelector('slot');");
-    lines.push("    if (_slot && _slotted.length > 0) {");
-    lines.push("      for (const n of _slotted) _slot.before(n);");
-    lines.push("      _slot.remove();");
-    lines.push("    }");
+    lines.push(
+      "    const _slot = this.querySelector('slot');",
+      "    if (_slot && _slotted.length > 0) {",
+      "      for (const n of _slotted) _slot.before(n);",
+      "      _slot.remove();",
+      "    }",
+    );
   }
-  lines.push("  }");
-  lines.push("");
-
-  // DisconnectedCallback
-  lines.push("  disconnectedCallback() {");
-  lines.push("    if (this.#dispose) { this.#dispose(); this.#dispose = null; }");
-  lines.push("  }");
-
-  lines.push("}");
-  lines.push("");
-  lines.push(`customElements.define('${doc.tagName}', ${className});`);
-  lines.push("");
+  lines.push(
+    "  }",
+    "",
+    // DisconnectedCallback
+    "  disconnectedCallback() {",
+    "    if (this.#dispose) { this.#dispose(); this.#dispose = null; }",
+    "  }",
+    "}",
+    "",
+    `customElements.define('${doc.tagName}', ${className});`,
+    "",
+  );
 
   return lines.join("\n");
 }
@@ -482,6 +488,7 @@ function emitLitChildren(
     return "";
   }
 
+  // Legacy whole-children repeater: the array IS the children slot.
   if (isMappedArray(children)) {
     return emitMappedArray(children, indent);
   }
@@ -490,7 +497,12 @@ function emitLitChildren(
     return "";
   }
 
-  return children.map((child: JxMutableNode | string) => emitLitNode(child, indent)).join("\n");
+  // Mixed children: elements/text plus array pseudo-elements expanded inline among siblings.
+  return children
+    .map((child: JxMutableNode | string) =>
+      isMappedArray(child) ? emitMappedArray(child, indent) : emitLitNode(child, indent),
+    )
+    .join("\n");
 }
 
 /**
