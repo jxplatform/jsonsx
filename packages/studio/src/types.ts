@@ -132,6 +132,18 @@ export interface StudioPlatform {
   aiStreamUrl: (id: string) => string | Promise<string>;
   aiStopSession: (id: string) => Promise<void>;
   aiDeleteSession: (id: string) => Promise<void>;
+  // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
+  /** Open a project in a new window, focusing an existing window if it is already open. */
+  openProjectInNewWindow?: (root: string) => Promise<void>;
+  /** Open a fresh welcome window. */
+  newWindow?: () => Promise<void>;
+  /**
+   * Point THIS window's backend at a project and return its config. If the project is already open
+   * in another window, that window is focused and `deduped` is true (no project is loaded here).
+   */
+  setWindowProject?: (root: string) => Promise<{ deduped: boolean; config: ProjectConfig | null }>;
+  /** The project root this window's backend is currently bound to. */
+  getProjectRoot?: () => Promise<{ root: string | null }>;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────

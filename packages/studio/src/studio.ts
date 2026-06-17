@@ -661,6 +661,23 @@ function openProject() {
 async function openRecentProject(root: string) {
   try {
     const platform = getPlatform();
+
+    // Multi-window (desktop): if this window already holds a project, open the chosen one in a new
+    // Window (focusing an existing window if it's already open) rather than replacing this project.
+    if (projectState && platform.openProjectInNewWindow) {
+      await platform.openProjectInNewWindow(root);
+      return;
+    }
+
+    // Multi-window (desktop): bind THIS window's backend to the project before reading from it. If
+    // The project is already open in another window, that window is focused and we bail here.
+    if (platform.setWindowProject) {
+      const res = await platform.setWindowProject(root);
+      if (res.deduped) {
+        return;
+      }
+    }
+
     platform.projectRoot = root;
     const content = await platform.readFile("project.json");
     const config = JSON.parse(content);

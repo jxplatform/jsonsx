@@ -212,6 +212,24 @@ export function createDesktopPlatform() {
       return res;
     },
 
+    // ─── Multi-window ──────────────────────────────────────────────────────────
+
+    async openProjectInNewWindow(root: string) {
+      await rpc.request.openProjectInNewWindow({ root });
+    },
+
+    async newWindow() {
+      await rpc.request.newWindow();
+    },
+
+    async setWindowProject(root: string) {
+      return rpc.request.setWindowProject({ root });
+    },
+
+    async getProjectRoot() {
+      return rpc.request.getProjectRoot();
+    },
+
     async probeRootProject() {
       try {
         const content = await rpc.request.readFile({ path: "project.json" });

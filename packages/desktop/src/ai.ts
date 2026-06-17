@@ -20,7 +20,7 @@ import {
 export async function handleAiRoute(
   req: Request,
   path: string,
-  projectRoot: string,
+  projectRoot: string | null,
 ): Promise<Response | null> {
   if (!path.startsWith("/studio/ai/")) {
     return null;
@@ -33,6 +33,11 @@ export async function handleAiRoute(
 
   if (path === "/studio/ai/session" && req.method === "POST") {
     try {
+      // Session creation normally flows through per-window RPC (which supplies the window's project
+      // Root). The HTTP create path is only reachable with an explicit root.
+      if (!projectRoot) {
+        return Response.json({ error: "No project root for session creation" }, { status: 400 });
+      }
       const body = (await req.json()) as {
         message: string;
         systemPrompt?: string;

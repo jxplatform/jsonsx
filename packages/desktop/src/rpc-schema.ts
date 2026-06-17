@@ -339,6 +339,27 @@ export interface StudioRPC {
         params: { id: string };
         response: void;
       };
+      // Window management (multi-window)
+      newWindow: {
+        params: void;
+        response: void;
+      };
+      openProjectInNewWindow: {
+        params: { root: string };
+        response: void;
+      };
+      setWindowProject: {
+        params: { root: string };
+        response: { deduped: boolean; config: SiteConfig | null };
+      };
+      getProjectRoot: {
+        params: void;
+        response: { root: string | null };
+      };
+      listOpenWindows: {
+        params: void;
+        response: { id: number; projectRoot: string | null }[];
+      };
     };
     messages: Record<string, never>;
   }>;
