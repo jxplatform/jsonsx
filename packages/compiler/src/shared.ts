@@ -7,7 +7,7 @@
  */
 
 import { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
-import { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
+import { evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
 import {
   childrenContainArray,
   isExpressionDef,
@@ -33,15 +33,9 @@ import type {
 } from "@jxsuite/schema/types";
 
 // Re-export runtime utilities used by submodules
-export {
-  camelToKebab,
-  toCSSText,
-  RESERVED_KEYS,
-  compileExpression,
-  isMutating,
-  evaluateExpression,
-};
-export type { ExpressionNode };
+export { RESERVED_KEYS, camelToKebab, toCSSText } from "@jxsuite/runtime";
+export { compileExpression, evaluateExpression, isMutating } from "@jxsuite/runtime/expression";
+export type { ExpressionNode } from "@jxsuite/runtime/expression";
 
 // CDN defaults
 export const DEFAULT_REACTIVITY_SRC = "https://esm.sh/@vue/reactivity@3.5.32";

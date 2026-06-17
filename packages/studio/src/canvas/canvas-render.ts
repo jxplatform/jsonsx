@@ -487,8 +487,7 @@ export function renderCanvas() {
       canvasWrap,
     );
 
-    canvasPanels.push(origPanel as unknown as CanvasPanel);
-    canvasPanels.push(currPanel as unknown as CanvasPanel);
+    canvasPanels.push(origPanel as unknown as CanvasPanel, currPanel as unknown as CanvasPanel);
 
     /** @param {string} content */
     const parseContent = (content: string) => {

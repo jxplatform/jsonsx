@@ -750,15 +750,12 @@ function emitClientModule(
     lines.push(`import { ${[...names].join(", ")} } from '${src}';`);
   }
 
-  lines.push("");
-
   // State — reactive state
-  lines.push("const state = reactive({");
+  lines.push("", "const state = reactive({");
   for (const [key, val] of stateEntries) {
     lines.push(`  ${key}: ${JSON.stringify(val)},`);
   }
-  lines.push("});");
-  lines.push("");
+  lines.push("});", "");
 
   // Prototype init blocks (Request fetch, LocalStorage read, etc.)
   if (initBlocks.length > 0) {
@@ -804,38 +801,43 @@ function emitClientModule(
   } else {
     lines.push("const on = {};");
   }
-  lines.push("");
-
   // Hydration function
-  lines.push("function hydrate(root) {");
-  lines.push("  root.querySelectorAll('[data-bind]').forEach(el => {");
-  lines.push("    [...el.attributes].forEach(a => {");
-  lines.push("      if (a.name.startsWith(':')) {");
-  lines.push("        const parts = a.name.slice(1).split('.');");
-  lines.push("        const key = a.value;");
+  lines.push(
+    "",
+    "function hydrate(root) {",
+    "  root.querySelectorAll('[data-bind]').forEach(el => {",
+    "    [...el.attributes].forEach(a => {",
+    "      if (a.name.startsWith(':')) {",
+    "        const parts = a.name.slice(1).split('.');",
+    "        const key = a.value;",
+  );
   if (needsLit) {
-    lines.push("        if (parts[0] === 'render') {");
-    lines.push("          effect(() => { render(bind[key](), el); });");
-    lines.push("        } else if (parts[0] === 'style' && parts.length > 1) {");
+    lines.push(
+      "        if (parts[0] === 'render') {",
+      "          effect(() => { render(bind[key](), el); });",
+      "        } else if (parts[0] === 'style' && parts.length > 1) {",
+    );
   } else {
     lines.push("        if (parts[0] === 'style' && parts.length > 1) {");
   }
-  lines.push("          effect(() => { el.style[parts[1]] = bind[key](); });");
-  lines.push("        } else if (parts[0] === 'attr' && parts.length > 1) {");
-  lines.push("          effect(() => { el.setAttribute(parts[1], bind[key]()); });");
-  lines.push("        } else {");
-  lines.push("          const prop = parts[0].replace(/-([a-z])/g, (_, c) => c.toUpperCase());");
-  lines.push("          effect(() => { el[prop] = bind[key](); });");
-  lines.push("        }");
-  lines.push("      } else if (a.name.startsWith('@')) {");
-  lines.push("        el.addEventListener(a.name.slice(1), on[a.value]);");
-  lines.push("      }");
-  lines.push("    });");
-  lines.push("  });");
-  lines.push("}");
-  lines.push("");
-  lines.push("hydrate(document);");
-  lines.push("");
+  lines.push(
+    "          effect(() => { el.style[parts[1]] = bind[key](); });",
+    "        } else if (parts[0] === 'attr' && parts.length > 1) {",
+    "          effect(() => { el.setAttribute(parts[1], bind[key]()); });",
+    "        } else {",
+    "          const prop = parts[0].replace(/-([a-z])/g, (_, c) => c.toUpperCase());",
+    "          effect(() => { el[prop] = bind[key](); });",
+    "        }",
+    "      } else if (a.name.startsWith('@')) {",
+    "        el.addEventListener(a.name.slice(1), on[a.value]);",
+    "      }",
+    "    });",
+    "  });",
+    "}",
+    "",
+    "hydrate(document);",
+    "",
+  );
 
   return lines.join("\n");
 }
@@ -862,8 +864,10 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
   ];
 
   if (isTemplateUrl) {
-    lines.push(`  const url = \`${url}\`;`);
-    lines.push('  if (!url || url === "undefined" || url.includes("undefined")) return;');
+    lines.push(
+      `  const url = \`${url}\`;`,
+      '  if (!url || url === "undefined" || url.includes("undefined")) return;',
+    );
   } else {
     lines.push(`  const url = ${JSON.stringify(url)};`);
   }
@@ -884,11 +888,13 @@ function emitRequestInit(key: string, def: JxPrototypeDef) {
   }
 
   const optsStr = fetchOpts.length > 0 ? `, { ${fetchOpts.join(", ")} }` : "";
-  lines.push(`  fetch(url${optsStr})`);
-  lines.push("    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))");
-  lines.push(`    .then(d => { state.${key} = d; })`);
-  lines.push(`    .catch(e => { state.${key} = { error: String(e) }; });`);
-  lines.push("});");
+  lines.push(
+    `  fetch(url${optsStr})`,
+    "    .then(r => r.ok ? r.json() : Promise.reject(r.statusText))",
+    `    .then(d => { state.${key} = d; })`,
+    `    .catch(e => { state.${key} = { error: String(e) }; });`,
+    "});",
+  );
 
   return lines.join("\n");
 }

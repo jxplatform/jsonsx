@@ -21,7 +21,7 @@ import { htmlToJx } from "./html-to-jx.ts";
 import type { MdastNode } from "./types.ts";
 import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
 
-export { htmlToJx };
+export { htmlToJx } from "./html-to-jx.ts";
 
 // ─── Dot-path expansion ─────────────────────────────────────────────────────
 

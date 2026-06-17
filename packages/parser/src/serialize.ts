@@ -1634,10 +1634,7 @@ function serializeRoundtrip(doc: JxDocument, opts: SerializeOptions): string {
     }
 
     if (Object.keys(frontmatter).length > 0) {
-      lines.push("---");
-      lines.push(stringifyYaml(frontmatter).trim());
-      lines.push("---");
-      lines.push("");
+      lines.push("---", stringifyYaml(frontmatter).trim(), "---", "");
     }
   }
 

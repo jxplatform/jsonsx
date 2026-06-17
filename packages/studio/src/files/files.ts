@@ -707,16 +707,18 @@ function showFileContextMenu(
       label: "New File\u2026",
     });
   }
-  items.push({ label: "\u2014" });
-  items.push({
-    action: () => renameFile(entry, ctx.renderLeftPanel),
-    label: "Rename\u2026",
-  });
-  items.push({
-    action: () => deleteFile(entry, ctx.renderLeftPanel),
-    danger: true,
-    label: "Delete",
-  });
+  items.push(
+    { label: "\u2014" },
+    {
+      action: () => renameFile(entry, ctx.renderLeftPanel),
+      label: "Rename\u2026",
+    },
+    {
+      action: () => deleteFile(entry, ctx.renderLeftPanel),
+      danger: true,
+      label: "Delete",
+    },
+  );
 
   let x = e.clientX,
     y = e.clientY;

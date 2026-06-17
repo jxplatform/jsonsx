@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 import type { JxElement, JxPath } from "@jxsuite/schema/types";
 
-export type { JxPath };
+export type { JxPath } from "@jxsuite/schema/types";
 
 /**
  * The live reactive scope: a prototype-chained object whose keys are user-defined state names.

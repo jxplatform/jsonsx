@@ -78,7 +78,7 @@ interface StylebookCtx {
   effectiveZoom: () => number;
 }
 
-export { stylebookMeta };
+export { default as stylebookMeta } from "../../data/stylebook-meta.json";
 
 /**
  * Resolve a nested tag path in a style object. e.g., "table th" → style["table"]["th"]
