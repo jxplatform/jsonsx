@@ -47,7 +47,6 @@ mock.module("electrobun/bun", () => ({
 
 // ─── Mock project-session ────────────────────────────────────────────────────
 
-const sessions: ReturnType<typeof makeSession>[] = [];
 function makeSession(initialRoot: string | null) {
   let root = initialRoot;
   const s = {
@@ -82,10 +81,14 @@ function makeSession(initialRoot: string | null) {
       };
     }),
   };
-  sessions.push(s);
   return s;
 }
-const createProjectSession = mock((root: string | null) => makeSession(root));
+const sessions: ReturnType<typeof makeSession>[] = [];
+const createProjectSession = mock((root: string | null) => {
+  const s = makeSession(root);
+  sessions.push(s);
+  return s;
+});
 mock.module("../src/project-session", () => ({
   createProjectSession,
   setFileDialog: mock(() => {}),
