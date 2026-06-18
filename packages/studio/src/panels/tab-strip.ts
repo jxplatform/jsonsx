@@ -77,7 +77,7 @@ function render() {
                 @auxclick=${(e: MouseEvent) => {
                   if (e.button === 1) {
                     e.preventDefault();
-                    requestClose(id);
+                    void requestClose(id);
                   }
                 }}
                 title=${tab.documentPath || "Untitled"}
@@ -88,7 +88,7 @@ function render() {
                   class="tab-strip-close"
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    requestClose(id);
+                    void requestClose(id);
                   }}
                 >
                   ×

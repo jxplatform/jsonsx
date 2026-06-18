@@ -266,7 +266,7 @@ export function eventsSidebarTemplate(helpers: { isCustomElementDoc: () => boole
             if (functionDefs.length > 0) {
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateProperty(t, selection, evName, {
-                  $ref: `#/state/${functionDefs[0][0]}`,
+                  $ref: `#/state/${functionDefs[0]![0]}`,
                 }),
               );
             } else {

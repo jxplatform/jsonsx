@@ -14,7 +14,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
-import type { CodeServiceResult, ComponentMeta, DirEntry, OpenProjectResult } from "./rpc-schema";
+import type { ProjectConfig } from "@jxsuite/schema/types";
+import type {
+  CodeServiceResult,
+  ComponentMeta,
+  DirEntry,
+  OpenProjectResult,
+  SiteConfig,
+} from "./rpc-schema";
 
 // ─── Internal schema types for class.json parsing ─────────────────────────────
 
@@ -35,6 +42,13 @@ interface CtorParam {
   $ref?: string;
   identifier?: string;
   name?: string;
+}
+
+interface ComponentJsonDef {
+  tagName?: string;
+  $id?: string;
+  $elements?: unknown[];
+  state?: Record<string, unknown>;
 }
 
 interface ClassJsonDef {
@@ -216,9 +230,11 @@ export function createProjectSession(initialRoot: string | null) {
     if (formatRegistry?.root === root) {
       return formatRegistry.registry;
     }
-    let projectConfig;
+    let projectConfig: ProjectConfig | undefined;
     try {
-      projectConfig = JSON.parse(readFileSync(resolve(root, "project.json"), "utf8"));
+      projectConfig = JSON.parse(
+        readFileSync(resolve(root, "project.json"), "utf8"),
+      ) as ProjectConfig;
     } catch {
       projectConfig = undefined;
     }
@@ -289,7 +305,7 @@ export function createProjectSession(initialRoot: string | null) {
     }
 
     const raw = await readFile(filePath, "utf8");
-    const config = JSON.parse(raw);
+    const config = JSON.parse(raw) as SiteConfig;
     projectRoot = dirname(filePath);
     formatRegistry = null;
 
@@ -453,7 +469,7 @@ export function createProjectSession(initialRoot: string | null) {
       }
       const fp = resolve(scanRoot, match);
       try {
-        const content = JSON.parse(await readFile(fp, "utf8"));
+        const content = JSON.parse(await readFile(fp, "utf8")) as ComponentJsonDef;
         if (content.tagName && content.tagName.includes("-")) {
           components.push({
             $id: content.$id || null,
@@ -575,12 +591,14 @@ export function createProjectSession(initialRoot: string | null) {
     }
 
     try {
-      const mod = await import(moduleAbsPath);
+      const mod = (await import(moduleAbsPath)) as Record<string, unknown> & {
+        default?: Record<string, unknown>;
+      };
       const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
       if (typeof ExportedClass !== "function") {
         return null;
       }
-      return ExportedClass.schema ?? null;
+      return (ExportedClass as { schema?: unknown }).schema ?? null;
     } catch {
       return null;
     }

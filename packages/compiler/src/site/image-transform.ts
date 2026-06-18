@@ -340,7 +340,7 @@ async function transformImgNode(
         imageRefs.set(absoluteSrc, manifest);
       }
 
-      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
+      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
       srcset = buildSrcset(manifest.variants, preferredFormat);
     }
   }
@@ -384,8 +384,8 @@ async function transformInnerHtmlImages(
   const replacements = [];
 
   for (const m of html.matchAll(IMG_TAG_RE)) {
-    const [tag] = m;
-    const [, attrs] = m;
+    const tag = m[0]!;
+    const attrs = m[1]!;
 
     if (SRCSET_ATTR_RE.test(attrs)) {
       continue;
@@ -400,7 +400,7 @@ async function transformInnerHtmlImages(
     }
 
     // Attribute values in pre-rendered innerHTML are entity-escaped — decode for processing
-    const src = srcMatch[1].replaceAll("&amp;", "&");
+    const src = srcMatch[1]!.replaceAll("&amp;", "&");
     const remote = isAllowedRemote(src, config);
     if (!remote && shouldSkip(src)) {
       continue;
@@ -425,7 +425,7 @@ async function transformInnerHtmlImages(
         imageRefs.set(absoluteSrc as string, manifest);
       }
 
-      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0];
+      const preferredFormat = config.formats.includes("avif") ? "avif" : config.formats[0]!;
       srcset = buildSrcset(manifest.variants, preferredFormat);
     }
     if (!srcset) {

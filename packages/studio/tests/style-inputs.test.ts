@@ -4,7 +4,7 @@ import * as storeActual from "../src/store";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // Make debounced style commits synchronous so @input handlers fire without real 400ms timers.
-mock.module("../src/store", () => ({
+void mock.module("../src/store", () => ({
   ...storeActual,
   debouncedStyleCommit:
     <A extends unknown[]>(_prop: string, _ms: number, fn: (...args: A) => void) =>
@@ -81,13 +81,13 @@ describe("renderKeywordInput", () => {
       renderKeywordInput(["uppercase"], "textTransform", "", () => {}),
     );
     const el = selector(container);
-    expect(el.options[0].style).toBe("text-transform: uppercase; font-family: Georgia, serif");
+    expect(el.options[0]!.style).toBe("text-transform: uppercase; font-family: Georgia, serif");
   });
 
   test("fontWeight previews without a selection omit font-family", async () => {
     const container = await renderInto(renderKeywordInput(["bold"], "fontWeight", "", () => {}));
     const el = selector(container);
-    expect(el.options[0].style).toBe("font-weight: bold;");
+    expect(el.options[0]!.style).toBe("font-weight: bold;");
   });
 
   test("change and input events both invoke onChange with the element value", async () => {

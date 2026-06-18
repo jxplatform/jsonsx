@@ -40,10 +40,10 @@ export function openBrowseModal() {
         ${ref((el) => {
           if (el) {
             requestAnimationFrame(() => {
-              renderBrowse(el as HTMLElement, {
+              void renderBrowse(el as HTMLElement, {
                 openFile: (path: string) => {
                   closeBrowseModal();
-                  openFileInTab(path);
+                  void openFileInTab(path);
                 },
               });
             });

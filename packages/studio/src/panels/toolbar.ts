@@ -160,9 +160,9 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
           @change=${(e: Event) => {
             const val = (e.target as unknown as HTMLInputElement).value;
             if (val === "__new__") {
-              handleNewProject();
+              void handleNewProject();
             } else {
-              ctx.openRecentProject(val);
+              void ctx.openRecentProject(val);
             }
           }}
         >
@@ -488,9 +488,9 @@ function toolbarTemplate() {
           @change=${(e: Event) => {
             const val = (e.target as unknown as HTMLInputElement).value;
             if (val === "__new__") {
-              handleNewProject();
+              void handleNewProject();
             } else {
-              ctx.openRecentProject(val);
+              void ctx.openRecentProject(val);
             }
           }}
         >

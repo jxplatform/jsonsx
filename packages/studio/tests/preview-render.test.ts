@@ -150,8 +150,8 @@ describe("renderCanvasNode children", () => {
     });
     const ul = parent.firstElementChild as HTMLElement;
     expect(ul.children.length).toBe(2);
-    expect(elToPath.get(ul.children[0])).toEqual(["children", 0]);
-    expect(elToPath.get(ul.children[1])).toEqual(["children", 1]);
+    expect(elToPath.get(ul.children[0]!)).toEqual(["children", 0]);
+    expect(elToPath.get(ul.children[1]!)).toEqual(["children", 1]);
     expect(ul.textContent).toBe("onetwo");
   });
 
@@ -182,7 +182,7 @@ describe("renderCanvasNode children", () => {
     });
     const ul = parent.firstElementChild as HTMLElement;
     expect(ul.children.length).toBe(2);
-    expect(elToPath.get(ul.children[0])).toEqual(["children", 0]);
+    expect(elToPath.get(ul.children[0]!)).toEqual(["children", 0]);
     const perimeter = ul.children[1] as HTMLElement;
     expect(perimeter.className).toBe("repeater-perimeter");
     expect(elToPath.get(perimeter)).toEqual(["children", 1]);

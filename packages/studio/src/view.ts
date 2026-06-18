@@ -145,7 +145,10 @@ export function applyPanelCollapse() {
   app.classList.toggle("left-collapsed", view.leftPanelCollapsed);
   app.classList.toggle("right-collapsed", view.rightPanelCollapsed);
   try {
-    const saved = JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || "{}");
+    const saved = JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || "{}") as Record<
+      string,
+      unknown
+    >;
     saved.leftCollapsed = view.leftPanelCollapsed;
     saved.rightCollapsed = view.rightPanelCollapsed;
     localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify(saved));

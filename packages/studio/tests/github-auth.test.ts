@@ -39,13 +39,10 @@ function setupFetch(responses: { ok?: boolean; json: unknown; status?: number }[
   };
 }
 
-let _dialogDoneFn = null;
-
-mock.module("../src/ui/layers.js", () => ({
+void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async () => true,
   showDialog: (fn: any) =>
     new Promise((resolve) => {
-      _dialogDoneFn = resolve;
       fn((val: any) => resolve(val));
     }),
 }));
@@ -88,6 +85,7 @@ describe("authenticateGithub", () => {
 
   test("throws when device code request fails", async () => {
     setupFetch([{ json: { error: "server_error" }, ok: false, status: 500 }]);
+    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().rejects.toThrow() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for the rejection.
     await expect(authenticateGithub()).rejects.toThrow("Failed to initiate GitHub device flow");
   });
 
@@ -111,8 +109,8 @@ describe("authenticateGithub", () => {
     });
     const result = await promise;
 
-    expect(mockFetchCalls[0].url).toBe("https://github.com/login/device/code");
-    const body = JSON.parse(mockFetchCalls[0].opts.body);
+    expect(mockFetchCalls[0]!.url).toBe("https://github.com/login/device/code");
+    const body = JSON.parse(mockFetchCalls[0]!.opts.body);
     expect(body.client_id).toBe("Ov23liYVlMFpgjOEPXJH");
     expect(body.scope).toBe("repo");
     expect(result).toBe("ghp_new_token");
@@ -143,7 +141,7 @@ describe("authenticateGithub", () => {
     expect(result).toBe("ghp_polled");
     expect(mockFetchCalls.length).toBe(3);
 
-    const [, tokenCall] = mockFetchCalls;
+    const tokenCall = mockFetchCalls[1]!;
     expect(tokenCall.url).toBe("https://github.com/login/oauth/access_token");
     const tokenBody = JSON.parse(tokenCall.opts.body);
     expect(tokenBody.device_code).toBe("dc_456");

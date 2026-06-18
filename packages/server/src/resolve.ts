@@ -6,7 +6,34 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { loadContentTypes } from "@jxsuite/compiler/content-loader";
 import type { DynamicClass } from "@jxsuite/runtime/types";
-import type { JxClassDef } from "@jxsuite/schema/types";
+import type { JxClassDef, ProjectConfig } from "@jxsuite/schema/types";
+
+interface ModuleNamespace {
+  default?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface ClassInstance {
+  resolve?: () => unknown;
+  value?: unknown;
+  [key: string]: unknown;
+}
+
+interface ResolveBody {
+  $src?: string;
+  $prototype?: string;
+  $export?: string;
+  $base?: string;
+  [key: string]: unknown;
+}
+
+interface ServerFunctionBody {
+  $src?: string;
+  $export?: string;
+  $base?: string;
+  arguments?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 /**
  * Lazy-load project context (project.json + content types) for class instantiation.
@@ -24,7 +51,7 @@ async function loadProjectContext(projectRoot: string) {
     return null;
   }
   try {
-    const config = JSON.parse(readFileSync(projectJsonPath, "utf8"));
+    const config = JSON.parse(readFileSync(projectJsonPath, "utf8")) as ProjectConfig;
     const contentTypes = config.contentTypes
       ? await loadContentTypes(projectRoot, config)
       : new Map();
@@ -46,9 +73,9 @@ export async function handleResolve(
   root: string,
   activeProjectRoot: string | null = null,
 ) {
-  let body;
+  let body: ResolveBody;
   try {
-    body = await req.json();
+    body = (await req.json()) as ResolveBody;
   } catch {
     return new Response("Invalid JSON body", { status: 400 });
   }
@@ -114,14 +141,16 @@ export async function handleResolve(
         // Hybrid mode: redirect to the JS implementation
         const implPath = resolve(dirname(moduleAbsPath), classDef.$implementation);
         const exportName = xport ?? classDef.title ?? $prototype;
-        const mod = await import(implPath);
-        const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
+        const mod = (await import(implPath)) as ModuleNamespace;
+        const ExportedClass =
+          exportName === undefined ? undefined : (mod[exportName] ?? mod.default?.[exportName]);
         if (typeof ExportedClass !== "function") {
           return new Response(`Export "${exportName}" not found in "${classDef.$implementation}"`, {
             status: 500,
           });
         }
-        const instance = new ExportedClass(config);
+        const ClassCtor = ExportedClass as new (config: unknown) => ClassInstance;
+        const instance = new ClassCtor(config);
         const value =
           typeof instance.resolve === "function"
             ? await instance.resolve()
@@ -165,9 +194,9 @@ export async function handleResolve(
  * @param {string} root
  */
 export async function handleServerFunction(req: Request, root: string) {
-  let body;
+  let body: ServerFunctionBody;
   try {
-    body = await req.json();
+    body = (await req.json()) as ServerFunctionBody;
   } catch {
     return new Response("Invalid JSON body", { status: 400 });
   }
@@ -192,9 +221,9 @@ export async function handleServerFunction(req: Request, root: string) {
     });
   }
 
-  let mod;
+  let mod: ModuleNamespace;
   try {
-    mod = await import(moduleAbsPath);
+    mod = (await import(moduleAbsPath)) as ModuleNamespace;
   } catch (error) {
     return new Response(`Failed to import "${$src}": ${errorMessage(error)}`, {
       status: 500,
@@ -209,7 +238,7 @@ export async function handleServerFunction(req: Request, root: string) {
   }
 
   try {
-    const result = await fn(args);
+    const result = await (fn as (args: Record<string, unknown>) => unknown)(args);
     return Response.json(result ?? null);
   } catch (error) {
     return Response.json({ error: errorMessage(error) }, { status: 500 });

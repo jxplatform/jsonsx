@@ -71,7 +71,7 @@ describe("image-cache", () => {
     };
     saveCache(TMP, cache);
     const loaded = loadCache(TMP);
-    expect(loaded.entries["abc:def"].source).toBe("img.png");
+    expect(loaded.entries["abc:def"]!.source).toBe("img.png");
     teardown();
   });
 

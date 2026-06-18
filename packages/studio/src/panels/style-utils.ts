@@ -245,7 +245,7 @@ export function currentFontFamily() {
   }
   const m = typeof raw === "string" && raw.match(/^var\((--[^)]+)\)$/);
   if (m) {
-    return tab?.doc.document?.style?.[m[1]] || "";
+    return tab?.doc.document?.style?.[m[1]!] || "";
   }
   return raw;
 }

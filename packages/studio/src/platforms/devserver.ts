@@ -8,6 +8,26 @@
  * See spec/desktop.md §8 for the full specification.
  */
 
+import type { ProjectConfig } from "@jxsuite/schema/types";
+import type { DirEntry } from "../types";
+
+/** A directory entry from the server, tolerating extra wire fields. */
+type WireDirEntry = DirEntry & Record<string, unknown>;
+
+/** Parse a fetch Response body as JSON, asserting the expected shape at the boundary. */
+async function readJson<T>(res: Response): Promise<T> {
+  return (await res.json()) as T;
+}
+
+interface ErrorBody {
+  error?: string;
+}
+
+interface SiteEntry {
+  config: unknown;
+  path: string;
+}
+
 /**
  * Create a DevServerPlatform instance.
  *
@@ -58,7 +78,7 @@ export function createDevServerPlatform() {
     set projectRoot(v) {
       _projectRoot = v || "";
       if (_projectRoot) {
-        this.activate(_projectRoot);
+        void this.activate(_projectRoot);
       }
     },
 
@@ -109,19 +129,16 @@ export function createDevServerPlatform() {
       }
 
       const file = await siteHandle.getFile();
-      const config = JSON.parse(await file.text());
+      const config = JSON.parse(await file.text()) as ProjectConfig;
 
       // Resolve server-relative path by matching against known sites
       const sitesRes = await fetch("/__studio/sites");
       if (!sitesRes.ok) {
         throw new Error("Failed to fetch site list from server");
       }
-      const sites = await sitesRes.json();
+      const sites = await readJson<SiteEntry[]>(sitesRes);
       const match = sites.find(
-        /** @param {{ config: unknown; path: string }} s */ (s: {
-          config: unknown;
-          path: string;
-        }) => JSON.stringify(s.config) === JSON.stringify(config),
+        (s: SiteEntry) => JSON.stringify(s.config) === JSON.stringify(config),
       );
 
       if (!match) {
@@ -132,7 +149,7 @@ export function createDevServerPlatform() {
         if (!findRes.ok) {
           throw new Error("Could not locate project on disk");
         }
-        const found = await findRes.json();
+        const found = await readJson<{ path?: string }>(findRes);
         if (!found.path) {
           throw new Error(`Could not find project directory "${dirHandle.name}"`);
         }
@@ -147,7 +164,7 @@ export function createDevServerPlatform() {
       return {
         config,
         handle: {
-          name: config.name || _projectRoot.split("/").pop(),
+          name: config.name || _projectRoot.split("/").pop()!,
           projectConfig: config,
           root: _projectRoot,
         },
@@ -164,8 +181,17 @@ export function createDevServerPlatform() {
           fetch("/__studio/project"),
           fetch("/__studio/project-info?dir=."),
         ]);
-        const meta = projectRes.ok ? await projectRes.json() : { name: "project", root: "." };
-        const info = infoRes.ok ? await infoRes.json() : { isSiteProject: false };
+        const meta = projectRes.ok
+          ? await readJson<{ name: string; root: string }>(projectRes)
+          : { name: "project", root: "." };
+        const info = infoRes.ok
+          ? await readJson<{
+              isSiteProject: boolean;
+              projectConfig?: ProjectConfig | null;
+              directories?: string[];
+              [key: string]: unknown;
+            }>(infoRes)
+          : { isSiteProject: false };
         return { info, meta };
       } catch {
         return null;
@@ -196,7 +222,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await readJson<ErrorBody>(res);
         throw new Error(data.error || "Failed to create project");
       }
       return await res.json();
@@ -210,7 +236,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Failed to list directory: ${dir}`);
       }
-      const entries = await res.json();
+      const entries = await readJson<WireDirEntry[]>(res);
       for (const e of entries) {
         e.path = stripRoot(e.path);
       }
@@ -223,7 +249,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Failed to read file: ${path}`);
       }
-      const data = await res.json();
+      const data = await readJson<{ content: string }>(res);
       return data.content;
     },
 
@@ -392,7 +418,7 @@ export function createDevServerPlatform() {
           method: "POST",
         });
         if (res.ok) {
-          const body = await res.json();
+          const body = await readJson<{ path?: string }>(res);
           return body.path || null;
         }
       } catch {}
@@ -412,7 +438,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         return [];
       }
-      const entries = await res.json();
+      const entries = await readJson<WireDirEntry[]>(res);
       for (const e of entries) {
         e.path = stripRoot(e.path);
       }
@@ -427,7 +453,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         return [];
       }
-      const body = await res.json();
+      const body = await readJson<{ formats?: unknown[] }>(res);
       return body.formats ?? [];
     },
 
@@ -442,7 +468,7 @@ export function createDevServerPlatform() {
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      const data = await res.json();
+      const data = await readJson<{ error?: string; result?: unknown }>(res);
       if (!res.ok) {
         throw new Error(data.error || "Format action failed");
       }
@@ -468,7 +494,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         return null;
       }
-      const { schema } = await res.json();
+      const { schema } = await readJson<{ schema: unknown }>(res);
       return schema;
     },
 
@@ -508,7 +534,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -522,7 +548,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -536,7 +562,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -550,7 +576,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -559,7 +585,7 @@ export function createDevServerPlatform() {
     async gitPull() {
       const res = await fetch("/__studio/git/pull", { method: "POST" });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -568,7 +594,7 @@ export function createDevServerPlatform() {
     async gitFetch() {
       const res = await fetch("/__studio/git/fetch", { method: "POST" });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -582,7 +608,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -596,7 +622,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -621,7 +647,7 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const data = await res.json();
+      const data = await readJson<{ content: string }>(res);
       return data.content;
     },
 
@@ -633,7 +659,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -647,7 +673,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -656,7 +682,7 @@ export function createDevServerPlatform() {
     async gitInit() {
       const res = await fetch("/__studio/git/init", { method: "POST" });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
     },
@@ -672,7 +698,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
     },
@@ -692,7 +718,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();
@@ -706,7 +732,7 @@ export function createDevServerPlatform() {
         method: "POST",
       });
       if (!res.ok) {
-        const body = await res.json();
+        const body = await readJson<ErrorBody>(res);
         throw new Error(body.error);
       }
       return await res.json();

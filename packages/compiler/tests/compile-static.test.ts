@@ -89,7 +89,7 @@ describe("compileStaticPage", () => {
     const { html, files } = compileStaticPage(doc, baseOpts);
     expect(html).toContain("jx-island-");
     expect(files.length).toBeGreaterThan(0);
-    expect(files[0].path).toContain("_islands/");
+    expect(files[0]!.path).toContain("_islands/");
   });
 
   test("includes importmap and module scripts for islands", () => {

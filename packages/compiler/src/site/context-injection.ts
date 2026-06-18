@@ -36,7 +36,7 @@ export function injectContext(
   doc: JxDocument,
   projectConfig: ProjectConfig,
   route: SiteRoute,
-  contentTypes = new Map<string, ContentLoaderEntry[]>(),
+  _contentTypes = new Map<string, ContentLoaderEntry[]>(),
   projectRoot: string | null = null,
 ) {
   if (!doc.state) {

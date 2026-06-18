@@ -25,7 +25,7 @@ describe("Jx", () => {
   test("mounts object doc into target", async () => {
     const target = document.createElement("div");
     await Jx({ tagName: "span", textContent: "mounted" }, target);
-    expect(target.children[0].tagName.toLowerCase()).toBe("span");
+    expect(target.children[0]!.tagName.toLowerCase()).toBe("span");
   });
 
   test("defaults target to document.body", async () => {

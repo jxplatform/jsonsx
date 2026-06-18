@@ -13,7 +13,7 @@ import { mockFormatAction, seedMarkdownFormat } from "./format-fixture";
 // A real contenteditable editing session.
 let editing = false;
 let stopEditingCalls = 0;
-mock.module("../src/editor/inline-edit", () => ({
+void mock.module("../src/editor/inline-edit", () => ({
   isEditing: () => editing,
   stopEditing: () => {
     stopEditingCalls += 1;

@@ -238,7 +238,7 @@ describe("jx-value-selector: event handler logic", () => {
 
     expect(mock.value).toBe("normal");
     expect(mock.dispatched.length).toBe(1);
-    expect(mock.dispatched[0].type).toBe("change");
+    expect(mock.dispatched[0]!.type).toBe("change");
     expect(e.stopped).toBe(true);
   });
 
@@ -264,7 +264,7 @@ describe("jx-value-selector: event handler logic", () => {
 
     expect(mock.value).toBe("Georgia, serif");
     expect(mock.dispatched.length).toBe(1);
-    expect(mock.dispatched[0].type).toBe("input");
+    expect(mock.dispatched[0]!.type).toBe("input");
   });
 
   test("all handlers call stopPropagation on the original event", () => {

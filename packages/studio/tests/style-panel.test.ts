@@ -5,7 +5,7 @@ import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 
 // Make debounced style commits synchronous so @input handlers fire without real 400ms timers.
-mock.module("../src/store", () => ({
+void mock.module("../src/store", () => ({
   ...storeActual,
   debouncedStyleCommit:
     <A extends unknown[]>(_prop: string, _ms: number, fn: (...args: A) => void) =>
@@ -15,7 +15,7 @@ mock.module("../src/store", () => ({
 
 // Stub the stylebook panel so nested-rule navigation doesn't drag in canvas panning.
 const selectStylebookTagMock = mock((..._args: unknown[]) => {});
-mock.module("../src/panels/stylebook-panel", () => ({
+void mock.module("../src/panels/stylebook-panel", () => ({
   selectStylebookTag: selectStylebookTagMock,
 }));
 

@@ -14,7 +14,7 @@ const mockGetSession = mock((_id: string): Record<string, unknown> | null => ({
   status: "active",
 }));
 
-mock.module("@jxsuite/server/claude-session", () => ({
+void mock.module("@jxsuite/server/claude-session", () => ({
   createSession: mockCreateSession,
   deleteSession: mockDeleteSession,
   getAuthStatus: mockGetAuthStatus,

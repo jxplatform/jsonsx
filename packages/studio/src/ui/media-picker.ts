@@ -290,7 +290,7 @@ function showMediaPickerPopover(anchorEl: HTMLElement, onCommit: (val: string) =
  */
 export function renderMediaPicker(prop: string, value: string, onCommit: (val: string) => void) {
   // Kick off async load (won't block render)
-  loadMediaCache();
+  void loadMediaCache();
 
   const currentValue = value || "";
   const isImage = IMAGE_EXTENSIONS.has(
@@ -318,7 +318,7 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
               quiet
               title="Browse media"
               @click=${(e: MouseEvent) => {
-                loadMediaCache();
+                void loadMediaCache();
                 showMediaPickerPopover(e.currentTarget as HTMLElement, onCommit);
               }}
             >

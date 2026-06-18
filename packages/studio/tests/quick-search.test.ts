@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { StudioFormat } from "../src/format/format-host";
 
 const openFileInTab = mock((_path: string) => {});
-mock.module("../src/files/files.js", () => ({ openFileInTab }));
+void mock.module("../src/files/files.js", () => ({ openFileInTab }));
 
 const { closeQuickSearch, initQuickSearch, openQuickSearch } =
   await import("../src/panels/quick-search");
@@ -119,12 +119,12 @@ describe("quick-search — searching", () => {
 
     const rows = items();
     expect(rows).toHaveLength(1);
-    expect(rows[0].querySelector(".quick-search-name")?.textContent).toBe("hello.md");
-    expect(rows[0].querySelector(".quick-search-path")?.textContent).toBe("/project/posts");
+    expect(rows[0]!.querySelector(".quick-search-name")?.textContent).toBe("hello.md");
+    expect(rows[0]!.querySelector(".quick-search-path")?.textContent).toBe("/project/posts");
     // Format-claimed extension renders the text-file icon
-    expect(rows[0].querySelector("sp-icon-file-txt")).toBeTruthy();
+    expect(rows[0]!.querySelector("sp-icon-file-txt")).toBeTruthy();
     // No recent badge in search mode
-    expect(rows[0].querySelector(".quick-search-badge")).toBeNull();
+    expect(rows[0]!.querySelector(".quick-search-badge")).toBeNull();
   });
 
   test("renders json and unknown-extension icons and a rootless dir part", async () => {
@@ -132,12 +132,12 @@ describe("quick-search — searching", () => {
     await search("doc");
     const names = items().map((el) => el.querySelector(".quick-search-name")?.textContent);
     expect(names).toEqual(["doc-a.json", "doc-b.json", "rootfile-doc.json"]);
-    expect(items()[0].querySelector("sp-icon-file-code")).toBeTruthy();
+    expect(items()[0]!.querySelector("sp-icon-file-code")).toBeTruthy();
     // File at the search root has an empty dir part
-    expect(items()[2].querySelector(".quick-search-path")?.textContent).toBe("");
+    expect(items()[2]!.querySelector(".quick-search-path")?.textContent).toBe("");
 
     await search("blob");
-    expect(items()[0].querySelector("sp-icon-document")).toBeTruthy();
+    expect(items()[0]!.querySelector("sp-icon-document")).toBeTruthy();
   });
 
   test("shows No results for a query with no matches", async () => {
@@ -175,21 +175,21 @@ describe("quick-search — keyboard navigation and selection", () => {
   test("arrow keys move the selection within bounds", async () => {
     openQuickSearch();
     await search("doc");
-    expect(items()[0].classList.contains("selected")).toBe(true);
+    expect(items()[0]!.classList.contains("selected")).toBe(true);
 
     keydown("ArrowDown");
-    expect(items()[1].classList.contains("selected")).toBe(true);
+    expect(items()[1]!.classList.contains("selected")).toBe(true);
     keydown("ArrowDown");
     keydown("ArrowDown"); // Clamped at the last row
-    expect(items()[2].classList.contains("selected")).toBe(true);
+    expect(items()[2]!.classList.contains("selected")).toBe(true);
 
     keydown("ArrowUp");
     keydown("ArrowUp");
     keydown("ArrowUp"); // Clamped at the first row
-    expect(items()[0].classList.contains("selected")).toBe(true);
+    expect(items()[0]!.classList.contains("selected")).toBe(true);
 
     keydown("x"); // Default branch: no state change
-    expect(items()[0].classList.contains("selected")).toBe(true);
+    expect(items()[0]!.classList.contains("selected")).toBe(true);
   });
 
   test("Enter opens the selected result and tracks it as recent", async () => {
@@ -215,9 +215,9 @@ describe("quick-search — keyboard navigation and selection", () => {
   test("mouseenter moves the selection and click opens the row", async () => {
     openQuickSearch();
     await search("doc");
-    items()[2].dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
-    expect(items()[2].classList.contains("selected")).toBe(true);
-    items()[2].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    items()[2]!.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }));
+    expect(items()[2]!.classList.contains("selected")).toBe(true);
+    items()[2]!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(openFileInTab).toHaveBeenCalledWith("rootfile-doc.json");
     expect(overlay()).toBeNull();
   });
@@ -234,8 +234,8 @@ describe("quick-search — recent files", () => {
     );
     const rows = items();
     expect(rows).toHaveLength(2);
-    expect(rows[0].querySelector(".quick-search-name")?.textContent).toBe("fresh.json");
-    expect(rows[0].querySelector(".quick-search-badge")?.textContent).toBe("recent");
+    expect(rows[0]!.querySelector(".quick-search-name")?.textContent).toBe("fresh.json");
+    expect(rows[0]!.querySelector(".quick-search-badge")?.textContent).toBe("recent");
 
     keydown("Enter");
     expect(openFileInTab).toHaveBeenCalledWith("/project/pages/fresh.json");

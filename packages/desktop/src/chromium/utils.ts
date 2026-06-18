@@ -41,7 +41,7 @@ export async function openFileDialog(): Promise<string | null> {
     const result = await new Promise<string | null>((resolve) => {
       const timeout = setTimeout(() => resolve(null), 60_000);
 
-      bus
+      void bus
         .getInterface("org.freedesktop.portal.Desktop", handle, "org.freedesktop.portal.Request")
         .then((request: unknown) => {
           (request as DbusRequest).on("Response", (response: number, results: unknown) => {

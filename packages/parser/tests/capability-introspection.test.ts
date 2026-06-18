@@ -70,7 +70,7 @@ describe("Markdown capability behavior", () => {
   test("parse transpiles markdown source to a Jx document", () => {
     const doc = Markdown.parse("---\ntitle: Hi\n---\n\n# Hello\n");
     expect(doc.title).toBe("Hi");
-    expect((doc.children as { tagName: string }[])[0].tagName).toBe("h1");
+    expect((doc.children as { tagName: string }[])[0]!.tagName).toBe("h1");
   });
 
   test("serialize roundtrips parse output", () => {
@@ -101,11 +101,11 @@ describe("Markdown capability behavior", () => {
     try {
       const entries = await Markdown.load(resolve(TMP, "hello-world.md"));
       expect(entries.length).toBe(1);
-      expect(entries[0].id).toBe("hello-world");
-      expect(entries[0].data.title).toBe("Hello");
-      expect(entries[0].body).toContain("First paragraph.");
-      expect(entries[0]._meta?.excerpt).toBe("First paragraph.");
-      expect(entries[0]._meta?.toc?.[0]?.text).toBe("Section");
+      expect(entries[0]!.id).toBe("hello-world");
+      expect(entries[0]!.data.title).toBe("Hello");
+      expect(entries[0]!.body).toContain("First paragraph.");
+      expect(entries[0]!._meta?.excerpt).toBe("First paragraph.");
+      expect(entries[0]!._meta?.toc?.[0]?.text).toBe("Section");
     } finally {
       rmSync(TMP, { force: true, recursive: true });
     }

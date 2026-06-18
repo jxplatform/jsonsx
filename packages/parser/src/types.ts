@@ -54,6 +54,21 @@ export interface MdastNode {
   align?: (string | null)[] | null;
 }
 
+/**
+ * Minimal structural type for the unified() processor chain.
+ *
+ * The unified/remark packages ship ESM-only types that oxlint's type-aware engine cannot resolve
+ * under `moduleResolution: bundler` (it sees them as `any`), even though tsgo resolves them
+ * correctly. We cast the `unified()` result to this hand-written surface once, at the construction
+ * boundary, so the rest of the pipeline is properly typed instead of `any`.
+ */
+export interface UnifiedProcessor {
+  use: (plugin: unknown, ...options: unknown[]) => UnifiedProcessor;
+  parse: (source: string) => MdastNode;
+  runSync: (tree: MdastNode, file?: unknown) => MdastNode;
+  stringify: (tree: unknown) => string;
+}
+
 export interface HastNode {
   type: string;
   tagName?: string;

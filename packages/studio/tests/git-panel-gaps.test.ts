@@ -23,13 +23,13 @@ let confirmResult = true;
 let publishCalls: unknown[] = [];
 let dialogHosts: HTMLElement[] = [];
 
-mock.module("../src/platform.js", () => ({
+void mock.module("../src/platform.js", () => ({
   getPlatform: () => mockPlatform,
   hasPlatform: () => true,
   registerPlatform: () => {},
 }));
 
-mock.module("../src/workspace/workspace.js", () => ({
+void mock.module("../src/workspace/workspace.js", () => ({
   activeTab: activeTabRef,
   closeAllTabs: () => {},
   closeTab: () => {},
@@ -37,11 +37,11 @@ mock.module("../src/workspace/workspace.js", () => ({
   renameTab: () => {},
 }));
 
-mock.module("../src/view.js", () => ({
+void mock.module("../src/view.js", () => ({
   view: viewObj,
 }));
 
-mock.module("../src/ui/layers.js", () => ({
+void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async (headline: string) => {
     confirmCalls.push(headline);
     return confirmResult;
@@ -61,11 +61,11 @@ mock.module("../src/ui/layers.js", () => ({
     }),
 }));
 
-mock.module("../src/panels/statusbar.js", () => ({
+void mock.module("../src/panels/statusbar.js", () => ({
   statusMessage: (msg: string) => statusMessages.push(msg),
 }));
 
-mock.module("../src/github/github-publish.js", () => ({
+void mock.module("../src/github/github-publish.js", () => ({
   publishToGithub: async (opts: unknown) => {
     publishCalls.push(opts);
     return true;

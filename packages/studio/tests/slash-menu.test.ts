@@ -102,11 +102,11 @@ describe("Slash Menu", () => {
     test("ArrowDown moves focused attribute", () => {
       showSlashMenu(anchor, "", { onSelect: () => {} });
       const items = getMenuItems();
-      expect(items[0].hasAttribute("focused")).toBe(true);
+      expect(items[0]!.hasAttribute("focused")).toBe(true);
 
       pressKey("ArrowDown");
-      expect(items[0].hasAttribute("focused")).toBe(false);
-      expect(items[1].hasAttribute("focused")).toBe(true);
+      expect(items[0]!.hasAttribute("focused")).toBe(false);
+      expect(items[1]!.hasAttribute("focused")).toBe(true);
     });
 
     test("ArrowUp wraps around to last item", () => {
@@ -126,7 +126,7 @@ describe("Slash Menu", () => {
       }
 
       // Should wrap to first
-      expect(items[0].hasAttribute("focused")).toBe(true);
+      expect(items[0]!.hasAttribute("focused")).toBe(true);
     });
   });
 
@@ -199,6 +199,7 @@ describe("Slash Menu", () => {
       // But our pressKey dispatches on document so the capture listener fires.
       // The key test: after Enter, the menu is closed and item selected.
       expect(isSlashMenuOpen()).toBe(false);
+      void _bubbled;
       document.removeEventListener("keydown", handler);
     });
   });
@@ -255,17 +256,17 @@ describe("Slash Menu", () => {
         onSelect: () => {},
       });
       const items = getMenuItems();
-      expect(items[0].hasAttribute("focused")).toBe(true);
+      expect(items[0]!.hasAttribute("focused")).toBe(true);
 
       pressKey("ArrowDown");
-      expect(items[1].hasAttribute("focused")).toBe(true);
+      expect(items[1]!.hasAttribute("focused")).toBe(true);
 
       pressKey("ArrowDown");
-      expect(items[2].hasAttribute("focused")).toBe(true);
+      expect(items[2]!.hasAttribute("focused")).toBe(true);
 
       // Wraps
       pressKey("ArrowDown");
-      expect(items[0].hasAttribute("focused")).toBe(true);
+      expect(items[0]!.hasAttribute("focused")).toBe(true);
     });
   });
 });

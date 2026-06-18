@@ -115,7 +115,7 @@ function _onStatusbarClick(e: Event) {
     return;
   }
   try {
-    const path = JSON.parse(pathStr);
+    const path = JSON.parse(pathStr) as JxPath;
     updateSession({ selection: path });
     renderOnly("leftPanel", "rightPanel", "canvas");
   } catch {

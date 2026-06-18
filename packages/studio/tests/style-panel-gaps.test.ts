@@ -9,7 +9,7 @@ import { flush, renderInto } from "./harness";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 // Stub the stylebook panel so importing style-panel doesn't drag in canvas panning side effects.
-mock.module("../src/panels/stylebook-panel", () => ({
+void mock.module("../src/panels/stylebook-panel", () => ({
   selectStylebookTag: mock(() => {}),
 }));
 

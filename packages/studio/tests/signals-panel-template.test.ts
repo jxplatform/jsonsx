@@ -331,14 +331,14 @@ describe("state signal editor", () => {
     const h = setup({ $sig: { default: "", type: "string" } });
     const editor = await expand(h, "$sig");
     commitValue(fieldEl(editor, "Type", "sp-picker"), "integer");
-    expect((docState().$sig as { type: string }).type).toBe("integer");
+    expect((docState().$sig! as { type: string }).type).toBe("integer");
   });
 
   test("format picker shows for string type and switches Default to a media picker", async () => {
     const h = setup({ $img: { default: "", type: "string" } });
     let editor = await expand(h, "$img");
     commitValue(fieldEl(editor, "Format", "sp-picker"), "image");
-    expect((docState().$img as { format: string }).format).toBe("image");
+    expect((docState().$img! as { format: string }).format).toBe("image");
 
     h.ctx.renderLeftPanel();
     editor = h.container.querySelector(".signal-editor") as HTMLElement;
@@ -350,7 +350,7 @@ describe("state signal editor", () => {
     await new Promise((r) => {
       setTimeout(r, 450);
     });
-    expect((docState().$img as { default: string }).default).toBe("/hero.png");
+    expect((docState().$img! as { default: string }).default).toBe("/hero.png");
   });
 
   test("format row hidden for non-string types", async () => {
@@ -371,28 +371,28 @@ describe("state signal editor", () => {
 
     let editor = await expand(h, "$int");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "42");
-    expect((docState().$int as { default: number }).default).toBe(42);
+    expect((docState().$int! as { default: number }).default).toBe(42);
 
     editor = await expand(h, "$num");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "3.5");
-    expect((docState().$num as { default: number }).default).toBe(3.5);
+    expect((docState().$num! as { default: number }).default).toBe(3.5);
 
     editor = await expand(h, "$bool");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "true");
-    expect((docState().$bool as { default: boolean }).default).toBe(true);
+    expect((docState().$bool! as { default: boolean }).default).toBe(true);
 
     editor = await expand(h, "$arr");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), '["a","b"]');
-    expect((docState().$arr as { default: string[] }).default).toEqual(["a", "b"]);
+    expect((docState().$arr! as { default: string[] }).default).toEqual(["a", "b"]);
 
     // Invalid JSON falls back to the raw string
     editor = await expand(h, "$obj");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "{oops");
-    expect((docState().$obj as { default: string }).default).toBe("{oops");
+    expect((docState().$obj! as { default: string }).default).toBe("{oops");
 
     editor = await expand(h, "$str");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "plain");
-    expect((docState().$str as { default: string }).default).toBe("plain");
+    expect((docState().$str! as { default: string }).default).toBe("plain");
   });
 
   test("invalid integer default coerces to 0 and object default displays as JSON", async () => {
@@ -402,7 +402,7 @@ describe("state signal editor", () => {
     });
     let editor = await expand(h, "$int");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "abc");
-    expect((docState().$int as { default: number }).default).toBe(0);
+    expect((docState().$int! as { default: number }).default).toBe(0);
 
     editor = await expand(h, "$obj");
     const tf = fieldEl<ValueEl>(editor, "Default", "sp-textfield");
@@ -413,12 +413,12 @@ describe("state signal editor", () => {
     const h = setup({ $s: { default: "" } });
     let editor = await expand(h, "$s");
     commitValue(fieldEl(editor, "Description", "sp-textfield"), "my desc");
-    expect((docState().$s as { description: string }).description).toBe("my desc");
+    expect((docState().$s! as { description: string }).description).toBe("my desc");
 
     h.ctx.renderLeftPanel();
     editor = h.container.querySelector(".signal-editor") as HTMLElement;
     commitValue(fieldEl(editor, "Description", "sp-textfield"), "");
-    expect((docState().$s as { description?: string }).description).toBeUndefined();
+    expect((docState().$s! as { description?: string }).description).toBeUndefined();
   });
 
   test("custom element docs expose CEM fields (attribute, reflects, deprecated)", async () => {
@@ -426,19 +426,19 @@ describe("state signal editor", () => {
     const editor = await expand(h, "$open");
 
     commitValue(fieldEl(editor, "Attribute", "sp-textfield"), "open");
-    expect((docState().$open as { attribute: string }).attribute).toBe("open");
+    expect((docState().$open! as { attribute: string }).attribute).toBe("open");
 
     const check = fieldEl<HTMLElement & { checked: boolean }>(editor, "reflects", "sp-checkbox");
     check.checked = true;
     check.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docState().$open as { reflects: boolean }).reflects).toBe(true);
+    expect((docState().$open! as { reflects: boolean }).reflects).toBe(true);
 
     check.checked = false;
     check.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docState().$open as { reflects?: boolean }).reflects).toBeUndefined();
+    expect((docState().$open! as { reflects?: boolean }).reflects).toBeUndefined();
 
     commitValue(fieldEl(editor, "Deprecated", "sp-textfield"), "use $visible");
-    expect((docState().$open as { deprecated: string }).deprecated).toBe("use $visible");
+    expect((docState().$open! as { deprecated: string }).deprecated).toBe("use $visible");
   });
 
   test("non-custom-element docs hide CEM fields", async () => {
@@ -465,7 +465,7 @@ describe("computed editor", () => {
     await new Promise((r) => {
       setTimeout(r, 540);
     });
-    const def = docState().$sum as { $compute: string; $deps: string[] };
+    const def = docState().$sum! as { $compute: string; $deps: string[] };
     expect(def.$compute).toBe("$x * $y + $x");
     expect(def.$deps).toEqual(["#/state/$x", "#/state/$y"]);
   });
@@ -486,7 +486,7 @@ describe("data source editors", () => {
     commitValue(fieldEl(editor, "URL", "sp-textfield"), "/api/posts");
     commitValue(fieldEl(editor, "Method", "sp-picker"), "POST");
     commitValue(fieldEl(editor, "Timing", "sp-picker"), "server");
-    const def = docState().$req as { method: string; timing: string; url: string };
+    const def = docState().$req! as { method: string; timing: string; url: string };
     expect(def.url).toBe("/api/posts");
     expect(def.method).toBe("POST");
     expect(def.timing).toBe("server");
@@ -497,11 +497,11 @@ describe("data source editors", () => {
     const editor = await expand(h, "$ls");
     commitValue(fieldEl(editor, "Key", "sp-textfield"), "theme");
     commitValue(fieldEl(editor, "Default", "textarea"), '{"mode":"dark"}');
-    expect((docState().$ls as { key: string }).key).toBe("theme");
-    expect((docState().$ls as { default: unknown }).default).toEqual({ mode: "dark" } as never);
+    expect((docState().$ls! as { key: string }).key).toBe("theme");
+    expect((docState().$ls! as { default: unknown }).default).toEqual({ mode: "dark" } as never);
 
     commitValue(fieldEl(editor, "Default", "textarea"), "not json");
-    expect((docState().$ls as { default: unknown }).default).toBe("not json" as never);
+    expect((docState().$ls! as { default: unknown }).default).toBe("not json" as never);
   });
 
   test("SessionStorage renders object defaults as pretty JSON", async () => {
@@ -517,7 +517,7 @@ describe("data source editors", () => {
     commitValue(fieldEl(editor, "Database", "sp-textfield"), "appdb");
     commitValue(fieldEl(editor, "Store", "sp-textfield"), "items");
     commitValue(fieldEl(editor, "Version", "sp-textfield"), "5");
-    let def = docState().$db as { database: string; store: string; version: number };
+    let def = docState().$db! as { database: string; store: string; version: number };
     expect(def.database).toBe("appdb");
     expect(def.store).toBe("items");
     expect(def.version).toBe(5);
@@ -532,7 +532,7 @@ describe("data source editors", () => {
     const editor = await expand(h, "$ck");
     commitValue(fieldEl(editor, "Cookie", "sp-textfield"), "sid");
     commitValue(fieldEl(editor, "Default", "sp-textfield"), "anon");
-    const def = docState().$ck as { default: string; name: string };
+    const def = docState().$ck! as { default: string; name: string };
     expect(def.name).toBe("sid");
     expect(def.default).toBe("anon");
   });
@@ -541,10 +541,10 @@ describe("data source editors", () => {
     const h = setup({ $set: { $prototype: "Set", default: [] } });
     const editor = await expand(h, "$set");
     commitValue(fieldEl(editor, "Default", "textarea"), '["a","b"]');
-    expect((docState().$set as { default: string[] }).default).toEqual(["a", "b"]);
+    expect((docState().$set! as { default: string[] }).default).toEqual(["a", "b"]);
 
     commitValue(fieldEl(editor, "Default", "textarea"), "{nope");
-    expect((docState().$set as { default: string[] }).default).toEqual(["a", "b"]);
+    expect((docState().$set! as { default: string[] }).default).toEqual(["a", "b"]);
   });
 
   test("FormData edits the fields key and renders existing fields as JSON", async () => {
@@ -553,7 +553,7 @@ describe("data source editors", () => {
     const ta = fieldEl<ValueEl>(editor, "Fields", "textarea");
     expect(JSON.parse(ta.value)).toEqual({ email: "" });
     commitValue(ta, '{"email":"","name":""}');
-    expect((docState().$fd as { fields: unknown }).fields).toEqual({
+    expect((docState().$fd! as { fields: unknown }).fields).toEqual({
       email: "",
       name: "",
     } as never);
@@ -565,7 +565,7 @@ describe("data source editors", () => {
     const ta = fieldEl<ValueEl>(editor, "Default", "textarea");
     expect(JSON.parse(ta.value)).toEqual({ a: 1 });
     commitValue(ta, '{"b":2}');
-    expect((docState().$map as { default: unknown }).default).toEqual({ b: 2 } as never);
+    expect((docState().$map! as { default: unknown }).default).toEqual({ b: 2 } as never);
   });
 
   test("unknown prototype falls back to the external plugin editor", async () => {
@@ -584,11 +584,11 @@ describe("function editor", () => {
     const editor = await expand(h, "save");
 
     commitValue(fieldEl(editor, "Description", "sp-textfield"), "saves things");
-    expect((docState().save as { description: string }).description).toBe("saves things");
+    expect((docState().save! as { description: string }).description).toBe("saves things");
 
     const body = editor.querySelector('textarea[style*="monospace"]') as ValueEl;
     inputValue(body, "console.log(1)");
-    expect((docState().save as { body: string }).body).toBe("console.log(1)");
+    expect((docState().save! as { body: string }).body).toBe("console.log(1)");
 
     pointer(
       editor.querySelector('sp-action-button[title="Open in code editor"]') as Element,
@@ -607,7 +607,7 @@ describe("function editor", () => {
 
     commitValue(fieldEl(editor, "Source", "sp-textfield"), "./other.js");
     commitValue(fieldEl(editor, "Export", "sp-textfield"), "main");
-    const def = docState().run as { $export: string; $src: string };
+    const def = docState().run! as { $export: string; $src: string };
     expect(def.$src).toBe("./other.js");
     expect(def.$export).toBe("main");
   });
@@ -621,7 +621,7 @@ describe("function editor", () => {
     const addInput = paramsRow.querySelector('input[placeholder="+"]') as ValueEl;
     addInput.value = "c";
     key(addInput, "Enter");
-    expect((docState().go as { parameters: unknown[] }).parameters).toEqual([
+    expect((docState().go! as { parameters: unknown[] }).parameters).toEqual([
       { name: "a" },
       { name: "b" },
       { name: "c" },
@@ -630,7 +630,7 @@ describe("function editor", () => {
     // Non-Enter keys do nothing
     addInput.value = "d";
     key(addInput, "a");
-    expect((docState().go as { parameters: unknown[] }).parameters).toHaveLength(3);
+    expect((docState().go! as { parameters: unknown[] }).parameters).toHaveLength(3);
 
     // Remove the first chip
     h.ctx.renderLeftPanel();
@@ -639,7 +639,7 @@ describe("function editor", () => {
       (el) => el.textContent?.trim() === "×",
     );
     pointer(firstRemove as Element, "click");
-    expect((docState().go as { parameters: unknown[] }).parameters).toEqual([
+    expect((docState().go! as { parameters: unknown[] }).parameters).toEqual([
       { name: "b" },
       { name: "c" },
     ] as never[]);
@@ -652,7 +652,7 @@ describe("function editor", () => {
       (el) => el.textContent?.trim() === "×",
     );
     pointer(remove as Element, "click");
-    expect((docState().go as { parameters?: unknown }).parameters).toBeUndefined();
+    expect((docState().go! as { parameters?: unknown }).parameters).toBeUndefined();
   });
 
   test("advanced parameter editor: edit name/type/description/optional, add and remove rows", async () => {
@@ -682,28 +682,28 @@ describe("function editor", () => {
 
     // Rename first param
     commitValue(inputsNow()[0] as Element, "event");
-    let params = (docState().adv as { parameters: never[] }).parameters;
+    let params = (docState().adv! as { parameters: never[] }).parameters;
     expect(params[0]).toEqual({ name: "event", type: { text: "Event" } } as never);
 
     // Clear its type, then set a description
     refresh();
     commitValue(inputsNow()[1] as Element, "");
-    params = (docState().adv as { parameters: never[] }).parameters;
+    params = (docState().adv! as { parameters: never[] }).parameters;
     expect(params[0]).toEqual({ name: "event" } as never);
     refresh();
     commitValue(inputsNow()[2] as Element, "the event");
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[0] as { description: string }).description).toBe("the event");
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[0]! as { description: string }).description).toBe("the event");
 
     // Set then clear the description on the second param
     refresh();
     commitValue(inputsNow()[5] as Element, "context");
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[1] as { description: string }).description).toBe("context");
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[1]! as { description: string }).description).toBe("context");
     refresh();
     commitValue(inputsNow()[5] as Element, "");
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[1] as { description?: string }).description).toBeUndefined();
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[1]! as { description?: string }).description).toBeUndefined();
 
     // Toggle optional on and off
     refresh();
@@ -714,25 +714,25 @@ describe("function editor", () => {
     let check0 = checkAt(0);
     check0.checked = true;
     check0.dispatchEvent(new Event("change", { bubbles: true }));
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[0] as { optional: boolean }).optional).toBe(true);
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[0]! as { optional: boolean }).optional).toBe(true);
     refresh();
     check0 = checkAt(0);
     check0.checked = false;
     check0.dispatchEvent(new Event("change", { bubbles: true }));
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[0] as { optional?: boolean }).optional).toBeUndefined();
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[0]! as { optional?: boolean }).optional).toBeUndefined();
 
     // Type set branch ({ text }) on second param
     refresh();
     commitValue(inputsNow()[4] as Element, "AppContext");
-    params = (docState().adv as { parameters: never[] }).parameters;
-    expect((params[1] as { type: unknown }).type).toEqual({ text: "AppContext" } as never);
+    params = (docState().adv! as { parameters: never[] }).parameters;
+    expect((params[1]! as { type: unknown }).type).toEqual({ text: "AppContext" } as never);
 
     // Add a row
     refresh();
     pointer(findByText(editor, "button.kv-add", "+ Add parameter") as Element, "click");
-    params = (docState().adv as { parameters: never[] }).parameters;
+    params = (docState().adv! as { parameters: never[] }).parameters;
     expect(params).toHaveLength(3);
     expect(params[2]).toEqual({ name: "" } as never);
 
@@ -743,7 +743,7 @@ describe("function editor", () => {
       (el) => el.textContent?.trim() === "×",
     );
     pointer(removes[2] as Element, "click");
-    params = (docState().adv as { parameters: never[] }).parameters;
+    params = (docState().adv! as { parameters: never[] }).parameters;
     expect(params).toHaveLength(2);
 
     // Back to basic mode
@@ -763,7 +763,7 @@ describe("function editor", () => {
       (el) => el.textContent?.trim() === "×",
     );
     pointer(remove as Element, "click");
-    expect((docState().solo as { parameters?: unknown }).parameters).toBeUndefined();
+    expect((docState().solo! as { parameters?: unknown }).parameters).toBeUndefined();
   });
 });
 
@@ -803,25 +803,25 @@ describe("emits editor", () => {
 
     expect(editor.querySelectorAll('input[placeholder="event name"]')).toHaveLength(2);
     commitValue(inputAt("event name", 0), "updated");
-    let { emits } = docState().notify as { emits: never[] };
-    expect((emits[0] as { name: string }).name).toBe("updated");
+    let { emits } = docState().notify! as { emits: never[] };
+    expect((emits[0]! as { name: string }).name).toBe("updated");
 
     // Clear type and description on the first event
     refresh();
     commitValue(inputAt("type", 0), "");
-    ({ emits } = docState().notify as { emits: never[] });
-    expect((emits[0] as { type?: unknown }).type).toBeUndefined();
+    ({ emits } = docState().notify! as { emits: never[] });
+    expect((emits[0]! as { type?: unknown }).type).toBeUndefined();
     refresh();
     commitValue(inputAt("description", 0), "");
-    ({ emits } = docState().notify as { emits: never[] });
-    expect((emits[0] as { description?: string }).description).toBeUndefined();
+    ({ emits } = docState().notify! as { emits: never[] });
+    expect((emits[0]! as { description?: string }).description).toBeUndefined();
 
     // Set type/description on the second event
     refresh();
     commitValue(inputAt("type", 1), "Event");
     refresh();
     commitValue(inputAt("description", 1), "fires on close");
-    ({ emits } = docState().notify as { emits: never[] });
+    ({ emits } = docState().notify! as { emits: never[] });
     expect(emits[1]).toEqual({
       description: "fires on close",
       name: "closed",
@@ -831,7 +831,7 @@ describe("emits editor", () => {
     // Add an event
     refresh();
     pointer(findByText(editor, "button.kv-add", "+ Add event") as Element, "click");
-    ({ emits } = docState().notify as { emits: never[] });
+    ({ emits } = docState().notify! as { emits: never[] });
     expect(emits).toHaveLength(3);
     expect(emits[2]).toEqual({ name: "" } as never);
 
@@ -842,7 +842,7 @@ describe("emits editor", () => {
       (el) => el.textContent?.trim() === "×" && el.closest('[data-prop="parameters"]') === null,
     );
     pointer(firstRemove as Element, "click");
-    ({ emits } = docState().notify as { emits: never[] });
+    ({ emits } = docState().notify! as { emits: never[] });
     expect(emits).toHaveLength(2);
   });
 
@@ -866,7 +866,7 @@ describe("emits editor", () => {
       (el) => el.textContent?.trim() === "×" && el.closest('[data-prop="parameters"]') === null,
     );
     pointer(remove as Element, "click");
-    expect((docState().fn as { emits?: unknown }).emits).toBeUndefined();
+    expect((docState().fn! as { emits?: unknown }).emits).toBeUndefined();
   });
 });
 
@@ -880,7 +880,7 @@ describe("expression editor", () => {
     const editor = await expand(h, "$inc");
     const opPicker = fieldEl<ValueEl>(editor, "operator", "sp-picker");
     commitValue(opPicker, "!");
-    const def = docState().$inc as { $expression: { operator: string } };
+    const def = docState().$inc! as { $expression: { operator: string } };
     expect(def.$expression.operator).toBe("!");
   });
 

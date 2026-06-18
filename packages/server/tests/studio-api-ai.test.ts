@@ -7,7 +7,7 @@ const record = (name: string, args: unknown[]) => {
   calls[name] = args;
 };
 
-mock.module("../src/claude-session.ts", () => ({
+void mock.module("../src/claude-session.ts", () => ({
   createSession: (projectDir: string, message: string, opts: unknown) => {
     record("createSession", [projectDir, message, opts]);
     if (message === "explode") {

@@ -8,7 +8,7 @@ import { basename, resolve } from "node:path";
 const prompts: string[] = [];
 const answers = ["", "A test site", "https://test.example", "2"];
 
-mock.module("node:readline/promises", () => ({
+void mock.module("node:readline/promises", () => ({
   createInterface: () => ({
     close: () => {},
     question: (prompt: string) => {
@@ -19,7 +19,7 @@ mock.module("node:readline/promises", () => ({
 }));
 
 const generateProject = mock(() => Promise.resolve());
-mock.module("../generate", () => ({ generateProject }));
+void mock.module("../generate", () => ({ generateProject }));
 
 const logs: string[] = [];
 console.log = (...args: unknown[]) => {

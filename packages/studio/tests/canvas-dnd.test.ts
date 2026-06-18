@@ -14,7 +14,7 @@ type AnyRec = Record<string, any>;
 const dropTargets: AnyRec[] = [];
 const monitors: AnyRec[] = [];
 
-mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   draggable: () => () => {},
   dropTargetForElements: (cfg: AnyRec) => {
     dropTargets.push(cfg);
@@ -27,7 +27,7 @@ mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
 }));
 
 // Imported transitively via panels/dnd; stubbed to keep the graph light.
-mock.module("../src/panels/stylebook-panel", () => ({
+void mock.module("../src/panels/stylebook-panel", () => ({
   renderComponentPreview: async () => document.createElement("div"),
 }));
 
@@ -336,7 +336,7 @@ describe("monitor — onDrop", () => {
       location: loc([targetOf(fx.sectionEl, ["children", 0])]),
       source: { data: { fragment: { tagName: "em" }, type: "block" } },
     });
-    const [section] = tab.doc.document.children as JxMutableNode[];
+    const section = (tab.doc.document.children as JxMutableNode[])[0]!;
     expect((section.children as JxMutableNode[]).map((c) => c.tagName)).toEqual(["h2", "em"]);
   });
 

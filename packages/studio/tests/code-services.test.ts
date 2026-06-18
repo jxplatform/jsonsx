@@ -14,7 +14,7 @@ import {
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
 // Mock monaco-editor
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (url: any) => ({ toString: () => url }) },
   editor: {

@@ -266,8 +266,8 @@ describe("content-loader", () => {
       const authors = contentTypes.get("authors") as ContentLoaderEntry[];
       expect(authors).toBeDefined();
       expect(authors.length).toBe(1);
-      expect(authors[0].id).toBe("jane");
-      expect(authors[0].data.name).toBe("Jane Doe");
+      expect(authors[0]!.id).toBe("jane");
+      expect(authors[0]!.data.name).toBe("Jane Doe");
     });
 
     it("loads CSV content type entries with type coercion", async () => {
@@ -299,7 +299,7 @@ describe("content-loader", () => {
       const sorted = queryContentType(blog, {
         sort: { field: "pubDate", order: "desc" },
       }) as ContentLoaderEntry[];
-      expect((sorted[0].data.pubDate as any) >= (sorted[1].data.pubDate as any)).toBe(true);
+      expect((sorted[0]!.data.pubDate as any) >= (sorted[1]!.data.pubDate as any)).toBe(true);
     });
 
     it("limits entries", async () => {
@@ -318,7 +318,7 @@ describe("content-loader", () => {
         sort: { field: "pubDate", order: "desc" },
       });
       expect(result.length).toBe(1);
-      expect(result[0].data.title).toBe("Second Post"); // Most recent non-draft
+      expect(result[0]!.data.title).toBe("Second Post"); // Most recent non-draft
     });
   });
 
@@ -579,9 +579,9 @@ describe("content-loader edge cases", () => {
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(2);
       // First item: multiline field preserved correctly
-      expect(items[0].data.name).toBe("Line1\nLine2");
+      expect(items[0]!.data.name).toBe("Line1\nLine2");
       // Second item: escaped quotes resolved to literal quotes
-      expect(items[1].data.name).toBe('Has "quotes"');
+      expect(items[1]!.data.name).toBe('Has "quotes"');
     } finally {
       rmSync(TMP2, { force: true, recursive: true });
     }
@@ -615,8 +615,8 @@ describe("content-loader edge cases", () => {
       );
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(2);
-      expect(items[0].id).toContain("list-0");
-      expect(items[1].id).toContain("list-1");
+      expect(items[0]!.id).toContain("list-0");
+      expect(items[1]!.id).toContain("list-1");
     } finally {
       rmSync(TMP2, { force: true, recursive: true });
     }
@@ -689,7 +689,7 @@ describe("content-loader edge cases", () => {
       );
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(1);
-      expect(items[0].id).toBe("bad");
+      expect(items[0]!.id).toBe("bad");
     } finally {
       rmSync(TMP2, { force: true, recursive: true });
     }
@@ -701,7 +701,7 @@ describe("content-loader edge cases", () => {
     const sorted = queryContentType(blog, {
       sort: { field: "pubDate", order: "asc" },
     }) as ContentLoaderEntry[];
-    expect((sorted[0].data.pubDate as any) <= (sorted[1].data.pubDate as any)).toBe(true);
+    expect((sorted[0]!.data.pubDate as any) <= (sorted[1]!.data.pubDate as any)).toBe(true);
   });
 
   it("loadCollection with $elements passes allowedNames", async () => {
@@ -732,7 +732,7 @@ describe("content-loader edge cases", () => {
       );
       const docs = contentTypes.get("docs") as ContentLoaderEntry[];
       expect(docs.length).toBe(1);
-      expect(docs[0].data.title).toBe("Intro");
+      expect(docs[0]!.data.title).toBe("Intro");
     } finally {
       rmSync(TMP2, { force: true, recursive: true });
     }
@@ -791,13 +791,13 @@ describe("content-loader edge cases", () => {
     const ascSorted = queryContentType(entries, {
       sort: { field: "score", order: "asc" },
     });
-    expect(ascSorted[0].data.score).toBe(10);
-    expect(ascSorted[2].data.score).toBe(30);
+    expect(ascSorted[0]!.data.score).toBe(10);
+    expect(ascSorted[2]!.data.score).toBe(30);
     const descSorted = queryContentType(entries, {
       sort: { field: "score", order: "desc" },
     });
-    expect(descSorted[0].data.score).toBe(30);
-    expect(descSorted[2].data.score).toBe(10);
+    expect(descSorted[0]!.data.score).toBe(30);
+    expect(descSorted[2]!.data.score).toBe(10);
   });
 });
 
@@ -837,7 +837,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "draft", op: "==", value: true }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].id).toBe("b");
+    expect(result[0]!.id).toBe("b");
   });
 
   it("!= operator excludes values", () => {
@@ -853,7 +853,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "title", op: "contains", value: "Guide" }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].id).toBe("a");
+    expect(result[0]!.id).toBe("a");
   });
 
   it("not contains operator excludes substring", () => {
@@ -869,7 +869,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "tags", op: "contains", value: "api" }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].id).toBe("c");
+    expect(result[0]!.id).toBe("c");
   });
 
   it("not contains operator excludes array membership", () => {
@@ -933,7 +933,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "title", op: "empty" }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].id).toBe("d");
+    expect(result[0]!.id).toBe("d");
   });
 
   it("multiple rules are ANDed together", () => {
@@ -952,7 +952,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: [{ field: "id", op: "==", value: "c" }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].data.title).toBe("Gamma Tutorial");
+    expect(result[0]!.data.title).toBe("Gamma Tutorial");
   });
 
   it("legacy plain-object filter still works", () => {
@@ -960,7 +960,7 @@ describe("queryContentType — array filter with operators", () => {
       filter: { draft: false, score: 10 },
     });
     expect(result.length).toBe(1);
-    expect(result[0].id).toBe("a");
+    expect(result[0]!.id).toBe("a");
   });
 });
 
@@ -996,8 +996,8 @@ describe("queryContentType — multi-field sort", () => {
     const result = queryContentType(entries, {
       sort: { field: "title", order: "asc" },
     });
-    expect(result[0].data.title).toBe("Apple");
-    expect(result[3].data.title).toBe("Zebra");
+    expect(result[0]!.data.title).toBe("Apple");
+    expect(result[3]!.data.title).toBe("Zebra");
   });
 
   it("sorts by id field", () => {
@@ -1014,6 +1014,6 @@ describe("queryContentType — multi-field sort", () => {
       sort: [{ field: "title", order: "asc" }],
     });
     expect(result.length).toBe(1);
-    expect(result[0].data.title).toBe("Apple");
+    expect(result[0]!.data.title).toBe("Apple");
   });
 });

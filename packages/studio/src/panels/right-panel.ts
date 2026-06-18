@@ -89,7 +89,6 @@ export function unmount() {
   _eventsContainer = null;
   _styleContainer = null;
   _assistantContainer = null;
-  _lastTab = null;
 }
 
 /**
@@ -104,7 +103,6 @@ let _propsContainer: HTMLElement | null = null;
 let _eventsContainer: HTMLElement | null = null;
 let _styleContainer: HTMLElement | null = null;
 let _assistantContainer: HTMLElement | null = null;
-let _lastTab: string | null = null;
 
 function _ensureContainers() {
   if (_propsContainer) {
@@ -183,9 +181,9 @@ function _doRender() {
     // Show/hide containers
     for (let i = 0; i < containers.length; i++) {
       if (tabKeys[i] === tab) {
-        containers[i].style.display = tabKeys[i] === "assistant" ? "flex" : "";
+        containers[i]!.style.display = tabKeys[i] === "assistant" ? "flex" : "";
       } else {
-        containers[i].style.display = "none";
+        containers[i]!.style.display = "none";
       }
     }
 
@@ -221,8 +219,6 @@ function _doRender() {
     } else if (tab === "assistant") {
       litRender(renderAiPanelTemplate(), _assistantContainer!);
     }
-
-    _lastTab = tab;
   } catch (error) {
     console.error("right-panel render error:", error);
   }

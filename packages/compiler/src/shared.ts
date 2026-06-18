@@ -241,9 +241,9 @@ export function createCompileContext(
   scopeDefs: Record<string, unknown> = {},
   media: Record<string, string> = {},
 ): CompileContext {
-  const scope = raw?.state
+  const scope: Record<string, unknown> = raw?.state
     ? buildInitialScope(raw.state, parentScope)
-    : (parentScope ?? Object.create(null));
+    : (parentScope ?? (Object.create(null) as Record<string, unknown>));
   return { media, scope, scopeDefs };
 }
 
@@ -256,7 +256,7 @@ export function buildInitialScope(
   defs: Record<string, JxStateDefinition> = {},
   parentScope: Record<string, unknown> | null = null,
 ) {
-  const scope = Object.create(parentScope ?? null);
+  const scope = Object.create(parentScope ?? null) as Record<string, unknown>;
 
   for (const [key, def] of Object.entries(defs)) {
     if (typeof def !== "object" || def === null || Array.isArray(def)) {
@@ -295,7 +295,9 @@ export function buildInitialScope(
     if (isFunctionDef(def)) {
       if (def.body) {
         const names = def.parameters ? paramNames(def.parameters) : (def.arguments ?? []);
-        const fn = new Function("state", ...names, def.body);
+        const fn = new Function("state", ...names, def.body) as (
+          state: Record<string, unknown>,
+        ) => unknown;
         if (def.body.includes("return")) {
           defineLazyScopeValue(scope, key, () => fn(scope));
         } else {
@@ -382,7 +384,7 @@ export function resolveRefValue(refValue: unknown, scope: Record<string, unknown
   }
   if (refValue.startsWith("$map/")) {
     const parts = refValue.split("/");
-    const [, key] = parts;
+    const key = parts[1]!;
     const base = (scope.$map as Record<string, unknown> | undefined)?.[key] ?? scope[`$map/${key}`];
     return parts.length > 2 ? getPathValue(base, parts.slice(2).join("/")) : base;
   }
@@ -406,10 +408,16 @@ export function evaluateStaticTemplate(str: string, scope: Record<string, unknow
   try {
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
-      const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`);
+      const fn = new Function("state", "$map", `return (${singleExprMatch[1]})`) as (
+        state: Record<string, unknown>,
+        $map: unknown,
+      ) => unknown;
       return fn(scope, scope?.$map);
     }
-    const fn = new Function("state", "$map", `return \`${str}\``);
+    const fn = new Function("state", "$map", `return \`${str}\``) as (
+      state: Record<string, unknown>,
+      $map: unknown,
+    ) => unknown;
     return fn(scope, scope?.$map);
   } catch {
     return null;
@@ -621,7 +629,7 @@ export function compileStyles(
           if (mProps) {
             rules.push(`${atRule} { ${selector} { ${mProps} } }`);
           }
-          for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
+          for (const [sel, sub] of Object.entries(val as Record<string, unknown>)) {
             if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
               continue;
             }
@@ -742,7 +750,7 @@ function emitNestedElement(
       if (mProps) {
         rules.push(`${atRule} { ${selector} { ${mProps} } }`);
       }
-      for (const [sel, sub] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
+      for (const [sel, sub] of Object.entries(val as Record<string, unknown>)) {
         if (sub === null || typeof sub !== "object" || Array.isArray(sub)) {
           continue;
         }
@@ -984,8 +992,7 @@ function _walkSrc(def: JxElement | JxMutableNode | string, srcs: Set<string>) {
  * @returns {{ key: string; exportName: string; src: string }[]}
  */
 export function collectServerEntries(doc: JxElement) {
-  /** @type {Map<string, { key: string; exportName: string; src: string }>} */
-  const entries = new Map();
+  const entries = new Map<string, { key: string; exportName: string; src: string }>();
   _walkServerEntries(doc, entries);
   return [...entries.values()];
 }

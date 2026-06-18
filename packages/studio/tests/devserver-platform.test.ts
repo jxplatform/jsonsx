@@ -143,28 +143,28 @@ describe("devserver platform basics", () => {
 
 describe("path prefix logic", () => {
   test("without a projectRoot, paths pass through unprefixed", async () => {
-    route("/__studio/files", () => json([{ kind: "file", name: "a.json", path: "src/a.json" }]));
+    route("/__studio/files", () => json([{ type: "file", name: "a.json", path: "src/a.json" }]));
     const p = createDevServerPlatform();
     const entries = await p.listDirectory("src");
     expect(callsTo("/__studio/files")[0]!.search.get("dir")).toBe("src");
-    expect(entries[0].path).toBe("src/a.json");
+    expect(entries[0]!.path).toBe("src/a.json");
   });
 
   test("with a projectRoot, '.' maps to the root and responses are stripped", async () => {
     route("/__studio/activate", () => json({ ok: true }));
     route("/__studio/files", () =>
       json([
-        { kind: "file", name: "index.json", path: "examples/site/index.json" },
-        { kind: "directory", name: "outside", path: "elsewhere/outside" },
+        { type: "file", name: "index.json", path: "examples/site/index.json" },
+        { type: "directory", name: "outside", path: "elsewhere/outside" },
       ]),
     );
     const p = createDevServerPlatform();
     p.projectRoot = "examples/site";
     const entries = await p.listDirectory(".");
     expect(callsTo("/__studio/files")[0]!.search.get("dir")).toBe("examples/site");
-    expect(entries[0].path).toBe("index.json");
+    expect(entries[0]!.path).toBe("index.json");
     // Paths outside the root are left untouched
-    expect(entries[1].path).toBe("elsewhere/outside");
+    expect(entries[1]!.path).toBe("elsewhere/outside");
   });
 
   test("relative paths are prefixed and backslashes normalized", async () => {
@@ -585,25 +585,25 @@ describe("locateFile", () => {
 
 describe("searchFiles", () => {
   test("builds a glob from the query plus normalized extensions", async () => {
-    route("/__studio/files", () => json([{ kind: "file", name: "foo.md", path: "docs/foo.md" }]));
+    route("/__studio/files", () => json([{ type: "file", name: "foo.md", path: "docs/foo.md" }]));
     const p = createDevServerPlatform();
     const results = await p.searchFiles("foo", [".md", "csv"]);
     const call = callsTo("/__studio/files")[0]!;
     expect(call.search.get("glob")).toBe("**/*foo*.{json,md,csv}");
     expect(call.search.get("dir")).toBe(".");
-    expect(results).toEqual([{ kind: "file", name: "foo.md", path: "docs/foo.md" }]);
+    expect(results).toEqual([{ type: "file", name: "foo.md", path: "docs/foo.md" }]);
   });
 
   test("strips the project root from result paths", async () => {
     route("/__studio/activate", () => json({ ok: true }));
     route("/__studio/files", () =>
-      json([{ kind: "file", name: "page.json", path: "site/pages/page.json" }]),
+      json([{ type: "file", name: "page.json", path: "site/pages/page.json" }]),
     );
     const p = createDevServerPlatform();
     p.projectRoot = "site";
     const results = await p.searchFiles("page");
     expect(callsTo("/__studio/files")[0]!.search.get("dir")).toBe("site");
-    expect(results[0].path).toBe("pages/page.json");
+    expect(results[0]!.path).toBe("pages/page.json");
   });
 
   test("returns [] on failure", async () => {

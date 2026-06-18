@@ -132,7 +132,7 @@ async function gitAction(action: string, body?: unknown) {
   updateUi("gitLoading", true);
   updateUi("gitError", null);
   try {
-    await plat[action](body);
+    await plat[action]!(body);
     await refreshGitStatus();
   } catch (error) {
     updateUi("gitError", errorMessage(error));
@@ -191,7 +191,7 @@ export function renderGitPanel(
   const loading = S.ui.gitLoading;
 
   if (!status && !loading) {
-    refreshGitStatus();
+    void refreshGitStatus();
     return html`<div class="git-panel">
       <div class="git-loading">Loading...</div>
     </div>`;
@@ -232,7 +232,7 @@ export function renderGitPanel(
   if (!_pollTimer) {
     _pollTimer = setInterval(() => {
       if (view.leftTab === "git" && !S.ui.gitLoading) {
-        refreshGitStatus();
+        void refreshGitStatus();
       }
     }, 30_000);
   }
@@ -417,7 +417,7 @@ export function renderGitPanel(
   const switchTab = (tab: string) => {
     _gitSubTab = tab;
     if (tab === "history" && !S.ui.gitLogEntries) {
-      fetchGitLog();
+      void fetchGitLog();
     }
     renderOnly("leftPanel");
   };
@@ -453,7 +453,7 @@ export function renderGitPanel(
         @keydown=${(e: KeyboardEvent) => {
           if (e.ctrlKey && e.key === "Enter") {
             e.preventDefault();
-            doCommit();
+            void doCommit();
           }
         }}
       ></sp-textfield>
@@ -489,7 +489,7 @@ export function renderGitPanel(
                   "hidden",
                   "",
                 );
-                doCommit();
+                void doCommit();
               }}
             >
               Commit (don't sync)

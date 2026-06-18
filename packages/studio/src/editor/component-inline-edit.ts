@@ -28,16 +28,6 @@ import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
 
 /**
- * @type {{
- *   findCanvasElement: (
- *     path: import("../state").JxPath,
- *     canvasEl: HTMLElement,
- *   ) => HTMLElement | null;
- * } | null}
- */
-let _ctx = null;
-
-/**
  * Initialize the component inline edit module.
  *
  * @param {{
@@ -45,12 +35,13 @@ let _ctx = null;
  *     path: import("../state").JxPath,
  *     canvasEl: HTMLElement,
  *   ) => HTMLElement | null;
- * }} ctx
+ * }} _ctx
  */
-export function initComponentInlineEdit(ctx: {
+export function initComponentInlineEdit(_ctx: {
   findCanvasElement: (path: JxPath, canvasEl: HTMLElement) => HTMLElement | null;
 }) {
-  _ctx = ctx;
+  // Public init hook retained for API symmetry; the ctx it once stored is no longer read here.
+  void _ctx;
 }
 
 /**
@@ -276,28 +267,6 @@ function splitParagraph() {
   });
 
   updateUi("pendingInlineEdit", { mediaName, path: newPath });
-}
-
-function _commitComponentInlineEdit() {
-  if (!view.componentInlineEdit) {
-    return;
-  }
-  const { el, path, originalText } = view.componentInlineEdit;
-  const newText = (el.textContent ?? "").trim();
-
-  cleanupComponentInlineEdit(el);
-
-  const pPath = parentElementPath(path);
-  if (!newText && pPath) {
-    transactDoc(activeTab.value, (t) => mutateRemoveNode(t, path));
-  } else if (newText !== originalText) {
-    transactDoc(activeTab.value, (t) =>
-      mutateUpdateProperty(t, path, "textContent", newText || undefined),
-    );
-  } else {
-    renderOnly("canvas");
-    renderOnly("overlays");
-  }
 }
 
 function cancelComponentInlineEdit() {

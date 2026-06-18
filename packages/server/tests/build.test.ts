@@ -22,7 +22,7 @@ describe("buildAll", () => {
     setup();
     try {
       const entryFile = join(FIXTURES, "entry.js");
-      Bun.write(entryFile, "export const x = 42;");
+      void Bun.write(entryFile, "export const x = 42;");
 
       await buildAll([{ entrypoints: [entryFile], label: "test", outdir: OUTDIR }]);
       const files = new Bun.Glob("*.js").scanSync({ cwd: OUTDIR });
@@ -43,8 +43,8 @@ describe("buildAll", () => {
       mkdirSync(out1, { recursive: true });
       mkdirSync(out2, { recursive: true });
 
-      Bun.write(entry1, "export const a = 1;");
-      Bun.write(entry2, "export const b = 2;");
+      void Bun.write(entry1, "export const a = 1;");
+      void Bun.write(entry2, "export const b = 2;");
 
       await buildAll([
         { entrypoints: [entry1], label: "a", outdir: out1 },
@@ -79,7 +79,7 @@ describe("rebuild", () => {
     setup();
     try {
       const entryFile = join(FIXTURES, "entry.js");
-      Bun.write(entryFile, "export const y = 99;");
+      void Bun.write(entryFile, "export const y = 99;");
 
       const builds = [
         {
@@ -101,7 +101,7 @@ describe("rebuild", () => {
     setup();
     try {
       const entryFile = join(FIXTURES, "main.js");
-      Bun.write(entryFile, "export const z = 0;");
+      void Bun.write(entryFile, "export const z = 0;");
 
       const builds = [
         {
@@ -123,7 +123,7 @@ describe("rebuild", () => {
     setup();
     try {
       const entryFile = join(FIXTURES, "entry.js");
-      Bun.write(entryFile, "export const w = 1;");
+      void Bun.write(entryFile, "export const w = 1;");
 
       const builds = [{ entrypoints: [entryFile], match: () => true, outdir: OUTDIR }];
       const result = await rebuild(builds, "x.js");

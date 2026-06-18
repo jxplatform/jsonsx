@@ -94,13 +94,13 @@ export function cacheKey(srcPath: string, config: ImageConfig) {
  * @param {string} projectRoot
  * @returns {CacheManifest}
  */
-export function loadCache(projectRoot: string) {
+export function loadCache(projectRoot: string): CacheManifest {
   const manifestPath = resolve(getImageCacheDir(projectRoot), "manifest.json");
   if (!existsSync(manifestPath)) {
     return { entries: {}, version: 1 };
   }
   try {
-    return JSON.parse(readFileSync(manifestPath, "utf8"));
+    return JSON.parse(readFileSync(manifestPath, "utf8")) as CacheManifest;
   } catch {
     return { entries: {}, version: 1 };
   }

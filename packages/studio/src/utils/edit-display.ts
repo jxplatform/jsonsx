@@ -160,7 +160,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
   }
   if (Array.isArray(node)) {
     // Arrays of nodes round-trip element-wise; the array itself is not a node.
-    return node.map((n) => prepareForEditMode(n)) as unknown as JxMutableNode;
+    return (node as JxMutableNode[]).map((n) => prepareForEditMode(n)) as unknown as JxMutableNode;
   }
 
   // A mapped-array node itself → its edit-mode perimeter (e.g. when the patcher re-renders an
@@ -227,7 +227,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       // Replace $switch cases with a placeholder showing the first case or a label
       const caseKeys = Object.keys(v);
       if (caseKeys.length > 0) {
-        const firstCase = (v as Record<string, unknown>)[caseKeys[0]];
+        const firstCase = (v as Record<string, unknown>)[caseKeys[0]!];
         out.children =
           firstCase && typeof firstCase === "object" && !(firstCase as Record<string, unknown>).$ref
             ? [prepareForEditMode(firstCase as JxMutableNode)]

@@ -48,7 +48,7 @@ export function extractFontFamily(href: string) {
   if (!match) {
     return "";
   }
-  return decodeURIComponent(match[1].replaceAll("+", " "));
+  return decodeURIComponent(match[1]!.replaceAll("+", " "));
 }
 
 /**

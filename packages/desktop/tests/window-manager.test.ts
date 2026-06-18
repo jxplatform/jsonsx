@@ -30,7 +30,7 @@ class MockWindow {
   }
 }
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   BrowserView: {
     defineRPC: (config: { handlers: { requests: Record<string, (p?: never) => unknown> } }) => {
       rpcConfigs.push(config);
@@ -89,7 +89,7 @@ const createProjectSession = mock((root: string | null) => {
   sessions.push(s);
   return s;
 });
-mock.module("../src/project-session", () => ({
+void mock.module("../src/project-session", () => ({
   createProjectSession,
   setFileDialog: mock(() => {}),
 }));
@@ -121,7 +121,7 @@ const createGitOps = mock(() => {
   gitInstances.push(g);
   return g;
 });
-mock.module("../src/git", () => ({ createGitOps }));
+void mock.module("../src/git", () => ({ createGitOps }));
 
 const pkgInstances: Record<string, ReturnType<typeof mock>>[] = [];
 const createPackageOps = mock(() => {
@@ -131,11 +131,11 @@ const createPackageOps = mock(() => {
   pkgInstances.push(p);
   return p;
 });
-mock.module("../src/packages", () => ({ createPackageOps }));
+void mock.module("../src/packages", () => ({ createPackageOps }));
 
 // ─── Mock updater + claude-session ───────────────────────────────────────────
 
-mock.module("../src/updater", () => ({
+void mock.module("../src/updater", () => ({
   applyUpdate: mock(() => "apply"),
   checkForUpdate: mock(() => "check"),
   downloadUpdate: mock(() => "download"),
@@ -147,7 +147,7 @@ const createSession = mock((_root: string, _msg: string, _opts: unknown) => ({ i
 const deleteSession = mock((_id: string) => {});
 const sendMessage = mock((_id: string, _msg: string) => {});
 const stopSession = mock((_id: string) => {});
-mock.module("@jxsuite/server/claude-session", () => ({
+void mock.module("@jxsuite/server/claude-session", () => ({
   createSession,
   deleteSession,
   getAuthStatus: mock(async () => ({ authenticated: true })),

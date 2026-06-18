@@ -19,7 +19,7 @@ let fetchCalls: { url: string; opts: any }[] = [];
 let fetchResponses: { ok: boolean; json: unknown }[] = [];
 const originalFetch = globalThis.fetch;
 
-mock.module("../src/ui/layers.js", () => ({
+void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async () => true,
   showDialog: (templateFn: any) =>
     new Promise((resolve) => {
@@ -36,13 +36,13 @@ mock.module("../src/ui/layers.js", () => ({
     }),
 }));
 
-mock.module("../src/github/github-auth.js", () => ({
+void mock.module("../src/github/github-auth.js", () => ({
   authenticateGithub: async () => authToken,
   clearGithubToken: () => {},
   getGithubToken: () => authToken,
 }));
 
-mock.module("../src/platform.js", () => ({
+void mock.module("../src/platform.js", () => ({
   getPlatform: () => ({
     gitAddRemote: (...args: unknown[]) => {
       remoteCalls.push(args);
@@ -56,7 +56,7 @@ mock.module("../src/platform.js", () => ({
   registerPlatform: () => {},
 }));
 
-mock.module("../src/panels/git-panel.js", () => ({
+void mock.module("../src/panels/git-panel.js", () => ({
   cleanupGitPanel: () => {},
   cloneRepository: async () => {},
   platformSupportsClone: () => false,
@@ -66,7 +66,7 @@ mock.module("../src/panels/git-panel.js", () => ({
   renderGitPanel: () => null,
 }));
 
-mock.module("../src/panels/statusbar.js", () => ({
+void mock.module("../src/panels/statusbar.js", () => ({
   statusMessage: (msg: string) => statusMessages.push(msg),
 }));
 

@@ -67,7 +67,7 @@ interface FakeEditor {
 const createdModels: FakeModel[] = [];
 const createdEditors: FakeEditor[] = [];
 
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (s: string) => ({ toString: () => s }) },
   editor: {
@@ -111,7 +111,7 @@ mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   },
 }));
 
-mock.module("../src/canvas/canvas-live-render.js", () => ({
+void mock.module("../src/canvas/canvas-live-render.js", () => ({
   activeLayoutPath: null,
   buildNestedSiteCSS: () => "",
   initCanvasLiveRender: () => {},
@@ -121,17 +121,17 @@ mock.module("../src/canvas/canvas-live-render.js", () => ({
     liveImpl(gen, doc, canvas, panel),
 }));
 
-mock.module("../src/panels/welcome-screen.js", () => ({
+void mock.module("../src/panels/welcome-screen.js", () => ({
   initWelcome: () => {},
   renderWelcome,
 }));
 
-mock.module("../src/panels/editors.js", () => ({
+void mock.module("../src/panels/editors.js", () => ({
   registerFunctionCompletions: () => {},
   renderFunctionEditor,
 }));
 
-mock.module("../src/panels/statusbar.js", () => ({
+void mock.module("../src/panels/statusbar.js", () => ({
   mountStatusbar: () => {},
   renderStatusbar: () => {},
   setStatusbarRenderer: () => {},
@@ -139,37 +139,37 @@ mock.module("../src/panels/statusbar.js", () => ({
   unmountStatusbar: () => {},
 }));
 
-mock.module("../src/panels/overlays.js", () => ({
+void mock.module("../src/panels/overlays.js", () => ({
   mount: () => {},
   render: overlaysRender,
   unmount: () => {},
 }));
 
-mock.module("../src/panels/canvas-dnd.js", () => ({
+void mock.module("../src/panels/canvas-dnd.js", () => ({
   registerPanelDnD,
   registerSubtreeDnD: () => {},
 }));
 
-mock.module("../src/panels/panel-events.js", () => ({
+void mock.module("../src/panels/panel-events.js", () => ({
   initPanelEvents: () => {},
   registerPanelEvents,
 }));
 
-mock.module("../src/panels/pseudo-preview.js", () => ({
+void mock.module("../src/panels/pseudo-preview.js", () => ({
   updateForcedPseudoPreview,
 }));
 
-mock.module("../src/editor/component-inline-edit.js", () => ({
+void mock.module("../src/editor/component-inline-edit.js", () => ({
   enterComponentInlineEdit,
   initComponentInlineEdit: () => {},
 }));
 
-mock.module("../src/panels/stylebook-panel.js", () => ({
+void mock.module("../src/panels/stylebook-panel.js", () => ({
   refreshStylebookStyles,
   renderStylebookMode,
 }));
 
-mock.module("../src/files/file-ops.js", () => ({
+void mock.module("../src/files/file-ops.js", () => ({
   parseSourceForPath: parseSourceForPathMock,
   serializeDocument: serializeDocumentMock,
 }));
@@ -382,8 +382,8 @@ describe("tab close/reopen lifecycle", () => {
 
     closeAllTabs();
     renderCanvas();
-    expect(editor.dispose).toHaveBeenCalled();
-    expect(model.dispose).toHaveBeenCalled();
+    expect(editor!.dispose).toHaveBeenCalled();
+    expect(model!.dispose).toHaveBeenCalled();
     expect(view.monacoEditor).toBeNull();
 
     // Reopening source mode builds a fresh editor instead of writing into the dead, detached one.
@@ -458,9 +458,9 @@ describe("source mode", () => {
     expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
     expect(view.monacoEditor).toBe(createdEditors[0] as never);
     await flush();
-    expect(createdModels[0]._value).toBe(JSON.stringify(tab.doc.document, null, 2));
-    expect(createdModels[0].lang).toBe("json");
-    expect(createdEditors[0]._ignoreNextChange).toBe(true);
+    expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
+    expect(createdModels[0]!.lang).toBe("json");
+    expect(createdEditors[0]!._ignoreNextChange).toBe(true);
   });
 
   test("export toolbar button invokes ctx.exportFile", async () => {
@@ -480,9 +480,9 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      editor._model!._value = JSON.stringify({ children: [], tagName: "main" });
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = JSON.stringify({ children: [], tagName: "main" });
+      fireModelChange(editor!);
       await runPending();
       expect(tab.doc.document.tagName).toBe("main");
       expect(tab.doc.dirty).toBe(true);
@@ -496,9 +496,9 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      editor._model!._value = "{ not json";
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = "{ not json";
+      fireModelChange(editor!);
       await runPending();
       expect(tab.doc.document.tagName).toBe("div");
       expect(tab.doc.dirty).toBe(false);
@@ -512,11 +512,11 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = true;
-      editor._model!._value = JSON.stringify({ tagName: "main" });
-      fireModelChange(editor);
+      editor!._ignoreNextChange = true;
+      editor!._model!._value = JSON.stringify({ tagName: "main" });
+      fireModelChange(editor!);
       await runPending();
-      expect(editor._ignoreNextChange).toBe(false);
+      expect(editor!._ignoreNextChange).toBe(false);
       expect(tab.doc.document.tagName).toBe("div");
       expect(tab.doc.dirty).toBe(false);
     });
@@ -529,11 +529,11 @@ describe("source mode", () => {
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
-      expect(createdModels[0].lang).toBe("javascript");
-      expect(createdModels[0]._value).toBe(String(tab.doc.document));
+      expect(createdModels[0]!.lang).toBe("javascript");
+      expect(createdModels[0]!._value).toBe(String(tab.doc.document));
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      fireModelChange(editor!);
       await runPending();
       expect(tab.doc.dirty).toBe(true);
     });
@@ -548,14 +548,14 @@ describe("source mode", () => {
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
-      expect(createdModels[0].lang).toBe("markdown");
+      expect(createdModels[0]!.lang).toBe("markdown");
       expect(serializeDocumentMock).toHaveBeenCalled();
-      expect(createdModels[0]._value).toBe("# markdown source");
+      expect(createdModels[0]!._value).toBe("# markdown source");
 
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      editor._model!._value = "# Edited";
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = "# Edited";
+      fireModelChange(editor!);
       await runPending();
       expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# Edited");
       expect(tab.doc.document.tagName).toBe("article");
@@ -577,8 +577,8 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      fireModelChange(editor!);
       await runPending();
       expect(tab.doc.document.tagName).toBe("div");
       expect(tab.doc.dirty).toBe(false);
@@ -592,14 +592,14 @@ describe("source mode", () => {
     await flush();
     expect(createdEditors.length).toBe(1);
     const [editor] = createdEditors;
-    editor._ignoreNextChange = false;
+    editor!._ignoreNextChange = false;
 
     tab.doc.document.tagName = "section";
     renderCanvas();
     await flush();
     expect(createdEditors.length).toBe(1);
-    expect(editor.getValue()).toBe(JSON.stringify(tab.doc.document, null, 2));
-    expect(editor._ignoreNextChange).toBe(true);
+    expect(editor!.getValue()).toBe(JSON.stringify(tab.doc.document, null, 2));
+    expect(editor!._ignoreNextChange).toBe(true);
   });
 
   test("re-render does not clobber the buffer while the editor has focus", async () => {
@@ -608,12 +608,12 @@ describe("source mode", () => {
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
-    editor._focused = true;
-    editor._model!._value = "user-typing";
+    editor!._focused = true;
+    editor!._model!._value = "user-typing";
     tab.doc.document.tagName = "section";
     renderCanvas();
     await flush();
-    expect(editor.getValue()).toBe("user-typing");
+    expect(editor!.getValue()).toBe("user-typing");
   });
 
   test("stale buffer updates are dropped when the editor was replaced mid-flight", async () => {
@@ -622,14 +622,14 @@ describe("source mode", () => {
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
-    editor._ignoreNextChange = false;
-    editor._model!._value = "stale-buffer";
+    editor!._ignoreNextChange = false;
+    editor!._model!._value = "stale-buffer";
 
     tab.doc.document.tagName = "section";
     renderCanvas(); // Fast path kicks off an async buffer refresh…
     view.monacoEditor = null; // …but the editor goes away before it lands
     await flush();
-    expect(editor.getValue()).toBe("stale-buffer");
+    expect(editor!.getValue()).toBe("stale-buffer");
   });
 
   test("change events fired after editor teardown are ignored", async () => {
@@ -639,10 +639,10 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      editor._model!._value = JSON.stringify({ tagName: "main" });
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = JSON.stringify({ tagName: "main" });
       view.monacoEditor = null;
-      fireModelChange(editor);
+      fireModelChange(editor!);
       await runPending();
       expect(tab.doc.document.tagName).toBe("div");
     });
@@ -655,9 +655,9 @@ describe("source mode", () => {
       renderCanvas();
       await flush();
       const [editor] = createdEditors;
-      editor._ignoreNextChange = false;
-      editor._model!._value = JSON.stringify({ tagName: "main" });
-      fireModelChange(editor);
+      editor!._ignoreNextChange = false;
+      editor!._model!._value = JSON.stringify({ tagName: "main" });
+      fireModelChange(editor!);
       closeAllTabs();
       await runPending();
       expect(tab.doc.document.tagName).toBe("div");
@@ -675,7 +675,7 @@ describe("source mode", () => {
     });
     renderCanvas();
     await flush();
-    expect(createdModels[0]._value).toBe("");
+    expect(createdModels[0]!._value).toBe("");
   });
 
   test("serialization failure on a re-render keeps the current buffer", async () => {
@@ -686,14 +686,14 @@ describe("source mode", () => {
     canvasMode = "source";
     renderCanvas();
     await flush();
-    expect(createdModels[0]._value).toBe("# markdown source");
+    expect(createdModels[0]!._value).toBe("# markdown source");
 
     serializeDocumentMock.mockImplementationOnce(async () => {
       throw new Error("format service unreachable");
     });
     renderCanvas();
     await flush();
-    expect(createdModels[0]._value).toBe("# markdown source");
+    expect(createdModels[0]!._value).toBe("# markdown source");
   });
 
   test("switching modes disposes the monaco editor and its model", async () => {
@@ -706,8 +706,8 @@ describe("source mode", () => {
 
     canvasMode = "design";
     renderCanvas();
-    expect(editor.dispose).toHaveBeenCalled();
-    expect(model.dispose).toHaveBeenCalled();
+    expect(editor!.dispose).toHaveBeenCalled();
+    expect(model!.dispose).toHaveBeenCalled();
     expect(view.monacoEditor).toBeNull();
   });
 });
@@ -747,11 +747,11 @@ describe("git-diff mode", () => {
     expect(headers).toEqual(["Original", "Current"]);
     expect(canvasPanels.length).toBe(2);
     const [orig, curr] = canvasPanels as unknown as CanvasPanel[];
-    expect(orig.canvas?.textContent).toContain("old text");
-    expect(curr.canvas?.textContent).toContain("new text");
+    expect(orig!.canvas?.textContent).toContain("old text");
+    expect(curr!.canvas?.textContent).toContain("new text");
     // Diff panels are never live-patchable
-    expect(orig.ready).toBe(false);
-    expect(curr.ready).toBe(false);
+    expect(orig!.ready).toBe(false);
+    expect(curr!.ready).toBe(false);
   });
 
   test("applies diff highlight classes when the live renderer provides elToPath", async () => {
@@ -845,7 +845,7 @@ describe("git-diff mode", () => {
     };
     renderCanvas();
     await flush();
-    expect(canvasPanels[0].canvas?.textContent).toContain("Failed to parse");
+    expect(canvasPanels[0]!.canvas?.textContent).toContain("Failed to parse");
   });
 
   test("format files parse diff content through the format host", async () => {
@@ -861,7 +861,7 @@ describe("git-diff mode", () => {
     await flush();
     expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# old");
     expect(parseSourceForPathMock).toHaveBeenCalledWith("/project/post.md", "# new");
-    expect(canvasPanels[0].canvas?.textContent).toContain("parsed-md");
+    expect(canvasPanels[0]!.canvas?.textContent).toContain("parsed-md");
   });
 });
 
@@ -1114,7 +1114,7 @@ describe("design mode", () => {
     expect(headers).toEqual(["Base (320px)", "Md (768px)"]);
     // Base panel header is highlighted when activeMedia is null
     expect(
-      canvasPanels[0].element?.querySelector(".canvas-panel-header")?.classList.contains("active"),
+      canvasPanels[0]!.element?.querySelector(".canvas-panel-header")?.classList.contains("active"),
     ).toBe(true);
     // Both panels rendered content (second one via deferred setTimeout)
     for (const panel of canvasPanels as unknown as CanvasPanel[]) {
@@ -1152,7 +1152,7 @@ describe("stylebook mode", () => {
     canvasMode = "stylebook";
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(1);
-    const helpers = renderStylebookMode.mock.calls[0][0] as Record<string, unknown>;
+    const helpers = renderStylebookMode.mock.calls[0]![0] as Record<string, unknown>;
     for (const key of [
       "applyTransform",
       "canvasPanelTemplate",

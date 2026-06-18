@@ -522,8 +522,8 @@ function elementToJx(el: HTMLElement): JxContentResult {
   if (nodes.length === 0) {
     return { textContent: "" };
   }
-  if (nodes.length === 1 && nodes[0].nodeType === Node.TEXT_NODE) {
-    return { textContent: nodes[0].textContent };
+  if (nodes.length === 1 && nodes[0]!.nodeType === Node.TEXT_NODE) {
+    return { textContent: nodes[0]!.textContent };
   }
 
   // Mixed content → children array
@@ -589,8 +589,8 @@ function domNodeToJx(node: Node) {
   const { childNodes } = el;
   if (childNodes.length === 0) {
     result.textContent = "";
-  } else if (childNodes.length === 1 && childNodes[0].nodeType === Node.TEXT_NODE) {
-    result.textContent = childNodes[0].textContent;
+  } else if (childNodes.length === 1 && childNodes[0]!.nodeType === Node.TEXT_NODE) {
+    result.textContent = childNodes[0]!.textContent;
   } else {
     result.children = [];
     for (const child of childNodes) {
@@ -615,8 +615,8 @@ function fragmentToJx(frag: DocumentFragment) {
   if (nodes.length === 0) {
     return { textContent: "" };
   }
-  if (nodes.length === 1 && nodes[0].nodeType === Node.TEXT_NODE) {
-    return { textContent: nodes[0].textContent };
+  if (nodes.length === 1 && nodes[0]!.nodeType === Node.TEXT_NODE) {
+    return { textContent: nodes[0]!.textContent };
   }
 
   const children: (JxMutableNode | string)[] = [];
@@ -630,10 +630,10 @@ function fragmentToJx(frag: DocumentFragment) {
   if (
     children.length === 1 &&
     typeof children[0] !== "string" &&
-    children[0].tagName === "span" &&
-    typeof children[0].textContent === "string"
+    children[0]!.tagName === "span" &&
+    typeof children[0]!.textContent === "string"
   ) {
-    return { textContent: children[0].textContent };
+    return { textContent: children[0]!.textContent };
   }
 
   return children.length > 0 ? { children } : { textContent: "" };

@@ -93,9 +93,9 @@ export async function bootStudio(opts: {
     <div id="layer-dialog"></div>
   `;
 
-  mock.module("../src/services/monaco-setup.js", () => ({}));
+  void mock.module("../src/services/monaco-setup.js", () => ({}));
 
-  mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+  void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
     KeyCode: {},
     KeyMod: {},
     MarkerSeverity: { Error: 8, Warning: 4 },
@@ -107,7 +107,7 @@ export async function bootStudio(opts: {
     },
   }));
 
-  mock.module("../src/panels/statusbar.ts", () => ({
+  void mock.module("../src/panels/statusbar.ts", () => ({
     mountStatusbar: mock(() => {}),
     renderStatusbar: mock(() => {}),
     setStatusbarRenderer: mock(() => {}),
@@ -117,7 +117,7 @@ export async function bootStudio(opts: {
     unmountStatusbar: mock(() => {}),
   }));
 
-  mock.module("../src/panels/toolbar.ts", () => ({
+  void mock.module("../src/panels/toolbar.ts", () => ({
     mount: (_el: HTMLElement, ctx: unknown) => {
       captured.toolbarCtx = ctx;
     },
@@ -125,20 +125,20 @@ export async function bootStudio(opts: {
     unmount: mock(() => {}),
   }));
 
-  mock.module("../src/panels/welcome-screen.ts", () => ({
+  void mock.module("../src/panels/welcome-screen.ts", () => ({
     initWelcome: (ctx: unknown) => {
       captured.welcomeCtx = ctx;
     },
     renderWelcome: mock(() => {}),
   }));
 
-  mock.module("../src/editor/shortcuts.ts", () => ({
+  void mock.module("../src/editor/shortcuts.ts", () => ({
     initShortcuts: (get: () => unknown) => {
       captured.shortcutsGet = get as () => any;
     },
   }));
 
-  mock.module("../src/panels/block-action-bar.ts", () => ({
+  void mock.module("../src/panels/block-action-bar.ts", () => ({
     dismissBlockActionBar: mock(() => {}),
     dismissLinkPopover: mock(() => {}),
     initBlockActionBar: (ctx: unknown) => {
@@ -147,7 +147,7 @@ export async function bootStudio(opts: {
     renderBlockActionBar: mock(() => {}),
   }));
 
-  mock.module("../src/canvas/canvas-render.ts", () => ({
+  void mock.module("../src/canvas/canvas-render.ts", () => ({
     applyCanvasMediaOverrides: mock(() => {}),
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
@@ -157,7 +157,7 @@ export async function bootStudio(opts: {
     scheduleCanvasRender: scheduleCanvasRenderMock,
   }));
 
-  mock.module("../src/canvas/canvas-patcher.ts", () => ({
+  void mock.module("../src/canvas/canvas-patcher.ts", () => ({
     applyPatchBatch: mock(() => {}),
     classifyOps: mock(() => ({ patchable: false, reason: "mock" })),
     consumePatchedDocument: mock(() => false),

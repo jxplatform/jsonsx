@@ -243,7 +243,7 @@ describe("distributeSlots", () => {
 
     const headerSlot = el.querySelector('header slot[name="head"]') as HTMLElement;
     expect(headerSlot.children.length).toBe(1);
-    expect(headerSlot.children[0].textContent).toBe("H");
+    expect(headerSlot.children[0]!.textContent).toBe("H");
 
     const sideSlot = el.querySelector('slot[name="side"]') as HTMLElement;
     expect(sideSlot.childNodes.length).toBe(0);

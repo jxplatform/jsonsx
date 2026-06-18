@@ -9,6 +9,16 @@ import { authenticateGithub } from "./github-auth";
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 
+interface GithubErrorResponse {
+  errors?: { message?: string }[];
+  message?: string;
+}
+
+interface GithubRepoResponse {
+  clone_url: string;
+  html_url: string;
+}
+
 /**
  * Full "Publish to GitHub" flow: 1. Authenticate (or reuse stored token) 2. Prompt for repo name /
  * visibility 3. Create the repo via GitHub API 4. Add remote + push
@@ -105,13 +115,13 @@ export async function publishToGithub({ projectName }: { projectName: string }) 
   });
 
   if (!createRes.ok) {
-    const err = await createRes.json();
+    const err = (await createRes.json()) as GithubErrorResponse;
     const msg = err.errors?.[0]?.message || err.message || "Failed to create repository";
     statusMessage(`Error: ${msg}`);
     return false;
   }
 
-  const repo = await createRes.json();
+  const repo = (await createRes.json()) as GithubRepoResponse;
   const platform = getPlatform();
 
   statusMessage("Setting remote and pushing…");

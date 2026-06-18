@@ -16,7 +16,7 @@ const draggables: AnyRec[] = [];
 const dropTargets: AnyRec[] = [];
 const monitors: AnyRec[] = [];
 
-mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   draggable: (cfg: AnyRec) => {
     draggables.push(cfg);
     return () => {};
@@ -31,7 +31,7 @@ mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   },
 }));
 
-mock.module("@atlaskit/pragmatic-drag-and-drop/combine", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop/combine", () => ({
   combine:
     (...fns: (() => void)[]) =>
     () => {
@@ -41,13 +41,13 @@ mock.module("@atlaskit/pragmatic-drag-and-drop/combine", () => ({
     },
 }));
 
-mock.module("@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item", () => ({
   attachInstruction: (data: AnyRec, opts: AnyRec) => ({ ...data, __opts: opts }),
   extractInstruction: (data: AnyRec) => data.__instr ?? null,
 }));
 
 let previewRenders = 0;
-mock.module("../src/panels/stylebook-panel", () => ({
+void mock.module("../src/panels/stylebook-panel", () => ({
   renderComponentPreview: async (comp: AnyRec) => {
     previewRenders += 1;
     const el = document.createElement(comp.tagName);
@@ -164,11 +164,11 @@ describe("registerLayersDnD — registration", () => {
     for (const cleanup of view.dndCleanups) {
       cleanup();
     }
-    expect(dragFor(rows[0]).getInitialData()).toEqual({
+    expect(dragFor(rows[0]!).getInitialData()).toEqual({
       path: ["children", 0],
       type: "tree-node",
     });
-    expect(dragFor(rows[1]).getInitialData()).toEqual({
+    expect(dragFor(rows[1]!).getInitialData()).toEqual({
       path: ["children", 0, "children", 0],
       type: "tree-node",
     });
@@ -180,16 +180,16 @@ describe("registerLayersDnD — registration", () => {
     actions.className = "layer-actions";
     const button = document.createElement("button");
     actions.append(button);
-    rows[0].append(actions);
+    rows[0]!.append(actions);
     const orig = document.elementFromPoint;
     try {
       (document as AnyRec).elementFromPoint = () => button;
       expect(
-        dragFor(rows[0]).canDrag({ element: rows[0], input: { clientX: 1, clientY: 1 } }),
+        dragFor(rows[0]!).canDrag({ element: rows[0], input: { clientX: 1, clientY: 1 } }),
       ).toBe(false);
       (document as AnyRec).elementFromPoint = () => rows[0];
       expect(
-        dragFor(rows[0]).canDrag({ element: rows[0], input: { clientX: 1, clientY: 1 } }),
+        dragFor(rows[0]!).canDrag({ element: rows[0], input: { clientX: 1, clientY: 1 } }),
       ).toBe(true);
     } finally {
       (document as AnyRec).elementFromPoint = orig;
@@ -199,27 +199,27 @@ describe("registerLayersDnD — registration", () => {
   test("onDragStart marks the row dragging, records its height, and hides descendants when expanded", async () => {
     const { rows } = await setupLayers();
     Object.defineProperty(rows[0], "offsetHeight", { value: 24 });
-    dragFor(rows[0]).onDragStart();
-    expect(rows[0].classList.contains("dragging")).toBe(true);
+    dragFor(rows[0]!).onDragStart();
+    expect(rows[0]!.classList.contains("dragging")).toBe(true);
     expect(view.layerDragSourceHeight).toBe(24);
-    expect(rows[1].style.display).toBe("none"); // Descendant of children/0
-    expect(rows[2].style.display).toBe("");
-    dragFor(rows[0]).onDrop();
-    expect(rows[0].classList.contains("dragging")).toBe(false);
+    expect(rows[1]!.style.display).toBe("none"); // Descendant of children/0
+    expect(rows[2]!.style.display).toBe("");
+    dragFor(rows[0]!).onDrop();
+    expect(rows[0]!.classList.contains("dragging")).toBe(false);
     expect(renderedPanels).toEqual(["leftPanel"]); // Expanded rows trigger a re-render
   });
 
   test("onDragStart/onDrop on a collapsed row neither hides rows nor re-renders", async () => {
     const { rows } = await setupLayers();
-    dragFor(rows[3]).onDragStart();
-    expect(rows[1].style.display).toBe("");
-    dragFor(rows[3]).onDrop();
+    dragFor(rows[3]!).onDragStart();
+    expect(rows[1]!.style.display).toBe("");
+    dragFor(rows[3]!).onDrop();
     expect(renderedPanels).toEqual([]);
   });
 
   test("canDrop blocks dropping a node into its own descendant", async () => {
     const { rows } = await setupLayers();
-    const child = dropFor(rows[1]);
+    const child = dropFor(rows[1]!);
     expect(child.canDrop({ source: { data: { path: ["children", 0] } } })).toBe(false);
     expect(child.canDrop({ source: { data: { path: ["children", 2] } } })).toBe(true);
     expect(child.canDrop({ source: { data: { fragment: { tagName: "hr" } } } })).toBe(true);
@@ -227,18 +227,18 @@ describe("registerLayersDnD — registration", () => {
 
   test("getData attaches hitbox options reflecting depth, void, and expanded flags", async () => {
     const { rows } = await setupLayers();
-    const expanded = dropFor(rows[0]).getData({ element: rows[0], input: {} });
+    const expanded = dropFor(rows[0]!).getData({ element: rows[0], input: {} });
     expect(expanded.path).toEqual(["children", 0]);
     expect(expanded.__opts.mode).toBe("expanded");
     expect(expanded.__opts.block).toEqual([]);
     expect(expanded.__opts.currentLevel).toBe(0);
     expect(expanded.__opts.indentPerLevel).toBe(16);
 
-    const voidRow = dropFor(rows[2]).getData({ element: rows[2], input: {} });
+    const voidRow = dropFor(rows[2]!).getData({ element: rows[2], input: {} });
     expect(voidRow.__opts.block).toEqual(["make-child"]);
     expect(voidRow.__opts.mode).toBe("standard");
 
-    const nested = dropFor(rows[1]).getData({ element: rows[1], input: {} });
+    const nested = dropFor(rows[1]!).getData({ element: rows[1], input: {} });
     expect(nested.__opts.currentLevel).toBe(1);
   });
 });
@@ -247,76 +247,76 @@ describe("showLayerDropGap / clearLayerDropGap", () => {
   test("reorder-above shifts the target row and everything below it", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 24;
-    dropFor(rows[2]).onDragEnter({ self: { data: { __instr: { type: "reorder-above" } } } });
-    expect(rows[0].style.transform).toBe("");
-    expect(rows[1].style.transform).toBe("");
-    expect(rows[2].style.transform).toBe("translateY(24px)");
-    expect(rows[3].style.transform).toBe("translateY(24px)");
-    expect(view._currentDropTargetRow).toBe(rows[2]);
+    dropFor(rows[2]!).onDragEnter({ self: { data: { __instr: { type: "reorder-above" } } } });
+    expect(rows[0]!.style.transform).toBe("");
+    expect(rows[1]!.style.transform).toBe("");
+    expect(rows[2]!.style.transform).toBe("translateY(24px)");
+    expect(rows[3]!.style.transform).toBe("translateY(24px)");
+    expect(view._currentDropTargetRow).toBe(rows[2]!);
   });
 
   test("reorder-below shifts only rows after the target and skips the dragging row", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 10;
-    rows[3].classList.add("dragging");
-    dropFor(rows[1]).onDrag({ self: { data: { __instr: { type: "reorder-below" } } } });
-    expect(rows[1].style.transform).toBe("");
-    expect(rows[2].style.transform).toBe("translateY(10px)");
-    expect(rows[3].style.transform).toBe(""); // Dragging row never shifts
+    rows[3]!.classList.add("dragging");
+    dropFor(rows[1]!).onDrag({ self: { data: { __instr: { type: "reorder-below" } } } });
+    expect(rows[1]!.style.transform).toBe("");
+    expect(rows[2]!.style.transform).toBe("translateY(10px)");
+    expect(rows[3]!.style.transform).toBe(""); // Dragging row never shifts
   });
 
   test("make-child highlights the row and clears any gap", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 24;
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
-    expect(rows[2].classList.contains("drop-target")).toBe(true);
-    expect(rows[3].style.transform).toBe("");
-    expect(view._currentDropTargetRow).toBe(rows[2]);
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
+    expect(rows[2]!.classList.contains("drop-target")).toBe(true);
+    expect(rows[3]!.style.transform).toBe("");
+    expect(view._currentDropTargetRow).toBe(rows[2]!);
   });
 
   test("moving to a new row clears the previous highlight", async () => {
     const { rows } = await setupLayers();
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
-    dropFor(rows[3]).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
-    expect(rows[2].classList.contains("drop-target")).toBe(false);
-    expect(rows[3].classList.contains("drop-target")).toBe(true);
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
+    dropFor(rows[3]!).onDrag({ self: { data: { __instr: { type: "make-child" } } } });
+    expect(rows[2]!.classList.contains("drop-target")).toBe(false);
+    expect(rows[3]!.classList.contains("drop-target")).toBe(true);
   });
 
   test("a blocked or missing instruction clears the gap", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 24;
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
-    dropFor(rows[2]).onDrag({
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
+    dropFor(rows[2]!).onDrag({
       self: { data: { __instr: { type: "instruction-blocked" } } },
     });
-    expect(rows[3].style.transform).toBe("");
+    expect(rows[3]!.style.transform).toBe("");
     expect(view._currentDropTargetRow).toBeNull();
 
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
-    dropFor(rows[2]).onDrag({ self: { data: {} } });
-    expect(rows[3].style.transform).toBe("");
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
+    dropFor(rows[2]!).onDrag({ self: { data: {} } });
+    expect(rows[3]!.style.transform).toBe("");
   });
 
   test("drop-target onDrop clears the gap", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 24;
-    dropFor(rows[2]).onDragEnter({ self: { data: { __instr: { type: "reorder-above" } } } });
-    dropFor(rows[2]).onDrop();
-    expect(rows[3].style.transform).toBe("");
+    dropFor(rows[2]!).onDragEnter({ self: { data: { __instr: { type: "reorder-above" } } } });
+    dropFor(rows[2]!).onDrop();
+    expect(rows[3]!.style.transform).toBe("");
     expect(view._currentDropTargetRow).toBeNull();
   });
 
   test("clearLayerDropGap restores display hidden by hideDescendantRows", async () => {
     const { container, rows } = await setupLayers();
     // Simulate hideDescendantRows hiding the dragged subtree during a drag.
-    rows[1].style.display = "none";
-    rows[1].style.transform = "translateY(24px)";
+    rows[1]!.style.display = "none";
+    rows[1]!.style.transform = "translateY(24px)";
     dnd.clearLayerDropGap(container);
     // Without the display reset, lit would reuse this node (display:none) for whatever row lands
     // On it after the post-drop re-render — silently hiding an unrelated sibling.
-    expect(rows[1].style.display).toBe("");
-    expect(rows[1].style.transform).toBe("");
+    expect(rows[1]!.style.display).toBe("");
+    expect(rows[1]!.style.transform).toBe("");
   });
 });
 
@@ -326,18 +326,18 @@ describe("registerLayersDnD — monitor", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     const before = JSON.stringify(tab.doc.document);
     const [monitor] = monitors;
-    monitor.onDrop({
+    monitor!.onDrop({
       location: { current: { dropTargets: [] } },
       source: { data: {}, element: document.createElement("div") },
     });
-    monitor.onDrop({
+    monitor!.onDrop({
       location: { current: { dropTargets: [{ data: { path: ["children", 0] } }] } },
       source: {
         data: { path: ["children", 2], type: "tree-node" },
         element: document.createElement("div"),
       },
     });
-    monitor.onDrop({
+    monitor!.onDrop({
       location: {
         current: {
           dropTargets: [
@@ -357,7 +357,7 @@ describe("registerLayersDnD — monitor", () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
     tab.session.selection = ["children", 2];
-    monitors[0].onDrop({
+    monitors[0]!.onDrop({
       location: {
         current: {
           dropTargets: [{ data: { __instr: { type: "make-child" }, path: ["children", 0] } }],
@@ -367,7 +367,7 @@ describe("registerLayersDnD — monitor", () => {
       source: { data: { path: ["children", 2], type: "tree-node" }, element: rows[0] },
     });
     const [section] = tab.doc.document.children as JxMutableNode[];
-    expect((section.children as JxMutableNode[]).map((c) => c.textContent)).toEqual([
+    expect((section!.children as JxMutableNode[]).map((c) => c.textContent)).toEqual([
       "title",
       "second",
     ]);
@@ -378,7 +378,7 @@ describe("registerLayersDnD — monitor", () => {
     const { rows } = await setupLayers();
     const tab = resetWorkspaceWithTab(makeDoc());
     tab.session.selection = ["children", 2];
-    monitors[0].onDrop({
+    monitors[0]!.onDrop({
       location: {
         current: {
           dropTargets: [{ data: { __instr: { type: "reorder-above" }, path: ["children", 0] } }],
@@ -387,28 +387,28 @@ describe("registerLayersDnD — monitor", () => {
       source: { data: { path: ["children", 2], type: "tree-node" }, element: rows[3] },
     });
     expect(view._layersCollapsed).toBeNull();
-    expect((tab.doc.document.children as JxMutableNode[])[0].textContent).toBe("second");
+    expect((tab.doc.document.children as JxMutableNode[])[0]!.textContent).toBe("second");
   });
 
   test("onDropTargetChange clears the gap only when over a non-tree target", async () => {
     const { rows } = await setupLayers();
     view.layerDragSourceHeight = 24;
-    dropFor(rows[2]).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
+    dropFor(rows[2]!).onDrag({ self: { data: { __instr: { type: "reorder-above" } } } });
     // Still over a tree target — gap persists
-    monitors[0].onDropTargetChange({
+    monitors[0]!.onDropTargetChange({
       location: {
         current: { dropTargets: [{ data: { __instr: { type: "reorder-above" } } }] },
       },
     });
-    expect(rows[3].style.transform).toBe("translateY(24px)");
+    expect(rows[3]!.style.transform).toBe("translateY(24px)");
     // No target at all — gap also persists
-    monitors[0].onDropTargetChange({ location: { current: { dropTargets: [] } } });
-    expect(rows[3].style.transform).toBe("translateY(24px)");
+    monitors[0]!.onDropTargetChange({ location: { current: { dropTargets: [] } } });
+    expect(rows[3]!.style.transform).toBe("translateY(24px)");
     // Over a non-tree target (no instruction) — gap clears
-    monitors[0].onDropTargetChange({
+    monitors[0]!.onDropTargetChange({
       location: { current: { dropTargets: [{ data: {} }] } },
     });
-    expect(rows[3].style.transform).toBe("");
+    expect(rows[3]!.style.transform).toBe("");
   });
 });
 
@@ -445,14 +445,14 @@ describe("registerComponentsDnD", () => {
     )!;
     expect(preview.querySelector("my-card")).not.toBeNull();
 
-    const data = draggables[0].getInitialData();
+    const data = draggables[0]!.getInitialData();
     expect(data.type).toBe("block");
     expect(data.fragment).toEqual({
       $props: { count: "", title: "Hello" },
       tagName: "my-card",
     });
     // Fragment is cloned per call
-    expect(draggables[0].getInitialData().fragment).not.toBe(data.fragment);
+    expect(draggables[0]!.getInitialData().fragment).not.toBe(data.fragment);
   });
 
   test("rows with an empty tag are skipped and existing previews are not re-rendered", async () => {
@@ -470,7 +470,7 @@ describe("registerComponentsDnD", () => {
     expect(previewRenders).toBe(0);
     expect(draggables).toHaveLength(1);
     // No props array → empty $props
-    expect(draggables[0].getInitialData().fragment).toEqual({ $props: {}, tagName: "my-card" });
+    expect(draggables[0]!.getInitialData().fragment).toEqual({ $props: {}, tagName: "my-card" });
   });
 });
 
@@ -495,13 +495,13 @@ describe("registerElementsDnD", () => {
 
     expect(draggables).toHaveLength(3);
     const previews = leftPanel.querySelectorAll(".element-card-preview");
-    expect(previews[0].firstElementChild?.tagName.toLowerCase()).toBe("p");
-    expect(previews[0].textContent).toBe("p");
-    expect(previews[1].firstElementChild?.tagName.toLowerCase()).toBe("span"); // Unsafe tag
-    expect(previews[1].textContent).toBe("script");
-    expect(previews[2].textContent).toBe("keep"); // Already filled
+    expect(previews[0]!.firstElementChild?.tagName.toLowerCase()).toBe("p");
+    expect(previews[0]!.textContent).toBe("p");
+    expect(previews[1]!.firstElementChild?.tagName.toLowerCase()).toBe("span"); // Unsafe tag
+    expect(previews[1]!.textContent).toBe("script");
+    expect(previews[2]!.textContent).toBe("keep"); // Already filled
 
-    const data = draggables[0].getInitialData();
+    const data = draggables[0]!.getInitialData();
     expect(data).toEqual({
       fragment: { tagName: "p", textContent: "Paragraph text" },
       type: "block",

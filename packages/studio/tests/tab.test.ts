@@ -105,7 +105,7 @@ describe("Tab primitive", () => {
     const tab = createTab({ document: doc, id: "test-5" });
 
     doc.children.push({ tagName: "span" });
-    expect(tab.history.snapshots[0].document?.children).toHaveLength(1);
+    expect(tab.history.snapshots[0]!.document?.children).toHaveLength(1);
 
     disposeTab(tab);
   });

@@ -11,12 +11,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "
 // ─── Module mocks (must precede the shortcuts import) ─────────────────────────
 
 const openQuickSearch = mock(() => {});
-mock.module("../src/panels/quick-search.js", () => ({ openQuickSearch }));
+void mock.module("../src/panels/quick-search.js", () => ({ openQuickSearch }));
 
 const copyNode = mock(async () => {});
 const cutNode = mock(async () => {});
 const pasteNode = mock(async () => {});
-mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
+void mock.module("../src/editor/context-menu.js", () => ({ copyNode, cutNode, pasteNode }));
 
 const { initShortcuts } = await import("../src/editor/shortcuts");
 const store = await import("../src/store");
@@ -482,7 +482,7 @@ describe("plain shortcuts", () => {
     pressDoc("Delete");
     const children = tab.doc.document.children as { textContent?: string }[];
     expect(children.length).toBe(2);
-    expect(children[0].textContent).toBeUndefined();
+    expect(children[0]!.textContent).toBeUndefined();
   });
 
   test("Backspace with root selection does nothing", () => {

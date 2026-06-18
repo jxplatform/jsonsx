@@ -130,7 +130,7 @@ describe("renderStylebookOverlays before mode init", () => {
     expect(() => {
       renderStylebookOverlays();
     }).not.toThrow();
-    expect(canvasPanels[0].overlay.children.length).toBe(0);
+    expect(canvasPanels[0]!.overlay.children.length).toBe(0);
   });
 });
 
@@ -144,10 +144,10 @@ describe("renderStylebookMode", () => {
     expect(panelTemplateCalls).toEqual([[null, null, true, undefined]]);
     expect(canvasPanels.length).toBe(1);
     const [panel] = canvasPanels;
-    expect(panel.canvas.classList.contains("sb-canvas")).toBe(true);
-    const card = panel.canvas.querySelector(".element-card");
+    expect(panel!.canvas.classList.contains("sb-canvas")).toBe(true);
+    const card = panel!.canvas.querySelector(".element-card");
     expect(card).not.toBeNull();
-    const h1 = panel.canvas.querySelector("h1") as HTMLElement;
+    const h1 = panel!.canvas.querySelector("h1") as HTMLElement;
     expect(h1.style.color).toBe("red");
     expect(h1.style.pointerEvents).toBe("none");
     expect(ctxMocks.applyTransform).toHaveBeenCalled();
@@ -175,8 +175,8 @@ describe("renderStylebookMode", () => {
       ["md", "Md (768px)", false, 768],
     ]);
     expect(canvasPanels.length).toBe(2);
-    const baseH1 = canvasPanels[0].canvas.querySelector("h1") as HTMLElement;
-    const mdH1 = canvasPanels[1].canvas.querySelector("h1") as HTMLElement;
+    const baseH1 = canvasPanels[0]!.canvas.querySelector("h1") as HTMLElement;
+    const mdH1 = canvasPanels[1]!.canvas.querySelector("h1") as HTMLElement;
     expect(baseH1.style.color).toBe("red");
     expect(mdH1.style.color).toBe("blue");
     expect(ctxMocks.updateActivePanelHeaders).toHaveBeenCalled();
@@ -211,7 +211,7 @@ describe("renderStylebookMode", () => {
     const tab = makeTab();
     tab.session.ui.stylebookFilter = "blockquote";
     renderStylebookMode(ctx);
-    const [{ canvas }] = canvasPanels;
+    const { canvas } = canvasPanels[0]!;
     expect(canvas.querySelector("blockquote")).not.toBeNull();
     expect(canvas.querySelector("h1")).toBeNull();
   });
@@ -303,12 +303,12 @@ describe("renderStylebookMode top-level @media styles", () => {
       },
     });
     renderStylebookMode(ctx);
-    const baseH1 = canvasPanels[0].canvas.querySelector("h1") as HTMLElement;
-    const mdH1 = canvasPanels[1].canvas.querySelector("h1") as HTMLElement;
+    const baseH1 = canvasPanels[0]!.canvas.querySelector("h1") as HTMLElement;
+    const mdH1 = canvasPanels[1]!.canvas.querySelector("h1") as HTMLElement;
     expect(baseH1.style.color).toBe("");
     expect(mdH1.style.color).toBe("orange");
     // Compound path through the media block
-    const mdQuoteP = canvasPanels[1].canvas.querySelector("blockquote p") as HTMLElement;
+    const mdQuoteP = canvasPanels[1]!.canvas.querySelector("blockquote p") as HTMLElement;
     expect(mdQuoteP.style.color).toBe("navy");
   });
 });
@@ -379,7 +379,7 @@ describe("selectStylebookTag", () => {
     makeTab();
     renderStylebookMode(ctx);
     selectStylebookTag("h1");
-    const [{ overlay }] = canvasPanels;
+    const { overlay } = canvasPanels[0]!;
     const box = overlay.querySelector(".overlay-selection") as HTMLElement;
     expect(box).not.toBeNull();
     expect(box.style.top).toBe("2px");
@@ -402,7 +402,7 @@ describe("renderStylebookOverlays", () => {
     tab.session.ui.stylebookSelection = "h1";
     (canvasPanels[0] as unknown as Record<string, unknown>)._lastHoverTag = "p";
     renderStylebookOverlays();
-    const [{ overlay }] = canvasPanels;
+    const { overlay } = canvasPanels[0]!;
     const hover = overlay.querySelector(".overlay-hover") as HTMLElement;
     const selection = overlay.querySelector(".overlay-selection") as HTMLElement;
     expect(hover).not.toBeNull();
@@ -416,7 +416,7 @@ describe("renderStylebookOverlays", () => {
     tab.session.ui.stylebookSelection = "h1";
     (canvasPanels[0] as unknown as Record<string, unknown>)._lastHoverTag = "h1";
     renderStylebookOverlays();
-    const [{ overlay }] = canvasPanels;
+    const { overlay } = canvasPanels[0]!;
     expect(overlay.querySelector(".overlay-hover")).toBeNull();
     expect(overlay.querySelector(".overlay-selection")).not.toBeNull();
   });
@@ -433,12 +433,12 @@ describe("stylebook panel events", () => {
     const tab = makeTab();
     renderStylebookMode(ctx);
     const [panel] = canvasPanels;
-    const h1 = panel.canvas.querySelector("h1") as HTMLElement;
+    const h1 = panel!.canvas.querySelector("h1") as HTMLElement;
     pointElements = [h1];
     tab.session.ui.activeMedia = "md";
-    ctxMocks.updateActivePanelHeaders.mockClear();
+    ctxMocks.updateActivePanelHeaders!.mockClear();
 
-    clickAt(panel.overlayClk as HTMLElement);
+    clickAt(panel!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBe("h1");
     expect(tab.session.ui.activeMedia).toBeNull();
@@ -449,10 +449,10 @@ describe("stylebook panel events", () => {
     const tab = makeTab({ $media: { "--": "320px", md: "(min-width: 768px)" } });
     renderStylebookMode(ctx);
     const [, mdPanel] = canvasPanels;
-    const h1 = mdPanel.canvas.querySelector("h1") as HTMLElement;
+    const h1 = mdPanel!.canvas.querySelector("h1") as HTMLElement;
     pointElements = [h1];
 
-    clickAt(mdPanel.overlayClk as HTMLElement);
+    clickAt(mdPanel!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBe("h1");
     expect(tab.session.ui.activeMedia).toBe("md");
@@ -462,10 +462,10 @@ describe("stylebook panel events", () => {
     const tab = makeTab();
     renderStylebookMode(ctx);
     const [panel] = canvasPanels;
-    const li = panel.canvas.querySelector("ul li") as HTMLElement;
+    const li = panel!.canvas.querySelector("ul li") as HTMLElement;
     pointElements = [li];
 
-    clickAt(panel.overlayClk as HTMLElement);
+    clickAt(panel!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBe("ul li");
   });
@@ -476,7 +476,7 @@ describe("stylebook panel events", () => {
     selectStylebookTag("h1");
     pointElements = [];
 
-    clickAt(canvasPanels[0].overlayClk as HTMLElement);
+    clickAt(canvasPanels[0]!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBeNull();
     expect(tab.session.ui.activeSelector).toBeNull();
@@ -490,7 +490,7 @@ describe("stylebook panel events", () => {
     document.body.append(outsider);
     pointElements = [outsider];
 
-    clickAt(canvasPanels[0].overlayClk as HTMLElement);
+    clickAt(canvasPanels[0]!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBeNull();
   });
@@ -501,10 +501,10 @@ describe("stylebook panel events", () => {
     selectStylebookTag("h1");
     const [panel] = canvasPanels;
     // Section labels live inside the canvas but have no tag mapping up to the canvas
-    const label = panel.canvas.querySelector(".sb-label") as HTMLElement;
+    const label = panel!.canvas.querySelector(".sb-label") as HTMLElement;
     pointElements = [label];
 
-    clickAt(panel.overlayClk as HTMLElement);
+    clickAt(panel!.overlayClk as HTMLElement);
 
     expect(tab.session.ui.stylebookSelection).toBeNull();
   });
@@ -513,10 +513,10 @@ describe("stylebook panel events", () => {
     makeTab();
     renderStylebookMode(ctx);
     const [panel] = canvasPanels;
-    const label = panel.canvas.querySelector(".sb-label") as HTMLElement;
-    pointElements = [label, panel.canvas.querySelector("h1") as HTMLElement];
+    const label = panel!.canvas.querySelector(".sb-label") as HTMLElement;
+    pointElements = [label, panel!.canvas.querySelector("h1") as HTMLElement];
 
-    (panel.overlayClk as HTMLElement).dispatchEvent(
+    (panel!.overlayClk as HTMLElement).dispatchEvent(
       new MouseEvent("mousemove", { bubbles: true, clientX: 5, clientY: 5 }),
     );
 
@@ -528,23 +528,23 @@ describe("stylebook panel events", () => {
     makeTab();
     renderStylebookMode(ctx);
     const [panel] = canvasPanels;
-    const h1 = panel.canvas.querySelector("h1") as HTMLElement;
+    const h1 = panel!.canvas.querySelector("h1") as HTMLElement;
     pointElements = [h1];
 
-    (panel.overlayClk as HTMLElement).dispatchEvent(
+    (panel!.overlayClk as HTMLElement).dispatchEvent(
       new MouseEvent("mousemove", { bubbles: true, clientX: 5, clientY: 5 }),
     );
 
     expect((panel as unknown as Record<string, unknown>)._lastHoverTag).toBe("h1");
-    expect(panel.overlay.querySelector(".overlay-hover")).not.toBeNull();
+    expect(panel!.overlay.querySelector(".overlay-hover")).not.toBeNull();
 
     // Moving off elements clears the hover
     pointElements = [];
-    (panel.overlayClk as HTMLElement).dispatchEvent(
+    (panel!.overlayClk as HTMLElement).dispatchEvent(
       new MouseEvent("mousemove", { bubbles: true, clientX: 6, clientY: 6 }),
     );
     expect((panel as unknown as Record<string, unknown>)._lastHoverTag).toBeNull();
-    expect(panel.overlay.querySelector(".overlay-hover")).toBeNull();
+    expect(panel!.overlay.querySelector(".overlay-hover")).toBeNull();
   });
 });
 
@@ -563,7 +563,7 @@ describe("refreshStylebookStyles", () => {
   test("re-applies simple tag styles to mapped cards and CSS variables in place", () => {
     const tab = makeTab({ style: { "--accent": "red", h1: { color: "red" } } });
     renderStylebookMode(ctx);
-    const [{ canvas }] = canvasPanels;
+    const { canvas } = canvasPanels[0]!;
     const h1 = canvas.querySelector("h1") as HTMLElement;
     // The card wrapper is the element registered in the stylebook tag map
     const card = h1.closest(".element-card") as HTMLElement;
@@ -583,7 +583,7 @@ describe("refreshStylebookStyles", () => {
   test("clears stale styles back to the entry base", () => {
     const tab = makeTab({ style: { h1: { color: "red" } } });
     renderStylebookMode(ctx);
-    const card = canvasPanels[0].canvas
+    const card = canvasPanels[0]!.canvas
       .querySelector("h1")!
       .closest(".element-card") as HTMLElement;
     (tab.doc.document as Record<string, unknown>).style = { h1: { margin: "1px" } };
@@ -595,7 +595,7 @@ describe("refreshStylebookStyles", () => {
   test("applies compound selector styles to nested elements", () => {
     const tab = makeTab({ style: {} });
     renderStylebookMode(ctx);
-    const li = canvasPanels[0].canvas.querySelector("ul li") as HTMLElement;
+    const li = canvasPanels[0]!.canvas.querySelector("ul li") as HTMLElement;
     (tab.doc.document as Record<string, unknown>).style = {
       ul: { li: { color: "purple" } },
     };
@@ -609,10 +609,10 @@ describe("refreshStylebookStyles", () => {
       style: { h1: { color: "red" } },
     });
     renderStylebookMode(ctx);
-    const baseCard = canvasPanels[0].canvas
+    const baseCard = canvasPanels[0]!.canvas
       .querySelector("h1")!
       .closest(".element-card") as HTMLElement;
-    const mdCard = canvasPanels[1].canvas
+    const mdCard = canvasPanels[1]!.canvas
       .querySelector("h1")!
       .closest(".element-card") as HTMLElement;
 
@@ -631,10 +631,10 @@ describe("refreshStylebookStyles", () => {
       style: {},
     });
     renderStylebookMode(ctx);
-    const baseCard = canvasPanels[0].canvas
+    const baseCard = canvasPanels[0]!.canvas
       .querySelector("h1")!
       .closest(".element-card") as HTMLElement;
-    const mdCard = canvasPanels[1].canvas
+    const mdCard = canvasPanels[1]!.canvas
       .querySelector("h1")!
       .closest(".element-card") as HTMLElement;
 

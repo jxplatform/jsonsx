@@ -40,7 +40,7 @@ function doc(): JxMutableNode {
 }
 
 function child(i: number): JxMutableNode {
-  return (doc().children as JxMutableNode[])[i];
+  return (doc().children as JxMutableNode[])[i]!;
 }
 
 beforeEach(() => {
@@ -241,7 +241,7 @@ describe("applyPatchBatch gaps", () => {
     child(0).style = { color: "blue" };
     applyPatchBatch(tab, [{ op: "set-style", path: ["children", 0] }]);
     expect(ctxCalls.mediaOverrides.length).toBe(1);
-    expect(ctxCalls.mediaOverrides[0][0]).toBe(panel.canvas);
+    expect(ctxCalls.mediaOverrides[0]![0]).toBe(panel.canvas);
   });
 
   test("insert re-applies media overrides when the panel has active breakpoints", () => {
@@ -315,7 +315,7 @@ describe("applyPatchBatch gaps", () => {
     divEl.append(shortPath, foreign);
 
     const children = doc().children as JxMutableNode[];
-    const [moved] = children.splice(2, 1);
+    const moved = children.splice(2, 1)[0]!;
     children.splice(0, 0, moved);
     applyPatchBatch(tab, [{ fromPath: ["children", 2], op: "move", toIndex: 0, toParentPath: [] }]);
 

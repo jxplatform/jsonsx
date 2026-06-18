@@ -4,7 +4,7 @@ import * as storeActual from "../src/store";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // Make debounced style commits synchronous so @input handlers fire without real 400ms timers.
-mock.module("../src/store", () => ({
+void mock.module("../src/store", () => ({
   ...storeActual,
   debouncedStyleCommit:
     <A extends unknown[]>(_prop: string, _ms: number, fn: (...args: A) => void) =>

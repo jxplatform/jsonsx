@@ -61,10 +61,11 @@ export function computeInheritedStyle(
       if (name === activeTab) {
         break;
       }
-      const selBlock = ((style[`@${name}`] || {}) as Record<string, unknown>)[activeSelector] || {};
+      const selBlock = (((style[`@${name}`] || {}) as Record<string, unknown>)[activeSelector] ||
+        {}) as JxStyle;
       for (const [p, v] of Object.entries(selBlock)) {
         if (typeof v !== "object") {
-          inherited[p] = v ?? "";
+          inherited[p] = (v as string | number) ?? "";
         }
       }
     }

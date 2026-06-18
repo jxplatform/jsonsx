@@ -80,7 +80,7 @@ function handleNewContentType(rerender: () => void) {
   rerender();
 
   // Persist in background
-  saveProjectConfig().then(async () => {
+  void saveProjectConfig().then(async () => {
     const platform = getPlatform();
     await platform.writeFile(`content/${slug}/.gitkeep`, "");
   });
@@ -116,7 +116,7 @@ function handleAddField(rerender: () => void) {
   showAddField = false;
   newFieldState = { format: "", name: "", required: false, type: "string" };
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -135,7 +135,7 @@ function handleDeleteField(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -159,7 +159,7 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -185,7 +185,7 @@ function handleRenameField(oldName: string, newName: string, rerender: () => voi
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -205,7 +205,7 @@ function handleChangeType(fieldName: string, newType: string, rerender: () => vo
       : undefined;
   schema.properties[fieldName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -223,7 +223,7 @@ function handleChangeFormat(fieldName: string, format: string, rerender: () => v
   const type = prop.type || "string";
   schema.properties[fieldName] = schemaForType(type, format || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -239,7 +239,7 @@ function handleChangeRefTarget(fieldName: string, target: string, rerender: () =
 
   schema.properties[fieldName] = { $ref: `#/contentTypes/${target}` };
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 // ─── Nested field handlers ───────────────────────────────────────────────────
@@ -280,7 +280,7 @@ function handleAddNestedField(
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -301,7 +301,7 @@ function handleDeleteNested(parentName: string, childName: string, rerender: () 
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -327,7 +327,7 @@ function handleToggleNestedRequired(parentName: string, childName: string, reren
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -360,7 +360,7 @@ function handleRenameNested(
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -387,7 +387,7 @@ function handleChangeNestedType(
       : undefined;
   parent.properties[childName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -412,7 +412,7 @@ function handleChangeNestedFormat(
   const type = prop.type || "string";
   parent.properties[childName] = schemaForType(type, format || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /** @param {() => void} rerender */
@@ -429,7 +429,7 @@ function handleDeleteContentType(rerender: () => void) {
   selectedContentType = null;
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -508,7 +508,7 @@ export function renderContentTypesEditor(container: HTMLElement) {
   if (!selectedContentType || !contentTypes[selectedContentType]) {
     editorTpl = html`<div class="settings-empty-state">Select or create a content type</div>`;
   } else {
-    const col = contentTypes[selectedContentType];
+    const col = contentTypes[selectedContentType]!;
     const schema = (col.schema || {}) as ContentTypeSchema;
     const properties = schema.properties || {};
     const required = schema.required || [];

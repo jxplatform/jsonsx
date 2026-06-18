@@ -392,8 +392,8 @@ describe("renderLayersTemplate — keyed rows", () => {
     const doc = activeTab.value!.doc.document as unknown as {
       children: { children: unknown[] }[];
     };
-    const [arr] = doc.children[0].children.splice(0, 1);
-    doc.children[1].children.push(arr);
+    const arr = doc.children[0]!.children.splice(0, 1)[0]!;
+    doc.children[1]!.children.push(arr);
     await renderLayers();
 
     const para = rowByKey(["children", 1, "children", 0]);

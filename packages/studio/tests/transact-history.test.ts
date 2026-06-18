@@ -55,9 +55,9 @@ describe("patch-based history entries", () => {
     const tab = makeTab();
     transactDoc(tab, (t) => mutateUpdateStyle(t, ["children", 0], "color", "blue"));
     const [, entry] = tab.history.snapshots;
-    expect(entry.document).toBeNull();
-    expect(entry.forwardOps).toHaveLength(1);
-    expect(entry.inverseOps).toHaveLength(1);
+    expect(entry!.document).toBeNull();
+    expect(entry!.forwardOps).toHaveLength(1);
+    expect(entry!.inverseOps).toHaveLength(1);
   });
 
   test("un-instrumented transactions store a full snapshot", () => {
@@ -66,8 +66,8 @@ describe("patch-based history entries", () => {
       (t.doc.document as Record<string, unknown>).className = "custom";
     });
     const [, entry] = tab.history.snapshots;
-    expect(entry.document).not.toBeNull();
-    expect(entry.forwardOps).toBeNull();
+    expect(entry!.document).not.toBeNull();
+    expect(entry!.forwardOps).toBeNull();
   });
 
   test("undo/redo round-trips a style edit surgically", () => {
@@ -133,7 +133,7 @@ describe("patch-based history entries", () => {
       const tab = makeTab();
       const before = docJson(tab);
       transactDoc(tab, (t) => mutateUpdateStyle(t, ["children", 0], "color", "blue"));
-      expect(tab.history.snapshots[1].document).not.toBeNull();
+      expect(tab!.history.snapshots[1]!.document).not.toBeNull();
       undo(tab);
       expect(docJson(tab)).toBe(before);
     } finally {
@@ -245,14 +245,14 @@ describe("randomized undo/redo equivalence", () => {
       // Walk all the way back, checking every intermediate state
       for (let i = tab.history.index; i > 0; i--) {
         undo(tab);
-        expect(docJson(tab)).toBe(states[i - 1]);
+        expect(docJson(tab)).toBe(states[i - 1]!);
       }
       expect(tab.history.index).toBe(0);
 
       // And all the way forward again
       for (let i = 1; i < tab.history.snapshots.length; i++) {
         redo(tab);
-        expect(docJson(tab)).toBe(states[i]);
+        expect(docJson(tab)).toBe(states[i]!);
       }
     });
   }

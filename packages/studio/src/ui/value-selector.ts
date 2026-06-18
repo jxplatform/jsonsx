@@ -22,7 +22,7 @@ import { live } from "lit/directives/live.js";
 type ComboOption = { value: string; label: string; style?: string } | { divider: true };
 
 export class JxValueSelector extends LitElement {
-  static properties = {
+  static override properties = {
     options: { attribute: false },
     placeholder: { type: String },
     size: { type: String },
@@ -45,7 +45,7 @@ export class JxValueSelector extends LitElement {
   }
 
   /** No shadow DOM — render directly into light DOM */
-  createRenderRoot() {
+  override createRenderRoot() {
     return this;
   }
 
@@ -111,7 +111,7 @@ export class JxValueSelector extends LitElement {
     }
   }
 
-  render() {
+  override render() {
     if (this._isPicker) {
       return html`
         <sp-picker

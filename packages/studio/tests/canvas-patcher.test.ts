@@ -46,7 +46,7 @@ function doc(): JxMutableNode {
 }
 
 function child(i: number): JxMutableNode {
-  return (doc().children as JxMutableNode[])[i];
+  return (doc().children as JxMutableNode[])[i]!;
 }
 
 beforeEach(() => {
@@ -210,7 +210,7 @@ describe("classifyOps", () => {
 
     const mapPath = ["children", 3, "children", "map"];
     const template = (
-      (doc().children as JxMutableNode[])[3].children as unknown as { map: JxMutableNode }
+      (doc().children as JxMutableNode[])[3]!.children as unknown as { map: JxMutableNode }
     ).map;
     template.style = { color: "green" };
     applyPatchBatch(tab, [{ op: "set-style", path: mapPath }]);
@@ -331,7 +331,7 @@ describe("structural patches", () => {
   test("move reorders DOM and rewrites the moved subtree's paths", () => {
     // Move div (index 2) to index 0
     const children = doc().children as JxMutableNode[];
-    const [moved] = children.splice(2, 1);
+    const moved = children.splice(2, 1)[0]!;
     children.splice(0, 0, moved);
     applyPatchBatch(tab, [{ fromPath: ["children", 2], op: "move", toIndex: 0, toParentPath: [] }]);
 
@@ -345,7 +345,7 @@ describe("structural patches", () => {
   test("move into another container", () => {
     // Move p (index 0) into div, at index 1 (after em)
     const children = doc().children as JxMutableNode[];
-    const [moved] = children.splice(0, 1);
+    const moved = children.splice(0, 1)[0]!;
     const target = children[1] as JxMutableNode; // The div, now at index 1
     (target.children as JxMutableNode[]).push(moved);
     applyPatchBatch(tab, [
@@ -380,7 +380,7 @@ describe("structural patches", () => {
 
   test("set-attr applies as a subtree replace", () => {
     const children = doc().children as JxMutableNode[];
-    children[0].attributes = { title: "tip" };
+    children[0]!.attributes = { title: "tip" };
     applyPatchBatch(tab, [{ attr: "title", op: "set-attr", path: ["children", 0] }]);
 
     const replaced = rootEl.children[0] as HTMLElement;

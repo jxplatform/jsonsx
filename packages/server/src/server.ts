@@ -30,6 +30,14 @@ import { existsSync, readFileSync } from "node:fs";
  * @param {string} urlPath - URL pathname (e.g. "/pages/@jxsuite/parser/Foo.class.json")
  * @returns {string | null} Absolute file path or null
  */
+interface PackageJson {
+  exports?: Record<string, string | { import?: string; default?: string }>;
+  customElements?: string;
+  module?: string;
+  main?: string;
+  [key: string]: unknown;
+}
+
 function resolveNpmPath(rootDir: string, urlPath: string) {
   let root = rootDir;
   let segments = urlPath.split("/").filter(Boolean);
@@ -49,7 +57,7 @@ function resolveNpmPath(rootDir: string, urlPath: string) {
   let start = -1;
   let isScoped = false;
   for (let i = 0; i < segments.length; i++) {
-    if (segments[i].startsWith("@")) {
+    if (segments[i]!.startsWith("@")) {
       start = i;
       isScoped = true;
       break;
@@ -63,14 +71,14 @@ function resolveNpmPath(rootDir: string, urlPath: string) {
     if (start < 0 || start + 1 >= segments.length) {
       return null;
     }
-    const scope = segments[start];
-    const pkg = segments[start + 1];
+    const scope = segments[start]!;
+    const pkg = segments[start + 1]!;
     subpath = segments.slice(start + 2).join("/");
     pkgDir = join(root, "node_modules", scope, pkg);
   } else {
     // Unscoped: try each segment as a package name in node_modules
     for (let i = 0; i < segments.length; i++) {
-      const candidate = join(root, "node_modules", segments[i]);
+      const candidate = join(root, "node_modules", segments[i]!);
       if (existsSync(join(candidate, "package.json"))) {
         start = i;
         pkgDir = candidate;
@@ -91,10 +99,11 @@ function resolveNpmPath(rootDir: string, urlPath: string) {
   // If there's a subpath, check package.json exports first
   if (subpath) {
     try {
-      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as PackageJson;
       const exportKey = `./${subpath}`;
-      if (pkgJson.exports && pkgJson.exports[exportKey]) {
-        const mapped = join(pkgDir, pkgJson.exports[exportKey]);
+      const exportVal = pkgJson.exports?.[exportKey];
+      if (typeof exportVal === "string") {
+        const mapped = join(pkgDir, exportVal);
         if (existsSync(mapped)) {
           return mapped;
         }
@@ -107,7 +116,7 @@ function resolveNpmPath(rootDir: string, urlPath: string) {
     }
     // CEM-relative: subpath may be relative to the custom elements manifest directory
     try {
-      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as PackageJson;
       if (pkgJson.customElements) {
         const cemDir = pkgJson.customElements.replace(/\/[^/]+$/, "");
         const cemRelative = join(pkgDir, cemDir, subpath);
@@ -120,7 +129,7 @@ function resolveNpmPath(rootDir: string, urlPath: string) {
 
   // Bare package (no subpath): resolve entry point
   try {
-    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8"));
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, "utf8")) as PackageJson;
     const exp = pkgJson.exports?.["."];
     const entry =
       (typeof exp === "object" ? (exp.import ?? exp.default) : exp) ??
@@ -236,7 +245,7 @@ export async function createDevServer(options: {
       if (enableStudio && path.startsWith("/__studio/")) {
         // Activate project — tells the server which project root to use for static file fallback
         if (path === "/__studio/activate" && req.method === "POST") {
-          const body = await req.json();
+          const body = (await req.json()) as { root?: string };
           const raw = body.root || null;
           // Always store as absolute path
           activeProjectRoot = raw ? resolve(absRoot, raw) : null;
@@ -302,7 +311,7 @@ export async function createDevServer(options: {
                 minify: false,
               });
               if (result.success && result.outputs.length > 0) {
-                bundleCache.set(cacheKey, await result.outputs[0].text());
+                bundleCache.set(cacheKey, await result.outputs[0]!.text());
               }
             } catch (error) {
               console.error("Bundle failed for", resolved, error);

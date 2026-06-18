@@ -11,7 +11,7 @@ import { setFormats } from "../src/format/format-host";
 import type { DirEntry } from "../src/types";
 
 const openFileInTab = mock(async (_path: string) => {});
-mock.module("../src/files/files.js", () => ({ openFileInTab }));
+void mock.module("../src/files/files.js", () => ({ openFileInTab }));
 
 const { closeBrowseModal, openBrowseModal } = await import("../src/browse/browse-modal");
 const { invalidateBrowseCache } = await import("../src/browse/browse");

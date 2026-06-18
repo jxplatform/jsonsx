@@ -44,29 +44,29 @@ let mockPlatform: Partial<StudioPlatform>;
 let statusMessages: string[] = [];
 let showDialogResult: any = null;
 
-mock.module("../src/ui/layers.js", () => ({
+void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async () => true,
   showDialog: async () => showDialogResult,
 }));
 
-mock.module("../src/github/github-auth.js", () => ({
+void mock.module("../src/github/github-auth.js", () => ({
   authenticateGithub: async () => localStorage.getItem(STORAGE_KEY),
   clearGithubToken: () => localStorage.removeItem(STORAGE_KEY),
   getGithubToken: () => localStorage.getItem(STORAGE_KEY),
 }));
 
-mock.module("../src/platform.js", () => ({
+void mock.module("../src/platform.js", () => ({
   getPlatform: () => mockPlatform,
   registerPlatform: () => {},
 }));
 
-mock.module("../src/panels/git-panel.js", () => ({
+void mock.module("../src/panels/git-panel.js", () => ({
   platformSupportsClone: () => false,
   refreshGitStatus: async () => {},
   renderGitPanel: () => null,
 }));
 
-mock.module("../src/panels/statusbar.js", () => ({
+void mock.module("../src/panels/statusbar.js", () => ({
   statusMessage: (msg: string) => statusMessages.push(msg),
 }));
 
@@ -120,13 +120,13 @@ describe("publishToGithub", () => {
     const result = await publishToGithub({ projectName: "test-project" });
     expect(result).toBe(true);
 
-    expect(mockFetchCalls[0].url).toBe("https://api.github.com/user/repos");
-    const body = JSON.parse(mockFetchCalls[0].opts.body);
+    expect(mockFetchCalls[0]!.url).toBe("https://api.github.com/user/repos");
+    const body = JSON.parse(mockFetchCalls[0]!.opts.body);
     expect(body.name).toBe("my-repo");
     expect(body.private).toBe(true);
     expect(body.auto_init).toBe(false);
 
-    const authHeader = mockFetchCalls[0].opts.headers.Authorization;
+    const authHeader = mockFetchCalls[0]!.opts.headers.Authorization;
     expect(authHeader).toBe("Bearer ghp_test_token");
 
     expect(mockPlatform.gitAddRemote).toHaveBeenCalledWith(
@@ -201,6 +201,6 @@ describe("publishToGithub", () => {
 
     await publishToGithub({ projectName: "test" });
     expect(mockFetchCalls.length).toBeGreaterThan(0);
-    expect(mockFetchCalls[0].opts.headers.Accept).toBe("application/vnd.github+json");
+    expect(mockFetchCalls[0]!.opts.headers.Accept).toBe("application/vnd.github+json");
   });
 });

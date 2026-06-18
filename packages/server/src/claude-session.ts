@@ -136,7 +136,7 @@ export function createSession(
 
   const stream = query({ options: queryOpts, prompt: message });
   session.query = stream;
-  processStream(session, stream);
+  void processStream(session, stream);
 
   return { id };
 }
@@ -177,7 +177,7 @@ export function sendMessage(id: string, message: string) {
 
   const stream = query({ options: queryOpts, prompt: message });
   session.query = stream;
-  processStream(session, stream);
+  void processStream(session, stream);
 }
 
 /**

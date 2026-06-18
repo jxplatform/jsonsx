@@ -78,7 +78,7 @@ describe("createWatcher", () => {
       const { value } = await reader.read();
       const text = new TextDecoder().decode(value);
       expect(text).toContain("data: reload");
-      reader.cancel();
+      void reader.cancel();
     } finally {
       rmSync(FIXTURES, { force: true, recursive: true });
     }
@@ -124,7 +124,7 @@ describe("createWatcher", () => {
       ])) as ReadableStreamReadResult<Uint8Array>;
       const text = new TextDecoder().decode(value);
       expect(text).toContain("data: reload");
-      reader.cancel();
+      void reader.cancel();
     } finally {
       rmSync(FIXTURES, { force: true, recursive: true });
     }

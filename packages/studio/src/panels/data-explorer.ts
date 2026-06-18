@@ -164,7 +164,9 @@ export function renderDataTreeTemplate(
           ><span class="data-value data-${item === null ? "null" : typeof item}">${valText}</span>
         </div>`;
       }
-      const label = Array.isArray(item) ? `Array(${item.length})` : `{${Object.keys(item).length}}`;
+      const label = Array.isArray(item)
+        ? `Array(${item.length})`
+        : `{${Object.keys(item as object).length}}`;
       return html`
         <div class="data-branch" style="padding-left:${indent}">
           <span class="data-key">[${i}] </span

@@ -9,6 +9,7 @@ import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { basename, resolve } from "node:path";
 import { generateProject } from "./generate";
+import type { ProjectOptions } from "./generate";
 
 const [dest] = process.argv.slice(2);
 if (!dest) {
@@ -36,7 +37,7 @@ Deployment adapter:
 const adapterChoice = await rl.question("Adapter [1]: ");
 rl.close();
 
-const adapterMap = {
+const adapterMap: Record<string, ProjectOptions["adapter"]> = {
   1: "static",
   2: "cloudflare-pages",
   3: "node",

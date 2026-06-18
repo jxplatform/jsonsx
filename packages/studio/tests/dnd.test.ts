@@ -127,7 +127,7 @@ describe("applyDropInstruction — block inserts", () => {
     );
     const children = tab.doc.document.children as JxMutableNode[];
     expect(children).toHaveLength(4);
-    expect(children[1].tagName).toBe("hr");
+    expect(children[1]!.tagName).toBe("hr");
     assertNoHoles(tab.doc.document);
   });
 

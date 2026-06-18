@@ -282,7 +282,7 @@ export async function renderCanvasLive(
   if (isPage) {
     const layoutPath = getEffectiveLayoutPath(doc.$layout);
     if (layoutPath) {
-      const layoutDoc = await resolveLayoutDoc(layoutPath);
+      const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
       if (layoutDoc) {
         if (gen !== view.renderGeneration) {
           return null;
@@ -325,7 +325,7 @@ export async function renderCanvasLive(
           if (typeof child === "string") {
             continue;
           }
-          findArrayPaths(child, [...path, "children", i]);
+          findArrayPaths(child!, [...path, "children", i]);
         }
       } else if (
         node.children &&

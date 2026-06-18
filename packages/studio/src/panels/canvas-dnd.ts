@@ -258,7 +258,7 @@ function nearestChildEdge(children: HTMLElement[], cursorY: number, parentPath: 
   let closestIdx = children.length - 1;
 
   for (let i = 0; i < children.length; i++) {
-    const rect = children[i].getBoundingClientRect();
+    const rect = children[i]!.getBoundingClientRect();
     const topDist = Math.abs(cursorY - rect.top);
     const bottomDist = Math.abs(cursorY - rect.bottom);
 
@@ -277,7 +277,7 @@ function nearestChildEdge(children: HTMLElement[], cursorY: number, parentPath: 
   const childPath = [...parentPath, "children", closestIdx];
   return {
     instruction,
-    referenceEl: children[closestIdx],
+    referenceEl: children[closestIdx]!,
     targetPath: childPath,
   };
 }

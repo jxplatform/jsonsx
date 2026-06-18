@@ -99,8 +99,8 @@ describe("renderStatusbar", () => {
     const segs = [...statusbarEl.querySelectorAll(".sb-path-seg")] as HTMLElement[];
     expect(segs.map((s) => s.textContent)).toEqual(["section", "Repeater", "article"]);
     // The Repeater crumb targets the array node's own path (clickable → selects the array).
-    expect(segs[1].dataset.path).toBe(JSON.stringify(["children", 0, "children", 0]));
-    expect(segs[2].dataset.path).toBe(JSON.stringify(["children", 0, "children", 0, "map"]));
+    expect(segs[1]!.dataset.path).toBe(JSON.stringify(["children", 0, "children", 0]));
+    expect(segs[2]!.dataset.path).toBe(JSON.stringify(["children", 0, "children", 0, "map"]));
   });
 
   test("segment label falls back to tag then [index]", () => {

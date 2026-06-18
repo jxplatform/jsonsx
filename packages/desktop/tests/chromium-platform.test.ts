@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 // ─── Embedded mock RPC server ──────────────────────────────────────────────
@@ -147,7 +148,7 @@ describe("chromium desktop platform", () => {
   });
 
   afterAll(() => {
-    server.stop();
+    void server.stop();
   });
 
   test("has correct id", () => {

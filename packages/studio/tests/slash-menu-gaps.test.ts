@@ -62,7 +62,7 @@ describe("showFilter mode", () => {
     input.value = "img";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(menuItems().length).toBe(1);
-    expect(menuItems()[0].textContent).toContain("Image");
+    expect(menuItems()[0]!.textContent).toContain("Image");
   });
 
   test("clearing the filter restores the full list", () => {
@@ -79,8 +79,8 @@ describe("showFilter mode", () => {
     expect(isSlashMenuOpen()).toBe(true);
     const items = menuItems();
     expect(items.length).toBe(1);
-    expect(items[0].hasAttribute("disabled")).toBe(true);
-    expect(items[0].textContent).toContain("No matches");
+    expect(items[0]!.hasAttribute("disabled")).toBe(true);
+    expect(items[0]!.textContent).toContain("No matches");
   });
 
   test("filter input re-focuses after each re-render", async () => {
@@ -124,7 +124,7 @@ describe("showFilter mode", () => {
     input.value = "bet";
     input.dispatchEvent(new Event("input", { bubbles: true }));
     expect(menuItems().length).toBe(1);
-    expect(menuItems()[0].textContent).toContain("Beta");
+    expect(menuItems()[0]!.textContent).toContain("Beta");
   });
 });
 
@@ -142,7 +142,7 @@ describe("outside click", () => {
     showSlashMenu(anchor, "", { onSelect: () => {} });
     await flush();
     const [item] = menuItems();
-    item.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    item!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(isSlashMenuOpen()).toBe(true);
   });
 });
@@ -158,7 +158,7 @@ describe("click selection", () => {
       },
     });
     await flush();
-    menuItems()[0].dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    menuItems()[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     expect(selected as unknown).toEqual({
       description: "Insert image",
       label: "Image",

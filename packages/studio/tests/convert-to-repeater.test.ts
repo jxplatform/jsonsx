@@ -8,7 +8,7 @@ import { flush, installMockPlatform, resetStudioState, resetWorkspaceWithTab } f
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Tab } from "../src/tabs/tab";
 
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (url: string) => ({ toString: () => url }) },
   editor: { setModelMarkers: mock(() => {}) },
@@ -118,7 +118,7 @@ describe("existing array defs", () => {
     await done;
 
     // The selected element becomes the array node directly — no throwaway <div> wrapper.
-    const repeater = child0();
+    const repeater = child0()!;
     expect(repeater.tagName).toBeUndefined();
     expect(repeater.$prototype).toBe("Array");
     expect(repeater.items).toEqual({ $ref: "#/state/rows" });

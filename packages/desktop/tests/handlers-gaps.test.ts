@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -5,7 +6,7 @@ import { join } from "node:path";
 import type { ComponentMeta } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Utils: { openFileDialog: async () => [] },
@@ -34,7 +35,7 @@ const fakeRegistry = {
 
 const mockBuildRegistry = mock(async (_root: string, _config: unknown) => fakeRegistry);
 
-mock.module("@jxsuite/compiler/format-host", () => ({
+void mock.module("@jxsuite/compiler/format-host", () => ({
   buildProjectFormatRegistry: mockBuildRegistry,
 }));
 
@@ -48,7 +49,7 @@ const mockHandleServerFunction = mock(
   async (_req: Request, _root: string) => new Response('{"error":"boom"}', { status: 500 }),
 );
 
-mock.module("@jxsuite/server/resolve", () => ({
+void mock.module("@jxsuite/server/resolve", () => ({
   handleResolve: mockHandleResolve,
   handleServerFunction: mockHandleServerFunction,
 }));

@@ -135,6 +135,7 @@ describe("buildFormatRegistry", () => {
       "/proj/Markdown.class.json": MARKDOWN_CLASS,
       "/proj/OtherMd.class.json": other,
     });
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(
       buildFormatRegistry(
         { Markdown: "./Markdown.class.json", OtherMd: "./OtherMd.class.json" },
@@ -257,6 +258,7 @@ describe("FormatEntry.call", () => {
   test("throws a clear error for undeclared capabilities", async () => {
     const io = makeIO({ "/p/Csv.class.json": CSV_CLASS });
     const reg = await buildFormatRegistry({ Csv: "./Csv.class.json" }, io, "/p/x");
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(reg.byName("Csv")!.call("serialize", {})).rejects.toThrow(
       /does not declare a "serialize" capability/,
     );
@@ -265,6 +267,7 @@ describe("FormatEntry.call", () => {
   test("throws when the implementation lacks the static method", async () => {
     const io = makeIO({ "/p/Csv.class.json": CSV_CLASS }, { "/p/csv.js": { Csv: {} } });
     const reg = await buildFormatRegistry({ Csv: "./Csv.class.json" }, io, "/p/x");
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(reg.byName("Csv")!.call("parse", "a,b")).rejects.toThrow(
       /no static "parse" method/,
     );

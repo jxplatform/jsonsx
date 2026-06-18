@@ -15,9 +15,55 @@ import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import * as claude from "./claude-session.ts";
 import type { ClassJsonDef } from "./types.ts";
+import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (p: string) => p.replaceAll("\\", "/");
+
+interface PackageJson {
+  name?: string;
+  workspaces?: unknown;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  customElements?: string;
+  [key: string]: unknown;
+}
+
+/** A custom-element-manifest declaration (subset consumed here). */
+interface CemDeclaration {
+  customElement?: boolean;
+  tagName?: string;
+  description?: string;
+  cssProperties?: unknown[];
+  events?: unknown[];
+  slots?: unknown[];
+  members?: { kind?: string; privacy?: string; [key: string]: unknown }[];
+  attributes?: {
+    name?: string;
+    default?: unknown;
+    description?: string;
+    type?: { text?: string };
+  }[];
+  [key: string]: unknown;
+}
+
+interface CemModule {
+  path?: string;
+  declarations?: CemDeclaration[];
+}
+
+interface Cem {
+  modules?: CemModule[];
+}
+
+/** A parsed Jx component document (subset consumed by component discovery). */
+interface ComponentDoc {
+  $id?: string;
+  tagName?: string;
+  $elements?: unknown[];
+  state?: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 // ─── Format registry (per project root, invalidated on project.json change) ──
 
@@ -33,10 +79,10 @@ const formatRegistryCache = new Map<string, { mtime: number; registry: FormatReg
 async function getFormatRegistry(projectRoot: string): Promise<FormatRegistry> {
   const projectJsonPath = resolve(projectRoot, "project.json");
   let mtime = 0;
-  let projectConfig;
+  let projectConfig: ProjectConfig | undefined;
   try {
     mtime = statSync(projectJsonPath).mtimeMs;
-    projectConfig = JSON.parse(readFileSync(projectJsonPath, "utf8"));
+    projectConfig = JSON.parse(readFileSync(projectJsonPath, "utf8")) as ProjectConfig;
   } catch {
     projectConfig = undefined;
   }
@@ -111,14 +157,14 @@ export function parseGitStatus(out: string) {
     } else if (line.startsWith("# branch.ab ")) {
       const m = line.match(/\+(\d+) -(\d+)/);
       if (m) {
-        ahead = Number.parseInt(m[1], 10);
-        behind = Number.parseInt(m[2], 10);
+        ahead = Number.parseInt(m[1]!, 10);
+        behind = Number.parseInt(m[2]!, 10);
       }
     } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
       const parts = line.split(" ");
-      const [, xy] = parts;
-      const [stagedCode] = xy;
-      const [, unstagedCode] = xy;
+      const xy = parts[1]!;
+      const stagedCode = xy[0]!;
+      const unstagedCode = xy[1]!;
       let filePath;
       if (line.startsWith("2 ")) {
         const tabIdx = line.indexOf("\t");
@@ -169,7 +215,7 @@ export async function handleStudioApi(
   // Project metadata
   if (path === "/__studio/project" && req.method === "GET") {
     try {
-      const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+      const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8")) as PackageJson;
       return Response.json({
         name: pkg.name ?? basename(root),
         root,
@@ -211,12 +257,12 @@ export async function handleStudioApi(
       }
 
       let isSiteProject = false;
-      let projectConfig = null;
+      let projectConfig: ProjectConfig | null = null;
       try {
-        const raw = JSON.parse(await readFile(resolve(absDir, "project.json"), "utf8"));
+        const raw = JSON.parse(await readFile(resolve(absDir, "project.json"), "utf8")) as unknown;
         if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
           isSiteProject = true;
-          projectConfig = raw;
+          projectConfig = raw as ProjectConfig;
         }
       } catch {}
 
@@ -245,7 +291,7 @@ export async function handleStudioApi(
       while (dir) {
         const candidate = resolve(dir, "project.json");
         if (existsSync(candidate)) {
-          const config = JSON.parse(readFileSync(candidate, "utf8"));
+          const config = JSON.parse(readFileSync(candidate, "utf8")) as ProjectConfig;
           const relPath = fwd(dir);
           const absFile = filePath.startsWith("~")
             ? filePath.replace("~", process.env.HOME || "")
@@ -313,10 +359,10 @@ export async function handleStudioApi(
         }
         const fp = resolve(root, match);
         try {
-          const raw = JSON.parse(await readFile(fp, "utf8"));
+          const raw = JSON.parse(await readFile(fp, "utf8")) as unknown;
           if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
             const projectDir = fwd(dirname(fp));
-            sites.push({ config: raw, path: projectDir });
+            sites.push({ config: raw as ProjectConfig, path: projectDir });
           }
         } catch {}
       }
@@ -329,7 +375,13 @@ export async function handleStudioApi(
   // Create a new project
   if (path === "/__studio/create-project" && req.method === "POST") {
     try {
-      const body = await req.json();
+      const body = (await req.json()) as {
+        name?: string;
+        description?: string;
+        url?: string;
+        adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
+        directory?: string;
+      };
       const { name, description, url: siteUrl, adapter, directory } = body;
       if (!name || !directory) {
         return Response.json({ error: "name and directory are required" }, { status: 400 });
@@ -339,13 +391,15 @@ export async function handleStudioApi(
 
       const { generateProject } = await import("@jxsuite/create/generate");
       await generateProject(destPath, {
-        adapter,
-        description,
         name,
-        url: siteUrl,
+        ...(adapter !== undefined ? { adapter } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(siteUrl !== undefined ? { url: siteUrl } : {}),
       });
 
-      const config = JSON.parse(await readFile(resolve(destPath, "project.json"), "utf8"));
+      const config = JSON.parse(
+        await readFile(resolve(destPath, "project.json"), "utf8"),
+      ) as ProjectConfig;
       const projectRoot = fwd(relative(root, destPath));
       return Response.json({ config, root: projectRoot });
     } catch (error) {
@@ -442,16 +496,16 @@ export async function handleStudioApi(
         }
         const fp = resolve(scanRoot, match);
         try {
-          let content;
+          let content: ComponentDoc;
           if (match.endsWith(".json")) {
-            content = JSON.parse(await readFile(fp, "utf8"));
+            content = JSON.parse(await readFile(fp, "utf8")) as ComponentDoc;
           } else {
             const entry = registry.byExtension(extname(match), "parse");
             if (!entry) {
               continue;
             }
             const source = await readFile(fp, "utf8");
-            content = (await entry.call("parse", source)) as Record<string, unknown>;
+            content = (await entry.call("parse", source)) as ComponentDoc;
           }
           if (content.tagName && content.tagName.includes("-")) {
             components.push({
@@ -495,7 +549,7 @@ export async function handleStudioApi(
       try {
         const projectPkgPath = resolve(scanRoot, "package.json");
         if (existsSync(projectPkgPath)) {
-          const pkg = JSON.parse(await readFile(projectPkgPath, "utf8"));
+          const pkg = JSON.parse(await readFile(projectPkgPath, "utf8")) as PackageJson;
           const deps = { ...pkg.dependencies, ...pkg.devDependencies };
           for (const name of Object.keys(deps)) {
             try {
@@ -520,7 +574,7 @@ export async function handleStudioApi(
               if (!actualPath) {
                 continue;
               }
-              const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
+              const depPkg = JSON.parse(await readFile(actualPath, "utf8")) as PackageJson;
               if (!depPkg.customElements) {
                 continue;
               }
@@ -528,7 +582,7 @@ export async function handleStudioApi(
               if (!existsSync(cemPath)) {
                 continue;
               }
-              const cem = JSON.parse(await readFile(cemPath, "utf8"));
+              const cem = JSON.parse(await readFile(cemPath, "utf8")) as Cem;
               for (const mod of cem.modules || []) {
                 for (const decl of mod.declarations || []) {
                   if (decl.customElement && decl.tagName) {
@@ -539,17 +593,16 @@ export async function handleStudioApi(
                       events: decl.events || [],
                       hasElements: false,
                       members: (decl.members || []).filter(
-                        (m: Record<string, unknown>) =>
-                          m.kind === "field" && m.privacy !== "private",
+                        (m) => m.kind === "field" && m.privacy !== "private",
                       ),
                       modulePath: mod.path,
                       package: name,
                       path: null,
-                      props: (decl.attributes || []).map((a: Record<string, unknown>) => ({
+                      props: (decl.attributes || []).map((a) => ({
                         default: a.default,
                         description: a.description || null,
                         name: a.name,
-                        type: (a.type as Record<string, unknown> | undefined)?.text,
+                        type: a.type?.text,
                       })),
                       slots: decl.slots || [],
                       source: "npm",
@@ -580,17 +633,14 @@ export async function handleStudioApi(
       if (!existsSync(pkgPath)) {
         return Response.json([]);
       }
-      const pkg = JSON.parse(await readFile(pkgPath, "utf8"));
+      const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as PackageJson;
       const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      /**
-       * @type {{
-       *   name: string;
-       *   version: string;
-       *   hasCem: boolean;
-       *   customElementsPath: string | null;
-       * }[]}
-       */
-      const packages = [];
+      const packages: {
+        name: string;
+        version: string;
+        hasCem: boolean;
+        customElementsPath: string | null;
+      }[] = [];
       for (const [name, version] of Object.entries(deps)) {
         const depPkgPath = resolve(scanRoot, "node_modules", ...name.split("/"), "package.json");
         const fallbackPath = resolve(root, "node_modules", ...name.split("/"), "package.json");
@@ -603,12 +653,12 @@ export async function handleStudioApi(
           continue;
         }
         try {
-          const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
+          const depPkg = JSON.parse(await readFile(actualPath, "utf8")) as PackageJson;
           packages.push({
             customElementsPath: depPkg.customElements || null,
             hasCem: Boolean(depPkg.customElements),
             name,
-            version: /** @type {string} */ version,
+            version,
           });
         } catch {}
       }
@@ -637,7 +687,7 @@ export async function handleStudioApi(
       if (!actualPath) {
         return Response.json({ cem: null });
       }
-      const depPkg = JSON.parse(await readFile(actualPath, "utf8"));
+      const depPkg = JSON.parse(await readFile(actualPath, "utf8")) as PackageJson;
       if (!depPkg.customElements) {
         return Response.json({ cem: null });
       }
@@ -645,7 +695,7 @@ export async function handleStudioApi(
       if (!existsSync(cemPath)) {
         return Response.json({ cem: null });
       }
-      const cem = JSON.parse(await readFile(cemPath, "utf8"));
+      const cem = JSON.parse(await readFile(cemPath, "utf8")) as Cem;
       return Response.json({ cem });
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 500 });
@@ -655,7 +705,7 @@ export async function handleStudioApi(
   // Add an npm package
   if (path === "/__studio/packages/add" && req.method === "POST") {
     try {
-      const body = await req.json();
+      const body = (await req.json()) as { name?: string; dir?: string; dev?: boolean };
       const { name } = body;
       if (!name || typeof name !== "string") {
         return Response.json({ error: "Missing name" }, { status: 400 });
@@ -688,7 +738,7 @@ export async function handleStudioApi(
   // Remove an npm package
   if (path === "/__studio/packages/remove" && req.method === "POST") {
     try {
-      const body = await req.json();
+      const body = (await req.json()) as { name?: string; dir?: string };
       const { name } = body;
       if (!name || typeof name !== "string") {
         return Response.json({ error: "Missing name" }, { status: 400 });
@@ -808,9 +858,9 @@ export async function handleStudioApi(
 
   // Rename file
   if (path === "/__studio/file/rename" && req.method === "POST") {
-    let body;
+    let body: { from?: string; to?: string };
     try {
-      body = await req.json();
+      body = (await req.json()) as { from?: string; to?: string };
     } catch {
       return new Response("Invalid JSON", { status: 400 });
     }
@@ -841,9 +891,9 @@ export async function handleStudioApi(
 
   // Locate a file by name within the project root
   if (path === "/__studio/locate" && req.method === "POST") {
-    let body;
+    let body: { name?: string };
     try {
-      body = await req.json();
+      body = (await req.json()) as { name?: string };
     } catch {
       return new Response("Invalid JSON", { status: 400 });
     }
@@ -879,15 +929,16 @@ export async function handleStudioApi(
   // Dispatches parse/serialize through the project's format registry by import name.
   if (path === "/__studio/format" && req.method === "POST") {
     try {
-      const body = await req.json();
-      const { format, action, source, doc, options } = body as {
+      const body = (await req.json()) as {
         format?: string;
         action?: string;
         source?: string;
         doc?: Record<string, unknown>;
         options?: Record<string, unknown>;
+        dir?: string;
       };
-      const dir = (body.dir as string | undefined) || activeProjectRoot || root;
+      const { format, action, source, doc, options } = body;
+      const dir = body.dir || activeProjectRoot || root;
       const projectRoot = isAbsolute(dir) ? dir : resolve(root, dir);
       assertAccessible(projectRoot, root, activeProjectRoot);
 
@@ -985,7 +1036,7 @@ export async function handleStudioApi(
     if (moduleAbsPath.endsWith(".class.json")) {
       try {
         const content = readFileSync(moduleAbsPath, "utf8");
-        const classDef = JSON.parse(content);
+        const classDef = JSON.parse(content) as ClassJsonDef;
         return Response.json({
           schema: extractStudioSchema(classDef, moduleAbsPath),
         });
@@ -1003,7 +1054,7 @@ export async function handleStudioApi(
     if (existsSync(classJsonPath)) {
       try {
         const content = readFileSync(classJsonPath, "utf8");
-        const classDef = JSON.parse(content);
+        const classDef = JSON.parse(content) as ClassJsonDef;
         return Response.json({
           schema: extractStudioSchema(classDef, classJsonPath),
         });
@@ -1014,7 +1065,10 @@ export async function handleStudioApi(
 
     // Fallback: import JS module (backwards compat for classes without .class.json)
     try {
-      const mod = await import(moduleAbsPath);
+      const mod = (await import(moduleAbsPath)) as {
+        default?: Record<string, unknown>;
+        [key: string]: unknown;
+      };
       const ExportedClass = mod[exportName] ?? mod.default?.[exportName];
       if (typeof ExportedClass !== "function") {
         return Response.json({
@@ -1022,7 +1076,7 @@ export async function handleStudioApi(
           schema: null,
         });
       }
-      return Response.json({ schema: ExportedClass.schema ?? null });
+      return Response.json({ schema: (ExportedClass as { schema?: unknown }).schema ?? null });
     } catch (error) {
       return Response.json({
         error: errorMessage(error),
@@ -1091,7 +1145,10 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "add-remote" && req.method === "POST") {
-        const { name, url: remoteUrl } = await req.json();
+        const { name, url: remoteUrl } = (await req.json()) as {
+          name?: string;
+          url?: string;
+        };
         if (!name || !remoteUrl) {
           return new Response("name and url required", { status: 400 });
         }
@@ -1108,9 +1165,9 @@ export async function handleStudioApi(
             continue;
           }
           const [name, head] = line.split("\t");
-          branches.push(name);
+          branches.push(name!);
           if (head === "*") {
-            current = name;
+            current = name!;
           }
         }
         return Response.json({ branches, current });
@@ -1131,7 +1188,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "stage" && req.method === "POST") {
-        const { files } = await req.json();
+        const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
         }
@@ -1145,7 +1202,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "unstage" && req.method === "POST") {
-        const { files } = await req.json();
+        const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
         }
@@ -1154,7 +1211,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "commit" && req.method === "POST") {
-        const { message } = await req.json();
+        const { message } = (await req.json()) as { message?: string };
         if (!message || typeof message !== "string") {
           return Response.json({ error: "Missing message" }, { status: 400 });
         }
@@ -1169,11 +1226,11 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "push" && req.method === "POST") {
-        let body: Record<string, unknown> = {};
+        let body: { setUpstream?: boolean } = {};
         try {
-          body = await req.json();
+          body = (await req.json()) as { setUpstream?: boolean };
         } catch {}
-        const { setUpstream } = body as { setUpstream?: boolean };
+        const { setUpstream } = body;
         if (setUpstream) {
           const branchRaw = await runGit(["rev-parse", "--abbrev-ref", "HEAD"]);
           const branch = branchRaw.trim();
@@ -1195,7 +1252,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "checkout" && req.method === "POST") {
-        const { branch } = await req.json();
+        const { branch } = (await req.json()) as { branch?: string };
         if (!branch || typeof branch !== "string") {
           return Response.json({ error: "Missing branch" }, { status: 400 });
         }
@@ -1204,7 +1261,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "create-branch" && req.method === "POST") {
-        const { name } = await req.json();
+        const { name } = (await req.json()) as { name?: string };
         if (!name || typeof name !== "string") {
           return Response.json({ error: "Missing name" }, { status: 400 });
         }
@@ -1238,7 +1295,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "discard" && req.method === "POST") {
-        const { files } = await req.json();
+        const { files } = (await req.json()) as { files?: string[] };
         if (!Array.isArray(files) || files.length === 0) {
           return Response.json({ error: "Missing files" }, { status: 400 });
         }
@@ -1252,7 +1309,7 @@ export async function handleStudioApi(
       }
 
       if (gitCmd === "clone" && req.method === "POST") {
-        const { url: repoUrl } = await req.json();
+        const { url: repoUrl } = (await req.json()) as { url?: string };
         if (!repoUrl || typeof repoUrl !== "string") {
           return Response.json({ error: "Missing url" }, { status: 400 });
         }
@@ -1284,11 +1341,13 @@ export async function handleStudioApi(
 
   if (path === "/__studio/ai/session" && req.method === "POST") {
     try {
-      const body = await req.json();
+      const body = (await req.json()) as { message?: string; systemPrompt?: string };
       const projectDir = activeProjectRoot || root;
-      const result = claude.createSession(projectDir, body.message, {
-        systemPrompt: body.systemPrompt,
-      });
+      const opts: { systemPrompt?: string } = {};
+      if (body.systemPrompt !== undefined) {
+        opts.systemPrompt = body.systemPrompt;
+      }
+      const result = claude.createSession(projectDir, body.message!, opts);
       return Response.json(result);
     } catch (error) {
       return Response.json(
@@ -1303,7 +1362,7 @@ export async function handleStudioApi(
     path.endsWith("/stream") &&
     req.method === "GET"
   ) {
-    const [id] = path.split("/").slice(4);
+    const id = path.split("/").slice(4)[0]!;
     return claude.streamSession(id);
   }
 
@@ -1313,9 +1372,9 @@ export async function handleStudioApi(
     req.method === "POST"
   ) {
     try {
-      const [id] = path.split("/").slice(4);
-      const body = await req.json();
-      claude.sendMessage(id, body.message);
+      const id = path.split("/").slice(4)[0]!;
+      const body = (await req.json()) as { message?: string };
+      claude.sendMessage(id, body.message!);
       return Response.json({ ok: true });
     } catch (error) {
       return Response.json(
@@ -1326,19 +1385,19 @@ export async function handleStudioApi(
   }
 
   if (path.startsWith("/__studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
-    const [id] = path.split("/").slice(4);
+    const id = path.split("/").slice(4)[0]!;
     claude.stopSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/__studio/ai/session/") && req.method === "DELETE") {
-    const [id] = path.split("/").slice(4);
+    const id = path.split("/").slice(4)[0]!;
     claude.deleteSession(id);
     return Response.json({ ok: true });
   }
 
   if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
-    const [id] = path.split("/").slice(4);
+    const id = path.split("/").slice(4)[0]!;
     const info = claude.getSession(id);
     if (!info) {
       return Response.json({ error: "Not found" }, { status: 404 });
@@ -1369,7 +1428,7 @@ function extractStudioSchema(classDef: ClassJsonDef, classJsonPath: string) {
     try {
       const parentPath = resolve(dirname(classJsonPath), classDef.extends.$ref);
       const parentContent = readFileSync(parentPath, "utf8");
-      const parentDef = JSON.parse(parentContent);
+      const parentDef = JSON.parse(parentContent) as ClassJsonDef;
       parentSchema = extractStudioSchema(parentDef, parentPath);
     } catch {
       // Parent not found — proceed without inheritance

@@ -415,33 +415,33 @@ describe("array-of-objects fields", () => {
     };
 
     inputValue(row().querySelector("sp-textfield") as Element, "renamed");
-    expect((cols()[0] as { label: string }).label).toBe("renamed");
+    expect((cols()[0]! as { label: string }).label).toBe("renamed");
 
     remount();
     const sw = row().querySelector("sp-switch") as HTMLElement & { checked: boolean };
     sw.checked = false;
     sw.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((cols()[0] as { visible: boolean }).visible).toBe(false);
+    expect((cols()[0]! as { visible: boolean }).visible).toBe(false);
 
     remount();
     commitValue(row().querySelectorAll("sp-number-field")[1] as Element, "5");
-    expect((cols()[0] as { width: number }).width).toBe(5);
+    expect((cols()[0]! as { width: number }).width).toBe(5);
 
     remount();
     commitValue(row().querySelectorAll("sp-number-field")[0] as Element, "1.5");
-    expect((cols()[0] as { ratio: number }).ratio).toBe(1.5);
+    expect((cols()[0]! as { ratio: number }).ratio).toBe(1.5);
 
     remount();
     commitValue(row().querySelectorAll("sp-number-field")[1] as Element, "");
-    expect((cols()[0] as { width?: number }).width).toBeUndefined();
+    expect((cols()[0]! as { width?: number }).width).toBeUndefined();
 
     remount();
     commitValue(row().querySelector("sp-picker") as Element, "right");
-    expect((cols()[0] as { align: string }).align).toBe("right");
+    expect((cols()[0]! as { align: string }).align).toBe("right");
 
     remount();
     commitValue(row().querySelector("sp-picker") as Element, "__none__");
-    expect((cols()[0] as { align?: string }).align).toBeUndefined();
+    expect((cols()[0]! as { align?: string }).align).toBeUndefined();
   });
 
   test("add button appends a row seeded with item defaults and notifies ctx", () => {

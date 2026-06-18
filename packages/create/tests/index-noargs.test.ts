@@ -21,6 +21,7 @@ const cliEntry = "../index";
 
 describe("create-jxsuite CLI without arguments", () => {
   test("prints usage and exits with code 1", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(import(cliEntry)).rejects.toThrow("process.exit(1)");
     expect(errors.join("\n")).toContain("Usage: bun create @jxsuite <directory>");
   });

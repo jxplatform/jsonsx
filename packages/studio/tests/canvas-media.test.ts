@@ -65,9 +65,9 @@ describe("parseMediaEntries", () => {
       "--md": "(min-width: 768px)",
     });
     expect(result.sizeBreakpoints).toHaveLength(2);
-    expect(result.sizeBreakpoints[0].name).toBe("--md");
-    expect(result.sizeBreakpoints[0].type).toBe("min");
-    expect(result.sizeBreakpoints[1].name).toBe("--lg");
+    expect(result.sizeBreakpoints[0]!.name).toBe("--md");
+    expect(result.sizeBreakpoints[0]!.type).toBe("min");
+    expect(result.sizeBreakpoints[1]!.name).toBe("--lg");
   });
 
   test("sorts max-width breakpoints from largest to smallest", () => {
@@ -101,7 +101,7 @@ describe("parseMediaEntries", () => {
 
   test("handles fractional pixel values", () => {
     const result = parseMediaEntries({ "--xs": "(max-width: 479.5px)" });
-    expect(result.sizeBreakpoints[0].width).toBe(479.5);
+    expect(result.sizeBreakpoints[0]!.width).toBe(479.5);
   });
 });
 

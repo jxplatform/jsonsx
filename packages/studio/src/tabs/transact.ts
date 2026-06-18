@@ -190,8 +190,8 @@ function pushHistoryEntry(
   });
   if (truncated.length > HISTORY_LIMIT) {
     // The new base entry must be a self-contained checkpoint before the old base is dropped.
-    if (!truncated[1].document) {
-      truncated[1].document = materializeState(truncated, 1);
+    if (!truncated[1]!.document) {
+      truncated[1]!.document = materializeState(truncated, 1);
     }
     truncated.shift();
   }
@@ -213,15 +213,15 @@ function materializeState(
   target: number,
 ): JxMutableNode {
   let base = target;
-  while (base >= 0 && !snapshots[base].document) {
+  while (base >= 0 && !snapshots[base]!.document) {
     base -= 1;
   }
   if (base < 0) {
     throw new Error("history-missing-checkpoint");
   }
-  const doc = jsonClone(snapshots[base].document) as JxMutableNode;
+  const doc = jsonClone(snapshots[base]!.document) as JxMutableNode;
   for (let i = base + 1; i <= target; i++) {
-    for (const op of snapshots[i].forwardOps ?? []) {
+    for (const op of snapshots[i]!.forwardOps ?? []) {
       applyDocOpToDoc(doc, op);
     }
   }
@@ -287,7 +287,7 @@ function applyDocOpToDoc(doc: JxMutableNode, op: JxDocOp) {
       const fromParent = getNodeAtPath(doc, op.fromParentPath);
       const toParent = getNodeAtPath(doc, op.toParentPath);
       const [node] = childArray(fromParent).splice(op.fromIndex, 1);
-      childArray(toParent).splice(op.toIndex, 0, node);
+      childArray(toParent).splice(op.toIndex, 0, node!);
       return;
     }
     default: {
@@ -357,7 +357,7 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
 function restoreState(tab: Tab, index: number) {
   const { snapshots } = tab.history;
   tab.doc.document = materializeState(snapshots, index);
-  const snap = snapshots[index];
+  const snap = snapshots[index]!;
   tab.session.selection = snap.selection ? [...toRaw(snap.selection)] : null;
 }
 
@@ -384,7 +384,7 @@ export function undo(tab: Tab) {
   if (tab.history.index <= 0) {
     return;
   }
-  const entry = tab.history.snapshots[tab.history.index];
+  const entry = tab.history.snapshots[tab.history.index]!;
   const inverseOps = patchHistoryEnabled() ? entry.inverseOps : null;
   if (inverseOps && inverseOps.length > 0) {
     // Surgical path: apply inverse ops through the normal transaction pipeline (the canvas
@@ -413,7 +413,7 @@ export function redo(tab: Tab) {
   if (tab.history.index >= tab.history.snapshots.length - 1) {
     return;
   }
-  const entry = tab.history.snapshots[tab.history.index + 1];
+  const entry = tab.history.snapshots[tab.history.index + 1]!;
   const forwardOps = patchHistoryEnabled() ? entry.forwardOps : null;
   if (forwardOps && forwardOps.length > 0) {
     transactDoc(
@@ -828,9 +828,9 @@ export function mutateUpdateNestedStylePath(
     // Clean up empty parent objects
     let cur: JxStyle | undefined = node.style;
     for (let i = 0; i < stylePath.length && cur; i++) {
-      const child = getNestedStyle(cur, stylePath[i]);
+      const child = getNestedStyle(cur, stylePath[i]!);
       if (child && Object.keys(child).length === 0) {
-        delete cur[stylePath[i]];
+        delete cur[stylePath[i]!];
         break;
       }
       cur = child;
@@ -878,9 +878,9 @@ export function mutateUpdateMediaNestedStylePath(
     delete obj[prop];
     let cur: JxStyle | undefined = media;
     for (let i = 0; i < stylePath.length && cur; i++) {
-      const child = getNestedStyle(cur, stylePath[i]);
+      const child = getNestedStyle(cur, stylePath[i]!);
       if (child && Object.keys(child).length === 0) {
-        delete cur[stylePath[i]];
+        delete cur[stylePath[i]!];
         break;
       }
       cur = child;

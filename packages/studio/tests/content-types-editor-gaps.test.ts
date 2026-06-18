@@ -16,7 +16,7 @@ let capturedHandlers: Record<string, (...args: never[]) => void> | null = null;
 
 // Minimal stand-ins for the schema-field-ui templates; schemaForType mirrors the real module's
 // String/number cases, which is all these tests add.
-mock.module("../src/settings/schema-field-ui", () => ({
+void mock.module("../src/settings/schema-field-ui", () => ({
   addFieldFormTpl: () => html``,
   detectFieldFormat: () => "",
   fieldCardTpl: (

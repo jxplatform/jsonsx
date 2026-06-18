@@ -49,7 +49,7 @@ export function createPackageOps(session: { readonly projectRoot: string | null 
       return [];
     }
 
-    const pkg = await file.json();
+    const pkg = (await file.json()) as { dependencies?: Record<string, string> };
     const deps = pkg.dependencies || {};
     return Object.entries(deps).map(([name, version]) => ({
       name,

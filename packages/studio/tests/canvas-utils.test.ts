@@ -349,7 +349,7 @@ describe("observeCenterUntilStable", () => {
     defineMetric(wrap, "scrollWidth", 600);
     observeCenterUntilStable();
     expect(view.needsCenter).toBe(true);
-    const [ro] = FakeResizeObserver.instances;
+    const ro = FakeResizeObserver.instances[0]!;
     expect(ro.observed).toEqual([wrap]);
     expect(view.panX).toBe(200);
 
@@ -362,7 +362,7 @@ describe("observeCenterUntilStable", () => {
   test("disconnects once the user pans (needsCenter false)", () => {
     makePanzoomWrap();
     observeCenterUntilStable();
-    const [ro] = FakeResizeObserver.instances;
+    const ro = FakeResizeObserver.instances[0]!;
     view.needsCenter = false;
     ro.cb();
     expect(ro.disconnected).toBe(true);
@@ -373,7 +373,8 @@ describe("observeCenterUntilStable", () => {
     makePanzoomWrap();
     observeCenterUntilStable();
     observeCenterUntilStable();
-    const [first, second] = FakeResizeObserver.instances;
+    const first = FakeResizeObserver.instances[0]!;
+    const second = FakeResizeObserver.instances[1]!;
     expect(first.disconnected).toBe(true);
     expect(second.disconnected).toBe(false);
   });

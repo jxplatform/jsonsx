@@ -41,6 +41,7 @@ import {
 import { view } from "../view";
 import { addRecentProject, trackRecentFile } from "../recent-projects";
 import type { TemplateResult } from "lit-html";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioState } from "../state.js";
 import type { Tab } from "../tabs/tab.js";
 
@@ -339,7 +340,7 @@ function renderTreeLevelTemplate(
 ): TemplateResult | TemplateResult[] {
   const entries = requireProjectState().dirs.get(dirPath);
   if (!entries) {
-    loadDirectory(dirPath).then(() => ctx.renderLeftPanel());
+    void loadDirectory(dirPath).then(() => ctx.renderLeftPanel());
     return html`<div
       class="file-tree-item"
       style="padding-left:${8 + depth * 16}px;color:var(--fg-dim);font-style:italic"
@@ -427,13 +428,13 @@ export function setupTreeKeyboard(tree: HTMLElement) {
     switch (e.key) {
       case "ArrowDown": {
         if (idx < items.length - 1) {
-          items[idx + 1].focus();
+          items[idx + 1]!.focus();
         }
         break;
       }
       case "ArrowUp": {
         if (idx > 0) {
-          items[idx - 1].focus();
+          items[idx - 1]!.focus();
         }
         break;
       }
@@ -442,7 +443,7 @@ export function setupTreeKeyboard(tree: HTMLElement) {
           const path = focused.dataset.path as string;
           if (!requireProjectState().expanded.has(path)) {
             requireProjectState().expanded.add(path);
-            loadDirectory(path).then(() => {
+            void loadDirectory(path).then(() => {
               const panel = tree.closest(".panel-body");
               if (panel) {
                 (panel.querySelector(".file-tree-item:focus") as HTMLElement | null)?.click();
@@ -619,7 +620,7 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
           return;
         }
 
-        moveFileEntry(srcPath, newPath!, renderLeftPanel);
+        void moveFileEntry(srcPath, newPath!, renderLeftPanel);
       },
     });
     _fileTreeDndCleanups.push(monitorCleanup);
@@ -753,7 +754,7 @@ function showFileContextMenu(
                 style=${item.danger ? "color: var(--danger)" : ""}
                 @click=${() => {
                   dismissFileContextMenu();
-                  item.action?.();
+                  void item.action?.();
                 }}
                 >${item.label}</sp-menu-item
               >`,
@@ -955,12 +956,12 @@ export async function openFileFromTree(
     }
 
     if (formatForPath(path)) {
-      await ctx.loadMarkdown(content, null);
+      ctx.loadMarkdown(content, null);
       ctx.S.documentPath = path;
       ctx.S.dirty = false;
       ctx.commit(ctx.S);
     } else if (path.endsWith(".json")) {
-      const doc = JSON.parse(content);
+      const doc = JSON.parse(content) as JxMutableNode;
       const newS = createState(doc);
       newS.documentPath = path;
       newS.dirty = false;
@@ -1001,14 +1002,15 @@ export async function openFileInTab(path: string) {
     }
 
     await loadFormats();
-    let document, frontmatter;
+    let document: Record<string, unknown>;
+    let frontmatter: Record<string, unknown> | undefined;
     const format = formatForPath(path);
     if (format) {
       const result = await parseSourceForPath(path, content);
       ({ document } = result);
       ({ frontmatter } = result);
     } else if (path.endsWith(".json")) {
-      document = JSON.parse(content);
+      document = JSON.parse(content) as Record<string, unknown>;
     } else {
       throw noFormatError(path);
     }
@@ -1058,7 +1060,7 @@ export async function reloadFileInTab(path: string) {
           tab.doc.document = document;
           tab.doc.content.frontmatter = frontmatter;
         } else if (path.endsWith(".json")) {
-          tab.doc.document = JSON.parse(content);
+          tab.doc.document = JSON.parse(content) as JxMutableNode;
         }
         tab.doc.dirty = false;
       } catch {}

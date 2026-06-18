@@ -73,7 +73,7 @@ function handleNewDef(rerender: () => void) {
   showNewDef = false;
   newDefName = "";
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /** @param {() => void} rerender */
@@ -105,7 +105,7 @@ function handleAddField(rerender: () => void) {
   showAddField = false;
   newFieldState = { format: "", name: "", required: false, type: "string" };
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -124,7 +124,7 @@ function handleDeleteField(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -148,7 +148,7 @@ function handleToggleRequired(fieldName: string, rerender: () => void) {
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -173,7 +173,7 @@ function handleRenameField(oldName: string, newName: string, rerender: () => voi
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -193,7 +193,7 @@ function handleChangeType(fieldName: string, newType: string, rerender: () => vo
       : undefined;
   def.properties[fieldName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -211,7 +211,7 @@ function handleChangeFormat(fieldName: string, format: string, rerender: () => v
   const type = prop.type || "string";
   def.properties[fieldName] = schemaForType(type, format || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 // ─── Nested field handlers ───────────────────────────────────────────────────
@@ -247,7 +247,7 @@ function handleAddNestedField(
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -268,7 +268,7 @@ function handleDeleteNested(parentName: string, childName: string, rerender: () 
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -294,7 +294,7 @@ function handleToggleNestedRequired(parentName: string, childName: string, reren
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -326,7 +326,7 @@ function handleRenameNested(
   }
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -353,7 +353,7 @@ function handleChangeNestedType(
       : undefined;
   parent.properties[childName] = schemaForType(newType, oldFormat || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /**
@@ -378,7 +378,7 @@ function handleChangeNestedFormat(
   const type = prop.type || "string";
   parent.properties[childName] = schemaForType(type, format || undefined);
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 /** @param {() => void} rerender */
@@ -395,7 +395,7 @@ function handleDeleteDef(rerender: () => void) {
   selectedDef = null;
 
   rerender();
-  saveProjectConfig();
+  void saveProjectConfig();
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────

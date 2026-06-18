@@ -57,6 +57,6 @@ describe("Jx", () => {
     ) as any;
     const target = document.createElement("div");
     await Jx("http://example.com/test.json", target);
-    expect(target.children[0].tagName.toLowerCase()).toBe("article");
+    expect(target.children[0]!.tagName.toLowerCase()).toBe("article");
   });
 });

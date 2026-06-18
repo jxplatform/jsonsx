@@ -83,7 +83,7 @@ describe("buildStylebookElement", () => {
     const rootStyle = { li: { color: "blue" } };
     const el = buildStylebookElement(entry, rootStyle, null);
     expect(el.children.length).toBe(2);
-    expect(el.children[0].textContent).toBe("Item 1");
+    expect(el.children[0]!.textContent).toBe("Item 1");
     expect((el.children[0] as HTMLElement).style.color).toBe("blue");
   });
 });
@@ -228,6 +228,7 @@ describe("renderComponentPreview", () => {
   });
 
   test("npm component not registered → does not throw", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().resolves.toBeDefined() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for resolution.
     await expect(
       renderComponentPreview(/** @type {any} */ { source: "npm", tagName: "sl-nonexistent" }),
     ).resolves.toBeDefined();

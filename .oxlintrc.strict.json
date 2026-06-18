@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Type-aware ("strict") lint pass — run via `bun run lint:strict`
+  // (`oxlint --type-aware -c .oxlintrc.strict.json .`), and as its own CI step.
+  //
+  // Kept SEPARATE from .oxlintrc.json on purpose. `--type-aware` activates every
+  // type-aware rule that belongs to an enabled category, and the main config runs
+  // all categories at error — so reusing it would turn on the whole tsgolint
+  // surface (~15k hits, incl. the rules we deliberately reject). Here every
+  // category is "off" and we opt IN to exactly the Flow-soundness set: strict
+  // promise tracking + no `any`-typed values flowing across boundaries.
+  //
+  // Deliberately NOT enabled: no-unsafe-type-assertion (~thousands of idiomatic
+  // `as`/DOM casts), strict-boolean-expressions (fights the lit-html
+  // `cond && html` idiom), prefer-readonly-parameter-types, etc.
+  "categories": {
+    "correctness": "off",
+    "nursery": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "restriction": "off",
+    "style": "off",
+    "suspicious": "off"
+  },
+  "ignorePatterns": ["dist", "**/*.map", ".claude", "examples"],
+  "overrides": [
+    {
+      // Tests and dev scripts stub external shapes with `any` by design
+      // (no-explicit-any is off for them in .oxlintrc.json). The no-unsafe-*
+      // family is therefore src-only; promise safety still applies everywhere.
+      "files": ["**/tests/**/*.*", "**/*.test.*", "**/scripts/**/*.*"],
+      "rules": {
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-argument": "off"
+      }
+    }
+  ],
+  "plugins": ["typescript"],
+  "rules": {
+    "typescript/no-floating-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-argument": "error"
+  }
+}

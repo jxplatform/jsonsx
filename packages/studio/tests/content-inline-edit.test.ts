@@ -108,15 +108,15 @@ describe("onCommit", () => {
     enterInlineEdit(el, ["children", 0]);
     el.textContent = "Edited text";
     stopEditing();
-    expect(docChildren()[0].textContent).toBe("Edited text");
-    expect(docChildren()[0].children).toBeUndefined();
+    expect(docChildren()[0]!.textContent).toBe("Edited text");
+    expect(docChildren()[0]!.children).toBeUndefined();
     expect(tab.doc.dirty).toBe(true);
   });
 
   test("unchanged text does not touch the document", () => {
     enterInlineEdit(el, ["children", 0]);
     stopEditing();
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
     expect(tab.doc.dirty).toBe(false);
   });
 
@@ -125,8 +125,8 @@ describe("onCommit", () => {
     el.innerHTML = "Hello <strong>bold</strong>";
     stopEditing();
     const [node] = docChildren();
-    expect(node.textContent).toBeUndefined();
-    expect(node.children).toEqual(["Hello ", { tagName: "strong", textContent: "bold" }]);
+    expect(node!.textContent).toBeUndefined();
+    expect(node!.children).toEqual(["Hello ", { tagName: "strong", textContent: "bold" }]);
   });
 
   test("identical children commit is a no-op", () => {
@@ -152,7 +152,7 @@ describe("onSplit (Enter)", () => {
     );
     await flush();
 
-    expect(docChildren()[0].textContent).toBe("Hel");
+    expect(docChildren()[0]!.textContent).toBe("Hel");
     expect(docChildren()[1]).toEqual({ tagName: "p", textContent: "lo" });
     expect(docChildren().length).toBe(3);
     expect(tab.session.selection).toEqual(["children", 1]);
@@ -169,8 +169,8 @@ describe("onSplit (Enter)", () => {
     await flush();
 
     const [before] = docChildren();
-    expect(before.textContent).toBeUndefined();
-    expect(before.children).toEqual(["ab", { tagName: "em", textContent: "cd" }, "e"]);
+    expect(before!.textContent).toBeUndefined();
+    expect(before!.children).toEqual(["ab", { tagName: "em", textContent: "cd" }, "e"]);
     expect(docChildren()[1]).toEqual({ tagName: "p", textContent: "f" });
   });
 
@@ -181,7 +181,7 @@ describe("onSplit (Enter)", () => {
     );
     await flush();
 
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
     expect(docChildren()[1]).toEqual({ tagName: "p", textContent: "" });
   });
 });
@@ -226,8 +226,8 @@ describe("onInsert (slash menu)", () => {
     pressMenu("Enter");
     await flush();
 
-    expect(docChildren()[1].tagName).toBe("p");
-    expect(docChildren()[1].textContent).toBeUndefined();
+    expect(docChildren()[1]!.tagName).toBe("p");
+    expect(docChildren()[1]!.textContent).toBeUndefined();
   });
 
   test("a lone <br> counts as empty and swaps in place", async () => {
@@ -237,7 +237,7 @@ describe("onInsert (slash menu)", () => {
     pressMenu("Enter");
     await flush();
 
-    expect(docChildren()[1].tagName).toBe("h1");
+    expect(docChildren()[1]!.tagName).toBe("h1");
     expect(docChildren().length).toBe(2);
   });
 
@@ -249,7 +249,7 @@ describe("onInsert (slash menu)", () => {
     pressMenu("Enter"); // Heading 1
     await flush();
 
-    expect(docChildren()[0].textContent).toBe("hello ");
+    expect(docChildren()[0]!.textContent).toBe("hello ");
     expect(docChildren()[1]).toEqual({ tagName: "h1", textContent: "Heading" });
     expect(docChildren().length).toBe(3);
     expect(tab.session.selection).toEqual(["children", 1]);

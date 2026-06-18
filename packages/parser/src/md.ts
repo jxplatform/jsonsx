@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 import { basename, extname, resolve as resolvePath } from "node:path";
 import { globSync } from "glob";
 import { mdastNodeToJx } from "./transpile.ts";
-import type { MarkdownFileResult, MdastNode, TocEntry } from "./types.ts";
+import type { MarkdownFileResult, MdastNode, TocEntry, UnifiedProcessor } from "./types.ts";
 import type { JxElement } from "@jxsuite/schema/types";
 
 // ─── Tree utilities (inline to avoid Bun ESM resolution issues with unist-util-*) ──
@@ -153,7 +153,7 @@ export function processMarkdown(
     directiveOptions?: unknown;
   } = {},
 ) {
-  let processor = unified()
+  let processor = (unified as unknown as () => UnifiedProcessor)()
     .use(remarkParse)
     .use(remarkFrontmatter, ["yaml"])
     .use(remarkParseFrontmatter)
@@ -175,7 +175,7 @@ export function processMarkdown(
   const excerpt = extractExcerpt(tree);
   const slug = basename(filePath, extname(filePath));
 
-  const bodyNodes = tree.children.filter(
+  const bodyNodes = tree.children!.filter(
     (n: MdastNode) => n.type !== "yaml" && n.type !== "toml",
   ) as MdastNode[];
   const $children = bodyNodes.map((n: MdastNode) => mdastNodeToJx(n)).filter(Boolean) as (
@@ -280,7 +280,9 @@ export class MarkdownCollection {
     const resolved = basePath ? resolvePath(basePath, src) : src;
     // Normalize to forward slashes — glob requires POSIX paths on all platforms
     const pattern = resolved.split("\\").join("/");
-    const files = globSync(pattern, { absolute: true });
+    const files = (globSync as (p: string, o: { absolute: boolean }) => string[])(pattern, {
+      absolute: true,
+    });
 
     const results = files.map((filePath: string) => {
       const source = readFileSync(filePath, "utf8");

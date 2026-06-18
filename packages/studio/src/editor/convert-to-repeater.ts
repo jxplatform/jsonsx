@@ -110,7 +110,7 @@ async function promptRepeaterConfig(defs: Record<string, unknown>) {
 
   const fnDefs = Object.entries(defs).filter(([, d]) => defCategory(d) === "function");
 
-  let source = arrayDefs.length > 0 ? arrayDefs[0][0] : "__new__";
+  let source = arrayDefs.length > 0 ? arrayDefs[0]![0] : "__new__";
   let newDefName = "";
   let filterDef = "";
   let sortDef = "";

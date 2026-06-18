@@ -1467,10 +1467,10 @@ describe("prototype directive round-trip", () => {
     };
     const back = mdastToJx(jxToMdast(jx)) as JxElement;
     const [, arr] = back.children as JxElement[];
-    expect(arr.$prototype).toBe("Array");
-    expect(arr.tagName).toBeUndefined();
-    expect(arr.items).toEqual({ $ref: "#/state/rows" });
-    expect(arr.filter).toEqual({ $ref: "#/state/byDate" });
-    expect((arr.map as JxElement).tagName).toBe("li");
+    expect(arr!.$prototype).toBe("Array");
+    expect(arr!.tagName).toBeUndefined();
+    expect(arr!.items).toEqual({ $ref: "#/state/rows" });
+    expect(arr!.filter).toEqual({ $ref: "#/state/byDate" });
+    expect((arr!.map as JxElement).tagName).toBe("li");
   });
 });

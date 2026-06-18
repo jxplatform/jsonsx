@@ -137,7 +137,7 @@ describe("renderDataTreeTemplate", () => {
     const el = await renderTree(Array.from({ length: 25 }, (_, i) => i));
     const branches = el.querySelectorAll(".data-branch");
     expect(branches.length).toBe(20);
-    expect(branches[0].querySelector(".data-key")?.textContent).toContain("[0]");
+    expect(branches[0]!.querySelector(".data-key")?.textContent).toContain("[0]");
     expect(el.querySelector(".data-ellipsis")?.textContent).toContain("5 more");
   });
 

@@ -189,8 +189,7 @@ export async function buildSite(
   }
 
   // ── 5b. Collect server entries from components (for site-wide bundling) ──
-  /** @type {{ exportName: string; src: string }[]} */
-  const siteServerEntries = [];
+  const siteServerEntries: { exportName: string; src: string }[] = [];
   if (projectConfig.build.adapter) {
     for (const [, doc] of componentDefs) {
       const entries = collectServerEntries(doc);
@@ -208,8 +207,7 @@ export async function buildSite(
 
   const cfImages = projectConfig.images.optimize && projectConfig.images.service === "cloudflare";
   const imageCache = projectConfig.images.optimize && !cfImages ? loadCache(projectRoot) : null;
-  /** @type {import("./image-transform.ts").ImageMetaCache | null} */
-  const imageMetaCache = cfImages ? new Map() : null;
+  const imageMetaCache: ImageMetaCache | null = cfImages ? new Map() : null;
   if (cfImages) {
     console.log(
       `images.service is "cloudflare" — srcsets use /cdn-cgi/image transform URLs. ` +
@@ -275,7 +273,7 @@ export async function buildSite(
             mode: "export",
           })) as string;
           if (content) {
-            const sidecarPath = outPath.replace(/\.html$/, fmt.extensions[0]);
+            const sidecarPath = outPath.replace(/\.html$/, fmt.extensions[0]!);
             writeFileSync(sidecarPath, content, "utf8");
             fileCount += 1;
           }
@@ -327,7 +325,7 @@ export async function buildSite(
     const { adapter } = projectConfig.build;
     log("Generating site-wide server worker...");
 
-    const deduped = new Map();
+    const deduped = new Map<string, { exportName: string; src: string }>();
     for (const entry of siteServerEntries) {
       if (!deduped.has(entry.exportName)) {
         deduped.set(entry.exportName, entry);
@@ -461,7 +459,7 @@ async function compilePage(
   // Determine the page title — resolve template strings against the scope
   let title = pageTitle ?? projectConfig.name ?? "Jx Site";
   if (typeof title === "string" && isTemplateString(title)) {
-    title = evaluateStaticTemplate(title, scope) ?? (title as string);
+    title = (evaluateStaticTemplate(title, scope) as string | null) ?? (title as string);
   }
 
   // Resolve template strings in $head entries
@@ -596,14 +594,16 @@ function resolveHeadTemplates(headEntries: JxHeadEntry[], scope: Record<string, 
       resolved.attributes = { ...resolved.attributes };
       for (const [k, v] of Object.entries(resolved.attributes)) {
         if (typeof v === "string" && isTemplateString(v)) {
-          resolved.attributes[k] = evaluateStaticTemplate(v, scope) ?? (v as string | boolean);
+          resolved.attributes[k] =
+            (evaluateStaticTemplate(v, scope) as string | boolean | null) ??
+            (v as string | boolean);
         }
       }
     }
     if (typeof resolved.textContent === "string" && isTemplateString(resolved.textContent)) {
       resolved.textContent =
-        evaluateStaticTemplate(resolved.textContent, scope) ??
-        (resolved.textContent as string | undefined);
+        (evaluateStaticTemplate(resolved.textContent, scope) as string | null) ??
+        resolved.textContent;
     }
     return resolved;
   });
@@ -663,11 +663,11 @@ function expandMapTemplate(template: JxElement, scope: Record<string, unknown>):
   const node = {} as JxElement;
   for (const [k, v] of Object.entries(template)) {
     if (k === "children" && Array.isArray(v)) {
-      node.children = v.map((child) => {
+      node.children = (v as (string | JxElement)[]).map((child) => {
         if (typeof child === "string") {
           return child;
         }
-        return expandMapTemplate(/** @type {JxMutableNode} */ child, scope);
+        return expandMapTemplate(child, scope);
       });
     } else if (k === "style" && v && typeof v === "object") {
       const style: JxStyle = { ...(v as JxStyle) };
@@ -719,10 +719,26 @@ function evaluateMapTemplate(str: string, scope: Record<string, unknown>) {
     const index = (scope.$map as Record<string, unknown>)?.index;
     const singleExprMatch = str.match(/^\$\{(.+)\}$/s);
     if (singleExprMatch) {
-      const fn = new Function("state", "$map", "item", "index", `return (${singleExprMatch[1]})`);
+      const fn = new Function(
+        "state",
+        "$map",
+        "item",
+        "index",
+        `return (${singleExprMatch[1]})`,
+      ) as (
+        state: Record<string, unknown>,
+        $map: unknown,
+        item: unknown,
+        index: unknown,
+      ) => unknown;
       return fn(scope, scope.$map, item, index);
     }
-    const fn = new Function("state", "$map", "item", "index", `return \`${str}\``);
+    const fn = new Function("state", "$map", "item", "index", `return \`${str}\``) as (
+      state: Record<string, unknown>,
+      $map: unknown,
+      item: unknown,
+      index: unknown,
+    ) => unknown;
     return fn(scope, scope.$map, item, index);
   } catch {
     return null;
@@ -752,26 +768,29 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
   }
   if (typeof node.textContent === "string" && isTemplateString(node.textContent)) {
     node.textContent =
-      evaluateStaticTemplate(node.textContent, scope) ?? (node.textContent as string | null);
+      (evaluateStaticTemplate(node.textContent, scope) as string | null) ??
+      (node.textContent as string | null);
   }
   if (node.style && typeof node.style === "object") {
     for (const [k, v] of Object.entries(node.style)) {
       if (typeof v === "string" && isTemplateString(v)) {
-        node.style[k] = evaluateStaticTemplate(v, scope) ?? (v as string | number | JxStyle);
+        node.style[k] =
+          (evaluateStaticTemplate(v, scope) as string | number | JxStyle | undefined) ??
+          (v as string | number | JxStyle);
       }
     }
   }
   if (node.attributes && typeof node.attributes === "object") {
     for (const [k, v] of Object.entries(node.attributes)) {
       if (typeof v === "string" && isTemplateString(v)) {
-        node.attributes[k] = evaluateStaticTemplate(v, scope) ?? v;
+        node.attributes[k] = (evaluateStaticTemplate(v, scope) as JxAttributeValue | null) ?? v;
       }
     }
   }
   if (node.$props && typeof node.$props === "object") {
     for (const [k, v] of Object.entries(node.$props)) {
       if (typeof v === "string" && isTemplateString(v)) {
-        node.$props[k] = evaluateStaticTemplate(v, scope) ?? v;
+        node.$props[k] = (evaluateStaticTemplate(v, scope) as JsonValue | null) ?? v;
       }
     }
   }
@@ -796,7 +815,7 @@ function resolveDocTemplates(node: JxElement | string, scope: Record<string, unk
   } else if (Array.isArray(node.children)) {
     let i = 0;
     while (i < node.children.length) {
-      const child = node.children[i];
+      const child = node.children[i]!;
       if (typeof child === "string" && isTemplateString(child)) {
         const resolved = evaluateStaticTemplate(child, scope);
         if (Array.isArray(resolved)) {
@@ -837,7 +856,7 @@ function expandMappedArrayStatic(
   scope: Record<string, unknown>,
 ): (JxElement | string)[] | null {
   const itemsSrc = arrayDef.items;
-  let items = null;
+  let items: unknown = null;
   if (isRef(itemsSrc)) {
     items = resolveRefValue(itemsSrc.$ref, scope);
   } else if (Array.isArray(itemsSrc)) {
@@ -847,8 +866,8 @@ function expandMappedArrayStatic(
   if (!Array.isArray(items) || !mapTemplate) {
     return null;
   }
-  return items.map((item, index) => {
-    const childScope = Object.create(scope);
+  return (items as unknown[]).map((item: unknown, index) => {
+    const childScope = Object.create(scope) as Record<string, unknown>;
     childScope.$map = { index, item };
     childScope["$map/item"] = item;
     childScope["$map/index"] = index;
@@ -883,7 +902,7 @@ function expandComponents(
     return;
   }
   if (Array.isArray(node)) {
-    for (const n of node) {
+    for (const n of node as (JxElement | string)[]) {
       expandComponents(n, componentDefs, slotCss);
     }
     return;
@@ -1042,11 +1061,11 @@ function injectHead(html: string, headEntries: JxHeadEntry[], lang: string) {
   const existingMatch = html.match(headPattern);
   let preservedBlocks = "";
   if (existingMatch) {
-    const styles = existingMatch[1].match(/<style>[\s\S]*?<\/style>/gi);
+    const styles = existingMatch[1]!.match(/<style>[\s\S]*?<\/style>/gi);
     if (styles) {
       preservedBlocks += `\n  ${styles.join("\n  ")}`;
     }
-    const scripts = existingMatch[1].match(/<script[\s\S]*?<\/script>/gi);
+    const scripts = existingMatch[1]!.match(/<script[\s\S]*?<\/script>/gi);
     if (scripts) {
       preservedBlocks += `\n  ${scripts.join("\n  ")}`;
     }

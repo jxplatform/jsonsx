@@ -155,7 +155,7 @@ const server = Bun.serve({
     async message(ws, raw) {
       let msg: { id: number; method: string; params?: unknown };
       try {
-        msg = JSON.parse(raw as string);
+        msg = JSON.parse(raw as string) as { id: number; method: string; params?: unknown };
       } catch {
         ws.send(JSON.stringify({ error: "Invalid JSON", id: 0 }));
         return;

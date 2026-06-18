@@ -88,7 +88,7 @@ describe("mutator op recording", () => {
     const log = installConsumer();
     transactDoc(tab, mutation);
     expect(log.classified.length).toBe(1);
-    return log.classified[0];
+    return log.classified[0]!;
   }
 
   test("mutateUpdateStyle → set-style", () => {
@@ -119,7 +119,7 @@ describe("mutator op recording", () => {
 
   test("mutateUpdateProperty deleting an event binding keeps isEvent via the previous value", () => {
     transact(tab, (doc) => {
-      const [first] = doc.children as Record<string, unknown>[];
+      const first = (doc.children as Record<string, unknown>[])[0]!;
       first["onclick"] = { $ref: "#/state/handler" };
     });
     const ops = opsFor((t) => mutateUpdateProperty(t, ["children", 0], "onclick"));
@@ -217,7 +217,7 @@ describe("transactDoc consumer wiring", () => {
     expect(
       (
         (toRaw(tab.doc.document) as Record<string, unknown>).children as Record<string, unknown>[]
-      )[0].style,
+      )[0]!.style,
     ).toEqual({ color: "blue" });
   });
 });
