@@ -65,6 +65,7 @@ function makeSession(initialRoot: string | null) {
     handleCreateDirectory: mock(async () => {}),
     handleUploadFile: mock(async () => {}),
     handleResolveSiteContext: mock(async () => ({ sitePath: null })),
+    listDirectory: mock(async () => []),
     discoverComponents: mock(async () => []),
     codeService: mock(async () => null),
     locateFile: mock(async () => null),
@@ -73,10 +74,13 @@ function makeSession(initialRoot: string | null) {
     jxServerFunction: mock(async () => ({ body: "{}", status: 200 })),
     listFormats: mock(async () => []),
     formatAction: mock(async () => ({})),
-    openProject: mock(async () => ({
-      config: { name: "Proj" },
-      handle: { name: "Proj", projectConfig: {}, root: "." },
-    })),
+    openProject: mock(async () => {
+      root = "/proj/opened";
+      return {
+        config: { name: "Proj" },
+        handle: { name: "Proj", projectConfig: {}, root: "." },
+      };
+    }),
   };
   sessions.push(s);
   return s;
@@ -138,12 +142,14 @@ mock.module("../src/updater", () => ({
 
 const createSession = mock((_root: string, _msg: string, _opts: unknown) => ({ id: "sess-1" }));
 const deleteSession = mock((_id: string) => {});
+const sendMessage = mock((_id: string, _msg: string) => {});
+const stopSession = mock((_id: string) => {});
 mock.module("@jxsuite/server/claude-session", () => ({
   createSession,
   deleteSession,
   getAuthStatus: mock(async () => ({ authenticated: true })),
-  sendMessage: mock(() => {}),
-  stopSession: mock(() => {}),
+  sendMessage,
+  stopSession,
 }));
 
 // ─── Import module under test ────────────────────────────────────────────────
@@ -243,6 +249,67 @@ describe("per-window RPC", () => {
     expect(pkg.addPackage).toHaveBeenCalledWith({ name: "p" });
   });
 
+  test("delegates every remaining file/git/package/updater request handler", async () => {
+    openProjectWindow("/proj/sweep");
+    const reqs = lastRequests();
+    const session = sessions.at(-1)!;
+    const git = gitInstances.at(-1)!;
+    const pkg = pkgInstances.at(-1)!;
+
+    // File / project handlers (each forwards to the window's session).
+    await reqs.readFileAsDataUrl({ path: "a.png" } as never);
+    await reqs.deleteFile({ path: "a.json" } as never);
+    await reqs.renameFile({ from: "a", to: "b" } as never);
+    await reqs.createDirectory({ path: "d" } as never);
+    await reqs.uploadFile({ data: "x", path: "p" } as never);
+    await reqs.resolveSiteContext({ filePath: "pages/a.json" } as never);
+    await reqs.listDirectory({ dir: "src" } as never);
+    await reqs.discoverComponents({} as never);
+    await reqs.codeService({ action: "lint", payload: {} } as never);
+    await reqs.locateFile({ name: "x.json" } as never);
+    await reqs.fetchPluginSchema({ src: "m.js" } as never);
+    await reqs.formatAction({ action: "parse", format: "md" } as never);
+    await reqs.jxResolve({ body: "{}" } as never);
+    await reqs.jxServerFunction({ body: "{}" } as never);
+    await reqs.listFormats();
+    expect(session.handleDeleteFile).toHaveBeenCalledWith({ path: "a.json" });
+    expect(session.listDirectory).toHaveBeenCalledWith({ dir: "src" });
+    expect(session.listFormats).toHaveBeenCalledTimes(1);
+
+    // Git handlers.
+    await reqs.gitBranches();
+    await reqs.gitLog({ limit: 5 } as never);
+    await reqs.gitStage({ files: ["a"] } as never);
+    await reqs.gitUnstage({ files: ["a"] } as never);
+    await reqs.gitCommit({ message: "m" } as never);
+    await reqs.gitPush({} as never);
+    await reqs.gitPull();
+    await reqs.gitFetch();
+    await reqs.gitCheckout({ branch: "dev" } as never);
+    await reqs.gitCreateBranch({ name: "f" } as never);
+    await reqs.gitDiff({} as never);
+    await reqs.gitDiscard({ files: ["a"] } as never);
+    await reqs.gitInit();
+    await reqs.gitAddRemote({ name: "origin", url: "u" } as never);
+    expect(git.gitBranches).toHaveBeenCalledTimes(1);
+    expect(git.gitCommit).toHaveBeenCalledWith({ message: "m" });
+
+    // Package handlers.
+    await reqs.listPackages();
+    await reqs.removePackage({ name: "lodash" } as never);
+    expect(pkg.listPackages).toHaveBeenCalledTimes(1);
+
+    // Process-shared handlers.
+    expect(await reqs.aiAuthStatus()).toEqual({ authenticated: true } as never);
+    expect(reqs.updaterApplyUpdate()).toBe("apply");
+    expect(reqs.updaterCheckForUpdate()).toBe("check");
+    expect(reqs.updaterDownloadUpdate()).toBe("download");
+    expect(reqs.updaterGetLocalInfo()).toBe("local");
+    expect(reqs.updaterGetStatus()).toBe("status");
+    const open = reqs.listOpenWindows() as { id: number; projectRoot: string | null }[];
+    expect(open.some((w) => w.projectRoot === "/proj/sweep")).toBe(true);
+  });
+
   test("window controls target this window and maximize toggles", () => {
     const win = openProjectWindow("/proj/controls") as unknown as MockWindow;
     const reqs = lastRequests();
@@ -327,6 +394,50 @@ describe("disposeWindow", () => {
   });
 });
 
+// ─── AI session request handlers ────────────────────────────────────────────
+
+describe("AI session request handlers", () => {
+  test("aiCreateSession throws when the window has no project open", () => {
+    openProjectWindow(null);
+    const reqs = lastRequests();
+    expect(() => reqs.aiCreateSession({ message: "hi" } as never)).toThrow("No project open");
+  });
+
+  test("aiSendMessage / aiStopSession / aiDeleteSession delegate to claude-session", () => {
+    openProjectWindow("/proj/ai-ops");
+    const reqs = lastRequests();
+    reqs.aiCreateSession({ message: "hi" } as never); // Records sess-1
+
+    reqs.aiSendMessage({ id: "sess-1", message: "yo" } as never);
+    expect(sendMessage).toHaveBeenCalledWith("sess-1", "yo");
+
+    reqs.aiStopSession({ id: "sess-1" } as never);
+    expect(stopSession).toHaveBeenCalledWith("sess-1");
+
+    reqs.aiDeleteSession({ id: "sess-1" } as never);
+    expect(deleteSession).toHaveBeenCalledWith("sess-1");
+  });
+});
+
+// ─── openProject request handler ─────────────────────────────────────────────
+
+describe("openProject request handler", () => {
+  test("opens a project, binds the root and updates the window title", async () => {
+    const win = openProjectWindow(null) as unknown as MockWindow;
+    const reqs = lastRequests();
+    const session = sessions.at(-1)!;
+
+    const result = await reqs.openProject();
+    expect(session.openProject).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      config: { name: "Proj" },
+      handle: { name: "Proj", projectConfig: {}, root: "." },
+    } as never);
+    expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/opened");
+    expect(win.setTitle).toHaveBeenLastCalledWith(`opened ${DASH} Jx Studio`);
+  });
+});
+
 // ─── Broadcast ──────────────────────────────────────────────────────────────
 
 describe("broadcastUpdateReady", () => {
@@ -355,5 +466,8 @@ describe("parseProjectDirFromUrl", () => {
   });
   test("returns null for non-file protocols", () => {
     expect(parseProjectDirFromUrl("https://example.com/project.json")).toBeNull();
+  });
+  test("returns null when the url cannot be parsed", () => {
+    expect(parseProjectDirFromUrl("::::not a valid url")).toBeNull();
   });
 });

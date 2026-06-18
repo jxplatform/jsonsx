@@ -86,6 +86,7 @@ const platform = createDesktopPlatform();
 const assetResponses: Record<string, () => string> = {
   "assets/pic.png": () => "data:image/png;base64,SU1H",
   "bg/tile.png": () => "data:image/png;base64,Qkc=",
+  "deep/backdrop.png": () => "data:image/png;base64,REVFUEJH",
   "deep/inner.png": () => "data:image/png;base64,TkVTVA==",
   "empty/none.png": () => "",
   "fail/err.png": () => {
@@ -118,6 +119,11 @@ const wrap = document.createElement("div");
 const innerImg = document.createElement("img");
 innerImg.setAttribute("src", "deep/inner.png");
 wrap.append(innerImg);
+// A styled child nested in an added subtree exercises the querySelectorAll("[style]") branch.
+const styleWrap = document.createElement("div");
+const styleChild = document.createElement("div");
+styleChild.setAttribute("style", "background-image: url('deep/backdrop.png')");
+styleWrap.append(styleChild);
 const bgDiv = document.createElement("div");
 bgDiv.setAttribute("style", "background-image: url('./bg/tile.png')");
 const bgHttpDiv = document.createElement("div");
@@ -141,6 +147,7 @@ document.body.append(
   imgViews,
   video,
   wrap,
+  styleWrap,
   bgDiv,
   bgHttpDiv,
   emptyImg,
@@ -397,6 +404,8 @@ describe("platform methods", () => {
     ["aiAuthStatus", [], "aiAuthStatus", undefined],
     ["aiCreateSession", [{ message: "hi" }], "aiCreateSession", { message: "hi" }],
     ["aiStreamUrl", ["sess-1"], "aiStreamUrl", { id: "sess-1" }],
+    ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
+    ["getProjectRoot", [], "getProjectRoot", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -430,6 +439,8 @@ describe("platform methods", () => {
     ["aiSendMessage", ["sess-1", "hello"], "aiSendMessage", { id: "sess-1", message: "hello" }],
     ["aiStopSession", ["sess-1"], "aiStopSession", { id: "sess-1" }],
     ["aiDeleteSession", ["sess-1"], "aiDeleteSession", { id: "sess-1" }],
+    ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
+    ["newWindow", [], "newWindow", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of voidDelegations) {
@@ -573,6 +584,11 @@ describe("asset resolution via MutationObserver", () => {
   test("resolves nested children of an added subtree", async () => {
     await flush();
     expect(innerImg.getAttribute("src")).toBe("data:image/png;base64,TkVTVA==");
+  });
+
+  test("resolves background images on styled children of an added subtree", async () => {
+    await flush();
+    expect(styleChild.style.backgroundImage).toContain("data:image/png;base64,REVFUEJH");
   });
 
   test("rewrites style background-image url", async () => {
