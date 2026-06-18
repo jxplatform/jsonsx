@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  // Type-aware ("strict") lint pass — run via `bun run lint:strict`
+  // Type-aware ("strict") lint pass — run via `bun run lint:typecheck`
   // (`oxlint --type-aware -c .oxlintrc.strict.json .`), and as its own CI step.
   //
   // Kept SEPARATE from .oxlintrc.json on purpose. `--type-aware` activates every

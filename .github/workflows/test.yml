@@ -148,4 +148,4 @@ jobs:
       - run: bun run typecheck
       # Type-aware (tsgolint) pass — Flow-soundness rules in .oxlintrc.strict.json.
       # The tsgolint binary ships with the oxlint-tsgolint dev dep (installed above).
-      - run: bun run lint:strict
+      - run: bun run lint:typecheck

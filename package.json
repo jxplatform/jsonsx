@@ -30,7 +30,7 @@
     "generate:schema": "bun run --cwd packages/schema schema",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
-    "lint:strict": "oxlint --type-aware -c .oxlintrc.strict.json .",
+    "lint:typecheck": "oxlint --type-aware -c .oxlintrc.typecheck.json .",
     "pack": "bun run --workspaces bun pm pack",
     "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
