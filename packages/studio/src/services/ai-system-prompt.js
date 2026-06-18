@@ -221,15 +221,28 @@ Be concise. Don't explain what Jx is unless asked. Just build.`,
   sections.push(`## Error Recovery
 
 If a tool call fails (returns { success: false }):
-1. Read the error message carefully — it tells you exactly what went wrong.
-2. Correct your arguments based on the error.
-3. Re-issue the corrected tool call.
-4. If you can't figure out what went wrong after 2 attempts, ask the user for clarification.
+1. Read the error message carefully — it includes a "→ Fix:" hint telling you exactly how to correct the error.
+2. Each error points to a specific path in the document and a specific rule violation.
+3. Apply the suggested fix using set_property, remove_node, or add_child as appropriate.
+4. Do NOT re-issue the exact same tool call with the same arguments — you must CHANGE something.
+5. If you see the SAME error after 2 attempts, try a completely different approach (e.g., remove and re-add the node instead of patching it).
 
-Common errors and fixes:
-- "introduced schema errors" → your edit produced invalid Jx. Common causes: a custom element tagName without a hyphen (use "site-header", not "header"); a style given as a CSS string instead of a camelCase object; a non-IDL attribute (aria-*, data-*, role) placed outside the attributes object. Read the listed errors and correct them.
-- "No node exists at path" → use read_document to check the current structure, then use the correct path.
-- "Validation failed: Missing required argument X" → check the tool's parameter schema and include the missing argument.`);
+### Common validation errors and their fixes:
+
+| Error pattern | What happened | How to fix |
+|---|---|---|
+| "must NOT have additional property" in style | You used a non-camelCase CSS property (e.g. "background-color") or put an HTML attribute directly on the element. | Use camelCase: "backgroundColor". Put aria-*, data-*, role, and other non-IDL attributes inside the "attributes" object: { "attributes": { "aria-label": "..." } } |
+| "must match pattern" on tagName | A custom element tag name doesn't contain a hyphen. | Add a hyphen: "newsletter-form" not "newsletter". Standard HTML elements use their exact name ("div", "p", "input"). |
+| "must be string" | A value is an unquoted number, boolean, or bare word. | Wrap the value in quotes: "10px" not 10px. All CSS values and text must be strings. |
+| "must be number" / "must be integer" | A numeric field (like index, tabIndex) is wrapped in quotes. | Remove the quotes: use 0 not "0". |
+| "must have required property" | A required field is missing from the node. | Add the missing property. Every element must have "tagName". |
+| "must be object" | A field that expects an object (like style or attributes) received a string or other type. | Use {} not a string. |
+| "No node exists at path" | The path you provided doesn't point to an existing node. | Call read_document first to see the current structure and valid paths, then use the correct path. |
+
+### If you keep getting errors:
+- Call read_document again — the document may have changed since you last read it.
+- Remove the problematic node entirely with remove_node, then re-create it correctly with add_child.
+- If the error message points to a different path than you expected, the node might have moved due to previous edits.`);
 
   return sections.join("\n\n---\n\n");
 }

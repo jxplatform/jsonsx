@@ -418,9 +418,22 @@ export function createProxyStreamingClient({ chatUrl, model = "gpt-4o", apiKey, 
       } catch {
         /* Ignore */
       }
+      // Try to extract a clean message from JSON error bodies (e.g. the proxy's
+      // { error: "..." } shape or OpenAI's { error: { message: "..." } }).
+      let cleanMessage = errorBody || response.statusText;
+      try {
+        const parsed = JSON.parse(errorBody);
+        if (typeof parsed.error === "string") {
+          cleanMessage = parsed.error;
+        } else if (parsed.error?.message) {
+          cleanMessage = parsed.error.message;
+        }
+      } catch {
+        /* Not JSON — use the raw body. */
+      }
       yield {
         type: "error",
-        message: `API error ${response.status}: ${errorBody || response.statusText}`,
+        message: cleanMessage,
         code: String(response.status),
       };
       return;

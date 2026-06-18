@@ -117,7 +117,7 @@ describe("ai agent loop — integration", () => {
 
     expect(client.calls()).toBe(5); // MAX_ROUNDS
     expect(chatState.status).toBe("error");
-    expect(chatState.error).toContain("several attempts");
+    expect(chatState.error).toContain("wasn't able");
     disposeTab(tab);
   });
 });

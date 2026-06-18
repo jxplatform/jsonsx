@@ -166,9 +166,23 @@ export async function handleChat(req) {
         } catch {
           /* Ignore */
         }
+        // Parse the upstream JSON error body (OpenAI returns { error: { message: "..." } },
+        // while some compatible providers return { error: "..." }). Extract a clean message
+        // instead of embedding the raw JSON in the error text.
+        let cleanMessage = errorBody || response.statusText;
+        try {
+          const parsed = JSON.parse(errorBody);
+          if (typeof parsed.error === "string") {
+            cleanMessage = parsed.error;
+          } else if (parsed.error?.message) {
+            cleanMessage = parsed.error.message;
+          }
+        } catch {
+          /* Not JSON — use the raw body. */
+        }
         writeSSE(controller, {
           type: "error",
-          message: `API error ${response.status}: ${errorBody || response.statusText}`,
+          message: cleanMessage,
           code: String(response.status),
         });
         controller.close();

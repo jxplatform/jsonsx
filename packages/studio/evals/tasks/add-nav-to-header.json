@@ -1,0 +1,14 @@
+{
+  "id": "add-nav-to-header",
+  "prompt": "Add a navigation bar to this header with two links: Home (href /) and About (href /about).",
+  "tags": ["intent", "add_child"],
+  "intent": [
+    "adds a nav element inside the header",
+    "two anchor links with textContent Home and About",
+    "hrefs are / and /about"
+  ],
+  "initialDoc": {
+    "tagName": "site-header",
+    "children": [{ "tagName": "h1", "textContent": "My Site" }]
+  }
+}

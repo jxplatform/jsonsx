@@ -354,6 +354,9 @@ export async function createDevServer(options: {
     },
 
     port,
+    // Keep SSE connections alive — heartbeats are every 15 s, and AI streaming/
+    // Claude auth checks can take 30+ s. Default 10 s kills them prematurely.
+    idleTimeout: 120,
   });
 
   console.log(`\n@jxsuite/server listening on http://localhost:${server.port}`);

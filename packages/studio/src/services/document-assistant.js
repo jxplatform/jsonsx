@@ -52,24 +52,24 @@ export function createDocumentAssistant() {
       return;
     }
 
-    const plat = getPlatform();
-    const chatUrl = await Promise.resolve(plat.aiChatUrl());
-    // Re-read the persisted model each send: the session is constructed once at module load
-    // (before the user sets a key/model), so the picker's choice must be picked up here.
-    chatState.setModel(getModel());
-    const streamingClient = createProxyStreamingClient({
-      chatUrl,
-      model: chatState.model,
-      // Sent as X-Api-Key; the proxy falls back to the server's OPENAI_API_KEY when empty.
-      apiKey: getOpenAiKey() || undefined,
-      // Optional OpenAI-compatible endpoint override; empty uses the proxy default.
-      baseUrl: getBaseUrl() || undefined,
-    });
-
     chatState.sendMessage(text);
 
-    controller = new AbortController();
     try {
+      const plat = getPlatform();
+      const chatUrl = await Promise.resolve(plat.aiChatUrl());
+      // Re-read the persisted model each send: the session is constructed once at module load
+      // (before the user sets a key/model), so the picker's choice must be picked up here.
+      chatState.setModel(getModel());
+      const streamingClient = createProxyStreamingClient({
+        chatUrl,
+        model: chatState.model,
+        // Sent as X-Api-Key; the proxy falls back to the server's OPENAI_API_KEY when empty.
+        apiKey: getOpenAiKey() || undefined,
+        // Optional OpenAI-compatible endpoint override; empty uses the proxy default.
+        baseUrl: getBaseUrl() || undefined,
+      });
+
+      controller = new AbortController();
       await runAgentLoop({
         chatState,
         streamingClient,
@@ -77,6 +77,10 @@ export function createDocumentAssistant() {
         systemPrompt: buildPrompt(),
         signal: controller.signal,
       });
+    } catch (error) {
+      // Synchronous failure (e.g. platform not registered, network unreachable before
+      // the stream starts). Set the error so the panel can display it.
+      chatState.setError(error instanceof Error ? error.message : String(error));
     } finally {
       controller = null;
     }

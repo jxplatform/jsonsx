@@ -29,6 +29,9 @@ export async function runAgentLoop({
   systemPrompt,
   signal,
 }) {
+  /** @type {string[]} */
+  const allErrors = [];
+
   for (let round = 1; round <= MAX_ROUNDS; round++) {
     const messages = chatState.toMessagesArray();
     const tools = toolRegistry.listForLLM();
@@ -97,6 +100,9 @@ export async function runAgentLoop({
           error: `Failed to parse arguments: ${/** @type {Error} */ (error).message}`,
         };
       }
+      if (!result.success && result.error) {
+        allErrors.push(result.error);
+      }
       chatState.appendToolResult(id, result);
       chatState.pushToolResultMessage(id, JSON.stringify(result));
     }
@@ -106,7 +112,14 @@ export async function runAgentLoop({
     }
   }
 
+  // Surface the actual errors so the user knows what went wrong, not just a
+  // generic "I couldn't do it" message.
+  const uniqueErrors = [...new Set(allErrors)];
+  const detail =
+    uniqueErrors.length > 0
+      ? `\n\nErrors encountered:\n${uniqueErrors.map((e) => `- ${e}`).join("\n")}`
+      : "";
   chatState.setError(
-    "I wasn't able to complete this change after several attempts. You can try rephrasing your request.",
+    `I wasn't able to complete this change after ${MAX_ROUNDS} attempts.${detail}\n\nYou can try rephrasing your request or manually fixing the errors above.`,
   );
 }

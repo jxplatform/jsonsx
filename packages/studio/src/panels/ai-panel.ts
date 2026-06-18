@@ -358,12 +358,24 @@ function renderKeyGate() {
 // ─── Stack B (document assistant) rendering ─────────────────────────────────
 
 /** Send a message through the Stack B document assistant agent loop. */
-function handleAssistantSend(text: string) {
+async function handleAssistantSend(text: string) {
   if (!text.trim() || assistant.chatState.status === "streaming") {
     return;
   }
   chatInstance?.inputAreaSetEnabled(false);
-  void assistant.sendMessage(text);
+  try {
+    await assistant.sendMessage(text);
+  } catch {
+    // Synchronous failure (e.g. network unreachable) — the DocumentAssistant's
+    // Own try/catch calls chatState.setError(), which watchAssistant() displays.
+    // Re-enable input here as a safety net.
+  }
+  // Always re-enable input after the send attempt completes (or fails).
+  // WatchAssistant() also re-enables it when status !== "streaming", but if
+  // The assistant threw before chatState entered "streaming", we need this.
+  if (assistant.chatState.status !== "streaming") {
+    chatInstance?.inputAreaSetEnabled(true);
+  }
 }
 
 /** Render a single finalized chat-state message into QuikChat. */
@@ -460,7 +472,13 @@ function watchAssistant() {
         assistantStreamedLen = 0;
         chatInstance.inputAreaSetEnabled(true);
         if (cs.error) {
-          chatInstance.messageAddNew(`Error: ${cs.error}`, "", "left", "assistant");
+          const advice = formatErrorAdvice(cs.error);
+          chatInstance.messageAddNew(
+            `❌ ${cs.error}${advice ? `\n\n${advice}` : ""}`,
+            "",
+            "left",
+            "assistant",
+          );
         }
       }
     });
@@ -481,6 +499,30 @@ function formatAssistantToolLabel(tc: { name: string; arguments: string }) {
     /* Partial/unparsed args — show name only */
   }
   return `🔧 ${tc.name}${detail}`;
+}
+
+/**
+ * Return actionable advice for common AI assistant errors so the user knows how to recover instead
+ * of just seeing a raw error message.
+ *
+ * @param {string} error
+ * @returns {string}
+ */
+function formatErrorAdvice(error: string) {
+  const lower = error.toLowerCase();
+  if (lower.includes("no api key") || lower.includes("401")) {
+    return "Click the 🔑 button in the toolbar to add an OpenAI-compatible API key.";
+  }
+  if (lower.includes("network error") || lower.includes("fetch")) {
+    return "Check that the dev server is running and reachable.";
+  }
+  if (lower.includes("429") || lower.includes("rate limit")) {
+    return "The API rate limit was hit. Wait a moment and try again.";
+  }
+  if (lower.includes("500") || lower.includes("internal")) {
+    return "The upstream API returned a server error. Try again in a moment.";
+  }
+  return "";
 }
 
 function replayMessages() {

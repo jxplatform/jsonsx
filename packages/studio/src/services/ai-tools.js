@@ -24,6 +24,60 @@ const PATH_DESCRIPTION =
   '(e.g. ["children", 0, "children", 1]). Use read_document to discover valid paths.';
 
 /**
+ * Translate a raw JSON Schema validation error into a Jx-specific actionable message. The LLM needs
+ * concrete guidance on HOW to fix errors, not just what rule was violated.
+ *
+ * @param {string} rawError - Message from ajv (e.g. "/children/0/style: must NOT have additional
+ *   property")
+ * @returns {string}
+ */
+function translateValidationError(rawError) {
+  const lower = rawError.toLowerCase();
+
+  // Additional property — extract the offending key from the message if present
+  if (
+    lower.includes("must not have additional property") ||
+    lower.includes("additional properties")
+  ) {
+    return `${rawError}\n  → Fix: Remove or move the unexpected property. Style properties must be camelCase (e.g. "backgroundColor", not "background-color"). Non-IDL HTML attributes (aria-*, data-*, role, ...) must go inside an "attributes" object: { "attributes": { "aria-label": "..." } }.`;
+  }
+
+  // Pattern — usually tagName hyphen rule
+  if (lower.includes("must match pattern")) {
+    return `${rawError}\n  → Fix: Custom element tag names must contain a hyphen (e.g. "newsletter-form", "feature-card"). Standard HTML elements use their exact name (e.g. "div", "input", "button").`;
+  }
+
+  // Type error
+  if (lower.includes("must be string")) {
+    return `${rawError}\n  → Fix: Wrap the value in quotes — all Jx property values should be strings. For example, use "10px" (string) not 10px (unquoted).`;
+  }
+
+  if (lower.includes("must be number") || lower.includes("must be integer")) {
+    return `${rawError}\n  → Fix: Remove quotes from the numeric value — it should be a plain number, not a string.`;
+  }
+
+  if (lower.includes("must be object") || lower.includes("must be array")) {
+    return `${rawError}\n  → Fix: The value must be an object/array (use {} or []), not a string or number.`;
+  }
+
+  if (lower.includes("must be boolean")) {
+    return `${rawError}\n  → Fix: Use true or false without quotes for boolean values.`;
+  }
+
+  // Required property
+  if (lower.includes("must have required property")) {
+    return `${rawError}\n  → Fix: Add the missing required property. Every Jx element must have at least a "tagName" field.`;
+  }
+
+  // Enum / allowed values
+  if (lower.includes("must be equal to one of the allowed values")) {
+    return `${rawError}\n  → Fix: Change the value to one of the allowed options listed in the error.`;
+  }
+
+  return rawError;
+}
+
+/**
  * Apply a mutation, then validate the document and report only the schema errors the edit newly
  * introduced (the eval signal — ADR §6b). The change stays applied either way (optimistic apply +
  * undo, ADR §5); reporting the errors lets the agent loop self-correct on the next round.
@@ -40,11 +94,10 @@ async function applyAndValidate(tab, mutationFn, summary, validate) {
   const after = await validate(toRaw(tab.doc.document));
   const newErrors = after.filter((e) => !before.has(e));
   if (newErrors.length > 0) {
+    const formatted = newErrors.map((e) => `- ${translateValidationError(e)}`).join("\n");
     return {
       success: false,
-      error: `Change applied, but it introduced schema errors. Correct them with a follow-up edit:\n${newErrors
-        .map((e) => `- ${e}`)
-        .join("\n")}`,
+      error: `Change applied, but it introduced schema errors. Fix these issues with follow-up edits:\n${formatted}`,
     };
   }
   return { success: true, summary };
