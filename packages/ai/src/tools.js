@@ -1,5 +1,5 @@
 /**
- * tools.js — Tool registry infrastructure
+ * Tools.js — Tool registry infrastructure
  *
  * Provider-agnostic base classes for defining and registering tools that an LLM
  * can call. Tools have JSON Schema parameter definitions and execute functions.
@@ -116,7 +116,7 @@ export function createToolRegistry() {
      * @returns {ToolDefinition[]}
      */
     list() {
-      return Array.from(_tools.values());
+      return [..._tools.values()];
     },
 
     /**
@@ -125,7 +125,7 @@ export function createToolRegistry() {
      * @returns {object[]}
      */
     listForLLM() {
-      return Array.from(_tools.values()).map((t) => ({
+      return [..._tools.values()].map((t) => ({
         type: "function",
         function: {
           name: t.name,
@@ -163,10 +163,14 @@ export function createToolRegistry() {
         return { valid: false, errors: [`Unknown tool: "${toolName}"`] };
       }
 
-      if (!tool.strict) return { valid: true };
+      if (!tool.strict) {
+        return { valid: true };
+      }
 
       const schema = tool.parameters;
-      if (!schema || !schema.properties) return { valid: true };
+      if (!schema || !schema.properties) {
+        return { valid: true };
+      }
 
       const errors = [];
       const props = /** @type {Record<string, object>} */ (schema.properties);
@@ -188,15 +192,21 @@ export function createToolRegistry() {
         }
 
         const expectedType = propSchema.type;
-        if (!expectedType) continue;
+        if (!expectedType) {
+          continue;
+        }
 
         const actualType = Array.isArray(value) ? "array" : typeof value;
 
         // Number / integer type validation with string coercion
         if (expectedType === "number" || expectedType === "integer") {
-          if (actualType === "number") continue;
+          if (actualType === "number") {
+            continue;
+          }
           if (actualType === "string") {
-            if (!isNaN(Number(value))) continue;
+            if (!Number.isNaN(Number(value))) {
+              continue;
+            }
             errors.push(`Argument "${key}" should be a number, got non-numeric string "${value}"`);
             continue;
           }
@@ -239,9 +249,9 @@ export function createToolRegistry() {
 
       try {
         return await tool.execute(args);
-      } catch (err) {
+      } catch (error) {
         return toolError(
-          `Tool "${toolName}" execution error: ${/** @type {Error} */ (err).message}`,
+          `Tool "${toolName}" execution error: ${/** @type {Error} */ (error).message}`,
         );
       }
     },

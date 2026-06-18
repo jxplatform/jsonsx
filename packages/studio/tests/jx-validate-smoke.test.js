@@ -9,11 +9,11 @@ describe("jx-validate (real @jxsuite/schema)", () => {
       children: [{ tagName: "p", textContent: "hi" }],
     });
     expect(errs).toEqual([]);
-  }, 30000);
+  }, 30_000);
 
   test("malformed style (string not object) is flagged", async () => {
     const errs = await validateDoc({ tagName: "div", style: "color: red" });
     expect(errs.length).toBeGreaterThan(0);
     expect(errs.join(" ")).toContain("style");
-  }, 30000);
+  }, 30_000);
 });

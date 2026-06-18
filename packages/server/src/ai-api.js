@@ -1,5 +1,5 @@
 /**
- * ai-api.js — AI proxy endpoints for Jx Studio
+ * Ai-api.js — AI proxy endpoints for Jx Studio
  *
  * Handles /__studio/ai/chat (SSE streaming proxy to OpenAI) and /__studio/ai/models.
  * The server acts as a thin proxy: validates the request shape, forwards to OpenAI,
@@ -75,10 +75,13 @@ function writeSSE(controller, event) {
  * @returns {Response}
  */
 function jsonError(status, message) {
-  return new Response(JSON.stringify({ error: message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
+  return Response.json(
+    { error: message },
+    {
+      status,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 }
 
 // ─── /__studio/ai/chat — SSE streaming proxy ───────────────────────────────
@@ -143,13 +146,13 @@ export async function handleChat(req) {
           body: JSON.stringify(openaiBody),
           signal: req.signal,
         });
-      } catch (err) {
-        if (/** @type {Error} */ (err).name === "AbortError") {
+      } catch (error) {
+        if (/** @type {Error} */ (error).name === "AbortError") {
           writeSSE(controller, { type: "done", stopReason: "cancelled" });
         } else {
           writeSSE(controller, {
             type: "error",
-            message: `Network error: ${/** @type {Error} */ (err).message}`,
+            message: `Network error: ${/** @type {Error} */ (error).message}`,
           });
         }
         controller.close();
@@ -161,7 +164,7 @@ export async function handleChat(req) {
         try {
           errorBody = await response.text();
         } catch {
-          /* ignore */
+          /* Ignore */
         }
         writeSSE(controller, {
           type: "error",
@@ -188,7 +191,9 @@ export async function handleChat(req) {
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
@@ -196,7 +201,9 @@ export async function handleChat(req) {
 
           for (const line of lines) {
             const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+            if (!trimmed || !trimmed.startsWith("data: ")) {
+              continue;
+            }
 
             const dataStr = trimmed.slice(6);
             if (dataStr === "[DONE]") {
@@ -218,10 +225,14 @@ export async function handleChat(req) {
             }
 
             const choice = parsed.choices?.[0];
-            if (!choice) continue;
+            if (!choice) {
+              continue;
+            }
 
-            const delta = choice.delta;
-            if (!delta) continue;
+            const { delta } = choice;
+            if (!delta) {
+              continue;
+            }
 
             // Text content
             if (delta.content) {
@@ -293,16 +304,16 @@ export async function handleChat(req) {
         pendingToolCalls.clear();
         writeSSE(controller, { type: "done", stopReason: "stop" });
         controller.close();
-      } catch (err) {
+      } catch (error) {
         reader.cancel();
-        if (/** @type {Error} */ (err).name === "AbortError") {
+        if (/** @type {Error} */ (error).name === "AbortError") {
           writeSSE(controller, { type: "done", stopReason: "cancelled" });
           controller.close();
           return;
         }
         writeSSE(controller, {
           type: "error",
-          message: `Stream error: ${/** @type {Error} */ (err).message}`,
+          message: `Stream error: ${/** @type {Error} */ (error).message}`,
         });
         controller.close();
       }
@@ -337,14 +348,17 @@ export async function handleModels(req) {
   // No key available → return hardcoded defaults so the UI can at least render.
   if (missingKey) {
     const defaults = [
-      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
-      { id: "gpt-4.1", name: "GPT-4.1", contextWindow: 1000000 },
-      { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", contextWindow: 1000000 },
-      { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128000 },
+      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000 },
+      { id: "gpt-4.1", name: "GPT-4.1", contextWindow: 1_000_000 },
+      { id: "gpt-4.1-mini", name: "GPT-4.1 Mini", contextWindow: 1_000_000 },
+      { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128_000 },
     ];
-    return new Response(JSON.stringify({ models: defaults, configured: false }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json(
+      { models: defaults, configured: false },
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 
   // Key is available — proxy to the upstream /models endpoint.
@@ -356,9 +370,9 @@ export async function handleModels(req) {
 
     if (!upstreamResp.ok) {
       // Upstream failed — return defaults with configured flag so user can still try.
-      const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 }];
-      return new Response(
-        JSON.stringify({ models: defaults, configured: true, upstreamError: upstreamResp.status }),
+      const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000 }];
+      return Response.json(
+        { models: defaults, configured: true, upstreamError: upstreamResp.status },
         {
           headers: { "Content-Type": "application/json" },
         },
@@ -369,21 +383,24 @@ export async function handleModels(req) {
     // OpenAI /models returns { object: "list", data: [{ id, ... }] }
     // Map to our simpler format.
     const rawModels = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
-    const models = rawModels.map((m) => ({
-      id: m.id,
-      name: m.id,
-      contextWindow: m.context_window || 0,
-      ownedBy: m.owned_by,
+    const models = rawModels.map(({ id, context_window, owned_by }) => ({
+      id,
+      name: id,
+      contextWindow: context_window || 0,
+      ownedBy: owned_by,
     }));
 
-    return new Response(JSON.stringify({ models, configured: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
+    return Response.json(
+      { models, configured: true },
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   } catch {
     // Network error → return defaults.
-    const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 }];
-    return new Response(
-      JSON.stringify({ models: defaults, configured: true, upstreamError: "network" }),
+    const defaults = [{ id: "gpt-4o", name: "GPT-4o", contextWindow: 128_000 }];
+    return Response.json(
+      { models: defaults, configured: true, upstreamError: "network" },
       {
         headers: { "Content-Type": "application/json" },
       },
@@ -401,7 +418,7 @@ export async function handleModels(req) {
  * @returns {Promise<Response | null>} Response if handled, null if route doesn't match
  */
 export async function handleAiApi(req, url) {
-  const pathname = url.pathname;
+  const { pathname } = url;
 
   if (pathname === "/__studio/ai/chat" && req.method === "POST") {
     return handleChat(req);

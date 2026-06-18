@@ -54,6 +54,9 @@ export function createDocumentAssistant() {
 
     const plat = getPlatform();
     const chatUrl = await Promise.resolve(plat.aiChatUrl());
+    // Re-read the persisted model each send: the session is constructed once at module load
+    // (before the user sets a key/model), so the picker's choice must be picked up here.
+    chatState.setModel(getModel());
     const streamingClient = createProxyStreamingClient({
       chatUrl,
       model: chatState.model,

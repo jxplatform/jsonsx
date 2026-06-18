@@ -7,7 +7,7 @@
  * @module @jxsuite/server/tests
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { handleAiApi } from "../src/ai-api.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -21,7 +21,9 @@ import { handleAiApi } from "../src/ai-api.js";
 async function readSSEEvents(response) {
   const events = [];
   const reader = response.body?.getReader();
-  if (!reader) return events;
+  if (!reader) {
+    return events;
+  }
 
   const decoder = new TextDecoder();
   let buffer = "";
@@ -29,24 +31,28 @@ async function readSSEEvents(response) {
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        if (!trimmed || !trimmed.startsWith("data: ")) {
+          continue;
+        }
         const dataStr = trimmed.slice(6);
         try {
           events.push(JSON.parse(dataStr));
         } catch {
-          // skip unparseable
+          // Skip unparseable
         }
       }
     }
   } catch {
-    // stream ended
+    // Stream ended
   }
 
   return events;
@@ -65,7 +71,9 @@ async function readSSEEvents(response) {
 function mockReq(pathname, { method = "GET", body, headers = {} } = {}) {
   const url = new URL(`http://localhost${pathname}`);
   const init = { method, headers: new Headers(headers) };
-  if (body) init.body = JSON.stringify(body);
+  if (body) {
+    init.body = JSON.stringify(body);
+  }
   return new Request(url, init);
 }
 
@@ -139,7 +147,9 @@ describe("POST /__studio/ai/chat — error handling", () => {
     expect(data.error).toContain("API key");
 
     // Restore
-    if (prevKey) process.env.OPENAI_API_KEY = prevKey;
+    if (prevKey) {
+      process.env.OPENAI_API_KEY = prevKey;
+    }
   });
 
   it("returns 400 when messages is not an array", async () => {
@@ -188,9 +198,9 @@ describe("POST /__studio/ai/chat — SSE streaming", () => {
   it("returns SSE content-type on success", async () => {
     // This test verifies the response has correct SSE headers.
     // We mock the upstream by setting OPENAI_API_KEY and a valid base URL
-    // that will fail with a clean error (we test the pipeline shape, not OpenAI)
+    // That will fail with a clean error (we test the pipeline shape, not OpenAI)
     process.env.OPENAI_API_KEY = "test-key";
-    process.env.OPENAI_BASE_URL = "https://httpstat.us"; // returns 200 for any path
+    process.env.OPENAI_BASE_URL = "https://httpstat.us"; // Returns 200 for any path
 
     const req = mockReq("/__studio/ai/chat", {
       method: "POST",
@@ -207,7 +217,7 @@ describe("POST /__studio/ai/chat — SSE streaming", () => {
 
     expect(res).not.toBeNull();
     // The upstream will fail (not an actual OpenAI endpoint) but the
-    // response shape should be SSE with an error event
+    // Response shape should be SSE with an error event
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
     expect(res.headers.get("Cache-Control")).toBe("no-cache");
 
@@ -244,10 +254,12 @@ describe("POST /__studio/ai/chat — SSE streaming", () => {
     // The upstream will fail (invalid key) but 401 is from OUR handler, not upstream
     expect(res).not.toBeNull();
     // 401 from our handler means no key found; anything else means key was found
-    // and passed to upstream (which will fail with a different error)
+    // And passed to upstream (which will fail with a different error)
     expect(res.status).not.toBe(401);
 
-    if (prevKey) process.env.OPENAI_API_KEY = prevKey;
+    if (prevKey) {
+      process.env.OPENAI_API_KEY = prevKey;
+    }
   });
 
   it("falls back to OPENAI_API_KEY env var", async () => {

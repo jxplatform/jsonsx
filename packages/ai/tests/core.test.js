@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { createToolDefinition, createToolRegistry, toolSuccess, toolError } from "../src/tools.js";
+import { createToolDefinition, createToolRegistry, toolSuccess } from "../src/tools.js";
 import { createChatState } from "../src/chat-state.js";
 import {
   STREAM_EVENT_TYPES,
@@ -191,7 +191,7 @@ describe("ChatState", () => {
     const chat = createChatState();
     chat.sendMessage("Hello");
 
-    expect(chat.messages.length).toBe(2); // user + placeholder assistant
+    expect(chat.messages.length).toBe(2); // User + placeholder assistant
     expect(chat.messages[0].role).toBe("user");
     expect(chat.messages[0].content).toBe("Hello");
     expect(chat.messages[1].role).toBe("assistant");

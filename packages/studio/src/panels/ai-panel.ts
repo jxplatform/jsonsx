@@ -14,9 +14,11 @@ import { effect, effectScope } from "../reactivity";
 import { createDocumentAssistant } from "../services/document-assistant";
 import {
   getBaseUrl,
+  getModel,
   getOpenAiKey,
   hasOpenAiKey,
   setBaseUrl,
+  setModel,
   setOpenAiKey,
 } from "../services/ai-settings";
 
@@ -80,6 +82,12 @@ let mode: AiMode = "assistant";
 let keyEditing = false;
 let keyDraft = "";
 let baseUrlDraft = "";
+let modelDraft = "";
+
+/** Fetched from /__studio/ai/models (proxied to the upstream provider). */
+let availableModels: { id: string; name: string }[] = [];
+let modelsLoading = false;
+let modelsError = "";
 
 /** Stack B (document AST assistant) session — created lazily, persists across tab switches. */
 const assistant = createDocumentAssistant();
@@ -186,17 +194,26 @@ function setMode(next: AiMode) {
 function startEditApiKey() {
   keyDraft = getOpenAiKey();
   baseUrlDraft = getBaseUrl();
+  modelDraft = getModel();
   keyEditing = true;
   rerenderPanel();
+  // Auto-fetch available models if not already loaded.
+  if (availableModels.length === 0 && !modelsLoading) {
+    fetchModels();
+  }
 }
 
 /** Persist the drafted key + endpoint and return to the chat. */
 function saveApiKey() {
   setOpenAiKey(keyDraft);
   setBaseUrl(baseUrlDraft);
+  setModel(modelDraft);
   keyDraft = "";
   baseUrlDraft = "";
+  modelDraft = "";
   keyEditing = false;
+  // Clear fetched models so they're re-fetched with the new credentials next time.
+  availableModels = [];
   rerenderPanel();
 }
 
@@ -204,8 +221,52 @@ function saveApiKey() {
 function cancelEditApiKey() {
   keyDraft = "";
   baseUrlDraft = "";
+  modelDraft = "";
   keyEditing = false;
   rerenderPanel();
+}
+
+/**
+ * Fetch available models from the proxy's /__studio/ai/models endpoint. Sends the stored API key as
+ * X-Api-Key so the proxy can forward to the upstream provider. Falls back to the proxy's hardcoded
+ * default list when no key is configured.
+ */
+async function fetchModels() {
+  modelsLoading = true;
+  modelsError = "";
+  rerenderPanel();
+  try {
+    const plat = getPlatform();
+    const chatUrl = await Promise.resolve(plat.aiChatUrl());
+    const modelsUrl = chatUrl.replace(/\/chat$/, "/models");
+
+    const headers: Record<string, string> = {};
+    const storedKey = getOpenAiKey() || keyDraft;
+    if (storedKey) {
+      headers["X-Api-Key"] = storedKey;
+    }
+    // Forward the chosen endpoint so the proxy lists models from THAT provider, not the
+    // Default OpenAI host — otherwise a non-OpenAI key only ever gets the hardcoded fallback.
+    const baseUrl = baseUrlDraft || getBaseUrl();
+    if (baseUrl) {
+      headers["X-Api-Base-URL"] = baseUrl;
+    }
+
+    const resp = await fetch(modelsUrl, { headers });
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    availableModels = (data.models || []).map((m: { id: string; name?: string }) => ({
+      id: m.id,
+      name: m.name || m.id,
+    }));
+  } catch (error: unknown) {
+    modelsError = (error as Error).message || "Failed to fetch models";
+  } finally {
+    modelsLoading = false;
+    rerenderPanel();
+  }
 }
 
 /** The OpenAI (or compatible) key + endpoint settings form, shown as a gate when no key is set. */
@@ -228,6 +289,50 @@ function renderKeyGate() {
             keyDraft = (e.target as HTMLInputElement).value;
           }}
         />
+        <div style="font-weight:500;font-size:11px;margin-top:4px">Model</div>
+        ${availableModels.length > 0
+          ? html`
+              <sp-combobox
+                size="s"
+                allows-custom-value
+                .value=${modelDraft}
+                @change=${(e: Event) => {
+                  modelDraft = (e.target as HTMLInputElement).value;
+                }}
+                @input=${(e: Event) => {
+                  modelDraft = (e.target as HTMLInputElement).value;
+                }}
+              >
+                ${availableModels.map(
+                  (m) => html`<sp-menu-item value=${m.id}>${m.name}</sp-menu-item>`,
+                )}
+              </sp-combobox>
+            `
+          : html`
+              <input
+                type="text"
+                style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+                placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
+                .value=${modelDraft}
+                @input=${(e: Event) => {
+                  modelDraft = (e.target as HTMLInputElement).value;
+                }}
+              />
+            `}
+        <div style="display:flex;gap:8px;align-items:center">
+          <sp-button size="s" variant="secondary" ?disabled=${modelsLoading} @click=${fetchModels}>
+            ${modelsLoading
+              ? "Fetching…"
+              : availableModels.length > 0
+                ? "Refresh models"
+                : "Fetch models"}
+          </sp-button>
+          ${modelsError
+            ? html`<span style="font-size:10px;color:var(--spectrum-global-color-red-600)"
+                >${modelsError}</span
+              >`
+            : nothing}
+        </div>
         <input
           type="text"
           style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
