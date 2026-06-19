@@ -2,9 +2,6 @@
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
-  "**/_fixtures_handlers/**",
-  "**/_fixtures_proto/**",
-  "**/tests/_studio_fixtures/**",
-  "**/tests/fixtures/**",
+  "**/tests/**",
   "./result/**",
 ]
