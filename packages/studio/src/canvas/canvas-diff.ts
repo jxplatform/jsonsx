@@ -93,7 +93,7 @@ function markRecursive(
   const children = elementChildren(node);
   for (let i = 0; i < children.length; i++) {
     const childPath = `${path}/children/${i}`;
-    markRecursive(children[i], status, childPath, diffMap, allPaths);
+    markRecursive(children[i]!, status, childPath, diffMap, allPaths);
   }
 }
 
@@ -151,7 +151,7 @@ export function computeDocumentDiff(
       const children = elementChildren(currNode);
       for (let i = 0; i < children.length; i++) {
         const childPath = pathKey === "/" ? `children/${i}` : `${pathKey}/children/${i}`;
-        markRecursive(children[i], "added", childPath, diffMap, allPaths);
+        markRecursive(children[i]!, "added", childPath, diffMap, allPaths);
       }
       return;
     }
@@ -162,7 +162,7 @@ export function computeDocumentDiff(
       const children = elementChildren(origNode);
       for (let i = 0; i < children.length; i++) {
         const childPath = pathKey === "/" ? `children/${i}` : `${pathKey}/children/${i}`;
-        markRecursive(children[i], "removed", childPath, diffMap, allPaths);
+        markRecursive(children[i]!, "removed", childPath, diffMap, allPaths);
       }
     }
   };

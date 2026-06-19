@@ -12,7 +12,7 @@ import { describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import type { StudioSchema } from "../src/handlers";
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Utils: { openFileDialog: async () => [] },

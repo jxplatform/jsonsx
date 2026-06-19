@@ -170,9 +170,9 @@ function bindableFieldRow(
       const staticDefault = defaultAsString(defs[defName]);
       onChange(staticDefault || undefined);
     } else if (signalDefs.length > 0) {
-      onChange({ $ref: `#/state/${signalDefs[0][0]}` });
+      onChange({ $ref: `#/state/${signalDefs[0]![0]}` });
     } else if (extraSignals && extraSignals.length > 0) {
-      onChange({ $ref: extraSignals[0].value });
+      onChange({ $ref: extraSignals[0]!.value });
     }
   };
 
@@ -443,9 +443,9 @@ function renderComponentPropsFieldsTemplate(
             const staticDefault = defaultAsString(defs[defName]);
             onChange(staticDefault || undefined);
           } else if (signalDefs.length > 0) {
-            onChange({ $ref: `#/state/${signalDefs[0][0]}` });
+            onChange({ $ref: `#/state/${signalDefs[0]![0]}` });
           } else if (extraSignals && extraSignals.length > 0) {
-            onChange({ $ref: extraSignals[0].value });
+            onChange({ $ref: extraSignals[0]!.value });
           }
         };
 
@@ -562,7 +562,7 @@ function renderComponentPropsFieldsTemplate(
 
 /** Custom attrs fields template */
 function renderCustomAttrsFieldsTemplate(
-  node: JxMutableNode,
+  _node: JxMutableNode,
   path: JxPath,
   attrs: Record<string, unknown>,
   knownAttrNames: Set<string>,
@@ -806,7 +806,7 @@ function renderPageSection(node: JxMutableNode) {
   }
 
   if (layoutEntries === null) {
-    loadLayoutEntries();
+    void loadLayoutEntries();
     return nothing;
   }
 
@@ -1018,7 +1018,7 @@ export function renderPropertiesPanelTemplate(ctx: {
     }
   }
   for (const sec of htmlMeta.$sections) {
-    attrSections[sec.key].sort(
+    attrSections[sec.key]!.sort(
       (a: { name: string; entry: HtmlMetaEntry }, b: { name: string; entry: HtmlMetaEntry }) =>
         a.entry.$order - b.entry.$order,
     );
@@ -1269,9 +1269,9 @@ export function renderPropertiesPanelTemplate(ctx: {
     : nothing;
 
   const attrSectionTemplates = htmlMeta.$sections
-    .filter((sec) => attrSections[sec.key].length > 0)
+    .filter((sec) => attrSections[sec.key]!.length > 0)
     .map((sec) => {
-      const sectionAttrs = attrSections[sec.key];
+      const sectionAttrs = attrSections[sec.key]!;
       const hasAnySet = sectionAttrs.some(
         (a: { name: string; entry: HtmlMetaEntry }) => attrs[a.name] !== undefined,
       );

@@ -109,7 +109,7 @@ export function isNestedSelector(k: string) {
 
 // ─── Shared utilities ────────────────────────────────────────────────────────
 
-const _styleDebounceTimers = new Map();
+const _styleDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
  * @param {string} prop
@@ -151,7 +151,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
   }
   if (Array.isArray(node)) {
     // Arrays of nodes round-trip element-wise; the array itself is not a node.
-    return node.map((n) => stripEventHandlers(n)) as unknown as JxMutableNode;
+    return node.map((n: JxMutableNode) => stripEventHandlers(n)) as unknown as JxMutableNode;
   }
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(node)) {
@@ -160,7 +160,7 @@ export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
     }
     if (k === "children") {
       out.children = Array.isArray(v)
-        ? v.map((c) => stripEventHandlers(c))
+        ? v.map((c: JxMutableNode) => stripEventHandlers(c))
         : stripEventHandlers(v as JxMutableNode);
     } else if (k === "cases" && typeof v === "object") {
       const cases: Record<string, unknown> = {};

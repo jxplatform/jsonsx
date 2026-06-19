@@ -84,7 +84,7 @@ describe("parseGitStatus", () => {
   test("parses file paths with spaces", () => {
     const out = "1 M. N... 100644 100644 100644 abc123 def456 path with spaces/file name.js\n";
     const result = parseGitStatus(out);
-    expect(result.files[0].path).toBe("path with spaces/file name.js");
+    expect(result.files[0]!.path).toBe("path with spaces/file name.js");
   });
 
   test("handles empty output", () => {

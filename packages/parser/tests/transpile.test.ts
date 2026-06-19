@@ -251,11 +251,11 @@ describe("prototype directives", () => {
     const md = [':::Array{items.ref="#/state/rows"}', "${$map.item.name}", ":::", ""].join("\n");
     const doc = transpileJxMarkdown(md);
     const [node] = doc.children as JxElement[];
-    expect(node.$prototype).toBe("Array");
-    expect(node.tagName).toBeUndefined();
-    expect(node.items).toEqual({ $ref: "#/state/rows" });
-    expect((node.map as JxElement).tagName).toBe("p");
-    expect((node.map as JxElement).textContent).toBe("${$map.item.name}");
+    expect(node!.$prototype).toBe("Array");
+    expect(node!.tagName).toBeUndefined();
+    expect(node!.items).toEqual({ $ref: "#/state/rows" });
+    expect((node!.map as JxElement).tagName).toBe("p");
+    expect((node!.map as JxElement).textContent).toBe("${$map.item.name}");
   });
 
   test(":::Array nestled among sibling blocks keeps order", () => {
@@ -271,8 +271,8 @@ describe("prototype directives", () => {
     ].join("\n");
     const doc = transpileJxMarkdown(md);
     const kids = doc.children as JxElement[];
-    expect(kids[0].tagName).toBe("h1");
-    expect(kids[1].$prototype).toBe("Array");
+    expect(kids[0]!.tagName).toBe("h1");
+    expect(kids[1]!.$prototype).toBe("Array");
     // Trailing paragraph "End" remains a sibling after the array.
     expect(kids.at(-1)?.textContent ?? (kids.at(-1)?.children as unknown[])?.[0]).toBeDefined();
   });
@@ -285,8 +285,8 @@ describe("prototype directives", () => {
       "",
     ].join("\n");
     const [node] = transpileJxMarkdown(md).children as JxElement[];
-    expect(node.filter).toEqual({ $ref: "#/state/byDate" });
-    expect(node.sort).toEqual({ $ref: "#/state/asc" });
+    expect(node!.filter).toEqual({ $ref: "#/state/byDate" });
+    expect(node!.sort).toEqual({ $ref: "#/state/asc" });
   });
 });
 
@@ -830,15 +830,15 @@ describe("transpileJxMarkdown", () => {
   test("hard break inside a paragraph becomes br", () => {
     const doc = transpileJxMarkdown("line one\\\nline two\n");
     const [p] = doc.children as JxElement[];
-    expect(p.tagName).toBe("p");
-    expect(p.children).toEqual(["line one", { tagName: "br" }, "line two"]);
+    expect(p!.tagName).toBe("p");
+    expect(p!.children).toEqual(["line one", { tagName: "br" }, "line two"]);
   });
 
   test("strikethrough (gfm) becomes del", () => {
     const doc = transpileJxMarkdown("~~gone~~\n");
     const [p] = doc.children as JxElement[];
-    expect(p.textContent).toBeUndefined();
-    expect(p.children).toEqual([{ tagName: "del", textContent: "gone" }]);
+    expect(p!.textContent).toBeUndefined();
+    expect(p!.children).toEqual([{ tagName: "del", textContent: "gone" }]);
   });
 
   test("container directive with attributes round-trips through the pipeline", () => {
@@ -851,11 +851,11 @@ describe("transpileJxMarkdown", () => {
       ].join("\n"),
     );
     const [card] = doc.children as JxElement[];
-    expect(card.tagName).toBe("my-card");
-    expect(card.$ref).toBe("#/$defs/card");
-    expect(card.style).toEqual({ color: "red" });
-    expect(card.attributes).toEqual({ variant: "primary" });
-    expect(card.children).toEqual([
+    expect(card!.tagName).toBe("my-card");
+    expect(card!.$ref).toBe("#/$defs/card");
+    expect(card!.style).toEqual({ color: "red" });
+    expect(card!.attributes).toEqual({ variant: "primary" });
+    expect(card!.children).toEqual([
       { children: ["Body ", { tagName: "strong", textContent: "text" }], tagName: "p" },
     ]);
   });
@@ -863,7 +863,7 @@ describe("transpileJxMarkdown", () => {
   test("text directive inline in a paragraph", () => {
     const doc = transpileJxMarkdown("Press :kbd[Ctrl+S] to save.\n");
     const [p] = doc.children as JxElement[];
-    expect(p.children).toEqual(["Press ", { tagName: "kbd", textContent: "Ctrl+S" }, " to save."]);
+    expect(p!.children).toEqual(["Press ", { tagName: "kbd", textContent: "Ctrl+S" }, " to save."]);
   });
 
   test("block html in the body is flattened into children", () => {
@@ -877,6 +877,6 @@ describe("transpileJxMarkdown", () => {
   test("annotation attributes (--title) become $ keys", () => {
     const doc = transpileJxMarkdown('::my-widget{--title="Widget Title"}\n');
     const [widget] = doc.children as JxElement[];
-    expect(widget.$title).toBe("Widget Title");
+    expect(widget!.$title).toBe("Widget Title");
   });
 });

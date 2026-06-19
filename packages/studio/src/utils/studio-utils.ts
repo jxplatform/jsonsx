@@ -30,7 +30,7 @@ export function camelToLabel(prop: string) {
 
 export function toCamelCase(str: string): string {
   return str
-    .replaceAll(/[^a-zA-Z0-9]+(.)?/g, (_, c) => (c ? c.toUpperCase() : ""))
+    .replaceAll(/[^a-zA-Z0-9]+(.)?/g, (_, c: string | undefined) => (c ? c.toUpperCase() : ""))
     .replace(/^[A-Z]/, (c) => c.toLowerCase());
 }
 

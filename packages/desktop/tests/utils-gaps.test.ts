@@ -1,8 +1,9 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { describe, expect, mock, test } from "bun:test";
 
 // Make the electrobun import fail so init() exercises its catch path.
 // The real electrobun module starts a server on import; it must never load in tests.
-mock.module("electrobun/bun", () => {
+void mock.module("electrobun/bun", () => {
   throw new Error("electrobun unavailable in test env");
 });
 

@@ -60,7 +60,7 @@ const registerCompletionItemProvider = mock((_lang: string, _provider: unknown) 
   dispose: () => {},
 }));
 
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   MarkerSeverity: { Error: 8, Warning: 4 },
   Uri: { parse: (u: string) => ({ target: u, toString: () => u }) },
   editor: {
@@ -176,8 +176,8 @@ describe("renderFunctionEditor — def target", () => {
     expect(canvasWrap.style.padding).toBe("0px");
 
     expect(created).toHaveLength(1);
-    expect(created[0].options.language).toBe("javascript");
-    expect(created[0].value).toBe("return 1;");
+    expect(created[0]!.options.language).toBe("javascript");
+    expect(created[0]!.value).toBe("return 1;");
     expect(view.functionEditor).toBe(created[0] as never);
     expect(view.functionEditor!._editingTarget).toBe(
       JSON.stringify({ defName: "greet", type: "def" }),
@@ -217,7 +217,7 @@ describe("renderFunctionEditor — def target", () => {
     // Format request carries the def's parameter names; formatted code replaces the buffer
     const formatCall = codeServiceCalls.find(([action]) => action === "format")!;
     expect(formatCall[1]).toEqual({ args: ["state", "name"], code: "return 1;" });
-    expect(created[0].value).toBe("return 1;\n");
+    expect(created[0]!.value).toBe("return 1;\n");
 
     expect(setModelMarkers).toHaveBeenCalledTimes(1);
     const [model, owner, markers] = setModelMarkers.mock.calls[0] as any[];
@@ -244,16 +244,16 @@ describe("renderFunctionEditor — def target", () => {
     const [ed] = created;
 
     // Buffer drifted from the document → re-sync writes the body back with the ignore flag
-    ed.value = "drifted()";
+    ed!.value = "drifted()";
     renderFunctionEditor(() => {});
     expect(created).toHaveLength(1);
-    expect(ed.value).toBe("return 1;");
+    expect(ed!.value).toBe("return 1;");
 
     // Buffer already in sync → nothing happens
     renderFunctionEditor(() => {});
     expect(created).toHaveLength(1);
-    expect(ed.value).toBe("return 1;");
-    expect(ed.disposed).toBe(false);
+    expect(ed!.value).toBe("return 1;");
+    expect(ed!.disposed).toBe(false);
   });
 
   test("debounced edits write the body back to the state def and lint the new code", async () => {
@@ -261,7 +261,7 @@ describe("renderFunctionEditor — def target", () => {
     renderFunctionEditor(() => {});
     const [ed] = created;
 
-    ed.type("return 42;");
+    ed!.type("return 42;");
     await sleep(600);
     const { greet } = activeTab.value!.doc.document.state as any;
     expect(greet.body).toBe("return 42;");
@@ -299,11 +299,11 @@ describe("renderFunctionEditor — event target", () => {
     setEditing({ eventKey: "onclick", path: ["children", 0], type: "event" });
     renderFunctionEditor(() => {});
 
-    expect(first.disposed).toBe(true);
+    expect(first!.disposed).toBe(true);
     expect(strayMonaco.dispose).toHaveBeenCalledTimes(1);
     expect(view.monacoEditor).toBeNull();
     expect(created).toHaveLength(2);
-    expect(created[1].value).toBe("go()");
+    expect(created[1]!.value).toBe("go()");
     const current = canvasWrap.querySelector(".breadcrumb-item.current");
     expect(current?.textContent).toBe("ƒ onclick");
   });
@@ -415,7 +415,7 @@ describe("registerFunctionCompletions", () => {
 
   test("returns no suggestions without an active tab", () => {
     closeAllTabs();
-    const [[, provider]] = registerCompletionItemProvider.mock.calls as any[][];
+    const [, provider] = registerCompletionItemProvider.mock.calls[0]! as any[];
     const model = { getWordUntilPosition: () => ({ endColumn: 1, startColumn: 1 }) };
     expect(provider.provideCompletionItems(model, { lineNumber: 1 }).suggestions).toEqual([]);
   });

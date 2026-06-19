@@ -139,7 +139,7 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
     } else if (key === "index") {
       base = iterCtx?.index ?? map?.index ?? state["$map/index"];
     } else {
-      base = map?.[key] ?? state[`$map/${key}`];
+      base = map?.[key!] ?? state[`$map/${key}`];
     }
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
@@ -167,7 +167,7 @@ function resolveExprRef(ref: string, state: JxScope, event: Event | null, iterCt
 function resolveWritableRef(
   ref: string,
   state: JxScope,
-  event: Event | null,
+  _event: Event | null,
   iterCtx?: IterCtx,
 ): { obj: JxScope; key: string } {
   if (ref.startsWith("$map/")) {
@@ -180,7 +180,7 @@ function resolveWritableRef(
     } else if (key === "index") {
       base = iterCtx?.index ?? map?.index ?? state["$map/index"];
     } else {
-      base = map?.[key] ?? state[`$map/${key}`];
+      base = map?.[key!] ?? state[`$map/${key}`];
     }
     if (parts.length > 2) {
       const pathParts = parts.slice(2);

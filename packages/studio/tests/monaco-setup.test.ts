@@ -8,12 +8,12 @@ import { describe, expect, mock, test } from "bun:test";
 
 const setDiagnosticsOptions = mock((_opts: unknown) => {});
 
-mock.module("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({
+void mock.module("monaco-editor/esm/vs/language/json/monaco.contribution.js", () => ({
   jsonDefaults: { setDiagnosticsOptions },
 }));
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({}));
-mock.module("monaco-editor/esm/vs/language/typescript/monaco.contribution.js", () => ({}));
-mock.module(
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({}));
+void mock.module("monaco-editor/esm/vs/language/typescript/monaco.contribution.js", () => ({}));
+void mock.module(
   "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js",
   () => ({}),
 );
@@ -33,7 +33,7 @@ await import("../src/services/monaco-setup");
 
 function diagnosticsArg(): any {
   expect(setDiagnosticsOptions).toHaveBeenCalledTimes(1);
-  const [[opts]] = setDiagnosticsOptions.mock.calls as unknown[][];
+  const [opts] = setDiagnosticsOptions.mock.calls[0]!;
   return opts;
 }
 

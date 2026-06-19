@@ -3,12 +3,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "
 import type { TemplateResult } from "lit-html";
 
 const refreshGitStatus = mock(async () => {});
-mock.module("../src/panels/git-panel.js", () => ({
+void mock.module("../src/panels/git-panel.js", () => ({
   refreshGitStatus,
 }));
 
 const openSettingsModal = mock(() => {});
-mock.module("../src/settings/settings-modal.js", () => ({
+void mock.module("../src/settings/settings-modal.js", () => ({
   openSettingsModal,
 }));
 

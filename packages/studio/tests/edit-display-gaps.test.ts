@@ -133,7 +133,7 @@ describe("prepareForEditMode basics", () => {
       { tagName: "p", textContent: "${x}" },
     ] as unknown as JxMutableNode) as unknown as Record<string, any>[];
     expect(Array.isArray(out)).toBe(true);
-    expect(out[0].textContent).toBe("❪ x ❫");
+    expect(out[0]!.textContent).toBe("❪ x ❫");
   });
 
   test("preserves state, $media and $elements untouched", () => {

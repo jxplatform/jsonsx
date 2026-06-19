@@ -14,11 +14,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|WriteFile|EditFile",
+        "matcher": "Edit|MultiEdit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f package.json ] && grep -q '\"jxsuite\"' package.json; then bunx nano-staged --unstaged --quiet --bail || exit 2; fi"
+            "command": "if [ -f package.json ] && grep -q '\"jxsuite\"' package.json; then bun .claude/hooks/validate-edit.js; fi"
           }
         ]
       }

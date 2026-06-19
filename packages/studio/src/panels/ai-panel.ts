@@ -43,6 +43,14 @@ interface QuikChatInstance {
   historyImport: (history: unknown[]) => void;
 }
 
+type QuikChatCtor = new (
+  container: HTMLElement,
+  onSend: (chat: unknown, msg: string) => void,
+  opts: Record<string, unknown>,
+) => QuikChatInstance;
+
+const QuikChat = quikchat as unknown as QuikChatCtor;
+
 let chatInstance: QuikChatInstance | null = null;
 let chatContainerEl: Element | null = null;
 let _quikChatEl: HTMLElement | null = null;
@@ -57,7 +65,7 @@ export function mountAiPanel() {
     return;
   }
   mounted = true;
-  checkAuth();
+  void checkAuth();
 }
 
 const _g = globalThis as unknown as {
@@ -87,10 +95,10 @@ export function mountQuikChat() {
     return;
   }
 
-  chatInstance = new quikchat(
+  chatInstance = new QuikChat(
     container,
     (_chat: unknown, msg: string) => {
-      handleUserSend(msg);
+      void handleUserSend(msg);
     },
     {
       messagesArea: { alternating: false },
@@ -197,14 +205,14 @@ function stop() {
     return;
   }
   const plat = getPlatform();
-  plat.aiStopSession(sessionId);
+  void plat.aiStopSession(sessionId);
   finishStream();
 }
 
 function newChat() {
   if (sessionId) {
     const plat = getPlatform();
-    plat.aiDeleteSession(sessionId);
+    void plat.aiDeleteSession(sessionId);
   }
   disconnectStream();
   messages = [];
@@ -223,6 +231,31 @@ function newChat() {
 
 // ─── SSE Stream ─────────────────────────────────────────────────────────────
 
+/** SSE `stream_event` payload (subset used here). */
+interface StreamEventData {
+  event?: { type?: string; delta?: { type?: string; text?: string } };
+}
+
+/** SSE `result` payload (subset used here). */
+interface ResultData {
+  result?: string;
+  is_error?: boolean;
+}
+
+/** SSE `error` payload (subset used here). */
+interface ErrorData {
+  error?: string;
+}
+
+/** Parse SSE JSON into the expected shape. Returns null on malformed input. */
+function parseSse<T>(raw: unknown): T | null {
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return null;
+  }
+}
+
 async function connectStream(id: string) {
   disconnectStream();
   const plat = getPlatform();
@@ -230,40 +263,37 @@ async function connectStream(id: string) {
   eventSource = new EventSource(url);
 
   eventSource.addEventListener("stream_event", (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      const evt = data.event;
-      if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-        const token = evt.delta.text;
-        currentAssistantText += token;
-        if (chatInstance && currentStreamMsgId != null) {
-          if (!streamStarted) {
-            chatInstance.messageReplaceContent(currentStreamMsgId, currentAssistantText);
-            streamStarted = true;
-          } else {
-            chatInstance.messageAppendContent(currentStreamMsgId, token);
-          }
+    const data = parseSse<StreamEventData>((e as MessageEvent).data);
+    const evt = data?.event;
+    if (evt?.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+      const token = evt.delta.text ?? "";
+      currentAssistantText += token;
+      if (chatInstance && currentStreamMsgId != null) {
+        if (!streamStarted) {
+          chatInstance.messageReplaceContent(currentStreamMsgId, currentAssistantText);
+          streamStarted = true;
+        } else {
+          chatInstance.messageAppendContent(currentStreamMsgId, token);
         }
       }
-    } catch {}
+    }
   });
 
   eventSource.addEventListener("assistant", (e) => {
-    try {
-      handleAssistantMessage(JSON.parse(e.data));
-    } catch {}
+    const data = parseSse<AssistantMessageData>((e as MessageEvent).data);
+    if (data) {
+      handleAssistantMessage(data);
+    }
   });
 
   eventSource.addEventListener("result", (e) => {
-    try {
-      const data = JSON.parse(e.data);
-      if (data.result && data.is_error) {
-        if (chatInstance && currentStreamMsgId != null) {
-          chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.result}`);
-        }
-        currentAssistantText = `Error: ${data.result}`;
+    const data = parseSse<ResultData>((e as MessageEvent).data);
+    if (data?.result && data.is_error) {
+      if (chatInstance && currentStreamMsgId != null) {
+        chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.result}`);
       }
-    } catch {}
+      currentAssistantText = `Error: ${data.result}`;
+    }
     finishStream();
   });
 
@@ -272,15 +302,13 @@ async function connectStream(id: string) {
   });
 
   eventSource.addEventListener("error", (e) => {
-    try {
-      const data = JSON.parse((e as MessageEvent).data);
-      if (data.error) {
-        if (chatInstance && currentStreamMsgId != null) {
-          chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.error}`);
-        }
-        currentAssistantText = `Error: ${data.error}`;
+    const data = parseSse<ErrorData>((e as MessageEvent).data);
+    if (data?.error) {
+      if (chatInstance && currentStreamMsgId != null) {
+        chatInstance.messageReplaceContent(currentStreamMsgId, `Error: ${data.error}`);
       }
-    } catch {}
+      currentAssistantText = `Error: ${data.error}`;
+    }
     finishStream();
   });
 
@@ -306,7 +334,7 @@ function finishStream() {
 
   if (pendingFileReloads.size > 0) {
     for (const fp of pendingFileReloads) {
-      reloadFileInTab(fp);
+      void reloadFileInTab(fp);
     }
     pendingFileReloads.clear();
   }

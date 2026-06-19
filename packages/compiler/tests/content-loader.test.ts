@@ -135,6 +135,7 @@ describe("loadContentTypes", () => {
       { contentTypes: { posts: { format: "Bogus", source: "./content/posts/" } } },
       makeRegistry(),
     );
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/format "Bogus" is not an imported format class/);
   });
 
@@ -144,6 +145,7 @@ describe("loadContentTypes", () => {
       { contentTypes: { feed: { source: "https://example.com/feed.csv" } } },
       makeRegistry(),
     );
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/remote sources require an explicit "format"/);
   });
 
@@ -158,6 +160,7 @@ describe("loadContentTypes", () => {
       },
       makeRegistry(entry),
     );
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/does not support remote sources/);
   });
 
@@ -216,6 +219,7 @@ describe("loadContentTypes", () => {
       { contentTypes: { data: { source: "./content/data.xyz" } } },
       makeRegistry(),
     );
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/No format class imported for "\.xyz"/);
   });
 
@@ -225,6 +229,7 @@ describe("loadContentTypes", () => {
       { contentTypes: { docs: { source: "./content/docs/" } } },
       makeRegistry(),
     );
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/directory sources need an explicit "format"/);
   });
 
@@ -333,6 +338,7 @@ describe("loadContentTypes", () => {
     const promise = loadContentTypes(TMP, {
       contentTypes: { data: { source: "./content/data.csv" } },
     });
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(promise).rejects.toThrow(/No format class imported for "\.csv"/);
   });
 

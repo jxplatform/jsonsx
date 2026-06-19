@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, describe, expect, test } from "bun:test";
 
 // Covers the parts of src/chromium/platform.ts not exercised by
@@ -105,7 +106,7 @@ const platform = createDesktopPlatform();
 
 afterAll(() => {
   globalThis.fetch = realFetch;
-  server.stop();
+  void server.stop();
 });
 
 function lastRequest(): ReceivedMessage | undefined {

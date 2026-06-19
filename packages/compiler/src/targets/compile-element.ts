@@ -481,7 +481,7 @@ export function emitElementModule(doc: JxDocument, className: string, elementImp
  */
 function emitLitChildren(
   children: JxMutableNode["children"],
-  parentStyle: JxStyle | null | undefined,
+  _parentStyle: JxStyle | null | undefined,
   indent: string,
 ) {
   if (!children) {

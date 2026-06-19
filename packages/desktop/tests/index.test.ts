@@ -7,7 +7,7 @@ import { describe, expect, mock, test } from "bun:test";
 // ─── Mock electrobun/bun (default export: events) ────────────────────────────
 
 const eventHandlers = new Map<string, (e: { data: { url: string } }) => void>();
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   default: {
     events: {
       on: (name: string, handler: (e: { data: { url: string } }) => void) => {
@@ -25,7 +25,7 @@ const broadcastUpdateReady = mock((_version: string) => {});
 const parseProjectDirFromUrl = mock((url: string) =>
   url.includes("project.json") ? "/parsed/dir" : null,
 );
-mock.module("../src/window-manager", () => ({
+void mock.module("../src/window-manager", () => ({
   broadcastUpdateReady,
   openProjectWindow,
   parseProjectDirFromUrl,
@@ -33,21 +33,21 @@ mock.module("../src/window-manager", () => ({
 }));
 
 const installApplicationMenu = mock(() => {});
-mock.module("../src/menu", () => ({ installApplicationMenu }));
+void mock.module("../src/menu", () => ({ installApplicationMenu }));
 
 const setFileDialog = mock((_fn: unknown) => {});
-mock.module("../src/project-session", () => ({ setFileDialog }));
+void mock.module("../src/project-session", () => ({ setFileDialog }));
 
 let notifyWebview: ((version: string) => void) | null = null;
 const startBackgroundChecks = mock(() => {});
 const setNotifyWebview = mock((fn: (version: string) => void) => {
   notifyWebview = fn;
 });
-mock.module("../src/updater", () => ({ setNotifyWebview, startBackgroundChecks }));
+void mock.module("../src/updater", () => ({ setNotifyWebview, startBackgroundChecks }));
 
 const openFileDialogSentinel = mock(async () => null);
 const initUtils = mock(async () => {});
-mock.module("../src/utils", () => ({
+void mock.module("../src/utils", () => ({
   init: initUtils,
   openFileDialog: openFileDialogSentinel,
 }));
@@ -58,7 +58,7 @@ const handleAiRoute = mock(async (_req: Request, path: string, _root: string | n
   }
   return null;
 });
-mock.module("../src/ai", () => ({ handleAiRoute }));
+void mock.module("../src/ai", () => ({ handleAiRoute }));
 
 // ─── Stub Bun.serve, then import the module under test ───────────────────────
 

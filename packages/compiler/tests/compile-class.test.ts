@@ -741,8 +741,8 @@ describe("compile — $prototype: Class routing", () => {
     });
     expect(result.html).toBe("");
     expect(result.files).toHaveLength(1);
-    expect(result.files[0].content).toContain("class TestClass {");
-    expect(result.files[0].content).toContain("export { TestClass };");
+    expect(result.files[0]!.content).toContain("class TestClass {");
+    expect(result.files[0]!.content).toContain("export { TestClass };");
   });
 
   test("output path derived from title for raw object", async () => {
@@ -751,6 +751,6 @@ describe("compile — $prototype: Class routing", () => {
       $prototype: "Class",
       title: "MyWidget",
     });
-    expect(result.files[0].path).toBe("MyWidget.js");
+    expect(result.files[0]!.path).toBe("MyWidget.js");
   });
 });

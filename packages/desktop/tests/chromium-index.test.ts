@@ -1,3 +1,4 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -75,11 +76,11 @@ const handleAiRouteMock = mock((_req: Request, path: string, _root: string) =>
   Promise.resolve(path === "/studio/ai/auth-status" ? Response.json({ ok: true }) : null),
 );
 
-mock.module("../src/handlers", () => handlerMocks);
-mock.module("../src/git", () => gitMocks);
-mock.module("../src/packages", () => packageMocks);
-mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
-mock.module("../src/ai", () => ({ handleAiRoute: handleAiRouteMock }));
+void mock.module("../src/handlers", () => handlerMocks);
+void mock.module("../src/git", () => gitMocks);
+void mock.module("../src/packages", () => packageMocks);
+void mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
+void mock.module("../src/ai", () => ({ handleAiRoute: handleAiRouteMock }));
 
 // ─── Fake chromium child process ────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ const spawnMock = mock((bin: string, args: string[], _opts: unknown) => {
   spawnCalls.push({ args, bin });
   return fakeChrome;
 });
-mock.module("node:child_process", () => ({ spawn: spawnMock }));
+void mock.module("node:child_process", () => ({ spawn: spawnMock }));
 
 // ─── Environment + globals for the import-time side effects ────────────────
 
@@ -159,7 +160,7 @@ afterAll(() => {
   for (const listener of sigtermHandlers) {
     process.removeListener("SIGTERM", listener);
   }
-  server?.stop(true);
+  void server?.stop(true);
   rmSync(FIXTURES, { force: true, recursive: true });
 });
 

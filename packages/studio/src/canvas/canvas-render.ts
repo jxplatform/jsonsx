@@ -428,7 +428,7 @@ export function renderCanvas() {
           }
         } else if (lang === "json") {
           try {
-            tabNow.doc.document = JSON.parse(editor.getValue());
+            tabNow.doc.document = JSON.parse(editor.getValue()) as JxMutableNode;
             tabNow.doc.dirty = true;
           } catch {
             // Invalid JSON — don't update state
@@ -490,14 +490,14 @@ export function renderCanvas() {
     canvasPanels.push(origPanel as unknown as CanvasPanel, currPanel as unknown as CanvasPanel);
 
     /** @param {string} content */
-    const parseContent = (content: string) => {
+    const parseContent = (content: string): Promise<JxMutableNode> => {
       const fmtPath = gitDiffState.filePath ?? "";
       if (formatForPath(fmtPath)) {
         return parseSourceForPath(fmtPath, content).then((r) => r.document);
       }
       return Promise.resolve().then(() => {
         try {
-          return JSON.parse(content);
+          return JSON.parse(content) as JxMutableNode;
         } catch {
           return {
             children: [{ tagName: "p", textContent: "Failed to parse" }],
@@ -508,7 +508,7 @@ export function renderCanvas() {
     };
 
     const { featureToggles } = S.ui;
-    Promise.all([
+    void Promise.all([
       parseContent(gitDiffState.originalContent || ""),
       parseContent(gitDiffState.currentContent || ""),
     ]).then(([originalDoc, currentDoc]) => {
@@ -659,7 +659,7 @@ export function renderCanvas() {
   );
 
   for (let i = 0; i < panelEntries.length; i++) {
-    const { panel, activeSet } = panelEntries[i];
+    const { panel, activeSet } = panelEntries[i]!;
     const p = panel as CanvasPanel;
     canvasPanels.push(p);
     if (i === 0) {

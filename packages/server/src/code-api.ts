@@ -21,6 +21,11 @@ interface OxcDiagnostic {
   [key: string]: unknown;
 }
 
+interface CodeApiBody {
+  code?: string;
+  args?: string[];
+}
+
 const OXLINT_BIN = resolve(
   import.meta.dir,
   "../../node_modules/.bin",
@@ -43,10 +48,10 @@ function unwrapFormatted(formatted: string) {
   const lines = formatted.split("\n");
   // Remove first line (function header) and last non-empty line (closing brace)
   let end = lines.length - 1;
-  while (end > 0 && lines[end].trim() === "") {
+  while (end > 0 && lines[end]!.trim() === "") {
     end -= 1;
   }
-  if (lines[end].trim() === "}") {
+  if (lines[end]!.trim() === "}") {
     end -= 1;
   }
   const bodyLines = lines.slice(1, end + 1);
@@ -90,9 +95,9 @@ export async function handleCodeApi(req: Request, url: URL) {
     return null;
   }
 
-  let body;
+  let body: CodeApiBody;
   try {
-    body = await req.json();
+    body = (await req.json()) as CodeApiBody;
   } catch {
     return new Response("Invalid JSON", { status: 400 });
   }
@@ -162,8 +167,8 @@ export async function handleCodeApi(req: Request, url: URL) {
       const output = await new Response(proc.stdout).text();
       await proc.exited;
 
-      const parsed = JSON.parse(output);
-      const adjusted = adjustDiagnostics(parsed.diagnostics || [], headerLen);
+      const parsed = JSON.parse(output) as { diagnostics?: OxcDiagnostic[] };
+      const adjusted = adjustDiagnostics(parsed.diagnostics ?? [], headerLen);
       return Response.json({ diagnostics: adjusted });
     } catch (error) {
       return Response.json({

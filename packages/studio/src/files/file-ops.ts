@@ -94,7 +94,7 @@ export async function openFile() {
           sourceFormat: format.name,
         });
       } else if (name.endsWith(".json")) {
-        const document = JSON.parse(text);
+        const document = JSON.parse(text) as Record<string, unknown>;
         openTab({ document, documentPath, fileHandle: handle, id: name });
       } else {
         throw noFormatError(name);
@@ -108,8 +108,8 @@ export async function openFile() {
           showOpenFilePicker: (options?: unknown) => Promise<FileSystemFileHandle[]>;
         }
       ).showOpenFilePicker({ types: pickerTypes });
-      const file = await handle.getFile();
-      await handleSource(handle.name, await file.text(), handle);
+      const file = await handle!.getFile();
+      await handleSource(handle!.name, await file.text(), handle!);
     } else {
       // Fallback: file input
       const input = document.createElement("input");

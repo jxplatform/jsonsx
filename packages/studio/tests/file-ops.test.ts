@@ -53,6 +53,7 @@ describe("parseSourceForPath", () => {
   });
 
   test("throws for unregistered extensions", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().rejects.toThrow() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for the rejection.
     await expect(parseSourceForPath("data.toml", "a = 1")).rejects.toThrow(
       /No format class imported/,
     );

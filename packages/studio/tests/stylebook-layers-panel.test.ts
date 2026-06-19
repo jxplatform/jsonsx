@@ -76,22 +76,22 @@ describe("elements tab", () => {
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const selected = [...el.querySelectorAll(".layer-row.selected")];
     expect(selected.length).toBe(1);
-    expect(selected[0].querySelector(".layer-tag")?.textContent).toBe("li");
+    expect(selected[0]!.querySelector(".layer-tag")?.textContent).toBe("li");
   });
 
   test("shows customization dot for tags styled via '& tag' keys", async () => {
     makeTab({ "& h1": { color: "red" } });
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const rows = [...el.querySelectorAll(".layer-row")];
-    expect(rows[0].querySelectorAll("span").length).toBe(3); // Tag + label + dot
-    expect(rows[1].querySelectorAll("span").length).toBe(2);
+    expect(rows[0]!.querySelectorAll("span").length).toBe(3); // Tag + label + dot
+    expect(rows[1]!.querySelectorAll("span").length).toBe(2);
   });
 
   test("empty '& tag' style block shows no dot", async () => {
     makeTab({ "& h1": {} });
     const el = await renderInto(renderStylebookLayersTemplate(ctx));
     const rows = [...el.querySelectorAll(".layer-row")];
-    expect(rows[0].querySelectorAll("span").length).toBe(2);
+    expect(rows[0]!.querySelectorAll("span").length).toBe(2);
   });
 
   test("uses fallback label when entry has no text", async () => {
@@ -113,8 +113,8 @@ describe("elements tab", () => {
       r.querySelector(".component-tag"),
     ) as HTMLElement[];
     expect(compRows.length).toBe(2);
-    expect(compRows[1].classList.contains("selected")).toBe(true);
-    compRows[0].click();
+    expect(compRows[1]!.classList.contains("selected")).toBe(true);
+    compRows[0]!.click();
     expect(selectStylebookTag).toHaveBeenCalledWith("x-card", undefined, { panCanvas: true });
   });
 });

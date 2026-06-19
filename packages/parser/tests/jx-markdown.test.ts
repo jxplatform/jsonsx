@@ -14,7 +14,6 @@ import {
 
 import { jxKey, mdKey } from "../src/transpile";
 
-const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
 const EXAMPLES_DIR = join(__dirname, "..", "..", "..", "examples");
 

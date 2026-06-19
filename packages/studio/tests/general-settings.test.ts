@@ -12,7 +12,7 @@ import { projectState } from "../src/store";
 import type { MockPlatformState } from "./harness";
 
 const openFileInTab = mock(async (_path: string) => {});
-mock.module("../src/files/files.js", () => ({ openFileInTab }));
+void mock.module("../src/files/files.js", () => ({ openFileInTab }));
 
 const { renderGeneralSettings } = await import("../src/settings/general-settings");
 

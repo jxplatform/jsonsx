@@ -48,7 +48,7 @@ describe("getNodeAtPath", () => {
   });
 
   test("resolves first child", () => {
-    expect(getNodeAtPath(doc, ["children", 0])).toBe(doc.children[0]);
+    expect(getNodeAtPath(doc, ["children", 0])).toBe(doc.children[0]!);
   });
 
   test("resolves deeply nested child", () => {
@@ -169,10 +169,10 @@ describe("flattenTree", () => {
     const doc = makeDoc();
     const rows = flattenTree(doc);
     expect(rows.length).toBe(5); // Root + h1 + section + p + span
-    expect(rows[0].nodeType).toBe("element");
-    expect(rows[0].depth).toBe(0);
-    expect((rows[1].node as JxMutableNode).tagName).toBe("h1");
-    expect(rows[1].depth).toBe(1);
+    expect(rows[0]!.nodeType).toBe("element");
+    expect(rows[0]!.depth).toBe(0);
+    expect((rows[1]!.node as JxMutableNode).tagName).toBe("h1");
+    expect(rows[1]!.depth).toBe(1);
   });
 
   test("flattens $map children", () => {
@@ -231,7 +231,7 @@ describe("flattenTree", () => {
     const rows = flattenTree(doc);
     const caseRows = rows.filter((r) => r.nodeType === "case");
     expect(caseRows.length).toBe(2);
-    expect(caseRows[0].depth).toBe(1);
+    expect(caseRows[0]!.depth).toBe(1);
   });
 
   test("emits case-ref for $ref cases", () => {
@@ -266,15 +266,15 @@ describe("flattenTree", () => {
     const rows = flattenTree(doc);
     // Should have the root + the slotted p child
     expect(rows.length).toBe(2);
-    expect((rows[1].node as JxMutableNode).tagName).toBe("p");
-    expect(rows[1].path).toEqual(["children", 0]);
+    expect((rows[1]!.node as JxMutableNode).tagName).toBe("p");
+    expect(rows[1]!.path).toEqual(["children", 0]);
   });
 
   test("leaf node returns single row", () => {
     const doc = { tagName: "br" };
     const rows = flattenTree(doc);
     expect(rows.length).toBe(1);
-    expect(rows[0].path).toEqual([]);
+    expect(rows[0]!.path).toEqual([]);
   });
 });
 
@@ -290,7 +290,7 @@ describe("normalizeArrayChildren", () => {
     const kids = doc.children as JxMutableNode[];
     expect(Array.isArray(kids)).toBe(true);
     expect(kids.length).toBe(1);
-    expect(kids[0].$prototype).toBe("Array");
+    expect(kids[0]!.$prototype).toBe("Array");
   });
 
   test("leaves an already-normalized member array untouched", () => {
@@ -319,7 +319,7 @@ describe("normalizeArrayChildren", () => {
     const kids = doc.children as JxMutableNode[];
     const [outer] = kids;
     expect(Array.isArray(kids)).toBe(true);
-    expect(Array.isArray((outer.map as JxMutableNode).children)).toBe(true);
+    expect(Array.isArray((outer!.map as JxMutableNode).children)).toBe(true);
   });
 });
 

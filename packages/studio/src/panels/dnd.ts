@@ -205,7 +205,7 @@ export function registerComponentsDnD() {
       // Fill preview with live rendered component
       const preview = row.querySelector(".element-card-preview");
       if (preview && !preview.querySelector(tagName)) {
-        renderComponentPreview(comp).then((el: HTMLElement) => {
+        void renderComponentPreview(comp).then((el: HTMLElement) => {
           preview.textContent = "";
           preview.append(el);
         });

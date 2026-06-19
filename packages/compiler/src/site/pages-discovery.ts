@@ -169,7 +169,7 @@ async function fileToRoute(relativePath: string, absolutePath: string, registry?
   // Convert [param] → :param and [...param] → *
   const urlPattern = urlPath.replaceAll(
     /\[\.\.\.(\w+)\]|\[(\w+)\]/g,
-    (match: string, spread: string, named: string) => {
+    (_match: string, spread: string, named: string) => {
       if (spread) {
         isCatchAll = true;
         isDynamic = true;
@@ -319,10 +319,9 @@ function resolvePathEntries(
   // Data file ref: { "$ref": "./data/products.json", param: "id", field: "sku" }
   if ("$ref" in $paths && $paths.$ref) {
     const filePath = resolve(projectRoot, $paths.$ref);
-    /** @type {Record<string, unknown>[]} */
-    let data;
+    let data: unknown;
     try {
-      data = JSON.parse(readFileSync(filePath, "utf8"));
+      data = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
     } catch (error) {
       const err = error as Error;
       console.warn(`Warning: $paths.$ref could not load "${$paths.$ref}": ${err.message}`);
@@ -334,7 +333,7 @@ function resolvePathEntries(
     }
     const param = $paths.param ?? "id";
     const field = $paths.field ?? "id";
-    return data.map((item: Record<string, unknown>) => ({
+    return (data as Record<string, unknown>[]).map((item: Record<string, unknown>) => ({
       [param]: item[field] ?? item.id ?? String(item),
     }));
   }

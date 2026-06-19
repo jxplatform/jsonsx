@@ -6,23 +6,23 @@ import type { Tab } from "../src/tabs/tab";
 // ─── Module mocks (must precede the toolbar import) ───────────────────────────
 
 const openQuickSearch = mock(() => {});
-mock.module("../src/panels/quick-search.js", () => ({
+void mock.module("../src/panels/quick-search.js", () => ({
   openQuickSearch,
 }));
 
 const refreshGitStatus = mock(async () => {});
-mock.module("../src/panels/git-panel.js", () => ({
+void mock.module("../src/panels/git-panel.js", () => ({
   refreshGitStatus,
 }));
 
 const openBrowseModal = mock(() => {});
-mock.module("../src/browse/browse-modal.js", () => ({
+void mock.module("../src/browse/browse-modal.js", () => ({
   openBrowseModal,
 }));
 
 let newProjectResult: { root: string } | null = null;
 const openNewProjectModal = mock(async () => newProjectResult);
-mock.module("../src/new-project/new-project-modal.js", () => ({
+void mock.module("../src/new-project/new-project-modal.js", () => ({
   openNewProjectModal,
 }));
 
@@ -500,7 +500,7 @@ describe("full toolbar (active tab)", () => {
     expect(group.classList.contains("mac")).toBe(false);
     const buttons = [...group.querySelectorAll("sp-action-button")];
     expect(buttons.map((b) => b.getAttribute("title"))).toEqual(["Minimize", "Maximize", "Close"]);
-    click(buttons[2]);
+    click(buttons[2]!);
     expect(controls.close).toHaveBeenCalledTimes(1);
     // Non-mac CSD renders at the end of the toolbar.
     expect(root.lastElementChild?.classList.contains("window-controls")).toBe(true);
@@ -535,7 +535,7 @@ describe("full toolbar (active tab)", () => {
         "Minimize",
         "Maximize",
       ]);
-      click(buttons[1]);
+      click(buttons[1]!);
       expect(controls.minimize).toHaveBeenCalledTimes(1);
       expect(root.firstElementChild?.nextElementSibling).not.toBeNull();
     } finally {

@@ -1,8 +1,9 @@
+// oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 const mockOpenFileDialog = mock(async () => ["/home/user/projects/project.json"]);
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Updater: {

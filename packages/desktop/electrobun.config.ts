@@ -1,7 +1,7 @@
 import type { ElectrobunConfig } from "electrobun";
 import { readFileSync } from "node:fs";
 
-const pkg = JSON.parse(readFileSync("./package.json", "utf8"));
+const pkg = JSON.parse(readFileSync("./package.json", "utf8")) as { version: string };
 
 export default {
   app: {

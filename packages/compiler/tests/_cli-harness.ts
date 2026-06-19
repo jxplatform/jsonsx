@@ -33,7 +33,7 @@ export function setBuildSite(impl: typeof buildSiteImpl) {
   buildSiteImpl = impl;
 }
 
-mock.module("../src/site/site-build.ts", () => ({
+void mock.module("../src/site/site-build.ts", () => ({
   buildSite: (root: string, opts: Record<string, unknown>) => {
     buildSiteCalls.push({ opts, root });
     return buildSiteImpl(root, opts);
@@ -48,7 +48,7 @@ export function setRunCli(impl: typeof runCliImpl) {
   runCliImpl = impl;
 }
 
-mock.module("../src/compiler.ts", () => ({
+void mock.module("../src/compiler.ts", () => ({
   runCli: (src: string, out?: string) => {
     runCliCalls.push({ out, src });
     return runCliImpl(src, out);

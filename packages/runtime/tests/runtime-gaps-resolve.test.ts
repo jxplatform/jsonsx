@@ -147,8 +147,8 @@ describe("resolveClassJson hybrid", () => {
     await wait(5);
     expect(state.v).toBe("from-proxy");
     expect(posts.length).toBe(1);
-    expect(posts[0].url).toBe("/__jx_resolve__");
-    expect(posts[0].body.$export).toBe("notAClass");
+    expect(posts[0]!.url).toBe("/__jx_resolve__");
+    expect(posts[0]!.body.$export).toBe("notAClass");
   });
 
   test("missing export falls back to dev proxy", async () => {
@@ -322,9 +322,9 @@ describe("resolveViaDevProxy", () => {
     const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     await wait(5);
     expect(state.v).toEqual({ echoed: "static-q" });
-    expect(posts[0].body.$src).toBe("@fake/pkg/x.class.json");
-    expect(posts[0].body.$prototype).toBe("Search");
-    expect(posts[0].body.q).toBe("static-q");
+    expect(posts[0]!.body.$src).toBe("@fake/pkg/x.class.json");
+    expect(posts[0]!.body.$prototype).toBe("Search");
+    expect(posts[0]!.body.q).toBe("static-q");
   });
 
   test("template config values re-resolve reactively", async () => {
@@ -463,8 +463,8 @@ describe("resolveServerFunction", () => {
     const state = await buildScope(doc as unknown as JxDocument, {}, "file:///nonexistent/dir/");
     await wait(5);
     expect(state.remote).toEqual({ r: "x" });
-    expect(posts[0].url).toBe("/__jx_server__");
-    expect(posts[0].body.$export).toBe("anyFn");
+    expect(posts[0]!.url).toBe("/__jx_server__");
+    expect(posts[0]!.body.$export).toBe("anyFn");
   });
 
   test("unimportable module without base falls back to proxy", async () => {

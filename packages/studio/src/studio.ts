@@ -106,7 +106,7 @@ import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
 import type { JxPath } from "./state";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, ProjectConfig } from "@jxsuite/schema/types";
 
 void _swc;
 
@@ -141,7 +141,7 @@ async function navigateToComponent(componentPath: string) {
     if (!content) {
       return;
     }
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as JxMutableNode;
     const tab = activeTab.value;
     if (!tab) {
       return;
@@ -297,7 +297,7 @@ requestIdleCallback(() => {
   const frag = document.createDocumentFragment();
   for (const [name] of webdata.cssProps) {
     const opt = document.createElement("option");
-    opt.value = name;
+    opt.value = name!;
     frag.append(opt);
   }
   dl.append(frag);
@@ -402,7 +402,7 @@ initWelcome({
   openNewProject: async () => {
     const result = await openNewProjectModal();
     if (result) {
-      openRecentProject(result.root);
+      void openRecentProject(result.root);
     }
   },
   openProject: () => openProject(),
@@ -517,7 +517,7 @@ if (_projectParam) {
     render();
     const platform = getPlatform();
     // oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: project probing must not block the initial render
-    (async () => {
+    void (async () => {
       try {
         const siteCtx = platform.resolveSiteContext
           ? await platform.resolveSiteContext(_projectParam)
@@ -610,14 +610,14 @@ if (_projectParam) {
             ({ frontmatter } = result);
             parsedMode = result.mode;
           } else {
-            parsedDoc = JSON.parse(content);
+            parsedDoc = JSON.parse(content) as JxMutableNode;
           }
 
           // Open in a tab
           openTab({
             id: fileRelPath,
             documentPath: fileRelPath,
-            document: parsedDoc,
+            document: parsedDoc as JxMutableNode,
             ...(frontmatter != null && { frontmatter }),
             sourceFormat: fileFormat?.name ?? null,
           });
@@ -639,7 +639,7 @@ if (_projectParam) {
   }
 } else {
   // Normal mode: probe for project at server root
-  loadProject();
+  void loadProject();
   render();
 }
 
@@ -680,7 +680,7 @@ async function openRecentProject(root: string) {
 
     platform.projectRoot = root;
     const content = await platform.readFile("project.json");
-    const config = JSON.parse(content);
+    const config = JSON.parse(content) as ProjectConfig;
 
     closeAllTabs();
 
@@ -689,7 +689,7 @@ async function openRecentProject(root: string) {
       dirs: new Map(),
       expanded: new Set(),
       isSiteProject: true,
-      name: config.name || root.split("/").pop(),
+      name: config.name || root.split("/").pop()!,
       projectConfig: config,
       projectRoot: root,
       searchQuery: "",

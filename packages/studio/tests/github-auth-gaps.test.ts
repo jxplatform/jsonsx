@@ -21,7 +21,7 @@ const STORAGE_KEY = "jx_github_token";
 
 let dialogHosts: HTMLElement[] = [];
 
-mock.module("../src/ui/layers.js", () => ({
+void mock.module("../src/ui/layers.js", () => ({
   showConfirmDialog: async () => true,
   showDialog: (templateFn: any) =>
     new Promise((resolve) => {

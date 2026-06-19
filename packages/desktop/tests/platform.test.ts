@@ -42,7 +42,7 @@ let capturedRpcConfig: {
 } | null = null;
 let electroviewCtorArgs: unknown = null;
 
-mock.module("electrobun/view", () => ({
+void mock.module("electrobun/view", () => ({
   Electroview: class {
     static defineRPC(config: never) {
       capturedRpcConfig = config;

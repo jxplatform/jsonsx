@@ -149,14 +149,14 @@ function findIntersectingElements(tag: string, range: Range, root: HTMLElement) 
  * @param {Element[]} matches
  */
 function unwrapTagInRange(
-  tag: string,
-  range: Range,
-  editableRoot: HTMLElement,
+  _tag: string,
+  _range: Range,
+  _editableRoot: HTMLElement,
   matches: Element[],
 ) {
   // Process in reverse so DOM mutations don't shift later nodes
   for (let i = matches.length - 1; i >= 0; i--) {
-    const el = matches[i];
+    const el = matches[i]!;
     unwrapElement(el);
   }
 }
@@ -249,7 +249,7 @@ function trimLeadingWhitespace(frag: DocumentFragment) {
   if (!match) {
     return null;
   }
-  const [, ws] = match;
+  const ws = match[1]!;
   if (text.length === ws.length) {
     // Entire node is whitespace — remove it
     first.remove();
@@ -276,7 +276,7 @@ function trimTrailingWhitespace(frag: DocumentFragment) {
   if (!match) {
     return null;
   }
-  const [, ws] = match;
+  const ws = match[1]!;
   if (text.length === ws.length) {
     last.remove();
   } else {
@@ -363,7 +363,7 @@ function mergeAdjacentSiblings(root: HTMLElement) {
 
   // Process in reverse to preserve earlier offsets
   for (let i = toMerge.length - 1; i >= 0; i--) {
-    const [el, next] = toMerge[i];
+    const [el, next] = toMerge[i]!;
     // Move all children from next into el
     while (next.firstChild) {
       el.append(next.firstChild);
@@ -468,8 +468,8 @@ function liftEdgeWhitespace(root: HTMLElement) {
     if (first && first.nodeType === Node.TEXT_NODE) {
       const text = first.textContent ?? "";
       const m = text.match(/^(\s+)/);
-      if (m && text.length > m[1].length) {
-        ops.push({ el, type: "lift-leading", ws: m[1] });
+      if (m && text.length > m[1]!.length) {
+        ops.push({ el, type: "lift-leading", ws: m[1]! });
       }
     }
 
@@ -477,8 +477,8 @@ function liftEdgeWhitespace(root: HTMLElement) {
     if (last && last.nodeType === Node.TEXT_NODE && last !== first) {
       const text = last.textContent ?? "";
       const m = text.match(/(\s+)$/);
-      if (m && text.length > m[1].length) {
-        ops.push({ el, type: "lift-trailing", ws: m[1] });
+      if (m && text.length > m[1]!.length) {
+        ops.push({ el, type: "lift-trailing", ws: m[1]! });
       }
     }
   }

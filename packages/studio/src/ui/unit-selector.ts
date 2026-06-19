@@ -42,7 +42,7 @@ export function renderUnitSelector(
   if (isKeyword) {
     displayValue = strVal;
   } else if (match) {
-    [, displayValue] = match;
+    displayValue = match[1]!;
   } else if (strVal !== "") {
     const num = Number.parseFloat(strVal);
     displayValue = Number.isNaN(num) ? strVal : String(num);
@@ -52,7 +52,7 @@ export function renderUnitSelector(
 
   // Parse placeholder so inherited values display as "500" not "500px"
   const placeholderMatch = placeholder.match(UNIT_RE);
-  const numericPlaceholder = placeholderMatch ? placeholderMatch[1] : placeholder || "0";
+  const numericPlaceholder = placeholderMatch ? placeholderMatch[1]! : placeholder || "0";
 
   const isExpression = isKeyword || (displayValue !== "" && !isNumericVal(displayValue));
   const hasUnits = units.length > 0 || keywords.length > 0;

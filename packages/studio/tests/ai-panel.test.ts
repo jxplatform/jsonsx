@@ -61,7 +61,7 @@ class FakeQuikChat {
   }
 }
 
-mock.module("quikchat/md", () => ({ default: FakeQuikChat }));
+void mock.module("quikchat/md", () => ({ default: FakeQuikChat }));
 
 // ─── EventSource fake ─────────────────────────────────────────────────────────
 

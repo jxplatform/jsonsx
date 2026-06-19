@@ -12,6 +12,18 @@ import { showDialog } from "../ui/layers";
 const CLIENT_ID = "Ov23liYVlMFpgjOEPXJH";
 const STORAGE_KEY = "jx_github_token";
 
+interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  interval?: number;
+}
+
+interface TokenResponse {
+  access_token?: string;
+  error?: string;
+}
+
 export function getGithubToken() {
   return localStorage.getItem(STORAGE_KEY);
 }
@@ -44,7 +56,7 @@ export async function authenticateGithub() {
   if (!codeRes.ok) {
     throw new Error("Failed to initiate GitHub device flow");
   }
-  const codeData = await codeRes.json();
+  const codeData = (await codeRes.json()) as DeviceCodeResponse;
 
   const { device_code, user_code, verification_uri, interval = 5 } = codeData;
 
@@ -69,7 +81,7 @@ export async function authenticateGithub() {
           },
           method: "POST",
         });
-        const tokenData = await tokenRes.json();
+        const tokenData = (await tokenRes.json()) as TokenResponse;
 
         if (tokenData.access_token) {
           localStorage.setItem(STORAGE_KEY, tokenData.access_token);

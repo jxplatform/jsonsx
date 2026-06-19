@@ -18,11 +18,12 @@ const WORKER_PATHS: Record<string, string> = {
 
 self.MonacoEnvironment = {
   getWorker(_, label: string) {
-    const path = WORKER_PATHS[label] || WORKER_PATHS.editorWorkerService;
+    const path = WORKER_PATHS[label] || WORKER_PATHS.editorWorkerService!;
     return new Worker(path, { type: "module" });
   },
 };
 
+// oxlint-disable-next-line typescript/no-unsafe-call, typescript/no-unsafe-member-access -- jsonDefaults is imported from Monaco's untyped ESM contribution (see @ts-expect-error above); no type declarations exist for this named export
 jsonDefaults.setDiagnosticsOptions({
   allowComments: false,
   schemas: [

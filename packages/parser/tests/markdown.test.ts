@@ -17,7 +17,6 @@ try {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const __filename = import.meta.filename;
 const __dirname = import.meta.dirname;
 const FIXTURE_DIR = join(__dirname, "..", "..", "..", "examples", "content", "posts");
 
@@ -136,7 +135,7 @@ describe("Markdown", () => {
   });
 
   test("$toc entries have depth, text, and id", () => {
-    const [entry] = result.$toc!;
+    const entry = result.$toc![0]!;
     expect(entry).toHaveProperty("depth");
     expect(entry).toHaveProperty("text");
     expect(entry).toHaveProperty("id");
@@ -500,6 +499,7 @@ describe("Runtime external prototype ($src)", () => {
       $prototype: "Markdown",
       $src: resolvePath(__dirname, "..", "md.js"),
     };
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test's `.rejects.toThrow()` returns a Promise at runtime but oxlint's type-aware engine types it as non-thenable; the await is required for the assertion to settle.
     await expect(resolvePrototype(def, {}, "$x")).rejects.toThrow(".class.json");
   });
 

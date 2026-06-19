@@ -334,7 +334,7 @@ export function renderHeadTemplate({
   let layoutSection: TemplateResult | symbol = nothing;
   if (isPage) {
     if (layoutEntries === null) {
-      loadLayoutEntries();
+      void loadLayoutEntries();
     } else {
       const currentLayout = doc.$layout;
       const defaultLayout = projectState?.projectConfig?.defaults?.layout;

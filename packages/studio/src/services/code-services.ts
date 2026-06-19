@@ -43,8 +43,18 @@ export async function locateDocument(name: string) {
   return platform.locateFile(name);
 }
 
+/** Schema returned by a plugin's `$prototype` module (loose superset used across panels). */
+export interface PluginSchema {
+  type?: string;
+  description?: string;
+  properties?: Record<string, unknown>;
+  required?: string[];
+  returns?: { type?: string };
+  [key: string]: unknown;
+}
+
 /** Cache of plugin schemas keyed by "$src::$prototype". */
-export const pluginSchemaCache = new Map();
+export const pluginSchemaCache = new Map<string, PluginSchema | null>();
 
 /**
  * Fetch and cache the schema for a $prototype module via the server. Works for both external
@@ -77,7 +87,11 @@ export async function fetchPluginSchema(
     }
     const base =
       !importedPath && state.documentPath ? `${location.origin}/${state.documentPath}` : undefined;
-    const schema = await platform.fetchPluginSchema(src, def.$prototype, base);
+    const schema = (await platform.fetchPluginSchema(
+      src,
+      def.$prototype,
+      base,
+    )) as PluginSchema | null;
     pluginSchemaCache.set(cacheKey, schema);
     return schema;
   } catch {

@@ -18,14 +18,14 @@ describe("parseCSV", () => {
 
   test("handles quoted fields with commas", () => {
     const rows = parseCSV('name,desc\n"Widget, blue",Nice');
-    expect(rows[0].name).toBe("Widget, blue");
+    expect(rows[0]!.name).toBe("Widget, blue");
   });
 
   test("handles quoted newlines and escaped quotes", () => {
     const rows = parseCSV('name,desc\n"Line1\nLine2",Simple\n"Has ""quotes""",Plain');
     expect(rows.length).toBe(2);
-    expect(rows[0].name).toBe("Line1\nLine2");
-    expect(rows[1].name).toBe('Has "quotes"');
+    expect(rows[0]!.name).toBe("Line1\nLine2");
+    expect(rows[1]!.name).toBe('Has "quotes"');
   });
 
   test("handles CRLF line endings", () => {
@@ -52,17 +52,17 @@ describe("coerceCSVRows", () => {
 
   test("coerces numbers, stripping currency symbols and commas", () => {
     const entries = coerceCSVRows([{ id: "x", price: "$1,234.50" }], schema);
-    expect(entries[0].data.price).toBe(1234.5);
+    expect(entries[0]!.data.price).toBe(1234.5);
   });
 
   test("empty number cells become null", () => {
     const entries = coerceCSVRows([{ id: "x", price: "" }], schema);
-    expect(entries[0].data.price).toBeNull();
+    expect(entries[0]!.data.price).toBeNull();
   });
 
   test("non-numeric number cells become null", () => {
     const entries = coerceCSVRows([{ id: "x", price: "n/a" }], schema);
-    expect(entries[0].data.price).toBeNull();
+    expect(entries[0]!.data.price).toBeNull();
   });
 
   test("coerces booleans — only 'true' is true", () => {
@@ -73,26 +73,26 @@ describe("coerceCSVRows", () => {
       ],
       schema,
     );
-    expect(entries[0].data.active).toBe(true);
-    expect(entries[1].data.active).toBe(false);
+    expect(entries[0]!.data.active).toBe(true);
+    expect(entries[1]!.data.active).toBe(false);
   });
 
   test("coerces arrays — comma split, trimmed, empties dropped", () => {
     const entries = coerceCSVRows([{ id: "a", tags: "one, two , ,three" }], schema);
-    expect(entries[0].data.tags).toEqual(["one", "two", "three"]);
+    expect(entries[0]!.data.tags).toEqual(["one", "two", "three"]);
   });
 
   test("id fallback chain: id → sku → slug → Slug → index", () => {
-    expect(coerceCSVRows([{ id: "i", sku: "s" }])[0].id).toBe("i");
-    expect(coerceCSVRows([{ sku: "s", slug: "sl" }])[0].id).toBe("s");
-    expect(coerceCSVRows([{ slug: "sl" }])[0].id).toBe("sl");
-    expect(coerceCSVRows([{ Slug: "SL" }])[0].id).toBe("SL");
-    expect(coerceCSVRows([{ name: "n" }])[0].id).toBe("0");
+    expect(coerceCSVRows([{ id: "i", sku: "s" }])[0]!.id).toBe("i");
+    expect(coerceCSVRows([{ sku: "s", slug: "sl" }])[0]!.id).toBe("s");
+    expect(coerceCSVRows([{ slug: "sl" }])[0]!.id).toBe("sl");
+    expect(coerceCSVRows([{ Slug: "SL" }])[0]!.id).toBe("SL");
+    expect(coerceCSVRows([{ name: "n" }])[0]!.id).toBe("0");
   });
 
   test("explicit idField wins over the fallback chain", () => {
     const entries = coerceCSVRows([{ code: "c", id: "i" }], undefined, "code");
-    expect(entries[0].id).toBe("c");
+    expect(entries[0]!.id).toBe("c");
   });
 });
 
@@ -102,9 +102,9 @@ describe("Csv.parse", () => {
       schema: { properties: { price: { type: "number" } } },
     });
     expect(entries.length).toBe(1);
-    expect(entries[0].id).toBe("WIDGET-1");
-    expect(entries[0].data.price).toBe(9.99);
-    expect(entries[0].body).toBeNull();
+    expect(entries[0]!.id).toBe("WIDGET-1");
+    expect(entries[0]!.data.price).toBe(9.99);
+    expect(entries[0]!.body).toBeNull();
   });
 });
 
@@ -123,7 +123,7 @@ describe("Csv.discover / Csv.load / resolve", () => {
   test("discover returns a single existing file as-is", async () => {
     const files = await Csv.discover("./data/catalog.csv", { baseDir: TMP });
     expect(files.length).toBe(1);
-    expect(files[0].endsWith("catalog.csv")).toBe(true);
+    expect(files[0]!.endsWith("catalog.csv")).toBe(true);
   });
 
   test("discover returns [] for a missing path", async () => {
@@ -135,14 +135,14 @@ describe("Csv.discover / Csv.load / resolve", () => {
     const entries = await Csv.load(resolve(TMP, "data/catalog.csv"), {
       schema: { properties: { price: { type: "number" } } },
     });
-    expect(entries[0].id).toBe("A-1");
-    expect(entries[0].data.price).toBe(9.99);
+    expect(entries[0]!.id).toBe("A-1");
+    expect(entries[0]!.data.price).toBe(9.99);
   });
 
   test("instance resolve loads the configured source", async () => {
     const csv = new Csv({ basePath: TMP, src: "./data/catalog.csv" });
     const entries = await csv.resolve();
     expect(entries.length).toBe(1);
-    expect(entries[0].data.name).toBe("Widget");
+    expect(entries[0]!.data.name).toBe("Widget");
   });
 });

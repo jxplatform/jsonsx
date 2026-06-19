@@ -82,7 +82,7 @@ function onKeydown(e: KeyboardEvent) {
     case "Enter": {
       e.preventDefault();
       if (items[_selectedIndex]) {
-        selectItem(items[_selectedIndex]);
+        selectItem(items[_selectedIndex]!);
       }
       break;
     }
@@ -101,7 +101,7 @@ function selectItem(item: { path: string; name?: string }) {
   closeQuickSearch();
   const { path } = item;
   trackRecentFile({ name: path.split("/").pop() || "", path });
-  openFileInTab(path);
+  void openFileInTab(path);
 }
 
 function fileIcon(name: string) {

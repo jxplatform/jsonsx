@@ -170,7 +170,7 @@ export async function resolveLayoutDoc(layoutPath: string) {
   try {
     const platform = getPlatform();
     const content = await platform.readFile(normalized);
-    const doc = JSON.parse(content);
+    const doc = JSON.parse(content) as JxMutableNode;
     layoutCache.set(normalized, doc);
     return structuredClone(doc);
   } catch {

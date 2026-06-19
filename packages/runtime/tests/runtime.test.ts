@@ -194,6 +194,7 @@ describe("resolve", () => {
 
   test("throws on non-ok response", async () => {
     global.fetch = mock(() => Promise.resolve({ ok: false, status: 404 })) as any;
+    // oxlint-disable-next-line typescript/await-thenable -- bun-types types `.rejects.toThrow()` as void, but it returns a Promise at runtime that must be awaited
     await expect(resolve("http://example.com/missing.json")).rejects.toThrow("404");
   });
 });
@@ -430,6 +431,7 @@ describe("buildScope", () => {
   });
 
   test("Shape 4: Function with both body and $src → throws", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- bun-types types `.rejects.toThrow()` as void, but it returns a Promise at runtime that must be awaited
     await expect(
       buildScope(
         {
@@ -1055,8 +1057,8 @@ describe("renderNode", () => {
       reactive({}),
     );
     expect(el.children.length).toBe(2);
-    expect(el.children[0].textContent).toBe("A");
-    expect(el.children[1].textContent).toBe("B");
+    expect(el.children[0]!.textContent).toBe("A");
+    expect(el.children[1]!.textContent).toBe("B");
   });
 
   test("$switch renders correct case", () => {
@@ -1246,7 +1248,7 @@ describe("renderNode", () => {
     filterTerm.value = "alph";
     await wait();
     expect(el.children.length).toBe(1);
-    expect(el.children[0].textContent).toBe("alpha");
+    expect(el.children[0]!.textContent).toBe("alpha");
   });
 
   test("Array map with paginated computed slice", async () => {
@@ -1324,14 +1326,14 @@ describe("computed $src + Array map integration", () => {
 
     const el = renderNode(doc as unknown as JxDocument, state) as HTMLElement;
     expect(el.children.length).toBe(3);
-    expect(el.children[0].textContent).toBe("Hello World");
+    expect(el.children[0]!.textContent).toBe("Hello World");
 
     state.searchTerm = "hello";
     await wait();
     expect(state.filteredPosts).toHaveLength(2);
     expect(el.children.length).toBe(2);
-    expect(el.children[0].textContent).toBe("Hello World");
-    expect(el.children[1].textContent).toBe("Hello Again");
+    expect(el.children[0]!.textContent).toBe("Hello World");
+    expect(el.children[1]!.textContent).toBe("Hello Again");
   });
 
   test("computed function paginates items reactively", async () => {
@@ -1359,17 +1361,17 @@ describe("computed $src + Array map integration", () => {
     const state = await buildScope(doc as unknown as JxDocument, {}, BASE);
     const el = renderNode(doc as unknown as JxDocument, state) as HTMLElement;
     expect(el.children.length).toBe(5);
-    expect(el.children[0].textContent).toBe("Item 1");
+    expect(el.children[0]!.textContent).toBe("Item 1");
 
     state.currentPage = 2;
     await wait();
     expect(el.children.length).toBe(5);
-    expect(el.children[0].textContent).toBe("Item 6");
+    expect(el.children[0]!.textContent).toBe("Item 6");
 
     state.currentPage = 3;
     await wait();
     expect(el.children.length).toBe(2);
-    expect(el.children[0].textContent).toBe("Item 11");
+    expect(el.children[0]!.textContent).toBe("Item 11");
   });
 
   test("event handler with parameters + return is callable, not computed", async () => {
@@ -1417,8 +1419,8 @@ describe("Array members in a children array", () => {
     // No extra wrapper: h1 + 2×li + footer are all direct children of <div>.
     const tags = [...el.children].map((c) => c.tagName.toLowerCase());
     expect(tags).toEqual(["h1", "li", "li", "footer"]);
-    expect(el.children[1].textContent).toBe("a");
-    expect(el.children[2].textContent).toBe("b");
+    expect(el.children[1]!.textContent).toBe("a");
+    expect(el.children[2]!.textContent).toBe("b");
   });
 
   test("array member as the sole child renders items directly into the parent", () => {
@@ -1456,8 +1458,8 @@ describe("Array members in a children array", () => {
     await wait();
     const tags = [...el.children].map((c) => c.tagName.toLowerCase());
     expect(tags).toEqual(["h1", "li"]);
-    expect(el.children[0].textContent).toBe("head");
-    expect(el.children[1].textContent).toBe("x");
+    expect(el.children[0]!.textContent).toBe("head");
+    expect(el.children[1]!.textContent).toBe("x");
   });
 
   test("two array members as siblings keep their relative order", () => {
@@ -1501,8 +1503,8 @@ describe("Array members in a children array", () => {
     );
     const sections = el.querySelectorAll("section");
     expect(sections.length).toBe(2);
-    expect(sections[0].querySelectorAll("span").length).toBe(2);
-    expect(sections[1].querySelectorAll("span").length).toBe(1);
+    expect(sections[0]!.querySelectorAll("span").length).toBe(2);
+    expect(sections[1]!.querySelectorAll("span").length).toBe(1);
     // Replacing the outer list disposes the old generation's inner arrays and rebuilds.
     state.groups = [{ items: ["only"] }];
     await wait();
@@ -1536,8 +1538,8 @@ describe("Jx", () => {
   test("mounts object doc into target", async () => {
     const target = document.createElement("div");
     await Jx({ tagName: "span", textContent: "mounted" }, target);
-    expect(target.children[0].tagName.toLowerCase()).toBe("span");
-    expect(target.children[0].textContent).toBe("mounted");
+    expect(target.children[0]!.tagName.toLowerCase()).toBe("span");
+    expect(target.children[0]!.textContent).toBe("mounted");
   });
 
   test("returns scope with naked value property", async () => {
@@ -1579,7 +1581,7 @@ describe("Jx", () => {
     ) as any;
     const target = document.createElement("div");
     await Jx("http://example.com/test.json", target);
-    expect(target.children[0].tagName.toLowerCase()).toBe("article");
+    expect(target.children[0]!.tagName.toLowerCase()).toBe("article");
   });
 
   test("defaults target to document.body", async () => {

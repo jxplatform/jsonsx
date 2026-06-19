@@ -13,17 +13,17 @@ const on = mock((event: string, handler: (event: unknown) => unknown) => {
   }
 });
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   ApplicationMenu: { on, setApplicationMenu },
 }));
 
 // ─── Mock ./utils and ./window-manager ──────────────────────────────────────
 
 const openFileDialog = mock(async (): Promise<string | null> => null);
-mock.module("../src/utils", () => ({ openFileDialog }));
+void mock.module("../src/utils", () => ({ openFileDialog }));
 
 const openProjectWindow = mock((_root: string | null) => ({}));
-mock.module("../src/window-manager", () => ({ openProjectWindow }));
+void mock.module("../src/window-manager", () => ({ openProjectWindow }));
 
 // ─── Import module under test ────────────────────────────────────────────────
 

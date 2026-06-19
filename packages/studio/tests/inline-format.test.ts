@@ -153,7 +153,7 @@ describe("normalizeInlineContent", () => {
     normalizeInlineContent(root);
     const ems = root.querySelectorAll("em");
     expect(ems.length).toBe(1);
-    expect(ems[0].textContent).toBe("italic");
+    expect(ems[0]!.textContent).toBe("italic");
   });
 
   test("removes empty inline elements", () => {

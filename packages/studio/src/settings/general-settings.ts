@@ -31,7 +31,7 @@ export function renderGeneralSettings(container: HTMLElement) {
   };
 
   const onAdapterChange = (e: Event) => {
-    updateSiteConfig({
+    void updateSiteConfig({
       build: { ...config.build, adapter: (e.target as HTMLInputElement).value },
     });
   };
@@ -40,7 +40,7 @@ export function renderGeneralSettings(container: HTMLElement) {
     // Lazy import breaks the general-settings ↔ settings-modal module cycle
     const { closeSettingsModal } = await import("./settings-modal");
     closeSettingsModal();
-    openFileInTab("project.json");
+    void openFileInTab("project.json");
   };
 
   // ─── Breakpoints ($media) ───────────────────────────────────────────────────
@@ -50,7 +50,7 @@ export function renderGeneralSettings(container: HTMLElement) {
 
   const onMediaValueChange = (key: string) => (e: Event) => {
     const updated = { ...media, [key]: (e.target as HTMLInputElement).value };
-    updateSiteConfig({ $media: updated });
+    void updateSiteConfig({ $media: updated });
   };
 
   const onMediaNameChange = (oldKey: string) => (e: Event) => {
@@ -63,20 +63,20 @@ export function renderGeneralSettings(container: HTMLElement) {
     for (const [k, v] of Object.entries(media)) {
       updated[k === oldKey ? newKey : k] = v;
     }
-    updateSiteConfig({ $media: updated });
+    void updateSiteConfig({ $media: updated });
     renderGeneralSettings(container);
   };
 
   const onRemoveBreakpoint = (key: string) => () => {
     const updated = { ...media };
     delete updated[key];
-    updateSiteConfig({ $media: updated });
+    void updateSiteConfig({ $media: updated });
     renderGeneralSettings(container);
   };
 
   const onAddBreakpoint = () => {
     const updated = { ...media, "--new": "(max-width: 480px)" };
-    updateSiteConfig({ $media: updated });
+    void updateSiteConfig({ $media: updated });
     renderGeneralSettings(container);
   };
 

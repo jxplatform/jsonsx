@@ -97,7 +97,7 @@ async function readFromClipboard() {
     for (const item of items) {
       if (item.types.includes(JX_MIME)) {
         const blob = await item.getType(JX_MIME);
-        const json = JSON.parse(await blob.text());
+        const json = JSON.parse(await blob.text()) as JxNode;
         return [json];
       }
       if (item.types.includes("text/html")) {
@@ -116,7 +116,7 @@ async function readFromClipboard() {
         const text = await blob.text();
         // Try parsing as Jx JSON
         try {
-          const parsed = JSON.parse(text);
+          const parsed = JSON.parse(text) as JxNode;
           if (parsed && parsed.tagName) {
             return [parsed];
           }
@@ -191,14 +191,14 @@ export async function pasteNode() {
     const idx = childIndex(tab.session.selection) as number;
     transactDoc(tab, (t) => {
       for (let i = 0; i < nodes.length; i++) {
-        mutateInsertNode(t, pp, idx + 1 + i, nodes[i]);
+        mutateInsertNode(t, pp, idx + 1 + i, nodes[i]!);
       }
     });
   } else {
     const idx = Array.isArray(parent.children) ? parent.children.length : 0;
     transactDoc(tab, (t) => {
       for (let i = 0; i < nodes.length; i++) {
-        mutateInsertNode(t, pPath, idx + i, nodes[i]);
+        mutateInsertNode(t, pPath, idx + i, nodes[i]!);
       }
     });
   }
@@ -401,7 +401,7 @@ export function showContextMenu(
           const idx = Array.isArray(node.children) ? node.children.length : 0;
           transactDoc(activeTab.value, (t) => {
             for (let i = 0; i < nodes.length; i++) {
-              mutateInsertNode(t, path, idx + i, nodes[i]);
+              mutateInsertNode(t, path, idx + i, nodes[i]!);
             }
           });
           statusMessage("Pasted");
@@ -420,7 +420,7 @@ export function showContextMenu(
           const idx = childIndex(path) as number;
           transactDoc(activeTab.value, (t) => {
             for (let i = 0; i < nodes.length; i++) {
-              mutateInsertNode(t, pp, idx + 1 + i, nodes[i]);
+              mutateInsertNode(t, pp, idx + 1 + i, nodes[i]!);
             }
           });
           statusMessage("Pasted");
@@ -463,7 +463,7 @@ export function showContextMenu(
                 style=${item.danger ? "color: var(--danger)" : ""}
                 @click=${() => {
                   dismissContextMenu();
-                  item.action?.();
+                  void item.action?.();
                 }}
                 >${item.label}</sp-menu-item
               >`,

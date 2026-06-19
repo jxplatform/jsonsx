@@ -53,7 +53,7 @@ export function renderCssVarsEditor(container: HTMLElement) {
   const mediaNames = media ? Object.keys(media).filter((m) => m !== "--") : [];
 
   const save = () => {
-    updateSiteConfig({ style: { ...rootStyle } });
+    void updateSiteConfig({ style: { ...rootStyle } });
   };
 
   const updateVar = (name: string, val: string) => {
@@ -297,7 +297,7 @@ function renderMediaOverrides(varName: string, rootStyle: JxStyle, mediaNames: s
                 (rootStyle[`@${o.mediaName}`] as Record<string, unknown>)[varName] = (
                   e.target as HTMLInputElement
                 ).value;
-                updateSiteConfig({ style: { ...rootStyle } });
+                void updateSiteConfig({ style: { ...rootStyle } });
               }}
               style="max-width:120px"
             ></sp-textfield>

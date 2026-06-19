@@ -440,7 +440,7 @@ describe("buildSite — cloudflare images service", () => {
 
   // Cloudflare mode only reads image dimensions (no variant generation); mock sharp so the
   // Test doesn't depend on the native binary being loadable.
-  mock.module("sharp", () => ({
+  void mock.module("sharp", () => ({
     default: () => ({
       metadata: async () => ({ format: "png", height: 720, width: 1280 }),
     }),
@@ -544,6 +544,7 @@ describe("buildSite — missing pages/", () => {
   });
 
   it("throws when pages/ directory does not exist", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(buildSite(NO_PAGES_TMP)).rejects.toThrow("pages/ directory not found");
   });
 });

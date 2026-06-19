@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 const toggleInlineFormat = mock((_tag: string, _el: unknown) => {});
-mock.module("../src/editor/inline-format.js", () => ({
+void mock.module("../src/editor/inline-format.js", () => ({
   normalizeInlineContent: () => {},
   toggleInlineFormat,
 }));
@@ -117,23 +117,23 @@ describe("commit conversion", () => {
 
   test("empty element commits empty textContent", () => {
     const c = commitWith("");
-    expect(c.textContent).toBe("");
-    expect(c.children).toBeNull();
+    expect(c!.textContent).toBe("");
+    expect(c!.children).toBeNull();
   });
 
   test("single text node commits as textContent", () => {
     const c = commitWith("plain words");
-    expect(c.textContent).toBe("plain words");
+    expect(c!.textContent).toBe("plain words");
   });
 
   test("mixed content commits as children", () => {
     const c = commitWith("a<strong>x</strong>c");
-    expect(c.children).toEqual(["a", { tagName: "strong", textContent: "x" }, "c"]);
+    expect(c!.children).toEqual(["a", { tagName: "strong", textContent: "x" }, "c"]);
   });
 
   test("legacy formatting tags are mapped to semantic equivalents", () => {
     const c = commitWith("<b>b</b><i>i</i><s>s</s> t");
-    expect(c.children).toEqual([
+    expect(c!.children).toEqual([
       { tagName: "strong", textContent: "b" },
       { tagName: "em", textContent: "i" },
       { tagName: "del", textContent: "s" },
@@ -143,7 +143,7 @@ describe("commit conversion", () => {
 
   test("anchor href and title are preserved", () => {
     const c = commitWith('<a href="/docs" title="Docs">link</a> tail');
-    const a = c.children![0] as JxMutableNode;
+    const a = c!.children![0] as JxMutableNode;
     expect(a.tagName).toBe("a");
     expect(a.attributes).toEqual({ href: "/docs", title: "Docs" });
     expect(a.textContent).toBe("link");
@@ -151,12 +151,12 @@ describe("commit conversion", () => {
 
   test("code elements keep only their text", () => {
     const c = commitWith("<code>let <b>x</b></code> w");
-    expect(c.children![0]).toEqual({ tagName: "code", textContent: "let x" });
+    expect(c!.children![0]).toEqual({ tagName: "code", textContent: "let x" });
   });
 
   test("nested inline elements recurse into children", () => {
     const c = commitWith("<strong>a<em>b</em></strong>x");
-    expect(c.children![0]).toEqual({
+    expect(c!.children![0]).toEqual({
       children: ["a", { tagName: "em", textContent: "b" }],
       tagName: "strong",
     });
@@ -164,13 +164,13 @@ describe("commit conversion", () => {
 
   test("empty inline element commits empty textContent", () => {
     const c = commitWith("<span></span>x");
-    expect(c.children![0]).toEqual({ tagName: "span", textContent: "" });
+    expect(c!.children![0]).toEqual({ tagName: "span", textContent: "" });
   });
 
   test("comment nodes are dropped and split text is merged", () => {
     const c = commitWith("x<!--note-->y");
-    expect(c.textContent).toBe("xy");
-    expect(c.children).toBeNull();
+    expect(c!.textContent).toBe("xy");
+    expect(c!.children).toBeNull();
   });
 });
 
@@ -183,7 +183,7 @@ describe("editing interactions", () => {
     keydown(el, "i", { ctrlKey: true });
     keydown(el, "`", { ctrlKey: true });
     expect(toggleInlineFormat.mock.calls.map((c) => c[0])).toEqual(["strong", "em", "code"]);
-    expect(toggleInlineFormat.mock.calls[0][1]).toBe(el);
+    expect(toggleInlineFormat.mock.calls[0]![1]).toBe(el);
   });
 
   test("other ctrl keys do not toggle formats", () => {
@@ -246,9 +246,9 @@ describe("Enter splits", () => {
     caretAt(el.firstChild!, 2);
     keydown(el, "Enter");
     expect(splits.length).toBe(1);
-    expect(splits[0].path).toEqual(["children", 0]);
-    expect(splits[0].before).toEqual({ textContent: "He" });
-    expect(splits[0].after).toEqual({ textContent: "llo" });
+    expect(splits[0]!.path).toEqual(["children", 0]);
+    expect(splits[0]!.before).toEqual({ textContent: "He" });
+    expect(splits[0]!.after).toEqual({ textContent: "llo" });
     expect(isEditing()).toBe(false);
     expect(endCount).toBe(1);
     expect(getActiveElement()).toBeNull();
@@ -259,8 +259,8 @@ describe("Enter splits", () => {
     edit();
     caretAt(el.firstChild!, 2); // End of "ab"
     keydown(el, "Enter");
-    expect(splits[0].before).toEqual({ textContent: "ab" });
-    expect(splits[0].after).toEqual({
+    expect(splits[0]!.before).toEqual({ textContent: "ab" });
+    expect(splits[0]!.after).toEqual({
       children: [{ tagName: "em", textContent: "cd" }],
     });
   });
@@ -270,7 +270,7 @@ describe("Enter splits", () => {
     edit();
     caretAt(el.firstChild!, 2);
     keydown(el, "Enter");
-    expect(splits[0].after).toEqual({ textContent: "cd" });
+    expect(splits[0]!.after).toEqual({ textContent: "cd" });
   });
 
   test("shift+Enter does not split", () => {
@@ -353,9 +353,9 @@ describe("slash menu", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
 
     expect(inserts.length).toBe(1);
-    expect(inserts[0].cmd.tag).toBe("h1");
-    expect(inserts[0].path).toEqual(["children", 0]);
-    expect(inserts[0].commitData).toEqual({ textContent: "intro " });
+    expect(inserts[0]!.cmd.tag).toBe("h1");
+    expect(inserts[0]!.path).toEqual(["children", 0]);
+    expect(inserts[0]!.commitData).toEqual({ textContent: "intro " });
     expect(el.textContent).toBe("intro ");
     expect(isEditing()).toBe(false);
     expect(endCount).toBe(1);

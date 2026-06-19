@@ -19,7 +19,7 @@ const mockCheckForUpdate = mock(() => ({
 const mockDownloadUpdate = mock(() => {});
 const mockApplyUpdate = mock(() => {});
 
-mock.module("electrobun/bun", () => ({
+void mock.module("electrobun/bun", () => ({
   BrowserWindow: class {},
   Electrobun: { start: () => {} },
   Updater: {

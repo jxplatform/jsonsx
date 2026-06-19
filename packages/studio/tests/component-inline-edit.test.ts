@@ -175,7 +175,7 @@ describe("keydown handling", () => {
     pressEl(el, "Escape");
     expect(view.componentInlineEdit).toBeNull();
     expect(el.hasAttribute("contenteditable")).toBe(false);
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
     expect(tab.doc.dirty).toBe(false);
     expect((panel.overlayClk as HTMLElement).style.pointerEvents).toBe("");
   });
@@ -191,7 +191,7 @@ describe("keydown handling", () => {
 
     pressEl(el, "Enter");
 
-    expect(docChildren()[0].textContent).toBe("Hel");
+    expect(docChildren()[0]!.textContent).toBe("Hel");
     expect(docChildren()[1]).toEqual({ tagName: "p", textContent: "lo" });
     expect(docChildren().length).toBe(4);
     expect(tab.session.selection).toEqual(["children", 1]);
@@ -206,10 +206,10 @@ describe("keydown handling", () => {
     enterComponentInlineEdit(el, ["children", 0]);
     // Selection is already collapsed at the end after entering
     pressEl(el, "Enter");
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
     // TextAfter "" → textContent undefined is dropped by mutateUpdateProperty
-    expect(docChildren()[1].tagName).toBe("p");
-    expect(docChildren()[1].textContent).toBe("");
+    expect(docChildren()[1]!.tagName).toBe("p");
+    expect(docChildren()[1]!.textContent).toBe("");
   });
 
   test("Shift+Enter does not split", () => {
@@ -288,7 +288,7 @@ describe("component slash commands", () => {
     emptyEl.dispatchEvent(new Event("input", { bubbles: true }));
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
 
-    expect(docChildren()[2].tagName).toBe("hr");
+    expect(docChildren()[2]!.tagName).toBe("hr");
     expect(tab.session.ui.pendingInlineEdit).toBeNull();
   });
 });
@@ -318,7 +318,7 @@ describe("outside mousedown commit", () => {
     el.textContent = "Edited";
     mousedown(document.body, { clientX: 5, clientY: 5 });
     expect(view.componentInlineEdit).toBeNull();
-    expect(docChildren()[0].textContent).toBe("Edited");
+    expect(docChildren()[0]!.textContent).toBe("Edited");
     expect(tab.doc.dirty).toBe(true);
   });
 
@@ -326,7 +326,7 @@ describe("outside mousedown commit", () => {
     enterComponentInlineEdit(el, ["children", 0]);
     mousedown(document.body);
     expect(view.componentInlineEdit).toBeNull();
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
     expect(tab.doc.dirty).toBe(false);
   });
 
@@ -335,7 +335,7 @@ describe("outside mousedown commit", () => {
     el.textContent = "   ";
     mousedown(document.body);
     expect(docChildren().length).toBe(2);
-    expect(docChildren()[0].textContent).toBe("World");
+    expect(docChildren()[0]!.textContent).toBe("World");
   });
 
   test("clicking another canvas element selects it", () => {
@@ -353,7 +353,7 @@ describe("outside mousedown commit", () => {
       path: ["children", 1],
     });
     expect(tab.session.ui.activeMedia).toBeNull();
-    expect(docChildren()[0].textContent).toBe("Hello");
+    expect(docChildren()[0]!.textContent).toBe("Hello");
   });
 
   test("clicking another element with changed text commits then selects", () => {
@@ -366,7 +366,7 @@ describe("outside mousedown commit", () => {
     el.textContent = "Rewritten";
     mousedown(document.body);
 
-    expect(docChildren()[0].textContent).toBe("Rewritten");
+    expect(docChildren()[0]!.textContent).toBe("Rewritten");
     expect(tab.session.selection).toEqual(["children", 1]);
   });
 

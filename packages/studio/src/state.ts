@@ -251,7 +251,7 @@ export function flattenTree(
   if (Array.isArray(children)) {
     for (let i = 0; i < children.length; i++) {
       const childPath = [...path, "children", i];
-      rows.push(...flattenTree(children[i], childPath, depth + 1));
+      rows.push(...flattenTree(children[i]!, childPath, depth + 1));
     }
   } else if (
     children &&

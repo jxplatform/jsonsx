@@ -49,9 +49,9 @@ describe("renderNode text nodes", () => {
   test("bare string/number/boolean children become text nodes", () => {
     const el = renderNode({ children: ["hi", 5, true], tagName: "div" } as any, reactive({}));
     expect(el.childNodes.length).toBe(3);
-    expect(el.childNodes[0].textContent).toBe("hi");
-    expect(el.childNodes[1].textContent).toBe("5");
-    expect(el.childNodes[2].textContent).toBe("true");
+    expect(el.childNodes[0]!.textContent).toBe("hi");
+    expect(el.childNodes[1]!.textContent).toBe("5");
+    expect(el.childNodes[2]!.textContent).toBe("true");
   });
 
   test("template string child is reactive", async () => {
@@ -90,9 +90,9 @@ describe("renderNode text nodes", () => {
     );
     expect(el.tagName.toLowerCase()).toBe("div");
     expect(seen.length).toBe(2);
-    expect(seen[0].tag).toBe("div");
-    expect(seen[1].tag).toBe("span");
-    expect(seen[1].path).toEqual(["children", 0]);
+    expect(seen[0]!.tag).toBe("div");
+    expect(seen[1]!.tag).toBe("span");
+    expect(seen[1]!.path).toEqual(["children", 0]);
   });
 });
 
@@ -297,8 +297,8 @@ describe("renderSwitch gaps", () => {
     );
     await wait(10);
     expect(el.children.length).toBe(1);
-    expect(el.children[0].tagName.toLowerCase()).toBe("article");
-    expect(el.children[0].textContent).toBe("external!");
+    expect(el.children[0]!.tagName.toLowerCase()).toBe("article");
+    expect(el.children[0]!.textContent).toBe("external!");
   });
 
   test("stale external case (superseded before fetch resolves) is dropped", async () => {
@@ -330,7 +330,7 @@ describe("renderSwitch gaps", () => {
     });
     await wait(10);
     expect(el.children.length).toBe(1);
-    expect(el.children[0].tagName.toLowerCase()).toBe("aside");
+    expect(el.children[0]!.tagName.toLowerCase()).toBe("aside");
     expect(el.textContent).toBe("B");
   });
 
@@ -621,11 +621,11 @@ describe("IndexedDB gaps", () => {
       objectStoreNames: { contains: (n: string) => storeNames.has(n) },
       transaction: () => ({ objectStore: () => "the-store" }),
     };
-    listeners.upgradeneeded({ target: { result: db } });
+    listeners.upgradeneeded!({ target: { result: db } });
     expect(storeNames.has("gapsStore")).toBe(true);
     expect(indexCalls).toEqual([["byName", "name", { unique: true }]]);
 
-    listeners.success({ target: { result: db } });
+    listeners.success!({ target: { result: db } });
     const api = result.value as {
       database: string;
       getStore: () => Promise<unknown>;
@@ -639,7 +639,7 @@ describe("IndexedDB gaps", () => {
     expect(api.version).toBe(1);
     expect(await api.getStore()).toBe("the-store");
 
-    listeners.error();
+    listeners.error!();
     expect(result.value).toEqual({ error: "idb fail" });
     delete (global as any).indexedDB;
   });

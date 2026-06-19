@@ -239,7 +239,7 @@ describe("compileElement — $expression state entries", () => {
       },
       tagName: "test-expr-handler",
     });
-    const [{ content }] = result.files;
+    const { content } = result.files[0]!;
     expect(content).toContain("this.state.increment = (s, e) => { s.count += 1; };");
   });
 
@@ -259,7 +259,7 @@ describe("compileElement — $expression state entries", () => {
       },
       tagName: "test-expr-computed",
     });
-    const [{ content }] = result.files;
+    const { content } = result.files[0]!;
     expect(content).toContain("this.state.sum = computed(() => (this.state.a + this.state.b));");
   });
 
@@ -281,7 +281,7 @@ describe("compileElement — $expression state entries", () => {
       state: { count: 0 },
       tagName: "test-expr-inline",
     });
-    const [{ content }] = result.files;
+    const { content } = result.files[0]!;
     expect(content).toContain('@click="${(e) => { s.count += 1; }}"');
   });
 
@@ -300,7 +300,7 @@ describe("compileElement — $expression state entries", () => {
       },
       tagName: "test-expr-toggle",
     });
-    const [{ content }] = result.files;
+    const { content } = result.files[0]!;
     expect(content).toContain("this.state.toggleDark = (s, e) => { s.dark = !(s.dark); };");
   });
 
@@ -324,7 +324,7 @@ describe("compileElement — $expression state entries", () => {
       },
       tagName: "test-expr-reduce",
     });
-    const [{ content }] = result.files;
+    const { content } = result.files[0]!;
     expect(content).toContain(
       "this.state.total = computed(() => this.state.nums.reduce((_acc, _item, _index) => (_acc + _item), 0));",
     );

@@ -19,7 +19,12 @@ const root = document.documentElement;
 // ─── Restore saved widths & collapse state ──────────────────────────────────
 
 try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}") as {
+    left?: number;
+    right?: number;
+    leftCollapsed?: boolean;
+    rightCollapsed?: boolean;
+  };
   if (saved.left) {
     root.style.setProperty("--panel-w-left", `${saved.left}px`);
   }

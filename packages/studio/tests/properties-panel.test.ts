@@ -181,19 +181,19 @@ describe("element section", () => {
     );
     let c = await renderPanel();
     pointer(c.querySelector('[title="Clear $id"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].$id).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.$id).toBeUndefined();
 
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear class"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].className).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.className).toBeUndefined();
 
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear text"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].textContent).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.textContent).toBeUndefined();
 
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear hidden"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].hidden).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.hidden).toBeUndefined();
   });
 
   test("editing the ID field commits on change", async () => {
@@ -202,7 +202,7 @@ describe("element section", () => {
     const field = c.querySelector('[data-prop="$id"] sp-textfield') as HTMLInputElement;
     field.value = "headline";
     field.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$id).toBe("headline");
+    expect((docNow().children as JxMutableNode[])[0]!.$id).toBe("headline");
   });
 
   test("class and text content fields commit on change", async () => {
@@ -211,13 +211,13 @@ describe("element section", () => {
     const cls = c.querySelector('[data-prop="className"] sp-textfield') as HTMLInputElement;
     cls.value = "lede";
     cls.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].className).toBe("lede");
+    expect((docNow().children as JxMutableNode[])[0]!.className).toBe("lede");
 
     c = await renderPanel();
     const text = c.querySelector('[data-prop="textContent"] sp-textfield') as HTMLInputElement;
     text.value = "Body copy";
     text.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].textContent).toBe("Body copy");
+    expect((docNow().children as JxMutableNode[])[0]!.textContent).toBe("Body copy");
   });
 
   test("hidden checkbox toggles the hidden property", async () => {
@@ -226,13 +226,13 @@ describe("element section", () => {
     const box = c.querySelector('[data-prop="hidden"] sp-checkbox') as HTMLInputElement;
     box.checked = true;
     box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].hidden).toBe(true);
+    expect((docNow().children as JxMutableNode[])[0]!.hidden).toBe(true);
 
     c = await renderPanel();
     const box2 = c.querySelector('[data-prop="hidden"] sp-checkbox') as HTMLInputElement;
     box2.checked = false;
     box2.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].hidden).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.hidden).toBeUndefined();
   });
 
   test("accordion toggle event flips the section state in session ui", async () => {
@@ -543,11 +543,11 @@ describe("component props section", () => {
     const field = sec.querySelector('[data-prop="title"] sp-textfield') as HTMLInputElement;
     field.value = "Updated";
     field.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props!.title).toBe("Updated");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("Updated");
 
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear title"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].$props).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.$props).toBeUndefined();
   });
 
   test("boolean prop checkbox sets true and clears on uncheck", async () => {
@@ -559,7 +559,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     box.checked = false;
     box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.$props).toBeUndefined();
 
     c = await renderPanel();
     box = section(c, "Component Props")!.querySelector(
@@ -567,7 +567,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     box.checked = true;
     box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props!.featured).toBe(true);
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.featured).toBe(true);
   });
 
   test("enum prop commits via jx-value-selector change detail", async () => {
@@ -578,7 +578,7 @@ describe("component props section", () => {
       '[data-prop="variant"] jx-value-selector',
     )!;
     sel.dispatchEvent(new CustomEvent("change", { bubbles: true, detail: { value: "fancy" } }));
-    expect((docNow().children as JxMutableNode[])[0].$props!.variant).toBe("fancy");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.variant).toBe("fancy");
   });
 
   test("date prop commits via its text field", async () => {
@@ -590,7 +590,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     field.value = "2026-06-12";
     field.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props!.published).toBe("2026-06-12");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.published).toBe("2026-06-12");
   });
 
   test("bind toggle binds a prop to the first signal and back to its default", async () => {
@@ -599,7 +599,7 @@ describe("component props section", () => {
     let c = await renderPanel();
     let row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
     pointer(row.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as JxMutableNode[])[0].$props!.title).toEqual({
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toEqual({
       $ref: "#/state/username",
     });
 
@@ -607,7 +607,7 @@ describe("component props section", () => {
     row = section(c, "Component Props")!.querySelector('[data-prop="title"]')!;
     expect(row.querySelector("sp-action-button")!.getAttribute("title")).toContain("Unbind");
     pointer(row.querySelector("sp-action-button")!, "click");
-    expect((docNow().children as JxMutableNode[])[0].$props!.title).toBe("kevin");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toBe("kevin");
   });
 
   test("bound prop renders a signal picker that rebinds or clears", async () => {
@@ -620,7 +620,7 @@ describe("component props section", () => {
     expect(picker).not.toBeNull();
     picker.value = "#/state/username";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props!.title).toEqual({
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.title).toEqual({
       $ref: "#/state/username",
     });
 
@@ -630,7 +630,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     picker.value = "";
     picker.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].$props).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.$props).toBeUndefined();
   });
 
   test("npm components write props into attributes instead of $props", async () => {
@@ -649,7 +649,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     field.value = "Click me";
     field.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].attributes!.label).toBe("Click me");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.label).toBe("Click me");
 
     // Empty value removes the attribute
     c = await renderPanel();
@@ -658,7 +658,7 @@ describe("component props section", () => {
     ) as HTMLInputElement;
     field.value = "";
     field.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].attributes?.label).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.label).toBeUndefined();
 
     // Npm comp without a path → no Edit definition link
     c = await renderPanel();
@@ -729,11 +729,11 @@ describe("html attribute sections", () => {
     // RenderTextInput commits via a 400ms debounced @input handler
     field.dispatchEvent(new Event("input", { bubbles: true }));
     await sleep(460);
-    expect((docNow().children as JxMutableNode[])[0].attributes!.href).toBe("/about");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("/about");
 
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear href"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].attributes?.href).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.href).toBeUndefined();
   });
 
   test("boolean attribute renders a checkbox and clears via the set-dot", async () => {
@@ -749,7 +749,7 @@ describe("html attribute sections", () => {
     const box = row.querySelector("sp-checkbox") as unknown as HTMLInputElement;
     box.checked = false;
     box.dispatchEvent(new Event("change", { bubbles: true }));
-    expect((docNow().children as JxMutableNode[])[0].attributes?.required).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.required).toBeUndefined();
 
     // Re-render with a value again and clear via the dot
     openDoc(
@@ -758,7 +758,7 @@ describe("html attribute sections", () => {
     );
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear required"]')!, "click");
-    expect((docNow().children as JxMutableNode[])[0].attributes?.required).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.required).toBeUndefined();
   });
 });
 
@@ -800,7 +800,7 @@ describe("custom attributes section", () => {
     ]);
     const c = await renderPanel();
     pointer(section(c, "Custom")!.querySelector(".kv-row sp-action-button")!, "click");
-    expect((docNow().children as JxMutableNode[])[0].attributes?.["data-x"]).toBeUndefined();
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.["data-x"]).toBeUndefined();
   });
 
   test("+ Add attribute click runs without mutating (empty value is a delete)", async () => {
@@ -810,7 +810,7 @@ describe("custom attributes section", () => {
     ]);
     const c = await renderPanel();
     pointer(kvAdd(section(c, "Custom")!, "+ Add attribute")!, "click");
-    expect(Object.keys((docNow().children as JxMutableNode[])[0].attributes!)).toEqual(["data-x"]);
+    expect(Object.keys((docNow().children as JxMutableNode[])[0]!.attributes!)).toEqual(["data-x"]);
   });
 });
 
@@ -1210,6 +1210,6 @@ describe("debounced edits", () => {
     num.value = "5";
     num.dispatchEvent(new Event("input", { bubbles: true }));
     await sleep(460);
-    expect((docNow().children as JxMutableNode[])[0].$props!.count).toBe("5");
+    expect((docNow().children as JxMutableNode[])[0]!.$props!.count).toBe("5");
   });
 });

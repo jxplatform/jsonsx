@@ -75,9 +75,9 @@ let consumePatchedReturn = false;
 const consumePatchedMock = mock((_doc: object) => consumePatchedReturn);
 let newProjectResult: { root: string } | null = null;
 
-mock.module("../src/services/monaco-setup.js", () => ({}));
+void mock.module("../src/services/monaco-setup.js", () => ({}));
 
-mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
+void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   KeyCode: {},
   KeyMod: {},
   MarkerSeverity: { Error: 8, Warning: 4 },
@@ -89,7 +89,7 @@ mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
   },
 }));
 
-mock.module("../src/panels/statusbar.ts", () => ({
+void mock.module("../src/panels/statusbar.ts", () => ({
   mountStatusbar: mock(() => {}),
   renderStatusbar: mock(() => {}),
   setStatusbarRenderer: mock(() => {}),
@@ -99,7 +99,7 @@ mock.module("../src/panels/statusbar.ts", () => ({
   unmountStatusbar: mock(() => {}),
 }));
 
-mock.module("../src/panels/toolbar.ts", () => ({
+void mock.module("../src/panels/toolbar.ts", () => ({
   mount: (_el: HTMLElement, ctx: unknown) => {
     toolbarCtx = ctx;
   },
@@ -107,20 +107,20 @@ mock.module("../src/panels/toolbar.ts", () => ({
   unmount: mock(() => {}),
 }));
 
-mock.module("../src/panels/welcome-screen.ts", () => ({
+void mock.module("../src/panels/welcome-screen.ts", () => ({
   initWelcome: (ctx: unknown) => {
     welcomeCtx = ctx;
   },
   renderWelcome: mock(() => {}),
 }));
 
-mock.module("../src/editor/shortcuts.ts", () => ({
+void mock.module("../src/editor/shortcuts.ts", () => ({
   initShortcuts: (get: () => unknown) => {
     shortcutsGet = get as () => any;
   },
 }));
 
-mock.module("../src/panels/block-action-bar.ts", () => ({
+void mock.module("../src/panels/block-action-bar.ts", () => ({
   dismissBlockActionBar: mock(() => {}),
   dismissLinkPopover: mock(() => {}),
   initBlockActionBar: (ctx: unknown) => {
@@ -129,7 +129,7 @@ mock.module("../src/panels/block-action-bar.ts", () => ({
   renderBlockActionBar: mock(() => {}),
 }));
 
-mock.module("../src/canvas/canvas-render.ts", () => ({
+void mock.module("../src/canvas/canvas-render.ts", () => ({
   applyCanvasMediaOverrides: mock(() => {}),
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
@@ -139,7 +139,7 @@ mock.module("../src/canvas/canvas-render.ts", () => ({
   scheduleCanvasRender: scheduleCanvasRenderMock,
 }));
 
-mock.module("../src/canvas/canvas-patcher.ts", () => ({
+void mock.module("../src/canvas/canvas-patcher.ts", () => ({
   applyPatchBatch: mock(() => {}),
   classifyOps: mock(() => ({ patchable: false, reason: "mock" })),
   consumePatchedDocument: consumePatchedMock,
@@ -149,7 +149,7 @@ mock.module("../src/canvas/canvas-patcher.ts", () => ({
   },
 }));
 
-mock.module("../src/new-project/new-project-modal.ts", () => ({
+void mock.module("../src/new-project/new-project-modal.ts", () => ({
   closeNewProjectModal: mock(() => {}),
   openNewProjectModal: mock(async () => newProjectResult),
 }));

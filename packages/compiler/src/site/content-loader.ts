@@ -21,6 +21,7 @@ import type { FormatEntry, FormatRegistry } from "@jxsuite/schema/format-registr
 import type {
   ContentTypeDef,
   ContentTypeSchema,
+  ContentTypeSchemaField,
   JxMutableNode,
   ProjectConfig,
 } from "@jxsuite/schema/types";
@@ -36,16 +37,16 @@ import type { ContentLoaderEntry } from "@jxsuite/parser/types";
  * @returns {ContentLoaderEntry[]} Array of ContentEntry shapes
  */
 function loadJSONEntries(filePath: string) {
-  const raw = JSON.parse(readFileSync(filePath, "utf8"));
+  const raw = JSON.parse(readFileSync(filePath, "utf8")) as unknown;
   if (Array.isArray(raw)) {
-    return raw.map((item: Record<string, unknown>, i: number) => ({
+    return (raw as Record<string, unknown>[]).map((item: Record<string, unknown>, i: number) => ({
       body: null,
       data: item,
       id: (item.id as string) ?? `${basename(filePath, ".json")}-${i}`,
     }));
   }
   // Single object file — filename is the id
-  const rawObj: Record<string, unknown> = raw;
+  const rawObj = raw as Record<string, unknown>;
   return [
     {
       body: null,
@@ -108,7 +109,7 @@ export async function loadContentTypes(
 ) {
   const result = loadContentConfig(projectRoot, projectConfig);
   if (!result) {
-    return new Map();
+    return new Map<string, ContentLoaderEntry[]>();
   }
 
   const { config } = result;
@@ -359,7 +360,8 @@ export function resolveContentTypeRefs(
       continue;
     }
 
-    for (const [field, def] of Object.entries(schema.properties)) {
+    for (const [field, rawDef] of Object.entries(schema.properties)) {
+      const def = rawDef as ContentTypeSchemaField;
       if (!def.$ref?.startsWith("#/contentTypes/")) {
         continue;
       }

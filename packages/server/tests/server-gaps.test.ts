@@ -118,7 +118,9 @@ describe("resolveNpmPath — gaps", () => {
 describe("createDevServer", () => {
   test("throws when root is missing", async () => {
     // @ts-expect-error — intentionally invalid options
-    await expect(createDevServer({})).rejects.toThrow("root is required");
+    const promise = createDevServer({});
+    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().rejects.toThrow() is typed as void but must be awaited at runtime
+    await expect(promise).rejects.toThrow("root is required");
   });
 
   describe("with watch disabled", () => {
@@ -300,7 +302,7 @@ describe("createDevServer", () => {
         const reader = (res.body as ReadableStream).getReader();
         const { value } = await reader.read();
         expect(new TextDecoder().decode(value)).toContain("data: reload");
-        reader.cancel();
+        void reader.cancel();
       } finally {
         clearInterval(interval);
         controller.abort();

@@ -58,7 +58,7 @@ describe("createWatcher — rebuild integration", () => {
       // The rebuild actually produced output
       const outputs = [...new Bun.Glob("*.js").scanSync({ cwd: join(dir, "out") })];
       expect(outputs.length).toBeGreaterThan(0);
-      reader.cancel();
+      void reader.cancel();
       await watcher.close();
       await sleep(100);
     } finally {
@@ -108,7 +108,7 @@ describe("createWatcher — rebuild integration", () => {
         }),
       ]);
       expect(raced).toBe("silent");
-      reader.cancel();
+      void reader.cancel();
       await watcher.close();
       // Drain any pending debounce timer before restoring Bun.build
       await sleep(150);
@@ -142,7 +142,7 @@ describe("createWatcher — rebuild integration", () => {
         }),
       ]);
       expect(raced).toBe("silent");
-      reader.cancel();
+      void reader.cancel();
       await watcher.close();
       await sleep(100);
     } finally {

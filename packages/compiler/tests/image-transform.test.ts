@@ -51,7 +51,7 @@ const mockManifest = {
   ],
 };
 
-mock.module("../src/site/image-optimizer.js", () => ({
+void mock.module("../src/site/image-optimizer.js", () => ({
   buildSrcset: mock((variants: any[], format: string) => {
     const filtered = variants.filter((v: any) => v.format === format);
     if (filtered.length === 0) {
@@ -69,7 +69,7 @@ mock.module("../src/site/image-optimizer.js", () => ({
   processImage: mock(async () => mockManifest),
 }));
 
-mock.module("../src/site/image-cache.js", () => ({
+void mock.module("../src/site/image-cache.js", () => ({
   getCached: mock(() => null),
   getImageCacheDir: mock((root: string) => `${root}/.cache/images`),
   setCached: mock(() => {}),
@@ -459,6 +459,7 @@ describe("image-transform", () => {
       const doc: any = { attributes: { src: "" }, tagName: "img" };
       const cache = { entries: {}, version: 1 };
 
+      // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
       await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
       expect(processImage).not.toHaveBeenCalled();
       expect(doc.attributes.srcset).toBeUndefined();
@@ -473,6 +474,7 @@ describe("image-transform", () => {
       };
       const cache = { entries: {}, version: 1 };
 
+      // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
       await expect(transformImageNodes(doc, defaultConfig, TMP, cache)).resolves.toBeDefined();
       expect(processImage).not.toHaveBeenCalled();
       expect(doc.innerHTML).not.toContain("srcset=");

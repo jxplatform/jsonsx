@@ -23,7 +23,7 @@ export function renderHeadEditor(container: HTMLElement) {
   const headEntries = config.$head || ([] as JxHeadEntry[]);
 
   const save = () => {
-    updateSiteConfig({ $head: headEntries });
+    void updateSiteConfig({ $head: headEntries });
   };
 
   const addEntry = (tag: string) => {
@@ -52,7 +52,7 @@ export function renderHeadEditor(container: HTMLElement) {
   };
 
   const updateEntry = (idx: number, key: string, val: string) => {
-    const entry = headEntries[idx];
+    const entry = headEntries[idx]!;
     if (key === "content" && (entry.tagName === "script" || entry.tagName === "style")) {
       entry.textContent = val;
     } else {

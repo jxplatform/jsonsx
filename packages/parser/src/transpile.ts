@@ -18,7 +18,7 @@ import remarkParseFrontmatter from "remark-parse-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkDirective from "remark-directive";
 import { htmlToJx } from "./html-to-jx.ts";
-import type { MdastNode } from "./types.ts";
+import type { MdastNode, UnifiedProcessor } from "./types.ts";
 import type { JsonValue, JxAttributeValue, JxDocument, JxElement } from "@jxsuite/schema/types";
 
 export { htmlToJx } from "./html-to-jx.ts";
@@ -94,7 +94,7 @@ export function expandDotPaths(attrs: Record<string, string>) {
     const segments = key.split(".");
     let target = result;
     for (let i = 0; i < segments.length - 1; i++) {
-      const seg = jxKey(segments[i]);
+      const seg = jxKey(segments[i]!);
       if (!(seg in target) || typeof target[seg] !== "object") {
         target[seg] = {};
       }
@@ -228,7 +228,7 @@ export function isJxMarkdown(source: string) {
   if (!fmMatch) {
     return false;
   }
-  return /^tagName:\s*.+-.+/m.test(fmMatch[1]);
+  return /^tagName:\s*.+-.+/m.test(fmMatch[1]!);
 }
 
 // ─── Transpiler ─────────────────────────────────────────────────────────────
@@ -662,7 +662,7 @@ export function convertChildren(children: MdastNode[]) {
  * @returns {object} Complete Jx JSON document
  */
 export function transpileJxMarkdown(source: string) {
-  const processor = unified()
+  const processor = (unified as unknown as () => UnifiedProcessor)()
     .use(remarkParse)
     .use(remarkFrontmatter, ["yaml"])
     .use(remarkParseFrontmatter)
@@ -681,7 +681,7 @@ export function transpileJxMarkdown(source: string) {
     doc[key] = value;
   }
 
-  const bodyNodes = tree.children.filter(
+  const bodyNodes = tree.children!.filter(
     (n: MdastNode) => n.type !== "yaml" && n.type !== "toml",
   ) as unknown as MdastNode[];
 

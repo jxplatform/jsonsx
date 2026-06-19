@@ -89,7 +89,7 @@ export async function Jx(
   const state = await buildScope(doc, {}, base);
   target.append(renderNode(doc, state, options));
   if (typeof state.onMount === "function") {
-    state.onMount(state);
+    (state.onMount as (s: JxScope) => unknown)(state);
   }
   return state;
 }
@@ -308,16 +308,31 @@ export { hasSchemaKeywords };
  * @param {JxScope} state
  * @returns {string}
  */
-function evaluateTemplate(str: string, state: JxScope) {
+function evaluateTemplate(str: string, state: JxScope): string {
   const $map = state?.$map as { item?: unknown; index?: number } | undefined;
-  const fn = new Function("state", "$map", "item", "index", `return \`${str}\``);
+  const fn = new Function("state", "$map", "item", "index", `return \`${str}\``) as (
+    state: JxScope,
+    $map: unknown,
+    item: unknown,
+    index: number | undefined,
+  ) => string;
   return fn(state, $map, $map?.item, $map?.index);
 }
 
 // ─── Step 2b: Function resolution (Shape 4) ─────────────────────────────────
 
+/** Shape of a dynamically imported module: named exports plus an optional default. */
+type ImportedModule = Record<string, unknown> & { default?: Record<string, unknown> };
+
+/** Minimal contract an externally-imported resolver class may implement. */
+interface ExternalClassInstance {
+  value?: unknown;
+  resolve?: () => unknown;
+  subscribe?: (cb: (newVal: unknown) => void) => void;
+}
+
 /** Module cache for $src imports (shared with external class resolution). */
-const _moduleCache = new Map();
+const _moduleCache = new Map<string, ImportedModule>();
 
 /**
  * Resolve a $prototype: "Function" entry into a function or computed.
@@ -345,11 +360,11 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
     return noop;
   }
 
-  let fn;
+  let fn: ((...args: unknown[]) => unknown) | undefined;
 
   if (def.body) {
     const params = resolveParamNames(def);
-    fn = new Function(...params, def.body);
+    fn = new Function(...params, def.body) as (...args: unknown[]) => unknown;
     Object.defineProperty(fn, "name", {
       configurable: true,
       value: def.name ?? key,
@@ -361,26 +376,27 @@ async function resolveFunction(def: JxFunctionDef, state: JxScope, key: string, 
       throw new Error(`Jx: '${key}' has neither body nor $src`);
     }
     const exportName = def.$export ?? key;
-    let mod;
+    let mod: ImportedModule;
     if (_moduleCache.has(src)) {
-      mod = _moduleCache.get(src);
+      mod = _moduleCache.get(src)!;
     } else {
       if (base) {
         const resolvedSrc = new URL(src, base).href;
         try {
-          mod = await import(resolvedSrc);
+          mod = (await import(resolvedSrc)) as ImportedModule;
         } catch {
-          mod = await import(src);
+          mod = (await import(src)) as ImportedModule;
         }
       } else {
-        mod = await import(src);
+        mod = (await import(src)) as ImportedModule;
       }
       _moduleCache.set(src, mod);
     }
-    fn = mod[exportName] ?? mod.default?.[exportName];
-    if (typeof fn !== "function") {
+    const candidate = mod[exportName] ?? mod.default?.[exportName];
+    if (typeof candidate !== "function") {
       throw new TypeError(`Jx: export "${exportName}" not found or not a function in "${src}"`);
     }
+    fn = candidate as (...args: unknown[]) => unknown;
   }
 
   // Detect computed: body contains a return statement, or $src function introspection.
@@ -483,11 +499,11 @@ export function renderNode(
   }
 
   // Extend scope with any $-prefixed local bindings declared on this node
-  let localState = state;
+  let localState: JxScope = state;
   for (const [key, val] of Object.entries(def)) {
     if (key.startsWith("$") && !RESERVED_KEYS.has(key)) {
       if (localState === state) {
-        localState = Object.create(state);
+        localState = Object.create(state) as JxScope;
       }
       localState[key] = isRefObj(val) ? resolveRef(val.$ref, state) : val;
     }
@@ -532,7 +548,7 @@ export function renderNode(
     renderMappedArrayInto(el, kids, localState, arrOpts);
   } else if (Array.isArray(kids)) {
     for (let i = 0; i < kids.length; i++) {
-      const child = kids[i];
+      const child = kids[i]!;
       const childOpts = options ? { ...options, _path: [...path, "children", i] } : undefined;
       if (isMappedArray(child)) {
         // Array pseudo-element among siblings: expand inline, no wrapper.
@@ -580,14 +596,15 @@ function applyProperties(el: HTMLElement, def: JxElement, state: JxScope) {
         const handler = resolveRef(val.$ref, state);
         if (typeof handler === "function") {
           const scope = state;
-          el.addEventListener(key.slice(2), (e) => handler(scope, e));
+          const handlerFn = handler as (s: JxScope, e: Event) => unknown;
+          el.addEventListener(key.slice(2), (e) => handlerFn(scope, e));
         }
         continue;
       }
       // Event handler: inline $prototype: "Function"
       if (isFunctionDef(val) && val.body) {
         const params = resolveParamNames(val);
-        const fn = new Function(...params, val.body);
+        const fn = new Function(...params, val.body) as (s: JxScope, e: Event) => unknown;
         const scope = state;
         el.addEventListener(key.slice(2), (e) => fn(scope, e));
         continue;
@@ -904,7 +921,7 @@ function renderMappedArrayInto(
     const nodes: ChildNode[] = [];
     scope.run(() => {
       for (const [index, item] of (items as unknown[]).entries()) {
-        const child = Object.create(state);
+        const child = Object.create(state) as JxScope;
         child.$map = { index, item };
         child["$map/item"] = item;
         child["$map/index"] = index;
@@ -1018,7 +1035,7 @@ export async function resolvePrototype(
 
       if (!def.manual) {
         effect(() => {
-          let url;
+          let url: string | undefined;
           if (isTemplateString(def.url)) {
             url = evaluateTemplate(def.url, state);
           } else {
@@ -1058,7 +1075,7 @@ export async function resolvePrototype(
           if (debounceMs > 0) {
             debounceTimer = setTimeout(doFetch, debounceMs);
           } else {
-            doFetch();
+            void doFetch();
           }
         });
       }
@@ -1071,11 +1088,13 @@ export async function resolvePrototype(
         const p: Record<string, string> = {};
         for (const [k, v] of Object.entries(def)) {
           if (k !== "$prototype") {
-            p[k] = isRefObj(v)
-              ? resolveRef(v.$ref, state)
-              : isTemplateString(v)
-                ? evaluateTemplate(v, state)
-                : v;
+            p[k] = (
+              isRefObj(v)
+                ? resolveRef(v.$ref, state)
+                : isTemplateString(v)
+                  ? evaluateTemplate(v, state)
+                  : v
+            ) as string;
           }
         }
         return new URLSearchParams(p).toString();
@@ -1086,10 +1105,10 @@ export async function resolvePrototype(
     case "SessionStorage": {
       const store = def.$prototype === "LocalStorage" ? localStorage : sessionStorage;
       const k = def.key ?? key;
-      let init;
+      let init: unknown;
       try {
         const s = store.getItem(k);
-        init = s !== null ? JSON.parse(s) : (def.default ?? null);
+        init = s !== null ? (JSON.parse(s) as unknown) : (def.default ?? null);
       } catch {
         init = def.default ?? null;
       }
@@ -1118,7 +1137,7 @@ export async function resolvePrototype(
           return null;
         }
         try {
-          return JSON.parse(decodeURIComponent(m[1]));
+          return JSON.parse(decodeURIComponent(m[1]!));
         } catch {
           return m[1];
         }
@@ -1279,16 +1298,16 @@ async function resolveExternalPrototype(
  * @returns {Promise<unknown>}
  */
 async function importAndInstantiate(def: JxScope, src: string, exportName: string, base?: string) {
-  let mod;
+  let mod: ImportedModule;
   if (_moduleCache.has(src)) {
-    mod = _moduleCache.get(src);
+    mod = _moduleCache.get(src)!;
   } else {
     try {
-      mod = await import(src);
+      mod = (await import(src)) as ImportedModule;
     } catch {
       if (base) {
         const resolvedSrc = new URL(src, base).href;
-        mod = await import(resolvedSrc);
+        mod = (await import(resolvedSrc)) as ImportedModule;
       } else {
         throw new Error(`Failed to import "${src}"`);
       }
@@ -1311,9 +1330,10 @@ async function importAndInstantiate(def: JxScope, src: string, exportName: strin
     }
   }
 
-  const instance = new ExportedClass(config);
+  const Ctor = ExportedClass as new (config: JxScope) => ExternalClassInstance;
+  const instance = new Ctor(config);
 
-  let value;
+  let value: unknown;
   if (typeof instance.resolve === "function") {
     value = await instance.resolve();
   } else if ("value" in instance) {
@@ -1400,9 +1420,9 @@ async function resolveClassJson(def: JxPrototypeDef, state: JxScope, key: string
       config[k] = v;
     }
   }
-  const instance = new DynClass(config);
+  const instance = new DynClass(config) as ExternalClassInstance;
 
-  let value;
+  let value: unknown;
   if (typeof instance.resolve === "function") {
     value = await instance.resolve();
   } else if ("value" in instance) {
@@ -1453,7 +1473,12 @@ function classFromSchema(classDef: JxClassDef) {
       }
       if (ctor?.body) {
         const bodyStr = Array.isArray(ctor.body) ? ctor.body.join("\n") : ctor.body;
-        new Function("config", bodyStr).call(this, config);
+        (
+          new Function("config", bodyStr) as (
+            this: unknown,
+            config: Record<string, unknown>,
+          ) => void
+        ).call(this, config);
       }
     }
   }
@@ -1586,17 +1611,17 @@ async function resolveServerFunction(
   const src = def.$src;
   const exportName = def.$export;
 
-  let mod;
+  let mod: ImportedModule;
   if (_moduleCache.has(src)) {
-    mod = _moduleCache.get(src);
+    mod = _moduleCache.get(src)!;
   } else {
     try {
-      mod = await import(src);
+      mod = (await import(src)) as ImportedModule;
     } catch {
       if (base) {
         try {
           const resolvedSrc = new URL(src, base).href;
-          mod = await import(resolvedSrc);
+          mod = (await import(resolvedSrc)) as ImportedModule;
         } catch {
           // Module cannot run in the browser — fall back to dev server proxy
           return resolveServerFunctionViaProxy(def, state, key, base);
@@ -1608,13 +1633,14 @@ async function resolveServerFunction(
     _moduleCache.set(src, mod);
   }
 
-  const fn = mod[exportName] ?? mod.default?.[exportName];
-  if (!fn) {
+  const candidate = mod[exportName] ?? mod.default?.[exportName];
+  if (!candidate) {
     throw new Error(`Jx: export "${exportName}" not found in "${src}" for "${key}"`);
   }
-  if (typeof fn !== "function") {
+  if (typeof candidate !== "function") {
     throw new TypeError(`Jx: "${exportName}" from "${src}" is not a function`);
   }
+  const fn = candidate as (args: JxScope) => Promise<unknown>;
 
   const rawArgs = def.arguments ?? {};
   const hasReactiveArg = Object.values(rawArgs).some((v: unknown) => isRefObj(v));
@@ -1730,7 +1756,7 @@ export function resolveRef(refPath: string, state: JxScope) {
     const parts = refPath.split("/");
     const [, key] = parts; // "item" or "index"
     const map = state.$map as Record<string, unknown> | undefined;
-    const base = map?.[key] ?? state[`$map/${key}`];
+    const base = map?.[key!] ?? state[`$map/${key}`];
     return parts.length > 2 ? getPath(base, parts.slice(2).join("/")) : base;
   }
   if (refPath.startsWith("#/state/")) {
@@ -1800,7 +1826,7 @@ function getPath(obj: unknown, path: string) {
  * @returns {JxScope}
  */
 function mergeProps(def: JxElement, parentState: JxScope): JxScope {
-  const child = Object.create(parentState);
+  const child = Object.create(parentState) as JxScope;
   for (const [k, v] of Object.entries(def.$props ?? {})) {
     child[k] = isRefObj(v) ? resolveRef(v.$ref, parentState) : v;
   }
@@ -1985,7 +2011,7 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       const propsAttr = this.dataset.jxProps;
       if (propsAttr) {
         try {
-          const props = JSON.parse(propsAttr);
+          const props = JSON.parse(propsAttr) as Record<string, unknown>;
           for (const [key, val] of Object.entries(props)) {
             if (key in (def.state ?? {})) {
               state[key] = val;
@@ -2042,19 +2068,19 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
       // Lifecycle: onMount
       const { onMount } = state;
       if (typeof onMount === "function") {
-        queueMicrotask(() => onMount(state));
+        queueMicrotask(() => (onMount as (s: JxScope) => unknown)(state));
       }
     }
 
     disconnectedCallback() {
       if (typeof this._state?.onUnmount === "function") {
-        this._state.onUnmount(this._state);
+        (this._state.onUnmount as (s: JxScope) => unknown)(this._state);
       }
     }
 
     adoptedCallback() {
       if (typeof this._state?.onAdopted === "function") {
-        this._state.onAdopted(this._state);
+        (this._state.onAdopted as (s: JxScope) => unknown)(this._state);
       }
     }
 
@@ -2125,7 +2151,7 @@ function renderCustomElementWithProps(
   const children = Array.isArray(def.children) ? def.children : [];
   for (let i = 0; i < children.length; i++) {
     const childOpts = options && path ? { ...options, _path: [...path, "children", i] } : undefined;
-    el.append(renderNode(children[i], state, childOpts));
+    el.append(renderNode(children[i]!, state, childOpts));
   }
 
   return el;

@@ -21,7 +21,7 @@ export function mount() {
       if (tab) {
         const gs = tab.session.ui.gitStatus;
         if (!gs && !tab.session.ui.gitLoading) {
-          refreshGitStatus();
+          void refreshGitStatus();
         }
       }
       renderActivityBar();

@@ -183,7 +183,7 @@ export function initShortcuts(
             const tabToClose = workspace.tabs.get(workspace.activeTabId);
             if (tabToClose?.doc.dirty) {
               const name = tabToClose.documentPath?.split("/").pop() || "Untitled";
-              showConfirmDialog(
+              void showConfirmDialog(
                 "Unsaved Changes",
                 `"${name}" has unsaved changes. Close without saving?`,
                 { confirmLabel: "Close", destructive: true },
@@ -232,17 +232,17 @@ export function initShortcuts(
         }
         case "c": {
           e.preventDefault();
-          copyNode();
+          void copyNode();
           break;
         }
         case "x": {
           e.preventDefault();
-          cutNode();
+          void cutNode();
           break;
         }
         case "v": {
           e.preventDefault();
-          pasteNode();
+          void pasteNode();
           break;
         }
         case "0": {

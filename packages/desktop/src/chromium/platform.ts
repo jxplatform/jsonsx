@@ -17,7 +17,11 @@ export function createDesktopPlatform(): StudioPlatform {
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
   ws.addEventListener("message", (event) => {
-    const msg = JSON.parse(event.data);
+    const msg = JSON.parse(event.data as string) as {
+      id: number;
+      error?: string;
+      result?: unknown;
+    };
     const p = pending.get(msg.id);
     if (!p) {
       return;

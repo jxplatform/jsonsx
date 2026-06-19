@@ -58,7 +58,7 @@ function resolveColorForDisplay(val: string | number | undefined) {
   const m = s.match(/^var\((--[^)]+)\)$/);
   if (m) {
     const style = getEffectiveStyle(activeTab.value?.doc.document?.style);
-    const resolved = style?.[m[1]];
+    const resolved = style?.[m[1]!];
     if (typeof resolved === "string") {
       return resolved;
     }
@@ -108,7 +108,7 @@ function matchesColorVar(
 // ─── JxColorPopover LitElement ──────────────────────────────────────────────
 
 export class JxColorPopover extends LitElement {
-  static properties = {
+  static override properties = {
     color: { type: String },
     colorVars: { attribute: false },
     displayColor: { attribute: false, type: String },
@@ -126,12 +126,12 @@ export class JxColorPopover extends LitElement {
   }
 
   /** No shadow DOM — render directly into light DOM for Spectrum theming */
-  createRenderRoot() {
+  override createRenderRoot() {
     return this;
   }
 
   /** @param {Map<string, unknown>} changed */
-  willUpdate(changed: Map<string, unknown>) {
+  override willUpdate(changed: Map<string, unknown>) {
     if (changed.has("color")) {
       const raw = resolveColorForDisplay(this.color);
       if (!raw || raw === "transparent") {
@@ -175,7 +175,7 @@ export class JxColorPopover extends LitElement {
     this.dispatchEvent(new CustomEvent("color-change", { bubbles: true, detail: varRef }));
   }
 
-  render() {
+  override render() {
     return html`
       <div class="color-popover-inner">
         <sp-color-area
@@ -258,7 +258,7 @@ export function renderColorSelector(
             <jx-color-popover
               .color=${value || ""}
               .colorVars=${colorVars}
-              @color-change=${(e: CustomEvent) => onChange(e.detail)}
+              @color-change=${(e: CustomEvent) => onChange(e.detail as string)}
             ></jx-color-popover>
           </sp-popover>
         </sp-overlay>
@@ -314,7 +314,7 @@ export function renderColorSelector(
           <jx-color-popover
             .color=${value || ""}
             .colorVars=${colorVars}
-            @color-change=${(e: CustomEvent) => onChange(e.detail)}
+            @color-change=${(e: CustomEvent) => onChange(e.detail as string)}
           ></jx-color-popover>
         </sp-popover>
       </sp-overlay>

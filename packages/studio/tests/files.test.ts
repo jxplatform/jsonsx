@@ -393,9 +393,9 @@ describe("openFileFromTree", () => {
     await openFileFromTree(ctx, "pages/a.json");
 
     expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0].documentPath).toBe("pages/a.json");
-    expect(ctx.commits[0].dirty).toBe(false);
-    expect(ctx.commits[0].document.tagName).toBe("article");
+    expect(ctx.commits[0]!.documentPath).toBe("pages/a.json");
+    expect(ctx.commits[0]!.dirty).toBe(false);
+    expect(ctx.commits[0]!.document.tagName).toBe("article");
     expect(requireProjectState().selectedPath).toBe("pages/a.json");
     expect(ctx.renders).toHaveLength(1);
   });
@@ -430,7 +430,7 @@ describe("openFileFromTree", () => {
       children: [],
       tagName: "section",
     });
-    expect(ctx.commits[0].documentPath).toBe("pages/next.json");
+    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
   });
 
   test("auto-save failure still opens the new file", async () => {
@@ -448,7 +448,7 @@ describe("openFileFromTree", () => {
     await openFileFromTree(ctx, "pages/next.json");
 
     expect(ctx.commits).toHaveLength(1);
-    expect(ctx.commits[0].documentPath).toBe("pages/next.json");
+    expect(ctx.commits[0]!.documentPath).toBe("pages/next.json");
   });
 
   test("empty content aborts without committing", async () => {

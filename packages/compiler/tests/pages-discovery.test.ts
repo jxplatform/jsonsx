@@ -28,8 +28,8 @@ describe("discoverPages", () => {
     writeFileSync(join(FIXTURES, "index.json"), JSON.stringify({ tagName: "div" }));
     const routes = await discoverPages(FIXTURES);
     expect(routes.length).toBe(1);
-    expect(routes[0].urlPattern).toBe("/");
-    expect(routes[0].isDynamic).toBe(false);
+    expect(routes[0]!.urlPattern).toBe("/");
+    expect(routes[0]!.isDynamic).toBe(false);
     cleanup();
   });
 
@@ -80,7 +80,7 @@ describe("discoverPages", () => {
       JSON.stringify({ $layout: "blog", tagName: "div" }),
     );
     const routes = await discoverPages(FIXTURES);
-    expect(routes[0].$layout).toBe("blog");
+    expect(routes[0]!.$layout).toBe("blog");
     cleanup();
   });
 
@@ -98,7 +98,7 @@ describe("discoverPages", () => {
     setup();
     writeFileSync(join(FIXTURES, "index.json"), JSON.stringify({ tagName: "div" }));
     const routes = await discoverPages(FIXTURES);
-    expect(routes[0].$layout).toBeNull();
+    expect(routes[0]!.$layout).toBeNull();
     cleanup();
   });
 
@@ -155,9 +155,9 @@ describe("expandDynamicRoutes", () => {
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
     expect(result.length).toBe(2);
-    expect(result[0].urlPattern).toBe("/blog/hello");
-    expect(result[1].urlPattern).toBe("/blog/world");
-    expect(result[0].isDynamic).toBe(false);
+    expect(result[0]!.urlPattern).toBe("/blog/hello");
+    expect(result[1]!.urlPattern).toBe("/blog/world");
+    expect(result[0]!.isDynamic).toBe(false);
     cleanup();
   });
 
@@ -184,9 +184,9 @@ describe("expandDynamicRoutes", () => {
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
     expect(result.length).toBe(3);
-    expect(result[0].urlPattern).toBe("/en");
-    expect(result[1].urlPattern).toBe("/fr");
-    expect(result[2].urlPattern).toBe("/de");
+    expect(result[0]!.urlPattern).toBe("/en");
+    expect(result[1]!.urlPattern).toBe("/fr");
+    expect(result[2]!.urlPattern).toBe("/de");
     cleanup();
   });
 
@@ -222,8 +222,8 @@ describe("expandDynamicRoutes", () => {
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES, contentTypes);
     expect(result.length).toBe(2);
-    expect(result[0].urlPattern).toBe("/blog/hello-world");
-    expect(result[1].urlPattern).toBe("/blog/second-post");
+    expect(result[0]!.urlPattern).toBe("/blog/hello-world");
+    expect(result[1]!.urlPattern).toBe("/blog/second-post");
     cleanup();
   });
 
@@ -257,8 +257,8 @@ describe("expandDynamicRoutes", () => {
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
     expect(result.length).toBe(2);
-    expect(result[0].urlPattern).toBe("/products/ABC123");
-    expect(result[1].urlPattern).toBe("/products/DEF456");
+    expect(result[0]!.urlPattern).toBe("/products/ABC123");
+    expect(result[1]!.urlPattern).toBe("/products/DEF456");
     cleanup();
   });
 
@@ -401,7 +401,7 @@ describe("expandDynamicRoutes", () => {
     ];
     const result = await expandDynamicRoutes(routes, FIXTURES);
     expect(result.length).toBe(1);
-    expect(result[0].urlPattern).toBe("/x/:id");
+    expect(result[0]!.urlPattern).toBe("/x/:id");
   });
 });
 

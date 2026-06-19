@@ -214,7 +214,7 @@ export function defBadgeLabel(def: SignalDef | unknown) {
  * @param {string} name
  * @param {SignalDef | null | undefined} def
  */
-export function defHint(name: string, def: SignalDef | null | undefined) {
+export function defHint(_name: string, def: SignalDef | null | undefined) {
   if (!def) {
     return "";
   }
@@ -413,15 +413,15 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
     state: [],
   } as Record<string, [string, SignalDef][]>;
   for (const [name, def] of entries) {
-    groups[defCategory(def)].push([name, asSignalDef(def)]);
+    groups[defCategory(def)]!.push([name, asSignalDef(def)]);
   }
 
   const categories = [
-    { items: groups.state, key: "state", label: "State" },
-    { items: groups.computed, key: "computed", label: "Computed" },
-    { items: groups.data, key: "data", label: "Data" },
-    { items: groups.expression, key: "expression", label: "Expressions" },
-    { items: groups.function, key: "function", label: "Functions" },
+    { items: groups.state!, key: "state", label: "State" },
+    { items: groups.computed!, key: "computed", label: "Computed" },
+    { items: groups.data!, key: "data", label: "Data" },
+    { items: groups.expression!, key: "expression", label: "Expressions" },
+    { items: groups.function!, key: "function", label: "Functions" },
   ];
 
   const collapsedCats = (S._collapsedSignalCats ||= new Set());
@@ -515,7 +515,7 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
               );
               expandedSignal = n;
               if (src) {
-                fetchPluginSchema(
+                void fetchPluginSchema(
                   { $prototype: protoName, $src: src },
                   {
                     ...(S.documentPath != null && {
@@ -887,7 +887,7 @@ function renderDataSourceFields(
     return textareaRow(fieldLabel, defaultStr, (v: string) => {
       try {
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateDef(t, name, { [fieldName]: JSON.parse(v) }),
+          mutateUpdateDef(t, name, { [fieldName]: JSON.parse(v) as unknown }),
         );
       } catch {}
     });
@@ -901,7 +901,7 @@ function renderFunctionFields(
   S: SignalsPanelState,
   name: string,
   def: SignalDef,
-  textareaRow: (
+  _textareaRow: (
     label: string,
     value: string,
     onChange: (value: string) => void,
@@ -962,7 +962,7 @@ function renderFunctionFields(
 
 /** Render CEM parameter editor with basic/advanced toggle. */
 function renderParameterEditorTemplate(
-  S: SignalsPanelState,
+  _S: SignalsPanelState,
   name: string,
   def: SignalDef,
   ctx: SignalsPanelCtx,
@@ -1061,7 +1061,7 @@ function renderParameterEditorTemplate(
                 @change=${(e: Event) => {
                   const next = [...params];
                   const val = (e.target as HTMLInputElement).value;
-                  const { type: _t, ...rest } = next[i];
+                  const { type: _t, ...rest } = next[i]!;
                   next[i] = val ? { ...rest, type: { text: val } } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
@@ -1076,7 +1076,7 @@ function renderParameterEditorTemplate(
                 @change=${(e: Event) => {
                   const next = [...params];
                   const val = (e.target as HTMLInputElement).value;
-                  const { description: _d, ...rest } = next[i];
+                  const { description: _d, ...rest } = next[i]!;
                   next[i] = val ? { ...rest, description: val } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
@@ -1090,7 +1090,7 @@ function renderParameterEditorTemplate(
                 @change=${(e: Event) => {
                   const next = [...params];
                   const { checked } = e.target as HTMLInputElement;
-                  const { optional: _o, ...rest } = next[i];
+                  const { optional: _o, ...rest } = next[i]!;
                   next[i] = checked ? { ...rest, optional: true } : rest;
                   transactDoc(activeTab.value, (t) =>
                     mutateUpdateDef(t, name, { parameters: next }),
@@ -1174,7 +1174,7 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             @change=${(e: Event) => {
               const next = [...emits];
               const val = (e.target as HTMLInputElement).value;
-              const { type: _t, ...rest } = next[i];
+              const { type: _t, ...rest } = next[i]!;
               next[i] = val ? { ...rest, type: { text: val } } : rest;
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
@@ -1187,7 +1187,7 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
             @change=${(e: Event) => {
               const next = [...emits];
               const val = (e.target as HTMLInputElement).value;
-              const { description: _d, ...rest } = next[i];
+              const { description: _d, ...rest } = next[i]!;
               next[i] = val ? { ...rest, description: val } : rest;
               transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { emits: next }));
             }}
@@ -1248,7 +1248,7 @@ function resolveSchemaEnum(
       const match = ref.match(/#\/\$context\/contentTypes\/\{@(\w+)\}\/schema\/properties/);
       if (match && parentDef) {
         const [, paramName] = match;
-        const typeName = parentDef[paramName] as string | undefined;
+        const typeName = parentDef[paramName!] as string | undefined;
         if (typeName) {
           const ct = projectState?.projectConfig?.contentTypes?.[typeName] as
             | Record<string, unknown>
@@ -1357,7 +1357,7 @@ function renderJsonTextField(
         try {
           transactDoc(activeTab.value, (t) =>
             mutateUpdateDef(t, name, {
-              [prop]: JSON.parse((e.target as HTMLInputElement).value),
+              [prop]: JSON.parse((e.target as HTMLInputElement).value) as unknown,
             }),
           );
         } catch {}
@@ -1490,7 +1490,7 @@ export function renderSchemaFieldsTemplate(
                   try {
                     transactDoc(activeTab.value, (t) =>
                       mutateUpdateDef(t, name, {
-                        [prop]: JSON.parse((e.target as HTMLInputElement).value),
+                        [prop]: JSON.parse((e.target as HTMLInputElement).value) as unknown,
                       }),
                     );
                   } catch {}
@@ -1501,7 +1501,9 @@ export function renderSchemaFieldsTemplate(
         `;
       } else if (ps.type === "array" && ps.items?.type === "object" && ps.items?.properties) {
         // Array of objects with defined schema → multi-row inline form
-        const rows = Array.isArray(currentValue) ? currentValue : [];
+        const rows: Record<string, unknown>[] = Array.isArray(currentValue)
+          ? (currentValue as Record<string, unknown>[])
+          : [];
         const itemProps = ps.items.properties as Record<string, Record<string, unknown>>;
         control = html`
           <div class="array-object-field">
@@ -1626,7 +1628,7 @@ export function renderExternalPrototypeEditorTemplate(
           ${schema.description
             ? html`<div class="signal-hint" style="padding:4px 0 8px">${schema.description}</div>`
             : nothing}
-          ${renderSchemaFieldsTemplate(schema, def, name, S, ctx)}
+          ${renderSchemaFieldsTemplate(schema as JsonSchema, def, name, S, ctx)}
         `;
       }
     } else {
@@ -1636,7 +1638,7 @@ export function renderExternalPrototypeEditorTemplate(
       >
         Loading schema…
       </div>`;
-      fetchPluginSchema(def, {
+      void fetchPluginSchema(def, {
         ...(S.documentPath != null && { documentPath: S.documentPath }),
       }).then((schema) => {
         if (schema) {

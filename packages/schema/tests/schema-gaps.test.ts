@@ -39,8 +39,8 @@ class FakeAjv {
 
 const addFormatsCalls: unknown[] = [];
 
-mock.module("ajv", () => ({ default: FakeAjv }));
-mock.module("ajv-formats", () => ({
+void mock.module("ajv", () => ({ default: FakeAjv }));
+void mock.module("ajv-formats", () => ({
   default: (ajv: unknown) => {
     addFormatsCalls.push(ajv);
   },

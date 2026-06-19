@@ -23,7 +23,7 @@ interface DndRegistry {
 }
 const dnd: DndRegistry = { cleanups: [], draggables: [], dropTargets: [], monitors: [] };
 
-mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   draggable: (opts: unknown) => {
     dnd.draggables.push(opts);
     return () => dnd.cleanups.push("draggable");
@@ -772,7 +772,7 @@ describe("setupTreeKeyboard", () => {
       item.tabIndex = -1;
       item.dataset.path = path;
       item.dataset.type = type;
-      item.textContent = path;
+      item.textContent = path!;
       tree.append(item);
     }
     panel.append(tree);
@@ -784,32 +784,32 @@ describe("setupTreeKeyboard", () => {
 
   test("marks the first item focusable", () => {
     const { items } = buildManualTree();
-    expect(items[0].getAttribute("tabindex")).toBe("0");
+    expect(items[0]!.getAttribute("tabindex")).toBe("0");
   });
 
   test("ArrowDown / ArrowUp move focus and clamp at the edges", () => {
     const { items, tree } = buildManualTree();
-    items[0].focus();
+    items[0]!.focus();
 
     key(tree, "ArrowDown");
-    expect(document.activeElement).toBe(items[1]);
+    expect(document.activeElement).toBe(items[1]!);
     key(tree, "ArrowDown");
     key(tree, "ArrowDown"); // Already at the last item
-    expect(document.activeElement).toBe(items[2]);
+    expect(document.activeElement).toBe(items[2]!);
 
     key(tree, "ArrowUp");
     key(tree, "ArrowUp");
     key(tree, "ArrowUp"); // Already at the first item
-    expect(document.activeElement).toBe(items[0]);
+    expect(document.activeElement).toBe(items[0]!);
   });
 
   test("Enter clicks the focused row; unhandled keys are not prevented", () => {
     const { items, tree } = buildManualTree();
     let clicks = 0;
-    items[1].addEventListener("click", () => {
+    items[1]!.addEventListener("click", () => {
       clicks += 1;
     });
-    items[1].focus();
+    items[1]!.focus();
 
     key(tree, "Enter");
     expect(clicks).toBe(1);
@@ -819,7 +819,7 @@ describe("setupTreeKeyboard", () => {
       cancelable: true,
       key: "x",
     });
-    const notPrevented = items[1].dispatchEvent(passthrough);
+    const notPrevented = items[1]!.dispatchEvent(passthrough);
     expect(notPrevented).toBe(true);
 
     const handled = new KeyboardEvent("keydown", {
@@ -827,7 +827,7 @@ describe("setupTreeKeyboard", () => {
       cancelable: true,
       key: "ArrowUp",
     });
-    items[1].dispatchEvent(handled);
+    items[1]!.dispatchEvent(handled);
     expect(handled.defaultPrevented).toBe(true);
   });
 
@@ -844,10 +844,10 @@ describe("setupTreeKeyboard", () => {
     siteState();
     const { items, tree } = buildManualTree();
     let dirClicks = 0;
-    items[0].addEventListener("click", () => {
+    items[0]!.addEventListener("click", () => {
       dirClicks += 1;
     });
-    items[0].focus();
+    items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
@@ -862,7 +862,7 @@ describe("setupTreeKeyboard", () => {
     siteState();
     requireProjectState().expanded.add("pages");
     const { items, tree } = buildManualTree();
-    items[0].focus();
+    items[0]!.focus();
 
     key(tree, "ArrowRight");
     await flush();
@@ -875,12 +875,12 @@ describe("setupTreeKeyboard", () => {
     siteState();
     requireProjectState().expanded.add("pages");
     const { items, tree } = buildManualTree();
-    items[0].focus();
+    items[0]!.focus();
 
     key(tree, "ArrowLeft");
     expect(requireProjectState().expanded.has("pages")).toBe(false);
 
-    items[1].focus();
+    items[1]!.focus();
     key(tree, "ArrowLeft"); // File row — nothing to collapse
     expect(requireProjectState().expanded.has("pages")).toBe(false);
   });

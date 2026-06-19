@@ -135,13 +135,13 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
   const editor = view.functionEditor;
 
   // Format on open — show pretty-printed code, then run initial lint
-  codeService("format", { args, code: body }).then((result) => {
+  void codeService("format", { args, code: body }).then((result) => {
     if (result?.code != null && view.functionEditor) {
       view.functionEditor._ignoreNextChange = true;
       view.functionEditor.setValue(result.code);
     }
   });
-  codeService("lint", { args, code: body }).then((result) => {
+  void codeService("lint", { args, code: body }).then((result) => {
     if (result?.diagnostics && view.functionEditor) {
       setLintMarkers(view.functionEditor, result.diagnostics as OxLintDiagnostic[]);
     }
@@ -183,7 +183,7 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
     lintDebounce = setTimeout(() => {
       const gen = (lintGen += 1);
       const currentCode = editor.getValue();
-      codeService("lint", { args, code: currentCode }).then((result) => {
+      void codeService("lint", { args, code: currentCode }).then((result) => {
         if (gen !== lintGen) {
           return;
         }

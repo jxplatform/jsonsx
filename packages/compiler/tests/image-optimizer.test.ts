@@ -21,7 +21,7 @@ const mockResize = mock(() => ({ toFormat: mockToFormat }));
 const mockMetadata = mock(() => Promise.resolve({ format: "jpeg", height: 600, width: 800 }));
 const mockSharpInstance = { metadata: mockMetadata, resize: mockResize };
 const mockSharp = mock(() => mockSharpInstance);
-mock.module("sharp", () => ({ default: mockSharp }));
+void mock.module("sharp", () => ({ default: mockSharp }));
 
 const TMP = resolve(tmpdir(), `jx-image-test-${Date.now()}`);
 
@@ -172,7 +172,7 @@ describe("image-cache", () => {
 
     saveCache(root, cache);
     const loaded = loadCache(root);
-    expect(loaded.entries["abc:def"].source).toBe("test.jpg");
+    expect(loaded.entries["abc:def"]!.source).toBe("test.jpg");
     teardown();
   });
 
@@ -251,7 +251,7 @@ describe("image-transform", () => {
       cache,
     );
     expect(result.imageRefs.size).toBe(0);
-    expect((doc.children[0].attributes as Record<string, unknown>)?.srcset).toBeUndefined();
+    expect((doc.children[0]!.attributes as Record<string, unknown>)?.srcset).toBeUndefined();
   });
 
   test("skips template string src", async () => {

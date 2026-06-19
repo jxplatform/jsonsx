@@ -78,12 +78,12 @@ export function parseCSV(csv: string): Record<string, string>[] {
     return fields;
   };
 
-  const headers = parseRow(lines[0]);
+  const headers = parseRow(lines[0]!);
   for (let i = 1; i < lines.length; i++) {
-    const fields = parseRow(lines[i]);
+    const fields = parseRow(lines[i]!);
     const obj: Record<string, string> = {};
     for (let j = 0; j < headers.length; j++) {
-      obj[headers[j].trim()] = fields[j]?.trim() ?? "";
+      obj[headers[j]!.trim()] = fields[j]?.trim() ?? "";
     }
     rows.push(obj);
   }

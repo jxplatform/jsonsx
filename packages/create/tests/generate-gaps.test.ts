@@ -20,6 +20,7 @@ describe("generateProject — destination guard", () => {
     mkdirSync(TMP, { recursive: true });
     writeFileSync(join(TMP, "existing.txt"), "occupied");
 
+    // oxlint-disable-next-line typescript/await-thenable -- Bun types `.rejects.toThrow` as void, but it resolves a Promise at runtime; the await is required.
     await expect(generateProject(TMP, { name: "Busy" })).rejects.toThrow(
       `Directory "${TMP}" is not empty`,
     );

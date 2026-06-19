@@ -26,7 +26,7 @@ const dnd: { draggables: { element: HTMLElement; getInitialData: () => unknown }
   draggables: [],
 };
 
-mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
+void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   draggable: (opts: { element: HTMLElement; getInitialData: () => unknown }) => {
     dnd.draggables.push(opts);
     return () => {};

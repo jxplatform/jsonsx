@@ -102,7 +102,7 @@ function _resolveNestedStyle(style: Record<string, unknown>, tagPath: string) {
 let _ctx: StylebookCtx | null = null;
 
 /** Lookup: tag → entry from stylebookMeta (built once) */
-const _entryByTag = new Map();
+const _entryByTag = new Map<string, StylebookEntry>();
 for (const section of stylebookMeta.$sections) {
   for (const entry of section.elements as StylebookEntry[]) {
     _entryByTag.set(entry.tag, entry);
@@ -289,7 +289,7 @@ export function refreshStylebookStyles() {
       const htmlEl = el as HTMLElement;
       // Determine if it's a compound selector (e.g. "ul li") or simple tag
       const parts = tag.split(" ");
-      const leafTag = parts.at(-1);
+      const leafTag = parts.at(-1)!;
       const entry = _entryByTag.get(leafTag);
 
       // Reset to base style
@@ -379,7 +379,7 @@ export function selectStylebookTag(tag: string, media?: string | null, { panCanv
   renderStylebookOverlays();
 
   if (tag && panCanvas && canvasPanels.length > 0) {
-    const el = findStylebookEl(canvasPanels[0].canvas, tag);
+    const el = findStylebookEl(canvasPanels[0]!.canvas, tag);
     if (el) {
       panToCanvasEl(el);
     }

@@ -21,7 +21,7 @@ async function* emptyStream() {
   // Yields nothing
 }
 
-mock.module("@anthropic-ai/claude-agent-sdk", () => ({
+void mock.module("@anthropic-ai/claude-agent-sdk", () => ({
   query: (args: QueryCall) => {
     queryCalls.push(args);
     const factory = pendingStreams.shift();

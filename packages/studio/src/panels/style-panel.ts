@@ -505,10 +505,10 @@ function styleSidebarTemplate(
       continue;
     }
     const sec = ((entry as Record<string, unknown>).$section as string) || "other";
-    sectionProps[sec].push({ entry, prop });
+    sectionProps[sec]!.push({ entry, prop });
   }
   for (const sec of cssMeta.$sections) {
-    sectionProps[sec.key].sort(
+    sectionProps[sec.key]!.sort(
       (
         a: { prop: string; entry: CssPropertyEntry },
         b: { prop: string; entry: CssPropertyEntry },
@@ -545,7 +545,7 @@ function styleSidebarTemplate(
   const sectionTemplates = cssMeta.$sections
     .filter((sec) => sec.key !== "other")
     .map((sec) => {
-      const entries = sectionProps[sec.key];
+      const entries = sectionProps[sec.key]!;
 
       const sectionActiveProps = entries.filter(
         ({ prop, entry }: { prop: string; entry: CssPropertyEntry }) => {
