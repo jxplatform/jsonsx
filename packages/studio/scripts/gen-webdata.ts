@@ -74,6 +74,7 @@ const CATEGORIES: Record<string, string[]> = {
     "nav",
     "search",
     "hgroup",
+    "slot",
   ],
   Text: [
     "h1",

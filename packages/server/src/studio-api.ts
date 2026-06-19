@@ -65,6 +65,38 @@ interface ComponentDoc {
   [key: string]: unknown;
 }
 
+interface SlotDef {
+  name: string;
+  fallback?: unknown[];
+}
+
+/**
+ * Collect slot definitions (name + fallback children) from a parsed component tree. Whitespace-only
+ * names count as unnamed (""). Only static children arrays are walked.
+ */
+function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return out;
+  }
+  const el = node as Record<string, unknown>;
+  if (el.tagName === "slot") {
+    const attrs = el.attributes as Record<string, unknown> | undefined;
+    const rawName = attrs?.name;
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    const { children } = el;
+    out.push({
+      name,
+      ...(Array.isArray(children) && children.length > 0 ? { fallback: children } : {}),
+    });
+  }
+  if (Array.isArray(el.children)) {
+    for (const c of el.children) {
+      collectSlotDefs(c, out);
+    }
+  }
+  return out;
+}
+
 // ─── Format registry (per project root, invalidated on project.json change) ──
 
 const formatRegistryCache = new Map<string, { mtime: number; registry: FormatRegistry }>();
@@ -508,6 +540,7 @@ export async function handleStudioApi(
             content = (await entry.call("parse", source)) as ComponentDoc;
           }
           if (content.tagName && content.tagName.includes("-")) {
+            const slotDefs = collectSlotDefs(content);
             components.push({
               $id: content.$id || null,
               hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
@@ -538,6 +571,7 @@ export async function handleStudioApi(
                     type: obj.type,
                   };
                 }),
+              ...(slotDefs.length > 0 ? { slots: slotDefs } : {}),
               source: "jx",
               tagName: content.tagName,
             });

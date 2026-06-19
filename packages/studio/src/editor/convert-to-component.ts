@@ -11,6 +11,7 @@ import { getPlatform } from "../platform";
 import { jsonClone } from "../utils/studio-utils";
 import { statusMessage } from "../panels/statusbar";
 import { showDialog } from "../ui/layers";
+import { validateComponentSlots } from "../services/cem-export";
 
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -76,7 +77,12 @@ export async function convertToComponent() {
     const platform = getPlatform();
     await platform.writeFile(componentFile, JSON.stringify(componentDef, null, 2));
     await loadComponentRegistry();
-    statusMessage(`Converted to <${name}>`);
+    const warning = validateComponentSlots(componentDef);
+    if (warning) {
+      statusMessage(`Converted to <${name}> — Warning: ${warning}`, 6000);
+    } else {
+      statusMessage(`Converted to <${name}>`);
+    }
   } catch (error) {
     statusMessage(`Error saving component: ${errorMessage(error)}`);
   }

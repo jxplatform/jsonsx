@@ -35,11 +35,18 @@ export interface GitLogEntry {
   date: string;
 }
 
+export interface ComponentSlotMeta {
+  name: string;
+  description?: string;
+  fallback?: (JxMutableNode | string)[];
+}
+
 export interface ComponentMeta {
   tagName: string;
   $id?: string | null;
   path: string;
   props?: { name: string; type?: string; default?: JsonValue; [k: string]: unknown }[];
+  slots?: ComponentSlotMeta[];
   hasElements?: boolean;
 }
 

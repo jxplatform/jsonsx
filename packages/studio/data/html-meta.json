@@ -49,6 +49,14 @@
       "$order": 70,
       "type": "string"
     },
+    "slot-name": {
+      "$attr": "name",
+      "$section": "identity",
+      "$order": 75,
+      "type": "string",
+      "$label": "Slot Name",
+      "$elements": ["slot"]
+    },
     "part": {
       "$section": "identity",
       "$order": 80,

@@ -35,6 +35,7 @@
         --map: #5b4fc7;
         --switch-c: var(--danger);
         --case-c: var(--spectrum-informative-color-800, #4f8bc7);
+        --slot-c: #1a8a7a;
         --hover-bg: rgba(255, 255, 255, 0.04);
         --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
         --accent-10: color-mix(in srgb, var(--accent) 10%, transparent);
@@ -1175,6 +1176,10 @@
         max-width: 60px;
         overflow: hidden;
         text-overflow: ellipsis;
+      }
+      .slot-tag {
+        background: var(--slot-c) !important;
+        color: var(--accent-fg) !important;
       }
       .component-row {
         opacity: 0.9;

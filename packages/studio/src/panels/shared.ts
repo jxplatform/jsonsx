@@ -82,6 +82,9 @@ export function defaultDef(tag: string): JxMutableNode {
     def.attributes = { alt: "Image" };
   } else if (tag === "iframe") {
     def.attributes = { src: "" };
+  } else if (tag === "slot") {
+    // Slot children are the fallback content shown when no slotted content is provided.
+    def.children = [{ tagName: "p", textContent: "Slot content" }];
   } else if (tag === "select") {
     def.children = [{ tagName: "option", textContent: "Option 1" }];
   } else if (tag === "ul" || tag === "ol") {

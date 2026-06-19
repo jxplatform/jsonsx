@@ -312,6 +312,10 @@ export function nodeLabel(node: JxMutableNode | null) {
   if (node.$id) {
     return node.$id;
   }
+  if (node.tagName === "slot") {
+    const name = node.attributes?.name;
+    return typeof name === "string" && name.trim() ? `slot: ${name.trim()}` : "slot";
+  }
   const tag = node.tagName ?? "div";
   const suffix = node.$switch ? " ⇆" : "";
   if (typeof node.textContent === "string" && node.textContent.length > 0) {

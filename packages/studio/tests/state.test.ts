@@ -359,6 +359,19 @@ describe("nodeLabel", () => {
   test("defaults to div when no tagName", () => {
     expect(nodeLabel({})).toBe("div");
   });
+
+  test("named slot shows its name", () => {
+    expect(nodeLabel({ attributes: { name: "header" }, tagName: "slot" })).toBe("slot: header");
+  });
+
+  test("unnamed slot shows plain slot label", () => {
+    expect(nodeLabel({ tagName: "slot" })).toBe("slot");
+    expect(nodeLabel({ attributes: { name: "  " }, tagName: "slot" })).toBe("slot");
+  });
+
+  test("$id wins over slot label", () => {
+    expect(nodeLabel({ $id: "hero-slot", tagName: "slot" })).toBe("hero-slot");
+  });
 });
 
 // ─── State factory ───────────────────────────────────────────────────────────

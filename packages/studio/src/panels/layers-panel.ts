@@ -210,6 +210,14 @@ export function renderLayersTemplate(ctx: {
       badgeClass = "layer-tag switch-tag";
       badgeText = "⇄";
       badgeTitle = "$switch";
+    } else if (jxNode.tagName === "slot") {
+      const slotName = jxNode.attributes?.name;
+      badgeClass = "layer-tag slot-tag";
+      badgeText = "▣";
+      badgeTitle =
+        typeof slotName === "string" && slotName.trim()
+          ? `Slot "${slotName.trim()}"`
+          : "Default slot";
     } else {
       badgeClass = "layer-tag";
       badgeText = jxNode.tagName || "div";

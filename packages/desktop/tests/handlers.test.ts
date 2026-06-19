@@ -297,6 +297,43 @@ describe("discoverComponents", () => {
     }
   });
 
+  test("extracts slot definitions with fallback children", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "components"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "components", "my-panel.json"),
+        JSON.stringify({
+          children: [
+            {
+              attributes: { name: "header" },
+              children: [{ tagName: "h2", textContent: "Default title" }],
+              tagName: "slot",
+            },
+            { children: ["Default body"], tagName: "slot" },
+          ],
+          tagName: "my-panel",
+        }),
+      );
+      // A slotless component, to confirm the key is omitted
+      writeFileSync(
+        join(FIXTURES, "components", "my-plain.json"),
+        JSON.stringify({ children: [{ tagName: "div" }], tagName: "my-plain" }),
+      );
+
+      const components = await discoverComponents({ dir: "." });
+      const panel = components.find((c: ComponentMeta) => c.tagName === "my-panel")!;
+      expect(panel.slots).toEqual([
+        { fallback: [{ tagName: "h2", textContent: "Default title" }], name: "header" },
+        { fallback: ["Default body"], name: "" },
+      ]);
+      const plain = components.find((c: ComponentMeta) => c.tagName === "my-plain")!;
+      expect(plain.slots).toBeUndefined();
+    } finally {
+      cleanup();
+    }
+  });
+
   test("skips non-component JSON files", async () => {
     setup();
     try {

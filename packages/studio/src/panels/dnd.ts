@@ -27,7 +27,11 @@ import {
 import { mutateInsertNode, mutateMoveNode, transact, transactDoc } from "../tabs/transact";
 import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
-import { componentRegistry, computeRelativePath } from "../files/components";
+import {
+  buildComponentInstance,
+  componentRegistry,
+  computeRelativePath,
+} from "../files/components";
 import { renderComponentPreview } from "./stylebook-panel";
 import { defaultDef, unsafeTags } from "./shared";
 import type { JxPath } from "../state";
@@ -211,19 +215,7 @@ export function registerComponentsDnD() {
         });
       }
 
-      const instanceDef = {
-        $props: comp.props
-          ? Object.fromEntries(
-              comp.props.map(
-                (/** @type {{ name: string; default?: unknown; [k: string]: unknown }} */ p) => [
-                  p.name,
-                  p.default !== undefined ? p.default : "",
-                ],
-              ),
-            )
-          : {},
-        tagName: comp.tagName,
-      };
+      const instanceDef = buildComponentInstance(comp);
       const cleanup = draggable({
         element: row,
         getInitialData() {

@@ -213,6 +213,58 @@ describe("saveFile", () => {
     expect(typeof writtenContent).toBe("string");
   });
 
+  test("component with duplicate default slots still saves (warn, not block)", async () => {
+    let written: any = null;
+    registerPlatform({
+      ...formatPlatform,
+      writeFile: (path: any, content: any) => {
+        written = { content, path };
+      },
+    } as any);
+
+    openTab({
+      document: {
+        children: [{ tagName: "slot" }, { tagName: "slot" }],
+        tagName: "my-card",
+      },
+      documentPath: "components/my-card.json",
+      id: "test-slot-warn",
+    });
+    activeTab.value!.doc.dirty = true;
+
+    // Should not throw; warning is surfaced via statusbar but the save proceeds
+    await saveFile();
+
+    expect(written).not.toBeNull();
+    expect(written.path).toBe("components/my-card.json");
+    expect(activeTab.value!.doc.dirty).toBe(false);
+  });
+
+  test("component with valid slots saves without warning", async () => {
+    let written: any = null;
+    registerPlatform({
+      ...formatPlatform,
+      writeFile: (path: any, content: any) => {
+        written = { content, path };
+      },
+    } as any);
+
+    openTab({
+      document: {
+        children: [{ tagName: "slot" }, { attributes: { name: "header" }, tagName: "slot" }],
+        tagName: "my-card",
+      },
+      documentPath: "components/my-card.json",
+      id: "test-slot-ok",
+    });
+    activeTab.value!.doc.dirty = true;
+
+    await saveFile();
+
+    expect(written).not.toBeNull();
+    expect(activeTab.value!.doc.dirty).toBe(false);
+  });
+
   test("handles save error gracefully", async () => {
     registerPlatform({
       ...formatPlatform,

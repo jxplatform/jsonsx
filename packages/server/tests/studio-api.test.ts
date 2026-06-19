@@ -479,6 +479,23 @@ writeFileSync(
   "utf8",
 );
 
+// Component fixture with named + default slots and fallback content
+writeFileSync(
+  join(SITE_PROJECT, "components", "my-panel.json"),
+  JSON.stringify({
+    children: [
+      {
+        attributes: { name: "header" },
+        children: [{ tagName: "h2", textContent: "Default title" }],
+        tagName: "slot",
+      },
+      { children: ["Default body"], tagName: "slot" },
+    ],
+    tagName: "my-panel",
+  }),
+  "utf8",
+);
+
 function projectInfoRequest(dir: string) {
   const params = new URLSearchParams();
   if (dir) {
@@ -571,6 +588,25 @@ describe("components — scoped scan", () => {
     const res = await callApi(req, url, import.meta.dir);
     const components = await res.json();
     expect(components).toEqual([]);
+  });
+
+  test("extracts slot definitions with fallback children", async () => {
+    const url = new URL("http://localhost/__studio/components?dir=_studio_fixtures/my-site");
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, import.meta.dir);
+    const components = await res.json();
+    const panel = components.find((c: Record<string, any>) => c.tagName === "my-panel");
+    expect(panel).toBeDefined();
+    expect(panel.slots).toEqual([
+      {
+        fallback: [{ tagName: "h2", textContent: "Default title" }],
+        name: "header",
+      },
+      { fallback: ["Default body"], name: "" },
+    ]);
+    // Slotless components omit the key entirely
+    const card = components.find((c: Record<string, any>) => c.tagName === "my-card");
+    expect(card.slots).toBeUndefined();
   });
 
   test("rejects directory traversal on dir param", async () => {

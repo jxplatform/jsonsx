@@ -17,6 +17,7 @@ export interface ComponentMeta {
   $id?: string | null;
   path: string;
   props?: { name: string; type?: string; default?: unknown }[];
+  slots?: { name: string; description?: string; fallback?: unknown[] }[];
   hasElements?: boolean;
 }
 

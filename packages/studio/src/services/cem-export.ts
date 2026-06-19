@@ -2,11 +2,11 @@
 import type { CemParameter, JxMutableNode, JxStateObject } from "@jxsuite/schema/types";
 import { isFunctionDef, isJsonObject } from "@jxsuite/schema/guards";
 
-/** Collect slot elements from the document tree. */
+/** Collect slot elements from the document tree. Whitespace-only names count as unnamed. */
 export function collectSlots(node?: JxMutableNode | null, slots: string[] = []) {
   if (node?.tagName === "slot") {
     const name = node.attributes?.name;
-    slots.push(typeof name === "string" ? name : "");
+    slots.push(typeof name === "string" ? name.trim() : "");
   }
   if (Array.isArray(node?.children)) {
     for (const c of node.children) {
@@ -14,6 +14,27 @@ export function collectSlots(node?: JxMutableNode | null, slots: string[] = []) 
     }
   }
   return slots;
+}
+
+/**
+ * Validate slot usage in a component definition. Returns a warning message or null when valid. Only
+ * static children are walked — slots inside $switch cases are mutually exclusive branches and are
+ * not counted (v1 limitation).
+ */
+export function validateComponentSlots(doc: JxMutableNode): string | null {
+  const names = collectSlots(doc);
+  const unnamed = names.filter((n) => n === "").length;
+  if (unnamed > 1) {
+    return `Component has ${unnamed} unnamed <slot> elements — only one default slot is allowed. Give extra slots a name attribute.`;
+  }
+  const seen = new Set<string>();
+  for (const n of names) {
+    if (n && seen.has(n)) {
+      return `Duplicate slot name "${n}" — slot names must be unique within a component.`;
+    }
+    seen.add(n);
+  }
+  return null;
 }
 
 /**

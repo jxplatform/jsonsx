@@ -51,6 +51,38 @@ interface ComponentJsonDef {
   state?: Record<string, unknown>;
 }
 
+interface SlotDef {
+  name: string;
+  fallback?: unknown[];
+}
+
+/**
+ * Collect slot definitions (name + fallback children) from a parsed component tree. Whitespace-only
+ * names count as unnamed (""). Only static children arrays are walked.
+ */
+function collectSlotDefs(node: unknown, out: SlotDef[] = []): SlotDef[] {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return out;
+  }
+  const el = node as Record<string, unknown>;
+  if (el.tagName === "slot") {
+    const attrs = el.attributes as Record<string, unknown> | undefined;
+    const rawName = attrs?.name;
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    const { children } = el;
+    out.push({
+      name,
+      ...(Array.isArray(children) && children.length > 0 ? { fallback: children } : {}),
+    });
+  }
+  if (Array.isArray(el.children)) {
+    for (const c of el.children) {
+      collectSlotDefs(c, out);
+    }
+  }
+  return out;
+}
+
 interface ClassJsonDef {
   title?: string;
   description?: string;
@@ -471,6 +503,7 @@ export function createProjectSession(initialRoot: string | null) {
       try {
         const content = JSON.parse(await readFile(fp, "utf8")) as ComponentJsonDef;
         if (content.tagName && content.tagName.includes("-")) {
+          const slotDefs = collectSlotDefs(content);
           components.push({
             $id: content.$id || null,
             hasElements: Array.isArray(content.$elements) && content.$elements.length > 0,
@@ -508,6 +541,7 @@ export function createProjectSession(initialRoot: string | null) {
                 }
                 return propResult;
               }),
+            ...(slotDefs.length > 0 ? { slots: slotDefs } : {}),
             tagName: content.tagName,
           });
         }

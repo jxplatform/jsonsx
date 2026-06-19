@@ -55,6 +55,7 @@ interface SignalOption {
 interface HtmlMetaEntry {
   $section: string;
   $order: number;
+  $attr?: string;
   $elements?: string[];
   $label?: string;
   $input?: string;
@@ -1003,7 +1004,9 @@ export function renderPropertiesPanelTemplate(ctx: {
   const applicableAttrs = {} as Record<string, HtmlMetaEntry>;
   for (const [attr, entry] of Object.entries(htmlMeta.$defs) as [string, HtmlMetaEntry][]) {
     if (!entry.$elements || entry.$elements.includes(tagName)) {
-      applicableAttrs[attr] = entry;
+      // The $attr field aliases a $defs key to a different attribute name.
+      // This lets the same attribute (e.g. "name") carry per-element metadata.
+      applicableAttrs[entry.$attr ?? attr] = entry;
     }
   }
 
