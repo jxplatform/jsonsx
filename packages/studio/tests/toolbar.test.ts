@@ -38,15 +38,8 @@ function makeCtx(overrides: Partial<ToolbarCtx> = {}): ToolbarCtx {
   return {
     closeFunctionEditor: mock(() => {}),
     getCanvasMode: mock(() => "edit"),
-    navigateBack: mock(() => {}),
-    navigateToLevel: mock((_level: number) => {}),
     openProject: mock(() => {}),
     openRecentProject: mock(async (_root: string) => {}),
-    parseMediaEntries: mock(() => ({
-      baseWidth: 1200,
-      featureQueries: [] as { name: string; query: string }[],
-      sizeBreakpoints: [],
-    })),
     renderCanvas: mock(() => {}),
     safeRenderRightPanel: mock(() => {}),
     saveFile: mock(() => {}),
@@ -288,75 +281,6 @@ describe("full toolbar (active tab)", () => {
     await flush();
     expect(tab.history.index).toBe(1);
     expect(tab.doc.document).toEqual({ children: [], tagName: "div" });
-  });
-
-  test("breadcrumb appears with a document stack and navigates", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-    expect(root.querySelector(".breadcrumb")).toBeNull();
-
-    tab.session.documentStack.push({ documentPath: "/project/parent.json" } as any);
-    await flush();
-
-    const crumb = root.querySelector(".breadcrumb")!;
-    const clickable = crumb.querySelector(".breadcrumb-item.clickable")!;
-    expect(clickable.textContent).toBe("parent.json");
-    expect(crumb.querySelector(".breadcrumb-item.current")?.textContent).toContain("index.json");
-
-    click(btn(root, "Back"));
-    expect(ctx.navigateBack).toHaveBeenCalledTimes(1);
-
-    click(clickable);
-    expect(ctx.navigateToLevel).toHaveBeenCalledWith(0);
-  });
-
-  test("breadcrumb falls back to 'untitled' for frames without a path", async () => {
-    const tab = openTestTab();
-    toolbar.mount(root, makeCtx());
-    tab.session.documentStack.push({} as any);
-    await flush();
-    expect(root.querySelector(".breadcrumb-item.clickable")?.textContent).toBe("untitled");
-  });
-
-  test("feature toggles render from media queries and flip session toggles", async () => {
-    const tab = openTestTab();
-    const ctx = makeCtx({
-      parseMediaEntries: mock(() => ({
-        baseWidth: 1200,
-        featureQueries: [{ name: "--dark-mode", query: "(prefers-color-scheme: dark)" }],
-        sizeBreakpoints: [],
-      })),
-    });
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const toggle = root.querySelector(
-      "sp-action-button[title='(prefers-color-scheme: dark)']",
-    ) as HTMLElement;
-    expect(toggle.textContent).toContain("Dark Mode");
-    expect(toggle.hasAttribute("selected")).toBe(false);
-
-    click(toggle);
-    await flush();
-    expect(tab.session.ui.featureToggles["--dark-mode"]).toBe(true);
-    expect(
-      root
-        .querySelector("sp-action-button[title='(prefers-color-scheme: dark)']")
-        ?.hasAttribute("selected"),
-    ).toBe(true);
-
-    click(root.querySelector("sp-action-button[title='(prefers-color-scheme: dark)']")!);
-    await flush();
-    expect(tab.session.ui.featureToggles["--dark-mode"]).toBe(false);
-  });
-
-  test("no toggle group when the document has no feature queries", async () => {
-    openTestTab();
-    toolbar.mount(root, makeCtx());
-    await flush();
-    expect(root.querySelector("sp-action-button[toggles]")).toBeNull();
   });
 
   test("mode switcher selects the current canvas mode and switches modes", async () => {

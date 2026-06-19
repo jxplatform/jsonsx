@@ -19,6 +19,7 @@
       // Claude hooks should be allowed to exit the process
       "files": [".claude/**/*.*"],
       "rules": {
+        "eslint/capitalized-comments": "off",
         "unicorn/no-process-exit": "off"
       }
     },

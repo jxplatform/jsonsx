@@ -39,8 +39,8 @@ const check = (name, args) => {
   try {
     execFileSync(bin(name), args, { stdio: ["ignore", "pipe", "pipe"] });
     return null; // exit 0 → clean
-  } catch (err) {
-    return `${err.stdout?.toString() ?? ""}${err.stderr?.toString() ?? ""}`.trim();
+  } catch (error) {
+    return `${error.stdout?.toString() ?? ""}${error.stderr?.toString() ?? ""}`.trim();
   }
 };
 

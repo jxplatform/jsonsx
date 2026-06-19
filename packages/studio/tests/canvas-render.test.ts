@@ -28,7 +28,7 @@ let liveImpl: LiveRender = async () => null;
 const renderWelcome = mock((host: HTMLElement) => {
   host.textContent = "welcome";
 });
-const renderFunctionEditor = mock((_close: () => void) => {});
+const renderFunctionEditor = mock(() => {});
 const statusMessage = mock((_msg: string, _duration?: number) => {});
 const overlaysRender = mock(() => {});
 const registerPanelDnD = mock((_panel: unknown) => {});
@@ -189,8 +189,6 @@ let canvasModeFn = () => canvasMode;
 let zoom = 1;
 
 const ctx = {
-  closeFunctionEditor: mock(() => {}),
-  exportFile: mock(() => {}),
   getCanvasMode: () => canvasModeFn(),
   gitDiffState: null as Record<string, unknown> | null,
   openFileFromTree: mock(() => {}),
@@ -291,8 +289,6 @@ beforeEach(() => {
     parseSourceForPathMock,
     serializeDocumentMock,
     ctx.setCanvasMode,
-    ctx.exportFile,
-    ctx.closeFunctionEditor,
   ]) {
     m.mockClear();
   }
@@ -433,7 +429,7 @@ describe("function editor dispatch", () => {
     const tab = resetWorkspaceWithTab();
     tab.session.ui.editingFunction = { path: ["children", 0], prop: "onclick" } as never;
     renderCanvas();
-    expect(renderFunctionEditor).toHaveBeenCalledWith(ctx.closeFunctionEditor);
+    expect(renderFunctionEditor).toHaveBeenCalled();
     expect(canvasPanels.length).toBe(0);
   });
 
@@ -461,16 +457,6 @@ describe("source mode", () => {
     expect(createdModels[0]!._value).toBe(JSON.stringify(tab.doc.document, null, 2));
     expect(createdModels[0]!.lang).toBe("json");
     expect(createdEditors[0]!._ignoreNextChange).toBe(true);
-  });
-
-  test("export toolbar button invokes ctx.exportFile", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "source";
-    renderCanvas();
-    await flush();
-    const btn = canvasWrap.querySelector("sp-action-button") as HTMLElement;
-    btn.click();
-    expect(ctx.exportFile).toHaveBeenCalled();
   });
 
   test("debounced edits sync valid JSON back into the document", async () => {

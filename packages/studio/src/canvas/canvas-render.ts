@@ -58,8 +58,6 @@ interface CanvasRenderCtx {
   getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
   openFileFromTree: (path: string) => void;
-  exportFile: () => void;
-  closeFunctionEditor: () => void;
   gitDiffState: GitDiffState | null;
   setGitDiffState: (state: GitDiffState | null) => void;
 }
@@ -223,7 +221,7 @@ export function renderCanvas() {
 
   // Function editor mode: editing a function body in Monaco (JS)
   if (S.ui.editingFunction) {
-    renderFunctionEditor(ctx.closeFunctionEditor);
+    renderFunctionEditor();
     return;
   }
 
@@ -350,12 +348,6 @@ export function renderCanvas() {
     let editorContainer: HTMLDivElement | null = null;
     litRender(
       html`<div class="source-wrap">
-        <div class="source-toolbar">
-          <sp-action-button size="s" @click=${ctx.exportFile}>
-            <sp-icon-export slot="icon"></sp-icon-export>
-            Export
-          </sp-action-button>
-        </div>
         <div
           class="source-editor"
           ${ref((el) => {
