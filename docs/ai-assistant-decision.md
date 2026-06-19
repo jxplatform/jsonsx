@@ -204,6 +204,12 @@ golden examples. Keep them from diverging:
 **All six steps complete.** The MVP is implemented end-to-end: request → proxy stream → AST tools
 applied optimistically with undo/redo → schema-validated self-correction loop.
 
+> [!IMPORTANT]
+> **"Complete" = the architecture skeleton is wired and tested, NOT that the assistant is
+> feature-complete or bug-free.** The six steps above are done; the canonical stack is settled.
+> Remaining work is _finishing the MVP on this skeleton_ — see §11. Do not re-open the
+> architecture decision or revive the native-UI plan to address the gaps below.
+
 ---
 
 ## 9. Verification (2026-06-13)
@@ -250,3 +256,36 @@ fallback when the client sends nothing.
 
 Steps: open the Studio URL above → right panel **Assistant** tab → enter your key (+ optional
 endpoint) in the gate → type a request → edits apply to the canvas, Ctrl+Z to undo.
+
+---
+
+## 11. Remaining MVP work (post-skeleton, 2026-06-18)
+
+The §8 skeleton is done; these are the gaps that make the assistant feel incomplete in real use.
+All are additive on Stack B — **no architecture change, no native-UI revival.**
+
+1. **Streaming reactivity bug (refresh).** `packages/ai/src/chat-state.js` `beginAssistantTurn`
+   keeps a reference to the **raw** placeholder message, then `appendDelta` writes
+   `_streamingMessage.content` through that raw reference (line ~182). Because the write bypasses
+   the Vue `reactive()` proxy, effects reading `messages[i].content` (e.g. `ai-panel.ts`
+   `watchAssistant`) are never notified — the chat only updates on remount (tab switch). Fix:
+   mutate through the proxy (re-read `store.messages[len-1]` after push) or render from
+   `streamingContent`. Add a test that asserts live streaming notifies an effect.
+2. **Tool coverage.** Only 4 tools ship (`read_document`, `set_property`, `add_child`,
+   `remove_node`). The model proposes changes it cannot express → "fails to create some changes."
+   Add (at least): `set_style`, `set_text`, `add_state`/`update_state`, `move_node`,
+   `create_component`, `create_page`. Mine `ai-assistant-plan.md` Phase 4 for the shape (snake_case,
+   `transactDoc()`-backed, schema-validated).
+3. **Tool/validation error surfacing.** Failed tool results (`{success:false}`) should be visible
+   in the panel, not silent, so users see why an edit didn't land.
+4. **Context management.** `context-manager.js` does not exist; long conversations will overflow
+   with no trimming/summarization. (Plan Phase 5 is the backlog reference.)
+5. **Conversation persistence.** localStorage restore not built (plan step 19).
+6. _Deferred, unchanged:_ shadow-render critic (§6c).
+
+## 12. Parked work
+
+The native lit-html chat components (`chat-messages.js`, `chat-composer.js`, `chat-tool-call.js`)
+written against the superseded plan are **parked, unwired**, on branch `parked/native-chat-ui`.
+They are not part of Stack B and must not be wired into `ai-panel.ts` without re-opening §4.3.
+Reusable if native chat is ever revisited: the markdown renderer and composer keybindings.

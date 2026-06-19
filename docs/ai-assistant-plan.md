@@ -1,3 +1,22 @@
+> [!WARNING]
+> **SUPERSEDED (2026-06-18) — read `docs/ai-assistant-decision.md` first.**
+> This plan is kept as a **capability backlog only**, not as a live checklist. The
+> ADR overrode its core design decisions:
+>
+> - **UI:** native lit-html chat from scratch → **deferred**. Stack B uses **QuikChat**
+>   in `ai-panel.ts` (ADR §4.3). The native components written for Phases 2–3 are parked,
+>   unwired, on branch `parked/native-chat-ui`.
+> - **Placement:** bottom panel + overlay (Phase 3 / step 12) → **right-panel tab** (ADR §4.2).
+> - **Diff UX:** batched accept/reject canvas diff (Phase 4 / step 16) → **optimistic apply +
+>   undo/redo** (ADR §5).
+> - **Tools:** the 13-tool camelCase table (Phase 4) → shipped as **4 snake_case tools**
+>   (`read_document`, `set_property`, `add_child`, `remove_node`; ADR §8.2). Expanding this
+>   set is the main remaining MVP work.
+>
+> Still useful here: the tool ideas, context-management strategy (Phase 5), and persistence
+> (step 19) as a backlog. Everything about UI framework, panel placement, and the diff gate
+> is obsolete.
+
 ## Plan: AI Chat Assistant for Jx Studio
 
 **TL;DR** — Add a native lit-html + Spectrum chat panel to Jx Studio that lets users build and iterate on websites and components using natural language. An OpenAI-powered LLM can read, create, and modify Jx JSON documents via a tool-calling system. The chat panel lives in a resizable bottom panel (with overlay fallback on small viewports); the LLM gets a carefully designed system prompt with Jx schema context, few-shot examples, and live document context; changes are previewed as a single batched canvas diff before being applied through `transactDoc()` for full undo/redo. No React — all UI is native lit-html + Spectrum Web Components, following assistant-ui's architecture patterns.
