@@ -3143,6 +3143,10 @@
     url = "https://registry.npmjs.org/merge2/-/merge2-1.4.1.tgz";
     hash = "sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==";
   };
+  "metafile-codecov-bundle@0.1.1" = fetchurl {
+    url = "https://registry.npmjs.org/metafile-codecov-bundle/-/metafile-codecov-bundle-0.1.1.tgz";
+    hash = "sha512-DoaTVqS9ObYW/zZCa7L3Eo4Df0GplHEl4Dh3HNeBy9BMYiF5ezc3LMI/Trp2NmxwJuxC4dJkS3vsi05LWBmTgQ==";
+  };
   "micromark-core-commonmark@2.0.3" = fetchurl {
     url = "https://registry.npmjs.org/micromark-core-commonmark/-/micromark-core-commonmark-2.0.3.tgz";
     hash = "sha512-RDBrHEMSxVFLg6xvnXmb1Ayr2WzLAWjeSATAoxwKYJV94TeNavgoIdA0a9ytzDSVzBy2YKFK+emCPOEibLeCrg==";

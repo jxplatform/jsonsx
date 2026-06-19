@@ -1,0 +1,53 @@
+name: Bundle Analysis
+
+# Codecov has no Bun-native bundler plugin, so we build each bundle with
+# `bun build --metafile` and convert that metafile into Codecov's v3 bundle
+# analysis payload via `metafile-codecov-bundle`, uploaded tokenlessly with
+# GitHub Actions OIDC (hence `id-token: write`).
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  bundle-analysis:
+    # Fork PRs get a read-only token with no OIDC, so the upload can't run.
+    # Skip them entirely (same guard as the coverage-comment job in test.yml).
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - compiler
+          - parser
+          - runtime
+          - studio
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Keep in sync with test.yml: bundle sizes shift between Bun
+          # versions, which would move the Codecov baseline.
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
+      - name: Build with metafile
+        run: bun run build:metafile
+        working-directory: packages/${{ matrix.package }}
+      - name: Upload bundle stats to Codecov
+        run: >-
+          bunx metafile-codecov
+          -f metafile.json
+          -n ${{ matrix.package }}
+          --output-dir dist
+          --bundler-name bun
+          --bundler-version "$(bun --version)"
+          --upload
+        working-directory: packages/${{ matrix.package }}

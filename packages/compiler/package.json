@@ -35,6 +35,7 @@
   "scripts": {
     "prepare": "bun build src/compiler.ts src/cli.ts --outdir=dist --format=esm --minify --target=node",
     "build": "bun run prepare",
+    "build:metafile": "bun build src/compiler.ts src/cli.ts --outdir=dist --format=esm --minify --target=node --metafile=metafile.json",
     "build:site": "bun src/cli.ts build",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",

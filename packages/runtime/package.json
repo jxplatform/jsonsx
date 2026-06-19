@@ -23,6 +23,7 @@
   },
   "scripts": {
     "build": "bun build ./src/runtime.ts --outdir dist --target browser --sourcemap=linked",
+    "build:metafile": "bun build ./src/runtime.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"

@@ -34,6 +34,7 @@
   "scripts": {
     "prepare": "bun build src/content.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node",
     "build": "bun run prepare",
+    "build:metafile": "bun build src/content.ts src/markdown.ts src/csv.ts src/serialize.ts --outdir=dist --format=esm --target=node --metafile=metafile.json",
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
