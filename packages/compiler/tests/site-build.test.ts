@@ -1660,8 +1660,25 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
       resolve(ARR_TMP, "pages/index.json"),
       JSON.stringify({
         $layout: "./layouts/main.json",
-        children: [{ tagName: "a-card" }, { tagName: "a-card" }],
+        children: [
+          { tagName: "a-card" },
+          // Instance with styled slot children → their styles are collected and injected.
+          {
+            children: [{ children: ["slotted"], style: { color: "green" }, tagName: "span" }],
+            tagName: "a-card",
+          },
+        ],
         title: "Home",
+      }),
+      "utf8",
+    );
+    // A page that uses no components — injectComponentScripts is invoked (components were
+    // Compiled) but finds none referenced on this page.
+    writeFileSync(
+      resolve(ARR_TMP, "pages/plain.json"),
+      JSON.stringify({
+        children: [{ children: ["No components here"], tagName: "h1" }],
+        title: "Plain",
       }),
       "utf8",
     );
@@ -1689,6 +1706,16 @@ describe("buildSite — expandComponents handles arrays in tree", () => {
     const matches = html.match(/Card Content/g);
     expect(matches).not.toBeNull();
     expect(matches?.length).toBeGreaterThanOrEqual(2);
+    // Styled slot content is collected and injected as a page style block.
+    expect(html).toContain("jxs-0");
+    expect(html).toContain("green");
+  });
+
+  it("leaves component-free pages untouched by script injection", async () => {
+    await buildSite(ARR_TMP);
+    const html = readFileSync(resolve(ARR_TMP, "dist/plain/index.html"), "utf8");
+    expect(html).toContain("No components here");
+    expect(html).not.toContain("a-card");
   });
 });
 
@@ -1756,5 +1783,130 @@ describe("buildSite — static repeater expansion", () => {
     expect(ol.indexOf("3")).toBeLessThan(ol.indexOf("footer"));
     // No throwaway wrapper div around the repeated items.
     expect(html).not.toContain("repeater-perimeter");
+  });
+});
+
+// ── Static expansion of map templates with style/attributes/$props/children ──
+
+describe("buildSite — rich map template expansion", () => {
+  const MAP_TMP = resolve(import.meta.dir, "__test-site-map-template__");
+
+  beforeAll(() => {
+    rmSync(MAP_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(MAP_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(MAP_TMP, "project.json"),
+      JSON.stringify({
+        // A site-level head entry with no attributes exercises the bare-specifier passthrough.
+        $head: [{ children: ["body{margin:0}"], tagName: "style" }],
+        build: { outDir: "./dist" },
+        name: "Map Tpl",
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(MAP_TMP, "pages/index.json"),
+      JSON.stringify({
+        children: [
+          {
+            // Whole-children repeater with a rich map template: the map node carries
+            // Style, attributes, $props, nested children, a multi-part template and an
+            // Erroring template (kept verbatim when evaluation throws).
+            children: {
+              $prototype: "Array",
+              items: { $ref: "#/state/posts" },
+              map: {
+                $props: { label: "${item.title}" },
+                attributes: { "data-id": "${item.id}" },
+                children: [
+                  { tagName: "h2", textContent: "Post: ${item.title}" },
+                  { tagName: "small", textContent: "${item.missing.deep}" },
+                  "static-sep",
+                ],
+                style: { color: "${item.color}" },
+                tagName: "article",
+              },
+            },
+            tagName: "section",
+          },
+          {
+            // Items provided as a literal array (not a $ref).
+            children: {
+              $prototype: "Array",
+              items: [{ title: "Lit1" }, { title: "Lit2" }],
+              map: { tagName: "li", textContent: "${item.title}" },
+            },
+            tagName: "ul",
+          },
+          {
+            // Items resolves to a non-array → left for client-side rendering (no static expansion).
+            children: {
+              $prototype: "Array",
+              items: { $ref: "#/state/notList" },
+              map: { tagName: "span", textContent: "${item}" },
+            },
+            tagName: "div",
+          },
+          {
+            // String map template — returned verbatim per item.
+            children: { $prototype: "Array", items: [1, 2], map: "plain-item" },
+            tagName: "p",
+          },
+          {
+            // $props template on a (non-component) element resolves against page state.
+            $props: { tone: "${pageTone}" },
+            tagName: "x-tone",
+          },
+          {
+            // String child whose template resolves to an array of nodes (spliced in place).
+            children: ["${state.frags}"],
+            tagName: "aside",
+          },
+        ],
+        state: {
+          frags: { default: [{ tagName: "b", textContent: "BOLD" }] },
+          notList: { default: "not an array" },
+          pageTone: { default: "warm" },
+          posts: {
+            default: [
+              { color: "red", id: "1", title: "First" },
+              { color: "blue", id: "2", title: "Second" },
+            ],
+          },
+        },
+        title: "Mapped",
+      }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(MAP_TMP, { force: true, recursive: true });
+  });
+
+  it("expands map templates with style, attributes, $props and nested children", async () => {
+    const result = await buildSite(MAP_TMP);
+    expect(result.errors).toHaveLength(0);
+    const html = readFileSync(resolve(MAP_TMP, "dist/index.html"), "utf8");
+    // Nested children + multi-part template resolved per item.
+    expect(html).toContain("Post: First");
+    expect(html).toContain("Post: Second");
+    // Attribute template resolved per item.
+    expect(html).toContain('data-id="1"');
+    expect(html).toContain('data-id="2"');
+    // Static string child preserved.
+    expect(html).toContain("static-sep");
+    // Literal-array items expanded.
+    expect(html).toContain("Lit1");
+    expect(html).toContain("Lit2");
+    // Style template resolved (emitted in a style block).
+    expect(html).toContain("red");
+    expect(html).toContain("blue");
+    // String map template returned verbatim.
+    expect(html).toContain("plain-item");
+    // $props template resolved against page state.
+    expect(html).toContain("x-tone");
+    // String child template resolving to an array of nodes is spliced in.
+    expect(html).toContain("BOLD");
   });
 });

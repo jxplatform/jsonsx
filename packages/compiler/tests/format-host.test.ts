@@ -1,8 +1,30 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildProjectFormatRegistry, createNodeFormatIO } from "../src/site/format-host";
+import {
+  buildProjectFormatRegistry,
+  createNodeFormatIO,
+  importImplementation,
+} from "../src/site/format-host";
+
+describe("importImplementation", () => {
+  test("falls back from a .js path to its .ts sibling", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jx-import-impl-"));
+    try {
+      writeFileSync(join(dir, "mod.ts"), "export const hello = 42;\n");
+      // Pass the .js path: the first candidate fails, the .ts sibling resolves.
+      const mod = await importImplementation(join(dir, "mod.js"));
+      expect(mod.hello).toBe(42);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
+
+  test("throws the last error when no candidate resolves", async () => {
+    await expect(importImplementation("/no/such/src/missing.js")).rejects.toThrow();
+  });
+});
 
 describe("createNodeFormatIO", () => {
   test("resolvePath falls back to host resolution for projects without node_modules", () => {

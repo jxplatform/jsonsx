@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { enterInlineEdit } from "../src/editor/content-inline-edit";
 import { isEditing, stopEditing } from "../src/editor/inline-edit";
 import { dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
-import { canvasPanels } from "../src/store";
+import { canvasPanels, elToPath } from "../src/store";
 import { view } from "../src/view";
 import type { CanvasPanel } from "../src/panels/canvas-dnd.js";
 import type { Tab } from "../src/tabs/tab";
@@ -174,6 +174,22 @@ describe("onSplit (Enter)", () => {
     expect(docChildren()[1]).toEqual({ tagName: "p", textContent: "f" });
   });
 
+  test("splits rich content into before-text and after-children", async () => {
+    el.innerHTML = "ab<em>cd</em>ef";
+    enterInlineEdit(el, ["children", 0]);
+    caretAt(el.firstChild!, 1); // Between "a" and "b" — everything after is rich
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    await flush();
+
+    const [before] = docChildren();
+    expect(before!.textContent).toBe("a");
+    const after = docChildren()[1]!;
+    expect(after.textContent).toBeUndefined();
+    expect(after.children).toEqual(["b", { tagName: "em", textContent: "cd" }, "ef"]);
+  });
+
   test("split at the very end yields an empty new paragraph", async () => {
     enterInlineEdit(el, ["children", 0]); // Caret placed at end on enter
     el.dispatchEvent(
@@ -256,11 +272,74 @@ describe("onInsert (slash menu)", () => {
     expect(isEditing()).toBe(false);
   });
 
+  test("non-empty rich block commits its children before inserting", async () => {
+    el.innerHTML = "hi <em>x</em> ";
+    enterInlineEdit(el, ["children", 0]);
+    const last = el.lastChild!;
+    caretAt(last, (last.textContent ?? "").length); // After the trailing space
+    await openSlashMenuOn(el);
+    pressMenu("Enter"); // Heading 1
+    await flush();
+
+    // The edited block was committed as a rich children array (not textContent).
+    expect(docChildren()[0]!.children).toBeDefined();
+    expect(docChildren()[0]!.textContent).toBeUndefined();
+    expect(docChildren()[1]).toEqual({ tagName: "h1", textContent: "Heading" });
+  });
+
   test("slash menu does not open mid-word", async () => {
     enterInlineEdit(el, ["children", 0]);
     caretAt(el.firstChild!, 3);
     el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "/" }));
     await flush();
     expect(isSlashMenuOpen()).toBe(false);
+  });
+});
+
+// ─── RAF re-entry into editing ──────────────────────────────────────────────
+// When the new/next element exists in the canvas, the post-mutation rAF re-enters
+// Inline editing on it. We map a real editable element to the target path so
+// FindCanvasElement resolves it.
+
+describe("re-enters editing on the resulting element", () => {
+  let target: HTMLElement;
+
+  beforeEach(() => {
+    target = document.createElement("p");
+    (panel.canvas as HTMLElement).append(target);
+    elToPath.set(el, ["children", 0]);
+    elToPath.set(target, ["children", 1]);
+  });
+
+  test("onSplit re-enters editing on the new paragraph", async () => {
+    enterInlineEdit(el, ["children", 0]);
+    caretAt(el.firstChild!, 3);
+    el.dispatchEvent(
+      new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter" }),
+    );
+    await flush();
+    expect(isEditing()).toBe(true);
+  });
+
+  test("onInsert into an empty block re-enters editing after the tag swap", async () => {
+    const empty = document.createElement("p");
+    (panel.canvas as HTMLElement).append(empty);
+    elToPath.set(empty, ["children", 1]);
+    // Re-point the target so the swapped element at children/1 is found.
+    enterInlineEdit(empty, ["children", 1]);
+    await openSlashMenuOn(empty);
+    pressMenu("Enter");
+    await flush();
+    expect(isEditing()).toBe(true);
+  });
+
+  test("onInsert after a non-empty block re-enters editing on the inserted element", async () => {
+    enterInlineEdit(el, ["children", 0]);
+    el.textContent = "hello ";
+    caretAt(el.firstChild!, 6);
+    await openSlashMenuOn(el);
+    pressMenu("Enter");
+    await flush();
+    expect(isEditing()).toBe(true);
   });
 });

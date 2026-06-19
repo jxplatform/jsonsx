@@ -99,4 +99,40 @@ describe("loadProjectConfig", () => {
       cleanup();
     }
   });
+
+  test("preserves $media, style and state without shallow-merging", () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({
+          $media: { "--md": "(min-width: 768px)" },
+          name: "Test",
+          state: { count: { default: 0 } },
+          style: { "--bg": "#000" },
+        }),
+        "utf8",
+      );
+      const { config } = loadProjectConfig(FIXTURES);
+      expect(config.$media).toEqual({ "--md": "(min-width: 768px)" });
+      expect(config.style).toEqual({ "--bg": "#000" });
+      expect(config.state).toEqual({ count: { default: 0 } });
+    } finally {
+      cleanup();
+    }
+  });
+
+  test("throws on unknown build adapter", () => {
+    setup();
+    try {
+      writeFileSync(
+        join(FIXTURES, "project.json"),
+        JSON.stringify({ build: { adapter: "deno" }, name: "Test" }),
+        "utf8",
+      );
+      expect(() => loadProjectConfig(FIXTURES)).toThrow('Unknown build adapter "deno"');
+    } finally {
+      cleanup();
+    }
+  });
 });

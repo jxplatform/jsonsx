@@ -69,6 +69,17 @@ function setupFixtures() {
   mkdirSync(join(FIXTURES, "node_modules", "brokenpkg"), { recursive: true });
   writeFileSync(join(FIXTURES, "node_modules", "brokenpkg", "package.json"), "{not json!");
   writeFileSync(join(FIXTURES, "node_modules", "brokenpkg", "sub.js"), "export const s = 3;");
+
+  // Package whose subpath is mapped through package.json "exports" to a real file
+  mkdirSync(join(FIXTURES, "node_modules", "exportspkg", "lib"), { recursive: true });
+  writeFileSync(
+    join(FIXTURES, "node_modules", "exportspkg", "package.json"),
+    JSON.stringify({ exports: { "./sub": "./lib/real.js" }, name: "exportspkg" }),
+  );
+  writeFileSync(
+    join(FIXTURES, "node_modules", "exportspkg", "lib", "real.js"),
+    "export const r = 1;",
+  );
 }
 
 // ─── resolveNpmPath edge cases ───────────────────────────────────────────────
@@ -83,6 +94,11 @@ describe("resolveNpmPath — gaps", () => {
   test("resolves subpath via direct path when exports has no entry", () => {
     const result = resolveNpmPath(FIXTURES, "/directpkg/extra.js");
     expect(result).toBe(join(FIXTURES, "node_modules", "directpkg", "extra.js"));
+  });
+
+  test("resolves subpath through a package.json exports string mapping", () => {
+    const result = resolveNpmPath(FIXTURES, "/exportspkg/sub");
+    expect(result).toBe(join(FIXTURES, "node_modules", "exportspkg", "lib", "real.js"));
   });
 
   test("resolves subpath relative to customElements manifest dir", () => {
@@ -233,6 +249,28 @@ describe("createDevServer", () => {
       const res = await fetch(`${base}/${abs}`);
       expect(res.status).toBe(200);
       expect(await res.text()).toBe("project data");
+    });
+
+    test("routes /__studio/code/* to handleCodeApi", async () => {
+      const res = await fetch(`${base}/__studio/code/format`, {
+        body: JSON.stringify({ code: "const x=1" }),
+        method: "POST",
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { code: string };
+      expect(typeof body.code).toBe("string");
+    });
+
+    test("routes other /__studio/* paths to handleStudioApi", async () => {
+      const res = await fetch(`${base}/__studio/sites`);
+      expect(res.status).toBe(200);
+      const sites = await res.json();
+      expect(Array.isArray(sites)).toBe(true);
+    });
+
+    test("unknown /__studio/* path falls through to a 404", async () => {
+      const res = await fetch(`${base}/__studio/this-endpoint-does-not-exist`);
+      expect(res.status).toBe(404);
     });
 
     test("bundles npm bare specifiers on demand and caches them", async () => {
