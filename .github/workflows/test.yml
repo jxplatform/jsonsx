@@ -39,6 +39,14 @@ jobs:
           bun test --isolate --coverage 2>&1 | tee /tmp/test-output.txt
         working-directory: packages/${{ matrix.package }}
       - run: bun scripts/check-coverage-manifest.ts packages/${{ matrix.package }}
+      - name: Upload coverage reports to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: jxsuite/jx
+          files: packages/${{ matrix.package }}/coverage/lcov.info
+          flags: ${{ matrix.package }}
       - name: Extract coverage report
         if: always()
         shell: bash
