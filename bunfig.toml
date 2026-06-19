@@ -1,3 +1,11 @@
+# Bun's default "isolated" linker (1.3+) mis-resolves package `exports` in this
+# workspace — e.g. @vue/reactivity resolves to its CJS `index.js` (whose exports
+# bun can't statically analyze) during the `--target=node` prepare builds, so
+# `bun install` fails running workspace prepare scripts. The classic hoisted
+# layout resolves correctly (and matches the Nix build). See oven-sh/bun#23615.
+[install]
+linker = "hoisted"
+
 [test]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
