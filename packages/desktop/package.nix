@@ -6,45 +6,9 @@
   copyDesktopItems,
   chromium,
   lib,
-  cacert,
 }:
 let
   version = (lib.importJSON ../../package.json).version;
-
-  # Fixed-output derivation for node_modules — has network access to fetch
-  # npm manifests that bun2nix doesn't cache yet.
-  # See: https://github.com/nix-community/bun2nix/issues/77
-  nodeModules = stdenv.mkDerivation {
-    pname = "jx-studio-node-modules";
-    inherit version;
-    src = lib.cleanSource ../..;
-
-    nativeBuildInputs = [ bun cacert ];
-
-    dontConfigure = true;
-    dontFixup = true;
-
-    buildPhase = ''
-      export HOME="$TMPDIR"
-      bun install --frozen-lockfile --ignore-scripts
-    '';
-
-    installPhase = ''
-      mkdir -p $out
-      # Copy node_modules preserving symlinks (Bun's resolution depends on them)
-      cp -r node_modules $out/node_modules
-      find packages -name node_modules -type d | while read -r nm; do
-        mkdir -p "$out/$(dirname "$nm")"
-        cp -r "$nm" "$out/$nm"
-      done
-      # Remove dangling symlinks that reference the build sandbox
-      find $out -type l ! -exec test -e {} \; -delete 2>/dev/null || true
-    '';
-
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-  };
 in
 stdenv.mkDerivation {
   pname = "jx-studio";
@@ -53,27 +17,37 @@ stdenv.mkDerivation {
   src = lib.cleanSource ../..;
 
   nativeBuildInputs = [
+    bun2nix.hook
     bun
     makeWrapper
     copyDesktopItems
   ];
 
-  desktopItems = [ ./jx-studio.desktop ];
+  # Offline Bun install cache derived straight from bun.lock via bun.nix.
+  # Every dependency hash comes from the lockfile, so there is no aggregate
+  # node_modules hash to maintain by hand — regenerate bun.nix with `bun2nix`
+  # (the repo's postinstall already does) whenever the lockfile changes.
+  bunDeps = bun2nix.fetchBunDeps {
+    bunNix = ../../bun.nix;
+  };
 
-  configurePhase = ''
-    # Restore node_modules from the FOD
-    cp -r "${nodeModules}"/node_modules .
-    chmod -R u+w node_modules
-    # Restore workspace-scoped node_modules
-    find "${nodeModules}/packages" -name node_modules -type d 2>/dev/null | while read -r nm; do
-      rel="''${nm#${nodeModules}/}"
-      if [ ! -d "$rel" ]; then
-        mkdir -p "$(dirname "$rel")"
-        cp -r "$nm" "$rel"
-        chmod -R u+w "$rel"
-      fi
-    done
-  '';
+  # Use the classic flat node_modules layout. The isolated linker (the bun2nix
+  # default) materializes packages behind a per-package store of symlinks that
+  # the copied-to-$out output cannot resolve at runtime; hoisted gives real
+  # files that survive the `cp -r node_modules` below.
+  bunInstallFlags = [ "--linker=hoisted" ];
+
+  # The build never needed dependency lifecycle scripts (the previous FOD ran
+  # `bun install --ignore-scripts`), and running them would require network
+  # access that the sandbox forbids.
+  dontRunLifecycleScripts = true;
+
+  # We ship a runnable Bun workspace, not a single compiled Bun binary, so the
+  # build and install steps are driven below rather than by the hook defaults.
+  dontUseBunBuild = true;
+  dontUseBunCheck = true;
+
+  desktopItems = [ ./jx-studio.desktop ];
 
   buildPhase = ''
     runHook preBuild
