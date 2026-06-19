@@ -59,6 +59,14 @@ if (/\.(ts|tsx|js|jsx)$/.test(file)) {
   }
 }
 
+// 3) Lint typecheck errors — no --fix, just report. (JS/TS only.)
+if (/\.(ts|tsx)$/.test(file)) {
+  const typecheck = check("oxlint", ["--type-aware", "-c", ".oxlintrc.typecheck.json", file]);
+  if (typecheck) {
+    problems.push(`• Type errors:\n${typecheck}`);
+  }
+}
+
 if (problems.length > 0) {
   console.error(
     `⚠ Codebase-rule check failed for ${file} (the edit was kept; please fix):\n\n${problems.join("\n\n")}`,

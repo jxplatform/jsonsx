@@ -22,6 +22,7 @@ describe("importImplementation", () => {
   });
 
   test("throws the last error when no candidate resolves", async () => {
+    // oxlint-disable-next-line typescript/await-thenable -- bun:test async matcher returns a Promise; type-aware engine misresolves its return type
     await expect(importImplementation("/no/such/src/missing.js")).rejects.toThrow();
   });
 });
