@@ -41,7 +41,7 @@
     "test:coverage:workspaces": "bun run --workspaces test:coverage",
     "typecheck": "tsgo",
     "typecheck:legacy": "tsc",
-    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces upgrade"
+    "upgrade": "bunx npm-check-updates -u && bun install && bun run --workspaces --if-present upgrade"
   },
   "dependencies": {
     "@jxsuite/server": "workspace:^"

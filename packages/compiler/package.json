@@ -42,14 +42,14 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@apidevtools/json-schema-ref-parser": "^15.3.6",
+    "@apidevtools/json-schema-ref-parser": "^15.4.0",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.2"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.10.2",
+    "@happy-dom/global-registrator": "^20.10.6",
     "@types/mdast": "^4.0.4"
   }
 }

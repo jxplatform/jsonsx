@@ -31,8 +31,8 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
-    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^1.2.0",
+    "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
+    "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",
@@ -79,11 +79,11 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.10.2",
+    "@happy-dom/global-registrator": "^20.10.6",
     "@types/mdast": "^4.0.4",
-    "@webref/css": "^8.5.8",
+    "@webref/css": "^8.6.0",
     "@webref/elements": "^2.7.1",
-    "@webref/idl": "^3.81.0"
+    "@webref/idl": "^3.81.1"
   },
   "//vue-reactivity": "Exact pin required — must match @jxsuite/runtime to avoid cross-boundary proxy bugs"
 }
