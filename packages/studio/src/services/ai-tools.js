@@ -13,8 +13,10 @@ import { getNodeAtPath } from "../state";
 import { toRaw } from "../reactivity";
 import {
   mutateInsertNode,
+  mutateMoveNode,
   mutateRemoveNode,
   mutateUpdateProperty,
+  mutateUpdateStyle,
   transactDoc,
 } from "../tabs/transact";
 import { validateDoc } from "./jx-validate";
@@ -110,9 +112,10 @@ async function applyAndValidate(tab, mutationFn, summary, validate) {
  * @param {{
  *   getTab: () => import("../tabs/tab").Tab | null;
  *   validate?: (doc: unknown) => Promise<string[]>;
+ *   saveFile?: (relPath: string, content: string) => Promise<void>;
  * }} ctx
  */
-export function registerAiTools(registry, { getTab, validate = validateDoc }) {
+export function registerAiTools(registry, { getTab, validate = validateDoc, saveFile }) {
   registry.register(
     createToolDefinition({
       name: "read_document",
@@ -168,7 +171,11 @@ export function registerAiTools(registry, { getTab, validate = validateDoc }) {
             description: "The new value, or null to remove the property.",
           },
         },
-        required: ["path", "key", "value"],
+        /*
+         * "value" omitted from required: passing null / omitting it means "remove the property",
+         * but the registry rejects null on required args (tools.js:181). See §14.
+         */
+        required: ["path", "key"],
       },
       async execute(args) {
         const tab = getTab();
@@ -249,6 +256,371 @@ export function registerAiTools(registry, { getTab, validate = validateDoc }) {
           `Inserted node at ${JSON.stringify([...parentPath, "children", index])}.`,
           validate,
         );
+      },
+    }),
+  );
+
+  // ── set_style ──────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "set_style",
+      description:
+        "Set or remove a CSS style property on a node. Style property names use camelCase " +
+        '(e.g. "backgroundColor", "fontSize", "borderRadius"). Values are always strings ' +
+        '(e.g. "10px", "center", "var(--color-accent)"). Pass value: null to remove.',
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "array",
+            description: PATH_DESCRIPTION,
+            items: { type: ["string", "number"] },
+          },
+          property: {
+            type: "string",
+            description: 'CSS property name in camelCase, e.g. "backgroundColor".',
+          },
+          value: {
+            description:
+              'CSS value as a string (e.g. "10px", "var(--color-accent)"), or null to remove.',
+          },
+        },
+        /*
+         * "value" omitted from required so null / omitted = remove (registry rejects null on
+         * required args, tools.js:181). See §14.
+         */
+        required: ["path", "property"],
+      },
+      async execute(args) {
+        const tab = getTab();
+        if (!tab) {
+          return { success: false, error: "No document is open." };
+        }
+        const { path } = args;
+        if (getNodeAtPath(tab.doc.document, path) === undefined) {
+          return { success: false, error: `No node exists at path ${JSON.stringify(path)}.` };
+        }
+        const prop = /** @type {string} */ (args.property);
+        const val = args.value == null ? undefined : String(args.value);
+        return applyAndValidate(
+          tab,
+          (t) => mutateUpdateStyle(t, path, prop, val),
+          `Set style "${prop}" at ${JSON.stringify(path)}.`,
+          validate,
+        );
+      },
+    }),
+  );
+
+  // ── set_text ───────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "set_text",
+      description:
+        "Set the textContent of a node. Convenience alias for set_property with key: 'textContent'.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "array",
+            description: PATH_DESCRIPTION,
+            items: { type: ["string", "number"] },
+          },
+          value: { type: "string", description: "Text content." },
+        },
+        required: ["path", "value"],
+      },
+      async execute(args) {
+        const tab = getTab();
+        if (!tab) {
+          return { success: false, error: "No document is open." };
+        }
+        const { path } = args;
+        if (getNodeAtPath(tab.doc.document, path) === undefined) {
+          return { success: false, error: `No node exists at path ${JSON.stringify(path)}.` };
+        }
+        return applyAndValidate(
+          tab,
+          (t) => mutateUpdateProperty(t, path, "textContent", /** @type {string} */ (args.value)),
+          `Set textContent at ${JSON.stringify(path)}.`,
+          validate,
+        );
+      },
+    }),
+  );
+
+  // ── add_state ──────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "add_state",
+      description:
+        "Add a new reactive state variable under the document's `state` object. The value can be a scalar " +
+        '(e.g. 0, ""), a typed object ({ "type": "string", "default": "" }), a computed ' +
+        'string ("${state.other}"), a function ({ "$prototype": "Function", "body": "..." }), ' +
+        'or a data source ({ "$prototype": "Data", "$src": "./data.json" }).',
+      parameters: {
+        type: "object",
+        properties: {
+          key: { type: "string", description: 'State variable name, e.g. "count", "isOpen".' },
+          value: {
+            description:
+              "Initial value or state shape object (scalar, typed, computed, function, or data source).",
+          },
+        },
+        required: ["key", "value"],
+      },
+      async execute(args) {
+        const tab = getTab();
+        if (!tab) {
+          return { success: false, error: "No document is open." };
+        }
+        const { key } = /** @type {{ key: string }} */ (args);
+        if (tab.doc.document.state && tab.doc.document.state[key] !== undefined) {
+          return {
+            success: false,
+            error: `State key "${key}" already exists. Use update_state to change it, or remove it first.`,
+          };
+        }
+        return applyAndValidate(
+          tab,
+          (t) => {
+            // Ensure the state object exists before setting a key on it.
+            if (!t.doc.document.state) {
+              t.doc.document.state = {};
+            }
+            /*
+             * Directly mutate — bypass mutateUpdateProperty because its "" → delete behaviour
+             * (transact.ts:248) is wrong for state defaults (e.g. "title": "").
+             */
+            t.doc.document.state[key] = args.value;
+          },
+          `Added state "${key}".`,
+          validate,
+        );
+      },
+    }),
+  );
+
+  // ── update_state ───────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "update_state",
+      description:
+        "Update or remove an existing state variable at the document root. Pass value: null to remove.",
+      parameters: {
+        type: "object",
+        properties: {
+          key: { type: "string", description: 'State variable name to update, e.g. "count".' },
+          value: {
+            description:
+              "New value (same shapes as add_state), or null to remove the state variable.",
+          },
+        },
+        /*
+         * "value" omitted from required so null = remove (registry rejects null on required
+         * args, tools.js:181). See §14.
+         */
+        required: ["key"],
+      },
+      async execute(args) {
+        const tab = getTab();
+        if (!tab) {
+          return { success: false, error: "No document is open." };
+        }
+        const { key } = /** @type {{ key: string }} */ (args);
+        if (!tab.doc.document.state || tab.doc.document.state[key] === undefined) {
+          return {
+            success: false,
+            error: `State key "${key}" does not exist. Use add_state to create it, or check the name. Current state keys: ${Object.keys(tab.doc.document.state || {}).join(", ") || "(none)"}`,
+          };
+        }
+        return applyAndValidate(
+          tab,
+          (t) => {
+            /*
+             * Directly mutate — bypass mutateUpdateProperty because its "" → delete behaviour
+             * (transact.ts:248) is wrong for state defaults (e.g. "title": "").
+             */
+            if (args.value == null) {
+              delete t.doc.document.state[key];
+            } else {
+              t.doc.document.state[key] = args.value;
+            }
+          },
+          args.value == null ? `Removed state "${key}".` : `Updated state "${key}".`,
+          validate,
+        );
+      },
+    }),
+  );
+
+  // ── move_node ──────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "move_node",
+      description:
+        "Move a node from one location to another in the document tree. The node is removed " +
+        "from fromPath and inserted into toParentPath at toIndex.",
+      parameters: {
+        type: "object",
+        properties: {
+          fromPath: {
+            type: "array",
+            description: `${PATH_DESCRIPTION} The node to move.`,
+            items: { type: ["string", "number"] },
+          },
+          toParentPath: {
+            type: "array",
+            description: `${PATH_DESCRIPTION} The target parent (a node, not a children array).`,
+            items: { type: ["string", "number"] },
+          },
+          toIndex: {
+            type: "integer",
+            description: "Insertion index in the target parent's children array.",
+          },
+        },
+        required: ["fromPath", "toParentPath", "toIndex"],
+      },
+      async execute(args) {
+        const tab = getTab();
+        if (!tab) {
+          return { success: false, error: "No document is open." };
+        }
+        const { fromPath, toParentPath, toIndex } = args;
+        if (fromPath.length < 2) {
+          return { success: false, error: "Cannot move the document root." };
+        }
+        if (getNodeAtPath(tab.doc.document, fromPath) === undefined) {
+          return {
+            success: false,
+            error: `No node exists at fromPath ${JSON.stringify(fromPath)}.`,
+          };
+        }
+        if (getNodeAtPath(tab.doc.document, toParentPath) === undefined) {
+          return {
+            success: false,
+            error: `No node exists at toParentPath ${JSON.stringify(toParentPath)}.`,
+          };
+        }
+        return applyAndValidate(
+          tab,
+          (t) => mutateMoveNode(t, fromPath, toParentPath, toIndex),
+          `Moved node from ${JSON.stringify(fromPath)} to ${JSON.stringify([...toParentPath, "children", toIndex])}.`,
+          validate,
+        );
+      },
+    }),
+  );
+
+  // ── create_component ───────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "create_component",
+      description:
+        "Create a new Jx component file on disk. Writes the component JSON to the given " +
+        "relative path within the project. The content must be a valid Jx component document.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              'File path relative to the project root, e.g. "components/newsletter-form.json".',
+          },
+          content: {
+            type: "object",
+            description:
+              "The complete Jx component JSON (must include tagName, optionally state, style, children, $elements).",
+          },
+        },
+        required: ["path", "content"],
+      },
+      async execute(args) {
+        if (!saveFile) {
+          return {
+            success: false,
+            error: "File operations are not available in this environment.",
+          };
+        }
+        const relPath = /** @type {string} */ (args.path);
+        const { content } = /** @type {{ content: object }} */ (args);
+        // Validate content against the Jx schema before writing.
+        const errors = await validate(content);
+        if (errors.length > 0) {
+          const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
+          return {
+            success: false,
+            error: `Component content has schema errors. Fix these before creating the file:\n${formatted}`,
+          };
+        }
+        try {
+          await saveFile(relPath, JSON.stringify(content, null, 2));
+          return { success: true, summary: `Created component at "${relPath}".` };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      },
+    }),
+  );
+
+  // ── create_page ────────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "create_page",
+      description:
+        "Create a new Jx page file on disk. A page typically includes a layout component and " +
+        "section children. The content must be a valid Jx page document.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: 'File path relative to the project root, e.g. "pages/about.json".',
+          },
+          content: {
+            type: "object",
+            description:
+              "The complete Jx page JSON (typically includes $elements to import a layout, children for sections).",
+          },
+        },
+        required: ["path", "content"],
+      },
+      async execute(args) {
+        if (!saveFile) {
+          return {
+            success: false,
+            error: "File operations are not available in this environment.",
+          };
+        }
+        const relPath = /** @type {string} */ (args.path);
+        const { content } = /** @type {{ content: object }} */ (args);
+        const errors = await validate(content);
+        if (errors.length > 0) {
+          const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
+          return {
+            success: false,
+            error: `Page content has schema errors. Fix these before creating the file:\n${formatted}`,
+          };
+        }
+        try {
+          await saveFile(relPath, JSON.stringify(content, null, 2));
+          return { success: true, summary: `Created page at "${relPath}".` };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
       },
     }),
   );

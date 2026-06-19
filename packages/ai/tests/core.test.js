@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
+import { effect } from "@vue/reactivity";
 import { createToolDefinition, createToolRegistry, toolSuccess } from "../src/tools.js";
 import { createChatState } from "../src/chat-state.js";
 import {
@@ -306,6 +307,42 @@ describe("ChatState", () => {
 
     // Only 2 messages: user "First" + placeholder assistant
     expect(chat.messages.filter((m) => m.role === "user").length).toBe(1);
+  });
+
+  it("notifies reactive effects on streaming appendDelta (messages[i].content)", () => {
+    const chat = createChatState();
+
+    let effectCount = 0;
+    let lastContent = "";
+
+    effect(() => {
+      // Track the streaming message's content so the effect re-runs on every delta.
+      const msgs = /** @type {{ role: string; content: string }[]} */ (chat.messages);
+      if (msgs.length > 0) {
+        lastContent = msgs.at(-1).content;
+      }
+      // Track status changes too so effect re-runs on sendMessage/finishStream.
+      void chat.status;
+      effectCount += 1;
+    });
+
+    // Initial effect run
+    expect(effectCount).toBe(1);
+
+    chat.sendMessage("Hello");
+    // SendMessage creates user msg + placeholder assistant → at least one more effect run
+    expect(effectCount).toBeGreaterThanOrEqual(2);
+    const afterSend = effectCount;
+
+    chat.appendDelta("Hi ");
+    // AppendDelta must notify effects — content changed
+    expect(effectCount).toBeGreaterThan(afterSend);
+    expect(lastContent).toBe("Hi ");
+    const afterFirstDelta = effectCount;
+
+    chat.appendDelta("there!");
+    expect(effectCount).toBeGreaterThan(afterFirstDelta);
+    expect(lastContent).toBe("Hi there!");
   });
 });
 

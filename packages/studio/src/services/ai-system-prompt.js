@@ -179,8 +179,15 @@ export function buildSystemPrompt({ document, projectConfig, components, project
 You have access to these tools that read and modify the live Jx document directly. Always prefer tool calls over describing changes in text:
 - read_document(path?) — inspect the whole document or the subtree at a path. Paths are JSON arrays of keys/indices from the root, e.g. ["children", 0, "children", 1].
 - set_property(path, key, value) — set or remove a property on the node at path (tagName, textContent, className, style, attributes, $props…). Pass value: null to remove.
+- set_style(path, property, value) — set or remove a CSS style property (camelCase) on a node. Values as strings: "10px", "var(--color-accent)". Pass value: null to remove.
+- set_text(path, value) — convenient alias for set_property with key: "textContent".
 - add_child(parentPath, index, node) — insert a new node into the children of parentPath at index.
 - remove_node(path) — remove the node at path.
+- move_node(fromPath, toParentPath, toIndex) — move a node from one location to another.
+- add_state(key, value) — add a reactive state variable under the document's 'state' object. Value can be scalar, typed, computed, function, or data source.
+- update_state(key, value) — update or remove (value: null) an existing state variable.
+- create_component(path, content) — create a new .json component file on disk.
+- create_page(path, content) — create a new .json page file on disk.
 
 When the user asks you to build or modify something:
 1. Call read_document first if needed to discover the current structure and valid paths.

@@ -17,6 +17,22 @@ import { registerAiTools } from "./ai-tools";
 import { runAgentLoop } from "./tool-executor";
 import { buildSystemPrompt } from "./ai-system-prompt";
 import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
+import { trimContext } from "./context-manager";
+
+const PERSIST_KEY_PREFIX = "jx-ai-chat-history";
+const MAX_PERSIST_MESSAGES = 50;
+
+/**
+ * Project-scoped localStorage key (uses the project root) so conversations don't bleed across
+ * projects (ADR §11.5 / §14.2). Falls back to a shared key when no project is open.
+ *
+ * @returns {string}
+ */
+function persistKey() {
+  return workspace.projectRoot
+    ? `${PERSIST_KEY_PREFIX}:${workspace.projectRoot}`
+    : PERSIST_KEY_PREFIX;
+}
 
 /**
  * Create a document-assistant session bound to the currently active tab.
@@ -32,7 +48,13 @@ export function createDocumentAssistant() {
   const chatState = createChatState({ model: getModel() });
 
   const toolRegistry = createToolRegistry();
-  registerAiTools(toolRegistry, { getTab: () => activeTab.value });
+  registerAiTools(toolRegistry, {
+    getTab: () => activeTab.value,
+    saveFile: async (relPath, content) => {
+      const plat = getPlatform();
+      await plat.writeFile(relPath, content);
+    },
+  });
 
   /** @type {AbortController | null} */
   let controller = null;
@@ -53,6 +75,15 @@ export function createDocumentAssistant() {
     }
 
     chatState.sendMessage(text);
+
+    // Trim context before streaming to keep the conversation within token limits.
+    const trimmed = trimContext(chatState, buildPrompt());
+    if (trimmed) {
+      chatState.setTokenCount(trimmed.estimatedTokens);
+    }
+
+    // Persist after trimming so the saved history reflects what's actually sent.
+    persistChat(chatState);
 
     try {
       const plat = getPlatform();
@@ -78,8 +109,10 @@ export function createDocumentAssistant() {
         signal: controller.signal,
       });
     } catch (error) {
-      // Synchronous failure (e.g. platform not registered, network unreachable before
-      // the stream starts). Set the error so the panel can display it.
+      /*
+       * Synchronous failure (e.g. platform not registered, network unreachable before the
+       * stream starts). Set the error so the panel can display it.
+       */
       chatState.setError(error instanceof Error ? error.message : String(error));
     } finally {
       controller = null;
@@ -94,7 +127,46 @@ export function createDocumentAssistant() {
   function newChat() {
     stop();
     chatState.clearChat();
+    persistChat(chatState);
   }
+
+  // ── Persistence ───────────────────────────────────────────────────────
+
+  /** Persist recent messages to localStorage (non-blocking). */
+  function persistChat(cs) {
+    try {
+      const msgs = cs.messages.slice(-MAX_PERSIST_MESSAGES);
+      localStorage.setItem(persistKey(), JSON.stringify(msgs));
+    } catch {
+      // Storage full or unavailable — not critical.
+    }
+  }
+
+  /** Restore messages from a previous session, if any. */
+  function restoreChat() {
+    try {
+      const raw = localStorage.getItem(persistKey());
+      if (!raw) {
+        return;
+      }
+      const msgs = JSON.parse(raw);
+      if (!Array.isArray(msgs) || msgs.length === 0) {
+        return;
+      }
+      // Push into chat state (skips streaming state)
+      for (const m of msgs) {
+        chatState.messages.push({
+          ...m,
+          id: m.id || `restored_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        });
+      }
+    } catch {
+      // Corrupt or empty — ignore.
+    }
+  }
+
+  // Restore once on creation.
+  restoreChat();
 
   return { chatState, sendMessage, stop, newChat };
 }

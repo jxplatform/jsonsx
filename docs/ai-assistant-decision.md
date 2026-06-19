@@ -259,29 +259,94 @@ endpoint) in the gate → type a request → edits apply to the canvas, Ctrl+Z t
 
 ---
 
-## 11. Remaining MVP work (post-skeleton, 2026-06-18)
+## 11. Remaining MVP work (completed 2026-06-19)
 
-The §8 skeleton is done; these are the gaps that make the assistant feel incomplete in real use.
-All are additive on Stack B — **no architecture change, no native-UI revival.**
+All five §11 gaps are closed. The MVP is now feature-complete on the Stack B skeleton — 11 tools,
+live-streaming chat, visible error feedback, token-budget trimming, and localStorage persistence.
 
-1. **Streaming reactivity bug (refresh).** `packages/ai/src/chat-state.js` `beginAssistantTurn`
-   keeps a reference to the **raw** placeholder message, then `appendDelta` writes
-   `_streamingMessage.content` through that raw reference (line ~182). Because the write bypasses
-   the Vue `reactive()` proxy, effects reading `messages[i].content` (e.g. `ai-panel.ts`
-   `watchAssistant`) are never notified — the chat only updates on remount (tab switch). Fix:
-   mutate through the proxy (re-read `store.messages[len-1]` after push) or render from
-   `streamingContent`. Add a test that asserts live streaming notifies an effect.
-2. **Tool coverage.** Only 4 tools ship (`read_document`, `set_property`, `add_child`,
-   `remove_node`). The model proposes changes it cannot express → "fails to create some changes."
-   Add (at least): `set_style`, `set_text`, `add_state`/`update_state`, `move_node`,
-   `create_component`, `create_page`. Mine `ai-assistant-plan.md` Phase 4 for the shape (snake_case,
-   `transactDoc()`-backed, schema-validated).
-3. **Tool/validation error surfacing.** Failed tool results (`{success:false}`) should be visible
-   in the panel, not silent, so users see why an edit didn't land.
-4. **Context management.** `context-manager.js` does not exist; long conversations will overflow
-   with no trimming/summarization. (Plan Phase 5 is the backlog reference.)
-5. **Conversation persistence.** localStorage restore not built (plan step 19).
-6. _Deferred, unchanged:_ shadow-render critic (§6c).
+### 11.1 Streaming reactivity bug ✅
+
+**Fix:** `packages/ai/src/chat-state.js` — `beginAssistantTurn()` re-reads `_streamingMessage`
+through the Vue reactive proxy after `store.messages.push()` so `appendDelta` /
+`appendToolCallStart` / `appendToolResult` mutations notify effects (e.g. `watchAssistant` in
+`ai-panel.ts`).
+
+**Test:** `packages/ai/tests/core.test.js` — new test "notifies reactive effects on streaming
+appendDelta" wires an `effect()` that tracks `messages[last].content`, calls `appendDelta` twice,
+and asserts the effect count increments each time. 24/24 tests pass.
+
+### 11.2 Tool coverage ✅
+
+**File:** `packages/studio/src/services/ai-tools.js` — 7 new tools added (11 total):
+
+| Tool               | Description                                                                                       | Mutation helper                         |
+| ------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `set_style`        | Set/remove CSS property (camelCase) on a node                                                     | `mutateUpdateStyle`                     |
+| `set_text`         | Set `textContent` (convenience alias)                                                             | `mutateUpdateProperty`                  |
+| `add_state`        | Add reactive state variable (scalar, typed, computed, function, data source) — **✅ FIXED §14.1** | Direct mutation on `doc.state`          |
+| `update_state`     | Update or remove existing state variable — **✅ FIXED §14.1**                                     | Direct mutation, checks existence first |
+| `move_node`        | Move node between parents in the document tree                                                    | `mutateMoveNode`                        |
+| `create_component` | Write new `.json` component file to disk                                                          | `saveFile()` via `plat.writeFile()`     |
+| `create_page`      | Write new `.json` page file to disk                                                               | Same                                    |
+
+All new tools use `applyAndValidate` for schema-validation feedback. `registerAiTools` now accepts
+optional `saveFile` callback (threaded from `document-assistant.js`).
+
+**System prompt:** `ai-system-prompt.js` updated to list all 11 tools with one-line descriptions.
+
+### 11.3 Error surfacing ✅
+
+**File:** `packages/studio/src/panels/ai-panel.ts` — `renderAssistantMessage()` parses tool result
+messages. Failed results (`{success: false}`) render as `⚠️ error message` in the chat. Successful
+results stay hidden (no noise). New helper `tryParseToolResult()` safely parses JSON from message
+content.
+
+### 11.4 Context management ✅
+
+**New file:** `packages/studio/src/services/context-manager.js` — `trimContext(chatState, systemPrompt)`:
+
+- Estimates tokens (4 chars ≈ 1 token), caps at 8,000 total (system prompt + messages).
+- Drops oldest messages while preserving last 20 + ≥3 user/tool turns.
+- Inserts a summary note so the model knows context was truncated.
+- Sets `tokenCount` and `contextWarning` on `chatState`.
+
+Wired into `document-assistant.js` → `sendMessage()` — runs before each stream.
+
+### 11.5 Conversation persistence ✅
+
+**File:** `packages/studio/src/services/document-assistant.js`
+
+- `persistChat()`: saves last 50 messages to `localStorage` (`jx-ai-chat-history`) after each
+  send and on `newChat()`.
+- `restoreChat()`: restores messages on `createDocumentAssistant()` creation.
+- Both degrade gracefully on storage-full, corrupt JSON, or missing key.
+
+### 11.6 Deferred (unchanged)
+
+Shadow-render critic (§6c) — remains Phase 2.
+
+---
+
+### 📋 §11 Turnover (2026-06-19)
+
+| Artifact | Path                                                 | Description                                                                                                                                                             |
+| -------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Module   | `packages/studio/src/services/ai-tools.js`           | 11 tools total (4 original + 7 new). `set_style`, `set_text`, `add_state`, `update_state`, `move_node`, `create_component`, `create_page`. Accepts `saveFile` callback. |
+| Module   | `packages/studio/src/services/context-manager.js`    | **New.** `trimContext()` — token estimation, oldest-message dropping, summary-note insertion, budget warning.                                                           |
+| Module   | `packages/studio/src/services/document-assistant.js` | Threads `saveFile` into `registerAiTools`. Wires `trimContext` before each send. Adds `persistChat`/`restoreChat` (localStorage).                                       |
+| Module   | `packages/studio/src/services/ai-system-prompt.js`   | Tool list updated from 4 to 11 with descriptions.                                                                                                                       |
+| Module   | `packages/studio/src/panels/ai-panel.ts`             | Failed tool results surface as ⚠️ messages. New `tryParseToolResult()` helper.                                                                                          |
+| Fix      | `packages/ai/src/chat-state.js`                      | `_streamingMessage` re-read through reactive proxy after push.                                                                                                          |
+| Test     | `packages/ai/tests/core.test.js`                     | New test: "notifies reactive effects on streaming appendDelta". 24/24 pass.                                                                                             |
+| Tests    | `packages/studio/tests/ai-loop.test.js`              | 3/3 pass.                                                                                                                                                               |
+| Tests    | `packages/studio/tests/jx-validate-smoke.test.js`    | 2/2 pass.                                                                                                                                                               |
+
+**§11 items wired end-to-end, but NOT all correct — see §14 review.** The MVP plumbing is in place
+(11 tools, live-streaming chat, schema-validated self-correction loop capped at 5 rounds,
+token-budget trimming, localStorage persistence, visible error feedback) with zero architecture
+changes — all additive on Stack B. **However, a 2026-06-19 review found one blocker
+(`add_state`/`update_state` write to the wrong path) plus requirement deviations. Do not treat §11
+as done until §14 must-fix items are closed.**
 
 ## 12. Parked work
 
@@ -322,3 +387,75 @@ values, and not Tailwind utility classes (which jx does not render).
 tune output quality while results aren't reliably rendering. Aesthetic quality has **no automated
 eval**: schema validation (§6b) and shadow-render (§6c) catch correctness, not taste. A visual
 critic is genuinely later (Phase 2+).
+
+---
+
+## 14. Implementation review (2026-06-19)
+
+Review of the uncommitted §11 implementation. Verified by reading the diffs + running the suite
+(`packages/ai` 24/24, `studio` ai-loop 5/5 pass; `typecheck` clean apart from a pre-existing `sharp`
+error in the compiler, unrelated). **Verified correct:** the §11.1 reactivity fix (with regression
+test), §11.3 error surfacing, and the `set_style` / `set_text` / `move_node` / `create_component` /
+`create_page` tools (schema-validated; `saveFile` correctly bound to the real `platform.writeFile`).
+
+### 14.1 ✅ Fixed — `add_state` / `update_state` target path and empty-string handling
+
+**Path bug (already fixed in current code):** Both tools now target `["state"]` instead of `[]`.
+`add_state` creates the `state` object if missing before setting a key.
+
+**Empty-string deletion (fixed 2026-06-19):** `mutateUpdateProperty` deletes when value is `""`
+(`transact.ts:248`), which broke state defaults like `"title": ""`. Both `add_state` and
+`update_state` now directly mutate `t.doc.document.state[key]` instead of calling
+`mutateUpdateProperty`, so empty-string defaults are preserved.
+
+**System prompt updated:** Tool descriptions changed from "at the document root" to
+"under the document's `state` object".
+
+### 14.2 🟡 Should-fix — deviations from recorded requirements
+
+- **Persistence is not project-scoped.** `document-assistant.js` uses a single global key
+  `"jx-ai-chat-history"`. §11.5 / plan step 19 require keying by **project root** — otherwise
+  switching projects mixes conversations. Fix: append the project root to the key.
+- **Context budget is a hardcoded `MAX_TOKENS = 8000`.** For a 128k model (gpt-4o) this truncates
+  history far too early, and the §13 premium-component workstream produces large outputs that will
+  hit it. Requirement was ~80% of the **model's** window. Also missing: the 50%-of-window _warning_
+  threshold (currently `contextWarning` only fires on actual trimming, not as an early heads-up).
+
+### 14.3 🟡 Gaps
+
+- **Thin test coverage on the new surface.** Only the reactivity fix has a test. No tests for
+  `set_style` / `add_state` / `move_node` / `create_*`, context trimming, or persistence — a test on
+  `add_state` would have caught §14.1. Add unit tests before treating §11.2/§11.4/§11.5 as done.
+- **`create_component` / `create_page` overwrite silently** — no collision check on an existing path,
+  and the created file isn't opened/registered in Studio. Acceptable for v1; note the overwrite risk.
+
+### 14.4 Fix checklist
+
+- [x] `add_state` / `update_state`: target `["state"]`, create `state` if missing, handle `""`/removal. (2026-06-19)
+- [x] Project-scope the persistence localStorage key — `persistKey()` appends `workspace.projectRoot`.
+- [x] Make the context budget model-aware — `contextWindowFor(model)` × 80%, plus a 50% warning
+      threshold (verified: gpt-4 at ~5k/8192 tokens → `contextWarning` set, no trim).
+- [x] Add unit tests — `packages/studio/tests/ai-tools.test.js` (11 tests: state path/empty-string/
+      dup/remove/undo, set_style, move_node). All green.
+- [ ] (Optional, deferred) collision check + open-on-create for `create_component` / `create_page`.
+
+### 14.5 Additional bugs found during the fix pass (2026-06-19)
+
+- **🔴 Build break (fixed).** `ai-system-prompt.js` wrapped `` `state` `` in literal backticks
+  **inside the backtick template literal**, prematurely closing it — the module failed to build
+  (would have broken the studio bundle / GA.3). Replaced with `'state'`. Verified: builds, prompt
+  is 9955 chars.
+- **🔴 null-removal unreachable (fixed).** `set_property` / `set_style` / `update_state` advertise
+  "pass value: null to remove", but the registry's `validate` rejects `null` on **required** args
+  (`tools.js:181`), so removal never reached `execute`. Dropped `value` from each tool's `required`
+  so null/omitted now means remove.
+
+### 14.6 Verification status (2026-06-19)
+
+- **Tests:** `@jxsuite/ai` 24/24; new `ai-tools.test.js` 11/11; `ai-loop` + `jx-validate-smoke` 7/7.
+  Full studio suite: my changes add 11 passing tests and introduce **zero** new failures.
+- **Pre-existing, NOT caused by this work:** the studio suite has **21 failing tests at the committed
+  baseline** (`workspace` rename/primitive + `stylebook` CSS-variable suites) — test-pollution/ordering,
+  unrelated to AI. And `bun run lint` was already red on committed `packages/server/src/ai-api.js`
+  (`capitalized-comments`). Both predate this feature and should be tracked separately. All AI feature
+  files now lint clean.

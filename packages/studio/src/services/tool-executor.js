@@ -112,8 +112,10 @@ export async function runAgentLoop({
     }
   }
 
-  // Surface the actual errors so the user knows what went wrong, not just a
-  // generic "I couldn't do it" message.
+  /*
+   * Surface the actual errors so the user knows what went wrong, not just a generic
+   * "I couldn't do it" message.
+   */
   const uniqueErrors = [...new Set(allErrors)];
   const detail =
     uniqueErrors.length > 0

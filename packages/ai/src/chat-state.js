@@ -146,6 +146,12 @@ export function createChatState(opts = {}) {
       timestamp: Date.now(),
     });
     store.messages.push(_streamingMessage);
+    /*
+     * Re-read through the reactive proxy so appendDelta / appendToolCallStart mutations notify
+     * effects (e.g. watchAssistant in ai-panel.ts). _streamingMessage now holds the proxied
+     * version, not the raw object pushed above.
+     */
+    _streamingMessage = store.messages.at(-1);
 
     store.status = "streaming";
   }

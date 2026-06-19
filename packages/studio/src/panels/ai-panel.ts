@@ -392,7 +392,12 @@ function renderAssistantMessage(msg: {
     return;
   }
   if (msg.role === "tool") {
-    // Raw tool results are hidden from the user (spec §3.1).
+    // Show only failed tool results so the user knows why an edit didn't land
+    // (ADR §11.3). Successful tool results stay hidden to reduce noise.
+    const parsed = tryParseToolResult(msg.content);
+    if (parsed && !parsed.success) {
+      chatInstance.messageAddNew(`⚠️ ${parsed.error || "Tool call failed"}`, "", "left", "tool");
+    }
     return;
   }
   if (msg.content) {
@@ -483,6 +488,25 @@ function watchAssistant() {
       }
     });
   });
+}
+
+/**
+ * Parse a tool result message content (JSON string) into its success/error shape. Returns null if
+ * the content isn't a valid tool result.
+ *
+ * @param {string} content
+ * @returns {{ success: boolean; error?: string } | null}
+ */
+function tryParseToolResult(content: string) {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed.success === "boolean") {
+      return parsed;
+    }
+  } catch {
+    /* Not JSON — not a tool result */
+  }
+  return null;
 }
 
 /** @param {{ name: string; arguments: string }} tc */
