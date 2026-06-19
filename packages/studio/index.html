@@ -82,7 +82,7 @@
       /* ─── Layout ─────────────────────────────────── */
       #app {
         display: grid;
-        grid-template-rows: 36px auto minmax(0, 1fr) 24px;
+        grid-template-rows: 36px auto auto minmax(0, 1fr) 24px;
         grid-template-columns: 48px var(--panel-w-left) 1fr var(--panel-w-right);
         height: 100%;
       }
@@ -245,8 +245,16 @@
       #tab-strip:empty {
         display: none;
       }
+      #tab-bar {
+        grid-row: 3;
+        grid-column: 3;
+        min-width: 0;
+      }
+      #tab-bar:empty {
+        display: none;
+      }
       #activity-bar {
-        grid-row: 2 / 4;
+        grid-row: 2 / 5;
         grid-column: 1;
         display: flex;
         flex-direction: column;
@@ -254,21 +262,21 @@
         border-right: 1px solid var(--border);
       }
       #left-panel {
-        grid-row: 2 / 4;
+        grid-row: 2 / 5;
         grid-column: 2;
         overflow-y: auto;
         background: var(--bg-panel);
         border-right: 1px solid var(--border);
       }
       #canvas-wrap {
-        grid-row: 3;
+        grid-row: 4;
         grid-column: 3;
         position: relative;
         overflow: auto;
         background: var(--bg);
       }
       #right-panel {
-        grid-row: 2 / 4;
+        grid-row: 2 / 5;
         grid-column: 4;
         overflow-y: auto;
         background: var(--bg-panel);
@@ -424,7 +432,7 @@
         font-size: 11px;
       }
       #statusbar {
-        grid-row: 4;
+        grid-row: 5;
         grid-column: 1 / -1;
         display: flex;
         align-items: center;
@@ -521,7 +529,7 @@
 
       /* ─── Resize handles ─────────────────────────── */
       .resize-handle {
-        grid-row: 3;
+        grid-row: 4;
         width: 5px;
         margin-left: -3px;
         margin-right: -2px;
@@ -567,13 +575,16 @@
         flex: 1;
         min-width: 0;
       }
-      .source-toolbar {
+      .tab-bar {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 4px 8px;
         border-bottom: 1px solid var(--spectrum-global-color-gray-300);
         background: var(--spectrum-global-color-gray-100);
+      }
+      .tab-bar .tb-spacer {
+        flex: 1;
       }
       .source-editor {
         flex: 1;
@@ -3609,6 +3620,7 @@
       <div id="app">
         <div id="toolbar"></div>
         <div id="tab-strip"></div>
+        <div id="tab-bar"></div>
         <div id="activity-bar"></div>
         <div id="left-panel"></div>
         <div id="resize-left" class="resize-handle"></div>

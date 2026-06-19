@@ -38,8 +38,7 @@ function getFunctionBody(editing: EditingTarget | null | undefined) {
   return "";
 }
 
-/** @param {() => void} closeFunctionEditor */
-export function renderFunctionEditor(closeFunctionEditor: () => void) {
+export function renderFunctionEditor() {
   const editing = activeTab.value?.session.ui.editingFunction as EditingTarget | null | undefined;
 
   // If editor already exists and matches current target, just sync value
@@ -79,27 +78,10 @@ export function renderFunctionEditor(closeFunctionEditor: () => void) {
   canvasWrap.style.flexDirection = "column";
   canvasWrap.style.alignItems = "stretch";
 
-  // Toolbar breadcrumb handles context display — re-render it
-  renderOnly("toolbar");
-
-  const tab = activeTab.value;
-  const docName = tab?.documentPath?.split("/").pop() || tab?.doc.document?.tagName || "document";
-  const ed = editing as EditingTarget;
-  const funcLabel = ed.type === "def" ? `ƒ ${ed.defName}` : `ƒ ${ed.eventKey}`;
-
-  // Editor container
+  // The tab bar renders the Back button + breadcrumb context for the function editor.
   let editorContainer: HTMLDivElement | null = null;
   litRender(
     html`<div class="source-wrap">
-      <div class="source-toolbar">
-        <sp-action-button size="s" @click=${closeFunctionEditor}>
-          <sp-icon-back slot="icon"></sp-icon-back>
-          Back
-        </sp-action-button>
-        <span class="breadcrumb-item">${docName}</span>
-        <span class="breadcrumb-sep"> › </span>
-        <span class="breadcrumb-item current">${funcLabel}</span>
-      </div>
       <div
         class="source-editor"
         ${ref((el) => {

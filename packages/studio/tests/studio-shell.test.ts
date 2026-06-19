@@ -62,6 +62,7 @@ document.body.innerHTML = `
 // ─── Captured wiring contexts ─────────────────────────────────────────────────
 
 let toolbarCtx: any = null;
+let tabBarCtx: any = null;
 let welcomeCtx: any = null;
 let blockBarCtx: any = null;
 let canvasRenderCtx: any = null;
@@ -102,6 +103,14 @@ void mock.module("../src/panels/statusbar.ts", () => ({
 void mock.module("../src/panels/toolbar.ts", () => ({
   mount: (_el: HTMLElement, ctx: unknown) => {
     toolbarCtx = ctx;
+  },
+  render: mock(() => {}),
+  unmount: mock(() => {}),
+}));
+
+void mock.module("../src/panels/tab-bar.ts", () => ({
+  mount: (_el: HTMLElement, ctx: unknown) => {
+    tabBarCtx = ctx;
   },
   render: mock(() => {}),
   unmount: mock(() => {}),
@@ -208,6 +217,7 @@ beforeEach(() => {
 describe("bootstrap", () => {
   test("captures wiring contexts for every mocked panel module", () => {
     expect(toolbarCtx).not.toBeNull();
+    expect(tabBarCtx).not.toBeNull();
     expect(welcomeCtx).not.toBeNull();
     expect(blockBarCtx).not.toBeNull();
     expect(canvasRenderCtx).not.toBeNull();
@@ -349,7 +359,7 @@ describe("navigateBack", () => {
 
   test("no-op when the document stack is empty", async () => {
     openShellTab();
-    await toolbarCtx.navigateBack();
+    await tabBarCtx.navigateBack();
     expect(statusMessages).toHaveLength(0);
   });
 
@@ -358,7 +368,7 @@ describe("navigateBack", () => {
     tab.session.documentStack = [frameFor("section")] as any;
     tab.documentPath = "components/card.json";
     tab.doc.dirty = true;
-    await toolbarCtx.navigateBack();
+    await tabBarCtx.navigateBack();
     expect(state.files.get("components/card.json")).toContain('"tagName"');
     expect((tab.doc.document as any).tagName).toBe("section");
     expect(tab.documentPath).toBe("pages/parent.json");
@@ -375,7 +385,7 @@ describe("navigateBack", () => {
       throw new Error("disk full");
     };
     try {
-      await toolbarCtx.navigateBack();
+      await tabBarCtx.navigateBack();
     } finally {
       platform.writeFile = originalWrite;
     }
@@ -389,7 +399,7 @@ describe("navigateBack", () => {
     tab.session.documentStack = [undefined] as any;
     tab.doc.dirty = false;
     const before = tab.doc.document;
-    await toolbarCtx.navigateBack();
+    await tabBarCtx.navigateBack();
     expect(tab.doc.document).toBe(before);
     expect(statusMessages).toHaveLength(0);
   });
@@ -410,22 +420,22 @@ describe("navigateToLevel", () => {
   test("ignores out-of-range indexes", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("one")] as any;
-    await toolbarCtx.navigateToLevel(-1);
-    await toolbarCtx.navigateToLevel(5);
+    await tabBarCtx.navigateToLevel(-1);
+    await tabBarCtx.navigateToLevel(5);
     expect(tab.session.documentStack).toHaveLength(1);
     expect(statusMessages).toHaveLength(0);
   });
 
   test("ignores calls when there is no stack at all", async () => {
     openShellTab();
-    await toolbarCtx.navigateToLevel(0);
+    await tabBarCtx.navigateToLevel(0);
     expect(statusMessages).toHaveLength(0);
   });
 
   test("jumps to an ancestor level, truncating the stack", async () => {
     const tab = openShellTab();
     tab.session.documentStack = [frame("root"), frame("mid")] as any;
-    await toolbarCtx.navigateToLevel(0);
+    await tabBarCtx.navigateToLevel(0);
     expect((tab.doc.document as any).tagName).toBe("root");
     expect(tab.documentPath).toBe("pages/root.json");
     expect(tab.session.documentStack).toHaveLength(0);
@@ -437,7 +447,7 @@ describe("navigateToLevel", () => {
     tab.session.documentStack = [frame("root")] as any;
     tab.documentPath = "pages/deep.json";
     tab.doc.dirty = true;
-    await toolbarCtx.navigateToLevel(0);
+    await tabBarCtx.navigateToLevel(0);
     expect(state.files.has("pages/deep.json")).toBe(true);
     expect((tab.doc.document as any).tagName).toBe("root");
   });
@@ -452,7 +462,7 @@ describe("navigateToLevel", () => {
       throw new Error("readonly fs");
     };
     try {
-      await toolbarCtx.navigateToLevel(0);
+      await tabBarCtx.navigateToLevel(0);
     } finally {
       platform.writeFile = originalWrite;
     }
@@ -656,9 +666,9 @@ describe("wiring arrows", () => {
     expect(renderCanvasMock).toHaveBeenCalledTimes(1);
   });
 
-  test("toolbar exposes parseMediaEntries from canvas-media utils", () => {
-    expect(typeof toolbarCtx.parseMediaEntries).toBe("function");
-    expect(toolbarCtx.parseMediaEntries(null)).toEqual({
+  test("tab bar exposes parseMediaEntries from canvas-media utils", () => {
+    expect(typeof tabBarCtx.parseMediaEntries).toBe("function");
+    expect(tabBarCtx.parseMediaEntries(null)).toEqual({
       baseWidth: 320,
       featureQueries: [],
       sizeBreakpoints: [],
@@ -671,8 +681,8 @@ describe("wiring arrows", () => {
     expect(state.calls.filter((c) => c[0] === "openProject").length).toBe(before + 1);
   });
 
-  test("canvas render ctx exposes the export and git-diff hooks", () => {
-    expect(typeof canvasRenderCtx.exportFile).toBe("function");
+  test("tab bar exposes exportFile; canvas render ctx exposes the git-diff hooks", () => {
+    expect(typeof tabBarCtx.exportFile).toBe("function");
     expect(typeof canvasRenderCtx.setCanvasMode).toBe("function");
     canvasRenderCtx.setGitDiffState({ path: "x" });
     expect(canvasRenderCtx.gitDiffState).toEqual({ path: "x" });

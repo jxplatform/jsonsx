@@ -5,13 +5,10 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { updateSession, updateUi } from "../store";
+import { updateSession } from "../store";
 import { redo as tabRedo, undo as tabUndo } from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import type { DocumentStackEntry } from "../types";
-import { getEffectiveMedia } from "../site-context";
-import { mediaDisplayName } from "./shared";
 import { applyPanelCollapse, view } from "../view";
 import { getRecentProjects } from "../recent-projects";
 import { openQuickSearch } from "./quick-search";
@@ -23,21 +20,9 @@ import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
 
 interface ToolbarCtx {
-  navigateBack: () => void;
-  navigateToLevel: (level: number) => void;
   openProject: () => void;
   openFile?: (path: string) => void;
   saveFile: () => void;
-  parseMediaEntries: (media: Record<string, string> | null | undefined) => {
-    sizeBreakpoints: {
-      name: string;
-      query: string;
-      width: number;
-      type: string;
-    }[];
-    featureQueries: { name: string; query: string }[];
-    baseWidth: number;
-  };
   getCanvasMode: () => string;
   setCanvasMode: (mode: string) => void;
   renderCanvas: () => void;
@@ -54,7 +39,6 @@ let _scope: EffectScope | null = null;
 
 const toolbarIconMap = {
   "sp-icon-artboard": html`<sp-icon-artboard slot="icon"></sp-icon-artboard>`,
-  "sp-icon-back": html`<sp-icon-back slot="icon"></sp-icon-back>`,
   "sp-icon-brush": html`<sp-icon-brush slot="icon"></sp-icon-brush>`,
   "sp-icon-code": html`<sp-icon-code slot="icon"></sp-icon-code>`,
   "sp-icon-delete": html`<sp-icon-delete slot="icon"></sp-icon-delete>`,
@@ -298,65 +282,12 @@ function toolbarTemplate() {
 
   const S = {
     dirty: tab.doc.dirty,
-    document: tab.doc.document,
-    documentPath: tab.documentPath,
-    documentStack: tab.session.documentStack,
     fileHandle: tab.fileHandle,
     mode: tab.doc.mode,
     selection: tab.session.selection,
     ui: tab.session.ui,
   };
   const canvasMode = ctx.getCanvasMode();
-  const hasStack = S.documentStack && S.documentStack.length > 0;
-
-  const breadcrumbTpl = hasStack
-    ? html`
-        <div class="breadcrumb">
-          <sp-action-button size="s" title="Return to parent document" @click=${ctx.navigateBack}>
-            ${toolbarIconMap["sp-icon-back"]}Back
-          </sp-action-button>
-          ${S.documentStack.map(
-            (frame: DocumentStackEntry, i: number) => html`
-              <span class="breadcrumb-item clickable" @click=${() => ctx.navigateToLevel(i)}
-                >${frame.documentPath?.split("/").pop() || "untitled"}</span
-              >
-              <span class="breadcrumb-sep"> › </span>
-            `,
-          )}
-          <span class="breadcrumb-item current">
-            ${S.documentPath?.split("/").pop() || S.document.tagName || "document"}
-          </span>
-        </div>
-      `
-    : nothing;
-
-  const { featureQueries } = ctx.parseMediaEntries(getEffectiveMedia(S.document.$media));
-  const togglesTpl =
-    featureQueries.length > 0
-      ? html`
-          <sp-action-group compact size="s">
-            ${featureQueries.map(
-              (/** @type {{ name: string; query: string }} */ { name, query }) => html`
-                <sp-action-button
-                  toggles
-                  size="s"
-                  title=${query}
-                  ?selected=${Boolean(S.ui.featureToggles[name])}
-                  @click=${() => {
-                    const newToggles = {
-                      ...S.ui.featureToggles,
-                      [name]: !S.ui.featureToggles[name],
-                    };
-                    updateUi("featureToggles", newToggles);
-                  }}
-                >
-                  ${mediaDisplayName(name)}
-                </sp-action-button>
-              `,
-            )}
-          </sp-action-group>
-        `
-      : nothing;
 
   const modeSwitcherTpl = html`
     <sp-action-group selects="single" size="s" compact>
@@ -543,7 +474,7 @@ function toolbarTemplate() {
         </sp-action-button>`
       : nothing}
     <div class="tb-spacer"></div>
-    ${breadcrumbTpl} ${togglesTpl} ${modeSwitcherTpl}
+    ${modeSwitcherTpl}
     <sp-action-button
       quiet
       size="s"

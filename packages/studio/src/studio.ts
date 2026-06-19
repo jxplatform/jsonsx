@@ -92,6 +92,7 @@ import * as overlaysPanel from "./panels/overlays";
 import * as rightPanelMod from "./panels/right-panel";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
+import * as tabBar from "./panels/tab-bar";
 import { renderStylebookOverlays } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { defaultDef } from "./panels/shared";
@@ -324,11 +325,8 @@ initShellRefs();
 toolbarPanel.mount(toolbarEl, {
   closeFunctionEditor: () => closeFunctionEditor(),
   getCanvasMode,
-  navigateBack: () => navigateBack(),
-  navigateToLevel: (i: number) => navigateToLevel(i),
   openProject: () => openProject(),
   openRecentProject: (root: string) => openRecentProject(root),
-  parseMediaEntries,
   renderCanvas: () => renderCanvas(),
   safeRenderRightPanel: () => safeRenderRightPanel(),
   saveFile: () => saveFile(),
@@ -339,6 +337,15 @@ initLayers();
 initQuickSearch();
 
 tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
+
+tabBar.mount(document.querySelector("#tab-bar") as HTMLElement, {
+  closeFunctionEditor: () => closeFunctionEditor(),
+  exportFile,
+  getCanvasMode,
+  navigateBack: () => navigateBack(),
+  navigateToLevel: (i: number) => navigateToLevel(i),
+  parseMediaEntries,
+});
 
 overlaysPanel.mount({
   getCanvasMode,
@@ -384,8 +391,6 @@ initCanvasPatcher({
   updateForcedPseudoPreview,
 });
 initCanvasRender({
-  closeFunctionEditor: () => closeFunctionEditor(),
-  exportFile,
   getCanvasMode,
   get gitDiffState() {
     return gitDiffState;
