@@ -36,7 +36,9 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          bun test --isolate --coverage 2>&1 | tee /tmp/test-output.txt
+          bun test --isolate --coverage \
+            --reporter=junit --reporter-outfile=junit.xml \
+            2>&1 | tee /tmp/test-output.txt
         working-directory: packages/${{ matrix.package }}
       - run: bun scripts/check-coverage-manifest.ts packages/${{ matrix.package }}
       - name: Upload coverage reports to Codecov
@@ -46,6 +48,17 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: jxsuite/jx
           files: packages/${{ matrix.package }}/coverage/lcov.info
+          flags: ${{ matrix.package }}
+      - name: Upload test results to Codecov
+        # Test Analytics: Bun's JUnit reporter (written above) feeds Codecov's
+        # flaky-test / failure tracking. Runs even when tests fail so failures
+        # are recorded — only skipped if the job is cancelled.
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: jxsuite/jx
+          files: packages/${{ matrix.package }}/junit.xml
           flags: ${{ matrix.package }}
       - name: Extract coverage report
         if: always()

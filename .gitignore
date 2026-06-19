@@ -6,6 +6,7 @@
 *.local
 coverage/
 dist/
+junit.xml
 metafile.json
 node_modules/
 result
