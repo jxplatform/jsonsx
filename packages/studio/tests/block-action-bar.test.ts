@@ -18,7 +18,7 @@ import { view } from "../src/view";
 import { activeTab } from "../src/workspace/workspace";
 
 import type { JxPath } from "../src/state";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { JxMutableNode, JxStateDefinition } from "@jxsuite/schema/types";
 
 // ─── DnD adapter mock (must precede the module-under-test import) ────────────
 
@@ -500,6 +500,87 @@ describe("block action bar", () => {
     await flush();
     expect(el.querySelector("strong")).toBeNull();
     stray.remove();
+  });
+
+  // ─── Merge tags ──────────────────────────────────────────────────────────
+
+  function setupEditingWithState(state: Record<string, JxStateDefinition>) {
+    setup({ children: [{ tagName: "p", textContent: "hello" }], state, tagName: "div" }, [
+      "children",
+      0,
+    ]);
+    const el = rootEl.children[0] as HTMLElement;
+    startEditing(el, ["children", 0], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    renderBlockActionBar();
+    return el;
+  }
+
+  test("Insert data button is absent when not editing", () => {
+    setup(
+      { children: [{ tagName: "p", textContent: "A" }], state: { title: "x" }, tagName: "div" },
+      ["children", 0],
+    );
+    renderBlockActionBar();
+    expect(bar()!.querySelector('sp-action-button[title="Insert data"]')).toBeNull();
+  });
+
+  test("Insert data button appears while editing and opens a merge-tag menu", () => {
+    setupEditingWithState({ count: 5, title: "Hello" });
+    const btn = barButton("Insert data");
+    expect(btn.querySelector("sp-icon-data")).not.toBeNull();
+
+    btn.click();
+    expect(isSlashMenuOpen()).toBe(true);
+    // Two top-level state names → two merge tags (no live scope → no nested walk).
+    expect(document.querySelectorAll("sp-menu-item").length).toBe(2);
+  });
+
+  test("mousedown captures the selection; selecting a tag inserts a ${…} via execCommand", async () => {
+    const el = setupEditingWithState({ title: "Hello" });
+    selectText(el.firstChild!);
+
+    const btn = barButton("Insert data");
+    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(view.savedRange).not.toBeNull();
+
+    const orig = document.execCommand;
+    const execCalls: unknown[][] = [];
+    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
+      execCalls.push(args);
+      return true;
+    };
+
+    btn.click();
+    expect(isSlashMenuOpen()).toBe(true);
+    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    await flush();
+
+    expect(isSlashMenuOpen()).toBe(false);
+    expect(execCalls).toEqual([["insertText", false, "${state.title}"]]);
+    (document as unknown as Record<string, unknown>).execCommand = orig;
+  });
+
+  test("inserting a merge tag with no saved range is a no-op", async () => {
+    setupEditingWithState({ title: "Hello" });
+    view.savedRange = null;
+
+    const orig = document.execCommand;
+    const execCalls: unknown[][] = [];
+    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
+      execCalls.push(args);
+      return true;
+    };
+
+    barButton("Insert data").click();
+    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
+    await flush();
+    expect(execCalls).toEqual([]);
+    (document as unknown as Record<string, unknown>).execCommand = orig;
   });
 
   // ─── Link popover ──────────────────────────────────────────────────────────

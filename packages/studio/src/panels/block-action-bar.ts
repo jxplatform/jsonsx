@@ -9,13 +9,21 @@ import { styleMap } from "lit-html/directives/style-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 
-import { childIndex, childList, getNodeAtPath, nodeLabel, parentElementPath } from "../store";
+import {
+  childIndex,
+  childList,
+  elToScope,
+  getNodeAtPath,
+  nodeLabel,
+  parentElementPath,
+} from "../store";
 import { activeTab } from "../workspace/workspace";
 import { mutateMoveNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
 import { getActiveElement, getInlineActions, isEditing } from "../editor/inline-edit";
 import type { InlineAction } from "../editor/inline-edit";
 import { isTagActiveInSelection, toggleInlineFormat } from "../editor/inline-format";
+import { buildMergeTags } from "../editor/merge-tags";
 import { componentRegistry } from "../files/components";
 import { convertToComponent } from "../editor/convert-to-component";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
@@ -221,6 +229,60 @@ function applyInlineFormat(action: InlineAction) {
     const editableRoot = getActiveElement();
     toggleInlineFormat(tag, editableRoot);
   }
+  requestAnimationFrame(() => renderBlockActionBar());
+}
+
+/**
+ * Open the merge-tag menu — a searchable list of `${…}` template tokens for the data available in
+ * the current state. Reuses the shared slash-menu popover (filter + keyboard nav + dismiss).
+ *
+ * @param {MouseEvent} e
+ */
+function onMergeTagClick(e: MouseEvent) {
+  e.stopPropagation();
+  const anchorEl = e.currentTarget as HTMLElement;
+  const tab = activeTab.value;
+  const editable = getActiveElement();
+  const state = (tab?.doc.document.state ?? {}) as Record<string, unknown>;
+  const scope = getActivePanel()?.liveCtx?.scope ?? null;
+  const localScope = editable ? (elToScope.get(editable) ?? null) : null;
+
+  const commands = buildMergeTags(state, scope, localScope).map((t) => ({
+    description: t.hint,
+    label: t.label,
+    tag: t.token,
+  }));
+
+  showSlashMenu(anchorEl, "", {
+    commands,
+    onSelect: (cmd) => insertMergeTag(cmd.tag),
+    showFilter: true,
+  });
+}
+
+/**
+ * Insert a `${token}` template expression at the saved selection inside the active contenteditable.
+ * Mirrors onFormatClick's range-restore flow and inserts via execCommand so it joins the
+ * contenteditable's native undo stack (like paste).
+ *
+ * @param {string} token
+ */
+function insertMergeTag(token: string) {
+  if (!view.savedRange) {
+    return;
+  }
+  const anchor = view.savedRange.startContainer;
+  const editableRoot = (
+    anchor?.nodeType === Node.ELEMENT_NODE ? (anchor as Element) : anchor?.parentElement
+  )?.closest("[contenteditable]");
+  if (!editableRoot) {
+    return;
+  }
+  const sel = window.getSelection();
+  (editableRoot as HTMLElement).focus();
+  sel?.removeAllRanges();
+  sel?.addRange(view.savedRange);
+  document.execCommand("insertText", false, `\${${token}}`);
   requestAnimationFrame(() => renderBlockActionBar());
 }
 
@@ -515,6 +577,15 @@ export function renderBlockActionBar() {
                   `,
                 )}
               </sp-action-group>
+              <sp-action-button
+                size="xs"
+                quiet
+                title="Insert data"
+                @mousedown=${captureSelectionRange}
+                @click=${onMergeTagClick}
+              >
+                <sp-icon-data slot="icon"></sp-icon-data>
+              </sp-action-button>
             `
           : nothing}
       </div>

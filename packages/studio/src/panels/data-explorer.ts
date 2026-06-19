@@ -9,7 +9,7 @@ import type { TemplateResult } from "lit-html";
 const expandedDataKeys = new Set();
 
 /** Unwrap a Vue ref (has .value and .__v_isRef) to get the underlying value. */
-function unwrapSignal(value: unknown) {
+export function unwrapSignal(value: unknown) {
   if (value && typeof value === "object" && (value as Record<string, unknown>).__v_isRef) {
     return (value as Record<string, unknown>).value;
   }
@@ -17,7 +17,7 @@ function unwrapSignal(value: unknown) {
 }
 
 /** Type label for a signal value in the data explorer. */
-function dataTypeLabel(value: unknown) {
+export function dataTypeLabel(value: unknown) {
   const v = unwrapSignal(value);
   if (v === null) {
     return "null";
