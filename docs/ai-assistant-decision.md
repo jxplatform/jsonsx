@@ -289,3 +289,36 @@ The native lit-html chat components (`chat-messages.js`, `chat-composer.js`, `ch
 written against the superseded plan are **parked, unwired**, on branch `parked/native-chat-ui`.
 They are not part of Stack B and must not be wired into `ai-panel.ts` without re-opening §4.3.
 Reusable if native chat is ever revisited: the markdown renderer and composer keybindings.
+
+---
+
+## 13. Backlog — premium component generation (post-MVP workstream)
+
+**Goal:** have the assistant produce industry-standard, "premium" components (Linear/Stripe-grade
+layout, spacing, motion), not just structurally-correct ones.
+
+**Not a tools problem.** The existing tools (`set_property` is fully general; `add_child` takes a
+complete node) can already express any DOM + any CSS. Premium output is a **knowledge + context**
+problem, addressed via the system prompt and examples — no new plumbing.
+
+**Style model (verified 2026-06-18, NOT Tailwind).** Jx uses CSS-custom-property **design tokens**
+declared in `project.json` (e.g. `--color-bg-primary`, `--color-accent`, `--radius`, `--font-mono`)
+plus **nested style objects** (camelCase CSS props, nested selectors like `table > thead`) that
+reference tokens via `var(--token)`. `sites/jxsuite.com/project.json` is a strong reference: a
+complete semantic dark design system. The model must generate _with these tokens_, not hard-coded
+values, and not Tailwind utility classes (which jx does not render).
+
+**What this workstream entails (in order, after §11 MVP is solid):**
+
+1. **Design-knowledge section in `ai-system-prompt.js`** — spacing/type scales, elevation/shadow,
+   motion, and the rule to build with `var(--token)` references + the nested style-object model.
+2. **Curated few-shot examples** — high-quality `.jx` components as pattern targets (ADR §6d:
+   golden examples double as few-shot). Source from `examples/` and `sites/jxsuite.com/`.
+3. **Design-token injection** — feed the active project's `project.json` tokens into context so
+   output stays consistent with the project's system.
+4. **Quality tuning loop** — generate → eyeball → refine prompt/examples. Iterative, human-in-loop.
+
+**Sequencing / caveats.** Do **not** start this before §11.1 (the refresh bug) is fixed — you can't
+tune output quality while results aren't reliably rendering. Aesthetic quality has **no automated
+eval**: schema validation (§6b) and shadow-render (§6c) catch correctness, not taste. A visual
+critic is genuinely later (Phase 2+).
