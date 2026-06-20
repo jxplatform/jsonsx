@@ -420,6 +420,50 @@ where the last one left off.
   └──────────────────────────────────────────────────────────────┘
 -->
 
+### Turnover: 2026-06-20b — Claude (headless harness) — `$switch` schema fix
+
+**Model + temperature:** gpt-5.4 @ temp 0
+**Tests executed:** full L1–L5 regression (schema + prompt changed)
+**Overall assessment:** L5.3 (`$switch`) fixed by repairing two **core-schema** bugs the harness
+uncovered; no regression on L1–L3/L4.5/L5.1. L5.2 surfaced as flaky at the round cap (separate issue).
+
+**Root cause (L5.3):** `$switch` was unbuildable because the schema rejected the form the runtime
+and the shipped `examples/components/router.json` actually use — `router.json` itself failed
+validation (23 errors). Two orphaned-wiring bugs in `packages/schema`:
+
+1. `SwitchNode` was defined in `$defs` but **never referenced** — not in the `children` union
+   (`childrenValueSchema`), so a `$switch` node could never validate as a child.
+2. `switchDefSchema.$ref` required `InternalRef` (`^#/$defs/`), but `$switch` selects on **state**
+   (`^#/state/…`), as router.json and the runtime do → should be `StateRef`.
+
+**Changes made (production):**
+
+- `packages/schema/defs/children-value.schema.ts`: added `{ $ref: "#/$defs/SwitchNode" }` to the
+  children items union.
+- `packages/schema/defs/element-def.schema.ts`: `switchDefSchema.$ref` `InternalRef` → `StateRef`.
+- Regenerated `schema.json` / `project-schema.json` / `class-schema.json`.
+- `ai-system-prompt.js`: corrected the `$switch` few-shot to the valid nested form (wrapper
+  `tagName` + `$switch` state `$ref` + `cases`) — the prior example showed the standalone no-tagName
+  form, which the model faithfully copied and which doesn't validate as a child.
+
+**Verification:** `router.json` now VALID; schema package tests 48/48 pass; both schema edits are
+additive/more-permissive so they cannot invalidate previously-valid docs. Re-ran full L1–L5: L5.3
+pass, L1–L3/L4.5/L5.1 unchanged.
+
+**Open issues:**
+
+1. **L5.2 flaky at the 5-round cap.** Complex stateful component (todo + per-item delete handler);
+   the model produces a malformed `Function`-prototype state entry and can't recover within 5 rounds
+   (passed last session, errored this one — pure round-cap-boundary non-determinism). Next iteration:
+   improve `Function`-state guidance/few-shot and/or the cap & error messages (§8.1).
+2. **Two more invalid shipped examples** (`task-manager.json`, `dynamic-task-list.json`) fail on
+   unrelated drift (`oninput` handler shape, `children` value) — pre-existing, not from this change.
+3. L4.1 weak test (unchanged from prior turnover).
+
+**Next session:** Address L5.2 (Function-state shape + round cap), then re-validate Layer 5 at 3×.
+
+---
+
 ### Turnover: 2026-06-20 — Claude (headless harness)
 
 **Model + temperature:** gpt-5.4 @ temp 0 (via `packages/studio/tests/harness/`, OpenAI direct)

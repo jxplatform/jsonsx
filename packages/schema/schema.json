@@ -4665,7 +4665,7 @@
       "type": "object"
     },
     "ChildrenValue": {
-      "description": "Array of child definitions — elements, text, or Array namespaces (dynamic lists) mixed freely. A bare Array namespace (the whole children slot is one dynamic list) is also accepted for backward compatibility.",
+      "description": "Static array of child definitions, or an Array namespace for dynamic lists.",
       "oneOf": [
         {
           "items": {
@@ -4674,7 +4674,7 @@
                 "$ref": "#/$defs/ElementDef"
               },
               {
-                "$ref": "#/$defs/ArrayNamespace"
+                "$ref": "#/$defs/SwitchNode"
               },
               {
                 "type": "string"
@@ -4731,7 +4731,7 @@
       "description": "Reactive $ref that drives which case to render.",
       "properties": {
         "$ref": {
-          "$ref": "#/$defs/InternalRef"
+          "$ref": "#/$defs/StateRef"
         }
       },
       "required": [

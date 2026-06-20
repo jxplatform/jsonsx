@@ -39,7 +39,7 @@ export const elementPropertyValueSchema = {
 export const switchDefSchema = {
   additionalProperties: false,
   description: "Reactive $ref that drives which case to render.",
-  properties: { $ref: { $ref: "#/$defs/InternalRef" } },
+  properties: { $ref: { $ref: "#/$defs/StateRef" } },
   required: ["$ref"],
   type: "object",
 } as const;

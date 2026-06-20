@@ -191,8 +191,9 @@ Buttons mutate a numeric signal. Define handlers as Function-prototype state and
 }
 
 ### Conditional rendering — swap a subtree by a signal (\$switch + cases):
-A \$switch node picks one of 'cases' by the value of the referenced signal. Each case is a normal node.
+A \$switch node carries a wrapper "tagName" (usually "div"), a "\$switch" \$ref to a state value, and a "cases" object mapping each value to a node. The \$ref MUST point at state (#/state/...). Nest it as a normal child inside a children array.
 {
+  "tagName": "div",
   "\$switch": { "\$ref": "#/state/currentRoute" },
   "cases": {
     "home": { "tagName": "section", "textContent": "Home view" },
