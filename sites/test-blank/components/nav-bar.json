@@ -1,0 +1,76 @@
+{
+  "$id": "NavBar",
+  "tagName": "nav-bar",
+  "style": {
+    "display": "flex",
+    "alignItems": "center",
+    "justifyContent": "space-between",
+    "padding": "1rem 1.5rem",
+    "width": "100%",
+    "boxSizing": "border-box",
+    "backgroundColor": "var(--color-bg-primary)",
+    "borderBottom": "1px solid rgba(255,255,255,0.08)"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "textContent": "Logo",
+      "attributes": {
+        "href": "/"
+      },
+      "style": {
+        "color": "var(--color-text-primary)",
+        "textDecoration": "none",
+        "fontWeight": "700",
+        "fontSize": "1.125rem",
+        "letterSpacing": "-0.02em"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "alignItems": "center",
+        "gap": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "textContent": "Home",
+          "attributes": {
+            "href": "/"
+          },
+          "style": {
+            "color": "var(--color-text-secondary)",
+            "textDecoration": "none",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "tagName": "a",
+          "textContent": "About",
+          "attributes": {
+            "href": "/about"
+          },
+          "style": {
+            "color": "var(--color-text-secondary)",
+            "textDecoration": "none",
+            "fontWeight": "500"
+          }
+        },
+        {
+          "tagName": "a",
+          "textContent": "Contact",
+          "attributes": {
+            "href": "/contact"
+          },
+          "style": {
+            "color": "var(--color-text-secondary)",
+            "textDecoration": "none",
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -343,8 +343,12 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
         }
         return applyAndValidate(
           tab,
-          (t) => mutateUpdateProperty(t, path, "textContent", /** @type {string} */ (args.value)),
-          `Set textContent at ${JSON.stringify(path)}.`,
+          (t) => {
+            const node = getNodeAtPath(t.doc.document, path);
+            delete node.textContent;
+            node.children = [/** @type {string} */ (args.value)];
+          },
+          `Set text at ${JSON.stringify(path)}.`,
           validate,
         );
       },

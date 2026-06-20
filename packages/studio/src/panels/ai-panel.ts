@@ -91,6 +91,7 @@ let modelsError = "";
 
 /** Stack B (document AST assistant) session — created lazily, persists across tab switches. */
 const assistant = createDocumentAssistant();
+(globalThis as Record<string, unknown>).assistant = assistant;
 let assistantScope: EffectScope | null = null;
 let assistantRenderedCount = 0;
 let assistantStreamingMsgId = null as number | null;
@@ -466,7 +467,12 @@ function watchAssistant() {
           }
           break;
         }
-        renderAssistantMessage(m);
+        if (assistantStreamingMsgId != null && m.role === "assistant") {
+          // The streaming bubble already contains the full text — just finalize it in place.
+          chatInstance.messageReplaceContent(assistantStreamingMsgId, m.content || "");
+        } else {
+          renderAssistantMessage(m);
+        }
         assistantRenderedCount = i + 1;
         assistantStreamingMsgId = null;
         assistantStreamedLen = 0;
@@ -924,7 +930,9 @@ export function renderAiPanelTemplate() {
   }
 
   // Stack B gate: the document assistant needs an OpenAI-compatible key (or the server env var).
-  if (mode === "assistant" && (!hasOpenAiKey() || keyEditing)) {
+  // Skip the gate when the server already reports authenticated (env-var fallback).
+  const serverHasKey = authStatus === "authenticated";
+  if (mode === "assistant" && ((!hasOpenAiKey() && !serverHasKey) || keyEditing)) {
     return renderKeyGate();
   }
 

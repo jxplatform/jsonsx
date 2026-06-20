@@ -1,0 +1,76 @@
+{
+  "tagName": "counter-component",
+  "state": {
+    "count": {
+      "type": "number",
+      "default": 0
+    },
+    "increment": {
+      "$prototype": "Function",
+      "body": "state.count++"
+    },
+    "decrement": {
+      "$prototype": "Function",
+      "body": "state.count--"
+    }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "gap": "0.75rem",
+        "padding": "0.75rem 1rem",
+        "border": "1px solid rgba(0,0,0,0.1)",
+        "borderRadius": "var(--radius)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "textContent": "−",
+          "onclick": {
+            "$ref": "#/state/decrement"
+          },
+          "style": {
+            "width": "2.25rem",
+            "height": "2.25rem",
+            "border": "none",
+            "borderRadius": "999px",
+            "backgroundColor": "var(--color-accent)",
+            "color": "white",
+            "fontSize": "1.125rem",
+            "cursor": "pointer"
+          }
+        },
+        {
+          "tagName": "span",
+          "textContent": "${state.count}",
+          "style": {
+            "minWidth": "2rem",
+            "textAlign": "center",
+            "fontWeight": "600",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "+",
+          "onclick": {
+            "$ref": "#/state/increment"
+          },
+          "style": {
+            "width": "2.25rem",
+            "height": "2.25rem",
+            "border": "none",
+            "borderRadius": "999px",
+            "backgroundColor": "var(--color-accent)",
+            "color": "white",
+            "fontSize": "1.125rem",
+            "cursor": "pointer"
+          }
+        }
+      ]
+    }
+  ]
+}

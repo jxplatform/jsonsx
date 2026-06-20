@@ -107,6 +107,7 @@ export function createDocumentAssistant() {
         toolRegistry,
         systemPrompt: buildPrompt(),
         signal: controller.signal,
+        getTab: () => activeTab.value,
       });
     } catch (error) {
       /*

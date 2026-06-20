@@ -154,7 +154,7 @@ export function transactDoc(
     }
   }
 
-  if (!skipHistory) {
+  if (!skipHistory && !_batchTab) {
     pushHistoryEntry(tab, raw, record, selectionBefore);
   }
 
@@ -349,6 +349,36 @@ function applyDocOp(tab: Tab, op: JxDocOp) {
       break;
     }
   }
+}
+
+// ─── Batch (group multiple mutations into one undo step) ────────────────────
+
+let _batchTab: Tab | null = null;
+
+export function beginBatch(tab: Tab | null) {
+  _batchTab = tab;
+}
+
+export function endBatch() {
+  if (_batchTab) {
+    const raw = toRaw(_batchTab.doc.document);
+    const snapshot = {
+      document: jsonClone(raw),
+      selection: _batchTab.session.selection ? [..._batchTab.session.selection] : null,
+    };
+    const truncated = _batchTab.history.snapshots.slice(0, _batchTab.history.index + 1);
+    truncated.push(snapshot);
+    if (truncated.length > HISTORY_LIMIT) {
+      truncated.shift();
+    }
+    _batchTab.history.snapshots = truncated;
+    _batchTab.history.index = truncated.length - 1;
+  }
+  _batchTab = null;
+}
+
+export function isBatching(): boolean {
+  return _batchTab !== null;
 }
 
 // ─── Undo / Redo ─────────────────────────────────────────────────────────────

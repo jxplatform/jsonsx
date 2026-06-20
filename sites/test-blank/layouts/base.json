@@ -6,7 +6,7 @@
       "tagName": "main",
       "children": [
         {
-          "$ref": "$slot"
+          "tagName": "slot"
         }
       ]
     }

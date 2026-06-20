@@ -138,6 +138,10 @@ export function createChatState(opts = {}) {
     store.streamingContent = "";
     store.pendingToolCalls = [];
 
+    // Set status BEFORE pushing the placeholder so reactive effects see "streaming" when the
+    // push triggers them — otherwise the effect renders the empty placeholder as a finalized msg.
+    store.status = "streaming";
+
     // Create placeholder assistant message for streaming content
     _streamingMessage = /** @type {Message} */ ({
       id: uid(),
@@ -152,8 +156,6 @@ export function createChatState(opts = {}) {
      * version, not the raw object pushed above.
      */
     _streamingMessage = store.messages.at(-1);
-
-    store.status = "streaming";
   }
 
   /**
@@ -279,13 +281,20 @@ export function createChatState(opts = {}) {
     store.status = "error";
     store.error = message;
     store.streamingContent = "";
+    // Remove the partial streaming message — it may contain incomplete tool_calls
+    // that would poison the conversation history on the next send.
+    if (_streamingMessage) {
+      const idx = store.messages.lastIndexOf(_streamingMessage);
+      if (idx !== -1) store.messages.splice(idx, 1);
+    }
     _streamingMessage = null;
   }
 
   /** Cancel the current stream. Resets streaming state. */
   function cancelStream() {
-    // Remove the partial streaming message if it has no content or tool calls
-    if (_streamingMessage && !_streamingMessage.content && !_streamingMessage.toolCalls?.length) {
+    // Always remove the partial streaming message — it may contain incomplete
+    // tool_calls that would poison the conversation history on retry.
+    if (_streamingMessage) {
       const idx = store.messages.lastIndexOf(_streamingMessage);
       if (idx !== -1) {
         store.messages.splice(idx, 1);

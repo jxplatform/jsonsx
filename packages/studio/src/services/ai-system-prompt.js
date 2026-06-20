@@ -156,7 +156,24 @@ const REAL_WORLD_PATTERNS = `## Real-World Jx Patterns (from jxsuite.com product
     "--md": "(max-width: 768px)",
     "--sm": "(max-width: 640px)"
   }
-}`;
+}
+
+### Responsive Styles (per-node @breakpoint overrides)
+
+When the project defines $media breakpoints (e.g. "--md": "(max-width: 768px)"), apply responsive styles with @--breakpoint keys inside any node's style object. These override the base styles at the matching breakpoint:
+
+{
+  "tagName": "div",
+  "style": {
+    "display": "grid",
+    "gridTemplateColumns": "repeat(3, 1fr)",
+    "gap": "1.5rem",
+    "@--md": { "gridTemplateColumns": "repeat(2, 1fr)" },
+    "@--sm": { "gridTemplateColumns": "1fr" }
+  }
+}
+
+Always use @--breakpoint responsive overrides for "responsive" or "mobile-friendly" requests when the project has $media breakpoints. Check the Project Context for available breakpoints.`;
 
 const CONTROL_FLOW_PATTERNS = `## Control Flow & Reactivity (signals, lists, conditionals)
 
@@ -425,12 +442,14 @@ function buildProjectSummary({ projectConfig, components, projectRoot }) {
     }
   }
 
-  // Breakpoints
+  // Breakpoints — surfaced prominently so the model uses @--breakpoint responsive overrides
   if (projectConfig?.$media) {
     const breakpoints = Object.entries(projectConfig.$media)
       .map(([k, v]) => `${k}: ${v}`)
       .join(", ");
-    lines.push(`Breakpoints: ${breakpoints}`);
+    lines.push(
+      `Responsive breakpoints (use @${Object.keys(projectConfig.$media)[0]} etc. in style objects): ${breakpoints}`,
+    );
   }
 
   return lines.join("\n");

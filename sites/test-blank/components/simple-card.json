@@ -1,0 +1,67 @@
+{
+  "$id": "SimpleCard",
+  "tagName": "simple-card",
+  "state": {
+    "title": "Card Title",
+    "description": "This is a simple card description.",
+    "buttonLabel": "Learn More",
+    "buttonHref": "#"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.75rem",
+        "padding": "1.25rem",
+        "border": "1px solid rgba(0, 0, 0, 0.08)",
+        "borderRadius": "var(--radius)",
+        "backgroundColor": "white",
+        "boxShadow": "0 4px 16px rgba(0, 0, 0, 0.06)",
+        "maxWidth": "24rem"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "textContent": "${state.title}",
+          "style": {
+            "margin": "0",
+            "fontSize": "1.125rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          }
+        },
+        {
+          "tagName": "p",
+          "textContent": "${state.description}",
+          "style": {
+            "margin": "0",
+            "fontSize": "0.9375rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-text-secondary)"
+          }
+        },
+        {
+          "tagName": "a",
+          "textContent": "${state.buttonLabel}",
+          "attributes": {
+            "href": "${state.buttonHref}"
+          },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "alignSelf": "flex-start",
+            "padding": "0.6875rem 1rem",
+            "borderRadius": "var(--radius)",
+            "backgroundColor": "var(--color-accent)",
+            "color": "white",
+            "textDecoration": "none",
+            "fontWeight": "600"
+          }
+        }
+      ]
+    }
+  ]
+}
