@@ -18,7 +18,7 @@ export const propsObjectSchema = {
       { type: "number" },
       { type: "boolean" },
       { type: "array" },
-      { type: "object" },
+      { not: { required: ["$ref"] }, type: "object" },
       { $ref: "#/$defs/RefObject" },
     ],
   },

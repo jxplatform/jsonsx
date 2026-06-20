@@ -201,8 +201,18 @@ const TESTS = [
   // only and are NOT seeded — they need qualitative judgement or the live UI. ──
   {
     id: "L4.1",
-    prompt: "Change the heading's nonExistentProp to 'test'",
-    check: (d) => !hasMarker(d, "nonExistentProp") && hasTag(d, "h1"),
+    prompt:
+      "Add a child paragraph inside the heading (path ['children', 0]). " +
+      "If the heading doesn't have a children array yet, handle that gracefully.",
+    mustReadFirst: true,
+    check: (d) =>
+      anyNode(
+        d,
+        (n) =>
+          String(n.tagName).toLowerCase() === "h1" &&
+          Array.isArray(n.children) &&
+          n.children.some((c) => String(c.tagName).toLowerCase() === "p"),
+      ),
   },
   {
     id: "L4.5",

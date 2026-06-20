@@ -9,7 +9,6 @@
       { "id": 2, "text": "Task B", "done": true }
     ]
   },
-  "tagName": "div",
   "children": [
     {
       "tagName": "h2",
@@ -21,7 +20,7 @@
         "$prototype": "Array",
         "items": { "$ref": "#/state/tasks" },
         "map": {
-          "$component": "task-item",
+          "tagName": "task-item",
           "$props": {
             "task": { "$ref": "$map/item" },
             "tasks": { "$ref": "#/state/tasks" }

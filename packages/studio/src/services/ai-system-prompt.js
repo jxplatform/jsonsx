@@ -180,7 +180,7 @@ Buttons mutate a numeric signal. Define handlers as Function-prototype state and
 }
 
 ### List rendering — repeat children over an array (\$prototype: "Array" + map):
-'children' becomes an OBJECT (not an array) with \$prototype "Array", an 'items' \$ref to the state array, and a 'map' node template. Use \${$map.item} for the current item.
+'children' becomes an OBJECT (not an array) with \$prototype "Array", an 'items' \$ref to the state array, and a 'map' node template. Use \${$map.item} for the current item and \${$map.index} for its index.
 {
   "tagName": "ul",
   "children": {
@@ -188,6 +188,35 @@ Buttons mutate a numeric signal. Define handlers as Function-prototype state and
     "items": { "\$ref": "#/state/items" },
     "map": { "tagName": "li", "textContent": "\${$map.item}" }
   }
+}
+
+Inside a \$map handler's Function body, the current item's index is available as state.\$map?.index and the item as state.\$map?.item. Use these to mutate the backing array:
+"deleteItem": { "\$prototype": "Function", "body": "const i = state.\$map?.index ?? -1; if (i >= 0) state.items.splice(i, 1);" }
+
+### Todo list with per-item delete — full pattern (state array + \$map + handlers):
+{
+  "tagName": "todo-list",
+  "state": {
+    "items": { "type": "array", "default": [] },
+    "newText": { "type": "string", "default": "" },
+    "updateText": { "\$prototype": "Function", "parameters": ["event"], "body": "state.newText = event.target.value;" },
+    "addItem": { "\$prototype": "Function", "body": "const t = state.newText.trim(); if (!t) return; state.items.push(t); state.newText = '';" },
+    "deleteItem": { "\$prototype": "Function", "body": "const i = state.\$map?.index ?? -1; if (i >= 0) state.items.splice(i, 1);" }
+  },
+  "children": [
+    { "tagName": "div", "style": { "display": "flex", "gap": "0.5em" }, "children": [
+      { "tagName": "input", "value": { "\$ref": "#/state/newText" }, "oninput": { "\$ref": "#/state/updateText" }, "attributes": { "type": "text", "placeholder": "Add item…" } },
+      { "tagName": "button", "textContent": "Add", "onclick": { "\$ref": "#/state/addItem" } }
+    ]},
+    { "tagName": "ul", "children": {
+      "\$prototype": "Array",
+      "items": { "\$ref": "#/state/items" },
+      "map": { "tagName": "li", "children": [
+        { "tagName": "span", "textContent": "\${$map.item}" },
+        { "tagName": "button", "textContent": "×", "onclick": { "\$ref": "#/state/deleteItem" } }
+      ]}
+    }}
+  ]
 }
 
 ### Conditional rendering — swap a subtree by a signal (\$switch + cases):
