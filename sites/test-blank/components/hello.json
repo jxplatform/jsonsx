@@ -1,0 +1,15 @@
+{
+  "tagName": "div",
+  "$id": "test-component",
+  "children": [
+    {
+      "tagName": "p",
+      "children": [
+        {
+          "tagName": "t",
+          "text": "Hello from test component"
+        }
+      ]
+    }
+  ]
+}

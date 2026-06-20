@@ -1,0 +1,20 @@
+{
+  "tagName": "div",
+  "$id": "index-page",
+  "children": [
+    {
+      "tagName": "h1",
+      "children": [
+        {
+          "tagName": "t",
+          "text": "Blank Canvas - AI Test"
+        }
+      ],
+      "style": {
+        "textAlign": "center",
+        "padding": "40px",
+        "fontSize": "2rem"
+      }
+    }
+  ]
+}

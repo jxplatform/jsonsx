@@ -1,0 +1,471 @@
+# AI Assistant — Testing, Evaluation & Polish Loop
+
+**Status:** Active
+**Date:** 2026-06-19
+**Owner:** Gideon + Copilot
+**Branch:** `feat/ai-assistant-stack-b`
+**Depends on:** `docs/ai-assistant-decision.md`, `specs/ai-assistant.md`
+
+---
+
+## 1. Purpose
+
+The Stack B AI assistant (`@jxsuite/ai` + `document-assistant.js` + AST tools) is wired end-to-end
+but has **never been driven by a real LLM** — all validation to date uses integration tests with a
+fake streaming client (`packages/studio/tests/ai-loop.test.js`). The system prompt, tools
+(`read_document`, `set_property`, `add_child`, `remove_node`), 5-round agent loop, and schema
+validation feedback are all in place, but we need empirical data on how a **real model** behaves.
+
+This document defines a **human-in-the-loop, browser-observed, layer-by-layer evaluation** to turn
+the architectural skeleton into a reliable, polished assistant. Each layer builds on the previous;
+each test is scored on a standard 5-axis rubric; each fix is applied **one at a time** with
+attribution tracked.
+
+The blank canvas is `sites/test-blank/` — a minimal project with one page and one layout, created
+specifically for this eval.
+
+---
+
+## 2. Prerequisites
+
+| #   | Item                                                                      | Status |
+| --- | ------------------------------------------------------------------------- | ------ |
+| P1  | Dev server running (`bun run dev` on `:3000`)                             | ✅     |
+| P2  | Blank test project `sites/test-blank/` created                            | ✅     |
+| P3  | Studio loads at `?project=~/Dev/jx/sites/test-blank/project.json`         | ✅     |
+| P4  | "Assistant" tab visible in right panel tablist                            | ✅     |
+| P5  | API key saved in settings form (stored in `localStorage.jx.ai.openaiKey`) | ✅     |
+| P6  | Chat composer renders (key gate passed)                                   | ✅     |
+
+### 2.1 Test Project Structure
+
+```
+sites/test-blank/
+├── project.json          # Minimal project config
+├── layouts/
+│   └── base.json          # div > main > $slot
+├── pages/
+│   └── index.json         # div#index-page > h1 > t("Blank Canvas - AI Test")
+└── components/
+    └── hello.json         # div > p > t("Hello from test component")
+```
+
+---
+
+## 3. Evaluation Rubric (5-Axis)
+
+Every AI assistant response is scored on these five axes. Target: **≥ 4 on all axes** before
+moving to the next layer.
+
+| Axis             | 1 (Fail)                         | 2 (Poor)                        | 3 (Passable)                      | 4 (Good)                     | 5 (Excellent)                 |
+| ---------------- | -------------------------------- | ------------------------------- | --------------------------------- | ---------------------------- | ----------------------------- |
+| **Completeness** | No tool calls, only text reply   | Wrong tool called, or partial   | Most of the task done             | Task done, minor omission    | Fully complete, no gaps       |
+| **Correctness**  | Schema-invalid, broken render    | Schema-valid but wrong UX       | Schema-valid, looks roughly right | Schema-valid, matches intent | Schema-valid, polished result |
+| **Efficiency**   | 5 loop rounds (cap hit)          | 4 rounds                        | 3 rounds                          | 2 rounds                     | 1 round (read → apply)        |
+| **Recovery**     | Same error every round, hits cap | Retries but new error each time | Retries, partial fix              | Self-corrects on second try  | Self-corrects on first retry  |
+| **Undo/Redo**    | Breaks history, can't undo       | Undo works but leaves artifacts | Undo rolls back cleanly           | Undo+redo both work          | Undo/redo + Ctrl+Z/Y seamless |
+
+### 3.1 Scoring Conventions
+
+- **Completeness**: Count how many of the user's explicit asks were fulfilled. "Change the heading
+  and add a paragraph" → both done = 5, one done = 3, neither = 1.
+- **Correctness**: Schema validation pass is the floor; visual inspection of the canvas is the
+  ceiling. Use the browser DOM inspector (`right-click → Inspect`) to verify rendered output
+  matches the `.json`.
+- **Efficiency**: Count loop rounds from the QuikChat tool-call bubbles (`🔧 read_document`,
+  `🔧 set_property`, etc.). Fewer rounds = better, but 0 tool calls = 1 (the model didn't try).
+  **`read_document`-first is a hard constraint, not a cost.** A round saved by guessing a path
+  instead of reading is a Correctness/Recovery risk, not an Efficiency win — never tune the system
+  prompt to skip the read in order to lower the round count. If the model read first and still
+  finished in 2 rounds, that is the Efficiency ceiling for a multi-step task; do not penalize it
+  for the mandatory read.
+- **Recovery**: Only scored when a tool call returns `{ success: false, error: "..." }`. N/A
+  (no errors) counts as 5.
+- **Undo/Redo**: Press Ctrl+Z after the AI response completes. Canvas must revert to the pre-AI
+  state in one step. Ctrl+Y must re-apply.
+
+### 3.2 Evidence & Determinism Requirements
+
+These keep scores auditable and guard against an autonomous tester grading its own work generously.
+
+- **Every axis scored below 4 must cite evidence**, quoted verbatim in the turnover entry: the
+  tool-call JSON the model emitted, the tool-result JSON returned to it, and a DOM snippet or
+  screenshot of the canvas. A score with no quoted artifact is invalid — re-run and capture it.
+- **Correctness ≥ 4 requires a rendered-DOM artifact** (DOM query or screenshot), not the phrase
+  "looks right." The chrome-devtools tools are available for this and are cheap to use.
+- **Pin sampling to be near-deterministic** for eval runs (temperature 0 / lowest the provider
+  allows) and record the model + temperature in each turnover entry.
+- **Output is non-deterministic regardless** — a single pass is not proof. Any borderline result
+  (any axis at exactly 3 or 4, or a score that changed after a fix) must be run **2–3 times**;
+  report the range and treat the worst run as the score. This prevents "score degraded → revert"
+  (§10 step 8) from firing on noise.
+
+---
+
+## 4. Layer 0 — Baseline Verification
+
+**Goal:** Confirm the full pipeline is functional before testing specific capabilities.
+
+| Test | Action                                                             | Expected                                                                 | Result |
+| ---- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------ |
+| 0.1  | Open Assistant tab, verify chat composer is visible (not key gate) | Text input + send button                                                 | ⬜     |
+| 0.2  | Type "Hello" and press Send                                        | Message appears in chat, model responds (likely text-only since no task) | ⬜     |
+| 0.3  | Verify no red console errors during 0.2                            | Console clean (ignoring Spectrum dev-mode warnings)                      | ⬜     |
+| 0.4  | Verify `GET /__studio/ai/models` returns 200 and model list        | Network tab shows 200; "Fetch models" populates dropdown                 | ⬜     |
+
+> **Gate:** All Layer 0 tests must pass before proceeding to Layer 1. If the chat doesn't work
+> at all, nothing else matters.
+
+---
+
+## 4.5 Layer 0.5 — Few-Shot Examples Decision
+
+**Goal:** Decide _once, up front_ whether the system prompt needs few-shot Jx examples — before
+the per-test grind, not after burning iterations on prompt wording.
+
+**Why this is its own gate:** G2 (the system prompt currently has **zero** few-shot examples from
+the real `examples/` directory) is a High-severity gap. If the model fundamentally misunderstands
+Jx document shape, the fix is _examples_, not prompt rewording. Discovering that on test L1.1 and
+then again on L2.1 wastes attribution and iterations. So we probe it deliberately and decide before
+Layer 1.
+
+| Test | Action                                                                                                                           | Decision Criterion                                                                                                                                                   | Result |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 0.5a | Run a representative probe from each of Layers 1–3 **once** (e.g. L1.1, L2.1, L3.1) with the current prompt                      | Note whether failures are _wording_ (model tried the right shape, wrong detail) or _structural_ (model misunderstands the Jx document/children/style shape entirely) | ⬜     |
+| 0.5b | If ≥1 probe shows a **structural** misunderstanding, add 2–3 few-shot examples sourced from `examples/` to `ai-system-prompt.js` | Examples are schema-valid, copied/adapted from real files, and cover: a property change, a structural add, and a from-scratch component                              | ⬜     |
+| 0.5c | Re-run the same probes after adding examples                                                                                     | Structural errors gone (or materially reduced). Record before/after in turnover.                                                                                     | ⬜     |
+
+> **Decision:** This is **one allowed exception to "one fix per iteration"** — adding the
+> foundational few-shot example set is a single deliberate change made here, before scoring begins,
+> so it does not contaminate per-test attribution later. If 0.5a shows only wording-level issues,
+> **skip 0.5b/c** and leave examples to the normal polish loop (per the original G2 mitigation).
+> Record the decision ("examples added" / "not needed — wording-level only") in the first turnover.
+
+---
+
+## 5. Layer 1 — Single Property Changes
+
+**Goal:** Validate `read_document` → `set_property` → `transactDoc()` → canvas update end-to-end.
+
+The blank page (`pages/index.json`) has: `div#index-page > h1 > t("Blank Canvas - AI Test")`.
+
+| ID  | Prompt                                         | Expected Tool Calls                                                        | Canvas Check                                | Score                    |
+| --- | ---------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------- | ------------------------ |
+| 1.1 | _"Change the heading text to 'Hello World'"_   | `read_document` then `set_property(path, key="text", value="Hello World")` | Heading reads "Hello World"                 | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 1.2 | _"Make the heading font size 3rem"_            | `read_document` then `set_property` on style.fontSize                      | Heading larger, DOM shows `font-size: 3rem` | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 1.3 | _"Change the heading color to #3b82f6 (blue)"_ | `set_property` on style.color                                              | Heading visible blue on canvas              | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 1.4 | _"Center-align the heading"_                   | `set_property` on style.textAlign = "center"                               | Heading centered horizontally               | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 1.5 | _"Add 20px padding to the heading"_            | `set_property` on style.padding = "20px"                                   | Heading has visible padding                 | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+
+### 5.1 Layer 1 Watch Points
+
+- Does the model call `read_document` first, or does it guess paths? (Must read first — guessing
+  paths means the system prompt isn't clear enough.)
+- Do style mutations use camelCase (`fontSize`) or kebab-case (`font-size`)? Kebab-case triggers
+  schema validation errors → triggers the recovery loop.
+- Does the canvas update **immediately** (optimistic apply) or is there a delay?
+- Does the QuikChat UI show tool-call bubbles (`🔧`) during execution?
+
+---
+
+## 6. Layer 2 — Structural Mutations (Add / Remove)
+
+**Goal:** Validate `add_child` and `remove_node` — the tools that change document structure.
+
+| ID  | Prompt                                                                     | Expected Tool Calls                                                 | Canvas Check                        | Score                    |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------- | ------------------------ |
+| 2.1 | _"Add a paragraph below the heading that says 'This is a test paragraph'"_ | `read_document` → `add_child` to insert `p>t` after `h1`            | New paragraph visible below heading | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 2.2 | _"Add a button below the paragraph that says 'Click Me'"_                  | `add_child` to insert `button>t` after `p`                          | Button renders with text            | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 2.3 | _"Remove the paragraph you just added"_                                    | `read_document` → `remove_node` at paragraph's path                 | Paragraph gone; button still there  | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 2.4 | _"Add a 3-item bullet list to the page"_                                   | `add_child` for `ul` + 3× `li>t`                                    | Rendered list with 3 bullets        | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 2.5 | _"Wrap the heading in a <header> element"_                                 | `add_child` header → `remove_node` h1 → `add_child` h1 under header | Heading inside semantic `<header>`  | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+
+### 6.1 Layer 2 Watch Points
+
+- Does the model construct valid paths for `parentPath` in `add_child`? Wrong paths cause tool
+  failures → recovery loop.
+- Does it use a hyphenated tag name for custom elements? `tagName: "div"` on a component file
+  triggers a runtime error (must be e.g. `"my-card"`).
+- Are style properties nested correctly? `style: { fontSize: "14px" }` not
+  `style: "fontSize: 14px"`.
+- Does the loop self-correct when schema validation catches a mistake?
+
+---
+
+## 7. Layer 3 — New Component Creation
+
+**Goal:** The LLM creates valid, renderable Jx component `.json` files from scratch. This tests
+the model's understanding of the full Jx schema (not just property tweaks).
+
+| ID  | Prompt                                                                     | Expected Output                                              | Score                    |
+| --- | -------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------ |
+| 3.1 | _"Create a simple card component with a title, description, and a button"_ | New `components/card.json` — schema-valid, renders as a card | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 3.2 | _"Create a newsletter signup form with email input and submit button"_     | New component — `form>input[type=email]+button`              | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 3.3 | _"Create a responsive 3-column feature grid"_                              | Component uses `$media` breakpoints for responsive layout    | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 3.4 | _"Create a nav bar with logo and 3 links"_                                 | Component with `nav>div+ul>li*3` structure                   | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+
+### 7.1 Layer 3 Watch Points
+
+- **Does the file actually get written to disk?** Check `sites/test-blank/components/` after
+  each test. The `saveFile` callback in `document-assistant.js` writes via the platform's
+  `writeFile()`.
+- **Is the generated JSON schema-valid?** Check the console for `jx-validate` errors. Schema
+  errors should be fed back to the model within the same loop round.
+- **Does it use proper `$id` and tag naming?** Custom elements need hyphens in tag names.
+- **Does it handle `children` nesting correctly?** `children` is an array of child objects,
+  not a flat text field.
+
+---
+
+## 8. Layer 4 — Error Recovery & Loop Resilience
+
+**Goal:** Deliberately provoke failures and verify the 5-round self-correction loop works as
+designed (spec §10.2, ADR §6a).
+
+| ID  | Prompt / Action                                                        | Expected Loop Behavior                                                                     | Score                    |
+| --- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------ |
+| 4.1 | _"Change the heading's nonExistentProp to 'test'"_                     | Tool returns error → model retries with valid property → succeeds or explains why it can't | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 4.2 | _"Make it look better"_ (ambiguous, no specifics)                      | Model asks clarifying question OR makes a reasonable UX improvement and explains it        | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 4.3 | Kill the dev server mid-stream (Ctrl+C in terminal), then prompt again | Graceful error in chat; retry succeeds after server restart                                | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 4.4 | Send 3 prompts in rapid succession (click Send 3× fast)                | Composer disabled during streaming; only first prompt processes; no race conditions        | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 4.5 | _"Add a child at path ['children', 999]"_ (non-existent path)          | Tool returns error with path info → model reads doc to find valid path → corrects          | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+
+### 8.1 Layer 4 Watch Points
+
+- **Loop cap**: Does the model hit the 5-round cap on a recoverable error? If yes, the system
+  prompt's error guidance may need strengthening.
+- **Error messages**: Are the tool-error messages clear enough for the model to self-correct?
+  If not, `translateValidationError()` in `ai-tools.js` needs more patterns.
+- **UI feedback**: Does the user see useful error context, or just a generic failure?
+
+---
+
+## 9. Layer 5 — State & Signals (Advanced)
+
+**Goal:** Test reactive state patterns — signals, computed values, `$map`, `$switch`.
+
+| ID  | Prompt                                                                                      | Expected                                                              | Score                    |
+| --- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------ |
+| 5.1 | _"Create a counter component with + and − buttons that increments/decrements a number"_     | `state` with signal, buttons with click events that update the signal | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 5.2 | _"Create a todo list where you can type text and add items, with a delete button per item"_ | State array, input + add button, `$map` over items with delete        | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+| 5.3 | _"Create a tab switcher with 3 tabs that show different content"_                           | `$switch` based on activeTab signal                                   | C:⬜ R:⬜ E:⬜ V:⬜ U:⬜ |
+
+### 9.1 Layer 5 Watch Points
+
+- Does the model understand the `state` object shape? Signals vs computed vs functions?
+- Are event handlers correctly structured? `events: { click: { $action: "setState", ... } }`
+- Does `$map` get the right binding context?
+
+---
+
+## 10. The Polish Loop (Meta-Process)
+
+This is the **outer loop** — the process we follow for every test in Layers 1–5.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  1. SELECT a test from the current layer                │
+│                                                         │
+│  2. PROMPT the assistant in the browser                 │
+│                                                         │
+│  3. WATCH in real-time:                                 │
+│     • QuikChat streaming text                           │
+│     • Tool-call bubbles (🔧)                            │
+│     • Canvas updates                                    │
+│     • Browser console (F12)                             │
+│                                                         │
+│  4. ASSESS on the 5-axis rubric                         │
+│     Fill in the Score column for the test               │
+│     Capture evidence for any axis < 4 (§3.2):           │
+│       • tool-call JSON + tool-result JSON               │
+│       • DOM snippet / screenshot of the canvas          │
+│                                                         │
+│  5. IDENTIFY root cause of any axis < 4:                │
+│     ┌─────────────────────────────────────────────┐    │
+│     │ Symptom                  → Likely File       │    │
+│     │ Model doesn't read doc   → ai-system-prompt  │    │
+│     │ Model uses kebab-case    → ai-system-prompt  │    │
+│     │ Schema error unclear     → ai-tools.js       │    │
+│     │ Tool returns wrong error → ai-tools.js       │    │
+│     │ Loop doesn't re-stream   → tool-executor.js  │    │
+│     │ Loop hits cap too early  → tool-executor.js  │    │
+│     │ Context lost mid-chat    → context-manager   │    │
+│     │ Chat history disappears  → document-assistant│    │
+│     │ Streaming display glitch → ai-panel.ts       │    │
+│     │ Model can't do X at all  → Known limitation  │    │
+│     └─────────────────────────────────────────────┘    │
+│                                                         │
+│  6. APPLY exactly ONE fix                               │
+│                                                         │
+│  7. RE-TEST the SAME prompt                             │
+│                                                         │
+│  8. If score improved → move to next test               │
+│     If score unchanged → try a different fix            │
+│     If score degraded → revert, document why            │
+│     (borderline change? re-run 2–3× per §3.2)           │
+│                                                         │
+│  9. REGRESSION CHECK: if the fix touched                │
+│     ai-system-prompt.js or ai-tools.js, re-run the      │
+│     last passing test in EVERY prior layer. A prompt    │
+│     tweak for L2.4 can silently break L1.2.             │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 10.1 Critical Rule
+
+**One fix per iteration.** Never change the system prompt AND a tool AND the loop in a single
+pass — you lose attribution. If you change three things and the score improves, you don't know
+which change mattered.
+
+### 10.2 Fix Size Guidelines
+
+| Scope           | Example                                                         | When                                                     |
+| --------------- | --------------------------------------------------------------- | -------------------------------------------------------- |
+| **1-line**      | Add a sentence to system prompt, fix a typo in an error message | First attempt                                            |
+| **1-paragraph** | Add a few-shot example, reword a tool description               | If 1-line didn't work                                    |
+| **1-function**  | Rework `translateValidationError` for a new error pattern       | If the model consistently misinterprets an error         |
+| **1-file**      | Significant rework of system prompt structure                   | Rare — only if the model fundamentally misunderstands Jx |
+
+### 10.3 Alignment Guardrails (for an autonomous tester)
+
+When an LLM runs this loop unattended, the failure mode is not laziness — it is **moving the goal
+posts**: making the test pass instead of making the assistant better. These rules are non-negotiable
+and override any local "the score went up" signal.
+
+- **Fix the system, never the test.** The tester may edit only the files listed in §11. It must
+  **not** edit this plan's rubric, targets, or test prompts; must **not** edit the `sites/test-blank/`
+  fixtures to make a prompt easier; and must **not** lower the ≥4 target to ≥3. If a test seems
+  wrong, flag it in the turnover under "Open issues" — do not silently change it.
+- **"Known limitation" is not an escape hatch.** Marking a test as a known limitation (per the
+  §10 symptom table) requires a written justification in the turnover: what was tried, why it is a
+  model/architecture limit rather than a fixable prompt/tool gap, and what the unblock would take.
+  An unjustified "Known limitation" is treated as an unaddressed failure.
+- **No self-serving scores.** The tester is grading its own fixes — bias toward generosity is the
+  default failure. Every sub-4 score needs the §3.2 evidence. When genuinely uncertain between two
+  scores, pick the lower one.
+- **Observation must be real.** Do not record a canvas/console result you did not actually observe
+  via the browser tools. "Canvas updated" with no DOM/screenshot artifact is a hallucination risk —
+  attach the artifact or mark the test incomplete.
+- **One fix per iteration still holds even under time pressure.** Batching fixes to "go faster"
+  destroys attribution (§10.1) and is the most common way an autonomous run produces an
+  unexplainable, unrevertable mess.
+
+---
+
+## 11. Files in Scope for Polish
+
+| File                                                 | Role                                     | Most Likely Issues                                                                                           |
+| ---------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `packages/studio/src/services/ai-system-prompt.js`   | LLM guidance (~12.5KB)                   | Missing edge cases, ambiguous instructions, stale schema refs, not enough few-shot examples                  |
+| `packages/studio/src/services/ai-tools.js`           | Tool implementations + schema validation | `translateValidationError()` missing patterns, `applyAndValidate()` too strict/loose, path construction bugs |
+| `packages/studio/src/services/tool-executor.js`      | 5-round agent loop driver                | Race conditions, cap too low/high, error accumulation across rounds                                          |
+| `packages/studio/src/services/context-manager.js`    | Token trimming before each turn          | Over-aggressive (loses needed context) or too lenient (blows context window)                                 |
+| `packages/studio/src/services/document-assistant.js` | Session wiring + persistence             | localStorage persistence bugs, tab-switching state loss, abort handling                                      |
+| `packages/studio/src/panels/ai-panel.ts`             | Chat UI (QuikChat wrapper)               | Streaming display glitches, composer enable/disable timing, mode toggle bugs                                 |
+| `packages/studio/src/services/jx-validate.js`        | Schema validation (Ajv 2020)             | Stale compiled schema after schema changes, performance on large docs                                        |
+| `packages/server/src/ai-api.js`                      | SSE proxy to OpenAI                      | Error forwarding from upstream, timeout handling, model list caching                                         |
+| `packages/ai/src/chat-state.js`                      | Reactive chat state                      | Memory leaks, incorrect status transitions, message array mutations                                          |
+| `packages/ai/src/streaming-client.js`                | SSE parsing (OpenAI format)              | Truncated tool call args, partial JSON accumulation, abort handling                                          |
+
+---
+
+## 12. Turnover Tracking
+
+Each test session produces a **turnover entry** — a dated record of what was tested, what was
+observed, and what (if anything) was changed. This allows any agent (human or LLM) to pick up
+where the last one left off.
+
+### 12.1 Turnover Format
+
+```markdown
+### Turnover: YYYY-MM-DD — [Agent Name]
+
+**Model + temperature:** gpt-4o @ temp 0
+**Tests executed:** L1.1, L1.2
+**Overall assessment:** [one sentence summary]
+
+| Test ID | C   | R   | E   | V   | U   | Notes                                      |
+| ------- | --- | --- | --- | --- | --- | ------------------------------------------ |
+| L1.1    | 4   | 3   | 4   | 5   | 4   | Style used kebab-case, schema corrected it |
+| L1.2    | 5   | 5   | 5   | 5   | 5   | Perfect — one round, clean undo            |
+
+**Evidence (required for any axis < 4):**
+
+- L1.1 R:3 — tool-call: `{"name":"set_property","arguments":{...,"key":"font-size",...}}`;
+  tool-result: `{"success":false,"error":"unknown style key 'font-size' — did you mean 'fontSize'?"}`;
+  DOM after retry: `<h1 style="font-size:3rem">…</h1>` (screenshot attached)
+
+**Changes made (one fix per iteration):**
+
+- `ai-system-prompt.js`: Added explicit camelCase requirement for style properties
+
+**Regression check:** Re-ran L1.1 after the prompt change — still 4/5, no regression.
+
+**Fixes attempted and REVERTED (don't retry):**
+
+- `ai-tools.js`: tried auto-converting kebab→camel in `applyAndValidate` — masked the error the
+  model needs to learn from, Recovery score dropped. Reverted.
+
+**Next session:** Start at L1.3 (heading color)
+**Open issues:** None
+```
+
+### 12.2 Turnover Log
+
+<!--
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ADD NEW TURNOVERS ABOVE THIS LINE — most recent first       │
+  └──────────────────────────────────────────────────────────────┘
+-->
+
+_No turnovers yet — awaiting first test session._
+
+---
+
+## 13. Known Gaps & Risks
+
+| #   | Gap                                                                                                        | Severity | Mitigation                                                                                                                    |
+| --- | ---------------------------------------------------------------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| G1  | No runtime error capture (shadow-render critic is Phase 2)                                                 | Medium   | Schema validation catches most errors; runtime errors visible in console                                                      |
+| G2  | System prompt has 0 few-shot examples from the actual `examples/` directory                                | High     | **Resolved by the Layer 0.5 gate (§4.5)** — probe up front, add examples before Layer 1 if the misunderstanding is structural |
+| G3  | Context manager may trim too aggressively for long conversations                                           | Medium   | Monitor for "lost context" symptoms in Layer 4+                                                                               |
+| G4  | Only tested against one LLM provider (whatever key is configured)                                          | Low      | Provider-agnostic by design — test with both OpenAI and compatible endpoints                                                  |
+| G5  | Canvas hot-reload may interfere with AI mutations                                                          | Low      | Watch for canvas flicker or stale renders after tool execution                                                                |
+| G6  | `sites/test-blank/` uses `$schema` pointing to `../../packages/schema/` — may break if schema path changes | Low      | Fix path if validation fails with "schema not found"                                                                          |
+
+---
+
+## 14. Quick-Start Commands
+
+```bash
+# Start the dev server (from project root)
+bun run dev
+
+# Run existing AI tests (sanity check before starting)
+bun test --cwd packages/studio -- tests/ai-loop.test.js
+bun test --cwd packages/studio -- tests/ai-tools.test.js
+bun test --cwd packages/studio -- tests/jx-validate-smoke.test.js
+
+# Open the test project in Studio
+# Browser: http://localhost:3000/packages/studio/index.html?project=~/Dev/jx/sites/test-blank/project.json
+
+# Build studio (after code changes)
+bun run build:studio
+
+# Run all-the-things (typecheck, lint, test)
+bun run all-the-things
+```
+
+---
+
+## 15. References
+
+- **Architecture Decision:** `docs/ai-assistant-decision.md` — Stack B is canonical; Stack A is
+  optional dev-agent mode
+- **Implementation Plan (superseded):** `docs/ai-assistant-plan.md` — Capability backlog only
+- **Spec:** `specs/ai-assistant.md` — Full technical spec for the assistant
+- **Studio Spec:** `specs/studio.md` — Studio architecture and data flow
+- **ADR §6 (Looping):** `docs/ai-assistant-decision.md#6-looping--self-improvement--status-and-plan`
+- **ADR §8 (Next Steps):** `docs/ai-assistant-decision.md#8-immediate-next-steps`

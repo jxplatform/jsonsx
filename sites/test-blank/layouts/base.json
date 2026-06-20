@@ -1,0 +1,17 @@
+{
+  "tagName": "div",
+  "$id": "base-layout",
+  "children": [
+    {
+      "tagName": "main",
+      "children": [
+        {
+          "$ref": "$slot"
+        }
+      ]
+    }
+  ],
+  "style": {
+    "minHeight": "100vh"
+  }
+}
