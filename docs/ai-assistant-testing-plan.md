@@ -420,7 +420,58 @@ where the last one left off.
   └──────────────────────────────────────────────────────────────┘
 -->
 
-_No turnovers yet — awaiting first test session._
+### Turnover: 2026-06-20 — Claude (headless harness)
+
+**Model + temperature:** gpt-5.4 @ temp 0 (via `packages/studio/tests/harness/`, OpenAI direct)
+**Tests executed:** L1.1–L1.5, L2.1–L2.5, L3.1/3.2/3.4, L4.1/4.5, L5.1–L5.3 (logic axes only —
+rendered-DOM Correctness ceiling + seamless Undo/Redo are browser-only and deferred to the studio)
+**Overall assessment:** Harness drives the real loop end-to-end. L1–L3 stable green at worst-of-3;
+two real production fixes landed; Layer 5 list/signal now works, `$switch` still open.
+
+| Test         | C   | R   | E   | V   | U     | Notes                                                     |
+| ------------ | --- | --- | --- | --- | ----- | --------------------------------------------------------- |
+| L1.1–L1.5    | 5   | 3   | 4   | 5\* | 4     | all pass (R:3 = schema floor; ceiling is browser)         |
+| L2.1–L2.5    | 5   | 3   | 3–4 | 5\* | 4–5\* | all pass                                                  |
+| L3.1/3.2/3.4 | 5   | 3   | 4   | 5\* | 5\*   | component creation, one-shot                              |
+| L4.5         | 5   | 3   | 4   | 5\* | 4     | bad-path recovery works                                   |
+| L4.1         | 2   | 3   | 3   | 5\* | 4     | weak test — Jx accepts arbitrary props, no error provoked |
+| L5.1         | 5   | 3   | 4   | 5\* | 5\*   | counter (needs only `state`)                              |
+| L5.2         | 5   | 3   | 1   | 5\* | 4     | todo/`$map` now passes (was fail) but hits 5-round cap    |
+| L5.3         | 2   | 3   | 1   | 4   | 5\*   | `$switch` still fails — see open issues                   |
+
+**Changes made (production):**
+
+- `packages/ai/src/tools.js`: decoupled OpenAI `strict` payload flag from the registry's internal
+  `strict` validation. Tools were sent `strict: true` but the Jx schemas aren't strict-compliant
+  (polymorphic `value`, optional params) → GPT-5.x rejected _every_ request. OpenAI strict is now
+  opt-in per tool via `llmStrict` (default off); registry validation unchanged. **This was blocking
+  all GPT-5 use, including the studio via the proxy.**
+- `packages/ai/src/streaming-client.js`: `createOpenAIStreamingClient` accepts optional
+  `temperature` (forwarded only when defined) for near-deterministic eval (§3.2).
+- `ai-system-prompt.js`: added a **Control Flow & Reactivity** section with three schema-validated
+  few-shot examples (signal+handler counter, `$map` list, `$switch` conditional) sourced from
+  `examples/`. Closes the G2 gap for control flow. → L5.2 fail→pass; no L1–L3 regression.
+
+**Regression check:** Re-ran full L1–L5 after the prompt change — L1–L3 all still pass, no regression.
+
+**Open issues:**
+
+1. **L5.3 (`$switch`) still fails.** Two follow-up fixes (separate iterations): (a) the taught
+   `$switch` example is standalone — needs to show `$switch` nested _inside_ a `children` array; (b)
+   `translateValidationError` reports "must have required property 'tagName'" for a `$switch`-shaped
+   node, misleading the model away from the correct form (§8.1).
+2. **L5.2/L5.3 hit the 5-round cap** on complex components — round cap may be low for from-scratch
+   creation, or error guidance needs strengthening (§8.1).
+3. **L4.1 is a weak test** — setting `nonExistentProp` succeeds (Jx permits extra props), so it never
+   provokes recovery. Replace with a genuinely invalid op; L4.5 already covers real bad-path recovery.
+
+**Next session:** Fix L5.3 (nested `$switch` example + `translateValidationError` pattern), then
+re-validate Layer 5 at 3×.
+
+---
+
+_(Headless harness: see `docs/ai-assistant-headless-harness.md`. Logic axes only — browser axes still
+require the studio loop in §10.)_
 
 ---
 
@@ -457,6 +508,78 @@ bun run build:studio
 # Run all-the-things (typecheck, lint, test)
 bun run all-the-things
 ```
+
+---
+
+## 14.5 Monitoring the Live LLM Response
+
+Layers of observability for watching a real model drive the loop, from zero-code to surgical. The
+files cited here are verified against the current code (2026-06-20). **Read the caveats** — one
+commonly-repeated claim about the Network tab is wrong.
+
+### 14.5.1 Browser DevTools — Network tab (SSE)
+
+`createProxyStreamingClient` ([streaming-client.js:373](../packages/ai/src/streaming-client.js#L373))
+POSTs to `/__studio/ai/chat` and streams SSE back. DevTools → Network, filter `chat`, open the
+**EventStream**/Messages tab to see every `data:` chunk: `delta`, `tool_call_start/delta/end`,
+`done`.
+
+> ⚠️ **Caveat:** this is **not** the raw OpenAI stream. The proxy
+> ([ai-api.js `handleChat`](../packages/server/src/ai-api.js#L95)) normalizes upstream OpenAI SSE
+> into our `StreamEvent` shape **server-side**, and `createProxyStreamingClient` passes it straight
+> through ([streaming-client.js:476](../packages/ai/src/streaming-client.js#L476)). So the Network
+> tab shows **already-normalized** events. To see raw OpenAI deltas (`choices[0].delta`,
+> `finish_reason`, `[DONE]`), use §14.5.4 (server-side logging) — that is the only place the raw
+> upstream stream exists.
+
+### 14.5.2 Browser console — inspect reactive chat state
+
+`chatState` is a `@vue/reactivity` reactive store from `createChatState()`
+([chat-state.js](../packages/ai/src/chat-state.js)). It is **not** global today — it lives as
+`assistant.chatState`, where `assistant` is module-scoped in
+[ai-panel.ts:85](../packages/studio/src/panels/ai-panel.ts#L85). To inspect it live, expose it
+first (§14.5.2a), then read `window.assistant.chatState.messages` / `.status` while streaming.
+
+**14.5.2a — expose `assistant` on window (one-time debug change):** in `connectedCallback` (or near
+the module-scoped `assistant` in [ai-panel.ts](../packages/studio/src/panels/ai-panel.ts)), add
+`window.assistant = assistant;`. This is the lowest-effort hook and covers most needs combined with
+the Network tab.
+
+### 14.5.3 Debug log in the agent loop
+
+The simplest surgical change. In the `for await` loop in
+[tool-executor.js:44](../packages/studio/src/services/tool-executor.js#L44), add
+`console.log(event)` to print every normalized `StreamEvent` (deltas, tool-call boundaries, done,
+error) as the loop consumes it.
+
+### 14.5.4 Server-side proxy logging (raw upstream SSE)
+
+[ai-api.js](../packages/server/src/ai-api.js) `handleChat` currently has **no logging**. Add it to
+see (a) the full forwarded request — `messages`, `tools`, `systemPrompt` — before the upstream
+`fetch` at [ai-api.js:140](../packages/server/src/ai-api.js#L140), and (b) the **raw** OpenAI SSE
+inside the read loop before normalization. This is the authoritative view of what the model actually
+received and emitted.
+
+### 14.5.5 Render sync — watchAssistant() effect
+
+`watchAssistant()` ([ai-panel.ts:426](../packages/studio/src/panels/ai-panel.ts#L426)) uses
+`@vue/reactivity` `effect()` to sync `chatState` → QuikChat, rendering streaming text incrementally.
+Log inside the effect to see what the UI layer is doing with each reactive update (useful for
+"streaming display glitch" symptoms in §11).
+
+### 14.5.6 Existing test harness (loop logic in isolation)
+
+[ai-loop.test.js](../packages/studio/tests/ai-loop.test.js) drives `runAgentLoop` with a
+`fakeClient(rounds)` (an `async *streamChat()` that replays canned events) — no real LLM. Run it to
+see exactly which events the loop handles and how tool results feed back:
+
+```bash
+bun test --cwd packages/studio -- tests/ai-loop.test.js
+```
+
+> **Quickstart:** expose `assistant` on `window` (§14.5.2a) + watch the Network tab (§14.5.1) for
+> normalized state; add §14.5.4 server logging when you need the raw upstream stream. All six layers
+> are additive debug aids — none touch production logic.
 
 ---
 

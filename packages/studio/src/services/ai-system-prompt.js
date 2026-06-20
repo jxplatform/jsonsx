@@ -158,6 +158,50 @@ const REAL_WORLD_PATTERNS = `## Real-World Jx Patterns (from jxsuite.com product
   }
 }`;
 
+const CONTROL_FLOW_PATTERNS = `## Control Flow & Reactivity (signals, lists, conditionals)
+
+State entries are reactive signals. Mutate them in event handlers and the DOM updates automatically.
+Reference state in templates with \${state.x}; the value of the current item inside a list map is \${$map.item}.
+
+### Reactive counter — signal + event handlers (state Function + onclick \$ref):
+Buttons mutate a numeric signal. Define handlers as Function-prototype state and wire them with onclick: { "\$ref": "#/state/<name>" }.
+{
+  "tagName": "counter-widget",
+  "state": {
+    "count": { "type": "number", "default": 0 },
+    "increment": { "\$prototype": "Function", "body": "state.count++" },
+    "decrement": { "\$prototype": "Function", "body": "state.count--" }
+  },
+  "children": [
+    { "tagName": "button", "textContent": "−", "onclick": { "\$ref": "#/state/decrement" } },
+    { "tagName": "span", "textContent": "\${state.count}" },
+    { "tagName": "button", "textContent": "+", "onclick": { "\$ref": "#/state/increment" } }
+  ]
+}
+
+### List rendering — repeat children over an array (\$prototype: "Array" + map):
+'children' becomes an OBJECT (not an array) with \$prototype "Array", an 'items' \$ref to the state array, and a 'map' node template. Use \${$map.item} for the current item.
+{
+  "tagName": "ul",
+  "children": {
+    "\$prototype": "Array",
+    "items": { "\$ref": "#/state/items" },
+    "map": { "tagName": "li", "textContent": "\${$map.item}" }
+  }
+}
+
+### Conditional rendering — swap a subtree by a signal (\$switch + cases):
+A \$switch node picks one of 'cases' by the value of the referenced signal. Each case is a normal node.
+{
+  "\$switch": { "\$ref": "#/state/currentRoute" },
+  "cases": {
+    "home": { "tagName": "section", "textContent": "Home view" },
+    "about": { "tagName": "section", "textContent": "About view" }
+  }
+}
+
+To switch the active case, set the signal in a handler (e.g. state.currentRoute = "about").`;
+
 // ─── System prompt builder ───────────────────────────────────────────────────
 
 /**
@@ -209,6 +253,9 @@ Be concise. Don't explain what Jx is unless asked. Just build.`,
 
   // 4. Real-world patterns
   sections.push(REAL_WORLD_PATTERNS);
+
+  // 4b. Control flow & reactivity — signals, list rendering ($map), conditionals ($switch)
+  sections.push(CONTROL_FLOW_PATTERNS);
 
   // 5. Current document context
   if (document) {

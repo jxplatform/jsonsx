@@ -27,6 +27,7 @@
     "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "eval": "bun run evals/cli.js",
+    "eval:headless": "bun run tests/harness/run-eval.js",
     "lint:styles": "bun run scripts/check-styles.ts",
     "test": "bun run lint:styles && bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",

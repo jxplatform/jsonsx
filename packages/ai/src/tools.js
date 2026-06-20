@@ -63,13 +63,24 @@ export function toolError(error) {
  * @param {string} opts.name - Unique tool name (lowercase, underscores for spaces)
  * @param {string} opts.description - What the tool does (used by the LLM to decide when to call it)
  * @param {object} opts.parameters - JSON Schema for the tool's arguments
- * @param {boolean} [opts.strict] - Whether to enforce strict JSON Schema validation (default true)
+ * @param {boolean} [opts.strict] - Whether the registry enforces its own argument validation
+ *   (default true). Distinct from `llmStrict`.
+ * @param {boolean} [opts.llmStrict] - Whether to send OpenAI `strict: true` in the function schema
+ *   (default false). Only enable if the parameter schema is OpenAI-strict-compliant
+ *   (additionalProperties:false everywhere, all properties in `required`, every property typed).
  * @param {(args: object) => Promise<ToolResult> | ToolResult} opts.execute - The tool
  *   implementation
  * @returns {ToolDefinition}
  */
-export function createToolDefinition({ name, description, parameters, strict = true, execute }) {
-  return { name, description, parameters, strict, execute };
+export function createToolDefinition({
+  name,
+  description,
+  parameters,
+  strict = true,
+  llmStrict = false,
+  execute,
+}) {
+  return { name, description, parameters, strict, llmStrict, execute };
 }
 
 // ─── ToolRegistry ────────────────────────────────────────────────────────────
@@ -131,7 +142,12 @@ export function createToolRegistry() {
           name: t.name,
           description: t.description,
           parameters: t.parameters,
-          ...(t.strict !== false ? { strict: true } : {}),
+          // OpenAI strict mode is opt-in per tool via `llmStrict`, NOT the `strict` field — that one
+          // drives the registry's own argument validation below. They are different concerns:
+          // OpenAI strict requires every object to set additionalProperties:false and list all
+          // properties in `required`, which the Jx tools deliberately don't (e.g. set_property's
+          // `value` is polymorphic and optional). GPT-5.x rejects the schema otherwise.
+          ...(t.llmStrict === true ? { strict: true } : {}),
         },
       }));
     },

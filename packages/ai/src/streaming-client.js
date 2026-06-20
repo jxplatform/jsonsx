@@ -123,9 +123,12 @@ export const STREAM_EVENT_TYPES = /** @type {const} */ ({
  * @param {string} opts.baseUrl - OpenAI-compatible API base URL (e.g. "https://api.openai.com/v1")
  * @param {string} opts.apiKey - API key
  * @param {string} [opts.model] - Default model if not specified per-request
+ * @param {number} [opts.temperature] - Sampling temperature, forwarded only when defined. Omit for
+ *   reasoning models (GPT-5.x, o-series) that reject a custom temperature; set 0 for
+ *   near-deterministic eval runs.
  * @returns {StreamingClient}
  */
-export function createOpenAIStreamingClient({ baseUrl, apiKey, model = "gpt-4o" }) {
+export function createOpenAIStreamingClient({ baseUrl, apiKey, model = "gpt-4o", temperature }) {
   /**
    * @param {object[]} messages
    * @param {object[]} tools
@@ -142,6 +145,12 @@ export function createOpenAIStreamingClient({ baseUrl, apiKey, model = "gpt-4o" 
       stream: true,
       stream_options: { include_usage: true },
     };
+
+    // Forwarded only when provided — reasoning models (GPT-5.x, o-series) reject a custom
+    // temperature, so callers that target those models simply leave it undefined.
+    if (temperature !== undefined) {
+      body.temperature = temperature;
+    }
 
     if (tools && tools.length > 0) {
       body.tools = tools;

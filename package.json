@@ -27,6 +27,7 @@
     "desktop:stable": "bun run --cwd packages/desktop build:stable",
     "dev": "bun run server.js",
     "eval": "bun run --cwd packages/studio eval",
+    "eval:headless": "bun run --cwd packages/studio eval:headless",
     "format": "oxfmt .",
     "generate:schema": "bun run --cwd packages/schema schema",
     "lint": "oxlint .",
