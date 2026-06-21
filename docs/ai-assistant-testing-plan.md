@@ -566,6 +566,11 @@ where the last one left off.
 
 ### 12.2 Turnover Log
 
+> **Current Status (2026-06-20):** All L0–L5 tests pass at ≥4 on all 5 axes. The authoritative
+> turnover is **"Fix 1/2/3 browser verification"** (immediately below). Earlier "complete"
+> milestones further down were superseded by a coverage audit that found 5 untested browser-only
+> tests — those are now closed. 7 production bugs fixed total. Fortification backlog in §16.
+
 <!--
   ┌──────────────────────────────────────────────────────────────┐
   │  ADD NEW TURNOVERS ABOVE THIS LINE — most recent first       │
@@ -1095,6 +1100,169 @@ bun test --cwd packages/studio -- tests/ai-loop.test.js
 > **Quickstart:** expose `assistant` on `window` (§14.5.2a) + watch the Network tab (§14.5.1) for
 > normalized state; add §14.5.4 server logging when you need the raw upstream stream. All six layers
 > are additive debug aids — none touch production logic.
+
+---
+
+## 16. Fortification Backlog (post-eval)
+
+**Status:** Active — 2026-06-20
+**Context:** The L0–L5 capability eval is complete and green at ≥4 on all axes (see §12 latest
+turnover). What remains is **fortification**: hardening the gaps the happy-path eval never
+exercised. These are ordered by leverage. One PR per phase; each phase carries its own acceptance
+criteria so it can be picked up independently.
+
+### Phase 0 — Reconcile status (cheap, do first)
+
+The §12 log has three competing "complete" milestones (line ~789 claims L0–L5 done, line ~694
+walks it back, the top entry supersedes both). A reader trusting the wrong one will skip real work.
+
+- [x] Add a single **Current Status** banner at the top of §12 pointing to the authoritative
+      turnover (Fix 1/2/3 verification).
+- [x] Refresh memory `project_ai-assistant-browser-eval.md` — it predates the L3.3/L4.3/L5.2 fixes
+      and lists only 4 of the 7 bugs. Add the 3 later fixes (cancelStream, `@--breakpoint`,
+      undo batching) and the poisoned-history bug.
+- **Acceptance:** ✅ No contradictory milestone claims remain; memory matches the doc.
+
+### Phase 1 — Shadow-render critic (G1, highest leverage)
+
+The one true architectural gap. Today **schema-valid is the only correctness gate** in the loop;
+a doc can validate and still render wrong/blank. The eval caught this manually (Correctness was
+3→5 only _after_ a human watched the canvas). Automate it.
+
+**Injection point (decided after reading the code).** Not the executor loop. Every mutating tool
+(`set_property`, `add_child`, `remove_node`, `set_text`, `add_state`, `move_node`) funnels through
+**`applyAndValidate(tab, mutationFn, summary, validate)`** at
+[ai-tools.js:93](../packages/studio/src/services/ai-tools.js#L93), which already does a
+**before/after diff** (`new Set(validate(before))` vs `validate(after)`, report only newly-introduced
+errors) and returns the `{ success, error }` shape the loop feeds back to the model. The critic
+slots in there as a second gate after schema passes, reusing the exact same before/after-diff idea
+and the exact same error-surfacing path — zero new plumbing in `tool-executor.js`.
+
+**Render mechanism.** Minimal detached render, **not** `Jx()` (it does `fetch`/`$head`/customElement
+registration) and **not** `renderCanvasLive` (generation-guard, edit-mode prep, layout wrap). Just:
+`buildScope(doc, {}, base)` (async) → `renderNode(doc, state)` into a throwaway
+`document.createElement("div")`. Both runtime fns are exported from
+[runtime.ts](../packages/runtime/src/runtime.ts) ([buildScope:148](../packages/runtime/src/runtime.ts#L148),
+[renderNode:459](../packages/runtime/src/runtime.ts#L459)) and both can throw — which is the signal
+we want. Call `setSkipServerFunctions(true)` first (studio already does this in edit mode) so the
+critic doesn't hit the network.
+
+**Dependency-injection shape.** Add an optional `renderCheck` to the `registerAiTools` ctx,
+mirroring the existing `validate`/`saveFile` injection at
+[ai-tools.js:118](../packages/studio/src/services/ai-tools.js#L118), wired from
+[document-assistant.js:51](../packages/studio/src/services/document-assistant.js#L51):
+
+- **Studio (browser):** pass the real detached-render critic.
+- **Headless harness (no `document`):** pass nothing → `renderCheck` is undefined → critic is a
+  no-op, loop falls back to schema-only exactly as today. This keeps the harness green without a
+  DOM. (Alternative if we want harness coverage: shim `document` with happy-dom — see open
+  decision below.)
+
+**Tasks**
+
+- [x] New `packages/studio/src/services/render-critic.js`: `async function renderCheck(doc)` →
+      `{ ok: true } | { ok: false, error: string }`. v1 catches **render throws** only; translate
+      the thrown message into model-actionable text (extend the `translateValidationError` style).
+- [x] Containment (verified against runtime): render into a detached `div` inside
+      `effectScope().run(() => renderNode(doc, state))`, then `scope.stop()`. `renderNode` is
+      **synchronous** and uses bare `effect()` ([runtime.ts:16](../packages/runtime/src/runtime.ts#L16)),
+      so the scope captures and disposes all ~12 render-time effects (template/style/attribute
+      bindings). **Known leak boundary:** `buildScope` is async, so effects created during prototype/
+      computed setup cross an `await` and escape the scope (Vue tracks the active scope synchronously);
+      the throwaway `state` + detached `div` are unreferenced post-check, so they're GC-eligible —
+      acceptable for v1. Add a code comment noting this so it isn't mistaken for a bug.
+- [x] Two safety properties confirmed: the critic does **not** invoke `state.onMount()` (only `Jx()`
+      does, not `renderNode`), and custom-element `connectedCallback` does **not** fire on a detached
+      node — so no async mount/component side effects. **v1 boundary:** component/custom-element
+      instances are therefore not deep-rendered by the critic (it checks the host page structure +
+      bindings, not `<my-card>` internals). Component files are still gated by `create_component`
+      validation. Document this limitation.
+- [x] Before/after guard in `applyAndValidate`: only fail on a **newly-introduced** render break —
+      if the pre-mutation doc already failed to render, don't blame this mutation. (Cache the
+      turn-start render verdict to avoid a double render per call where possible.)
+- [x] Wire `renderCheck` through `registerAiTools` → `applyAndValidate`; surface a render failure
+      with the same `{ success: false, error }` contract so the existing loop self-corrects.
+- [x] Studio unit test: a deliberately broken-but-schema-valid doc (`$ref` to a missing state key;
+      malformed `Function` body) → critic returns `ok:false`; a valid doc → `ok:true`.
+
+**Out of scope for v1 (defer to v2):** empty/zero-node detection (needs baseline subtree diffing →
+false-positive risk on legitimately-empty containers); visual/pixel diff; deep custom-element/
+component-instance rendering (detached nodes don't fire `connectedCallback`); running the critic in
+the headless harness.
+
+**Harness: DECIDED — browser-only for v1.** The critic ships in the studio (where the agent loop
+actually runs); the headless harness passes no `renderCheck` and falls back to schema-only, staying
+green without a DOM dependency. Harness coverage (via happy-dom/jsdom shim) is a v2 consideration.
+
+- **Files:** new `render-critic.js`; `ai-tools.js` (ctx wiring + `applyAndValidate` guard);
+  `document-assistant.js` (inject the critic). `tool-executor.js` untouched.
+- **Acceptance:** A schema-valid doc with a missing-state `$ref` is caught by `renderCheck`,
+  surfaced to the model as a tool-result error, and the model self-corrects within the round budget
+  — verified by a studio unit test and one browser run.
+
+### Phase 2 — Context-trim coverage (G3, zero coverage today)
+
+`context-manager.js` (`trimContext`, model-aware budget) is fully built but **never exercised** —
+no test in the matrix runs a long enough conversation to trigger trimming.
+
+- [x] Add a unit test suite (`context-manager.test.js`) exercising trim: no-trim within budget,
+      trims oldest when over budget, preserves most recent messages, model-aware budget sizing,
+      contextWarning flag. 6 tests, all passing.
+- [x] Verify the truncation-summary note ([context-manager.js:171](../packages/studio/src/services/context-manager.js#L171))
+      doesn't orphan a `tool_calls` message — confirmed: the splice-based trim removes a contiguous
+      prefix, and tool_calls/tool pairs are always adjacent, so the pair is either fully kept or
+      fully trimmed. Test verifies this invariant.
+- **Acceptance:** Trim path has a passing test; no orphaned tool_calls after a trim.
+
+### Phase 3 — Round-cap / ambitious-task efficiency
+
+L3.3 and L4.2 hit the `MAX_ROUNDS = 5` cap ([tool-executor.js:13](../packages/studio/src/services/tool-executor.js#L13))
+and emitted the generic "couldn't complete after 5 attempts" instead of a useful partial result.
+
+- [ ] On cap-hit, replace the generic failure with a summary of what _was_ applied (the batch is
+      already tracked for undo — surface it).
+- [ ] Evaluate: prefer smaller targeted changes on vague prompts (system-prompt guidance) vs.
+      a higher cap for from-scratch component creation. Pick one; one fix per iteration (§10.1).
+- **Acceptance:** Re-run L3.3/L4.2 — Efficiency ≥3 and the cap-hit message names concrete changes.
+
+### Phase 4 — Weak/ambiguous tests
+
+- [ ] **L4.2** ("make it look better") — define the intended behavior (ask-vs-act) and score
+      against it instead of leaving it open. Document the decision in the rubric notes.
+- [ ] Confirm **L4.1** (rewritten to add-child-to-heading) still provokes genuine recovery, or
+      retire it — L4.5 already covers real bad-path recovery.
+- **Acceptance:** No test in §4–§9 is marked "weak/known-limitation" without a §10.3 justification.
+
+### Phase 5 — CI gate for regression
+
+The §10 regression rule is manual. Lock in the green suite.
+
+- [x] Add a CI workflow running the **deterministic** layers only — `ai-loop.test.js` (fake
+      client), `ai-tools.test.js`, `jx-validate-smoke`, `render-critic`, `context-manager`, and
+      schema package tests. No API key needed. `.github/workflows/ai-assistant-ci.yml` triggers on
+      PRs/pushes touching `packages/ai`, `packages/studio/src/services/`, `packages/studio/tests/`,
+      or `packages/schema`.
+- [ ] The **live** harness (`bun run eval:headless`, needs `OPENAI_API_KEY` + costs tokens + is
+      non-deterministic) goes in a separate **manual/scheduled** workflow gated on a repo secret —
+      not on every push. (Deferred — deterministic gate covers the regression risk.)
+- **Files:** new `.github/workflows/ai-assistant-ci.yml`.
+- **Acceptance:** PRs touching `packages/ai`, `packages/studio/src/services/`, or
+  `packages/schema` run the deterministic gate; live eval is one-click/scheduled.
+
+### Phase 6 — Provider portability (G4, low priority)
+
+Every run used gpt-5.4. The "provider-agnostic by design" claim is unverified.
+
+- [ ] Run a single representative pass (L1.1, L2.1, L3.1, L5.1) against one non-OpenAI compatible
+      endpoint via the existing `streaming-client.js` proxy path. Record divergences.
+- **Acceptance:** A turnover entry documenting whether the loop survives a second provider, or a
+  written justification for deferring.
+
+### Sequencing
+
+Phase 0 immediately. Then **Phase 1 is the substantive win** — do it before the rest. Phases 2–5
+are independent and parallelizable across sessions. Phase 6 is optional/last. Each phase: one PR,
+turnover entry per §12.1, regression check per §10 step 9.
 
 ---
 

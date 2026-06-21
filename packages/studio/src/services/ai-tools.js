@@ -84,16 +84,26 @@ function translateValidationError(rawError) {
  * introduced (the eval signal — ADR §6b). The change stays applied either way (optimistic apply +
  * undo, ADR §5); reporting the errors lets the agent loop self-correct on the next round.
  *
+ * When a renderCheck function is provided, a second gate runs after schema validation passes: the
+ * mutated document is rendered in a detached DOM context and any render-time throws are surfaced as
+ * tool errors (same contract as schema errors).
+ *
  * @param {import("../tabs/tab").Tab} tab
  * @param {(t: import("../tabs/tab").Tab) => void} mutationFn
  * @param {string} summary
  * @param {(doc: unknown) => Promise<string[]>} validate
+ * @param {((doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>) | undefined} renderCheck
  * @returns {Promise<import("@jxsuite/ai/tools").ToolResult>}
  */
-async function applyAndValidate(tab, mutationFn, summary, validate) {
-  const before = new Set(await validate(toRaw(tab.doc.document)));
+async function applyAndValidate(tab, mutationFn, summary, validate, renderCheck) {
+  const rawBefore = toRaw(tab.doc.document);
+  const before = new Set(await validate(rawBefore));
+  const renderOkBefore = renderCheck ? await renderCheck(rawBefore) : { ok: true };
+
   transactDoc(tab, mutationFn);
-  const after = await validate(toRaw(tab.doc.document));
+
+  const rawAfter = toRaw(tab.doc.document);
+  const after = await validate(rawAfter);
   const newErrors = after.filter((e) => !before.has(e));
   if (newErrors.length > 0) {
     const formatted = newErrors.map((e) => `- ${translateValidationError(e)}`).join("\n");
@@ -102,6 +112,17 @@ async function applyAndValidate(tab, mutationFn, summary, validate) {
       error: `Change applied, but it introduced schema errors. Fix these issues with follow-up edits:\n${formatted}`,
     };
   }
+
+  if (renderCheck && renderOkBefore.ok) {
+    const renderResult = await renderCheck(rawAfter);
+    if (!renderResult.ok) {
+      return {
+        success: false,
+        error: `Change applied and schema-valid, but it broke rendering. Fix with follow-up edits:\n- ${renderResult.error}`,
+      };
+    }
+  }
+
   return { success: true, summary };
 }
 
@@ -113,9 +134,13 @@ async function applyAndValidate(tab, mutationFn, summary, validate) {
  *   getTab: () => import("../tabs/tab").Tab | null;
  *   validate?: (doc: unknown) => Promise<string[]>;
  *   saveFile?: (relPath: string, content: string) => Promise<void>;
+ *   renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
  * }} ctx
  */
-export function registerAiTools(registry, { getTab, validate = validateDoc, saveFile }) {
+export function registerAiTools(
+  registry,
+  { getTab, validate = validateDoc, saveFile, renderCheck },
+) {
   registry.register(
     createToolDefinition({
       name: "read_document",
@@ -198,6 +223,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
             ),
           `Set "${args.key}" at ${JSON.stringify(path)}.`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -255,6 +281,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
             ),
           `Inserted node at ${JSON.stringify([...parentPath, "children", index])}.`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -308,6 +335,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           (t) => mutateUpdateStyle(t, path, prop, val),
           `Set style "${prop}" at ${JSON.stringify(path)}.`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -350,6 +378,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           },
           `Set text at ${JSON.stringify(path)}.`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -403,6 +432,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           },
           `Added state "${key}".`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -457,6 +487,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           },
           args.value == null ? `Removed state "${key}".` : `Updated state "${key}".`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -516,6 +547,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           (t) => mutateMoveNode(t, fromPath, toParentPath, toIndex),
           `Moved node from ${JSON.stringify(fromPath)} to ${JSON.stringify([...toParentPath, "children", toIndex])}.`,
           validate,
+          renderCheck,
         );
       },
     }),
@@ -661,6 +693,7 @@ export function registerAiTools(registry, { getTab, validate = validateDoc, save
           (t) => mutateRemoveNode(t, path),
           `Removed node at ${JSON.stringify(path)}.`,
           validate,
+          renderCheck,
         );
       },
     }),

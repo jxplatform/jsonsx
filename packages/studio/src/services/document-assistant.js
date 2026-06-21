@@ -18,6 +18,7 @@ import { runAgentLoop } from "./tool-executor";
 import { buildSystemPrompt } from "./ai-system-prompt";
 import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
 import { trimContext } from "./context-manager";
+import { renderCheck } from "./render-critic";
 
 const PERSIST_KEY_PREFIX = "jx-ai-chat-history";
 const MAX_PERSIST_MESSAGES = 50;
@@ -54,6 +55,7 @@ export function createDocumentAssistant() {
       const plat = getPlatform();
       await plat.writeFile(relPath, content);
     },
+    renderCheck,
   });
 
   /** @type {AbortController | null} */
