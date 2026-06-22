@@ -15,6 +15,8 @@
 
 ---
 
+[![codecov](https://codecov.io/gh/jxsuite/jx/graph/badge.svg?token=4ZDC9K0CDD)](https://codecov.io/gh/jxsuite/jx)
+
 ## What is Jx?
 
 Jx is a schema and runtime for building reactive web applications using **plain JSON**. A Jx application is a tree of JSON objects whose structure mirrors the DOM API, whose reactivity is powered by [`@vue/reactivity`](https://github.com/vuejs/core/tree/main/packages/reactivity), and whose behavior is declared as inline functions or external module references.
