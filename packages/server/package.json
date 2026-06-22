@@ -15,6 +15,7 @@
   "exports": {
     ".": "./src/server.ts",
     "./claude-session": "./src/claude-session.ts",
+    "./refactor": "./src/refactor/index.ts",
     "./resolve": "./src/resolve.ts",
     "./types": "./src/types.ts"
   },

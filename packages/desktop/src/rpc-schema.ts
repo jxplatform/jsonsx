@@ -1,6 +1,7 @@
 // oxlint-disable typescript/no-invalid-void-type -- Electrobun RPCSchema uses `void` to mark no-payload params/responses
 import type { RPCSchema } from "electrobun/bun";
 import type { ProjectConfig } from "@jxsuite/schema/types";
+import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ export interface StudioRPC {
       };
       renameFile: {
         params: { from: string; to: string };
-        response: void;
+        response: RenameReport;
       };
       createDirectory: {
         params: { path: string };
@@ -369,6 +370,7 @@ export interface StudioRPC {
     messages: {
       fileChanged: { path: string };
       updateReady: { version: string };
+      onFileEvents: { events: FsEventPayload[] };
     };
   }>;
 }

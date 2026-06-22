@@ -47,13 +47,21 @@ describe("createWatcher — rebuild integration", () => {
 
       writeFileSync(join(dir, "entry.js"), `export const v = ${Date.now()};`);
 
-      const { value } = (await Promise.race([
-        reader.read(),
-        new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("timeout waiting for reload")), 3000);
-        }),
-      ])) as ReadableStreamReadResult<Uint8Array>;
-      expect(new TextDecoder().decode(value)).toContain("data: reload");
+      // Read SSE frames until the reload arrives — a named fs event may be interleaved first.
+      const decoder = new TextDecoder();
+      let reloaded = false;
+      while (!reloaded) {
+        const { value } = (await Promise.race([
+          reader.read(),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("timeout waiting for reload")), 3000);
+          }),
+        ])) as ReadableStreamReadResult<Uint8Array>;
+        if (value && decoder.decode(value).includes("data: reload")) {
+          reloaded = true;
+        }
+      }
+      expect(reloaded).toBe(true);
 
       // The rebuild actually produced output
       const outputs = [...new Bun.Glob("*.js").scanSync({ cwd: join(dir, "out") })];
@@ -107,7 +115,13 @@ describe("createWatcher — rebuild integration", () => {
           setTimeout(() => r("silent"), 300);
         }),
       ]);
-      expect(raced).toBe("silent");
+      // The sidebar still receives a (named) fs event, but the preview must NOT be told to reload.
+      if (raced !== "silent") {
+        const text = new TextDecoder().decode(
+          (raced as ReadableStreamReadResult<Uint8Array>).value ?? new Uint8Array(),
+        );
+        expect(text).not.toContain("data: reload");
+      }
       void reader.cancel();
       await watcher.close();
       // Drain any pending debounce timer before restoring Bun.build
@@ -141,7 +155,13 @@ describe("createWatcher — rebuild integration", () => {
           setTimeout(() => r("silent"), 400);
         }),
       ]);
-      expect(raced).toBe("silent");
+      // The sidebar still receives a (named) fs event, but the preview must NOT be told to reload.
+      if (raced !== "silent") {
+        const text = new TextDecoder().decode(
+          (raced as ReadableStreamReadResult<Uint8Array>).value ?? new Uint8Array(),
+        );
+        expect(text).not.toContain("data: reload");
+      }
       void reader.cancel();
       await watcher.close();
       await sleep(100);

@@ -9,7 +9,7 @@
  */
 
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { DirEntry } from "../types";
+import type { DirEntry, FsEvent, RenameResult } from "../types";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -298,7 +298,7 @@ export function createDevServerPlatform() {
      * @param {string} from
      * @param {string} to
      */
-    async renameFile(from: string, to: string) {
+    async renameFile(from: string, to: string): Promise<RenameResult> {
       const res = await fetch("/__studio/file/rename", {
         body: JSON.stringify({ from: serverPath(from), to: serverPath(to) }),
         headers: { "Content-Type": "application/json" },
@@ -307,6 +307,58 @@ export function createDevServerPlatform() {
       if (!res.ok) {
         throw new Error(`Failed to rename: ${from} → ${to}`);
       }
+      const report = await readJson<RenameResult>(res);
+      // Map server-root-relative report paths back to project-relative for the studio.
+      if (typeof report.from === "string") {
+        report.from = stripRoot(report.from);
+      }
+      if (typeof report.to === "string") {
+        report.to = stripRoot(report.to);
+      }
+      for (const f of report.references?.files ?? []) {
+        f.path = stripRoot(f.path);
+      }
+      for (const e of report.errors ?? []) {
+        e.path = stripRoot(e.path);
+      }
+      return report;
+    },
+
+    /**
+     * Subscribe to filesystem change events over the dev server's SSE stream. Listens for the named
+     * "fs" event (the preview iframe's default `onmessage` ignores it), strips paths to
+     * project-relative, and drops events for sibling projects outside the active root.
+     */
+    subscribeFileEvents(handler: (events: FsEvent[]) => void) {
+      if (typeof EventSource === "undefined") {
+        return () => {};
+      }
+      const es = new EventSource("/__reload");
+      es.addEventListener("fs", (ev: MessageEvent) => {
+        let payload: { events?: FsEvent[] };
+        try {
+          payload = JSON.parse(ev.data as string) as { events?: FsEvent[] };
+        } catch {
+          return;
+        }
+        const events: FsEvent[] = [];
+        for (const e of payload.events ?? []) {
+          const raw = e.path.replaceAll("\\", "/");
+          if (_projectRoot && raw !== _projectRoot && !raw.startsWith(`${_projectRoot}/`)) {
+            continue;
+          }
+          const path = stripRoot(raw);
+          if (path && !path.startsWith("..")) {
+            events.push({ isDir: e.isDir, path, type: e.type });
+          }
+        }
+        if (events.length > 0) {
+          handler(events);
+        }
+      });
+      return () => {
+        es.close();
+      };
     },
 
     /** @param {string} _path */

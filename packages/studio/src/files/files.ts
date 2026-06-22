@@ -16,6 +16,7 @@ import { createState, projectState, requireProjectState, setProjectState } from 
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 import { loadComponentRegistry } from "./components";
+import { markLocalMutation } from "./fs-events";
 import {
   draggable,
   dropTargetForElements,
@@ -44,6 +45,7 @@ import type { TemplateResult } from "lit-html";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioState } from "../state.js";
 import type { Tab } from "../tabs/tab.js";
+import type { RenameResult } from "../types";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -636,8 +638,9 @@ export function registerFileTreeDnD({ renderLeftPanel }: { renderLeftPanel: () =
  */
 async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: () => void) {
   const platform = getPlatform();
+  markLocalMutation(oldPath, newPath);
   try {
-    await platform.renameFile(oldPath, newPath);
+    const report = await platform.renameFile(oldPath, newPath);
 
     // Update open tabs referencing the moved path
     for (const [id] of workspace.tabs.entries()) {
@@ -662,6 +665,7 @@ async function moveFileEntry(oldPath: string, newPath: string, renderLeftPanel: 
       requireProjectState().expanded.add(newParent);
     }
 
+    reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
     statusMessage(`Moved to ${newPath}`);
   } catch (error) {
@@ -779,6 +783,7 @@ async function createNewFile(dirPath: string, renderLeftPanel: () => void) {
     return;
   }
   const path = dirPath === "." ? name : `${dirPath}/${name}`;
+  markLocalMutation(path);
   await loadFormats();
   const format = formatForPath(name);
   const content =
@@ -849,6 +854,28 @@ function showRenameFileDialog(currentName: string): Promise<string | null> {
   });
 }
 
+/** Build the status-bar message for a rename, summarising any reference/tag rewrites. */
+function renameStatus(newName: string, report: RenameResult): string {
+  const refs = report.references;
+  const tagNote = report.tag ? `; tag → <${report.tag.to}> (${report.tag.refsUpdated})` : "";
+  if (refs && refs.refsUpdated > 0) {
+    return `Renamed to ${newName}; updated ${refs.refsUpdated} reference(s) in ${refs.filesChanged} file(s)${tagNote}`;
+  }
+  if (tagNote) {
+    return `Renamed to ${newName}${tagNote}`;
+  }
+  return `Renamed to ${newName}`;
+}
+
+/** Reload any open tabs whose references the refactor rewrote (so the editor shows new paths). */
+function reloadRewrittenTabs(report: RenameResult, skipPath: string): void {
+  for (const f of report.references?.files ?? []) {
+    if (f.path !== skipPath && workspace.tabs.has(f.path)) {
+      void reloadFileInTab(f.path);
+    }
+  }
+}
+
 async function renameFile(
   entry: { name: string; path: string; type: string },
   renderLeftPanel: () => void,
@@ -862,9 +889,10 @@ async function renameFile(
     ? entryPath.slice(0, entryPath.lastIndexOf("/"))
     : ".";
   const newPath = parentDirPath === "." ? newName : `${parentDirPath}/${newName}`;
+  markLocalMutation(entry.path, newPath);
   try {
     const platform = getPlatform();
-    await platform.renameFile(entry.path, newPath);
+    const report = await platform.renameFile(entry.path, newPath);
     await loadDirectory(parentDirPath);
     if (requireProjectState().selectedPath === entry.path) {
       requireProjectState().selectedPath = newPath;
@@ -872,8 +900,9 @@ async function renameFile(
     if (workspace.tabs.has(entry.path)) {
       renameTab(entry.path, newPath, newPath);
     }
+    reloadRewrittenTabs(report, newPath);
     renderLeftPanel();
-    statusMessage(`Renamed to ${newName}`);
+    statusMessage(renameStatus(newName, report));
   } catch (error) {
     statusMessage(`Error: ${errorMessage(error)}`);
   }
@@ -892,6 +921,7 @@ async function deleteFile(
   }
   try {
     const platform = getPlatform();
+    markLocalMutation(entry.path);
     await platform.deleteFile(entry.path);
     const delPath = entry.path.replaceAll("\\", "/");
     const parentDirPath = delPath.includes("/") ? delPath.slice(0, delPath.lastIndexOf("/")) : ".";
@@ -1045,6 +1075,16 @@ export async function openFileInTab(path: string) {
  *
  * @param {string} path
  */
+/** Reload an open tab from disk when an external change arrives — but only if it is not dirty. */
+export function reloadCleanTab(path: string): void {
+  for (const [, tab] of workspace.tabs.entries()) {
+    if (tab.documentPath === path && !tab.doc.dirty) {
+      void reloadFileInTab(path);
+      return;
+    }
+  }
+}
+
 export async function reloadFileInTab(path: string) {
   for (const [, tab] of workspace.tabs.entries()) {
     if (tab.documentPath === path) {

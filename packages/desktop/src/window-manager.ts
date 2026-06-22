@@ -148,6 +148,12 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
 
   // The window is constructed after its rpc, so handlers read entry.win lazily via getWin().
   entry.rpc = buildWindowRpc(entry, () => entry.win);
+  // Push filesystem changes to the webview so the sidebar stays live (mirrors the dev server's SSE).
+  session.setFileEventSink((events) => {
+    try {
+      entry.rpc.send.onFileEvents({ events });
+    } catch {}
+  });
   entry.win = new BrowserWindow({
     frame: { height: 900, width: 1400, x: 0, y: 0 },
     navigationRules: "views://*,^*",

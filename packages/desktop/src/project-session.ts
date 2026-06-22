@@ -12,7 +12,9 @@ import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/p
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
+import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import type { FsEventPayload, FsWatcherHandle, RenameReport } from "@jxsuite/server/refactor";
 import type { FormatCapability, FormatRegistry } from "@jxsuite/schema/format-registry";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
@@ -275,6 +277,32 @@ export function createProjectSession(initialRoot: string | null) {
     return registry;
   }
 
+  // ─── Filesystem watching (pushes change events to the webview over RPC) ───────
+
+  let fileEventSink: ((events: FsEventPayload[]) => void) | null = null;
+  let watcherHandle: FsWatcherHandle | null = null;
+
+  function stopWatching(): void {
+    if (watcherHandle) {
+      void watcherHandle.close();
+      watcherHandle = null;
+    }
+  }
+
+  function startWatching(): void {
+    stopWatching();
+    if (projectRoot && fileEventSink) {
+      const sink = fileEventSink;
+      watcherHandle = createFsWatcher(projectRoot, (events) => sink(events));
+    }
+  }
+
+  /** Register (or clear) the sink that receives batched filesystem events for the active project. */
+  function setFileEventSink(sink: ((events: FsEventPayload[]) => void) | null): void {
+    fileEventSink = sink;
+    startWatching();
+  }
+
   /** List the project's registered format classes (auto-discovered from imports). */
   async function listFormats() {
     try {
@@ -340,6 +368,7 @@ export function createProjectSession(initialRoot: string | null) {
     const config = JSON.parse(raw) as SiteConfig;
     projectRoot = dirname(filePath);
     formatRegistry = null;
+    startWatching();
 
     return {
       config,
@@ -432,7 +461,7 @@ export function createProjectSession(initialRoot: string | null) {
     await rm(abs, { force: true, maxRetries: 3, retryDelay: 100 });
   }
 
-  async function renameFile(params: { from: string; to: string }): Promise<void> {
+  async function renameFile(params: { from: string; to: string }): Promise<RenameReport> {
     const root = requireRoot();
     const absFrom = resolve(root, params.from);
     const absTo = resolve(root, params.to);
@@ -440,6 +469,22 @@ export function createProjectSession(initialRoot: string | null) {
     assertUnderRoot(absTo, root);
     await mkdir(dirname(absTo), { recursive: true });
     await rename(absFrom, absTo);
+    // Refactor pass: rewrite references project-wide and auto-rename a component's tag (Pillar B/C).
+    // The move already succeeded, so a refactor failure degrades to a bare report instead of erroring.
+    try {
+      const registry = await getFormatRegistry();
+      return await applyRename({ absFrom, absTo, registry, root });
+    } catch {
+      const rel = (p: string) => relative(root, p).replaceAll("\\", "/");
+      return {
+        errors: [],
+        from: rel(absFrom),
+        isDir: false,
+        ok: true,
+        references: { files: [], filesChanged: 0, refsUpdated: 0 },
+        to: rel(absTo),
+      };
+    }
   }
 
   async function createDirectory(params: { path: string }): Promise<void> {
@@ -673,7 +718,10 @@ export function createProjectSession(initialRoot: string | null) {
     setProjectRoot(root: string | null) {
       projectRoot = root;
       formatRegistry = null;
+      startWatching();
     },
+    setFileEventSink,
+    dispose: stopWatching,
     listFormats,
     formatAction,
     openProject,

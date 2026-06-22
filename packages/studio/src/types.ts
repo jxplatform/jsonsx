@@ -69,6 +69,30 @@ export interface DirEntry {
   modified?: string;
 }
 
+/** A filesystem change pushed from the backend (project-relative, forward-slashed path). */
+export interface FsEvent {
+  type: "add" | "change" | "unlink" | "addDir" | "unlinkDir";
+  path: string;
+  isDir: boolean;
+}
+
+/** Result of a rename, including the references rewritten across the project (refactor report). */
+export interface RenameResult {
+  ok: boolean;
+  from: string;
+  to: string;
+  isDir?: boolean;
+  references?: {
+    filesChanged: number;
+    refsUpdated: number;
+    files: { path: string; count: number }[];
+  };
+  errors?: { path: string; error: string }[];
+  tag?: { from: string; to: string; filesChanged: number; refsUpdated: number };
+  tagSkipped?: string;
+  error?: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -90,8 +114,13 @@ export interface StudioPlatform {
   writeFile: (path: string, content: string) => Promise<void>;
   uploadFile: (path: string, data: string | File | Blob | ArrayBuffer) => Promise<unknown>;
   deleteFile: (path: string) => Promise<void>;
-  renameFile: (from: string, to: string) => Promise<void>;
+  renameFile: (from: string, to: string) => Promise<RenameResult>;
   createDirectory: (path: string) => Promise<void>;
+  /**
+   * Subscribe to backend filesystem change events for the active project. Returns an unsubscribe
+   * function. Optional: platforms without a watcher omit it and the sidebar stays manual-refresh.
+   */
+  subscribeFileEvents?: (handler: (events: FsEvent[]) => void) => () => void;
   discoverComponents: (dir?: string) => Promise<ComponentMeta[]>;
   addPackage: (name: string) => Promise<unknown>;
   removePackage: (name: string) => Promise<unknown>;

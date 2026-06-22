@@ -4,13 +4,19 @@ import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
 import type { StudioRPC } from "./rpc-schema";
 import type { ProjectConfig } from "@jxsuite/schema/types";
+import type { FsEventPayload } from "@jxsuite/server/refactor";
 
 export function createDesktopPlatform() {
+  // The studio sidebar's live-sync subscriber, if any. Set via subscribeFileEvents below.
+  let fileEventHandler: ((events: FsEventPayload[]) => void) | null = null;
   const rpc = Electroview.defineRPC<StudioRPC>({
     handlers: {
       messages: {
         fileChanged: (payload) => {
           console.log("[desktop] File changed:", payload.path);
+        },
+        onFileEvents: (payload) => {
+          fileEventHandler?.(payload.events);
         },
         updateReady: (payload) => {
           showUpdateToast(payload.version, rpc);
@@ -288,6 +294,15 @@ export function createDesktopPlatform() {
 
     async renameFile(from: string, to: string) {
       return rpc.request.renameFile({ from, to });
+    },
+
+    subscribeFileEvents(handler: (events: FsEventPayload[]) => void) {
+      fileEventHandler = handler;
+      return () => {
+        if (fileEventHandler === handler) {
+          fileEventHandler = null;
+        }
+      };
     },
 
     async createDirectory(path: string) {

@@ -3,7 +3,9 @@
 import { watch as chokidarWatch } from "chokidar";
 import { relative } from "node:path";
 import { rebuild } from "./build.ts";
+import { coalesceFsEvents, toFsEvent } from "./refactor/fs-events.ts";
 import type { BuildEntry } from "./types.ts";
+import type { FsEventPayload } from "./refactor/fs-events.ts";
 
 const DEFAULT_IGNORE = [
   "**/node_modules/**",
@@ -86,6 +88,17 @@ export function createWatcher(
     }
   }
 
+  /**
+   * Send a _named_ SSE event. The preview iframe only listens to the default (unnamed) `onmessage`,
+   * so named events (e.g. "fs") reach the studio shell without triggering a preview reload.
+   */
+  function broadcastEvent(event: string, payload: unknown) {
+    const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+    for (const send of clients) {
+      send(frame);
+    }
+  }
+
   function handleSSE() {
     /** @type {((msg: string) => void) | undefined} */
     let send: ((msg: string) => void) | undefined;
@@ -121,6 +134,9 @@ export function createWatcher(
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let fsTimer: ReturnType<typeof setTimeout> | null = null;
+  let fsBuffer: FsEventPayload[] = [];
+  const fsDebounceMs = 40;
   const watcher = chokidarWatch(root, {
     awaitWriteFinish: {
       pollInterval: 10,
@@ -131,11 +147,26 @@ export function createWatcher(
     ignored: (watchedPath) => shouldIgnore(watchedPath, ignore),
   });
 
-  watcher.on("all", (_, changedPath) => {
+  watcher.on("all", (eventType, changedPath) => {
     const filename = relative(root, changedPath);
     if (!filename || filename.startsWith("..")) {
       return;
     }
+
+    // Structured FS events for the studio sidebar (coalesced + batched), emitted as a named "fs"
+    // SSE event so the preview iframe ignores them while the studio shell subscribes to them.
+    const fsEvent = toFsEvent(eventType, root, changedPath);
+    if (fsEvent) {
+      fsBuffer = coalesceFsEvents(fsBuffer, fsEvent);
+      clearTimeout(fsTimer ?? undefined);
+      fsTimer = setTimeout(() => {
+        if (fsBuffer.length > 0) {
+          broadcastEvent("fs", { events: fsBuffer });
+          fsBuffer = [];
+        }
+      }, fsDebounceMs);
+    }
+
     clearTimeout(timer ?? undefined);
     timer = setTimeout(async () => {
       if (builds.length > 0) {
@@ -155,5 +186,5 @@ export function createWatcher(
     }, debounceMs);
   });
 
-  return { broadcast, handleSSE, watcher };
+  return { broadcast, broadcastEvent, handleSSE, watcher };
 }

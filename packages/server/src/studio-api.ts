@@ -12,6 +12,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
+import { applyRename } from "./refactor/apply.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import * as claude from "./claude-session.ts";
 import type { ClassJsonDef } from "./types.ts";
@@ -913,13 +914,23 @@ export async function handleStudioApi(
     try {
       await mkdir(dirname(absTo), { recursive: true });
       await rename(absFrom, absTo);
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+    // Refactor pass: rewrite path references project-wide and, for a component, auto-rename its tag.
+    // The move already succeeded, so a refactor failure is reported but never fails the rename.
+    const scanRoot = activeProjectRoot ?? root;
+    try {
+      const registry = await getFormatRegistry(scanRoot);
+      const report = await applyRename({ absFrom, absTo, registry, root: scanRoot });
+      return Response.json(report);
+    } catch (error) {
       return Response.json({
+        error: errorMessage(error),
         from: fwd(relative(root, absFrom)),
         ok: true,
         to: fwd(relative(root, absTo)),
       });
-    } catch (error) {
-      return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
   }
 

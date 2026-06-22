@@ -56,6 +56,8 @@ function makeSession(initialRoot: string | null) {
     setProjectRoot: mock((r: string | null) => {
       root = r;
     }),
+    setFileEventSink: mock((_sink: unknown) => {}),
+    dispose: mock(() => {}),
     handleReadFile: mock(async (_p: { path: string }) => '{"name":"Proj"}'),
     handleReadFileAsDataUrl: mock(async () => "data:"),
     handleWriteFile: mock(async () => {}),

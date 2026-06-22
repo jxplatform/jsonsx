@@ -9,7 +9,4 @@ linker = "hoisted"
 [test]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
-coveragePathIgnorePatterns = [
-  "**/tests/**",
-  "./result/**",
-]
+coveragePathIgnorePatterns = ["**/tests/**", "./result/**"]

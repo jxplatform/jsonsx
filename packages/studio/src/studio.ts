@@ -59,8 +59,10 @@ import {
   openFileInTab,
   openHomePage,
   registerFileTreeDnD,
+  reloadCleanTab,
   setupTreeKeyboard,
 } from "./files/files";
+import { startFsSync } from "./files/fs-events";
 import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
@@ -506,6 +508,13 @@ function safeRenderRightPanel() {
 // Now that renderers are registered, bootstrap
 registerFunctionCompletions();
 
+let fsUnsub: (() => void) | null = null;
+/** (Re)subscribe the sidebar to backend filesystem events for the active project. */
+function ensureFsSync() {
+  fsUnsub?.();
+  fsUnsub = startFsSync({ onContentChange: reloadCleanTab, renderLeftPanel });
+}
+
 const _urlParams = new URLSearchParams(location.search);
 const _projectParam = _urlParams.get("project") || _urlParams.get("open");
 
@@ -646,6 +655,7 @@ if (_projectParam) {
   // Normal mode: probe for project at server root
   void loadProject();
   render();
+  ensureFsSync();
 }
 
 // ─── Left panel: delegated to panels/left-panel.js ───────────────────────────
@@ -657,11 +667,13 @@ function renderLeftPanel() {
 function loadProject() {
   return _loadProject();
 }
-function openProject() {
-  return _openProject({
+async function openProject() {
+  const result = await _openProject({
     renderActivityBar: () => renderActivityBar(),
     renderLeftPanel,
   });
+  ensureFsSync();
+  return result;
 }
 async function openRecentProject(root: string) {
   try {
@@ -728,6 +740,7 @@ async function openRecentProject(root: string) {
     statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
+    ensureFsSync();
   } catch (error) {
     statusMessage(`Error: ${errorMessage(error)}`);
   }

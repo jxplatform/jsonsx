@@ -233,6 +233,36 @@ describe("handleRenameFile", () => {
       cleanup();
     }
   });
+
+  test("rewrites project references and reports them (refactor)", async () => {
+    setup();
+    try {
+      mkdirSync(join(FIXTURES, "pages"), { recursive: true });
+      mkdirSync(join(FIXTURES, "components"), { recursive: true });
+      writeFileSync(
+        join(FIXTURES, "pages/index.json"),
+        JSON.stringify({ children: [{ $ref: "../components/counter.json" }] }),
+      );
+      writeFileSync(
+        join(FIXTURES, "components/counter.json"),
+        JSON.stringify({ children: [], tagName: "my-counter" }),
+      );
+
+      const report = await handleRenameFile({
+        from: "components/counter.json",
+        to: "components/my-button.json",
+      });
+
+      const index = JSON.parse(await handleReadFile({ path: "pages/index.json" })) as {
+        children: { $ref: string }[];
+      };
+      expect(index.children[0]?.$ref).toBe("../components/my-button.json");
+      expect(report.references.refsUpdated).toBe(1);
+      expect(report.tag).toMatchObject({ from: "my-counter", to: "my-button" });
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 // ─── handleCreateDirectory ──────────────────────────────────────────────────

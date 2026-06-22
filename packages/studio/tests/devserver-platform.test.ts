@@ -8,6 +8,28 @@
 import "./harness";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { createDevServerPlatform } from "../src/platforms/devserver";
+import type { FsEvent } from "../src/types";
+
+/** Minimal EventSource stub: records the latest instance and lets tests emit named events. */
+class FakeEventSource {
+  static last: FakeEventSource | null = null;
+  closed = false;
+  url: string;
+  private listeners = new Map<string, (ev: MessageEvent) => void>();
+  constructor(url: string) {
+    this.url = url;
+    FakeEventSource.last = this;
+  }
+  addEventListener(type: string, fn: (ev: MessageEvent) => void): void {
+    this.listeners.set(type, fn);
+  }
+  emit(type: string, data: string): void {
+    this.listeners.get(type)?.({ data } as MessageEvent);
+  }
+  close(): void {
+    this.closed = true;
+  }
+}
 
 // ─── Fetch stub with route table ─────────────────────────────────────────────
 
@@ -437,6 +459,59 @@ describe("file operations", () => {
     route("/__studio/file/rename", () => json({}, 500));
     const p = createDevServerPlatform();
     expect(p.renameFile("a.json", "b.json")).rejects.toThrow("Failed to rename: a.json → b.json");
+  });
+
+  test("renameFile maps the refactor report back to project-relative paths", async () => {
+    route("/__studio/activate", () => json({ ok: true }));
+    route("/__studio/file/rename", () =>
+      json({
+        errors: [{ error: "x", path: "site/bad.json" }],
+        from: "site/a.json",
+        ok: true,
+        references: {
+          files: [{ count: 2, path: "site/pages/index.json" }],
+          filesChanged: 1,
+          refsUpdated: 2,
+        },
+        to: "site/b.json",
+      }),
+    );
+    const p = createDevServerPlatform();
+    p.projectRoot = "site";
+    const report = await p.renameFile("a.json", "b.json");
+    expect(report).toMatchObject({
+      errors: [{ path: "bad.json" }],
+      from: "a.json",
+      references: { files: [{ count: 2, path: "pages/index.json" }] },
+      to: "b.json",
+    });
+  });
+
+  test("subscribeFileEvents strips and filters fs events from the SSE stream", () => {
+    const original = (globalThis as { EventSource?: unknown }).EventSource;
+    (globalThis as { EventSource?: unknown }).EventSource = FakeEventSource;
+    try {
+      route("/__studio/activate", () => json({ ok: true }));
+      const p = createDevServerPlatform();
+      p.projectRoot = "site";
+      const received: FsEvent[] = [];
+      const stop = p.subscribeFileEvents?.((events) => received.push(...events)) ?? (() => {});
+      const es = FakeEventSource.last;
+      es?.emit(
+        "fs",
+        JSON.stringify({
+          events: [
+            { isDir: false, path: "site/pages/a.json", type: "add" },
+            { isDir: false, path: "other/x.json", type: "add" },
+          ],
+        }),
+      );
+      expect(received).toEqual([{ isDir: false, path: "pages/a.json", type: "add" }]);
+      stop();
+      expect(es?.closed).toBe(true);
+    } finally {
+      (globalThis as { EventSource?: unknown }).EventSource = original;
+    }
   });
 
   test("createDirectory is a no-op that resolves without fetching", async () => {
