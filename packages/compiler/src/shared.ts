@@ -1024,7 +1024,7 @@ function _walkServerEntries(
 
 // ─── Component pre-rendering ─────────────────────────────────────────────────
 
-const SELF_CLOSING = new Set<string>([
+export const SELF_CLOSING = new Set<string>([
   "input",
   "br",
   "hr",

@@ -12,6 +12,7 @@ import {
   escapeHtml,
   isNodeDynamic,
   resolveStaticValue,
+  SELF_CLOSING,
 } from "../shared.ts";
 import { emitElementModule } from "./compile-element.ts";
 import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
@@ -143,6 +144,13 @@ function compileNode(
 
   const tag = def.tagName ?? "div";
   const attrs = buildAttrs(def, nextContext.scope);
+
+  // Void elements (br, hr, img, …) have no closing tag.
+  // Emitting `<br></br>` makes HTML parsers read `</br>` as a second `<br>`.
+  if (SELF_CLOSING.has(tag)) {
+    return `<${tag}${attrs}>`;
+  }
+
   const inner = buildInnerWithIslands(def, raw, nextContext, islands);
 
   return `<${tag}${attrs}>${inner}</${tag}>`;

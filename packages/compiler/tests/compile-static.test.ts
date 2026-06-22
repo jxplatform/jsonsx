@@ -50,6 +50,25 @@ describe("compileStaticPage", () => {
     expect(html).toContain("<p>Content</p>");
   });
 
+  test("renders void elements without a closing tag", () => {
+    const doc = {
+      children: [
+        {
+          children: [
+            "Build any website.",
+            { tagName: "br" },
+            { tagName: "span", textContent: "Ship as static HTML." },
+          ],
+          tagName: "h1",
+        },
+      ],
+    };
+    const { html } = compileStaticPage(doc, baseOpts);
+    // `<br></br>` would be parsed by browsers as two line breaks.
+    expect(html).not.toContain("</br>");
+    expect((html.match(/<br/g) ?? []).length).toBe(1);
+  });
+
   test("escapes HTML in text content", () => {
     const doc = {
       children: [{ tagName: "p", textContent: "<script>alert('xss')</script>" }],
