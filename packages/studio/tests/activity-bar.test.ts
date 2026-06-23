@@ -12,6 +12,11 @@ void mock.module("../src/settings/settings-modal.js", () => ({
   openSettingsModal,
 }));
 
+const openAboutModal = mock(() => {});
+void mock.module("../src/about/about-modal.js", () => ({
+  openAboutModal,
+}));
+
 const store = await import("../src/store");
 const { initShellRefs, registerRenderer } = store;
 // `activityBar` is an `export let` populated by initShellRefs — read it via the namespace
@@ -37,6 +42,7 @@ beforeEach(() => {
   view.leftPanelCollapsed = false;
   refreshGitStatus.mockClear();
   openSettingsModal.mockClear();
+  openAboutModal.mockClear();
   // Note: never wipe bar().innerHTML — lit owns the container and caches its parts.
   document.querySelector("#app")?.classList.remove("left-collapsed", "right-collapsed");
 });
@@ -112,6 +118,7 @@ describe("renderActivityBar", () => {
       "git",
     ]);
     expect(bar().querySelector("sp-action-button[title='Settings']")).not.toBeNull();
+    expect(bar().querySelector("sp-action-button[title='About']")).not.toBeNull();
   });
 
   test("selects the current left tab when panel is open", () => {
@@ -185,6 +192,13 @@ describe("renderActivityBar", () => {
     const btn = bar().querySelector("sp-action-button[title='Settings']") as HTMLElement;
     btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(openSettingsModal).toHaveBeenCalledTimes(1);
+  });
+
+  test("about button opens the about modal", () => {
+    renderActivityBar();
+    const btn = bar().querySelector("sp-action-button[title='About']") as HTMLElement;
+    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(openAboutModal).toHaveBeenCalledTimes(1);
   });
 });
 

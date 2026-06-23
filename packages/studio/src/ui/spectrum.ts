@@ -87,6 +87,7 @@ import { IconCode } from "@spectrum-web-components/icons-workflow/src/elements/I
 import { IconBrush } from "@spectrum-web-components/icons-workflow/src/elements/IconBrush.js";
 import { IconGears } from "@spectrum-web-components/icons-workflow/src/elements/IconGears.js";
 import { IconSettings } from "@spectrum-web-components/icons-workflow/src/elements/IconSettings.js";
+import { IconInfo } from "@spectrum-web-components/icons-workflow/src/elements/IconInfo.js";
 import { IconBack } from "@spectrum-web-components/icons-workflow/src/elements/IconBack.js";
 import { IconProperties } from "@spectrum-web-components/icons-workflow/src/elements/IconProperties.js";
 import { IconEvent } from "@spectrum-web-components/icons-workflow/src/elements/IconEvent.js";
@@ -227,6 +228,7 @@ const components = [
   ["sp-icon-brush", IconBrush],
   ["sp-icon-gears", IconGears],
   ["sp-icon-settings", IconSettings],
+  ["sp-icon-info", IconInfo],
   ["sp-icon-back", IconBack],
   ["sp-icon-properties", IconProperties],
   ["sp-icon-event", IconEvent],

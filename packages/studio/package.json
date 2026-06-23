@@ -23,7 +23,7 @@
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked && bun run scripts/build-workers.ts",
+    "build": "bun run scripts/build.ts",
     "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
     "test": "bun test --isolate",

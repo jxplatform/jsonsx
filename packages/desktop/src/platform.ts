@@ -420,6 +420,29 @@ export function createDesktopPlatform() {
       return rpc.request.listPackages();
     },
 
+    async getAppInfo() {
+      const info = await rpc.request.updaterGetLocalInfo();
+      let updateStatus: string | undefined;
+      try {
+        const status = await rpc.request.updaterGetStatus();
+        updateStatus = status.error
+          ? `Update check failed: ${status.error}`
+          : status.updateReady
+            ? `Update ready (${status.version ?? "?"})`
+            : status.updateAvailable
+              ? `Update available (${status.version ?? "?"})`
+              : "Up to date";
+      } catch {
+        // Status is best-effort; omit it if the updater isn't reachable.
+      }
+      return {
+        version: info.version,
+        channel: info.channel,
+        hash: info.hash,
+        ...(updateStatus === undefined ? {} : { updateStatus }),
+      };
+    },
+
     async createProject(opts: {
       name: string;
       description?: string;

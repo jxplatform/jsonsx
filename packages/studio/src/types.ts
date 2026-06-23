@@ -55,6 +55,15 @@ export interface PackageInfo {
   version: string;
 }
 
+/** Desktop app/build info surfaced in the About screen. */
+export interface AppInfo {
+  version: string;
+  channel: string;
+  hash: string;
+  /** Human-readable update status (e.g. "Up to date", "Update available"), if known. */
+  updateStatus?: string;
+}
+
 export interface CodeServiceResult {
   code?: string;
   diagnostics?: unknown[];
@@ -125,6 +134,12 @@ export interface StudioPlatform {
   addPackage: (name: string) => Promise<unknown>;
   removePackage: (name: string) => Promise<unknown>;
   listPackages: () => Promise<PackageInfo[]>;
+  /**
+   * Desktop-only app/build info (release channel, commit hash, update status). Platforms without a
+   * native shell (e.g. the dev server) omit it, and the About screen hides the corresponding
+   * section.
+   */
+  getAppInfo?: () => Promise<AppInfo>;
   codeService: (action: string, payload: unknown) => Promise<CodeServiceResult | null>;
   resolveSiteContext: (filePath: string) => Promise<{
     sitePath: string | null;

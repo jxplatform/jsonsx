@@ -7,6 +7,7 @@ import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
 import { openSettingsModal } from "../settings/settings-modal";
+import { openAboutModal } from "../about/about-modal";
 import { refreshGitStatus } from "./git-panel";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -129,7 +130,18 @@ export function renderActivityBar() {
         `,
       )}
     </sp-tabs>
-    <div style="margin-top:auto;padding:8px 0;display:flex;justify-content:center">
+    <div
+      style="margin-top:auto;padding:8px 0;display:flex;flex-direction:column;align-items:center;gap:4px"
+    >
+      <sp-action-button
+        quiet
+        size="m"
+        title="About"
+        aria-label="About"
+        @click=${() => openAboutModal()}
+      >
+        <sp-icon-info slot="icon"></sp-icon-info>
+      </sp-action-button>
       <sp-action-button
         quiet
         size="m"

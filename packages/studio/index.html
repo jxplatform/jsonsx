@@ -2415,6 +2415,97 @@
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
         overflow: hidden;
       }
+      .about-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(440px, calc(100vw - 48px));
+        max-height: calc(100vh - 80px);
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+      }
+      .about-modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+      }
+      .about-meta {
+        margin: 0 0 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .about-meta-row {
+        display: flex;
+        gap: 12px;
+        font-size: 13px;
+      }
+      .about-meta-label {
+        width: 96px;
+        min-width: 96px;
+        margin: 0;
+        color: var(--fg-dim);
+      }
+      .about-meta-value {
+        margin: 0;
+        color: var(--fg);
+        word-break: break-word;
+      }
+      .about-links {
+        display: flex;
+        gap: 16px;
+        padding: 12px 0;
+        margin-bottom: 12px;
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+      }
+      .about-links a {
+        color: var(--spectrum-accent-color-1000, #6aa9ff);
+        text-decoration: none;
+      }
+      .about-links a:hover {
+        text-decoration: underline;
+      }
+      .about-section-title {
+        margin: 0 0 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--fg);
+      }
+      .about-muted {
+        margin: 0;
+        font-size: 13px;
+        color: var(--fg-dim);
+      }
+      .about-packages {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .about-package-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 12px;
+      }
+      .about-package-name {
+        color: var(--fg-dim);
+      }
+      .about-package-version {
+        color: var(--fg);
+        font-variant-numeric: tabular-nums;
+      }
       .settings-modal-header {
         display: flex;
         align-items: center;
