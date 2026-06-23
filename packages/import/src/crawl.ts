@@ -19,6 +19,8 @@ export interface CrawlOptions {
   skipStyles: boolean;
   skipAssets: boolean;
   respectRobots: boolean;
+  /** Capture a reference screenshot of each page before closing (for --verify). */
+  captureScreenshots?: boolean;
   onProgress?: (msg: string) => void;
 }
 
@@ -29,6 +31,8 @@ export interface CrawledPage {
   jx: ToJxResult;
   depth: number;
   links: string[];
+  /** Reference screenshot PNG buffer, present when captureScreenshots is true. */
+  screenshot?: Buffer;
 }
 
 export interface CrawlResult {
@@ -219,6 +223,10 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
         `  ⚠ Page exceeds node cap (${jx.nodeCount} > ${maxNodesPerPage}), skipping styles/assets`,
       );
       skippedByNodeCap.push(entry.url);
+      let screenshot: Buffer | undefined;
+      if (options.captureScreenshots) {
+        screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+      }
       await capture.page.close();
 
       pages.push({
@@ -228,6 +236,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
         jx,
         depth: entry.depth,
         links: capture.links,
+        screenshot,
       });
       continue;
     }
@@ -280,6 +289,10 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       }
     }
 
+    let screenshot: Buffer | undefined;
+    if (options.captureScreenshots) {
+      screenshot = Buffer.from(await capture.page.screenshot({ type: "png" }));
+    }
     await capture.page.close();
 
     const route = routeToFilePath(entry.url, origin);
@@ -290,6 +303,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       jx,
       depth: entry.depth,
       links: capture.links,
+      screenshot,
     });
 
     // Enqueue discovered links (BFS)

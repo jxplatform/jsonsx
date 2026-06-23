@@ -332,10 +332,10 @@ What's next: the AI pass (opt-in `--ai-components`) should:
 
 Built and verified end-to-end. New files delivered under `packages/import/`:
 
-| File                     | Role                                                                                                                                                                                                                                             |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/screenshot-diff.ts` | Pixel-level PNG comparison using `pixelmatch` + `pngjs`. Takes two PNG buffers, pads smaller to larger if sizes differ, returns fidelity % (0–100), mismatched pixel count, and a diff visualization PNG. Configurable threshold (default 0.15). |
-| `src/verify.ts`          | Orchestrator: builds the emitted Jx project via `@jxsuite/compiler/site` (`buildSite`), serves `dist/` locally via Bun, screenshots original URL + rendered page at same viewport via puppeteer, diffs, writes report + artifacts.               |
+| File                     | Role                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/screenshot-diff.ts` | Pixel-level PNG comparison using `pixelmatch` + `pngjs`. Takes two PNG buffers, pads smaller to larger if sizes differ, returns fidelity % (0–100), mismatched pixel count, and a diff visualization PNG. Configurable threshold (default 0.15).                                                                                      |
+| `src/verify.ts`          | Orchestrator: builds the emitted Jx project via `@jxsuite/compiler/site` (`buildSite`), serves `dist/` locally via Bun, screenshots rendered page at same viewport via puppeteer, diffs against reference screenshots captured during import, writes report + artifacts. Exports `captureReferenceScreenshot()` for capture-time use. |
 
 Modified files:
 
@@ -374,6 +374,39 @@ Output artifacts (in `<outDir>/verify/`):
 ---
 
 ### 11.9 Turnover Log — Phase 5 execution & fortification (2026-06-23)
+
+#### Turnover: 2026-06-23 #5 — Execution path trace + 4 bugs fixed
+
+**Tests executed:** 115/115 import tests pass, 288/288 parser tests unaffected.
+
+**Bugs found and fixed:**
+
+1. **Stub layout missing `<slot>` (critical)** — `emit.ts` wrote a fallback layout
+   `{ tagName: "div", children: [] }` with no `<slot>`. The compiler's `distributeSlots` found no
+   slot and silently dropped all page content. **Fix:** stub now includes `{ tagName: "slot" }`.
+
+2. **Detected layout used named slot, pages didn't target it (critical)** — `layout-detect.ts`
+   emitted `<slot name="content">` but stripped pages had no `attributes.slot: "content"` on their
+   children, so the compiler treated them as "default" content and found no unnamed slot to fill.
+   **Fix:** layout now uses an unnamed `<slot>` (default slot), matching how the compiler distributes
+   unslotted page children.
+
+3. **Emitted `project.json` missing `name` field** — the compiler uses `config.name` (default
+   `"Jx Site"`) for the HTML `<title>`, not `config.title`. Cloned sites all showed "Jx Site" in
+   the browser tab. **Fix:** emit both `name` and `title` from the captured page title.
+
+4. **Verify re-fetched the live site instead of comparing against capture-time state** — the
+   original site could change between import and verify, producing misleading fidelity scores.
+   **Fix:** reference screenshots are now captured during import (before `page.close()`) and passed
+   as PNG buffers to `verifyProject`. New `captureReferenceScreenshot()` export. Multi-page crawl
+   gets `captureScreenshots` option; screenshots stored on `CrawledPage.screenshot`.
+
+**API changes:**
+
+- `verifyProject` now takes `pages: Map<string, PageRef>` instead of `pageUrls: Map<string, string>`.
+  `PageRef` has `{ sourceUrl, screenshot: Buffer | string }`.
+- `crawlSite` accepts `captureScreenshots?: boolean`; `CrawledPage` gains optional `screenshot` field.
+- New export: `captureReferenceScreenshot(page, width?, height?)`.
 
 <!--
   ┌──────────────────────────────────────────────────────────────┐

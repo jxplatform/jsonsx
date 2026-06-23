@@ -188,6 +188,14 @@ if (maxDepth === 0) {
       }
     }
 
+    // Capture reference screenshot before closing the page (for --verify)
+    let referenceScreenshot: Buffer | undefined;
+    if (doVerify) {
+      console.log("  Capturing reference screenshot...");
+      const { captureReferenceScreenshot } = await import("./verify.ts");
+      referenceScreenshot = await captureReferenceScreenshot(capture.page);
+    }
+
     await capture.page.close();
 
     console.log("  Writing project...");
@@ -201,13 +209,15 @@ if (maxDepth === 0) {
     });
     console.log(`  Wrote ${files.length} files`);
 
-    if (doVerify) {
+    if (doVerify && referenceScreenshot) {
       console.log("\n  --- Phase 5: Verify ---");
       const { verifyProject } = await import("./verify.ts");
-      const pageUrls = new Map([["pages/index.json", url]]);
+      const verifyPages = new Map([
+        ["pages/index.json", { sourceUrl: url, screenshot: referenceScreenshot }],
+      ]);
       const verifyResult = await verifyProject({
         projectDir: outDir,
-        pageUrls,
+        pages: verifyPages,
         threshold: verifyThreshold,
         onProgress: (msg) => console.log(`  ${msg}`),
         browser,
@@ -240,6 +250,7 @@ if (maxDepth === 0) {
       skipStyles,
       skipAssets,
       respectRobots: !noRobots,
+      captureScreenshots: doVerify,
       onProgress: console.log,
     });
 
@@ -297,23 +308,33 @@ if (maxDepth === 0) {
     if (doVerify) {
       console.log("\n  --- Phase 5: Verify ---");
       const { verifyProject } = await import("./verify.ts");
-      const pageUrls = new Map<string, string>();
+      const verifyPages = new Map<string, { sourceUrl: string; screenshot: Buffer | string }>();
       for (const page of result.pages) {
-        pageUrls.set(page.route, page.url);
+        if (page.screenshot) {
+          verifyPages.set(page.route, { sourceUrl: page.url, screenshot: page.screenshot });
+        }
       }
-      const verifyResult = await verifyProject({
-        projectDir: outDir,
-        pageUrls,
-        threshold: verifyThreshold,
-        onProgress: (msg) => console.log(`  ${msg}`),
-      });
-      console.log(`\n  Verification complete:`);
-      for (const page of verifyResult.pages) {
-        const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
-        console.log(`    ${page.route} — ${status}`);
+      if (verifyPages.size === 0) {
+        console.log("  No reference screenshots captured — skipping verify");
       }
-      console.log(`  Average fidelity: ${verifyResult.averageFidelity}%`);
-      console.log(`  Report: ${verifyResult.reportDir}/report.json`);
+      const verifyResult =
+        verifyPages.size > 0
+          ? await verifyProject({
+              projectDir: outDir,
+              pages: verifyPages,
+              threshold: verifyThreshold,
+              onProgress: (msg) => console.log(`  ${msg}`),
+            })
+          : null;
+      if (verifyResult) {
+        console.log(`\n  Verification complete:`);
+        for (const page of verifyResult.pages) {
+          const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
+          console.log(`    ${page.route} — ${status}`);
+        }
+        console.log(`  Average fidelity: ${verifyResult.averageFidelity}%`);
+        console.log(`  Report: ${verifyResult.reportDir}/report.json`);
+      }
     }
 
     console.log(`\nDone! Open in Studio:`);

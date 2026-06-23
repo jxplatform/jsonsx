@@ -3,20 +3,27 @@
  * and report a per-page fidelity score.
  *
  * Uses the compiler's `buildSite` to produce static HTML, serves it locally via Bun, then
- * screenshots both original and rendered pages with puppeteer for pixel comparison.
+ * screenshots the rendered pages with puppeteer and diffs against reference screenshots captured
+ * during import.
  */
 
 import { join } from "node:path";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import type { Browser, Page } from "puppeteer-core";
 import { launchBrowser, closeBrowser } from "./capture.ts";
 import { diffScreenshots } from "./screenshot-diff.ts";
 
+export interface PageRef {
+  sourceUrl: string;
+  /** Pre-captured reference screenshot (PNG buffer or path to a .png file on disk). */
+  screenshot: Buffer | string;
+}
+
 export interface VerifyOptions {
   /** The emitted Jx project directory (contains project.json). */
   projectDir: string;
-  /** Map of route path → original source URL for each page. */
-  pageUrls: Map<string, string>;
+  /** Map of route path (e.g. "pages/index.json") → page reference data. */
+  pages: Map<string, PageRef>;
   /** Viewport width (default: 1440). */
   viewportWidth?: number;
   /** Viewport height (default: 900). */
@@ -77,10 +84,23 @@ async function screenshotPage(
 ): Promise<Buffer> {
   await page.setViewport({ width, height });
   await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });
-  // Wait a bit for any late paints
   await new Promise<void>((r) => {
     setTimeout(r, 500);
   });
+  const screenshot = await page.screenshot({ type: "png", fullPage: false });
+  return Buffer.from(screenshot);
+}
+
+/**
+ * Take a reference screenshot of a live page via puppeteer. Called during import so the screenshot
+ * is captured at the same time as the DOM.
+ */
+export async function captureReferenceScreenshot(
+  page: Page,
+  width = 1440,
+  height = 900,
+): Promise<Buffer> {
+  await page.setViewport({ width, height });
   const screenshot = await page.screenshot({ type: "png", fullPage: false });
   return Buffer.from(screenshot);
 }
@@ -130,18 +150,25 @@ export function serveDirectory(dir: string): {
   return { server, baseUrl: `http://localhost:${server.port}` };
 }
 
+function resolveScreenshot(ref: Buffer | string): Buffer {
+  if (Buffer.isBuffer(ref)) {
+    return ref;
+  }
+  return readFileSync(ref);
+}
+
 /**
- * Verify a cloned Jx project against its original source URLs.
+ * Verify a cloned Jx project against reference screenshots captured during import.
  *
  * 1. Build the project to static HTML via the Jx compiler
  * 2. Serve the built output locally
- * 3. For each page: screenshot original URL + screenshot local rendered page
- * 4. Pixel-diff and report fidelity
+ * 3. For each page: screenshot the rendered page, diff against the reference screenshot
+ * 4. Report per-page fidelity
  */
 export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> {
   const {
     projectDir,
-    pageUrls,
+    pages,
     viewportWidth = 1440,
     viewportHeight = 900,
     threshold = 0.15,
@@ -165,9 +192,9 @@ export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> 
   } catch (error) {
     const err = error as Error;
     return {
-      pages: [...pageUrls.entries()].map(([route, sourceUrl]) => ({
+      pages: [...pages.entries()].map(([route, ref]) => ({
         route,
-        sourceUrl,
+        sourceUrl: ref.sourceUrl,
         fidelity: 0,
         mismatchedPixels: 0,
         totalPixels: 0,
@@ -189,24 +216,15 @@ export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> 
   const results: PageVerifyResult[] = [];
 
   try {
-    // Step 3: Screenshot and diff each page
-    for (const [route, sourceUrl] of pageUrls) {
+    // Step 3: Screenshot rendered pages and diff against references
+    for (const [route, ref] of pages) {
       const urlPath = routeToUrlPath(route);
       const safeName = urlPath === "/" ? "index" : urlPath.slice(1).replaceAll("/", "-");
 
-      onProgress(`  Verifying ${route} (${sourceUrl})...`);
+      onProgress(`  Verifying ${route}...`);
 
       try {
-        // Screenshot original
-        onProgress(`    Screenshotting original: ${sourceUrl}`);
-        const origPage = await browser.newPage();
-        const originalPng = await screenshotPage(
-          origPage,
-          sourceUrl,
-          viewportWidth,
-          viewportHeight,
-        );
-        await origPage.close();
+        const originalPng = resolveScreenshot(ref.screenshot);
 
         // Screenshot rendered
         const renderedUrl = `${baseUrl}${urlPath}`;
@@ -237,7 +255,7 @@ export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> 
 
         results.push({
           route,
-          sourceUrl,
+          sourceUrl: ref.sourceUrl,
           fidelity: diff.fidelity,
           mismatchedPixels: diff.mismatchedPixels,
           totalPixels: diff.totalPixels,
@@ -250,7 +268,7 @@ export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> 
         onProgress(`    Error: ${err.message}`);
         results.push({
           route,
-          sourceUrl,
+          sourceUrl: ref.sourceUrl,
           fidelity: 0,
           mismatchedPixels: 0,
           totalPixels: 0,

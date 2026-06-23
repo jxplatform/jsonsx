@@ -62,6 +62,7 @@ export async function emitMultiPageProject({
   await mkdir(join(outDir, "public"), { recursive: true });
 
   const projectJson: Record<string, unknown> = {
+    name: title || "Imported Site",
     title: title || "Imported Site",
     description: `Imported from ${sourceUrl}`,
     imports: {},
@@ -134,7 +135,10 @@ export async function emitMultiPageProject({
 
   // Write layout
   const layoutPath = join(outDir, "layouts", "base.json");
-  const layoutDoc: JxElement = layout ?? { tagName: "div", children: [] };
+  const layoutDoc: JxElement = layout ?? {
+    tagName: "div",
+    children: [{ tagName: "slot" }],
+  };
   if (elementRefs.length > 0 && layout) {
     (layoutDoc as Record<string, unknown>).$elements = [
       ...elementRefs,

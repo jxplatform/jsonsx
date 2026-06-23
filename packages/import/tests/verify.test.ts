@@ -114,16 +114,18 @@ describe("verify - serveDirectory", () => {
 
 describe("verify - verifyProject (build-failure path)", () => {
   it("handles nonexistent project directory gracefully", async () => {
+    const dummyPng = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // Minimal PNG header (will fail parsing but that's fine — build fails first)
     const result = await verifyProject({
       projectDir: "/tmp/nonexistent-jx-verify-dir-12345",
-      pageUrls: new Map([["pages/index.json", "https://example.com"]]),
+      pages: new Map([
+        ["pages/index.json", { sourceUrl: "https://example.com", screenshot: dummyPng }],
+      ]),
       onProgress: () => {},
     });
 
     expect(result.averageFidelity).toBe(0);
     expect(result.pages.length).toBe(1);
     expect(result.pages[0].error).toBeTruthy();
-    // The error should indicate the build failed (project doesn't exist / compiler not available)
     expect(result.pages[0].error).toMatch(/build|not found|missing/i);
   });
 });

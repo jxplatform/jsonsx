@@ -12,7 +12,12 @@ export { crawlSite, normalizeUrl, routeToFilePath, fetchRobotsTxt } from "./craw
 export { detectLayout, hashSubtree, treesEqual } from "./layout-detect.ts";
 export { componentize } from "./componentize.ts";
 export { diffScreenshots } from "./screenshot-diff.ts";
-export { verifyProject, serveDirectory, routeToUrlPath } from "./verify.ts";
+export {
+  verifyProject,
+  captureReferenceScreenshot,
+  serveDirectory,
+  routeToUrlPath,
+} from "./verify.ts";
 export type { CaptureResult } from "./capture.ts";
 export type { ToJxResult } from "./to-jx.ts";
 export type { EmitOptions, MultiEmitOptions } from "./emit.ts";
@@ -29,4 +34,4 @@ export type {
   ComponentizeResult,
 } from "./componentize.ts";
 export type { DiffResult, DiffOptions } from "./screenshot-diff.ts";
-export type { VerifyOptions, PageVerifyResult, VerifyResult } from "./verify.ts";
+export type { VerifyOptions, PageRef, PageVerifyResult, VerifyResult } from "./verify.ts";

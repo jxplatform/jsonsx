@@ -124,10 +124,7 @@ export function detectLayout(pages: Map<string, JxElement>): LayoutResult | null
   const footerChildren =
     sharedSuffixLen > 0 ? allRoots[0].slice(allRoots[0].length - sharedSuffixLen) : [];
 
-  const slot: JxElement = {
-    tagName: "slot",
-    attributes: { name: "content" },
-  };
+  const slot: JxElement = { tagName: "slot" };
 
   const layout: JxElement = {
     tagName: "div",
