@@ -3,6 +3,7 @@ coverageReporter = ["text", "lcov"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "**/tests/**",
+  "./dist/*",
   "./result/**",
   "../compiler/**",
   "../create/**",
