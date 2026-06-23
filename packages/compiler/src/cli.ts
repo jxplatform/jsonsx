@@ -9,11 +9,16 @@
 
 import { resolve } from "node:path";
 
-const args = process.argv.slice(2);
-const [command] = args;
+// The CLI body runs inside an async function rather than via top-level await: when a test pulls this
+// Entry in with a dynamic import(), Bun's test runtime drops the continuation after a top-level await
+// (it never resumes on Windows), so the build step would silently never run. `ready` lets the
+// In-process CLI harness await the same sequence.
+async function main() {
+  const args = process.argv.slice(2);
+  const [command] = args;
 
-if (!command || command === "--help" || command === "-h") {
-  console.log(`Usage: jx <command> [options]
+  if (!command || command === "--help" || command === "-h") {
+    console.log(`Usage: jx <command> [options]
 
 Commands:
   build [root]   Build a Jx site to dist/
@@ -21,39 +26,43 @@ Commands:
 Options:
   --verbose      Print detailed build progress
   --no-clean     Don't clean outDir before building`);
-  process.exit(0);
-}
+    process.exit(0);
+  }
 
-if (command === "build") {
-  const rest = args.slice(1);
-  const flags = new Set(rest.filter((a) => a.startsWith("--")));
-  const positional = rest.find((a) => !a.startsWith("--"));
+  if (command === "build") {
+    const rest = args.slice(1);
+    const flags = new Set(rest.filter((a) => a.startsWith("--")));
+    const positional = rest.find((a) => !a.startsWith("--"));
 
-  const projectRoot = resolve(positional ?? ".");
-  const verbose = flags.has("--verbose");
-  const clean = !flags.has("--no-clean");
+    const projectRoot = resolve(positional ?? ".");
+    const verbose = flags.has("--verbose");
+    const clean = !flags.has("--no-clean");
 
-  console.log(`Building site from ${projectRoot}...`);
+    console.log(`Building site from ${projectRoot}...`);
 
-  try {
-    const { buildSite } = await import("./site/site-build.ts");
-    const result = await buildSite(projectRoot, { clean, verbose });
+    try {
+      const { buildSite } = await import("./site/site-build.ts");
+      const result = await buildSite(projectRoot, { clean, verbose });
 
-    if (result.errors.length > 0) {
-      console.error(`\nBuild completed with ${result.errors.length} error(s):`);
-      for (const err of result.errors) {
-        console.error(`  - ${err}`);
+      if (result.errors.length > 0) {
+        console.error(`\nBuild completed with ${result.errors.length} error(s):`);
+        for (const err of result.errors) {
+          console.error(`  - ${err}`);
+        }
+        process.exit(1);
       }
+
+      console.log(`\nDone: ${result.routes} routes → ${result.files} files`);
+    } catch (error) {
+      const err = error as Error;
+      console.error(`Build failed: ${err.message}`);
       process.exit(1);
     }
-
-    console.log(`\nDone: ${result.routes} routes → ${result.files} files`);
-  } catch (error) {
-    const err = error as Error;
-    console.error(`Build failed: ${err.message}`);
+  } else {
+    console.error(`Unknown command: ${command}\nRun "jx --help" for usage.`);
     process.exit(1);
   }
-} else {
-  console.error(`Unknown command: ${command}\nRun "jx --help" for usage.`);
-  process.exit(1);
 }
+
+// oxlint-disable-next-line unicorn/prefer-top-level-await
+export const ready = main();

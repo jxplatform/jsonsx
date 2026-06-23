@@ -553,6 +553,9 @@ describe("buildSite — missing pages/", () => {
 
 describe("buildSite — optimized images cache-to-dist", () => {
   const OPT_TMP = resolve(import.meta.dir, "__test-site-opt-images__");
+  // Stand-in for the npm global cache dir, so the test controls the base instead of shelling out to
+  // `npm config get cache` (which is unavailable when npm is not on PATH, e.g. a stock Windows shell).
+  const NPM_CACHE = resolve(import.meta.dir, "__test-opt-npm-cache__");
 
   function setupProject() {
     rmSync(OPT_TMP, { force: true, recursive: true });
@@ -575,33 +578,26 @@ describe("buildSite — optimized images cache-to-dist", () => {
 
   afterAll(() => {
     rmSync(OPT_TMP, { force: true, recursive: true });
+    rmSync(NPM_CACHE, { force: true, recursive: true });
   });
 
   it("copies cached variants from the global npm cache dir to dist", async () => {
     setupProject();
-    _testResetNpmCacheBase();
-
-    // Discover the real npm cache path and pre-populate it as a prior build would have.
-    // Use cwd: tmpdir() to avoid ENOWORKSPACES when running inside an npm workspace.
-    const { execSync } = await import("node:child_process");
-    const { tmpdir } = await import("node:os");
-    const { basename, resolve: res } = await import("node:path");
-    const npmBase = execSync("npm config get cache", {
-      cwd: tmpdir(),
-      encoding: "utf8",
-    }).trim();
-    const npmOptDir = res(npmBase, "jxsuite-images", basename(OPT_TMP), "_optimized");
+    // Point the cache base at a controlled directory (no dependency on npm being installed). The
+    // Source resolves the cache dir as <base>/jxsuite-images/<project-basename>, so pre-populate
+    // That exact path as a prior build would have.
+    const { basename } = await import("node:path");
+    rmSync(NPM_CACHE, { force: true, recursive: true });
+    _testSetNpmCacheBase(NPM_CACHE);
+    const npmOptDir = resolve(NPM_CACHE, "jxsuite-images", basename(OPT_TMP), "_optimized");
     mkdirSync(npmOptDir, { recursive: true });
-    writeFileSync(res(npmOptDir, "npm-cached.webp"), "fake-webp", "utf8");
+    writeFileSync(resolve(npmOptDir, "npm-cached.webp"), "fake-webp", "utf8");
 
     try {
       await buildSite(OPT_TMP, { clean: true });
       expect(existsSync(resolve(OPT_TMP, "dist/images/_optimized/npm-cached.webp"))).toBe(true);
     } finally {
-      rmSync(res(npmBase, "jxsuite-images", basename(OPT_TMP)), {
-        force: true,
-        recursive: true,
-      });
+      rmSync(NPM_CACHE, { force: true, recursive: true });
       _testResetNpmCacheBase();
     }
   });
