@@ -8,15 +8,19 @@ import { captureStyles } from "./style-capture.ts";
 import { diffAllStyles } from "./style-diff.ts";
 import { extractMedia } from "./media-extract.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
+import { collectAssets } from "./asset-collect.ts";
+import { downloadAssets } from "./asset-download.ts";
+import { rewriteAssetUrls } from "./asset-rewrite.ts";
 
 function usage(): never {
-  console.log(`Usage: jx-import <url> [--out <dir>] [--no-styles]
+  console.log(`Usage: jx-import <url> [--out <dir>] [--no-styles] [--no-assets]
 
 Clone a live website into a Jx project.
 
 Options:
-  --out <dir>   Output directory (default: sites/<hostname>)
-  --no-styles   Skip CSS capture (Phase 0 behavior)
+  --out <dir>    Output directory (default: sites/<hostname>)
+  --no-styles    Skip CSS capture (Phase 0 behavior)
+  --no-assets    Skip asset download (Phase 1 behavior)
 
 Examples:
   jx-import https://example.com
@@ -37,6 +41,7 @@ if (!url.startsWith("http://") && !url.startsWith("https://")) {
 }
 
 const skipStyles = args.includes("--no-styles");
+const skipAssets = args.includes("--no-assets");
 
 let outDir: string | undefined;
 const outIdx = args.indexOf("--out");
@@ -107,6 +112,33 @@ try {
     }
   }
 
+  // Phase 2: Asset download & URL rewrite
+  if (!skipAssets) {
+    console.log("  Collecting asset URLs...");
+    const collected = await collectAssets(capture.page);
+    console.log(
+      `  Found ${collected.assets.length} assets (${collected.inlineSvgCount} inline SVGs kept)`,
+    );
+
+    if (collected.assets.length > 0) {
+      console.log("  Downloading assets...");
+      const downloaded = await downloadAssets(collected.assets, outDir);
+      console.log(
+        `  Downloaded ${downloaded.rewriteMap.size} assets (${formatBytes(downloaded.totalBytes)})`,
+      );
+      if (downloaded.failed.length > 0) {
+        console.log(`  ⚠ ${downloaded.failed.length} assets failed to download`);
+      }
+      if (downloaded.skipped.length > 0) {
+        console.log(`  Skipped ${downloaded.skipped.length} tracking/analytics URLs`);
+      }
+
+      console.log("  Rewriting asset URLs...");
+      const rewrites = rewriteAssetUrls(jx.document, downloaded.rewriteMap);
+      console.log(`  Rewrote ${rewrites} URL references`);
+    }
+  }
+
   await capture.page.close();
 
   console.log("  Writing project...");
@@ -123,4 +155,14 @@ try {
   console.log(`  http://localhost:3000/packages/studio/index.html?project=${outDir}/project.json`);
 } finally {
   await closeBrowser();
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

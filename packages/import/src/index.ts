@@ -5,9 +5,14 @@ export { captureStyles, captureStylesAtWidth, STYLE_ALLOWLIST } from "./style-ca
 export { diffStyles, diffAllStyles, computeMediaDelta, kebabToCamel } from "./style-diff.ts";
 export { analyzeMediaQueries, extractMedia } from "./media-extract.ts";
 export { applyStylesToTree } from "./apply-styles.ts";
+export { collectAssets } from "./asset-collect.ts";
+export { downloadAssets } from "./asset-download.ts";
+export { rewriteAssetUrls } from "./asset-rewrite.ts";
 export type { CaptureResult } from "./capture.ts";
 export type { ToJxResult } from "./to-jx.ts";
 export type { EmitOptions } from "./emit.ts";
 export type { CapturedStyle, StyleCaptureResult } from "./style-capture.ts";
 export type { DiffedStyle } from "./style-diff.ts";
 export type { Breakpoint, MediaExtractionResult } from "./media-extract.ts";
+export type { DiscoveredAsset, AssetCollectionResult } from "./asset-collect.ts";
+export type { DownloadResult } from "./asset-download.ts";

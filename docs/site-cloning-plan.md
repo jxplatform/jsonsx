@@ -1,6 +1,6 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Phase 1 complete — Phase 2 next
+**Status:** Phase 2 complete — Phase 3 next
 **Date:** 2026-06-22
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
@@ -210,6 +210,35 @@ Verification:
   inline `<svg>` (keep inline), favicon.
 - Download same-origin + CDN assets into `public/assets/`, rewrite references to relative paths.
 - Skip/flag cross-origin tracking/analytics; never download `<script>`.
+
+**Turnover (2026-06-22): Phase 2 ✅ COMPLETE.**
+
+Built and verified end-to-end. New files delivered under `packages/import/`:
+
+| File                    | Role                                                                                                                                                                                                                                                           |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/asset-collect.ts`  | In-browser `page.evaluate()` — discovers asset URLs from `img[src]`, `img[srcset]`, `source[srcset]`, `video[poster]`, inline `style` `url()`, computed `background-image`, `@font-face` rules, favicons, and OG images. Counts inline SVGs (kept inline).     |
+| `src/asset-download.ts` | Downloads discovered assets to `public/assets/{images,fonts,icons,other}/`. Dedupes by URL, sanitizes filenames, handles collisions. Blocks known tracking/analytics domains (Google Analytics, GTM, Facebook, LinkedIn, etc.). Reports failed/skipped counts. |
+| `src/asset-rewrite.ts`  | Walks Jx tree in-place, rewrites absolute URLs → local relative paths. Handles `attributes.src`, `attributes.srcset`, `attributes.poster`, `style.backgroundImage` `url()` references, and `$media` nested style objects. Skips `<a>` href (navigation links). |
+
+Modified files:
+
+- `src/cli.ts` — Full Phase 2 pipeline wired in (collect → download → rewrite) between style application and emit. `--no-assets` flag skips asset download. Added `formatBytes` helper for download size reporting.
+- `src/index.ts` — Re-exports all new modules and types.
+
+Design decisions:
+
+- **Computed `background-image` scan** covers CSS-applied backgrounds that wouldn't be found by inline `style` attribute inspection alone — iterates all elements via `getComputedStyle`.
+- **Subdirectory organization** (`images/`, `fonts/`, `icons/`, `other/`) classified by source type and file extension — fonts from `@font-face` go to `fonts/`, favicons to `icons/`, images by extension.
+- **Tracking domain blocklist** — hardcoded set of known analytics/tracking domains (GA, GTM, Facebook, LinkedIn, Segment, Hotjar, etc.) are skipped and reported, never downloaded.
+- **Inline SVGs kept inline** — counted but not extracted to files, matching the plan. They're already valid Jx nodes after `htmlToJx`.
+- **Anchor hrefs preserved** — `<a>` link destinations are navigation, not assets; the rewriter explicitly skips them.
+
+Verification:
+
+- 49/49 import tests pass (14 new for Phase 2: 10 asset-rewrite, 4 asset-download).
+- 288/288 parser tests unaffected.
+- `--no-assets` flag confirmed to produce Phase 1 output (styles but no asset download).
 
 ## 9. Phase 3 — Crawl (whole-site trace)
 
