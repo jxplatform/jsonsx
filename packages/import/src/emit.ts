@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { JxElement } from "@jxsuite/schema/types";
 
@@ -11,6 +11,18 @@ export interface EmitOptions {
   breakpoints?: Record<string, string>;
 }
 
+export interface MultiEmitOptions {
+  outDir: string;
+  title: string;
+  sourceUrl: string;
+  /** Map of route path (e.g. "pages/index.json") → Jx document. */
+  pages: Map<string, JxElement>;
+  /** Optional layout to write to layouts/base.json. */
+  layout?: JxElement;
+  /** $media breakpoints to seed into project.json. */
+  breakpoints?: Record<string, string>;
+}
+
 export async function emitProject({
   outDir,
   title,
@@ -18,6 +30,23 @@ export async function emitProject({
   sourceUrl,
   breakpoints,
 }: EmitOptions): Promise<{ files: string[] }> {
+  return emitMultiPageProject({
+    outDir,
+    title,
+    sourceUrl,
+    pages: new Map([["pages/index.json", document]]),
+    breakpoints,
+  });
+}
+
+export async function emitMultiPageProject({
+  outDir,
+  title,
+  sourceUrl,
+  pages,
+  layout,
+  breakpoints,
+}: MultiEmitOptions): Promise<{ files: string[] }> {
   await mkdir(join(outDir, "pages"), { recursive: true });
   await mkdir(join(outDir, "layouts"), { recursive: true });
   await mkdir(join(outDir, "components"), { recursive: true });
@@ -39,16 +68,18 @@ export async function emitProject({
   await Bun.write(projectPath, `${JSON.stringify(projectJson, null, 2)}\n`);
   files.push(projectPath);
 
-  const pagePath = join(outDir, "pages", "index.json");
-  await Bun.write(pagePath, `${JSON.stringify(document, null, 2)}\n`);
-  files.push(pagePath);
+  // Write each page
+  for (const [route, doc] of pages) {
+    const pagePath = join(outDir, route);
+    await mkdir(dirname(pagePath), { recursive: true });
+    await Bun.write(pagePath, `${JSON.stringify(doc, null, 2)}\n`);
+    files.push(pagePath);
+  }
 
+  // Write layout
   const layoutPath = join(outDir, "layouts", "base.json");
-  const baseLayout: JxElement = {
-    tagName: "div",
-    children: [],
-  };
-  await Bun.write(layoutPath, `${JSON.stringify(baseLayout, null, 2)}\n`);
+  const layoutDoc: JxElement = layout ?? { tagName: "div", children: [] };
+  await Bun.write(layoutPath, `${JSON.stringify(layoutDoc, null, 2)}\n`);
   files.push(layoutPath);
 
   return { files };

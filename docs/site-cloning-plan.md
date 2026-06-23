@@ -1,6 +1,6 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Phase 2 complete — Phase 3 next
+**Status:** Phase 3 complete — Phase 4 next
 **Date:** 2026-06-22
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
@@ -248,6 +248,36 @@ Verification:
 - One Jx page per route under `pages/`, route → file path mapping mirrors the URL structure.
 - **Layout detection:** subtrees identical across ≥2 pages (header/nav/footer) get hoisted into a
   `layouts/base.json` with a `$slot`/children seam; pages reference it via `$layout`.
+
+**Turnover (2026-06-22): Phase 3 ✅ COMPLETE.**
+
+Built and verified end-to-end. New files delivered under `packages/import/`:
+
+| File                   | Role                                                                                                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/crawl.ts`         | BFS crawler: same-origin link discovery, `--depth` (default 2) and `--max-pages` (default 25) caps, `--max-nodes-per-page` (default 5000) guard. URL normalization (strip hash/trailing-slash/tracking-params, sort query). `robots.txt` respect. |
+| `src/layout-detect.ts` | Shared layout detection: compares top-level children across all crawled pages, identifies identical prefix (header) and suffix (footer) subtrees, hoists them into a `layouts/base.json` with a `<slot>` placeholder. Pages get `$layout` ref.    |
+
+Modified files:
+
+- `src/emit.ts` — New `emitMultiPageProject()` function writes multiple pages to route-based file paths (e.g., `/about` → `pages/about.json`, `/blog/post-1` → `pages/blog/post-1.json`). Creates nested directories automatically. Accepts optional `layout` to write to `layouts/base.json`. Old `emitProject()` now delegates to it for backward compatibility.
+- `src/cli.ts` — Full Phase 3 pipeline wired in. New flags: `--depth <n>`, `--max-pages <n>`, `--max-nodes-per-page <n>`, `--no-crawl` (single page mode, equivalent to `--depth 0`), `--no-robots`. Single-page mode (depth 0) uses the original Phase 0–2 pipeline directly. Multi-page mode runs BFS crawl → per-page style/asset capture → layout detection → multi-page emit.
+- `src/index.ts` — Re-exports all new modules and types.
+
+Design decisions:
+
+- **BFS, not DFS** — breadth-first ensures shallow, high-value pages are captured before depth budget is exhausted.
+- **Per-page style/asset capture** — each crawled page gets its own style capture and asset download pass (reusing Phase 1–2 machinery), so pages with different CSS get accurate styles.
+- **Node-cap guard** — pages exceeding `--max-nodes-per-page` still emit valid Jx but skip the expensive style/asset passes and log a warning. This implements the scale-spike recommendation from §14.
+- **Layout detection is structural + content equality** — not fuzzy hashing. Only subtrees that are byte-for-byte identical across ALL crawled pages at the same position (top-of-page or bottom-of-page) are hoisted. Conservative by design: false negatives (missed layout) are preferable to false positives (wrong content stripped).
+- **`$layout` reference** — stripped pages get `$layout: "layouts/base.json"`, matching the `JxDocument.$layout` field in the schema.
+- **Backward compatible** — `--no-crawl` or `--depth 0` produces identical output to Phase 2. Existing `emitProject()` API unchanged.
+
+Verification:
+
+- 84/84 import tests pass (35 new for Phase 3: 15 crawl URL normalization/routing, 16 layout detection, 4 multi-page emit).
+- 288/288 parser tests unaffected.
+- `--no-crawl` flag confirmed to produce Phase 2 output (single page with styles and assets).
 
 ## 10. Phase 4 — Componentization (heuristics → AI)
 
