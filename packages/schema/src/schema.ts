@@ -488,7 +488,7 @@ export async function generateSchemaString() {
 }
 
 // Minimal structural types for the optional `ajv` / `ajv-formats` peer deps
-// (not installed, and shipping no types, in this repo).
+// (no direct dependency, and shipping no types usable from here).
 interface AjvValidateFn {
   (doc: unknown): boolean;
   errors?: unknown[] | null;
@@ -506,8 +506,10 @@ type AddFormatsFn = (ajv: AjvInstance) => void;
 export async function validateDocument(doc: Record<string, unknown>) {
   let Ajv: AjvCtor, addFormats: AddFormatsFn;
   try {
+    // The generated schema is JSON Schema 2020-12, so use the matching Ajv build
+    // (the default `ajv` export is draft-07 and can't compile a 2020-12 schema).
     // @ts-expect-error — optional peer dependency
-    ({ default: Ajv } = (await import("ajv")) as { default: AjvCtor });
+    ({ default: Ajv } = (await import("ajv/dist/2020")) as { default: AjvCtor });
     // @ts-expect-error — optional peer dependency
     ({ default: addFormats } = (await import("ajv-formats")) as { default: AddFormatsFn });
   } catch {
