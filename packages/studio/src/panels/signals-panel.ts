@@ -706,9 +706,9 @@ function renderSignalEditorTemplate(
         : signalFieldRow("Default", defaultVal, (v: string) => {
             let parsed: unknown = v;
             if (def.type === "integer") {
-              parsed = Number.parseInt(v, 10) || 0;
+              parsed = Math.trunc(Number(v)) || 0;
             } else if (def.type === "number") {
-              parsed = Number.parseFloat(v) || 0;
+              parsed = Number(v) || 0;
             } else if (def.type === "boolean") {
               parsed = v === "true";
             } else if (def.type === "array" || def.type === "object") {
@@ -860,7 +860,7 @@ function renderDataSourceFields(
       )}
       ${signalFieldRow("Version", String(def.version || 1), (v: string) =>
         transactDoc(activeTab.value, (t) =>
-          mutateUpdateDef(t, name, { version: Number.parseInt(v, 10) || 1 }),
+          mutateUpdateDef(t, name, { version: Math.trunc(Number(v)) || 1 }),
         ),
       )}
     `;
@@ -1279,6 +1279,14 @@ function resolveSchemaEnum(
  * @param {(val: unknown) => void} onChange
  * @param {Record<string, unknown>} [parentDef] - Parent def for resolving dependent enum refs
  */
+/** Parse a numeric field value, returning NaN for blank input (so callers can treat it as unset). */
+function parseNumericField(raw: string, integer: boolean): number {
+  if (raw.trim() === "") {
+    return Number.NaN;
+  }
+  return integer ? Math.trunc(Number(raw)) : Number(raw);
+}
+
 function renderInlineField(
   key: string,
   schema: Record<string, unknown>,
@@ -1319,10 +1327,10 @@ function renderInlineField(
       .value=${value !== undefined ? value : nothing}
       step=${schema.type === "integer" ? "1" : nothing}
       @change=${(e: Event) => {
-        const parsed =
-          schema.type === "integer"
-            ? Number.parseInt((e.target as HTMLInputElement).value, 10)
-            : Number.parseFloat((e.target as HTMLInputElement).value);
+        const parsed = parseNumericField(
+          (e.target as HTMLInputElement).value,
+          schema.type === "integer",
+        );
         onChange(Number.isNaN(parsed) ? undefined : parsed);
       }}
     ></sp-number-field>`;
@@ -1439,10 +1447,10 @@ export function renderSchemaFieldsTemplate(
           @change=${(e: Event) => {
             clearTimeout(debounce);
             debounce = setTimeout(() => {
-              const parsed =
-                ps.type === "integer"
-                  ? Number.parseInt((e.target as HTMLInputElement).value, 10)
-                  : Number.parseFloat((e.target as HTMLInputElement).value);
+              const parsed = parseNumericField(
+                (e.target as HTMLInputElement).value,
+                ps.type === "integer",
+              );
               transactDoc(activeTab.value, (t) =>
                 mutateUpdateDef(t, name, {
                   [prop]: Number.isNaN(parsed) ? undefined : parsed,

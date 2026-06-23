@@ -8,9 +8,8 @@ import { Markdown } from "@jxsuite/parser/markdown";
 import { setFormats } from "../src/format/format-host";
 import type { StudioFormat } from "../src/format/format-host";
 
-const classDef = JSON.parse(
-  readFileSync(new URL(import.meta.resolve("@jxsuite/parser/Markdown.class.json")), "utf8"),
-);
+const classUrl = new URL(import.meta.resolve("@jxsuite/parser/Markdown.class.json"));
+const classDef = JSON.parse(readFileSync(classUrl, "utf8"));
 
 export const MARKDOWN_FORMAT: StudioFormat = {
   capabilities: Object.fromEntries(

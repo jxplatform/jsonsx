@@ -572,10 +572,8 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const contentTypes = await loadContentTypes(
-        TMP2,
-        JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
-      );
+      const project = JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8"));
+      const contentTypes = await loadContentTypes(TMP2, project);
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(2);
       // First item: multiline field preserved correctly
@@ -609,10 +607,8 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const contentTypes = await loadContentTypes(
-        TMP2,
-        JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
-      );
+      const project = JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8"));
+      const contentTypes = await loadContentTypes(TMP2, project);
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(2);
       expect(items[0]!.id).toContain("list-0");
@@ -683,10 +679,8 @@ describe("content-loader edge cases", () => {
     );
 
     try {
-      const contentTypes = await loadContentTypes(
-        TMP2,
-        JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
-      );
+      const project = JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8"));
+      const contentTypes = await loadContentTypes(TMP2, project);
       const items = contentTypes.get("items") as ContentLoaderEntry[];
       expect(items.length).toBe(1);
       expect(items[0]!.id).toBe("bad");
@@ -726,10 +720,8 @@ describe("content-loader edge cases", () => {
     writeFileSync(resolve(TMP2, "content/docs/intro.md"), "---\ntitle: Intro\n---\n\nHello docs\n");
 
     try {
-      const contentTypes = await loadContentTypes(
-        TMP2,
-        JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8")),
-      );
+      const project = JSON.parse(readFileSync(resolve(TMP2, "project.json"), "utf8"));
+      const contentTypes = await loadContentTypes(TMP2, project);
       const docs = contentTypes.get("docs") as ContentLoaderEntry[];
       expect(docs.length).toBe(1);
       expect(docs[0]!.data.title).toBe("Intro");
@@ -770,10 +762,8 @@ describe("content-loader edge cases", () => {
     const origWarn = console.warn;
     console.warn = (msg: string) => warnings.push(msg);
     try {
-      const contentTypes = await loadContentTypes(
-        TMP3,
-        JSON.parse(readFileSync(resolve(TMP3, "project.json"), "utf8")),
-      );
+      const project = JSON.parse(readFileSync(resolve(TMP3, "project.json"), "utf8"));
+      const contentTypes = await loadContentTypes(TMP3, project);
       expect(contentTypes.get("items")).toHaveLength(1);
       expect(warnings.some((w) => w.includes("missing required field"))).toBe(true);
     } finally {

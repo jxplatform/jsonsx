@@ -157,7 +157,9 @@ describe("mdToJx", () => {
   });
 
   test("converts unordered list", () => {
-    const mdast = root(list(false, listItem(paragraph("Item 1")), listItem(paragraph("Item 2"))));
+    const item1 = listItem(paragraph("Item 1"));
+    const item2 = listItem(paragraph("Item 2"));
+    const mdast = root(list(false, item1, item2));
     const result: any = mdToJx(mdast);
     const [ul] = result.children;
     expect(ul.tagName).toBe("ul");
@@ -166,7 +168,8 @@ describe("mdToJx", () => {
   });
 
   test("converts ordered list", () => {
-    const mdast = root(list(true, listItem(paragraph("First"))));
+    const firstItem = listItem(paragraph("First"));
+    const mdast = root(list(true, firstItem));
     const result: any = mdToJx(mdast);
     expect(result.children[0].tagName).toBe("ol");
   });

@@ -25,15 +25,15 @@ export function parseMediaEntries(mediaDef?: Record<string, string> | null) {
   for (const [name, query] of Object.entries(mediaDef)) {
     if (name === "--") {
       const wm = String(query).match(/^(\d+)\s*px$/);
-      baseWidth = wm ? Number.parseFloat(wm[1]!) : 320;
+      baseWidth = wm ? Number(wm[1]!) : 320;
       continue;
     }
     const minMatch = query.match(/min-width:\s*([\d.]+)px/);
     const maxMatch = query.match(/max-width:\s*([\d.]+)px/);
     if (minMatch) {
-      sizes.push({ name, query, type: "min", width: Number.parseFloat(minMatch[1]!) });
+      sizes.push({ name, query, type: "min", width: Number(minMatch[1]!) });
     } else if (maxMatch) {
-      sizes.push({ name, query, type: "max", width: Number.parseFloat(maxMatch[1]!) });
+      sizes.push({ name, query, type: "max", width: Number(maxMatch[1]!) });
     } else {
       features.push({ name, query });
     }

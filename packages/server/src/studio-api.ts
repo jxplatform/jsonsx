@@ -190,8 +190,8 @@ export function parseGitStatus(out: string) {
     } else if (line.startsWith("# branch.ab ")) {
       const m = line.match(/\+(\d+) -(\d+)/);
       if (m) {
-        ahead = Number.parseInt(m[1]!, 10);
-        behind = Number.parseInt(m[2]!, 10);
+        ahead = Math.trunc(Number(m[1]!));
+        behind = Math.trunc(Number(m[2]!));
       }
     } else if (line.startsWith("1 ") || line.startsWith("2 ")) {
       const parts = line.split(" ");

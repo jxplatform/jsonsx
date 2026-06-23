@@ -408,10 +408,9 @@ describe("array-of-objects fields", () => {
     // Remount with a plain clone — the tab document is a reactive proxy, which structuredClone
     // Cannot handle, so JSON round-trip instead.
     const remount = () => {
-      container = mountSchema(columnsSchema, {
-        // oxlint-disable-next-line unicorn/prefer-structured-clone
-        columns: JSON.parse(JSON.stringify(cols())),
-      });
+      // oxlint-disable-next-line unicorn/prefer-structured-clone
+      const plainColumns = JSON.parse(JSON.stringify(cols()));
+      container = mountSchema(columnsSchema, { columns: plainColumns });
     };
 
     inputValue(row().querySelector("sp-textfield") as Element, "renamed");

@@ -532,7 +532,7 @@ function convertJxNode(
     case "heading": {
       return {
         children: inline(el),
-        depth: Number.parseInt(tag.slice(1), 10),
+        depth: Math.trunc(Number(tag.slice(1))),
         type: "heading",
       };
     }
@@ -584,7 +584,7 @@ function convertJxNode(
           .filter(Boolean) as MdastNode[],
         ordered: tag === "ol",
         spread: false,
-        start: tag === "ol" ? Number.parseInt(el.attributes?.start as string, 10) || 1 : null,
+        start: tag === "ol" ? Math.trunc(Number(el.attributes?.start as string)) || 1 : null,
         type: "list",
       };
     }
@@ -932,7 +932,7 @@ function nodeToMdast(
 
   switch (mdastType) {
     case "heading": {
-      const depth = Number.parseInt(tag.slice(1), 10);
+      const depth = Math.trunc(Number(tag.slice(1)));
       const children =
         text != null ? [{ type: "text", value: text }] : exportChildren(node, ctx, scope);
       return [{ children, depth, type: "heading" }];
@@ -1343,7 +1343,7 @@ function splitHtmlBlocks(html: string) {
 function parseHtmlElement(html: string) {
   const hMatch = html.match(/^<(h[1-6])(?:\s[^>]*)?>(.+?)<\/\1>$/is);
   if (hMatch) {
-    const depth = Number.parseInt(hMatch[1]!.slice(1), 10);
+    const depth = Math.trunc(Number(hMatch[1]!.slice(1)));
     const children = parseInlineHtml(hMatch[2]!);
     return [{ children, depth, type: "heading" }];
   }

@@ -16,6 +16,11 @@ const DEFAULT_RIGHT = 280;
 
 const root = document.documentElement;
 
+/** Read a px-valued CSS custom property as a number (e.g. "320px" → 320). */
+function readPxVar(cssVar: string): number {
+  return Number(getComputedStyle(root).getPropertyValue(cssVar).replace(/px$/, ""));
+}
+
 // ─── Restore saved widths & collapse state ──────────────────────────────────
 
 try {
@@ -68,8 +73,7 @@ function setupHandle(
     handle.classList.add("dragging");
     document.body.style.userSelect = "none";
 
-    const current =
-      Number.parseInt(getComputedStyle(root).getPropertyValue(cssVar), 10) || defaultWidth;
+    const current = readPxVar(cssVar) || defaultWidth;
     drag = { startWidth: current, startX: e.clientX };
   });
 
@@ -105,11 +109,8 @@ function setupHandle(
 }
 
 function persistWidths() {
-  const left =
-    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-left"), 10) || DEFAULT_LEFT;
-  const right =
-    Number.parseInt(getComputedStyle(root).getPropertyValue("--panel-w-right"), 10) ||
-    DEFAULT_RIGHT;
+  const left = readPxVar("--panel-w-left") || DEFAULT_LEFT;
+  const right = readPxVar("--panel-w-right") || DEFAULT_RIGHT;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ left, right }));
   } catch {

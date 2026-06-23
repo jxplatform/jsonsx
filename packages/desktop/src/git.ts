@@ -55,8 +55,8 @@ export function createGitOps(session: { readonly projectRoot: string | null }) {
     let ahead = 0;
     let behind = 0;
     try {
-      ahead = Number.parseInt(await git("rev-list", "--count", "@{u}..HEAD"), 10) || 0;
-      behind = Number.parseInt(await git("rev-list", "--count", "HEAD..@{u}"), 10) || 0;
+      ahead = Math.trunc(Number(await git("rev-list", "--count", "@{u}..HEAD"))) || 0;
+      behind = Math.trunc(Number(await git("rev-list", "--count", "HEAD..@{u}"))) || 0;
     } catch {
       // No upstream configured
     }

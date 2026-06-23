@@ -44,6 +44,9 @@ export function renderUnitSelector(
   } else if (match) {
     displayValue = match[1]!;
   } else if (strVal !== "") {
+    // Intentional partial parse: shorthand like "10px 20px" displays its leading number.
+    // Number() yields NaN for those, so Number.parseFloat stays (see unit-selector tests).
+    // oxlint-disable-next-line unicorn/prefer-number-coercion
     const num = Number.parseFloat(strVal);
     displayValue = Number.isNaN(num) ? strVal : String(num);
   } else {

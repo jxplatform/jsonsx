@@ -67,8 +67,8 @@ export function registerLayersDnD() {
     for (const row of container.querySelectorAll("[data-dnd-row]") as NodeListOf<HTMLElement>) {
       const rowPath = (row.dataset.path as string)
         .split("/")
-        .map((s: string) => (/^\d+$/.test(s) ? Number.parseInt(s, 10) : s)) as JxPath;
-      const rowDepth = Number.parseInt(row.dataset.dndDepth as string, 10) || 0;
+        .map((s: string) => (/^\d+$/.test(s) ? Math.trunc(Number(s)) : s)) as JxPath;
+      const rowDepth = Math.trunc(Number(row.dataset.dndDepth as string)) || 0;
       const isVoid = Object.hasOwn(row.dataset, "dndVoid");
       const isExpanded = Object.hasOwn(row.dataset, "dndExpanded");
 

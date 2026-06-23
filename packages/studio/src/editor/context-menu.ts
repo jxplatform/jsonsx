@@ -70,10 +70,12 @@ function nodeToHtml(node: JxNode | string): string {
 async function writeToClipboard(json: Record<string, unknown>) {
   workspace.clipboard = json;
   try {
+    const jxBlob = new Blob([JSON.stringify(json)], { type: JX_MIME });
+    const htmlBlob = new Blob([nodeToHtml(json)], { type: "text/html" });
     await navigator.clipboard.write([
       new ClipboardItem({
-        [JX_MIME]: new Blob([JSON.stringify(json)], { type: JX_MIME }),
-        "text/html": new Blob([nodeToHtml(json)], { type: "text/html" }),
+        [JX_MIME]: jxBlob,
+        "text/html": htmlBlob,
       }),
     ]);
   } catch {

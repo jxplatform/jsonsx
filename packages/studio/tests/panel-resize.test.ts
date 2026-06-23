@@ -32,7 +32,7 @@ function widthOf(cssVar: string): string {
 
 /** Start width the handler will read back for a var (computed style, falling back to default). */
 function startWidth(cssVar: string, fallback: number): number {
-  return Number.parseInt(getComputedStyle(root).getPropertyValue(cssVar), 10) || fallback;
+  return Number(getComputedStyle(root).getPropertyValue(cssVar).replace(/px$/, "")) || fallback;
 }
 
 describe("import-time restore", () => {
