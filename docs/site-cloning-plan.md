@@ -1,6 +1,6 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Phase 3 complete — Phase 4 next
+**Status:** Phase 4 (heuristic) complete — AI pass (`--ai-components`) next
 **Date:** 2026-06-22
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
@@ -280,6 +280,39 @@ Verification:
 - `--no-crawl` flag confirmed to produce Phase 2 output (single page with styles and assets).
 
 ## 10. Phase 4 — Componentization (heuristics → AI)
+
+**Phase 4 heuristic pass — implemented 2026-06-22.**
+
+- **`componentize.ts`** — walks all page trees, hashes subtrees by normalized structure
+  (tag + child shape, ignoring text/attr leaf values), groups recurring patterns (≥N instances),
+  diffs instances to find varying leaves, lifts them to `state` props with `${state.x}` interpolation,
+  emits component definitions mirroring `simple-card.json` format (`$id`, `tagName`, `state`, children).
+- **Call-site rewriting** — subtree instances replaced with `{ tagName: "component-name", $props: {...} }`.
+- **`$elements` registration** — emitted pages/layouts get `$elements: [{ $ref: "../components/..." }]`
+  so the runtime discovers and registers extracted components.
+- **Emit integration** — `emitMultiPageProject()` accepts `componentizeOptions` (or `false` to skip);
+  writes component files to `components/`, wires `$elements` refs.
+- **CLI flags** — `--no-components`, `--min-instances <n>` (default 2), `--min-depth <n>` (default 2).
+- **Backward compatible** — `--no-components` or `componentizeOptions: false` produces Phase 3 output.
+
+Verification:
+
+- 94/94 import tests pass (10 new for Phase 4: pattern detection, prop extraction, call-site rewriting,
+  cross-page detection, minInstances/minDepth thresholds, static text preservation, $props correctness).
+- 288/288 parser tests unaffected.
+- `--no-components` confirmed to produce Phase 3 output.
+
+### Turnover — Phase 4 AI pass (`--ai-components`)
+
+What's done: heuristic componentization extracts structurally identical subtrees with varying leaf values.
+Component names are auto-generated (`component-div-0`); prop names are derived from tree position.
+
+What's next: the AI pass (opt-in `--ai-components`) should:
+
+1. Take heuristic candidates and ask the assistant for semantic names (e.g. `product-card` not `component-div-0`).
+2. Improve prop names (e.g. `title` not `text`).
+3. Detect slot boundaries (children that should be slots rather than props).
+4. Score results with the headless harness (`tests/harness/`).
 
 - **Heuristic pass:** hash normalized subtrees (tag+structure, ignoring text/attr leaf values);
   subtrees recurring ≥N times become a component under `components/`, with differing leaf values

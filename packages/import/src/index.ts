@@ -10,6 +10,7 @@ export { downloadAssets } from "./asset-download.ts";
 export { rewriteAssetUrls } from "./asset-rewrite.ts";
 export { crawlSite, normalizeUrl, routeToFilePath, fetchRobotsTxt } from "./crawl.ts";
 export { detectLayout, hashSubtree, treesEqual } from "./layout-detect.ts";
+export { componentize } from "./componentize.ts";
 export type { CaptureResult } from "./capture.ts";
 export type { ToJxResult } from "./to-jx.ts";
 export type { EmitOptions, MultiEmitOptions } from "./emit.ts";
@@ -20,3 +21,8 @@ export type { DiscoveredAsset, AssetCollectionResult } from "./asset-collect.ts"
 export type { DownloadResult } from "./asset-download.ts";
 export type { CrawlOptions, CrawledPage, CrawlResult } from "./crawl.ts";
 export type { LayoutResult } from "./layout-detect.ts";
+export type {
+  ComponentizeOptions,
+  ExtractedComponent,
+  ComponentizeResult,
+} from "./componentize.ts";

@@ -29,6 +29,9 @@ Options:
   --no-assets              Skip asset download
   --no-crawl               Single page only (equivalent to --depth 0)
   --no-robots              Ignore robots.txt
+  --no-components          Skip component extraction (Phase 4)
+  --min-instances <n>      Min recurring instances to extract a component (default: 2)
+  --min-depth <n>          Min subtree depth to consider for componentization (default: 2)
 
 Examples:
   jx-import https://example.com
@@ -62,10 +65,17 @@ const skipStyles = args.includes("--no-styles");
 const skipAssets = args.includes("--no-assets");
 const noCrawl = args.includes("--no-crawl");
 const noRobots = args.includes("--no-robots");
+const noComponents = args.includes("--no-components");
 
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);
 const maxPages = parseIntArg(args, "--max-pages", 25);
 const maxNodesPerPage = parseIntArg(args, "--max-nodes-per-page", 5000);
+const minInstances = parseIntArg(args, "--min-instances", 2);
+const minDepthArg = parseIntArg(args, "--min-depth", 2);
+
+const componentizeOptions = noComponents
+  ? (false as const)
+  : { minInstances, minDepth: minDepthArg };
 
 let outDir: string;
 const outIdx = args.indexOf("--out");
@@ -178,6 +188,7 @@ if (maxDepth === 0) {
       pages: new Map([["pages/index.json", jx.document]]),
       sourceUrl: url,
       breakpoints,
+      componentizeOptions,
     });
     console.log(`  Wrote ${files.length} files`);
 
@@ -246,6 +257,7 @@ if (maxDepth === 0) {
       pages: pageMap,
       layout,
       breakpoints: result.breakpoints,
+      componentizeOptions,
     });
 
     console.log(`  Wrote ${files.length} files:`);
