@@ -1,17 +1,40 @@
 {
   "tagName": "div",
-  "$id": "base-layout",
+  "$elements": [
+    {
+      "$ref": "../components/nav-bar.json"
+    },
+    {
+      "$ref": "../components/site-footer.json"
+    }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "backgroundColor": "var(--color-bg-primary)",
+    "display": "flex",
+    "flexDirection": "column"
+  },
   "children": [
     {
+      "tagName": "nav-bar"
+    },
+    {
       "tagName": "main",
+      "style": {
+        "flex": "1",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "width": "100%",
+        "padding": "2rem 1rem"
+      },
       "children": [
         {
           "tagName": "slot"
         }
       ]
+    },
+    {
+      "tagName": "site-footer"
     }
-  ],
-  "style": {
-    "minHeight": "100vh"
-  }
+  ]
 }

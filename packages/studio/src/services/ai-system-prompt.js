@@ -108,19 +108,33 @@ const REAL_WORLD_PATTERNS = `## Real-World Jx Patterns (from jxsuite.com product
   }]
 }
 
-### Card with configurable props (components/feature-card.json):
+### Premium: stat card with layered surface (components/stat-card.json):
+Note: surface elevation via --color-bg-surface on --color-bg-primary; accent only on the value; muted mono label; on-scale spacing.
 {
-  "tagName": "feature-card",
-  "state": {
-    "icon": "",
-    "iconBg": "rgba(59, 130, 246, 0.1)",
-    "title": "",
-    "description": ""
+  "tagName": "stat-card",
+  "state": { "value": "0", "label": "Description" },
+  "style": {
+    "display": "flex", "flexDirection": "column", "gap": "0.5rem",
+    "padding": "2rem", "borderRadius": "var(--radius-lg)",
+    "border": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-surface)"
   },
   "children": [
-    { "tagName": "div", "textContent": "\${state.icon}", "style": { "backgroundColor": "\${state.iconBg}", "width": "2.25rem", "height": "2.25rem", "borderRadius": "var(--radius)", "display": "flex", "alignItems": "center", "justifyContent": "center" } },
-    { "tagName": "h3", "textContent": "\${state.title}", "style": { "fontSize": "0.9375rem", "fontWeight": "600" } },
-    { "tagName": "p", "textContent": "\${state.description}", "style": { "color": "var(--color-text-secondary)", "fontSize": "0.875rem" } }
+    { "tagName": "div", "textContent": "\${state.value}", "style": { "fontSize": "2.5rem", "fontWeight": "700", "letterSpacing": "-0.03em", "lineHeight": "1", "color": "var(--color-accent)" } },
+    { "tagName": "div", "textContent": "\${state.label}", "style": { "fontFamily": "var(--font-mono)", "fontSize": "0.75rem", "letterSpacing": "0.08em", "textTransform": "uppercase", "color": "var(--color-text-muted)" } }
+  ]
+}
+
+### Premium: step card with centered layout (components/step-card.json):
+Note: restraint — no background, no border, just centered content with a circular badge; accent only on the number; secondary text for description.
+{
+  "tagName": "step-card",
+  "state": { "number": "1", "title": "", "description": "" },
+  "style": { "display": "block", "textAlign": "center", "padding": "2rem 1.5rem" },
+  "children": [
+    { "tagName": "div", "textContent": "\${state.number}", "style": { "width": "3rem", "height": "3rem", "borderRadius": "50%", "border": "2px solid var(--color-border)", "display": "flex", "alignItems": "center", "justifyContent": "center", "margin": "0 auto 1.25rem", "fontFamily": "var(--font-mono)", "fontSize": "0.875rem", "fontWeight": "700", "color": "var(--color-accent)" } },
+    { "tagName": "h3", "textContent": "\${state.title}", "style": { "fontSize": "1.0625rem", "fontWeight": "600", "margin": "0 0 0.5rem" } },
+    { "tagName": "p", "textContent": "\${state.description}", "style": { "color": "var(--color-text-secondary)", "fontSize": "0.875rem", "margin": "0", "lineHeight": "1.6" } }
   ]
 }
 
@@ -174,6 +188,28 @@ When the project defines $media breakpoints (e.g. "--md": "(max-width: 768px)"),
 }
 
 Always use @--breakpoint responsive overrides for "responsive" or "mobile-friendly" requests when the project has $media breakpoints. Check the Project Context for available breakpoints.`;
+
+const DESIGN_PRINCIPLES = `## Design Principles (premium component output)
+
+When building components, pages, or layouts, follow these rules to produce polished output:
+
+### Tokens first
+Reference the project's design tokens via var(--token) for ALL colors, radii, fonts, and max-widths. Never hard-code a hex color or px radius that a token already covers. Check the Project Context for available tokens.
+
+### Spacing rhythm
+Use a consistent step scale: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2 / 3 / 4rem. Never use arbitrary values like 13px or 7px. Padding and gaps should feel proportional.
+
+### Type scale
+Use these sizes for hierarchy: 0.875rem (small/caption) → 1rem (body) → 1.125rem (large body) → 1.25rem (h4) → 1.5rem (h3) → 2rem (h2) → 2.5–3rem (h1/hero). Use fontWeight (400/500/600/700) to reinforce hierarchy — not just size.
+
+### Color & elevation
+Layer surfaces: content panels use var(--color-bg-surface) on top of var(--color-bg-primary). Borders use var(--color-border) or var(--color-border-subtle). Secondary text uses var(--color-text-secondary), muted text uses var(--color-text-muted). Use var(--color-accent) sparingly — CTAs and key interactive elements only.
+
+### Layout
+Use generous padding (1.5–3rem sections, 1–1.5rem cards). Constrain content width with var(--max-width). For multi-column layouts, always add @--md and @--sm responsive overrides that stack to fewer/single columns.
+
+### Restraint
+Limit to 2–3 colors per component. Prefer whitespace over decoration. No gradients or heavy shadows unless specifically requested. One accent color, used sparingly.`;
 
 const CONTROL_FLOW_PATTERNS = `## Control Flow & Reactivity (signals, lists, conditionals)
 
@@ -249,6 +285,47 @@ A \$switch node carries a wrapper "tagName" (usually "div"), a "\$switch" \$ref 
 
 To switch the active case, set the signal in a handler (e.g. state.currentRoute = "about").`;
 
+// ─── Multi-Page Patterns ────────────────────────────────────────────────────
+
+const MULTI_PAGE_PATTERNS = `## Multi-Page Site Building
+
+### File-based routing
+Create pages under the pages/ directory — routes are automatic:
+- pages/index.json → /
+- pages/about.json → /about/
+- pages/blog/index.json → /blog/
+- pages/blog/[slug].json → /blog/:slug (dynamic route)
+
+### Layout inheritance
+Pages can reference a shared layout via "$layout":
+{ "$layout": "./layouts/base.json", "children": [{ "tagName": "section", "textContent": "Page content" }] }
+
+A layout uses { "tagName": "slot" } as the insertion point for page content:
+{
+  "tagName": "div",
+  "$elements": [{ "$ref": "../components/site-toolbar.json" }, { "$ref": "../components/site-footer.json" }],
+  "children": [
+    { "tagName": "site-toolbar" },
+    { "tagName": "main", "style": { "flex": "1" }, "children": [{ "tagName": "slot" }] },
+    { "tagName": "site-footer" }
+  ]
+}
+
+### Navigation between pages
+Use standard anchor links: { "tagName": "a", "attributes": { "href": "/about" }, "textContent": "About" }
+
+### Page metadata
+"$head" is an ARRAY of element definitions for <head> entries (title, meta, link tags):
+{ "$head": [{ "tagName": "title", "textContent": "About Us" }, { "tagName": "meta", "attributes": { "name": "description", "content": "Learn about our team" } }] }
+
+### Multi-page workflow
+When asked to build a site with multiple pages:
+1. Create the layout first (layouts/base.json) with navigation and footer slots
+2. Create shared components (nav bar, footer) and import them in the layout
+3. Create each page with "$layout" referencing the layout
+4. Use open_document to switch between files and refine each one
+5. Ensure navigation links match the actual page paths`;
+
 // ─── System prompt builder ───────────────────────────────────────────────────
 
 /**
@@ -279,6 +356,7 @@ You have access to these tools that read and modify the live Jx document directl
 - update_state(key, value) — update or remove (value: null) an existing state variable.
 - create_component(path, content) — create a new .json component file on disk.
 - create_page(path, content) — create a new .json page file on disk.
+- open_document(path) — switch the active document to another file. After opening, all tools operate on the new document. Use this after create_page/create_component to iteratively refine the new file.
 
 When the user asks you to build or modify something:
 1. Call read_document first if needed to discover the current structure and valid paths.
@@ -287,6 +365,8 @@ When the user asks you to build or modify something:
 4. Summarize what you changed clearly.
 
 Your edits apply to the live canvas immediately and are individually undoable. After each edit the document is schema-validated: if a tool returns { success: false } reporting schema errors, your change introduced them — issue a follow-up edit to fix them.
+
+You have a limited number of tool-call rounds per message. On vague or open-ended prompts ("make it look better", "improve this"), prefer a small number of targeted, high-impact changes over attempting to rebuild the entire page. Explain what you changed and offer to do more.
 
 Be concise. Don't explain what Jx is unless asked. Just build.`,
   ];
@@ -301,8 +381,14 @@ Be concise. Don't explain what Jx is unless asked. Just build.`,
   // 4. Real-world patterns
   sections.push(REAL_WORLD_PATTERNS);
 
+  // 4a. Design principles — spacing, type, color, layout, restraint
+  sections.push(DESIGN_PRINCIPLES);
+
   // 4b. Control flow & reactivity — signals, list rendering ($map), conditionals ($switch)
   sections.push(CONTROL_FLOW_PATTERNS);
+
+  // 4c. Multi-page site building — layouts, file-based routing, navigation
+  sections.push(MULTI_PAGE_PATTERNS);
 
   // 5. Current document context
   if (document) {
@@ -426,19 +512,33 @@ function buildProjectSummary({ projectConfig, components, projectRoot }) {
     lines.push(`Root: ${projectRoot}`);
   }
 
-  // Available components
+  // Available components — tag + purpose so the model can reuse them
   if (components && components.length > 0) {
-    const names = components.map((c) => c.tag || c.name || c.path).join(", ");
-    lines.push(`Available components: ${names}`);
+    lines.push(`Available components (reuse these instead of rebuilding):`);
+    for (const c of components) {
+      const tag = c.tagName || c.tag || c.name || c.path;
+      const label = c.$id ? ` — ${c.$id}` : "";
+      lines.push(`  <${tag}>${label}${c.path ? ` (${c.path})` : ""}`);
+    }
   }
 
-  // CSS custom properties from project config
+  // Design tokens — name → value pairs, grouped by prefix
   if (projectConfig?.style) {
-    const customProps = Object.keys(projectConfig.style)
-      .filter((k) => k.startsWith("--"))
-      .slice(0, 15);
-    if (customProps.length > 0) {
-      lines.push(`Design tokens: ${customProps.join(", ")}`);
+    const tokens = Object.entries(projectConfig.style).filter(([k]) => k.startsWith("--"));
+    if (tokens.length > 0) {
+      lines.push(
+        `Design tokens (always use var(--token) — never hard-code a color, radius, or font that a token defines):`,
+      );
+      const groups = { color: [], font: [], other: [] };
+      for (const [k, v] of tokens) {
+        if (k.startsWith("--color")) groups.color.push([k, v]);
+        else if (k.startsWith("--font")) groups.font.push([k, v]);
+        else groups.other.push([k, v]);
+      }
+      const fmt = (entries) => entries.map(([k, v]) => `  ${k}: ${v}`).join("\n");
+      if (groups.color.length) lines.push(fmt(groups.color));
+      if (groups.font.length) lines.push(fmt(groups.font));
+      if (groups.other.length) lines.push(fmt(groups.other));
     }
   }
 

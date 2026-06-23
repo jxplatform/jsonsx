@@ -1,0 +1,15 @@
+{
+  "tagName": "site-footer",
+  "children": [
+    {
+      "tagName": "footer",
+      "style": {
+        "padding": "2rem 0",
+        "textAlign": "center",
+        "fontSize": "0.95rem",
+        "color": "var(--color-text-secondary)"
+      },
+      "textContent": "© 2024 Your Name. All rights reserved."
+    }
+  ]
+}

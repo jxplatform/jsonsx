@@ -35,6 +35,8 @@ export async function runAgentLoop({
 }) {
   /** @type {string[]} */
   const allErrors = [];
+  /** @type {string[]} */
+  const appliedSummaries = [];
 
   // Batch all tool-call mutations into a single undo step
   if (getTab) beginBatch(getTab());
@@ -111,6 +113,9 @@ export async function runAgentLoop({
         if (!result.success && result.error) {
           allErrors.push(result.error);
         }
+        if (result.success && result.summary) {
+          appliedSummaries.push(result.summary);
+        }
         chatState.appendToolResult(id, result);
         chatState.pushToolResultMessage(id, JSON.stringify(result));
       }
@@ -125,12 +130,16 @@ export async function runAgentLoop({
      * "I couldn't do it" message.
      */
     const uniqueErrors = [...new Set(allErrors)];
-    const detail =
+    const applied =
+      appliedSummaries.length > 0
+        ? `\n\nChanges applied so far:\n${appliedSummaries.map((s) => `- ${s}`).join("\n")}`
+        : "";
+    const errors =
       uniqueErrors.length > 0
         ? `\n\nErrors encountered:\n${uniqueErrors.map((e) => `- ${e}`).join("\n")}`
         : "";
     chatState.setError(
-      `I wasn't able to complete this change after ${MAX_ROUNDS} attempts.${detail}\n\nYou can try rephrasing your request or manually fixing the errors above.`,
+      `I ran out of tool-call rounds (${MAX_ROUNDS}) before finishing.${applied}${errors}\n\nYou can continue by sending another message, or try a more specific request.`,
     );
   } finally {
     endBatch();

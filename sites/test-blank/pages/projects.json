@@ -1,0 +1,117 @@
+{
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "title",
+      "textContent": "Projects | Portfolio"
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Projects showcase."
+      }
+    }
+  ],
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "4rem 0",
+        "maxWidth": "800px",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "textContent": "Projects",
+          "style": {
+            "fontSize": "2rem",
+            "marginBottom": "2em",
+            "textAlign": "center"
+          }
+        },
+        {
+          "tagName": "ul",
+          "style": {
+            "display": "grid",
+            "gap": "2rem",
+            "gridTemplateColumns": "1fr 1fr",
+            "listStyle": "none",
+            "padding": "0",
+            "margin": "0",
+            "@--md": {
+              "gridTemplateColumns": "1fr"
+            }
+          },
+          "children": [
+            {
+              "tagName": "li",
+              "children": [
+                {
+                  "tagName": "h3",
+                  "textContent": "Project One",
+                  "style": {
+                    "margin": "0 0 0.5em 0",
+                    "fontSize": "1.2rem"
+                  }
+                },
+                {
+                  "tagName": "p",
+                  "textContent": "Brief description of Project One.",
+                  "style": {
+                    "color": "var(--color-text-secondary)"
+                  }
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "#"
+                  },
+                  "textContent": "Learn more →",
+                  "style": {
+                    "color": "var(--color-accent)",
+                    "textDecoration": "none",
+                    "fontWeight": "500"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "li",
+              "children": [
+                {
+                  "tagName": "h3",
+                  "textContent": "Project Two",
+                  "style": {
+                    "margin": "0 0 0.5em 0",
+                    "fontSize": "1.2rem"
+                  }
+                },
+                {
+                  "tagName": "p",
+                  "textContent": "Brief description of Project Two.",
+                  "style": {
+                    "color": "var(--color-text-secondary)"
+                  }
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "#"
+                  },
+                  "textContent": "Learn more →",
+                  "style": {
+                    "color": "var(--color-accent)",
+                    "textDecoration": "none",
+                    "fontWeight": "500"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

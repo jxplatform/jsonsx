@@ -86,6 +86,12 @@ export type JxNodeValue =
  * "Array"`) cannot be index-mutated — fail loudly instead of corrupting.
  */
 function childArray(node: JxMutableNode): (JxMutableNode | string)[] {
+  // Defense-in-depth: a path that resolves to a children array (rather than a node) would
+  // Otherwise get a bogus `.children` property tacked on here, silently storing the insert where
+  // Nothing renders. Callers must pass a node; fail loudly if they don't.
+  if (Array.isArray(node)) {
+    throw new TypeError("Cannot insert into a children array; parentPath must point at a node");
+  }
   if (!node.children) {
     node.children = [];
   }

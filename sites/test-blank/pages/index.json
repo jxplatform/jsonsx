@@ -1,15 +1,12 @@
 {
   "tagName": "div",
-  "$id": "index-page",
+  "attributes": {
+    "id": "index-page"
+  },
   "children": [
     {
       "tagName": "h1",
-      "children": ["Blank Canvas - AI Test"],
-      "style": {
-        "textAlign": "center",
-        "padding": "40px",
-        "fontSize": "2rem"
-      }
+      "children": ["Welcome Home"]
     }
   ]
 }

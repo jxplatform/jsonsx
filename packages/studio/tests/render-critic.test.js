@@ -93,4 +93,61 @@ describe("render-critic", () => {
 
     disposeTab(tab);
   });
+
+  test("create_page render gate — rejects a render-broken page before writing", async () => {
+    const { createToolRegistry } = await import("@jxsuite/ai");
+    const { registerAiTools } = await import("../src/services/ai-tools");
+
+    let written = null;
+    const registry = createToolRegistry();
+    registerAiTools(registry, {
+      getTab: () => null,
+      validate: async () => [],
+      renderCheck,
+      saveFile: async (path, content) => {
+        written = { path, content };
+      },
+    });
+
+    const result = await registry.execute("create_page", {
+      path: "pages/broken.json",
+      content: {
+        tagName: "div",
+        children: [{ tagName: "span", children: ["Value: ${nonExistent}"] }],
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("fails to render");
+    expect(written).toBeNull(); // Nothing written to disk.
+  });
+
+  test("create_component render gate — writes a valid component", async () => {
+    const { createToolRegistry } = await import("@jxsuite/ai");
+    const { registerAiTools } = await import("../src/services/ai-tools");
+
+    let written = null;
+    const registry = createToolRegistry();
+    registerAiTools(registry, {
+      getTab: () => null,
+      validate: async () => [],
+      renderCheck,
+      saveFile: async (path, content) => {
+        written = { path, content };
+      },
+    });
+
+    const result = await registry.execute("create_component", {
+      path: "components/ok-card.json",
+      content: {
+        tagName: "ok-card",
+        state: { title: "Hi" },
+        children: [{ tagName: "h3", children: ["${state.title}"] }],
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(written).not.toBeNull();
+    expect(written.path).toBe("components/ok-card.json");
+  });
 });

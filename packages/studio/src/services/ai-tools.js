@@ -12,6 +12,9 @@ import { createToolDefinition } from "@jxsuite/ai/tools";
 import { getNodeAtPath } from "../state";
 import { toRaw } from "../reactivity";
 import {
+  beginBatch,
+  endBatch,
+  isBatching,
   mutateInsertNode,
   mutateMoveNode,
   mutateRemoveNode,
@@ -20,6 +23,7 @@ import {
   transactDoc,
 } from "../tabs/transact";
 import { validateDoc } from "./jx-validate";
+import { flagHardcodedTokens, formatTokenHints } from "./token-lint";
 
 const PATH_DESCRIPTION =
   "Path to a node in the document, as a JSON array of keys/indices from the root " +
@@ -93,9 +97,10 @@ function translateValidationError(rawError) {
  * @param {string} summary
  * @param {(doc: unknown) => Promise<string[]>} validate
  * @param {((doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>) | undefined} renderCheck
+ * @param {Record<string, string> | undefined} projectStyle
  * @returns {Promise<import("@jxsuite/ai/tools").ToolResult>}
  */
-async function applyAndValidate(tab, mutationFn, summary, validate, renderCheck) {
+async function applyAndValidate(tab, mutationFn, summary, validate, renderCheck, projectStyle) {
   const rawBefore = toRaw(tab.doc.document);
   const before = new Set(await validate(rawBefore));
   const renderOkBefore = renderCheck ? await renderCheck(rawBefore) : { ok: true };
@@ -123,6 +128,15 @@ async function applyAndValidate(tab, mutationFn, summary, validate, renderCheck)
     }
   }
 
+  // Soft token-discipline hints (never fail the mutation)
+  if (projectStyle) {
+    const findings = flagHardcodedTokens(rawAfter, projectStyle);
+    const hints = formatTokenHints(findings);
+    if (hints) {
+      return { success: true, summary: `${summary}\n\n${hints}` };
+    }
+  }
+
   return { success: true, summary };
 }
 
@@ -135,11 +149,13 @@ async function applyAndValidate(tab, mutationFn, summary, validate, renderCheck)
  *   validate?: (doc: unknown) => Promise<string[]>;
  *   saveFile?: (relPath: string, content: string) => Promise<void>;
  *   renderCheck?: (doc: unknown) => Promise<{ ok: true } | { ok: false; error: string }>;
+ *   openDocument?: (path: string) => Promise<void>;
+ *   projectStyle?: Record<string, string>;
  * }} ctx
  */
 export function registerAiTools(
   registry,
-  { getTab, validate = validateDoc, saveFile, renderCheck },
+  { getTab, validate = validateDoc, saveFile, renderCheck, openDocument, projectStyle },
 ) {
   registry.register(
     createToolDefinition({
@@ -224,6 +240,7 @@ export function registerAiTools(
           `Set "${args.key}" at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -263,6 +280,24 @@ export function registerAiTools(
         if (parent === undefined) {
           return { success: false, error: `No node exists at path ${JSON.stringify(parentPath)}.` };
         }
+        /*
+         * Guard against a parentPath that points at a children *array* rather than a node — the
+         * common failure is a trailing "children" segment (e.g. ["children",0,"children"]).
+         * add_child appends "children" + index itself, so an array-valued parentPath would splice
+         * into a bogus `.children` property on the array (childArray() creates one) and the node
+         * would be stored where nothing renders, yet the tool would report success. Reject it with
+         * a precise message so the loop self-corrects.
+         */
+        if (Array.isArray(parent)) {
+          return {
+            success: false,
+            error:
+              `parentPath ${JSON.stringify(parentPath)} points at a children array, not a node. ` +
+              `Drop the trailing "children" segment — add_child appends "children" and the index ` +
+              `automatically. For example, to insert into the node at ["children",0,"children",1], ` +
+              `pass parentPath: ["children",0,"children",1].`,
+          };
+        }
         if (parent.children !== undefined && !Array.isArray(parent.children)) {
           return {
             success: false,
@@ -282,6 +317,7 @@ export function registerAiTools(
           `Inserted node at ${JSON.stringify([...parentPath, "children", index])}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -336,6 +372,7 @@ export function registerAiTools(
           `Set style "${prop}" at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -379,6 +416,7 @@ export function registerAiTools(
           `Set text at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -433,6 +471,7 @@ export function registerAiTools(
           `Added state "${key}".`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -488,6 +527,7 @@ export function registerAiTools(
           args.value == null ? `Removed state "${key}".` : `Updated state "${key}".`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -548,6 +588,7 @@ export function registerAiTools(
           `Moved node from ${JSON.stringify(fromPath)} to ${JSON.stringify([...toParentPath, "children", toIndex])}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),
@@ -586,7 +627,6 @@ export function registerAiTools(
         }
         const relPath = /** @type {string} */ (args.path);
         const { content } = /** @type {{ content: object }} */ (args);
-        // Validate content against the Jx schema before writing.
         const errors = await validate(content);
         if (errors.length > 0) {
           const formatted = errors.map((e) => `- ${translateValidationError(e)}`).join("\n");
@@ -594,6 +634,15 @@ export function registerAiTools(
             success: false,
             error: `Component content has schema errors. Fix these before creating the file:\n${formatted}`,
           };
+        }
+        if (renderCheck) {
+          const renderResult = await renderCheck(content);
+          if (!renderResult.ok) {
+            return {
+              success: false,
+              error: `Component is schema-valid but fails to render. Fix before creating:\n- ${renderResult.error}`,
+            };
+          }
         }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
@@ -648,6 +697,15 @@ export function registerAiTools(
             error: `Page content has schema errors. Fix these before creating the file:\n${formatted}`,
           };
         }
+        if (renderCheck) {
+          const renderResult = await renderCheck(content);
+          if (!renderResult.ok) {
+            return {
+              success: false,
+              error: `Page is schema-valid but fails to render. Fix before creating:\n- ${renderResult.error}`,
+            };
+          }
+        }
         try {
           await saveFile(relPath, JSON.stringify(content, null, 2));
           return { success: true, summary: `Created page at "${relPath}".` };
@@ -655,6 +713,70 @@ export function registerAiTools(
           return {
             success: false,
             error: `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+          };
+        }
+      },
+    }),
+  );
+
+  // ── open_document ─────────────────────────────────────────────────────
+
+  registry.register(
+    createToolDefinition({
+      name: "open_document",
+      description:
+        "Switch the active document to another file in the project. After opening, all " +
+        "tools (read_document, set_property, add_child, etc.) operate on the newly-active " +
+        "document. Use this to iteratively refine pages or components after creating them " +
+        "with create_page or create_component.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description:
+              'File path relative to the project root, e.g. "pages/about.json" or ' +
+              '"components/nav-bar.json". Must be an existing file.',
+          },
+        },
+        required: ["path"],
+      },
+      async execute(args) {
+        if (!openDocument) {
+          return {
+            success: false,
+            error: "File navigation is not available in this environment.",
+          };
+        }
+        const relPath = /** @type {string} */ (args.path);
+        try {
+          await openDocument(relPath);
+          const tab = getTab();
+          if (!tab) {
+            return {
+              success: false,
+              error: `File "${relPath}" could not be opened — no active tab after navigation.`,
+            };
+          }
+          /*
+           * The agent loop opens a single undo batch on the tab that was active at loop start
+           * (tool-executor.js → beginBatch). Switching the active document mid-loop would strand
+           * the new tab's edits with no history snapshot — undo would have nothing to roll back.
+           * Flush the previous tab's batch and re-open one on the newly-active tab so edits in
+           * each document remain individually undoable.
+           */
+          if (isBatching()) {
+            endBatch();
+            beginBatch(tab);
+          }
+          return {
+            success: true,
+            summary: `Switched to "${relPath}". All tools now operate on this document.`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: `Failed to open "${relPath}": ${error instanceof Error ? error.message : String(error)}`,
           };
         }
       },
@@ -694,6 +816,7 @@ export function registerAiTools(
           `Removed node at ${JSON.stringify(path)}.`,
           validate,
           renderCheck,
+          projectStyle,
         );
       },
     }),

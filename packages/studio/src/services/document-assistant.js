@@ -13,12 +13,14 @@ import { createChatState, createProxyStreamingClient, createToolRegistry } from 
 import { getPlatform } from "../platform";
 import { activeTab, workspace } from "../workspace/workspace";
 import { toRaw } from "../reactivity";
+import { componentRegistry } from "../files/components";
 import { registerAiTools } from "./ai-tools";
 import { runAgentLoop } from "./tool-executor";
 import { buildSystemPrompt } from "./ai-system-prompt";
 import { getBaseUrl, getModel, getOpenAiKey } from "./ai-settings";
 import { trimContext } from "./context-manager";
 import { renderCheck } from "./render-critic";
+import { openFileInTab } from "../files/files";
 
 const PERSIST_KEY_PREFIX = "jx-ai-chat-history";
 const MAX_PERSIST_MESSAGES = 50;
@@ -56,6 +58,8 @@ export function createDocumentAssistant() {
       await plat.writeFile(relPath, content);
     },
     renderCheck,
+    openDocument: openFileInTab,
+    projectStyle: workspace.projectConfig?.style,
   });
 
   /** @type {AbortController | null} */
@@ -66,6 +70,7 @@ export function createDocumentAssistant() {
     return buildSystemPrompt({
       document: tab ? toRaw(tab.doc.document) : undefined,
       projectConfig: workspace.projectConfig || undefined,
+      components: componentRegistry.length > 0 ? componentRegistry : undefined,
       projectRoot: workspace.projectRoot || undefined,
     });
   }
