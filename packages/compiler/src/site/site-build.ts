@@ -17,7 +17,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { isMappedArray, isRef } from "@jxsuite/schema/guards";
 import { loadProjectConfig } from "./site-loader.ts";
 import { discoverPages, expandDynamicRoutes, readPageDocument } from "./pages-discovery.ts";
@@ -158,7 +158,11 @@ export async function buildSite(
           formats: formatRegistry,
         });
         for (const f of result.files) {
-          const outName = f.path.includes("/") ? (f.path.split("/").pop() as string) : f.path;
+          // Reduce the emitted path (an absolute source path with .json swapped to .js) to a bare
+          // Filename for the dist/components/ output. basename handles both / and \ — a
+          // Forward-slash-only split left the full drive path on Windows, so resolve() then wrote
+          // The sidecar back into the source tree instead of dist.
+          const outName = basename(f.path);
           writeFileSync(resolve(componentOutDir, outName), f.content, "utf8");
           if (f.tagName) {
             compiledComponentTags.push(f.tagName);

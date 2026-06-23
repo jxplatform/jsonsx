@@ -682,6 +682,16 @@ describe("buildSite — component CSS generation", () => {
     // Component JS is bundled as app.js or per-component module
     expect(html).toContain('src="./app.js"');
   });
+
+  it("writes the component JS sidecar into dist, never beside the source component", async () => {
+    await buildSite(COMP_TMP, { clean: true });
+    // The compiled custom-element module lands in dist/components/, mirroring the .css sidecar.
+    expect(existsSync(resolve(COMP_TMP, "dist/components/my-button.js"))).toBe(true);
+    // Regression guard (Windows): compileElement emits an absolute source path with the extension
+    // Swapped to .js. A forward-slash-only basename split left the full drive path intact, so the
+    // Write resolved back next to the source component instead of into dist.
+    expect(existsSync(resolve(COMP_TMP, "components/my-button.js"))).toBe(false);
+  });
 });
 
 // ── Component compilation error handling ─────────────────────────────────────
