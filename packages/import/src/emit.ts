@@ -2,7 +2,7 @@ import { join, dirname } from "node:path";
 import { mkdir } from "node:fs/promises";
 import type { JxElement } from "@jxsuite/schema/types";
 import { componentize } from "./componentize.ts";
-import type { ComponentizeOptions } from "./componentize.ts";
+import type { ComponentizeOptions, ComponentizeResult } from "./componentize.ts";
 
 export interface EmitOptions {
   outDir: string;
@@ -27,6 +27,8 @@ export interface MultiEmitOptions {
   breakpoints?: Record<string, string>;
   /** Phase 4: componentization options. Pass false to skip. */
   componentizeOptions?: ComponentizeOptions | false;
+  /** Pre-computed componentization result (from AI pass). Overrides componentizeOptions. */
+  precomputedComponents?: ComponentizeResult;
 }
 
 export async function emitProject({
@@ -55,6 +57,7 @@ export async function emitMultiPageProject({
   layout,
   breakpoints,
   componentizeOptions,
+  precomputedComponents,
 }: MultiEmitOptions): Promise<{ files: string[] }> {
   await mkdir(join(outDir, "pages"), { recursive: true });
   await mkdir(join(outDir, "layouts"), { recursive: true });
@@ -78,27 +81,27 @@ export async function emitMultiPageProject({
   let finalPages = pages;
   const componentFiles = new Map<string, JxElement>();
 
-  if (componentizeOptions !== false) {
-    const compResult = componentize(pages, componentizeOptions ?? {});
-    if (compResult.components.size > 0) {
-      finalPages = compResult.rewrittenPages;
+  const compResult =
+    precomputedComponents ??
+    (componentizeOptions !== false ? componentize(pages, componentizeOptions ?? {}) : null);
 
-      for (const [fileName, comp] of compResult.components) {
-        const compDoc: JxElement = {
-          ...comp.template,
-          $id: comp.$id,
-          tagName: comp.tagName,
-        };
+  if (compResult && compResult.components.size > 0) {
+    finalPages = compResult.rewrittenPages;
 
-        // Build state from the template's interpolated values
-        const state: Record<string, string> = {};
-        extractStateDefaults(comp.template, state);
-        if (Object.keys(state).length > 0) {
-          compDoc.state = state;
-        }
+    for (const [fileName, comp] of compResult.components) {
+      const compDoc: JxElement = {
+        ...comp.template,
+        $id: comp.$id,
+        tagName: comp.tagName,
+      };
 
-        componentFiles.set(fileName, compDoc);
+      const state: Record<string, string> = {};
+      extractStateDefaults(comp.template, state);
+      if (Object.keys(state).length > 0) {
+        compDoc.state = state;
       }
+
+      componentFiles.set(fileName, compDoc);
     }
   }
 

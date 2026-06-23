@@ -1,6 +1,6 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Phase 5 (verify) complete — all pipeline phases shipped
+**Status:** Phase 4 AI pass + Phase 5 verify complete — full pipeline shipped
 **Date:** 2026-06-23
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
@@ -302,24 +302,43 @@ Verification:
 - 288/288 parser tests unaffected.
 - `--no-components` confirmed to produce Phase 3 output.
 
-### Turnover — Phase 4 AI pass (`--ai-components`)
+### Turnover — Phase 4 AI pass (`--ai-components`) ✅ COMPLETE (2026-06-23)
 
-What's done: heuristic componentization extracts structurally identical subtrees with varying leaf values.
-Component names are auto-generated (`component-div-0`); prop names are derived from tree position.
+New file delivered under `packages/import/`:
 
-What's next: the AI pass (opt-in `--ai-components`) should:
+| File                     | Role                                                                                                                                                                                                                            |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/ai-componentize.ts` | LLM-assisted refinement of heuristic components. Takes `ComponentizeResult`, sends each component to an OpenAI-compatible chat API (JSON mode), renames tagName/props/call-sites. Falls back to heuristic names on LLM failure. |
 
-1. Take heuristic candidates and ask the assistant for semantic names (e.g. `product-card` not `component-div-0`).
-2. Improve prop names (e.g. `title` not `text`).
-3. Detect slot boundaries (children that should be slots rather than props).
-4. Score results with the headless harness (`tests/harness/`).
+Modified files:
 
-- **Heuristic pass:** hash normalized subtrees (tag+structure, ignoring text/attr leaf values);
-  subtrees recurring ≥N times become a component under `components/`, with differing leaf values
-  lifted to `state` props and call-sites rewritten to `${state.x}` (mirror `simple-card.json`).
-- **AI pass (opt-in `--ai-components`):** hand the heuristic candidates to the assistant for better
-  names + prop schemas + slot boundaries. Score it with the headless harness (`tests/harness/`) so
-  it's regressable, exactly like the L1–L5 eval — this reuses infrastructure we already trust.
+- `src/cli.ts` — `--ai-components` flag, `--ai-model <model>` override. Requires `OPENAI_API_KEY` env var. Wired into both single-page and multi-page paths. Runs heuristic first, then AI refinement, then passes `precomputedComponents` to emit.
+- `src/emit.ts` — New `precomputedComponents` option on `MultiEmitOptions`. When provided, skips internal `componentize()` and uses the pre-computed result directly.
+- `src/index.ts` — Re-exports `aiComponentize` and `AiComponentizeOptions`.
+
+Tests:
+
+- `tests/ai-componentize.test.ts` — 8 tests with a mock HTTP server: rename components/props, LLM failure fallback, call-site rewriting, name deduplication, empty input, API key forwarding, custom model, prop interpolation rewriting.
+
+Design decisions:
+
+- **Direct `fetch` to OpenAI-compatible API** — no dependency on `@jxsuite/ai`. Uses JSON mode (`response_format: { type: "json_object" }`) for structured output. Single round-trip per component, no streaming.
+- **Heuristic-first, AI-second** — the heuristic pass always runs first to detect structural patterns. The AI pass only refines naming. This means `--ai-components` without `--no-components` is the correct invocation; `--no-components --ai-components` produces no components (heuristic is the gate).
+- **Graceful degradation** — if the LLM returns invalid JSON, a non-kebab name, or a network error, that component keeps its heuristic name. No component is lost.
+- **Name deduplication** — if the LLM suggests the same name for two different components, a numeric suffix is appended (`product-card-2`).
+- **Default model: `gpt-4o-mini`** — cheap and fast for a naming task. Override with `--ai-model`.
+
+CLI usage:
+
+```
+OPENAI_API_KEY=sk-... jx-import https://example.com --ai-components
+OPENAI_API_KEY=sk-... jx-import https://example.com --ai-components --ai-model gpt-4o
+```
+
+What remains from the original plan but was deferred:
+
+- **Slot boundary detection** — identifying children that should be `<slot>` rather than interpolated props. Deferred: requires deeper semantic analysis and runtime slot support for imported components.
+- **Headless harness scoring** — running AI-refined components through the eval harness. Deferred: the existing eval tests L3.x cover component creation by the assistant, not imported components.
 
 ## 11. Phase 5 — Verify (fidelity gate)
 

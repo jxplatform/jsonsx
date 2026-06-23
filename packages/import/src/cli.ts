@@ -32,15 +32,22 @@ Options:
   --no-components          Skip component extraction (Phase 4)
   --min-instances <n>      Min recurring instances to extract a component (default: 2)
   --min-depth <n>          Min subtree depth to consider for componentization (default: 2)
+  --ai-components          Use LLM to refine component names and props (Phase 4 AI pass)
+  --ai-model <model>       Model for AI componentization (default: gpt-4o-mini)
   --verify                 After import, build and screenshot-diff vs original (Phase 5)
   --verify-threshold <n>   Pixel diff threshold 0..1 (default: 0.15)
+
+Environment:
+  OPENAI_API_KEY           Required for --ai-components
+  OPENAI_BASE_URL          Custom API base URL (default: https://api.openai.com/v1)
 
 Examples:
   jx-import https://example.com
   jx-import https://example.com --depth 1 --max-pages 10
   jx-import https://example.com --no-crawl
   jx-import https://example.com --out sites/my-clone --no-styles
-  jx-import https://example.com --verify`);
+  jx-import https://example.com --verify
+  jx-import https://example.com --ai-components`);
   process.exit(1);
 }
 
@@ -69,6 +76,9 @@ const skipAssets = args.includes("--no-assets");
 const noCrawl = args.includes("--no-crawl");
 const noRobots = args.includes("--no-robots");
 const noComponents = args.includes("--no-components");
+const doAiComponents = args.includes("--ai-components");
+const aiModelIdx = args.indexOf("--ai-model");
+const aiModel = aiModelIdx !== -1 && args[aiModelIdx + 1] ? args[aiModelIdx + 1] : undefined;
 const doVerify = args.includes("--verify");
 const verifyThresholdIdx = args.indexOf("--verify-threshold");
 const verifyThreshold =
@@ -198,6 +208,34 @@ if (maxDepth === 0) {
 
     await capture.page.close();
 
+    // Phase 4 AI pass: run heuristic componentize, then refine with LLM
+    let precomputedComponents;
+    if (doAiComponents && componentizeOptions !== false) {
+      const { componentize } = await import("./componentize.ts");
+      const { aiComponentize } = await import("./ai-componentize.ts");
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        console.error("Error: --ai-components requires OPENAI_API_KEY environment variable");
+        process.exit(1);
+      }
+      console.log("  Running heuristic componentization...");
+      const pageMap = new Map([["pages/index.json", jx.document]]);
+      const heuristic = componentize(pageMap, componentizeOptions ?? {});
+      if (heuristic.components.size > 0) {
+        console.log(`  Found ${heuristic.components.size} component(s), refining with AI...`);
+        precomputedComponents = await aiComponentize(
+          heuristic,
+          {
+            apiKey,
+            baseUrl: process.env.OPENAI_BASE_URL,
+            model: aiModel,
+          },
+          (msg) => console.log(`  ${msg}`),
+        );
+        console.log(`  AI refined ${precomputedComponents.components.size} component(s)`);
+      }
+    }
+
     console.log("  Writing project...");
     const { files } = await emitMultiPageProject({
       outDir,
@@ -205,7 +243,8 @@ if (maxDepth === 0) {
       pages: new Map([["pages/index.json", jx.document]]),
       sourceUrl: url,
       breakpoints,
-      componentizeOptions,
+      componentizeOptions: precomputedComponents ? false : componentizeOptions,
+      precomputedComponents,
     });
     console.log(`  Wrote ${files.length} files`);
 
@@ -288,6 +327,33 @@ if (maxDepth === 0) {
       }
     }
 
+    // Phase 4 AI pass
+    let precomputedComponentsMulti;
+    if (doAiComponents && componentizeOptions !== false) {
+      const { componentize } = await import("./componentize.ts");
+      const { aiComponentize } = await import("./ai-componentize.ts");
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        console.error("Error: --ai-components requires OPENAI_API_KEY environment variable");
+        process.exit(1);
+      }
+      console.log("  Running heuristic componentization...");
+      const heuristic = componentize(pageMap, componentizeOptions ?? {});
+      if (heuristic.components.size > 0) {
+        console.log(`  Found ${heuristic.components.size} component(s), refining with AI...`);
+        precomputedComponentsMulti = await aiComponentize(
+          heuristic,
+          {
+            apiKey,
+            baseUrl: process.env.OPENAI_BASE_URL,
+            model: aiModel,
+          },
+          (msg) => console.log(`  ${msg}`),
+        );
+        console.log(`  AI refined ${precomputedComponentsMulti.components.size} component(s)`);
+      }
+    }
+
     console.log("  Writing project...");
     const title = result.pages[0]?.title || new URL(url).hostname;
     const { files } = await emitMultiPageProject({
@@ -297,7 +363,8 @@ if (maxDepth === 0) {
       pages: pageMap,
       layout,
       breakpoints: result.breakpoints,
-      componentizeOptions,
+      componentizeOptions: precomputedComponentsMulti ? false : componentizeOptions,
+      precomputedComponents: precomputedComponentsMulti,
     });
 
     console.log(`  Wrote ${files.length} files:`);
