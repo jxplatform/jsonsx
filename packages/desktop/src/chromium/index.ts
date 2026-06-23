@@ -127,9 +127,15 @@ const server = Bun.serve({
 
     const root = getProjectRoot();
     if (root) {
+      // Map the URL pathname back to a filesystem path. On Windows the browser requests absolute
+      // Paths as /C:/Users/… (leading slash + forward slashes), so drop the slash before the drive
+      // Letter and compare with separators normalized; on POSIX both transforms are no-ops.
+      const fsPath = path.replace(/^\/([A-Za-z]:)/, "$1");
+      const normalize = (p: string) => p.replaceAll("\\", "/");
+
       // Serve absolute paths that fall under the project root
-      if (path.startsWith(root)) {
-        const file = Bun.file(path);
+      if (normalize(fsPath).startsWith(normalize(root))) {
+        const file = Bun.file(fsPath);
         if (await file.exists()) {
           return new Response(file);
         }
@@ -203,13 +209,13 @@ function findChromium(): string | null {
     "google-chrome-stable",
   ].filter(Boolean) as string[];
 
+  // Bun.which resolves a binary in PATH on every platform (no dependency on a POSIX `which`, which
+  // Is absent from a stock Windows shell and made resolution flaky depending on the host shell).
   for (const bin of candidates) {
-    try {
-      const result = Bun.spawnSync(["which", bin]);
-      if (result.exitCode === 0) {
-        return result.stdout.toString().trim();
-      }
-    } catch {}
+    const found = Bun.which(bin);
+    if (found) {
+      return found;
+    }
   }
   return null;
 }

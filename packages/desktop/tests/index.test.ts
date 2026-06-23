@@ -70,7 +70,10 @@ Bun.serve = (opts: { fetch: (req: Request) => Promise<Response>; port: number })
   return { port: 43_210, stop: () => {} };
 };
 
-await import("../src/index");
+const mod = await import("../src/index");
+// The boot sequence runs in an exported async function (`ready`) instead of a top-level await, so
+// Await it before asserting on its effects and before restoring the real Bun.serve.
+await mod.ready;
 
 // @ts-expect-error restore the real Bun.serve
 Bun.serve = realServe;

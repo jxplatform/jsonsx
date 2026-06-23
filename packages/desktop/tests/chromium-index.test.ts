@@ -12,6 +12,13 @@ import { join } from "node:path";
 const FIXTURES = join(import.meta.dir, "_fixtures_chromium_index");
 const STUDIO_ASSETS = join(FIXTURES, "_studio_assets");
 
+// Convert an absolute filesystem path to the URL pathname a browser would request for it. A bare
+// POSIX path is already a valid URL path; a Windows path (C:\Users\x) becomes /C:/Users/x.
+function toUrlPath(absPath: string): string {
+  const forward = absPath.replaceAll("\\", "/");
+  return forward.startsWith("/") ? forward : `/${forward}`;
+}
+
 mkdirSync(join(FIXTURES, "public"), { recursive: true });
 mkdirSync(STUDIO_ASSETS, { recursive: true });
 writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
@@ -113,7 +120,7 @@ void mock.module("node:child_process", () => ({ spawn: spawnMock }));
 
 process.argv[2] = FIXTURES;
 process.env.JX_STUDIO_ASSETS = STUDIO_ASSETS;
-process.env.CHROMIUM_BIN = "sh"; // Resolvable via `which` everywhere
+process.env.CHROMIUM_BIN = "sh";
 process.env.WAYLAND_DISPLAY ||= "wayland-test";
 
 const exitCalls: number[] = [];
@@ -132,6 +139,12 @@ let server: ReturnType<typeof Bun.serve> | undefined;
   return server;
 };
 
+// Resolve CHROMIUM_BIN deterministically: the real Bun.which returns null in a stock Windows shell
+// (no `sh` on PATH), which would send the launcher down its "no chromium found" exit path instead.
+const realWhich = Bun.which.bind(Bun);
+(Bun as unknown as { which: (cmd: string) => string | null }).which = (cmd: string) =>
+  cmd === "sh" ? "/usr/bin/sh" : null;
+
 const logs: string[] = [];
 const realLog = console.log;
 console.log = (...args: unknown[]) => {
@@ -142,6 +155,7 @@ await import("../src/chromium/index");
 
 console.log = realLog;
 (Bun as unknown as { serve: typeof Bun.serve }).serve = realServe;
+(Bun as unknown as { which: typeof Bun.which }).which = realWhich;
 
 const sigintHandlers = process
   .listeners("SIGINT")
@@ -219,7 +233,8 @@ describe("chromium launcher startup", () => {
     expect(bin.endsWith("/sh")).toBe(true);
     expect(args[0]).toBe(`--app=${baseUrl}/studio/index.html`);
     expect(args).toContain("--no-first-run");
-    expect(args.some((a) => a.includes(".jx/chromium-profile"))).toBe(true);
+    // The profile dir is built with path.resolve, so the separator is OS-native (\ on Windows).
+    expect(args.some((a) => a.includes(join(".jx", "chromium-profile")))).toBe(true);
   });
 
   test("adds wayland flags when WAYLAND_DISPLAY is set", () => {
@@ -353,13 +368,13 @@ describe("chromium launcher HTTP server", () => {
   });
 
   test("serves absolute paths under the project root", async () => {
-    const res = await fetch(`${baseUrl}${FIXTURES}/hello.txt`);
+    const res = await fetch(`${baseUrl}${toUrlPath(FIXTURES)}/hello.txt`);
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("Hello Index");
   });
 
   test("falls through when an absolute path under the root does not exist", async () => {
-    const res = await fetch(`${baseUrl}${FIXTURES}/missing-abs.txt`);
+    const res = await fetch(`${baseUrl}${toUrlPath(FIXTURES)}/missing-abs.txt`);
     expect(res.status).toBe(404);
   });
 
