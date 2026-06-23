@@ -1,6 +1,6 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Draft
+**Status:** Phase 1 complete — Phase 2 next
 **Date:** 2026-06-22
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
@@ -135,6 +135,30 @@ I'll detail each phase in its own follow-up section so this stays reviewable. He
 **Exit criteria:** the emitted `sites/cloned-example/pages/index.json` passes `validateDoc` and
 renders in Studio without throwing. Visual fidelity explicitly _not_ a Phase 0 gate.
 
+**Turnover (2026-06-22): Phase 0 ✅ COMPLETE.**
+
+Built and verified end-to-end. Files delivered under `packages/import/`:
+
+| File                  | Role                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/capture.ts`      | Headless Chromium via `puppeteer-core` (`launch`). Strips `<script>`/`<noscript>` in-page, collects same-origin `<a href>` links for Phase 3 crawl.             |
+| `src/to-jx.ts`        | `convertToJx(bodyHtml)` — feeds `htmlToJx`, strips unsafe tags (`iframe`/`object`/`embed`/`link`/`meta`), collects `<style>` content for Phase 1, counts nodes. |
+| `src/emit.ts`         | Writes `project.json` + `pages/index.json` + scaffolds `layouts/`, `components/`, `public/`.                                                                    |
+| `src/cli.ts`          | Top-level-await CLI: `jx-import <url> [--out dir]`. Warns on >5k-node pages.                                                                                    |
+| `src/index.ts`        | Public API re-exports.                                                                                                                                          |
+| `tests/to-jx.test.ts` | 9 tests: strip scripts/iframe/style collection, node count, empty input.                                                                                        |
+| `tests/emit.test.ts`  | 2 tests: file output + directory creation.                                                                                                                      |
+
+Verification:
+
+- `example.com` (6 nodes) → valid Jx, zero `validateDoc` errors, renders in Studio.
+- `tailwindcss.com` (2,288 nodes, 1.5 MB JSON) → valid Jx, zero errors, renders in Studio with
+  full structure visible in layers panel. No styles (expected — Phase 1), broken images (Phase 2).
+- 11/11 import tests pass, 288/288 parser tests unaffected.
+
+State model improvements filed separately: `docs/studio-state-model-improvements.md` (three items:
+structural-sharing history, virtualized layers, collapse-by-default for large imports).
+
 ## 7. Phase 1 — CSS fidelity (computed-diff per node)
 
 - During capture, walk the live DOM and for each element record `getComputedStyle` keyed by a
@@ -148,6 +172,37 @@ renders in Studio without throwing. Visual fidelity explicitly _not_ a Phase 0 g
   distinct query widths so Studio's media tabs line up (`specs/studio.md` §3.6).
 - Guardrail: cap emitted declarations per node (drop noise like every inherited font metric) — a
   curated allowlist of visually-meaningful properties beats dumping all ~350 computed props.
+
+**Turnover (2026-06-22): Phase 1 ✅ COMPLETE.**
+
+Built and verified end-to-end. New files delivered under `packages/import/`:
+
+| File                   | Role                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/style-capture.ts` | In-browser `page.evaluate()` — walks live DOM depth-first, captures `getComputedStyle` for ~120 allowlisted visually-meaningful properties per element, builds UA-default baselines per tagName via throwaway elements, discovers `@media` queries from stylesheets.                             |
+| `src/style-diff.ts`    | Diffs captured styles against UA defaults. Drops noise values (`auto`, `0px`, `normal`, etc.) for non-exempt properties; keeps them for semantically meaningful properties (`overflow`, `display`, `white-space`, etc.). Converts kebab-case → camelCase. Numeric-only values become JS numbers. |
+| `src/media-extract.ts` | Parses discovered `@media` queries, identifies simple `min-width`/`max-width` breakpoints (skips complex/feature queries), orchestrates viewport resize + re-capture at each breakpoint width, computes style deltas vs base capture.                                                            |
+| `src/apply-styles.ts`  | Maps diffed styles onto Jx tree nodes by matching depth-first element-index paths (same walk order as browser capture). Applies base styles to `node.style`, media deltas as `@--768`-style nested objects matching Studio's `applyCanvasStyle` convention.                                      |
+
+Modified files:
+
+- `src/capture.ts` — `capturePage` now returns the puppeteer `Page` object (kept open for style capture); caller is responsible for closing it after style work.
+- `src/emit.ts` — Accepts optional `breakpoints` option; writes `$media` map into `project.json` so Studio's media tabs line up.
+- `src/cli.ts` — Full Phase 1 pipeline wired in (capture → style capture → diff → media extract → apply → emit). `--no-styles` flag reverts to Phase 0 behavior.
+- `src/index.ts` — Re-exports all new modules and types.
+
+Design decisions:
+
+- **Did not reuse `applyStyleKeyMapping`/`expandStylePaths`** from `transpile.ts` — those map pseudo-class and `--custom-property` keys for remark-directive attributes, not CSS property names. Hand-rolled `kebabToCamel` is a simpler, correct fit for computed-style property conversion.
+- **Viewport re-capture** for `$media` instead of CSS rule parsing — simpler, catches JS-driven responsive changes, matches the plan's "re-snapshot computed styles at each breakpoint width" strategy.
+- **Property allowlist** (~120 properties) covers layout, flex, grid, box model, border, background, typography, and visual properties. Deliberately excludes inherited font metrics, animation keyframes, and other noise.
+- **Noise filtering** — values like `auto`, `0px`, `normal` are dropped for most properties but kept for exempt properties where they carry semantic meaning (e.g., `overflow: hidden`, `display: none`, `white-space: nowrap`).
+
+Verification:
+
+- 35/35 import tests pass (24 new for Phase 1: style-diff, media-extract, apply-styles).
+- 288/288 parser tests unaffected.
+- `--no-styles` flag confirmed to produce Phase 0 output (no style capture).
 
 ## 8. Phase 2 — Assets
 

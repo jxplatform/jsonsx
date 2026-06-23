@@ -7,6 +7,8 @@ export interface EmitOptions {
   title: string;
   document: JxElement;
   sourceUrl: string;
+  /** $media breakpoints to seed into project.json (Phase 1). */
+  breakpoints?: Record<string, string>;
 }
 
 export async function emitProject({
@@ -14,17 +16,22 @@ export async function emitProject({
   title,
   document,
   sourceUrl,
+  breakpoints,
 }: EmitOptions): Promise<{ files: string[] }> {
   await mkdir(join(outDir, "pages"), { recursive: true });
   await mkdir(join(outDir, "layouts"), { recursive: true });
   await mkdir(join(outDir, "components"), { recursive: true });
   await mkdir(join(outDir, "public"), { recursive: true });
 
-  const projectJson = {
+  const projectJson: Record<string, unknown> = {
     title: title || "Imported Site",
     description: `Imported from ${sourceUrl}`,
     imports: {},
   };
+
+  if (breakpoints && Object.keys(breakpoints).length > 0) {
+    projectJson.$media = breakpoints;
+  }
 
   const files: string[] = [];
 

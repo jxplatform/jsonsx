@@ -4,18 +4,24 @@ import { resolve } from "node:path";
 import { capturePage, launchBrowser, closeBrowser } from "./capture.ts";
 import { convertToJx } from "./to-jx.ts";
 import { emitProject } from "./emit.ts";
+import { captureStyles } from "./style-capture.ts";
+import { diffAllStyles } from "./style-diff.ts";
+import { extractMedia } from "./media-extract.ts";
+import { applyStylesToTree } from "./apply-styles.ts";
 
 function usage(): never {
-  console.log(`Usage: jx-import <url> [--out <dir>]
+  console.log(`Usage: jx-import <url> [--out <dir>] [--no-styles]
 
 Clone a live website into a Jx project.
 
 Options:
   --out <dir>   Output directory (default: sites/<hostname>)
+  --no-styles   Skip CSS capture (Phase 0 behavior)
 
 Examples:
   jx-import https://example.com
-  jx-import https://example.com --out sites/my-clone`);
+  jx-import https://example.com --out sites/my-clone
+  jx-import https://example.com --no-styles`);
   process.exit(1);
 }
 
@@ -29,6 +35,8 @@ if (!url.startsWith("http://") && !url.startsWith("https://")) {
   console.error("Error: URL must start with http:// or https://");
   process.exit(1);
 }
+
+const skipStyles = args.includes("--no-styles");
 
 let outDir: string | undefined;
 const outIdx = args.indexOf("--out");
@@ -61,12 +69,53 @@ try {
     );
   }
 
+  let breakpoints: Record<string, string> | undefined;
+
+  if (!skipStyles) {
+    console.log("  Capturing computed styles...");
+    const styleResult = await captureStyles(capture.page);
+    console.log(
+      `  Captured styles for ${styleResult.elements.length} elements, ${Object.keys(styleResult.uaDefaults).length} tag baselines`,
+    );
+
+    console.log("  Diffing against UA defaults...");
+    const diffed = diffAllStyles(styleResult.elements, styleResult.uaDefaults);
+    console.log(`  ${diffed.length} elements with non-default styles`);
+
+    if (styleResult.mediaQueries.length > 0) {
+      console.log(
+        `  Extracting @media breakpoints (${styleResult.mediaQueries.length} queries found)...`,
+      );
+      const media = await extractMedia(
+        capture.page,
+        styleResult.elements,
+        styleResult.uaDefaults,
+        styleResult.mediaQueries,
+      );
+      const bpCount = Object.keys(media.breakpoints).length;
+      if (bpCount > 0) {
+        console.log(`  ${bpCount} breakpoints with style changes`);
+        ({ breakpoints } = media);
+        applyStylesToTree(jx.document, diffed, media.deltas);
+      } else {
+        console.log("  No responsive breakpoints with style changes");
+        applyStylesToTree(jx.document, diffed);
+      }
+    } else {
+      console.log("  No @media queries found");
+      applyStylesToTree(jx.document, diffed);
+    }
+  }
+
+  await capture.page.close();
+
   console.log("  Writing project...");
   const { files } = await emitProject({
     outDir,
     title: capture.title,
     document: jx.document,
     sourceUrl: url,
+    breakpoints,
   });
   console.log(`  Wrote ${files.length} files`);
 

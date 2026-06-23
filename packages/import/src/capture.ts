@@ -7,6 +7,8 @@ export interface CaptureResult {
   bodyHtml: string;
   /** Discovered same-origin links for the crawler (Phase 3). */
   links: string[];
+  /** The puppeteer Page, kept open for style capture (Phase 1). Caller must close. */
+  page: Page;
 }
 
 const DEFAULT_CHROME_PATHS = [
@@ -59,42 +61,42 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
+/**
+ * Capture a page's DOM. Returns the page object still open — the caller is responsible for closing
+ * it (after style capture in Phase 1, or immediately).
+ */
 export async function capturePage(url: string, browser?: Browser): Promise<CaptureResult> {
   const br = browser ?? (await launchBrowser());
   const page: Page = await br.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
-  try {
-    await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });
+  await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });
 
-    const result = await page.evaluate(() => {
-      // Strip scripts and noscript before capture
-      for (const el of document.querySelectorAll("script, noscript")) {
-        el.remove();
-      }
+  const result = await page.evaluate(() => {
+    // Strip scripts and noscript before capture
+    for (const el of document.querySelectorAll("script, noscript")) {
+      el.remove();
+    }
 
-      const links: string[] = [];
-      const { origin } = location;
-      for (const a of document.querySelectorAll("a[href]")) {
-        try {
-          const { href } = new URL((a as HTMLAnchorElement).href, location.href);
-          if (href.startsWith(origin) && !href.includes("#")) {
-            links.push(href);
-          }
-        } catch {
-          // Skip invalid URLs
+    const links: string[] = [];
+    const { origin } = location;
+    for (const a of document.querySelectorAll("a[href]")) {
+      try {
+        const { href } = new URL((a as HTMLAnchorElement).href, location.href);
+        if (href.startsWith(origin) && !href.includes("#")) {
+          links.push(href);
         }
+      } catch {
+        // Skip invalid URLs
       }
+    }
 
-      return {
-        title: document.title,
-        bodyHtml: document.body.innerHTML,
-        links: [...new Set(links)],
-      };
-    });
+    return {
+      title: document.title,
+      bodyHtml: document.body.innerHTML,
+      links: [...new Set(links)],
+    };
+  });
 
-    return { url, ...result };
-  } finally {
-    await page.close();
-  }
+  return { url, ...result, page };
 }
