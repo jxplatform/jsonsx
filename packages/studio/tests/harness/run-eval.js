@@ -159,7 +159,8 @@ const TESTS = [
   },
   {
     id: "L2.5",
-    prompt: "Wrap the heading in a <header> element",
+    prompt:
+      "Wrap the heading in a <header> element — the h1 should become a child of a new <header> tag",
     mustReadFirst: true,
     check: (d) =>
       anyNode(

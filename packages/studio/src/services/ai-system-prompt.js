@@ -283,7 +283,30 @@ A \$switch node carries a wrapper "tagName" (usually "div"), a "\$switch" \$ref 
   }
 }
 
-To switch the active case, set the signal in a handler (e.g. state.currentRoute = "about").`;
+To switch the active case, set the signal in a handler (e.g. state.currentRoute = "about").
+
+### Tab switcher — full pattern (onclick handlers + \$switch):
+{
+  "tagName": "tab-panel",
+  "state": {
+    "activeTab": { "type": "string", "default": "tab1" },
+    "showTab1": { "\$prototype": "Function", "body": "state.activeTab = 'tab1';" },
+    "showTab2": { "\$prototype": "Function", "body": "state.activeTab = 'tab2';" },
+    "showTab3": { "\$prototype": "Function", "body": "state.activeTab = 'tab3';" }
+  },
+  "children": [
+    { "tagName": "div", "style": { "display": "flex", "gap": "0.5rem" }, "children": [
+      { "tagName": "button", "textContent": "Tab 1", "onclick": { "\$ref": "#/state/showTab1" } },
+      { "tagName": "button", "textContent": "Tab 2", "onclick": { "\$ref": "#/state/showTab2" } },
+      { "tagName": "button", "textContent": "Tab 3", "onclick": { "\$ref": "#/state/showTab3" } }
+    ]},
+    { "tagName": "div", "\$switch": { "\$ref": "#/state/activeTab" }, "cases": {
+      "tab1": { "tagName": "section", "textContent": "Content for Tab 1" },
+      "tab2": { "tagName": "section", "textContent": "Content for Tab 2" },
+      "tab3": { "tagName": "section", "textContent": "Content for Tab 3" }
+    }}
+  ]
+}`;
 
 // ─── Multi-Page Patterns ────────────────────────────────────────────────────
 

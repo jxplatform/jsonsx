@@ -1,7 +1,7 @@
 # AI Assistant — Headless Real-LLM Harness
 
-**Status:** Proposed
-**Date:** 2026-06-20
+**Status:** Active — L1–L5 green (17/18 C:5), L2.5 known limitation
+**Date:** 2026-06-22
 **Owner:** Gideon
 **Branch:** `feat/ai-assistant-stack-b`
 **Relates to:** `docs/ai-assistant-testing-plan.md` (manual/browser eval), `specs/ai-assistant.md`
@@ -92,6 +92,24 @@ headless test** — setting `nonExistentProp` succeeds with no error (Jx accepts
 it never provokes recovery; L4.5 covers genuine bad-path recovery and passed. **Next: add
 `$map`/`$switch`/signal few-shot examples (from `examples/`) to `ai-system-prompt.js`, then
 regression-check L1–L5.**
+
+**Post-premium-components revalidation (2026-06-22, gpt-5.4 @ temp 0, 1 run each):** Full L1–L5
+suite re-run after Phases 1–4 of the premium component plan landed (token injection, design
+principles, premium few-shot, token lint). Fixes applied this session:
+
+- `textOf()` in `doc-query.js` now walks string children (was skipping `["Hello World"]`-style text
+  nodes → L1.1 false negative).
+- Added full tab-switcher example to `CONTROL_FLOW_PATTERNS` in `ai-system-prompt.js` — shows
+  onclick handlers + `$switch` + cases end-to-end. Fixed L5.3 (was hitting 5-round cap with invalid
+  inline onclick objects).
+- L2.5 prompt clarified ("the h1 should become a child of a new header tag") — model still renames
+  the tag instead of wrapping. **Known toolset limitation**: no `wrap_element` tool, so wrapping
+  requires multi-step read→rename→insert→restructure that the model can't reliably coordinate in 5
+  rounds.
+
+Results: **17/18 C:5** (L2.5 the sole exception). L5.2 and L5.3 now pass — the `$map`/`$switch`
+coverage added in earlier sessions plus the new tab-switcher example resolved the control-flow gap.
+44/44 deterministic AI tests still green.
 
 ### Harness layout
 

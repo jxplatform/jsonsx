@@ -19,12 +19,21 @@ export function allNodes(doc) {
   return out;
 }
 
-/** Concatenated visible text — `t` node `text` fields plus any `textContent`. @param {any} doc */
+/** Concatenated visible text — text nodes, textContent, and string children. @param {any} doc */
 export function textOf(doc) {
-  return allNodes(doc)
-    .map((n) => n.text ?? n.textContent ?? "")
-    .filter(Boolean)
-    .join(" ");
+  const parts = [];
+  const walk = (n) => {
+    if (typeof n === "string") {
+      parts.push(n);
+      return;
+    }
+    if (!n || typeof n !== "object") return;
+    if (n.text) parts.push(n.text);
+    if (n.textContent) parts.push(n.textContent);
+    if (Array.isArray(n.children)) for (const c of n.children) walk(c);
+  };
+  walk(doc);
+  return parts.join(" ");
 }
 
 /**

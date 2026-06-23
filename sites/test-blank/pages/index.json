@@ -1,8 +1,6 @@
 {
   "tagName": "div",
-  "attributes": {
-    "id": "index-page"
-  },
+  "attributes": { "id": "index-page" },
   "children": [
     {
       "tagName": "h1",

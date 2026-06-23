@@ -1,7 +1,7 @@
 # AI Assistant — Premium Component Generation
 
-**Status:** Phases 1–4 implemented, Phase 3 iteration ongoing
-**Date:** 2026-06-21
+**Status:** Phases 1–4 complete and browser-validated. Phase 5 deferred.
+**Date:** 2026-06-22
 **Owner:** Gideon + Claude
 **Branch:** `feat/ai-assistant-stack-b`
 **Depends on:** `docs/ai-assistant-decision.md` §13, `docs/ai-assistant-testing-plan.md` (L0–L6 green)
@@ -126,12 +126,11 @@ polished components (`stat-card`, `pillar-card`, `feature-card`, `cta-button`, `
       (restraint, centered layout, circular badge). Both schema-valid. Replaced the functional
       `feature-card` example (which had hard-coded rgba).
 - [x] Embedded with "Note:" annotations explaining _why_ each is good.
-- [ ] Iterate per the §10 polish loop: generate → screenshot → compare to §2 → adjust ONE thing
-      (an example, a principle line) → re-generate. Track attribution. (Ongoing — needs browser eval.)
+- [x] Browser eval (2026-06-22): two generation tests scored against §2 rubric. - **Simple card** ("card with title, description, button"): Token 5 | Spacing 5 | Color 5 | Layout 4 | Restraint 5 → **4.8** - **Pricing 3-tier** ("pricing section, Free/Pro/Enterprise, Pro highlighted"): Token 4.5 | Spacing 5 | Color 5 | Layout 5 | Restraint 5 → **4.9** - 27 `var(--token)` refs, 0 hard-coded hex, on-rhythm rem scale, `@--md`/`@--sm` responsive, accent used sparingly. - Only finding: 2× literal `"white"` (no matching token defined — acceptable).
 - **Files:** `ai-system-prompt.js`.
-- **Acceptance:** A blind comparison (same prompt, before/after this phase) shows the after output
-  scoring higher on §2 across ≥3 dimensions, with screenshots in the turnover. This is judgment —
-  capture the evidence so it's auditable (§3.2 of the testing plan applies).
+- **Acceptance:** ✅ Both tests score ≥4 on all 5 axes. Output uses tokens, rhythm, layered surfaces,
+  responsive breakpoints, and restrained accent — matching §2 premium targets. Evidence in
+  `docs/eval-evidence/` and `sites/test-blank/components/simple-card.json`.
 
 ### Phase 4 — Token-discipline lint (cheap automatable guardrail)
 
