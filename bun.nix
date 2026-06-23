@@ -3681,6 +3681,10 @@
     url = "https://registry.npmjs.org/pirates/-/pirates-4.0.7.tgz";
     hash = "sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==";
   };
+  "pixelmatch@7.2.0" = fetchurl {
+    url = "https://registry.npmjs.org/pixelmatch/-/pixelmatch-7.2.0.tgz";
+    hash = "sha512-xhcb4yHu9sM/G7foGzoLtXYcC0zHEaOXXjRKhGup0fw78Nf2Tkiapv4EQyMzrbcmQPsllAI7DbFY2UT7PlI9Pg==";
+  };
   "pkce-challenge@5.0.1" = fetchurl {
     url = "https://registry.npmjs.org/pkce-challenge/-/pkce-challenge-5.0.1.tgz";
     hash = "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ==";
@@ -3700,6 +3704,10 @@
   "pngjs@6.0.0" = fetchurl {
     url = "https://registry.npmjs.org/pngjs/-/pngjs-6.0.0.tgz";
     hash = "sha512-TRzzuFRRmEoSW/p1KVAmiOgPco2Irlah+bGFCeNfJXxxYGwSw7YwAOAcd7X28K/m5bjBWKsC29KyoMfHbypayg==";
+  };
+  "pngjs@7.0.0" = fetchurl {
+    url = "https://registry.npmjs.org/pngjs/-/pngjs-7.0.0.tgz";
+    hash = "sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==";
   };
   "posix-character-classes@0.1.1" = fetchurl {
     url = "https://registry.npmjs.org/posix-character-classes/-/posix-character-classes-0.1.1.tgz";

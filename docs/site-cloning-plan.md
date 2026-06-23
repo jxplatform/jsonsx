@@ -1,7 +1,7 @@
 # Site Cloning → Jx — Plan
 
-**Status:** Phase 4 (heuristic) complete — AI pass (`--ai-components`) next
-**Date:** 2026-06-22
+**Status:** Phase 5 (verify) complete — all pipeline phases shipped
+**Date:** 2026-06-23
 **Owner:** Gideon
 **Goal:** Take a live website URL, trace the whole site, and transform it into a faithful Jx
 project — then harvest the results into a reusable templates/themes portfolio. Also: a frank
@@ -327,6 +327,49 @@ What's next: the AI pass (opt-in `--ai-components`) should:
   same viewport. Emit a per-page fidelity % and a diff thumbnail.
 - This is the **render-critic pattern** from the AI eval generalized: schema-valid ≠ renders-right.
   Reuse `render-critic.js`'s detached-render check as the headless half.
+
+**Turnover (2026-06-23): Phase 5 ✅ COMPLETE.**
+
+Built and verified end-to-end. New files delivered under `packages/import/`:
+
+| File                     | Role                                                                                                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/screenshot-diff.ts` | Pixel-level PNG comparison using `pixelmatch` + `pngjs`. Takes two PNG buffers, pads smaller to larger if sizes differ, returns fidelity % (0–100), mismatched pixel count, and a diff visualization PNG. Configurable threshold (default 0.15). |
+| `src/verify.ts`          | Orchestrator: builds the emitted Jx project via `@jxsuite/compiler/site` (`buildSite`), serves `dist/` locally via Bun, screenshots original URL + rendered page at same viewport via puppeteer, diffs, writes report + artifacts.               |
+
+Modified files:
+
+- `src/cli.ts` — `--verify` flag runs Phase 5 after import. `--verify-threshold <n>` sets pixel diff sensitivity. Both single-page and multi-page paths supported.
+- `src/index.ts` — Re-exports `diffScreenshots`, `verifyProject`, and their types.
+- `package.json` — Added `pixelmatch`, `pngjs` as dependencies; `@jxsuite/compiler` as optional dependency (only needed for `--verify`); `@types/pngjs` as devDependency.
+
+Tests:
+
+- `tests/screenshot-diff.test.ts` — 8 tests: identical images, completely different, same color, size mismatch padding, partial match, diff PNG validity, threshold sensitivity, checkerboard pattern.
+- `tests/verify.test.ts` — 5 tests: route-to-URL-path mapping for index, nested, and deep routes.
+
+Design decisions:
+
+- **`pixelmatch` + `pngjs`** over custom pixel comparison — industry-standard, handles antialiasing tolerance, produces visual diff thumbnails. Small footprint (~20 KB combined).
+- **Compiler `buildSite`** as the render path — compiles Jx to static HTML with component hydration, matching the production output. Uses `Bun.serve` with port 0 for ephemeral local serving (no port conflicts).
+- **Dynamic import** of `@jxsuite/compiler/site` — keeps the compiler out of the critical path for non-verify imports; the optional dependency means `jx-import` still works without the compiler installed.
+- **Image size padding** — when original and rendered screenshots differ in dimensions (e.g. page height), the smaller is padded with white rather than erroring. Size mismatch itself contributes to the fidelity penalty naturally.
+- **Full-pipeline integration** — `--verify` runs after the complete import (styles, assets, components), so fidelity measures the end-to-end quality of the clone, not just structure.
+
+CLI usage:
+
+```
+jx-import https://example.com --verify
+jx-import https://example.com --verify --verify-threshold 0.2
+jx-import https://example.com --depth 1 --max-pages 5 --verify
+```
+
+Output artifacts (in `<outDir>/verify/`):
+
+- `report.json` — structured report with per-page fidelity, build errors, viewport config
+- `<page>-original.png` — screenshot of the live source URL
+- `<page>-rendered.png` — screenshot of the locally rendered Jx output
+- `<page>-diff.png` — pixel diff visualization (mismatches highlighted in red)
 
 ---
 

@@ -32,12 +32,15 @@ Options:
   --no-components          Skip component extraction (Phase 4)
   --min-instances <n>      Min recurring instances to extract a component (default: 2)
   --min-depth <n>          Min subtree depth to consider for componentization (default: 2)
+  --verify                 After import, build and screenshot-diff vs original (Phase 5)
+  --verify-threshold <n>   Pixel diff threshold 0..1 (default: 0.15)
 
 Examples:
   jx-import https://example.com
   jx-import https://example.com --depth 1 --max-pages 10
   jx-import https://example.com --no-crawl
-  jx-import https://example.com --out sites/my-clone --no-styles`);
+  jx-import https://example.com --out sites/my-clone --no-styles
+  jx-import https://example.com --verify`);
   process.exit(1);
 }
 
@@ -66,6 +69,12 @@ const skipAssets = args.includes("--no-assets");
 const noCrawl = args.includes("--no-crawl");
 const noRobots = args.includes("--no-robots");
 const noComponents = args.includes("--no-components");
+const doVerify = args.includes("--verify");
+const verifyThresholdIdx = args.indexOf("--verify-threshold");
+const verifyThreshold =
+  verifyThresholdIdx !== -1 && args[verifyThresholdIdx + 1]
+    ? Number.parseFloat(args[verifyThresholdIdx + 1]) || 0.15
+    : 0.15;
 
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);
 const maxPages = parseIntArg(args, "--max-pages", 25);
@@ -192,6 +201,26 @@ if (maxDepth === 0) {
     });
     console.log(`  Wrote ${files.length} files`);
 
+    if (doVerify) {
+      console.log("\n  --- Phase 5: Verify ---");
+      const { verifyProject } = await import("./verify.ts");
+      const pageUrls = new Map([["pages/index.json", url]]);
+      const verifyResult = await verifyProject({
+        projectDir: outDir,
+        pageUrls,
+        threshold: verifyThreshold,
+        onProgress: (msg) => console.log(`  ${msg}`),
+        browser,
+      });
+      console.log(`\n  Verification complete:`);
+      for (const page of verifyResult.pages) {
+        const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
+        console.log(`    ${page.route} — ${status}`);
+      }
+      console.log(`  Average fidelity: ${verifyResult.averageFidelity}%`);
+      console.log(`  Report: ${verifyResult.reportDir}/report.json`);
+    }
+
     console.log(`\nDone! Open in Studio:`);
     console.log(
       `  http://localhost:3000/packages/studio/index.html?project=${outDir}/project.json`,
@@ -263,6 +292,28 @@ if (maxDepth === 0) {
     console.log(`  Wrote ${files.length} files:`);
     for (const page of result.pages) {
       console.log(`    ${page.route} — "${page.title}" (${page.jx.nodeCount} nodes)`);
+    }
+
+    if (doVerify) {
+      console.log("\n  --- Phase 5: Verify ---");
+      const { verifyProject } = await import("./verify.ts");
+      const pageUrls = new Map<string, string>();
+      for (const page of result.pages) {
+        pageUrls.set(page.route, page.url);
+      }
+      const verifyResult = await verifyProject({
+        projectDir: outDir,
+        pageUrls,
+        threshold: verifyThreshold,
+        onProgress: (msg) => console.log(`  ${msg}`),
+      });
+      console.log(`\n  Verification complete:`);
+      for (const page of verifyResult.pages) {
+        const status = page.error ? `ERROR: ${page.error}` : `${page.fidelity}% fidelity`;
+        console.log(`    ${page.route} — ${status}`);
+      }
+      console.log(`  Average fidelity: ${verifyResult.averageFidelity}%`);
+      console.log(`  Report: ${verifyResult.reportDir}/report.json`);
     }
 
     console.log(`\nDone! Open in Studio:`);

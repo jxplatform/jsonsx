@@ -28,6 +28,14 @@
   "dependencies": {
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/schema": "workspace:^",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0",
     "puppeteer-core": "^24.9.0"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  },
+  "optionalDependencies": {
+    "@jxsuite/compiler": "workspace:^"
   }
 }

@@ -11,6 +11,8 @@ export { rewriteAssetUrls } from "./asset-rewrite.ts";
 export { crawlSite, normalizeUrl, routeToFilePath, fetchRobotsTxt } from "./crawl.ts";
 export { detectLayout, hashSubtree, treesEqual } from "./layout-detect.ts";
 export { componentize } from "./componentize.ts";
+export { diffScreenshots } from "./screenshot-diff.ts";
+export { verifyProject, serveDirectory, routeToUrlPath } from "./verify.ts";
 export type { CaptureResult } from "./capture.ts";
 export type { ToJxResult } from "./to-jx.ts";
 export type { EmitOptions, MultiEmitOptions } from "./emit.ts";
@@ -26,3 +28,5 @@ export type {
   ExtractedComponent,
   ComponentizeResult,
 } from "./componentize.ts";
+export type { DiffResult, DiffOptions } from "./screenshot-diff.ts";
+export type { VerifyOptions, PageVerifyResult, VerifyResult } from "./verify.ts";
