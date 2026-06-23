@@ -43,6 +43,13 @@ export interface ImageConfig {
 }
 
 type SharpModule = typeof SharpNS;
+/**
+ * Accepted output-format type, derived from the Sharp instance's own toFormat signature. Reaching
+ * into the `SharpNS.FormatEnum` namespace instead is fragile: sharp ships as `export = sharp`, so
+ * whether a default type-import exposes the merged namespace depends on esModuleInterop resolution
+ * (differs local vs CI).
+ */
+type SharpFormat = Parameters<ReturnType<SharpModule>["toFormat"]>[0];
 
 let _sharp: SharpModule | null = null;
 
@@ -175,7 +182,7 @@ export async function processImage(srcPath: string, cacheImgDir: string, config:
       const quality = config.quality[format as keyof ImageConfig["quality"]] ?? 80;
       const task = sharp(srcPath)
         .resize(width)
-        .toFormat(format as keyof SharpNS.FormatEnum, { quality })
+        .toFormat(format as SharpFormat, { quality })
         .toFile(absolutePath)
         .then(() => {});
 
