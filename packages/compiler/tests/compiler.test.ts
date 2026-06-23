@@ -284,9 +284,15 @@ describe("compile — static nodes", () => {
     expect(html).toContain("<li>second</li>");
   });
 
-  test("node with no textContent, innerHTML, or children → empty inner", async () => {
+  test("void elements", async () => {
     const { html } = await compile({ tagName: "br" });
-    expect(html).toContain("<br></br>");
+    expect(html).toContain("<br>");
+    expect(html).not.toContain("<br></br>");
+  });
+
+  test("node with no textContent, innerHTML, or children → empty inner", async () => {
+    const { html } = await compile({ tagName: "div" });
+    expect(html).toContain("<div></div>");
   });
 
   test("no dynamic content → no module script", async () => {
