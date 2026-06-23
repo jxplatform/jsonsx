@@ -1,0 +1,100 @@
+import { launch } from "puppeteer-core";
+import type { Browser, Page } from "puppeteer-core";
+
+export interface CaptureResult {
+  url: string;
+  title: string;
+  bodyHtml: string;
+  /** Discovered same-origin links for the crawler (Phase 3). */
+  links: string[];
+}
+
+const DEFAULT_CHROME_PATHS = [
+  "google-chrome-stable",
+  "google-chrome",
+  "chromium-browser",
+  "chromium",
+];
+
+function findChrome(): string {
+  const env = process.env.CHROME_PATH;
+  if (env) {
+    return env;
+  }
+
+  for (const name of DEFAULT_CHROME_PATHS) {
+    try {
+      const result = Bun.spawnSync(["which", name]);
+      const path = new TextDecoder().decode(result.stdout).trim();
+      if (path) {
+        return path;
+      }
+    } catch {
+      // Try next
+    }
+  }
+  throw new Error(
+    "Could not find Chrome/Chromium. Set CHROME_PATH or install google-chrome-stable.",
+  );
+}
+
+let _browser: Browser | null = null;
+
+export async function launchBrowser(): Promise<Browser> {
+  if (_browser?.connected) {
+    return _browser;
+  }
+  _browser = await launch({
+    executablePath: findChrome(),
+    headless: true,
+    args: ["--no-sandbox", "--disable-gpu"],
+  });
+  return _browser;
+}
+
+export async function closeBrowser(): Promise<void> {
+  if (_browser?.connected) {
+    await _browser.close();
+    _browser = null;
+  }
+}
+
+export async function capturePage(url: string, browser?: Browser): Promise<CaptureResult> {
+  const br = browser ?? (await launchBrowser());
+  const page: Page = await br.newPage();
+  await page.setViewport({ width: 1440, height: 900 });
+
+  try {
+    await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });
+
+    const result = await page.evaluate(() => {
+      // Strip scripts and noscript before capture
+      for (const el of document.querySelectorAll("script, noscript")) {
+        el.remove();
+      }
+
+      const links: string[] = [];
+      const { origin } = location;
+      for (const a of document.querySelectorAll("a[href]")) {
+        try {
+          const { href } = new URL((a as HTMLAnchorElement).href, location.href);
+          if (href.startsWith(origin) && !href.includes("#")) {
+            links.push(href);
+          }
+        } catch {
+          // Skip invalid URLs
+        }
+      }
+
+      return {
+        title: document.title,
+        bodyHtml: document.body.innerHTML,
+        links: [...new Set(links)],
+      };
+    });
+
+    return { url, ...result };
+  } finally {
+    await page.close();
+  }
+}

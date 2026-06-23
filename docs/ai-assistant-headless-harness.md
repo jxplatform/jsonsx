@@ -1,6 +1,6 @@
 # AI Assistant — Headless Real-LLM Harness
 
-**Status:** Active — L1–L5 green (17/18 C:5), L2.5 known limitation
+**Status:** Active — L1–L5 green (18/18 C:5); L2.5 now passes via `add_child`+`move_node`
 **Date:** 2026-06-22
 **Owner:** Gideon
 **Branch:** `feat/ai-assistant-stack-b`
@@ -102,14 +102,21 @@ principles, premium few-shot, token lint). Fixes applied this session:
 - Added full tab-switcher example to `CONTROL_FLOW_PATTERNS` in `ai-system-prompt.js` — shows
   onclick handlers + `$switch` + cases end-to-end. Fixed L5.3 (was hitting 5-round cap with invalid
   inline onclick objects).
-- L2.5 prompt clarified ("the h1 should become a child of a new header tag") — model still renames
-  the tag instead of wrapping. **Known toolset limitation**: no `wrap_element` tool, so wrapping
-  requires multi-step read→rename→insert→restructure that the model can't reliably coordinate in 5
-  rounds.
+- L2.5 prompt clarified ("the h1 should become a child of a new header tag"). Initially the model
+  renamed the tag (`set_property tagName`) instead of wrapping, which read as a toolset gap.
 
-Results: **17/18 C:5** (L2.5 the sole exception). L5.2 and L5.3 now pass — the `$map`/`$switch`
-coverage added in earlier sessions plus the new tab-switcher example resolved the control-flow gap.
-44/44 deterministic AI tests still green.
+Results (this session): **17/18 C:5** (L2.5 the lone miss). L5.2 and L5.3 now pass — the
+`$map`/`$switch` coverage added in earlier sessions plus the new tab-switcher example resolved the
+control-flow gap. 44/44 deterministic AI tests still green.
+
+**L2.5 re-traced (2026-06-22, gpt-5.4 @ temp 0, 5 runs):** now **5/5 PASS, C:5** — the earlier
+"renames the tag, needs `wrap_element`" call was wrong. Wrapping is expressible with the existing
+toolset by **composing two tools**, and the model discovers it reliably: `read_document` →
+`add_child` (empty `<header>` at index 0) → `move_node` (h1 into `["children",0,"children",0]`).
+A 1/5 variant uses `add_child` (header already containing the h1) → `remove_node` (old h1). The
+explicit second clause in the prompt steers the model off the `set_property(tagName)` rename and
+onto the move path. No `wrap_element` tool is needed. Only sub-5 axis is **Efficiency 3** (4 rounds,
+3 after the mandatory-read discount) — inherent to a 2-mutation op, not a defect.
 
 ### Harness layout
 
