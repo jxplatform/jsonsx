@@ -16,6 +16,9 @@ const DEFAULT_IGNORE = [
   "**/.direnv/**",
   "**/bun.lockb",
   "**/bun.lock",
+  // Bun test temporary directories — created/deleted transiently,
+  // Cause EINVAL on fs.watch when cleaned up mid-scan.
+  "**/__test-*/**",
 ];
 
 /** @param {string} value */
@@ -184,6 +187,14 @@ export function createWatcher(
         broadcast();
       }
     }, debounceMs);
+  });
+
+  // Gracefully handle watch errors (e.g. EINVAL on transient Bun test dirs)
+  watcher.on("error", (err) => {
+    if (err.message?.includes("EINVAL")) {
+      return;
+    }
+    console.error("[watch] chokidar error:", err.message ?? err);
   });
 
   return { broadcast, broadcastEvent, handleSSE, watcher };
