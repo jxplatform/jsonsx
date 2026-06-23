@@ -78,6 +78,22 @@ const sleep = (ms: number) =>
     setTimeout(resolve, ms);
   });
 
+/**
+ * Wait until a condition holds, polling on a short interval. Robust where a fixed `sleep` is not:
+ * the poll loop schedules with setTimeout(0) for a 0s device interval, and under full-suite load
+ * (or Windows' ~15ms timer granularity) that fires later than a fixed 10ms sleep, racing the
+ * assert.
+ */
+const waitFor = async (cond: () => boolean, timeoutMs = 2000) => {
+  const start = Date.now();
+  while (!cond()) {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error("waitFor: condition not met before timeout");
+    }
+    await sleep(5);
+  }
+};
+
 beforeEach(() => {
   localStorage.removeItem(STORAGE_KEY);
   for (const host of dialogHosts) {
@@ -137,7 +153,9 @@ describe("authenticateGithub dialog", () => {
         }),
     ];
     const promise = authenticateGithub();
-    await sleep(10); // 0s interval: poll fired, token request now in flight
+    // 0s interval: wait until the poll has fired and the token request is in flight (a fixed sleep
+    // Races setTimeout(0) under load / Windows timer granularity).
+    await waitFor(() => fetchCalls.length === 2);
     expect(fetchCalls.length).toBe(2);
 
     dialogHosts.at(-1)!.querySelector("sp-dialog-wrapper")!.dispatchEvent(new Event("cancel"));

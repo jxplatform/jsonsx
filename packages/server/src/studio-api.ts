@@ -7,7 +7,7 @@
  * All paths are relative to the project root. Directory traversal above root is rejected.
  */
 
-import { basename, dirname, extname, isAbsolute, relative, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { errorMessage } from "@jxsuite/schema/parse";
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -20,6 +20,14 @@ import type { ProjectConfig } from "@jxsuite/schema/types";
 
 /** Normalise a path to forward slashes (Windows `path` module returns backslashes). */
 const fwd = (p: string) => p.replaceAll("\\", "/");
+
+/**
+ * Expand a leading `~` to the user's home directory using path.join so separators are normalised (a
+ * plain string replace left the input's forward slashes intact, yielding mixed separators on
+ * Windows) and falling back to USERPROFILE where HOME is unset.
+ */
+const expandTilde = (p: string) =>
+  p.startsWith("~") ? join(process.env.HOME || process.env.USERPROFILE || "", p.slice(1)) : p;
 
 interface PackageJson {
   name?: string;
@@ -318,17 +326,13 @@ export async function handleStudioApi(
     }
     try {
       // Walk up from file's directory looking for project.json
-      let dir = dirname(
-        filePath.startsWith("~") ? filePath.replace("~", process.env.HOME || "") : filePath,
-      );
+      const absFile = expandTilde(filePath);
+      let dir = dirname(absFile);
       while (dir) {
         const candidate = resolve(dir, "project.json");
         if (existsSync(candidate)) {
           const config = JSON.parse(readFileSync(candidate, "utf8")) as ProjectConfig;
           const relPath = fwd(dir);
-          const absFile = filePath.startsWith("~")
-            ? filePath.replace("~", process.env.HOME || "")
-            : filePath;
           const fileRelPath = fwd(relative(dir, absFile));
           return Response.json({
             fileRelPath,
@@ -805,7 +809,7 @@ export async function handleStudioApi(
     if (!fp) {
       return new Response("Missing path", { status: 400 });
     }
-    const abs = fp.startsWith("~") ? fp.replace("~", process.env.HOME || "") : fp;
+    const abs = expandTilde(fp);
     try {
       assertAccessible(abs, root, activeProjectRoot);
     } catch (error) {

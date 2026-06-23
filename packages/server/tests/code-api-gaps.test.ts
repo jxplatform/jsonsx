@@ -1,33 +1,22 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { handleCodeApi } from "../src/code-api";
-import { dirname, resolve } from "node:path";
-import { existsSync, mkdirSync, rmSync, rmdirSync, symlinkSync } from "node:fs";
+import { resolve } from "node:path";
+import { existsSync, rmSync, symlinkSync } from "node:fs";
 
 // Code-api resolves the oxlint binary relative to its own source directory:
-// Packages/server/src/../../node_modules/.bin/oxlint → packages/node_modules/.bin.
-// That directory does not exist in a workspace layout, so link the repo-root
-// Binary there for the duration of this test file.
-const OXLINT_EXPECTED = resolve(
-  import.meta.dir,
-  "../src/../../node_modules/.bin",
-  process.platform === "win32" ? "oxlint.exe" : "oxlint",
-);
-const OXLINT_REAL = resolve(
-  import.meta.dir,
-  "../../../node_modules/.bin",
-  process.platform === "win32" ? "oxlint.exe" : "oxlint",
-);
+// Packages/server/src/../../node_modules/.bin/oxlint → packages/node_modules/.bin. That directory
+// Does not exist in a workspace layout (oxlint is hoisted to the repo-root node_modules), so mirror
+// The repo-root node_modules there for the duration of this file. A directory junction (vs a file
+// Symlink) needs no elevated privileges on Windows and keeps the real oxlint shim resolving its own
+// Package from the junctioned tree; on POSIX the type arg is ignored and it is a normal symlink.
+const EXPECTED_MODULES = resolve(import.meta.dir, "../../node_modules");
+const REAL_MODULES = resolve(import.meta.dir, "../../../node_modules");
 
 let createdLink = false;
-let createdBinDir = false;
-let createdModulesDir = false;
 
 beforeAll(() => {
-  if (!existsSync(OXLINT_EXPECTED) && existsSync(OXLINT_REAL)) {
-    createdModulesDir = !existsSync(dirname(dirname(OXLINT_EXPECTED)));
-    createdBinDir = !existsSync(dirname(OXLINT_EXPECTED));
-    mkdirSync(dirname(OXLINT_EXPECTED), { recursive: true });
-    symlinkSync(OXLINT_REAL, OXLINT_EXPECTED);
+  if (!existsSync(EXPECTED_MODULES) && existsSync(REAL_MODULES)) {
+    symlinkSync(REAL_MODULES, EXPECTED_MODULES, "junction");
     createdLink = true;
   }
 });
@@ -35,13 +24,8 @@ beforeAll(() => {
 afterAll(() => {
   try {
     if (createdLink) {
-      rmSync(OXLINT_EXPECTED, { force: true });
-    }
-    if (createdBinDir) {
-      rmdirSync(dirname(OXLINT_EXPECTED));
-    }
-    if (createdModulesDir) {
-      rmdirSync(dirname(dirname(OXLINT_EXPECTED)));
+      // Removing the path unlinks the junction/symlink itself; the real node_modules tree survives.
+      rmSync(EXPECTED_MODULES, { force: true, recursive: true });
     }
   } catch {}
 });

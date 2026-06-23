@@ -96,7 +96,24 @@ import { projectConfigSchema } from "../defs/project-config.schema";
 
 // ─── Web standards data loader ────────────────────────────────────────────────
 
-async function loadWebData() {
+let webDataCache: Promise<{
+  cssProps: string[];
+  eventHandlers: string[];
+  tagExamples: string[];
+}> | null = null;
+
+/**
+ * Web-standards parsing (WebIDL / CSS / HTML elements) is expensive and the data is static for the
+ * Process, so memoize it. generateSchema runs several times across a build or test run, and
+ * Re-parsing on each call made the validateDocument / CLI tests load-sensitive (occasionally past
+ * The 5s test timeout under full-suite CPU contention).
+ */
+function loadWebData() {
+  webDataCache ??= computeWebData();
+  return webDataCache;
+}
+
+async function computeWebData() {
   const [elementsData, cssData, idlData] = await Promise.all([
     listElements(),
     css.listAll(),
@@ -527,11 +544,11 @@ export async function validateDocument(doc: Record<string, unknown>) {
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
-if (process.argv[1] && process.argv[1].endsWith("schema.ts")) {
+async function runSchemaCli() {
   const { writeFileSync } = await import("node:fs");
   const { resolve, dirname } = await import("node:path");
 
-  const schemaDir = dirname(resolve(process.argv[1], ".."));
+  const schemaDir = dirname(resolve(process.argv[1] as string, ".."));
 
   const componentSchema = await generateSchema();
   const projectSchema = generateProjectSchema();
@@ -556,3 +573,9 @@ if (process.argv[1] && process.argv[1].endsWith("schema.ts")) {
     console.error("  class-schema.json");
   }
 }
+
+// Runs when invoked as a script or driven by a test that stages argv[1]. The build lives in an async
+// Function rather than a top-level await: Bun's test runtime drops a dynamically-imported module's
+// Top-level-await continuation on Windows. `ready` lets tests await the same sequence.
+// oxlint-disable-next-line unicorn/prefer-top-level-await
+export const ready = process.argv[1]?.endsWith("schema.ts") ? runSchemaCli() : undefined;

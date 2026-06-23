@@ -274,9 +274,12 @@ export async function createDevServer(options: {
       // Static files
 
       // If the URL path is an absolute filesystem path under the active project, serve directly.
-      // Browsers produce "//abs/path" when an absolute path is used as a URL path — normalise.
-      const fsPath = path.startsWith("//") ? path.slice(1) : path;
-      if (activeProjectRoot && fsPath.startsWith(activeProjectRoot)) {
+      // A POSIX absolute path arrives as "//abs/path"; a Windows one as "/C:/dir/file" (leading
+      // Slash + forward slashes), so drop the slash before the drive letter. Compare with
+      // Separators normalised, since activeProjectRoot is OS-native (backslashes on Windows).
+      const fsPath = path.startsWith("//") ? path.slice(1) : path.replace(/^\/([A-Za-z]:)/, "$1");
+      const normSep = (p: string) => p.replaceAll("\\", "/");
+      if (activeProjectRoot && normSep(fsPath).startsWith(normSep(activeProjectRoot))) {
         const file = Bun.file(fsPath);
         if (await file.exists()) {
           return new Response(file);

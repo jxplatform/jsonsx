@@ -20,13 +20,19 @@ if (!dest) {
 const destPath = resolve(dest);
 const dirName = basename(destPath);
 
-const rl = createInterface({ input: stdin, output: stdout });
+// The interactive flow runs inside an async function rather than via top-level await: when a test
+// Pulls this entry in with a dynamic import(), Bun's test runtime drops the continuation after a
+// Top-level await (it never resumes on Windows), leaving the prompts and generate step unexecuted.
+// `ready` lets the test await the same sequence. The no-arg usage guard stays at module scope so a
+// Bare invocation still exits during evaluation.
+async function main() {
+  const rl = createInterface({ input: stdin, output: stdout });
 
-const name = (await rl.question(`Project name (${dirName}): `)) || dirName;
-const description = await rl.question("Description: ");
-const url = await rl.question("Production URL (https://example.com): ");
+  const name = (await rl.question(`Project name (${dirName}): `)) || dirName;
+  const description = await rl.question("Description: ");
+  const url = await rl.question("Production URL (https://example.com): ");
 
-console.log(`
+  console.log(`
 Deployment adapter:
   1) static (default)
   2) cloudflare-pages
@@ -34,21 +40,21 @@ Deployment adapter:
   4) bun
   5) cloudflare-workers
 `);
-const adapterChoice = await rl.question("Adapter [1]: ");
-rl.close();
+  const adapterChoice = await rl.question("Adapter [1]: ");
+  rl.close();
 
-const adapterMap: Record<string, ProjectOptions["adapter"]> = {
-  1: "static",
-  2: "cloudflare-pages",
-  3: "node",
-  4: "bun",
-  5: "cloudflare-workers",
-};
-const adapter = adapterMap[adapterChoice] || "static";
+  const adapterMap: Record<string, ProjectOptions["adapter"]> = {
+    1: "static",
+    2: "cloudflare-pages",
+    3: "node",
+    4: "bun",
+    5: "cloudflare-workers",
+  };
+  const adapter = adapterMap[adapterChoice] || "static";
 
-await generateProject(destPath, { adapter, description, name, url });
+  await generateProject(destPath, { adapter, description, name, url });
 
-console.log(`
+  console.log(`
 Project created at ${destPath}
 
 Next steps:
@@ -56,3 +62,7 @@ Next steps:
   bun install
   bun run dev
 `);
+}
+
+// oxlint-disable-next-line unicorn/prefer-top-level-await
+export const ready = main();

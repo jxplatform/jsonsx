@@ -32,8 +32,12 @@ beforeAll(() => {
   git("init -b main");
   git("config user.email test@test.com");
   git("config user.name Test");
+  // Disable EOL conversion so checked-out content round-trips byte-for-byte: Windows git defaults to
+  // Autocrlf=true, which would restore "original content\n" as "...\r\n". Committing this into the
+  // Tree means clones inherit it too, keeping the clone test's checkout LF as well.
+  writeFileSync(join(REPO, ".gitattributes"), "* -text\n");
   writeFileSync(join(REPO, "tracked.txt"), "original content\n");
-  git("add tracked.txt");
+  git("add .gitattributes tracked.txt");
   git("commit -m initial");
 });
 

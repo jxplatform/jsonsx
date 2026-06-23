@@ -31,7 +31,10 @@ process.argv = [process.argv[0] ?? "bun", "index.ts", "my-test-site"];
 // Non-literal specifier: keeps tsgo from adding the CLI entry (which has a pre-existing
 // TS7053 implicit-any at adapterMap[adapterChoice]) to the type-check program.
 const cliEntry = "../index";
-await import(cliEntry);
+// The entry runs its interactive flow in an exported `ready` promise (not a top-level await), so
+// Await it: Bun's test runtime drops a dynamically-imported module's top-level-await continuation.
+const cliModule = (await import(cliEntry)) as { ready?: Promise<unknown> };
+await cliModule.ready;
 
 const destPath = resolve("my-test-site");
 

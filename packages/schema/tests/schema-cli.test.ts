@@ -18,7 +18,10 @@ console.error = (...args: unknown[]) => {
 const OUT = join(TMP, "custom-out.json");
 process.argv = [process.argv[0] ?? "bun", join(TMP, "src", "schema.ts"), OUT];
 
-await import("../src/schema");
+// The CLI build runs in the exported `ready` promise (not a top-level await), so await it: Bun's
+// Test runtime drops a dynamically-imported module's top-level-await continuation on Windows.
+const { ready } = await import("../src/schema");
+await ready;
 
 const outText = existsSync(OUT) ? readFileSync(OUT, "utf8") : "";
 const wroteDefaultTriple = existsSync(join(TMP, "project-schema.json"));
