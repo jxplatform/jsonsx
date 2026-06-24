@@ -590,6 +590,50 @@ describe("packages", () => {
     route("/__studio/packages", () => json({}, 500));
     expect(await p.listPackages()).toEqual([]);
   });
+
+  test("installDependencies posts install, returning the result or a failure log", async () => {
+    route("/__studio/packages/install", () => json({ ok: true }), "POST");
+    const p = createDevServerPlatform();
+    expect(await p.installDependencies!()).toEqual({ ok: true });
+    route("/__studio/packages/install", () => textRes("install boom", 500), "POST");
+    expect(await p.installDependencies!()).toEqual({ log: "install boom", ok: false });
+  });
+
+  test("dependenciesNeedInstall reflects the needsInstall flag", async () => {
+    route("/__studio/packages/needs-install", () => json({ needsInstall: true }));
+    const p = createDevServerPlatform();
+    expect(await p.dependenciesNeedInstall!()).toBe(true);
+    route("/__studio/packages/needs-install", () => json({}, 500));
+    expect(await p.dependenciesNeedInstall!()).toBe(false);
+  });
+
+  test("outdatedPackages returns the list, or [] on failure", async () => {
+    route("/__studio/packages/outdated", () =>
+      json([{ current: "^1.0.0", latest: "2.0.0", name: "a" }]),
+    );
+    const p = createDevServerPlatform();
+    expect(await p.outdatedPackages!()).toEqual([
+      { current: "^1.0.0", latest: "2.0.0", name: "a" },
+    ]);
+    route("/__studio/packages/outdated", () => json({}, 500));
+    expect(await p.outdatedPackages!()).toEqual([]);
+  });
+
+  test("setPackageVersions posts the updates, returning the result or a failure log", async () => {
+    const updates = [{ dev: false, name: "a", version: "^2.0.0" }];
+    route(
+      "/__studio/packages/set-versions",
+      (c) => {
+        expect(c.body).toEqual({ updates });
+        return json({ ok: true });
+      },
+      "POST",
+    );
+    const p = createDevServerPlatform();
+    expect(await p.setPackageVersions!(updates)).toEqual({ ok: true });
+    route("/__studio/packages/set-versions", () => textRes("conflict", 500), "POST");
+    expect(await p.setPackageVersions!(updates)).toEqual({ log: "conflict", ok: false });
+  });
 });
 
 describe("codeService", () => {

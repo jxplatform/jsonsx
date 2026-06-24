@@ -196,8 +196,12 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
       requests: {
         // Packages
         addPackage: (params) => pkg.addPackage(params),
+        dependenciesNeedInstall: () => pkg.dependenciesNeedInstall(),
+        installDependencies: () => pkg.installDependencies(),
         listPackages: () => pkg.listPackages(),
+        outdatedPackages: () => pkg.outdatedPackages(),
         removePackage: (params) => pkg.removePackage(params),
+        setPackageVersions: (params) => pkg.setPackageVersions(params),
 
         // AI (sessions are id-keyed and process-global; record ids for cleanup on close)
         aiAuthStatus: () => getAuthStatus(),

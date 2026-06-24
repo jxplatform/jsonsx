@@ -421,6 +421,44 @@ export function createDevServerPlatform() {
       return await res.json();
     },
 
+    async installDependencies() {
+      const res = await fetch("/__studio/packages/install", { method: "POST" });
+      if (!res.ok) {
+        return { log: await res.text(), ok: false };
+      }
+      return await res.json();
+    },
+
+    async dependenciesNeedInstall() {
+      const res = await fetch("/__studio/packages/needs-install");
+      if (!res.ok) {
+        return false;
+      }
+      const data = (await res.json()) as { needsInstall?: boolean };
+      return Boolean(data.needsInstall);
+    },
+
+    async outdatedPackages() {
+      const res = await fetch("/__studio/packages/outdated");
+      if (!res.ok) {
+        return [];
+      }
+      return await res.json();
+    },
+
+    /** @param {{ name: string; version: string; dev?: boolean }[]} updates */
+    async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {
+      const res = await fetch("/__studio/packages/set-versions", {
+        body: JSON.stringify({ updates }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      if (!res.ok) {
+        return { log: await res.text(), ok: false };
+      }
+      return await res.json();
+    },
+
     // ─── Code services (optional) ─────────────────────────────────────────
 
     /**

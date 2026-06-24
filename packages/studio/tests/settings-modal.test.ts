@@ -82,7 +82,14 @@ describe("open", () => {
     const navLabels = [...modal()!.querySelectorAll(".settings-nav-item")].map((b) =>
       b.textContent?.trim(),
     );
-    expect(navLabels).toEqual(["General", "Head", "CSS Variables", "Definitions", "Content Types"]);
+    expect(navLabels).toEqual([
+      "General",
+      "Head",
+      "CSS Variables",
+      "Definitions",
+      "Content Types",
+      "Dependencies",
+    ]);
     expect(navButton("General").classList.contains("active")).toBe(true);
 
     // The deferred rAF render filled the content area with the General section
@@ -146,6 +153,13 @@ describe("section navigation", () => {
     pointer(navButton("Content Types"), "click");
     await flush();
     expect(content().querySelector(".settings-empty-state")?.textContent).toContain("content type");
+  });
+
+  test("Dependencies section renders the dependency editor", async () => {
+    await openAndSettle();
+    pointer(navButton("Dependencies"), "click");
+    await flush();
+    expect(content().querySelector(".settings-section-title")?.textContent).toBe("Dependencies");
   });
 });
 

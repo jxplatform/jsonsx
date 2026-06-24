@@ -420,6 +420,22 @@ export function createDesktopPlatform() {
       return rpc.request.listPackages();
     },
 
+    async installDependencies() {
+      return rpc.request.installDependencies();
+    },
+
+    async dependenciesNeedInstall() {
+      return rpc.request.dependenciesNeedInstall();
+    },
+
+    async outdatedPackages() {
+      return rpc.request.outdatedPackages();
+    },
+
+    async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {
+      return rpc.request.setPackageVersions({ updates });
+    },
+
     async getAppInfo() {
       const info = await rpc.request.updaterGetLocalInfo();
       let updateStatus: string | undefined;

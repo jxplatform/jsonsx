@@ -16,6 +16,8 @@ import { createState, projectState, requireProjectState, setProjectState } from 
 import { getPlatform } from "../platform";
 import { statusMessage } from "../panels/statusbar";
 import { loadComponentRegistry } from "./components";
+import { ensureDependenciesInstalled } from "../packages/ensure-deps";
+import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
 import { markLocalMutation } from "./fs-events";
 import {
   draggable,
@@ -156,6 +158,7 @@ export async function openProject({
       selectedPath: null,
     });
 
+    await ensureDependenciesInstalled();
     await loadDirectory(".");
     await loadComponentRegistry();
 
@@ -187,6 +190,7 @@ export async function openProject({
     statusMessage(`Opened project: ${requireProjectState().name}`);
 
     await openHomePage();
+    void maybePromptJxsuiteUpdate(requireProjectState().projectRoot);
   } catch (error) {
     statusMessage(`Error: ${errorMessage(error)}`);
   }

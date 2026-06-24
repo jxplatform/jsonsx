@@ -76,6 +76,23 @@ export interface GitLogEntry {
 export interface PackageInfo {
   name: string;
   version: string;
+  /** True when the dependency lives in `devDependencies` rather than `dependencies`. */
+  dev?: boolean;
+}
+
+/** A dependency with a newer version available, as reported by `bun outdated` / the npm registry. */
+export interface OutdatedInfo {
+  name: string;
+  current: string;
+  latest: string;
+  wanted?: string;
+  dev?: boolean;
+}
+
+/** Result of a package mutation that runs `bun install` (install / set-versions). */
+export interface PackageOpResult {
+  ok: boolean;
+  log?: string;
 }
 
 // ─── Update types ────────────────────────────────────────────────────────────
@@ -263,6 +280,22 @@ export interface StudioRPC {
       listPackages: {
         params: void;
         response: PackageInfo[];
+      };
+      installDependencies: {
+        params: void;
+        response: PackageOpResult;
+      };
+      dependenciesNeedInstall: {
+        params: void;
+        response: boolean;
+      };
+      outdatedPackages: {
+        params: void;
+        response: OutdatedInfo[];
+      };
+      setPackageVersions: {
+        params: { updates: { name: string; version: string; dev?: boolean }[] };
+        response: PackageOpResult;
       };
       createProject: {
         params: {

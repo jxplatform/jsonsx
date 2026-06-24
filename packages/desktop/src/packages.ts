@@ -1,40 +1,36 @@
-import { resolve } from "node:path";
+import {
+  addPackage as addPkg,
+  dependenciesNeedInstall as needInstall,
+  installDependencies as install,
+  listPackages as list,
+  outdatedPackages as outdated,
+  removePackage as removePkg,
+  setPackageVersions as setVersions,
+} from "@jxsuite/server/packages";
 import { getProjectRoot } from "./handlers";
-import type { PackageInfo } from "./rpc-schema";
+import type { OutdatedInfo, PackageInfo, PackageOpResult } from "./rpc-schema";
 
 /** Build package operations bound to one project session (its projectRoot is the package cwd). */
 export function createPackageOps(session: { readonly projectRoot: string | null }) {
-  async function addPackage(params: { name: string }): Promise<void> {
+  function requireRoot(): string {
     const root = session.projectRoot;
     if (!root) {
       throw new Error("No project open");
     }
-    const proc = Bun.spawn(["bun", "add", params.name], {
-      cwd: root,
-      stderr: "pipe",
-      stdout: "pipe",
-    });
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`Failed to add package: ${stderr.trim()}`);
+    return root;
+  }
+
+  async function addPackage(params: { name: string }): Promise<void> {
+    const res = await addPkg(requireRoot(), params.name);
+    if (!res.ok) {
+      throw new Error(`Failed to add package: ${res.log ?? "bun add failed"}`);
     }
   }
 
   async function removePackage(params: { name: string }): Promise<void> {
-    const root = session.projectRoot;
-    if (!root) {
-      throw new Error("No project open");
-    }
-    const proc = Bun.spawn(["bun", "remove", params.name], {
-      cwd: root,
-      stderr: "pipe",
-      stdout: "pipe",
-    });
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
-      throw new Error(`Failed to remove package: ${stderr.trim()}`);
+    const res = await removePkg(requireRoot(), params.name);
+    if (!res.ok) {
+      throw new Error(`Failed to remove package: ${res.log ?? "bun remove failed"}`);
     }
   }
 
@@ -43,21 +39,44 @@ export function createPackageOps(session: { readonly projectRoot: string | null 
     if (!root) {
       return [];
     }
-    const pkgPath = resolve(root, "package.json");
-    const file = Bun.file(pkgPath);
-    if (!(await file.exists())) {
-      return [];
-    }
-
-    const pkg = (await file.json()) as { dependencies?: Record<string, string> };
-    const deps = pkg.dependencies || {};
-    return Object.entries(deps).map(([name, version]) => ({
-      name,
-      version: version as string,
-    }));
+    return list(root);
   }
 
-  return { addPackage, removePackage, listPackages };
+  async function installDependencies(): Promise<PackageOpResult> {
+    return install(requireRoot());
+  }
+
+  async function dependenciesNeedInstall(): Promise<boolean> {
+    const root = session.projectRoot;
+    if (!root) {
+      return false;
+    }
+    return needInstall(root);
+  }
+
+  async function outdatedPackages(): Promise<OutdatedInfo[]> {
+    const root = session.projectRoot;
+    if (!root) {
+      return [];
+    }
+    return outdated(root);
+  }
+
+  async function setPackageVersions(params: {
+    updates: { name: string; version: string; dev?: boolean }[];
+  }): Promise<PackageOpResult> {
+    return setVersions(requireRoot(), params.updates);
+  }
+
+  return {
+    addPackage,
+    dependenciesNeedInstall,
+    installDependencies,
+    listPackages,
+    outdatedPackages,
+    removePackage,
+    setPackageVersions,
+  };
 }
 
 // ─── Legacy free functions (default process-global session via getProjectRoot) ──

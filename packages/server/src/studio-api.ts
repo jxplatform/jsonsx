@@ -13,6 +13,12 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from "node:
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import { applyRename } from "./refactor/apply.ts";
+import {
+  dependenciesNeedInstall,
+  installDependencies,
+  outdatedPackages,
+  setPackageVersions,
+} from "./packages.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
 import * as claude from "./claude-session.ts";
 import type { ClassJsonDef } from "./types.ts";
@@ -677,6 +683,7 @@ export async function handleStudioApi(
       const packages: {
         name: string;
         version: string;
+        dev: boolean;
         hasCem: boolean;
         customElementsPath: string | null;
       }[] = [];
@@ -695,6 +702,7 @@ export async function handleStudioApi(
           const depPkg = JSON.parse(await readFile(actualPath, "utf8")) as PackageJson;
           packages.push({
             customElementsPath: depPkg.customElements || null,
+            dev: pkg.dependencies?.[name] === undefined,
             hasCem: Boolean(depPkg.customElements),
             name,
             version,
@@ -798,6 +806,54 @@ export async function handleStudioApi(
         );
       }
       return Response.json({ ok: true });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
+  // Install all dependencies (bun install)
+  if (path === "/__studio/packages/install" && req.method === "POST") {
+    try {
+      const body = (await req.json().catch(() => ({}))) as { dir?: string };
+      const dir = body.dir || activeProjectRoot || root;
+      const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+      return Response.json(await installDependencies(scanRoot));
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
+  // Whether dependencies need installing (node_modules missing)
+  if (path === "/__studio/packages/needs-install" && req.method === "GET") {
+    const dir = url.searchParams.get("dir") || activeProjectRoot || root;
+    const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+    return Response.json({ needsInstall: dependenciesNeedInstall(scanRoot) });
+  }
+
+  // Dependencies with a newer version available
+  if (path === "/__studio/packages/outdated" && req.method === "GET") {
+    try {
+      const dir = url.searchParams.get("dir") || activeProjectRoot || root;
+      const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+      return Response.json(await outdatedPackages(scanRoot));
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
+  // Set version ranges for one or more packages, then reinstall
+  if (path === "/__studio/packages/set-versions" && req.method === "POST") {
+    try {
+      const body = (await req.json()) as {
+        dir?: string;
+        updates?: { name: string; version: string; dev?: boolean }[];
+      };
+      if (!Array.isArray(body.updates)) {
+        return Response.json({ error: "Missing updates" }, { status: 400 });
+      }
+      const dir = body.dir || activeProjectRoot || root;
+      const scanRoot = isAbsolute(dir) ? dir : resolve(root, dir);
+      return Response.json(await setPackageVersions(scanRoot, body.updates));
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 500 });
     }

@@ -13,6 +13,7 @@ import { renderContentTypesEditor } from "./content-types-editor";
 import { renderCssVarsEditor } from "./css-vars-editor";
 import { renderHeadEditor } from "./head-editor";
 import { renderGeneralSettings } from "./general-settings";
+import { renderDependenciesEditor } from "./dependencies-editor";
 import { openModal } from "../ui/layers";
 
 let _handle: ReturnType<typeof openModal> | null = null;
@@ -27,6 +28,7 @@ const sections = [
   { icon: "sp-icon-brush", key: "cssVars", label: "CSS Variables" },
   { icon: "sp-icon-data", key: "definitions", label: "Definitions" },
   { icon: "sp-icon-view-grid", key: "contentTypes", label: "Content Types" },
+  { icon: "sp-icon-box", key: "dependencies", label: "Dependencies" },
 ];
 
 export function openSettingsModal() {
@@ -129,6 +131,10 @@ function renderActiveSection() {
     }
     case "contentTypes": {
       renderContentTypesEditor(_contentEl);
+      break;
+    }
+    case "dependencies": {
+      renderDependenciesEditor(_contentEl);
       break;
     }
     default: {

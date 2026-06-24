@@ -74,6 +74,8 @@ import { mountResizeEdges } from "./resize-edges";
 import { codeService } from "./services/code-services";
 import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/signals-panel";
 import { loadComponentRegistry } from "./files/components";
+import { ensureDependenciesInstalled } from "./packages/ensure-deps";
+import { maybePromptJxsuiteUpdate } from "./packages/jxsuite-update";
 
 import { html, render as litRender } from "lit-html";
 
@@ -713,6 +715,7 @@ async function openRecentProject(root: string) {
       selectedPath: null,
     });
 
+    await ensureDependenciesInstalled();
     await loadDirectory(".");
     await loadComponentRegistry();
 
@@ -741,6 +744,7 @@ async function openRecentProject(root: string) {
 
     await openHomePage();
     ensureFsSync();
+    void maybePromptJxsuiteUpdate(root);
   } catch (error) {
     statusMessage(`Error: ${errorMessage(error)}`);
   }

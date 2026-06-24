@@ -53,6 +53,27 @@ export interface ComponentMeta {
 export interface PackageInfo {
   name: string;
   version: string;
+  /** True when the dependency lives in `devDependencies` rather than `dependencies`. */
+  dev?: boolean;
+}
+
+/** A dependency with a newer version available, as reported by `bun outdated` / the npm registry. */
+export interface OutdatedInfo {
+  name: string;
+  /** The version range pinned in package.json (e.g. "^0.19.0"). */
+  current: string;
+  /** The newest published version. */
+  latest: string;
+  /** The newest version satisfying the current range, if known. */
+  wanted?: string;
+  dev?: boolean;
+}
+
+/** Result of a package mutation that runs `bun install` (install / set-versions). */
+export interface PackageOpResult {
+  ok: boolean;
+  /** Combined stdout/stderr from the bun invocation, surfaced to the user on failure. */
+  log?: string;
 }
 
 /** Desktop app/build info surfaced in the About screen. */
@@ -134,6 +155,22 @@ export interface StudioPlatform {
   addPackage: (name: string) => Promise<unknown>;
   removePackage: (name: string) => Promise<unknown>;
   listPackages: () => Promise<PackageInfo[]>;
+  /**
+   * Run `bun install` in the project root. Optional: platforms without a Bun-capable backend omit
+   * it and the install-on-open / reinstall affordances are skipped.
+   */
+  installDependencies?: () => Promise<PackageOpResult>;
+  /** Whether the project has uninstalled dependencies (node_modules missing). */
+  dependenciesNeedInstall?: () => Promise<boolean>;
+  /** List dependencies that have a newer version available. */
+  outdatedPackages?: () => Promise<OutdatedInfo[]>;
+  /**
+   * Rewrite the version range of each named package (preserving its dependencies/devDependencies
+   * placement) and run `bun install`. Used by the @jxsuite bump and per-dependency updates.
+   */
+  setPackageVersions?: (
+    updates: { name: string; version: string; dev?: boolean }[],
+  ) => Promise<PackageOpResult>;
   /**
    * Desktop-only app/build info (release channel, commit hash, update status). Platforms without a
    * native shell (e.g. the dev server) omit it, and the About screen hides the corresponding

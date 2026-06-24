@@ -61,6 +61,7 @@
     "@spectrum-web-components/picker": "^1.12.1",
     "@spectrum-web-components/picker-button": "^1.12.1",
     "@spectrum-web-components/popover": "^1.12.1",
+    "@spectrum-web-components/progress-circle": "^1.12.1",
     "@spectrum-web-components/search": "^1.12.1",
     "@spectrum-web-components/swatch": "^1.12.1",
     "@spectrum-web-components/switch": "^1.12.1",

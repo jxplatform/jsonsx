@@ -373,6 +373,15 @@ describe("platform methods", () => {
     ["addPackage", ["lodash"], "addPackage", { name: "lodash" }],
     ["removePackage", ["lodash"], "removePackage", { name: "lodash" }],
     ["listPackages", [], "listPackages", undefined],
+    ["installDependencies", [], "installDependencies", undefined],
+    ["dependenciesNeedInstall", [], "dependenciesNeedInstall", undefined],
+    ["outdatedPackages", [], "outdatedPackages", undefined],
+    [
+      "setPackageVersions",
+      [[{ name: "x", version: "^1" }]],
+      "setPackageVersions",
+      { updates: [{ name: "x", version: "^1" }] },
+    ],
     ["gitStatus", [], "gitStatus", undefined],
     ["gitBranches", [], "gitBranches", undefined],
     ["gitStage", [["a.json"]], "gitStage", { files: ["a.json"] }],
@@ -625,5 +634,66 @@ describe("asset resolution via MutationObserver", () => {
   test("swallows data url resolution failures", async () => {
     await flush();
     expect(failImg.getAttribute("src")).toBeNull();
+  });
+});
+
+describe("getAppInfo", () => {
+  test("reports 'Up to date' when no update is pending", async () => {
+    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "abc", version: "1.2.3" }));
+    impls.set("updaterGetStatus", () => ({
+      error: null,
+      updateAvailable: false,
+      updateReady: false,
+      version: null,
+    }));
+    const info = await platform.getAppInfo!();
+    expect(info).toEqual({
+      channel: "stable",
+      hash: "abc",
+      updateStatus: "Up to date",
+      version: "1.2.3",
+    });
+  });
+
+  test("reports available then ready updates", async () => {
+    impls.set("updaterGetLocalInfo", () => ({ channel: "canary", hash: "d", version: "1.0.0" }));
+    impls.set("updaterGetStatus", () => ({
+      error: null,
+      updateAvailable: true,
+      updateReady: false,
+      version: "1.1.0",
+    }));
+    const available = await platform.getAppInfo!();
+    expect(available.updateStatus).toBe("Update available (1.1.0)");
+    impls.set("updaterGetStatus", () => ({
+      error: null,
+      updateAvailable: true,
+      updateReady: true,
+      version: "1.1.0",
+    }));
+    const ready = await platform.getAppInfo!();
+    expect(ready.updateStatus).toBe("Update ready (1.1.0)");
+  });
+
+  test("reports a failed update check", async () => {
+    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "d", version: "1.0.0" }));
+    impls.set("updaterGetStatus", () => ({
+      error: "boom",
+      updateAvailable: false,
+      updateReady: false,
+      version: null,
+    }));
+    const failed = await platform.getAppInfo!();
+    expect(failed.updateStatus).toBe("Update check failed: boom");
+  });
+
+  test("omits updateStatus when the status call throws", async () => {
+    impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "d", version: "1.0.0" }));
+    impls.set("updaterGetStatus", () => {
+      throw new Error("rpc down");
+    });
+    const info = await platform.getAppInfo!();
+    expect(info.updateStatus).toBeUndefined();
+    expect(info.version).toBe("1.0.0");
   });
 });

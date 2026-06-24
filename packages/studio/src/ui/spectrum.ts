@@ -48,6 +48,7 @@ import { Accordion } from "@spectrum-web-components/accordion/src/Accordion.js";
 import { AccordionItem } from "@spectrum-web-components/accordion/src/AccordionItem.js";
 import { ActionBar } from "@spectrum-web-components/action-bar/src/ActionBar.js";
 import { Toast } from "@spectrum-web-components/toast/src/Toast.js";
+import { ProgressCircle } from "@spectrum-web-components/progress-circle/src/ProgressCircle.js";
 import { Table } from "@spectrum-web-components/table/src/Table.js";
 import { TableHead } from "@spectrum-web-components/table/src/TableHead.js";
 import { TableHeadCell } from "@spectrum-web-components/table/src/TableHeadCell.js";
@@ -191,6 +192,7 @@ const components = [
   ["sp-accordion-item", AccordionItem],
   ["sp-action-bar", ActionBar],
   ["sp-toast", Toast],
+  ["sp-progress-circle", ProgressCircle],
   ["sp-table", Table],
   ["sp-table-head", TableHead],
   ["sp-table-head-cell", TableHeadCell],
