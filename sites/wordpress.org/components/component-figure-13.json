@@ -1,0 +1,209 @@
+{
+  "tagName": "component-figure-13",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": {
+        "width": "${state.width}",
+        "height": "${state.height}",
+        "src": "${state.src}",
+        "alt": "${state.alt}",
+        "class": "${state.class2}",
+        "srcset": "${state.srcset}",
+        "sizes": "${state.sizes}"
+      },
+      "style": {
+        "verticalAlign": "bottom",
+        "width": "360px",
+        "height": "230px",
+        "maxWidth": "100%",
+        "wordBreak": "break-word",
+        "overflowWrap": "break-word",
+        "visibility": "visible",
+        "pointerEvents": "auto",
+        "@--419": {
+          "width": "379px",
+          "height": "242.125px"
+        },
+        "@--499": {
+          "width": "459px",
+          "height": "293.25px"
+        },
+        "@--599": {
+          "width": "559px",
+          "height": "357.125px"
+        },
+        "@--600": {
+          "width": "560px",
+          "height": "357.766px"
+        },
+        "@--700": {
+          "width": "660px",
+          "height": "421.656px"
+        },
+        "@--768": {
+          "width": "720px",
+          "height": "460px"
+        },
+        "@--781": {
+          "width": "720px",
+          "height": "460px"
+        },
+        "@--782": {
+          "width": "220.656px",
+          "height": "140.969px"
+        },
+        "@--889": {
+          "width": "256.328px",
+          "height": "163.75px"
+        },
+        "@--890": {
+          "width": "216.656px",
+          "height": "138.406px"
+        },
+        "@--900": {
+          "width": "220px",
+          "height": "140.547px"
+        },
+        "@--959": {
+          "width": "239.656px",
+          "height": "153.109px"
+        },
+        "@--960": {
+          "width": "240px",
+          "height": "153.328px"
+        },
+        "@--1080": {
+          "width": "280px",
+          "height": "178.875px"
+        },
+        "@--1100": {
+          "width": "286.656px",
+          "height": "183.141px"
+        },
+        "@--1152": {
+          "width": "304px",
+          "height": "194.219px"
+        },
+        "@--1199": {
+          "width": "319.656px",
+          "height": "204.219px"
+        },
+        "@--1280": {
+          "width": "346.656px",
+          "height": "221.469px"
+        },
+        "@--1281": {
+          "width": "347px",
+          "height": "221.688px"
+        },
+        "@--1300": {
+          "width": "353.328px",
+          "height": "225.734px"
+        }
+      }
+    }
+  ],
+  "style": {
+    "width": "360px",
+    "height": "230px",
+    "wordBreak": "break-word",
+    "overflowWrap": "break-word",
+    "visibility": "visible",
+    "pointerEvents": "auto",
+    "@--419": {
+      "width": "379px",
+      "height": "242.125px"
+    },
+    "@--499": {
+      "width": "459px",
+      "height": "293.25px"
+    },
+    "@--599": {
+      "width": "559px",
+      "height": "357.125px"
+    },
+    "@--600": {
+      "width": "560px",
+      "height": "357.766px"
+    },
+    "@--700": {
+      "width": "660px",
+      "height": "421.656px"
+    },
+    "@--768": {
+      "width": "728px",
+      "height": "460px"
+    },
+    "@--781": {
+      "width": "741px",
+      "height": "460px"
+    },
+    "@--782": {
+      "width": "220.656px",
+      "height": "140.969px"
+    },
+    "@--889": {
+      "width": "256.328px",
+      "height": "163.75px"
+    },
+    "@--890": {
+      "width": "216.656px",
+      "height": "138.406px"
+    },
+    "@--900": {
+      "width": "220px",
+      "height": "140.547px"
+    },
+    "@--959": {
+      "width": "239.656px",
+      "height": "153.109px"
+    },
+    "@--960": {
+      "width": "240px",
+      "height": "153.328px"
+    },
+    "@--1080": {
+      "width": "280px",
+      "height": "178.875px"
+    },
+    "@--1100": {
+      "width": "286.656px",
+      "height": "183.141px"
+    },
+    "@--1152": {
+      "width": "304px",
+      "height": "194.219px"
+    },
+    "@--1199": {
+      "width": "319.656px",
+      "height": "204.219px"
+    },
+    "@--1280": {
+      "width": "346.656px",
+      "height": "221.469px"
+    },
+    "@--1281": {
+      "width": "347px",
+      "height": "221.688px"
+    },
+    "@--1300": {
+      "width": "353.328px",
+      "height": "225.734px"
+    }
+  },
+  "$id": "ComponentFigure13",
+  "state": {
+    "class": "",
+    "width": "",
+    "height": "",
+    "src": "",
+    "alt": "",
+    "class2": "",
+    "srcset": "",
+    "sizes": ""
+  }
+}

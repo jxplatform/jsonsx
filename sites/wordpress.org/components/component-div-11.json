@@ -1,0 +1,443 @@
+{
+  "tagName": "component-div-11",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "wp-block-column is-layout-flow wp-block-column-is-layout-flow"
+      },
+      "style": {
+        "flex-basis": "60%",
+        "flex": "0 1 60%",
+        "flexBasis": "60%",
+        "width": "696px",
+        "height": "52px",
+        "borderTopColor": "rgb(255, 255, 255)",
+        "borderRightColor": "rgb(255, 255, 255)",
+        "borderBottomColor": "rgb(255, 255, 255)",
+        "borderLeftColor": "rgb(255, 255, 255)",
+        "textDecorationColor": "rgb(255, 255, 255)",
+        "wordBreak": "break-word",
+        "overflowWrap": "break-word",
+        "color": "rgb(255, 255, 255)",
+        "visibility": "visible",
+        "outlineColor": "rgb(255, 255, 255)",
+        "pointerEvents": "auto",
+        "@--419": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "379px",
+          "height": "104px"
+        },
+        "@--499": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "459px",
+          "height": "78px"
+        },
+        "@--599": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "559px",
+          "height": "78px"
+        },
+        "@--600": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "560px",
+          "height": "78px"
+        },
+        "@--700": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "660px"
+        },
+        "@--768": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "728px"
+        },
+        "@--781": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "741px"
+        },
+        "@--782": {
+          "width": "445.188px",
+          "height": "78px"
+        },
+        "@--889": {
+          "width": "509.391px",
+          "height": "78px"
+        },
+        "@--890": {
+          "width": "438px",
+          "height": "78px"
+        },
+        "@--900": {
+          "width": "444px",
+          "height": "78px"
+        },
+        "@--959": {
+          "width": "479.391px",
+          "height": "78px"
+        },
+        "@--960": {
+          "width": "480px",
+          "height": "78px"
+        },
+        "@--1080": {
+          "width": "552px",
+          "height": "78px"
+        },
+        "@--1100": {
+          "width": "564px",
+          "height": "78px"
+        },
+        "@--1152": {
+          "width": "595.188px",
+          "height": "78px"
+        },
+        "@--1199": {
+          "width": "623.391px",
+          "height": "78px"
+        },
+        "@--1280": {
+          "width": "672px"
+        },
+        "@--1281": {
+          "width": "672.594px"
+        },
+        "@--1300": {
+          "width": "684px"
+        }
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "attributes": {
+            "class": "is-style-short-text wp-block-paragraph"
+          },
+          "textContent": "${state.text}",
+          "style": {
+            "width": "696px",
+            "height": "52px",
+            "borderTopColor": "rgb(255, 255, 255)",
+            "borderRightColor": "rgb(255, 255, 255)",
+            "borderBottomColor": "rgb(255, 255, 255)",
+            "borderLeftColor": "rgb(255, 255, 255)",
+            "lineHeight": "26px",
+            "textDecorationColor": "rgb(255, 255, 255)",
+            "wordBreak": "break-word",
+            "overflowWrap": "break-word",
+            "color": "rgb(255, 255, 255)",
+            "visibility": "visible",
+            "outlineColor": "rgb(255, 255, 255)",
+            "pointerEvents": "auto",
+            "@--419": {
+              "width": "379px",
+              "height": "104px"
+            },
+            "@--499": {
+              "width": "459px",
+              "height": "78px"
+            },
+            "@--599": {
+              "width": "559px",
+              "height": "78px"
+            },
+            "@--600": {
+              "width": "560px",
+              "height": "78px"
+            },
+            "@--700": {
+              "width": "660px"
+            },
+            "@--768": {
+              "width": "728px"
+            },
+            "@--781": {
+              "width": "741px"
+            },
+            "@--782": {
+              "width": "445.188px",
+              "height": "78px"
+            },
+            "@--889": {
+              "width": "509.391px",
+              "height": "78px"
+            },
+            "@--890": {
+              "width": "438px",
+              "height": "78px"
+            },
+            "@--900": {
+              "width": "444px",
+              "height": "78px"
+            },
+            "@--959": {
+              "width": "479.391px",
+              "height": "78px"
+            },
+            "@--960": {
+              "width": "480px",
+              "height": "78px"
+            },
+            "@--1080": {
+              "width": "552px",
+              "height": "78px"
+            },
+            "@--1100": {
+              "width": "564px",
+              "height": "78px"
+            },
+            "@--1152": {
+              "width": "595.188px",
+              "height": "78px"
+            },
+            "@--1199": {
+              "width": "623.391px",
+              "height": "78px"
+            },
+            "@--1280": {
+              "width": "672px"
+            },
+            "@--1281": {
+              "width": "672.594px"
+            },
+            "@--1300": {
+              "width": "684px"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "wp-block-column is-layout-flow wp-block-column-is-layout-flow"
+      },
+      "style": {
+        "flex-basis": "40%",
+        "flex": "0 1 40%",
+        "flexBasis": "40%",
+        "width": "464px",
+        "height": "52px",
+        "borderTopColor": "rgb(255, 255, 255)",
+        "borderRightColor": "rgb(255, 255, 255)",
+        "borderBottomColor": "rgb(255, 255, 255)",
+        "borderLeftColor": "rgb(255, 255, 255)",
+        "textDecorationColor": "rgb(255, 255, 255)",
+        "wordBreak": "break-word",
+        "overflowWrap": "break-word",
+        "color": "rgb(255, 255, 255)",
+        "visibility": "visible",
+        "outlineColor": "rgb(255, 255, 255)",
+        "pointerEvents": "auto",
+        "@--419": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "379px"
+        },
+        "@--499": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "459px"
+        },
+        "@--599": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "559px"
+        },
+        "@--600": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "560px"
+        },
+        "@--700": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "660px"
+        },
+        "@--768": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "728px"
+        },
+        "@--781": {
+          "flex": "1 1 100%",
+          "flexGrow": 1,
+          "flexBasis": "100%",
+          "width": "741px"
+        },
+        "@--782": {
+          "width": "296.797px",
+          "height": "78px"
+        },
+        "@--889": {
+          "width": "339.594px",
+          "height": "78px"
+        },
+        "@--890": {
+          "width": "292px",
+          "height": "78px"
+        },
+        "@--900": {
+          "width": "296px",
+          "height": "78px"
+        },
+        "@--959": {
+          "width": "319.594px",
+          "height": "78px"
+        },
+        "@--960": {
+          "width": "320px",
+          "height": "78px"
+        },
+        "@--1080": {
+          "width": "368px",
+          "height": "78px"
+        },
+        "@--1100": {
+          "width": "376px",
+          "height": "78px"
+        },
+        "@--1152": {
+          "width": "396.797px",
+          "height": "78px"
+        },
+        "@--1199": {
+          "width": "415.594px",
+          "height": "78px"
+        },
+        "@--1280": {
+          "width": "448px"
+        },
+        "@--1281": {
+          "width": "448.391px"
+        },
+        "@--1300": {
+          "width": "456px"
+        }
+      }
+    }
+  ],
+  "style": {
+    "display": "flex",
+    "width": "1160px",
+    "height": "52px",
+    "marginTop": "30px",
+    "borderTopColor": "rgb(255, 255, 255)",
+    "borderRightColor": "rgb(255, 255, 255)",
+    "borderBottomColor": "rgb(255, 255, 255)",
+    "borderLeftColor": "rgb(255, 255, 255)",
+    "textDecorationColor": "rgb(255, 255, 255)",
+    "overflowWrap": "break-word",
+    "color": "rgb(255, 255, 255)",
+    "visibility": "visible",
+    "outlineColor": "rgb(255, 255, 255)",
+    "pointerEvents": "auto",
+    "@--419": {
+      "flexWrap": "wrap",
+      "width": "379px",
+      "height": "104px"
+    },
+    "@--499": {
+      "flexWrap": "wrap",
+      "width": "459px",
+      "height": "78px"
+    },
+    "@--599": {
+      "flexWrap": "wrap",
+      "width": "559px",
+      "height": "78px"
+    },
+    "@--600": {
+      "flexWrap": "wrap",
+      "width": "560px",
+      "height": "78px"
+    },
+    "@--700": {
+      "flexWrap": "wrap",
+      "width": "660px"
+    },
+    "@--768": {
+      "flexWrap": "wrap",
+      "width": "728px"
+    },
+    "@--781": {
+      "flexWrap": "wrap",
+      "width": "741px"
+    },
+    "@--782": {
+      "width": "742px",
+      "height": "78px"
+    },
+    "@--889": {
+      "width": "849px",
+      "height": "78px"
+    },
+    "@--890": {
+      "width": "730px",
+      "height": "78px"
+    },
+    "@--900": {
+      "width": "740px",
+      "height": "78px"
+    },
+    "@--959": {
+      "width": "799px",
+      "height": "78px"
+    },
+    "@--960": {
+      "width": "800px",
+      "height": "78px"
+    },
+    "@--1080": {
+      "width": "920px",
+      "height": "78px"
+    },
+    "@--1100": {
+      "width": "940px",
+      "height": "78px"
+    },
+    "@--1152": {
+      "width": "992px",
+      "height": "78px"
+    },
+    "@--1199": {
+      "width": "1039px",
+      "height": "78px"
+    },
+    "@--1280": {
+      "width": "1120px"
+    },
+    "@--1281": {
+      "width": "1121px"
+    },
+    "@--1300": {
+      "width": "1140px"
+    }
+  },
+  "$id": "ComponentDiv11",
+  "state": {
+    "class": "",
+    "text": ""
+  }
+}

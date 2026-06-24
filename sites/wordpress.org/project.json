@@ -1,0 +1,32 @@
+{
+  "name": "Blog Tool, Publishing Platform, and CMS – WordPress.org",
+  "title": "Blog Tool, Publishing Platform, and CMS – WordPress.org",
+  "description": "Imported from https://wordpress.org",
+  "imports": {},
+  "images": {
+    "optimize": false
+  },
+  "$media": {
+    "--419": "(max-width: 419px)",
+    "--499": "(max-width: 499px)",
+    "--599": "(max-width: 599px)",
+    "--600": "(min-width: 600px)",
+    "--700": "(max-width: 700px)",
+    "--768": "(min-width: 768px)",
+    "--781": "(max-width: 781px)",
+    "--782": "(min-width: 782px)",
+    "--889": "(max-width: 889px)",
+    "--890": "(min-width: 890px)",
+    "--900": "(max-width: 900px)",
+    "--959": "(max-width: 959px)",
+    "--960": "(min-width: 960px)",
+    "--1080": "(min-width: 1080px)",
+    "--1100": "(max-width: 1100px)",
+    "--1152": "(min-width: 1152px)",
+    "--1199": "(max-width: 1199px)",
+    "--1280": "(min-width: 1280px)",
+    "--1281": "(min-width: 1281px)",
+    "--1300": "(min-width: 1300px)",
+    "--1400": "(min-width: 1400px)"
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "tagName": "component-p-15",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": {
+        "href": "${state.href}"
+      },
+      "textContent": "${state.text}",
+      "style": {
+        "wordBreak": "break-word",
+        "overflowWrap": "break-word",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "width": "360px",
+    "height": "30px",
+    "marginTop": "20px",
+    "wordBreak": "break-word",
+    "overflowWrap": "break-word",
+    "visibility": "visible",
+    "pointerEvents": "auto",
+    "@--419": {
+      "width": "379px"
+    },
+    "@--499": {
+      "width": "459px"
+    },
+    "@--599": {
+      "width": "559px"
+    },
+    "@--600": {
+      "width": "560px"
+    },
+    "@--700": {
+      "width": "660px"
+    },
+    "@--768": {
+      "width": "728px"
+    },
+    "@--781": {
+      "width": "741px"
+    },
+    "@--782": {
+      "width": "220.672px"
+    },
+    "@--889": {
+      "width": "256.344px"
+    },
+    "@--890": {
+      "width": "216.672px"
+    },
+    "@--900": {
+      "width": "220px"
+    },
+    "@--959": {
+      "width": "239.672px"
+    },
+    "@--960": {
+      "width": "240px"
+    },
+    "@--1080": {
+      "width": "280px"
+    },
+    "@--1100": {
+      "width": "286.672px"
+    },
+    "@--1152": {
+      "width": "304px"
+    },
+    "@--1199": {
+      "width": "319.672px"
+    },
+    "@--1280": {
+      "width": "346.672px"
+    },
+    "@--1281": {
+      "width": "347px"
+    },
+    "@--1300": {
+      "width": "353.344px"
+    }
+  },
+  "$id": "ComponentP15",
+  "state": {
+    "class": "",
+    "text": "",
+    "href": ""
+  }
+}
