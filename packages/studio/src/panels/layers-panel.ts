@@ -151,7 +151,11 @@ export function renderLayersTemplate(ctx: {
             class="layer-row"
             style="padding-left:${depth * 16 + 8}px; opacity: 0.6; font-style: italic;"
           >
-            <span class="layer-tag" style="background: #64748b; font-size: 0.65rem;">text</span>
+            <span
+              class="layer-tag"
+              style="background: var(--spectrum-gray-500, #64748b); font-size: 0.65rem;"
+              >text</span
+            >
             <span class="layer-label">${textPreview}</span>
           </div>
         `,

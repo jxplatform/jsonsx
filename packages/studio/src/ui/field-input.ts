@@ -223,7 +223,7 @@ export function rawTextArea(
   const { onInput, onCommit } = makeHandlers(key, ms, commit, opts.commitMode);
   const style = [
     `min-height:${opts.minHeight ?? "40px"}`,
-    opts.mono ? "font-family:'SF Mono','Fira Code','Consolas',monospace;font-size:11px" : "",
+    opts.mono ? "font-family:var(--font-mono);font-size:var(--spectrum-font-size-50,11px)" : "",
     opts.style ?? "",
   ]
     .filter(Boolean)

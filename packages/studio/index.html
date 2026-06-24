@@ -16,13 +16,34 @@
       sp-tab:not(:first-of-type) {
         margin-inline-start: var(--mod-tabs-item-horizontal-spacing, 8px);
       }
-      :root {
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        /* html/body sit outside <sp-theme>, so the --spectrum-* tokens are not
+           in scope here; the hex fallback is the intentional pre-theme backdrop
+           shown behind the app before sp-theme fills the viewport. */
+        background: var(--spectrum-background-layer-1-color, #1e1e1e);
+      }
+      /* Studio semantic token layer.
+         Declared on sp-theme — not :root — so each var(--spectrum-*) reference
+         resolves against the tokens sp-theme exposes via its :host rules. At
+         :root (the <html> ancestor of sp-theme) every --spectrum-* is undefined,
+         so these would silently collapse to the hex fallback and the app would
+         never respond to the Spectrum theme. All studio chrome, including the
+         #layer-* overlay hosts, lives inside <sp-theme>. */
+      sp-theme {
+        display: block;
+        height: 100%;
+        /* Surfaces */
         --bg: var(--spectrum-background-layer-1-color, #1e1e1e);
         --bg-panel: var(--spectrum-background-layer-2-color, #252526);
         --bg-input: var(--spectrum-gray-300, #3c3c3c);
         --border: var(--spectrum-gray-300, #3c3c3c);
+        /* Text */
         --fg: var(--spectrum-neutral-content-color-default, #cccccc);
         --fg-dim: var(--spectrum-gray-600, #808080);
+        /* Accent and status */
         --accent: var(--spectrum-accent-color-900, #007acc);
         --accent-fg: var(--spectrum-white, #ffffff);
         --danger: var(--spectrum-negative-color-900, #f44747);
@@ -30,54 +51,68 @@
         --tag: var(--spectrum-informative-color-900, #569cd6);
         --signal: var(--spectrum-notice-color-900, #dcdcaa);
         --handler: var(--spectrum-purple-900, #c586c0);
-        --radius: var(--spectrum-corner-radius-100, 3px);
-        --warning: #c5a332;
-        --map: #5b4fc7;
+        --warning: var(--spectrum-orange-900, #c5a332);
+        --map: var(--spectrum-indigo-900, #5b4fc7);
+        --slot-c: var(--spectrum-seafoam-900, #1a8a7a);
         --switch-c: var(--danger);
         --case-c: var(--spectrum-informative-color-800, #4f8bc7);
-        --slot-c: #1a8a7a;
+        /* Corner radius */
+        --radius: var(--spectrum-corner-radius-100, 3px);
+        /* Monospace stack for code/source chrome. The Spectrum code token
+           resolves to Source Code Pro/Monaco; the studio prefers the developer
+           fonts SF Mono / Fira Code, so we keep those ahead of the Spectrum
+           stack rather than regressing to Monaco. */
+        --font-mono: "SF Mono", "Fira Code",
+          var(--spectrum-code-font-family-stack, monospace);
+        /* Hover wash and accent tints */
         --hover-bg: rgba(255, 255, 255, 0.04);
         --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
         --accent-10: color-mix(in srgb, var(--accent) 10%, transparent);
         --accent-15: color-mix(in srgb, var(--accent) 15%, transparent);
         --accent-20: color-mix(in srgb, var(--accent) 20%, transparent);
         --accent-50: color-mix(in srgb, var(--accent) 50%, transparent);
-        /* Light canvas (stylebook, block previews, content mode) */
-        --canvas-fg: #1a1a1a;
-        --canvas-fg-2: #333;
-        --canvas-fg-3: #555;
-        --canvas-dim: #888;
-        --canvas-muted: #999;
-        --canvas-light: #bbb;
-        --canvas-border: #ddd;
-        --canvas-rule: #eee;
-        --canvas-bg-1: #f5f5f5;
-        --canvas-bg-2: #f0f0f0;
-        --canvas-track: #e0e0e0;
-        /* Data explorer syntax colors */
-        --data-key: #9cdcfe;
-        --data-string: #ce9178;
-        --data-number: #b5cea8;
+        /* Light canvas palette (stylebook, block/element previews, content
+           mode). These surfaces always render as a light "document" regardless
+           of the app chrome, so the ramp is derived from the theme-independent
+           Spectrum white/black tokens via color-mix rather than hard-coded hex.
+           The percentage is the black (foreground) or white (background) blend
+           of each step; this keeps the canvas light even in the dark chrome
+           while still being Spectrum-sourced. */
+        --canvas-fg: color-mix(in srgb, var(--spectrum-black, #000) 90%, var(--spectrum-white, #fff));
+        --canvas-fg-2: color-mix(in srgb, var(--spectrum-black, #000) 80%, var(--spectrum-white, #fff));
+        --canvas-fg-3: color-mix(in srgb, var(--spectrum-black, #000) 67%, var(--spectrum-white, #fff));
+        --canvas-dim: color-mix(in srgb, var(--spectrum-black, #000) 47%, var(--spectrum-white, #fff));
+        --canvas-muted: color-mix(in srgb, var(--spectrum-black, #000) 40%, var(--spectrum-white, #fff));
+        --canvas-light: color-mix(in srgb, var(--spectrum-black, #000) 27%, var(--spectrum-white, #fff));
+        --canvas-border: color-mix(in srgb, var(--spectrum-black, #000) 13%, var(--spectrum-white, #fff));
+        --canvas-rule: color-mix(in srgb, var(--spectrum-black, #000) 7%, var(--spectrum-white, #fff));
+        --canvas-bg-1: color-mix(in srgb, var(--spectrum-white, #fff) 96%, var(--spectrum-black, #000));
+        --canvas-bg-2: color-mix(in srgb, var(--spectrum-white, #fff) 94%, var(--spectrum-black, #000));
+        --canvas-track: color-mix(in srgb, var(--spectrum-white, #fff) 88%, var(--spectrum-black, #000));
+        /* Data explorer syntax colors (mapped to nearest Spectrum hues) */
+        --data-key: var(--spectrum-blue-700, #9cdcfe);
+        --data-string: var(--spectrum-orange-700, #ce9178);
+        --data-number: var(--spectrum-celery-700, #b5cea8);
         --data-boolean: var(--tag);
+        /* Layout */
         --panel-w-left: 240px;
         --panel-w-right: 280px;
-      }
-      html,
-      body {
-        height: 100%;
-        overflow: hidden;
-        font:
-          12px/1.5 -apple-system,
+        /* Typography — align the chrome with the Spectrum sans stack used by
+           the SWC components; 12px maps exactly to font-size-75. line-height
+           stays 1.5 (a deliberate reading height; the Spectrum body token is
+           1.3, which would tighten the whole UI). */
+        color: var(--fg);
+        background: var(--bg);
+        font-family: var(
+          --spectrum-sans-font-family-stack,
+          -apple-system,
           BlinkMacSystemFont,
           "Segoe UI",
           system-ui,
-          sans-serif;
-        color: var(--fg);
-        background: var(--bg);
-      }
-      sp-theme {
-        display: block;
-        height: 100%;
+          sans-serif
+        );
+        font-size: var(--spectrum-font-size-75, 12px);
+        line-height: 1.5;
       }
 
       /* ─── Layout ─────────────────────────────────── */
@@ -337,7 +372,7 @@
         background: transparent;
         border: none;
         border-radius: 0;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-family: inherit;
       }
       #ai-quikchat .quikchat-messages-area {
@@ -345,7 +380,7 @@
         color: var(--fg);
       }
       #ai-quikchat .quikchat-message-content {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         line-height: 1.5;
       }
       #ai-quikchat .quikchat-message[data-role="user"] .quikchat-message-content {
@@ -359,23 +394,23 @@
         padding: 6px 10px;
       }
       #ai-quikchat .quikchat-message[data-role="tool"] .quikchat-message-content {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         background: var(--hover-bg);
         border-left: 2px solid var(--accent);
-        border-radius: 4px;
+        border-radius: var(--radius);
         padding: 4px 8px;
         color: var(--fg-dim);
       }
       #ai-quikchat .quikchat-message-content code {
         background: rgba(0, 0, 0, 0.3);
         padding: 1px 4px;
-        border-radius: 3px;
-        font-size: 11px;
+        border-radius: var(--radius);
+        font-size: var(--spectrum-font-size-50, 11px);
       }
       #ai-quikchat .quikchat-message-content pre {
         background: rgba(0, 0, 0, 0.3);
         padding: 8px;
-        border-radius: 4px;
+        border-radius: var(--radius);
         overflow-x: auto;
         margin: 6px 0;
       }
@@ -392,8 +427,8 @@
         background: var(--bg-input);
         color: var(--fg);
         border: 1px solid var(--border);
-        border-radius: 4px;
-        font-size: 12px;
+        border-radius: var(--radius);
+        font-size: var(--spectrum-font-size-75, 12px);
         font-family: inherit;
       }
       #ai-quikchat .quikchat-input-textbox:focus {
@@ -402,10 +437,10 @@
       }
       #ai-quikchat .quikchat-input-send-btn {
         background: var(--accent);
-        color: #fff;
+        color: var(--accent-fg);
         border: none;
-        border-radius: 4px;
-        font-size: 12px;
+        border-radius: var(--radius);
+        font-size: var(--spectrum-font-size-75, 12px);
         cursor: pointer;
       }
       #ai-quikchat .quikchat-input-send-btn:hover {
@@ -424,13 +459,13 @@
         padding: 24px;
         text-align: center;
         color: var(--fg-dim);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
       .ai-code-snippet {
         background: var(--bg-input);
         padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 11px;
+        border-radius: var(--radius);
+        font-size: var(--spectrum-font-size-50, 11px);
       }
       #statusbar {
         grid-row: 5;
@@ -438,19 +473,19 @@
         display: flex;
         align-items: center;
         padding: 0 8px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         background: var(--bg-panel);
         border-top: 1px solid var(--border);
       }
       #statusbar .sb-path-seg {
         cursor: pointer;
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
         padding: 0 2px;
       }
       #statusbar .sb-path-seg:hover {
         color: var(--fg);
-        background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+        background: var(--hover-bg);
         text-decoration: underline;
       }
       #statusbar .sb-path-sep {
@@ -477,7 +512,7 @@
         align-items: center;
         gap: 4px;
         padding: 4px 8px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         cursor: pointer;
         white-space: nowrap;
@@ -513,9 +548,9 @@
         border: none;
         background: none;
         color: var(--fg-dim);
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         line-height: 1;
-        border-radius: 3px;
+        border-radius: var(--radius);
         cursor: pointer;
         opacity: 0;
       }
@@ -524,7 +559,7 @@
         opacity: 1;
       }
       .tab-strip-close:hover {
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--hover-bg);
         color: var(--fg);
       }
 
@@ -581,8 +616,8 @@
         align-items: center;
         gap: 8px;
         padding: 4px 8px;
-        border-bottom: 1px solid var(--spectrum-global-color-gray-300);
-        background: var(--spectrum-global-color-gray-100);
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-panel);
       }
       .tab-bar .tb-spacer {
         flex: 1;
@@ -620,13 +655,13 @@
         padding: 4px 8px;
         background: var(--bg-panel);
         border-bottom: 1px solid var(--border);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg);
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       .canvas-panel-header {
         padding: 4px 8px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         background: var(--bg-panel);
         border: 1px solid var(--border);
@@ -635,7 +670,7 @@
         text-align: center;
         cursor: pointer;
         user-select: none;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       .canvas-panel-header.active {
         color: var(--accent);
@@ -643,8 +678,11 @@
       }
       .canvas-panel-viewport {
         position: relative;
-        background: #fff;
+        background: var(--spectrum-white, #fff);
         border: 1px solid var(--border);
+        /* The viewport is a light document surface, so pin a light color-scheme
+           for native form controls and scrollbars rendered inside it. */
+        color-scheme: light;
       }
       .canvas-panel-header.active + .canvas-panel-viewport {
         border-color: var(--accent);
@@ -661,8 +699,8 @@
       .canvas-panel-canvas slot:empty {
         display: block;
         min-height: 3rem;
-        border: 2px dashed var(--spectrum-global-color-gray-400);
-        border-radius: 4px;
+        border: 2px dashed var(--spectrum-gray-400, #999);
+        border-radius: var(--radius);
         position: relative;
         background: repeating-linear-gradient(
           45deg,
@@ -679,8 +717,8 @@
         left: 50%;
         transform: translate(-50%, -50%);
         font-size: 0.75rem;
-        color: var(--spectrum-global-color-gray-500);
-        font-family: var(--spectrum-global-font-family-code);
+        color: var(--spectrum-gray-500, #888);
+        font-family: var(--font-mono);
         pointer-events: none;
       }
       .canvas-panel-overlay {
@@ -709,9 +747,9 @@
         background: var(--bg-panel);
         border: 1px solid var(--border);
         border-radius: 16px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg);
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         pointer-events: auto;
       }
@@ -754,7 +792,7 @@
         padding: 1px 5px;
         background: var(--spectrum-purple-600, #9256d9);
         color: white;
-        border-radius: 3px;
+        border-radius: var(--radius);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         pointer-events: none;
@@ -767,7 +805,8 @@
         font-size: 10px;
         background: var(--accent);
         color: var(--accent-fg);
-        border-radius: 2px 2px 0 0;
+        border-radius: var(--spectrum-corner-radius-75)
+          var(--spectrum-corner-radius-75) 0 0;
         white-space: nowrap;
         pointer-events: none;
       }
@@ -790,7 +829,7 @@
       .block-action-bar .bar-tag {
         font-size: 10px;
         padding: 0 4px;
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
         color: var(--accent-fg);
         background: var(--tag);
         max-width: 140px;
@@ -806,7 +845,7 @@
       }
       .block-action-bar .bar-drag-handle {
         cursor: grab;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         padding: 0 4px;
         opacity: 0.7;
         user-select: none;
@@ -862,7 +901,7 @@
         min-width: 16px;
         height: 16px;
         padding: 0 4px;
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         background: var(--accent);
         color: var(--spectrum-white);
         font-size: 9px;
@@ -932,7 +971,7 @@
         gap: 6px;
         padding: 3px 8px;
         cursor: pointer;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg);
         user-select: none;
       }
@@ -988,7 +1027,7 @@
         padding: 24px;
         text-align: center;
         color: var(--fg-dim);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
       .project-header {
         display: flex;
@@ -998,7 +1037,7 @@
         gap: 6px;
       }
       .project-name {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 600;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1050,7 +1089,7 @@
       .layer-drag-handle {
         color: var(--fg-dim);
         opacity: 0.6;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         cursor: grab;
         padding: 0 4px 0 0;
       }
@@ -1065,7 +1104,7 @@
       .layer-tag {
         padding: 0 4px;
         font-size: 10px;
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
         color: var(--accent-fg);
         background: var(--tag);
         flex-shrink: 0;
@@ -1079,10 +1118,10 @@
       }
       .layer-title-input {
         width: 100%;
-        background: var(--bg-alt, #1e1e1e);
+        background: var(--bg);
         color: inherit;
         border: 1px solid var(--accent, #0078d4);
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
         font: inherit;
         font-size: inherit;
         padding: 0 2px;
@@ -1103,7 +1142,7 @@
       }
       .repeater-perimeter {
         border: 1px dashed color-mix(in srgb, var(--map) 25%, transparent);
-        border-radius: 4px;
+        border-radius: var(--radius);
         padding: 4px;
         min-height: 24px;
         position: relative;
@@ -1115,9 +1154,9 @@
         left: 6px;
         font-size: 9px;
         color: color-mix(in srgb, var(--map) 50%, transparent);
-        background: #fff;
+        background: var(--spectrum-white, #fff);
         padding: 0 3px;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         pointer-events: none;
       }
       /* Empty element placeholders (design/edit mode only) */
@@ -1126,7 +1165,7 @@
         min-width: 120px;
         min-height: 80px;
         border: 1px dashed color-mix(in srgb, var(--fg-dim, #808080) 30%, transparent);
-        border-radius: 4px;
+        border-radius: var(--radius);
         background: color-mix(in srgb, var(--fg-dim, #808080) 5%, transparent)
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' fill='none'%3E%3Crect x='4' y='8' width='32' height='24' rx='2' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Ccircle cx='13' cy='16' r='3' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Cpath d='M8 28l8-8 5 5 4-4 7 7' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
           center / 40px no-repeat;
@@ -1143,7 +1182,7 @@
       }
       .empty-container-placeholder {
         border: 1px dashed color-mix(in srgb, var(--fg-dim, #808080) 25%, transparent);
-        border-radius: 4px;
+        border-radius: var(--radius);
         min-height: 32px;
         position: relative;
       }
@@ -1155,7 +1194,7 @@
         transform: translate(-50%, -50%);
         color: color-mix(in srgb, var(--fg-dim, #808080) 40%, transparent);
         font-style: italic;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         pointer-events: none;
         white-space: nowrap;
@@ -1211,7 +1250,7 @@
         align-items: center;
         gap: 6px;
         padding: 6px 8px 2px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         font-weight: 600;
         color: var(--fg-dim);
         text-transform: uppercase;
@@ -1229,11 +1268,11 @@
         align-items: center;
         gap: 4px;
         padding: 3px 4px;
-        font-size: 11px;
-        border-radius: 3px;
+        font-size: var(--spectrum-font-size-50, 11px);
+        border-radius: var(--radius);
       }
       .import-row:hover {
-        background: var(--bg-hover);
+        background: var(--hover-bg);
       }
       .import-name {
         font-weight: 500;
@@ -1253,7 +1292,7 @@
       }
       .imports-empty {
         padding: 8px 12px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--text-hint);
         font-style: italic;
       }
@@ -1293,7 +1332,7 @@
         display: flex;
         align-items: center;
         gap: 2px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         margin-left: 8px;
       }
       .breadcrumb-item {
@@ -1329,7 +1368,7 @@
         border-color: var(--accent);
       }
       .element-card-preview {
-        background: #fff;
+        background: var(--spectrum-white, #fff);
         padding: 6px 8px;
         min-height: 32px;
         max-height: 120px;
@@ -1363,13 +1402,16 @@
         color: var(--fg-dim);
         background: var(--bg-input);
         text-align: center;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       .elements-list {
         border: none;
       }
       .elements-list sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: 11px;
+        --spectrum-accordion-item-header-font-size: var(
+          --spectrum-font-size-50,
+          11px
+        );
         border-bottom: 1px solid var(--border);
       }
 
@@ -1400,16 +1442,16 @@
 
       /* ─── Git diff highlighting ──────────────────── */
       .element-diff-added {
-        background-color: rgba(115, 201, 145, 0.15);
-        outline: 1px solid #73c991;
+        background-color: color-mix(in srgb, var(--success) 15%, transparent);
+        outline: 1px solid var(--success);
       }
       .element-diff-removed {
-        background-color: rgba(224, 108, 117, 0.15);
-        outline: 1px solid #e06c75;
+        background-color: color-mix(in srgb, var(--danger) 15%, transparent);
+        outline: 1px solid var(--danger);
       }
       .element-diff-modified {
-        background-color: rgba(226, 185, 61, 0.15);
-        outline: 1px solid #e2b93d;
+        background-color: color-mix(in srgb, var(--signal) 15%, transparent);
+        outline: 1px solid var(--signal);
       }
 
       /* ─── Insertion helper ─────────────────────────── */
@@ -1424,7 +1466,7 @@
         border: 1.5px solid var(--accent);
         background: var(--bg-panel);
         color: var(--accent);
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 500;
         line-height: 1;
         cursor: pointer;
@@ -1521,7 +1563,7 @@
       .field-label {
         width: 80px;
         flex-shrink: 0;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         text-align: right;
         overflow: hidden;
@@ -1533,7 +1575,7 @@
         min-width: 0;
         padding: 3px 6px;
         font: inherit;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg);
         background: var(--bg-input);
         border: 1px solid var(--border);
@@ -1550,7 +1592,7 @@
       textarea.field-input {
         resize: vertical;
         min-height: 60px;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       /* Spectrum components inside field rows */
       .field-row sp-textfield,
@@ -1570,7 +1612,7 @@
       .field-row sp-field-label {
         width: 80px;
         flex-shrink: 0;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         text-align: right;
       }
@@ -1607,7 +1649,7 @@
       .kv-add {
         display: inline-block;
         padding: 2px 8px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         cursor: pointer;
         color: var(--accent);
       }
@@ -1620,7 +1662,10 @@
         border: none;
       }
       .style-sidebar sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: 11px;
+        --spectrum-accordion-item-header-font-size: var(
+          --spectrum-font-size-50,
+          11px
+        );
       }
       .style-sidebar sp-accordion-item [slot="heading"] {
         display: flex;
@@ -1715,7 +1760,7 @@
         gap: 1px;
       }
       .font-token-preview {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         line-height: 1.3;
       }
       .font-token-name {
@@ -1853,32 +1898,32 @@
       .signal-badge {
         padding: 0 4px;
         font-size: 10px;
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
         font-weight: 600;
         flex-shrink: 0;
         min-width: 18px;
         text-align: center;
       }
       .signal-badge.state {
-        background: #4a3d00;
+        background: color-mix(in srgb, var(--signal) 25%, transparent);
         color: var(--signal);
       }
       .signal-badge.computed {
-        background: #1a3a1a;
+        background: color-mix(in srgb, var(--success) 25%, transparent);
         color: var(--success);
       }
       .signal-badge.data {
-        background: #1a2a4a;
-        color: #6ab0f3;
+        background: color-mix(in srgb, var(--tag) 25%, transparent);
+        color: var(--tag);
       }
       .signal-badge.handler {
-        background: #3d2042;
+        background: color-mix(in srgb, var(--handler) 25%, transparent);
         color: var(--handler);
       }
       .signal-name {
         flex: 1;
-        font-family: "SF Mono", "Fira Code", monospace;
-        font-size: 11px;
+        font-family: var(--font-mono);
+        font-size: var(--spectrum-font-size-50, 11px);
         overflow: hidden;
         text-overflow: ellipsis;
       }
@@ -1894,7 +1939,7 @@
         visibility: hidden;
         cursor: pointer;
         color: var(--danger);
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         flex-shrink: 0;
       }
       .signal-row:hover .signal-del {
@@ -1909,7 +1954,10 @@
         border: none;
       }
       .signals-panel sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: 11px;
+        --spectrum-accordion-item-header-font-size: var(
+          --spectrum-font-size-50,
+          11px
+        );
       }
       .signals-add {
         display: flex;
@@ -1926,7 +1974,7 @@
         justify-content: flex-end;
       }
       .data-refresh-btn {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         padding: 2px 8px;
         background: var(--bg-input);
         border: 1px solid var(--border);
@@ -1963,7 +2011,7 @@
       .data-name {
         flex: 1;
         font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1980,7 +2028,7 @@
       }
       .data-leaf,
       .data-branch {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         font-family: "SF Mono", "Fira Code", "Consolas", monospace;
         padding: 1px 8px;
         line-height: 1.5;
@@ -2039,7 +2087,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         cursor: pointer;
         color: var(--fg-dim);
         border: 1px solid transparent;
@@ -2048,7 +2096,7 @@
       }
       .bind-toggle:hover {
         color: var(--fg);
-        background: rgba(255, 255, 255, 0.06);
+        background: var(--hover-bg);
       }
       .bind-toggle.bound {
         color: var(--accent);
@@ -2066,7 +2114,7 @@
         gap: 6px;
         align-items: center;
         padding: 2px 0;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
       }
       .event-code {
         font-family: monospace;
@@ -2108,26 +2156,26 @@
       }
       .event-body-row sp-textfield {
         flex: 1;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
       }
 
       /* ─── Toolbar ────────────────────────────────── */
       .tb-filename {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         max-width: 200px;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .tb-file-title {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg);
         max-width: 300px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         padding: 0 8px;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       .tb-dirty {
         color: var(--accent);
@@ -2154,7 +2202,7 @@
       .tb-search-trigger {
         flex: 0 1 280px;
         border: 1px solid var(--spectrum-gray-300, #393939);
-        border-radius: 4px;
+        border-radius: var(--radius);
         --mod-actionbutton-edge-to-text: 10px;
       }
       .tb-search-trigger:hover {
@@ -2165,7 +2213,7 @@
         text-align: left;
         color: var(--spectrum-gray-600, #666);
         font-weight: normal;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
       .tb-search-label kbd {
         font-family: inherit;
@@ -2187,7 +2235,7 @@
         flex-direction: column;
         background: var(--spectrum-gray-100, #1e1e1e);
         border: 1px solid var(--spectrum-gray-300, #393939);
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         overflow: hidden;
         align-self: flex-start;
@@ -2195,7 +2243,7 @@
       .quick-search-input {
         width: 100%;
         padding: 12px 16px;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         border: none;
         outline: none;
         background: var(--spectrum-gray-75, #141414);
@@ -2217,7 +2265,7 @@
       }
       .quick-search-item.selected {
         background: var(--spectrum-blue-700, #0054a3);
-        color: #fff;
+        color: var(--spectrum-white, #fff);
       }
       .quick-search-item:hover:not(.selected) {
         background: var(--spectrum-gray-200, #2a2a2a);
@@ -2232,16 +2280,16 @@
       }
       .quick-search-path {
         opacity: 0.5;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       .quick-search-badge {
         margin-left: auto;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         padding: 1px 6px;
-        border-radius: 3px;
+        border-radius: var(--radius);
         background: var(--spectrum-gray-300, #393939);
         color: var(--spectrum-gray-700, #999);
       }
@@ -2253,7 +2301,7 @@
       }
       .quick-search-section-label {
         padding: 8px 16px 4px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         text-transform: uppercase;
         color: var(--spectrum-gray-600, #666);
         letter-spacing: 0.5px;
@@ -2268,7 +2316,7 @@
         flex-direction: column;
         background: var(--bg-panel);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
         overflow: hidden;
       }
@@ -2281,7 +2329,7 @@
       }
       .browse-modal-title {
         margin: 0;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 600;
         color: var(--fg);
       }
@@ -2357,15 +2405,15 @@
         width: 32px;
         height: 32px;
         object-fit: cover;
-        border-radius: 3px;
+        border-radius: var(--radius);
         vertical-align: middle;
         margin-right: 8px;
         background: var(--spectrum-gray-200, #2a2a2a);
       }
       .browse-path-cell {
         color: var(--fg-dim);
-        font-family: "SF Mono", "Fira Code", monospace;
-        font-size: 11px;
+        font-family: var(--font-mono);
+        font-size: var(--spectrum-font-size-50, 11px);
       }
       .browse-view-switcher {
         display: flex;
@@ -2411,7 +2459,7 @@
         flex-direction: column;
         background: var(--bg-panel);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
         overflow: hidden;
       }
@@ -2427,7 +2475,7 @@
         flex-direction: column;
         background: var(--bg-panel);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
         overflow: hidden;
       }
@@ -2497,7 +2545,7 @@
         display: flex;
         justify-content: space-between;
         gap: 12px;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
       .about-package-name {
         color: var(--fg-dim);
@@ -2515,7 +2563,7 @@
       }
       .settings-modal-title {
         margin: 0;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 600;
         color: var(--fg);
       }
@@ -2577,7 +2625,7 @@
       }
       .settings-field-desc {
         margin: 0 0 6px;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg-dim);
       }
       .settings-field-row {
@@ -2598,7 +2646,7 @@
       }
       .settings-media-name-fixed {
         width: 80px;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 500;
         color: var(--fg-dim);
         padding: 0 8px;
@@ -2620,7 +2668,7 @@
         flex-direction: column;
         background: var(--bg-panel);
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: var(--spectrum-corner-radius-200, 8px);
         box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
         width: 420px;
         max-height: 80vh;
@@ -2634,7 +2682,7 @@
       }
       .new-project-modal-title {
         margin: 0;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 600;
         color: var(--fg);
       }
@@ -2658,13 +2706,13 @@
         gap: 4px;
       }
       .new-project-label {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 500;
         color: var(--fg-dim);
       }
       .new-project-error {
-        font-size: 12px;
-        color: var(--negative);
+        font-size: var(--spectrum-font-size-75, 12px);
+        color: var(--danger);
         padding: 4px 0;
       }
       /* CSS Vars editor */
@@ -2686,14 +2734,14 @@
         padding: 4px 0;
       }
       .css-var-name {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg-dim);
         min-width: 100px;
       }
       .css-var-swatch {
         width: 24px;
         height: 24px;
-        border-radius: 4px;
+        border-radius: var(--radius);
         border: 1px solid var(--border);
         position: relative;
         overflow: hidden;
@@ -2723,7 +2771,7 @@
         padding: 2px 0;
       }
       .css-var-media-label {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         min-width: 60px;
       }
@@ -2738,7 +2786,7 @@
       /* Head editor */
       .head-entry {
         border: 1px solid var(--border);
-        border-radius: 4px;
+        border-radius: var(--radius);
         padding: 12px;
         margin-bottom: 8px;
       }
@@ -2749,7 +2797,7 @@
         margin-bottom: 8px;
       }
       .head-entry-tag {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 600;
         color: var(--fg);
       }
@@ -2757,12 +2805,12 @@
         width: 100%;
         min-height: 80px;
         padding: 8px;
-        font-family: "SF Mono", "Fira Code", monospace;
-        font-size: 12px;
+        font-family: var(--font-mono);
+        font-size: var(--spectrum-font-size-75, 12px);
         background: var(--spectrum-gray-100, #1e1e1e);
         color: var(--fg);
         border: 1px solid var(--border);
-        border-radius: 4px;
+        border-radius: var(--radius);
         resize: vertical;
       }
 
@@ -2801,7 +2849,7 @@
       }
       .settings-editor-header h3 {
         margin: 0;
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 600;
       }
       .settings-empty-state {
@@ -2831,7 +2879,7 @@
       }
       .schema-field-card {
         border: 1px solid var(--border);
-        border-radius: 4px;
+        border-radius: var(--radius);
         padding: 6px 10px;
       }
       .schema-field-row {
@@ -2883,7 +2931,7 @@
         width: 24px;
         height: 24px;
         object-fit: cover;
-        border-radius: 3px;
+        border-radius: var(--radius);
         border: 1px solid var(--border);
         flex-shrink: 0;
       }
@@ -2941,7 +2989,7 @@
       }
       .style-filter-toggle[selected] {
         background: var(--accent);
-        color: #fff;
+        color: var(--accent-fg);
       }
       .selector-select {
         min-width: 0;
@@ -2953,7 +3001,7 @@
         padding: 3px 6px;
         font: inherit;
         font-size: 10px;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         color: var(--fg);
         background: var(--bg-input);
         border: 1px solid var(--accent);
@@ -2966,7 +3014,7 @@
         display: flex;
         flex-direction: column;
         height: 100%;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
 
       /* Sync status bar */
@@ -2996,7 +3044,7 @@
         color: var(--fg);
       }
       .git-sync-time {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
       }
 
@@ -3020,7 +3068,7 @@
         min-width: 0;
       }
       .git-branch-label {
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
       }
       .git-branch-name {
@@ -3042,9 +3090,9 @@
         flex: 1;
         padding: 8px 12px;
         font: inherit;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 600;
-        background: var(--bg-muted, rgba(255, 255, 255, 0.04));
+        background: var(--hover-bg);
         border: none;
         border-bottom: 2px solid transparent;
         color: var(--fg-dim);
@@ -3071,7 +3119,7 @@
         border-bottom: 1px solid var(--border);
       }
       .git-commit-label {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 500;
         color: var(--fg-dim);
       }
@@ -3114,7 +3162,7 @@
         width: 100%;
         padding: 6px 12px;
         font: inherit;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg);
         background: none;
         border: none;
@@ -3122,7 +3170,7 @@
         cursor: pointer;
       }
       .git-split-menu-item:hover {
-        background: var(--bg-hover, rgba(255, 255, 255, 0.08));
+        background: var(--hover-bg);
       }
 
       /* Changed Components grouping */
@@ -3139,7 +3187,7 @@
         flex-shrink: 0;
       }
       .git-component-name {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 500;
         color: var(--fg);
       }
@@ -3153,7 +3201,7 @@
         align-items: center;
         gap: 6px;
         padding: 8px 12px 6px;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-weight: 700;
         color: var(--fg);
       }
@@ -3183,7 +3231,7 @@
         cursor: default;
       }
       .git-file-row:hover {
-        background: var(--bg-hover);
+        background: var(--hover-bg);
       }
       .git-file-info {
         flex: 1;
@@ -3219,25 +3267,25 @@
         text-align: center;
         font-size: 10px;
         font-weight: 700;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
       .git-status-M {
-        color: #e2b93d;
+        color: var(--signal);
       }
       .git-status-A {
-        color: #73c991;
+        color: var(--success);
       }
       .git-status-D {
-        color: #e06c75;
+        color: var(--danger);
       }
       .git-status-R {
-        color: #6796e6;
+        color: var(--tag);
       }
       .git-status-U {
-        color: #73c991;
+        color: var(--success);
       }
       .git-status-C {
-        color: #6796e6;
+        color: var(--tag);
       }
 
       /* History tab */
@@ -3254,15 +3302,15 @@
         border-bottom: 1px solid var(--border);
       }
       .git-history-entry:hover {
-        background: var(--bg-hover);
+        background: var(--hover-bg);
       }
       .git-history-hash {
         font-size: 10px;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         color: var(--accent);
       }
       .git-history-message {
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg);
       }
       .git-history-meta {
@@ -3275,20 +3323,20 @@
         padding: 8px;
         text-align: center;
         color: var(--fg-dim);
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
       }
       .git-error {
         padding: 6px 8px;
-        font-size: 11px;
-        color: #e06c75;
-        background: rgba(224, 108, 117, 0.08);
+        font-size: var(--spectrum-font-size-50, 11px);
+        color: var(--danger);
+        background: color-mix(in srgb, var(--danger) 8%, transparent);
         border-bottom: 1px solid var(--border);
       }
       .git-empty {
         padding: 16px 8px;
         text-align: center;
         color: var(--fg-dim);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
 
       .git-panel-empty {
@@ -3306,7 +3354,7 @@
       }
       .git-empty-state p {
         margin: 0;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
       }
       .git-sync-bar--no-remote {
         gap: 8px;
@@ -3352,7 +3400,7 @@
       .tb-toggle {
         padding: 3px 8px;
         font: inherit;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
         background: transparent;
         border: 1px solid var(--border);
@@ -3371,11 +3419,11 @@
       /* ─── Stylebook ─────────────────────────────────── */
       .stylebook-style-header {
         padding: 6px 8px;
-        font-size: 11px;
+        font-size: var(--spectrum-font-size-50, 11px);
         font-weight: 600;
         color: var(--accent);
         border-bottom: 1px solid var(--border);
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
       }
 
       /* Chrome bar (tabs + filter) above the canvas viewport */
@@ -3430,14 +3478,14 @@
       }
       .sb-var-row-title {
         font-weight: 600;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--canvas-fg-2);
         white-space: nowrap;
       }
       .sb-var-row-ref {
         font-size: 10px;
         color: var(--canvas-muted);
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         overflow: hidden;
         text-overflow: ellipsis;
       }
@@ -3490,7 +3538,7 @@
       .sb-var-swatch {
         width: 28px;
         height: 28px;
-        border-radius: 4px;
+        border-radius: var(--radius);
         border: 1px solid var(--canvas-border);
         cursor: pointer;
         position: relative;
@@ -3511,18 +3559,18 @@
         margin-top: 2px;
         padding: 8px;
         background: var(--canvas-bg-1);
-        border-radius: 4px;
+        border-radius: var(--radius);
         border: 1px solid var(--canvas-rule);
       }
       .sb-var-font-preview {
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         line-height: 1.4;
         color: var(--canvas-fg-2);
       }
       .sb-var-size-track {
         background: var(--canvas-track);
         height: 8px;
-        border-radius: 4px;
+        border-radius: var(--radius);
         width: 100%;
         overflow: hidden;
       }
@@ -3530,7 +3578,7 @@
         height: 100%;
         background: var(--accent, #007acc);
         transition: width 0.3s;
-        border-radius: 4px;
+        border-radius: var(--radius);
       }
       .sb-var-del {
         opacity: 0;
@@ -3544,7 +3592,7 @@
         padding: 16px 8px;
         text-align: center;
         color: var(--canvas-light);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         font-style: italic;
       }
       .sb-var-add-btn {
@@ -3552,9 +3600,9 @@
         pointer-events: auto;
         background: none;
         border: 1px dashed var(--canvas-border);
-        border-radius: 4px;
+        border-radius: var(--radius);
         padding: 5px 10px;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--canvas-fg-3);
         cursor: pointer;
         display: flex;
@@ -3568,7 +3616,7 @@
         background: var(--canvas-bg-1);
       }
       .sb-var-add-icon {
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         font-weight: 600;
       }
       .sb-var-add-actions {
@@ -3597,7 +3645,7 @@
       .sb-var-add-preview {
         font-size: 10px;
         color: var(--canvas-muted);
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: var(--font-mono);
         min-height: 14px;
       }
 
@@ -3607,7 +3655,7 @@
         outline-offset: 1px;
         cursor: text;
         min-height: 1.5em;
-        border-radius: 2px;
+        border-radius: var(--spectrum-corner-radius-75, 2px);
       }
       .canvas-panel-canvas [contenteditable="true"]:focus {
         outline-color: var(--accent);
@@ -3637,7 +3685,7 @@
         letter-spacing: -0.5px;
       }
       .welcome-subtitle {
-        font-size: 14px;
+        font-size: var(--spectrum-font-size-100, 14px);
         color: var(--fg-dim);
         margin: 2px 0 0;
       }
@@ -3704,7 +3752,7 @@
       }
       .welcome-recent-path {
         color: var(--fg-dim);
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

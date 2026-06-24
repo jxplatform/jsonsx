@@ -117,7 +117,8 @@ export async function maybePromptJxsuiteUpdate(projectRoot: string): Promise<voi
   const confirmed = await showConfirmDialog(
     "Update @jxsuite packages?",
     html`This project uses older @jxsuite packages. Update them to match Studio ${check.target}?
-      <br /><br /><span style="font-size:12px;color:var(--fg-dim);white-space:pre-line"
+      <br /><br /><span
+        style="font-size:var(--spectrum-font-size-75, 12px);color:var(--fg-dim);white-space:pre-line"
         >${list}</span
       >`,
     { cancelLabel: "Not now", confirmLabel: "Update" },

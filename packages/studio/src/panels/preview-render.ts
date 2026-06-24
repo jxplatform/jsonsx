@@ -122,7 +122,7 @@ export function renderCanvasNode(
     const placeholder = document.createElement("div");
     placeholder.textContent = `[$switch: ${keys.join(" | ")}]`;
     placeholder.style.cssText =
-      "font-family:monospace;font-size:11px;padding:6px 10px;background:color-mix(in srgb, var(--danger) 8%, transparent);border:1px dashed color-mix(in srgb, var(--danger) 40%, transparent);border-radius:4px;color:var(--danger);font-style:italic";
+      "font-family:var(--font-mono);font-size:var(--spectrum-font-size-50,11px);padding:6px 10px;background:color-mix(in srgb, var(--danger) 8%, transparent);border:1px dashed color-mix(in srgb, var(--danger) 40%, transparent);border-radius:var(--radius);color:var(--danger);font-style:italic";
     el.append(placeholder);
   }
 

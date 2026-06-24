@@ -208,7 +208,7 @@ function renderMediaPickerPopover() {
                           slot="icon"
                           src=${m.path}
                           alt=""
-                          style="width:24px;height:24px;object-fit:cover;border-radius:2px"
+                          style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
                         />`
                       : nothing}
                     ${m.name}

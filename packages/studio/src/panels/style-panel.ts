@@ -804,7 +804,7 @@ function styleSidebarTemplate(
                 (rule) => html`
                   <div style="display:flex;align-items:center;gap:4px">
                     <button
-                      style="flex:1;text-align:left;padding:6px 10px;background:var(--spectrum-gray-200, #1a1a1a);border:none;border-radius:4px;color:var(--spectrum-gray-900, #fafafa);font-size:12px;cursor:pointer"
+                      style="flex:1;text-align:left;padding:6px 10px;background:var(--spectrum-gray-200, #1a1a1a);border:none;border-radius:var(--radius);color:var(--spectrum-gray-900, #fafafa);font-size:var(--spectrum-font-size-75, 12px);cursor:pointer"
                       @click=${() => {
                         const newSelector = activeSelector ? `${activeSelector} ${rule}` : rule;
                         selectStylebookTag(newSelector, undefined, {
@@ -821,7 +821,7 @@ function styleSidebarTemplate(
                 `,
               )}
               <button
-                style="padding:6px 10px;background:none;border:1px dashed var(--spectrum-gray-400, #333);border-radius:4px;color:var(--spectrum-gray-700, #a1a1aa);font-size:12px;cursor:pointer"
+                style="padding:6px 10px;background:none;border:1px dashed var(--spectrum-gray-400, #333);border-radius:var(--radius);color:var(--spectrum-gray-700, #a1a1aa);font-size:var(--spectrum-font-size-75, 12px);cursor:pointer"
                 @click=${() => {
                   // oxlint-disable-next-line no-alert -- native prompt is the intended quick-input UX here
                   const name = prompt("Selector name (e.g. th, :hover, .active):");

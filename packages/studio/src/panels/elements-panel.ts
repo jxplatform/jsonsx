@@ -141,7 +141,8 @@ export function renderElementsTemplate(ctx: {
                     }}
                   >
                     <div class="element-card-preview">
-                      <span style="color:var(--fg-dim);font-size:11px;font-style:italic"
+                      <span
+                        style="color:var(--fg-dim);font-size:var(--spectrum-font-size-50, 11px);font-style:italic"
                         >&lt;${comp.tagName}&gt;</span
                       >
                     </div>

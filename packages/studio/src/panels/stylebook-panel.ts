@@ -592,7 +592,7 @@ export async function renderComponentPreview(comp: ComponentEntry) {
 function _componentFallback(tagName: string) {
   const fallback = document.createElement("div");
   fallback.style.cssText =
-    "padding:12px;border:1px dashed var(--border);border-radius:4px;color:var(--fg-dim)";
+    "padding:12px;border:1px dashed var(--border);border-radius:var(--radius);color:var(--fg-dim)";
   fallback.textContent = `<${tagName}>`;
   return fallback;
 }

@@ -332,7 +332,8 @@ function renderLiteralEditor(operand: unknown, onChange: (newVal: JxExpressionOp
                 @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)}
                 >true</sp-checkbox
               >`
-            : html`<span style="font-size:12px;color:var(--spectrum-global-color-gray-600)"
+            : html`<span
+                style="font-size:var(--spectrum-font-size-75, 12px);color:var(--spectrum-gray-600, #808080)"
                 >null</span
               >`}
     </div>
@@ -425,7 +426,7 @@ function renderSpliceArgsEditor(
             class="array-object-row"
             style="display:flex;gap:4px;align-items:center;margin-bottom:4px"
           >
-            <span style="font-size:10px;color:var(--spectrum-global-color-gray-600);min-width:30px">
+            <span style="font-size:10px;color:var(--spectrum-gray-600, #808080);min-width:30px">
               ${labels[idx] ?? "item"}
             </span>
             ${renderOperandEditor(
@@ -496,7 +497,7 @@ export function renderExpressionEditor(
 
   const nestStyle =
     depth > 0
-      ? "border-left:2px solid var(--spectrum-global-color-gray-300);margin-left:8px;padding-left:8px;"
+      ? "border-left:2px solid var(--spectrum-gray-300, #3c3c3c);margin-left:8px;padding-left:8px;"
       : "";
 
   return html`

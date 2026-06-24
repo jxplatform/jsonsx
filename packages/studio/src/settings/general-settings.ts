@@ -94,16 +94,18 @@ export function renderGeneralSettings(container: HTMLElement) {
             ? html`<img
                 src=${currentFavicon}
                 alt="Current favicon"
-                style="width:32px;height:32px;object-fit:contain;border:1px solid var(--border);border-radius:4px;padding:2px"
+                style="width:32px;height:32px;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius);padding:2px"
               />`
             : html`<div
-                style="width:32px;height:32px;border:1px dashed var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:11px"
+                style="width:32px;height:32px;border:1px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--fg-dim);font-size:var(--spectrum-font-size-50, 11px)"
               >
                 —
               </div>`}
           <sp-action-button size="s" @click=${onFaviconUpload}> Upload Favicon </sp-action-button>
           ${currentFavicon
-            ? html`<span style="font-size:11px;color:var(--fg-dim)">${currentFavicon}</span>`
+            ? html`<span style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
+                >${currentFavicon}</span
+              >`
             : nothing}
         </div>
       </div>

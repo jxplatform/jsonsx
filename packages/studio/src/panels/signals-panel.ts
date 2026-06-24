@@ -943,7 +943,7 @@ function renderFunctionFields(
         </div>
         <textarea
           class="field-input"
-          style="min-height:60px;font-family:monospace;font-size:11px"
+          style="min-height:60px;font-family:var(--font-mono);font-size:var(--spectrum-font-size-50, 11px)"
           .value=${def.body || ""}
           @input=${(e: Event) => {
             const v = (e.target as HTMLInputElement).value;
@@ -981,7 +981,7 @@ function renderParameterEditorTemplate(
           ${params.map(
             (p: CemParameter, i: number) => html`
               <span
-                style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:3px;background:var(--bg-hover);font-size:11px;font-family:monospace"
+                style="display:inline-flex;align-items:center;gap:2px;padding:1px 6px;border-radius:var(--radius);background:var(--hover-bg);font-size:var(--spectrum-font-size-50, 11px);font-family:var(--font-mono)"
               >
                 ${p.name || "?"}
                 <span
@@ -1002,7 +1002,7 @@ function renderParameterEditorTemplate(
           )}
           <input
             class="field-input"
-            style="width:60px;flex:0 0 auto;font-size:11px"
+            style="width:60px;flex:0 0 auto;font-size:var(--spectrum-font-size-50, 11px)"
             placeholder="+"
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === "Enter" && (e.target as HTMLInputElement).value.trim()) {
@@ -1145,7 +1145,7 @@ function renderEmitsEditorTemplate(S: SignalsPanelState, name: string, def: Sign
 
   return html`
     <div
-      style="font-size:11px;font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
+      style="font-size:var(--spectrum-font-size-50, 11px);font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
     >
       Emits
     </div>
@@ -1474,7 +1474,7 @@ export function renderSchemaFieldsTemplate(
                     ${Object.entries(cv.properties as Record<string, Record<string, unknown>>).map(
                       ([k, v]) => html`
                         <span
-                          style="background:var(--bg-alt);padding:1px 6px;border-radius:3px;font-size:10px;color:var(--fg-dim)"
+                          style="background:var(--bg);padding:1px 6px;border-radius:var(--radius);font-size:10px;color:var(--fg-dim)"
                           >${k}: ${v.type ?? "any"}</span
                         >
                       `,
@@ -1642,7 +1642,7 @@ export function renderExternalPrototypeEditorTemplate(
     } else {
       // Trigger async load — will re-render when cached
       schemaContent = html`<div
-        style="padding:4px 0;font-size:11px;color:var(--fg-dim);font-style:italic"
+        style="padding:4px 0;font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim);font-style:italic"
       >
         Loading schema…
       </div>`;
@@ -1658,7 +1658,10 @@ export function renderExternalPrototypeEditorTemplate(
 
   return html`
     ${importedPath
-      ? html`<div class="signal-hint" style="padding:4px 0 2px;font-size:11px;color:var(--fg-dim)">
+      ? html`<div
+          class="signal-hint"
+          style="padding:4px 0 2px;font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim)"
+        >
           ${def.$prototype}
         </div>`
       : html`

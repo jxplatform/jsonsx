@@ -25,7 +25,7 @@ function card(body: TemplateResult): TemplateResult {
       class="progress-modal"
       role="dialog"
       aria-live="polite"
-      style="position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 48px));max-height:calc(100vh - 96px);height:max-content;background:var(--bg-elevated,#1e1e1e);border:1px solid var(--border,#3a3a3a);border-radius:8px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)"
+      style="position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 48px));max-height:calc(100vh - 96px);height:max-content;background:var(--bg-panel,#1e1e1e);border:1px solid var(--border,#3a3a3a);border-radius:var(--spectrum-corner-radius-200,8px);padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:0 8px 32px rgba(0,0,0,.4)"
     >
       ${body}
     </div>
@@ -37,9 +37,11 @@ function runningView(title: string, status: string): TemplateResult {
     <div style="display:flex;align-items:center;gap:14px">
       <sp-progress-circle indeterminate size="m" aria-label=${title}></sp-progress-circle>
       <div style="display:flex;flex-direction:column;gap:2px">
-        <strong style="font-size:14px">${title}</strong>
+        <strong style="font-size:var(--spectrum-font-size-100, 14px)">${title}</strong>
         ${status
-          ? html`<span style="font-size:12px;color:var(--fg-dim,#aaa)">${status}</span>`
+          ? html`<span style="font-size:var(--spectrum-font-size-75, 12px);color:var(--fg-dim,#aaa)"
+              >${status}</span
+            >`
           : ""}
       </div>
     </div>
@@ -49,9 +51,11 @@ function runningView(title: string, status: string): TemplateResult {
 function errorView(title: string, message: string, onClose: () => void): TemplateResult {
   return card(html`
     <div style="display:flex;flex-direction:column;gap:8px">
-      <strong style="font-size:14px;color:var(--negative,#e34850)">${title} failed</strong>
+      <strong style="font-size:var(--spectrum-font-size-100, 14px);color:var(--danger,#e34850)"
+        >${title} failed</strong
+      >
       <pre
-        style="font-size:11px;white-space:pre-wrap;overflow:auto;max-height:240px;margin:0;color:var(--fg-dim,#aaa)"
+        style="font-size:var(--spectrum-font-size-50, 11px);white-space:pre-wrap;overflow:auto;max-height:240px;margin:0;color:var(--fg-dim,#aaa)"
       >
 ${message}</pre
       >

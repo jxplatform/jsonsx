@@ -457,7 +457,9 @@ export function renderAiPanelTemplate() {
         <div class="ai-status-center">
           <sp-icon-artboard style="font-size:32px"></sp-icon-artboard>
           <div>Claude authentication required</div>
-          <div style="font-size:11px;color:var(--spectrum-global-color-gray-600)">
+          <div
+            style="font-size:var(--spectrum-font-size-50, 11px);color:var(--spectrum-gray-600, #808080)"
+          >
             Run the following in your terminal:
           </div>
           <code class="ai-code-snippet">npx @anthropic-ai/claude-code login</code>

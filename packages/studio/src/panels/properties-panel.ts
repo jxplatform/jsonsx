@@ -331,7 +331,7 @@ function renderSwitchFieldsTemplate(
       mapSignals,
     )}
     <div
-      style="font-size:11px;font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
+      style="font-size:var(--spectrum-font-size-50, 11px);font-weight:600;color:var(--fg-dim);margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.05em"
     >
       Cases
     </div>
@@ -369,7 +369,7 @@ function renderSwitchFieldsTemplate(
             >→</span
           >
           <span
-            style="cursor:pointer;color:var(--danger);font-size:11px"
+            style="cursor:pointer;color:var(--danger);font-size:var(--spectrum-font-size-50, 11px)"
             @click=${(e: Event) => {
               e.stopPropagation();
               transactDoc(activeTab.value!, (t) => mutateRemoveSwitchCase(t, path, caseName));
@@ -657,7 +657,7 @@ function renderMediaFieldsTemplate(node: JxMutableNode) {
                   }}
                 />
                 <span
-                  style="font-size:10px;color:var(--fg-dim);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap"
+                  style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
                   >${view.addBreakpointPreview}</span
                 >
               </div>
@@ -714,7 +714,7 @@ function mediaBreakpointRowTemplate(name: string, query: string) {
         <input
           class="field-input"
           .value=${live(mediaDisplayName(name))}
-          style="flex:1;font-weight:600;font-size:12px"
+          style="flex:1;font-weight:600;font-size:var(--spectrum-font-size-75, 12px)"
           @input=${(e: Event) => {
             const newKey = friendlyNameToMedia((e.target as HTMLInputElement).value);
             currentRawLabel = newKey || "";
@@ -738,7 +738,7 @@ function mediaBreakpointRowTemplate(name: string, query: string) {
         />
         <span
           class="bp-raw-label"
-          style="font-size:10px;color:var(--fg-dim);font-family:'SF Mono','Fira Code',monospace;white-space:nowrap"
+          style="font-size:10px;color:var(--fg-dim);font-family:var(--font-mono);white-space:nowrap"
           >${name}</span
         >
         <span
@@ -892,14 +892,18 @@ function renderLayoutSelectionPanel(ctx: { navigateToComponent: (path: string) =
                 style="font-size:9px;padding:2px 6px;background:var(--spectrum-purple-600);color:white;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px"
                 >Layout</span
               >
-              <code style="font-size:12px;font-family:monospace">&lt;${tagName}&gt;</code>
+              <code
+                style="font-size:var(--spectrum-font-size-75, 12px);font-family:var(--font-mono)"
+                >&lt;${tagName}&gt;</code
+              >
             </div>
             ${className
               ? html`<div class="style-row">
                   <div class="style-row-label">
                     <sp-field-label size="s">Class</sp-field-label>
                   </div>
-                  <span style="font-size:11px;color:var(--fg-dim);word-break:break-all"
+                  <span
+                    style="font-size:var(--spectrum-font-size-50, 11px);color:var(--fg-dim);word-break:break-all"
                     >${className}</span
                   >
                 </div>`
@@ -1234,9 +1238,9 @@ export function renderPropertiesPanelTemplate(ctx: {
                       const def = d as Record<string, unknown>;
                       return html`
                         <div
-                          style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:11px"
+                          style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
                         >
-                          <code style="font-family:monospace;color:var(--accent)"
+                          <code style="font-family:var(--font-mono);color:var(--accent)"
                             >${def.attribute}</code
                           >
                           <span style="color:var(--fg-dim)"> → </span>
@@ -1248,7 +1252,7 @@ export function renderPropertiesPanelTemplate(ctx: {
                             : nothing}
                           ${def.reflects
                             ? html`<span
-                                style="font-size:9px;background:var(--bg-hover);padding:1px 4px;border-radius:3px"
+                                style="font-size:9px;background:var(--hover-bg);padding:1px 4px;border-radius:var(--radius)"
                                 >reflects</span
                               >`
                             : nothing}
@@ -1344,9 +1348,9 @@ export function renderPropertiesPanelTemplate(ctx: {
                 ${cssProps.map(
                   ([prop, val]) => html`
                     <div
-                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:11px"
+                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
                     >
-                      <code style="font-family:monospace;color:var(--accent)">${prop}</code>
+                      <code style="font-family:var(--font-mono);color:var(--accent)">${prop}</code>
                       <span style="margin-left:auto;color:var(--fg-dim)">${String(val)}</span>
                     </div>
                   `,
@@ -1374,9 +1378,11 @@ export function renderPropertiesPanelTemplate(ctx: {
                 ${parts.map(
                   (p) => html`
                     <div
-                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:11px"
+                      style="display:flex;gap:6px;align-items:center;padding:2px 0;font-size:var(--spectrum-font-size-50, 11px)"
                     >
-                      <code style="font-family:monospace;color:var(--accent)">${p.name}</code>
+                      <code style="font-family:var(--font-mono);color:var(--accent)"
+                        >${p.name}</code
+                      >
                       <span style="color:var(--fg-dim)">&lt;${p.tag}&gt;</span>
                     </div>
                   `,
