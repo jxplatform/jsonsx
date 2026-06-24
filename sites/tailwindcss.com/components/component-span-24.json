@@ -1,0 +1,144 @@
+{
+  "tagName": "component-span-24",
+  "attributes": {
+    "class": "line"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(90.7612 -33.1343 -0.542295)",
+        "borderTopColor": "lab(90.7612 -33.1343 -0.542295)",
+        "borderRightColor": "lab(90.7612 -33.1343 -0.542295)",
+        "borderBottomColor": "lab(90.7612 -33.1343 -0.542295)",
+        "borderLeftColor": "lab(90.7612 -33.1343 -0.542295)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(90.7612 -33.1343 -0.542295)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(90.7612 -33.1343 -0.542295)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(84.7652 -1.94535 -7.93337)",
+        "borderTopColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderRightColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderBottomColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderLeftColor": "lab(84.7652 -1.94535 -7.93337)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(84.7652 -1.94535 -7.93337)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(84.7652 -1.94535 -7.93337)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text2}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(80.3307 -20.2945 -31.385)",
+        "borderTopColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderRightColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderBottomColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderLeftColor": "lab(80.3307 -20.2945 -31.385)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(80.3307 -20.2945 -31.385)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(80.3307 -20.2945 -31.385)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text3}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(84.7652 -1.94535 -7.93337)",
+        "borderTopColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderRightColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderBottomColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderLeftColor": "lab(84.7652 -1.94535 -7.93337)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(84.7652 -1.94535 -7.93337)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(84.7652 -1.94535 -7.93337)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text4}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(98.1434 -0.369519 -1.05966)",
+        "borderTopColor": "lab(98.1434 -0.369519 -1.05966)",
+        "borderRightColor": "lab(98.1434 -0.369519 -1.05966)",
+        "borderBottomColor": "lab(98.1434 -0.369519 -1.05966)",
+        "borderLeftColor": "lab(98.1434 -0.369519 -1.05966)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(98.1434 -0.369519 -1.05966)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(98.1434 -0.369519 -1.05966)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text5}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(84.7652 -1.94535 -7.93337)",
+        "borderTopColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderRightColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderBottomColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderLeftColor": "lab(84.7652 -1.94535 -7.93337)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(84.7652 -1.94535 -7.93337)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(84.7652 -1.94535 -7.93337)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text6}"
+    }
+  ],
+  "style": {
+    "display": "block",
+    "width": "448.797px",
+    "height": "24px",
+    "minHeight": "24px",
+    "marginLeft": "36px",
+    "borderTopColor": "lab(98.1434 -0.369519 -1.05966)",
+    "borderRightColor": "lab(98.1434 -0.369519 -1.05966)",
+    "borderBottomColor": "lab(98.1434 -0.369519 -1.05966)",
+    "borderLeftColor": "lab(98.1434 -0.369519 -1.05966)",
+    "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+    "fontSize": "13px",
+    "textDecorationColor": "lab(98.1434 -0.369519 -1.05966)",
+    "whiteSpace": "pre",
+    "color": "lab(98.1434 -0.369519 -1.05966)",
+    "visibility": "visible",
+    "outlineColor": "lab(98.1434 -0.369519 -1.05966)",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentSpan24",
+  "state": {
+    "text": "",
+    "text2": "",
+    "text3": "",
+    "text4": "",
+    "text5": "",
+    "text6": ""
+  }
+}

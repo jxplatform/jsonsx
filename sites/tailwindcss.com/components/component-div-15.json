@@ -1,0 +1,73 @@
+{
+  "tagName": "component-div-15",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "${state.class2}"
+      },
+      "style": {
+        "flex": "0 0 auto",
+        "flexShrink": 0,
+        "width": "1px",
+        "height": "32px",
+        "backgroundColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.3)",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "span",
+      "attributes": {
+        "class": "${state.class3}"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "attributes": {
+            "class": "font-mono text-[13px]/7 text-gray-950 dark:text-white"
+          },
+          "textContent": "${state.text}",
+          "style": {
+            "width": "46.8125px",
+            "height": "28px",
+            "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+            "fontSize": "13px",
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "display": "block",
+        "width": "46.8125px",
+        "height": "32px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "display": "flex",
+    "flex": "0 0 auto",
+    "flexShrink": 0,
+    "gap": "8px",
+    "rowGap": "8px",
+    "columnGap": "8px",
+    "width": "40px",
+    "height": "32px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv15",
+  "state": {
+    "class": "",
+    "class2": "",
+    "class3": "",
+    "text": ""
+  }
+}

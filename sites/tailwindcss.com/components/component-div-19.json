@@ -1,0 +1,33 @@
+{
+  "tagName": "component-div-19",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "data-sm": "${state.datasm}",
+        "data-md": "${state.datamd}"
+      },
+      "style": {
+        "width": "863.984px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "position": "relative",
+    "width": "863.984px",
+    "marginLeft": "400px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv19",
+  "state": {
+    "class": "",
+    "datasm": "",
+    "datamd": ""
+  }
+}

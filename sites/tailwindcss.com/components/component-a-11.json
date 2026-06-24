@@ -1,0 +1,77 @@
+{
+  "tagName": "component-a-11",
+  "attributes": {
+    "class": "${state.class}",
+    "aria-label": "${state.arialabel}",
+    "href": "${state.href}"
+  },
+  "children": [
+    {
+      "tagName": "svg",
+      "attributes": {
+        "viewBox": "${state.viewBox}",
+        "fill": "${state.fill}",
+        "class": "${state.class2}"
+      },
+      "children": [
+        {
+          "tagName": "path",
+          "attributes": {
+            "class": "${state.class3}",
+            "d": "${state.d}"
+          },
+          "style": {
+            "visibility": "visible",
+            "cursor": "pointer",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tagName": "path",
+          "attributes": {
+            "fill": "${state.fill2}",
+            "d": "${state.d2}"
+          },
+          "style": {
+            "visibility": "visible",
+            "cursor": "pointer",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "overflow": "hidden",
+        "overflowX": "hidden",
+        "overflowY": "hidden",
+        "width": "159.047px",
+        "height": "20px",
+        "visibility": "visible",
+        "cursor": "pointer",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "display": "block",
+    "flex": "0 0 auto",
+    "flexShrink": 0,
+    "width": "159.047px",
+    "height": "20px",
+    "visibility": "visible",
+    "cursor": "pointer",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentA11",
+  "state": {
+    "class": "",
+    "arialabel": "",
+    "href": "",
+    "viewBox": "",
+    "fill": "",
+    "class2": "",
+    "class3": "",
+    "d": "",
+    "fill2": "",
+    "d2": ""
+  }
+}

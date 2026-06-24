@@ -1,0 +1,97 @@
+{
+  "tagName": "component-div-17",
+  "attributes": {
+    "class": "flex gap-6"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "flex flex-1 flex-col gap-2.5"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "attributes": {
+            "class": "text-base/7 font-medium text-gray-950 dark:text-white"
+          },
+          "textContent": "${state.text}",
+          "style": {
+            "display": "block",
+            "width": "479.516px",
+            "height": "28px",
+            "fontWeight": 500,
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tagName": "div",
+          "attributes": {
+            "class": "${state.class}"
+          },
+          "style": {
+            "width": "479.516px",
+            "height": "10px",
+            "borderTopLeftRadius": "3.35544e+07px",
+            "borderTopRightRadius": "3.35544e+07px",
+            "borderBottomRightRadius": "3.35544e+07px",
+            "borderBottomLeftRadius": "3.35544e+07px",
+            "backgroundImage": "linear-gradient(to right, lab(75.0771 -60.7313 19.4147) 0%, lab(70.687 -23.6078 -45.9483) 100%)",
+            "visibility": "visible",
+            "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.999994 0.0000455678 0.0000200868 / 0.1) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "flex": "1 1 0%",
+        "flexGrow": 1,
+        "flexBasis": "0%",
+        "gap": "10px",
+        "rowGap": "10px",
+        "columnGap": "10px",
+        "width": "479.516px",
+        "height": "48px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "span",
+      "attributes": {
+        "class": "text-3xl/12 font-semibold text-gray-950 dark:text-white"
+      },
+      "textContent": "${state.text2}",
+      "style": {
+        "display": "block",
+        "width": "60.4688px",
+        "height": "48px",
+        "fontSize": "30px",
+        "fontWeight": 600,
+        "lineHeight": "48px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "display": "flex",
+    "gap": "24px",
+    "rowGap": "24px",
+    "columnGap": "24px",
+    "width": "563.984px",
+    "height": "48px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv17",
+  "state": {
+    "text": "",
+    "class": "",
+    "text2": ""
+  }
+}

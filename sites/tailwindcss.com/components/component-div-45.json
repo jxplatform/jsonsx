@@ -1,0 +1,94 @@
+{
+  "tagName": "component-div-45",
+  "attributes": {
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": {
+        "alt": "",
+        "src": "${state.src}",
+        "class": "${state.class2}"
+      },
+      "style": {
+        "gridColumn": "span 2 / span 2",
+        "gridArea": "auto / span 2 / auto / span 2",
+        "width": "372px",
+        "height": "160px",
+        "borderTopLeftRadius": "8px",
+        "borderTopRightRadius": "8px",
+        "borderBottomRightRadius": "8px",
+        "borderBottomLeftRadius": "8px",
+        "backgroundColor": "oklab(0.129999 -0.00404751 -0.027702 / 0.05)",
+        "visibility": "visible",
+        "objectFit": "cover",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "img",
+      "attributes": {
+        "alt": "",
+        "src": "${state.src2}",
+        "class": "${state.class3}"
+      },
+      "style": {
+        "gridColumn": "span 1 / span 1",
+        "gridArea": "auto / span 1 / auto / span 1",
+        "width": "182px",
+        "height": "160px",
+        "borderTopLeftRadius": "8px",
+        "borderTopRightRadius": "8px",
+        "borderBottomRightRadius": "8px",
+        "borderBottomLeftRadius": "8px",
+        "backgroundColor": "oklab(0.129999 -0.00404751 -0.027702 / 0.05)",
+        "visibility": "visible",
+        "objectFit": "cover",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "img",
+      "attributes": {
+        "alt": "",
+        "src": "${state.src3}",
+        "class": "${state.class4}"
+      },
+      "style": {
+        "width": "182px",
+        "height": "160px",
+        "borderTopLeftRadius": "8px",
+        "borderTopRightRadius": "8px",
+        "borderBottomRightRadius": "8px",
+        "borderBottomLeftRadius": "8px",
+        "backgroundColor": "oklab(0.129999 -0.00404751 -0.027702 / 0.05)",
+        "visibility": "visible",
+        "objectFit": "cover",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "display": "grid",
+    "gap": "8px",
+    "rowGap": "8px",
+    "columnGap": "8px",
+    "gridTemplateColumns": "182px 182px 182px 182px",
+    "gridTemplateRows": "160px",
+    "width": "752px",
+    "height": "160px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv45",
+  "state": {
+    "class": "",
+    "src": "",
+    "class2": "",
+    "src2": "",
+    "class3": "",
+    "src3": "",
+    "class4": ""
+  }
+}

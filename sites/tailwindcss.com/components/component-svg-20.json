@@ -1,0 +1,58 @@
+{
+  "tagName": "component-svg-20",
+  "attributes": {
+    "xmlns": "${state.xmlns}",
+    "viewBox": "${state.viewBox}",
+    "fill": "${state.fill}",
+    "aria-hidden": "${state.ariahidden}",
+    "data-slot": "${state.dataslot}",
+    "class": "${state.class}"
+  },
+  "children": [
+    {
+      "tagName": "path",
+      "attributes": {
+        "fillRule": "${state.fillRule}",
+        "d": "${state.d}",
+        "clipRule": "${state.clipRule}"
+      },
+      "style": {
+        "fontSize": "12px",
+        "fontWeight": 500,
+        "fontVariant": "tabular-nums",
+        "lineHeight": "20px",
+        "textAlign": "center",
+        "visibility": "visible",
+        "cursor": "default",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "overflow": "hidden",
+    "overflowX": "hidden",
+    "overflowY": "hidden",
+    "width": "16px",
+    "height": "16px",
+    "fontSize": "12px",
+    "fontWeight": 500,
+    "fontVariant": "tabular-nums",
+    "lineHeight": "20px",
+    "textAlign": "center",
+    "visibility": "visible",
+    "cursor": "default",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentSvg20",
+  "state": {
+    "xmlns": "",
+    "viewBox": "",
+    "fill": "",
+    "ariahidden": "",
+    "dataslot": "",
+    "class": "",
+    "fillRule": "",
+    "d": "",
+    "clipRule": ""
+  }
+}

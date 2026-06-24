@@ -1,0 +1,39 @@
+{
+  "tagName": "component-defs-12",
+  "children": [
+    {
+      "tagName": "clipPath",
+      "attributes": {
+        "id": "${state.id}"
+      },
+      "children": [
+        {
+          "tagName": "rect",
+          "attributes": {
+            "width": "112",
+            "height": "72",
+            "fill": "var(--site-background)"
+          },
+          "style": {
+            "width": "112px",
+            "height": "72px",
+            "visibility": "visible",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDefs12",
+  "state": {
+    "id": ""
+  }
+}

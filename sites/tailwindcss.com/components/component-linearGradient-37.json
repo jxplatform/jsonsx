@@ -1,0 +1,54 @@
+{
+  "tagName": "component-linearGradient-37",
+  "attributes": {
+    "id": "${state.id}",
+    "x1": "${state.x1}",
+    "x2": "${state.x2}",
+    "y1": "${state.y1}",
+    "y2": "${state.y2}",
+    "gradientUnits": "userSpaceOnUse"
+  },
+  "children": [
+    {
+      "tagName": "stop",
+      "attributes": {
+        "stopColor": "${state.stopColor}"
+      },
+      "style": {
+        "visibility": "visible",
+        "cursor": "pointer",
+        "listStyleType": "none",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "stop",
+      "attributes": {
+        "offset": "1",
+        "stopColor": "${state.stopColor2}"
+      },
+      "style": {
+        "visibility": "visible",
+        "cursor": "pointer",
+        "listStyleType": "none",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "visibility": "visible",
+    "cursor": "pointer",
+    "listStyleType": "none",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentLineargradient37",
+  "state": {
+    "id": "",
+    "x1": "",
+    "x2": "",
+    "y1": "",
+    "y2": "",
+    "stopColor": "",
+    "stopColor2": ""
+  }
+}

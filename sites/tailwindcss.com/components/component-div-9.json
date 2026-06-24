@@ -1,0 +1,147 @@
+{
+  "tagName": "component-div-9",
+  "children": [
+    {
+      "tagName": "h3",
+      "attributes": {
+        "class": "mb-2 font-semibold"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": {
+            "href": "/plus?ref=footer",
+            "class": "hover:underline"
+          },
+          "textContent": "Tailwind Plus",
+          "style": {
+            "fontSize": "14px",
+            "fontWeight": 600,
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "cursor": "pointer",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "marginBottom": "8px",
+        "fontSize": "14px",
+        "fontWeight": 600,
+        "lineHeight": "28px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "ul",
+      "attributes": {
+        "class": "mt-4 grid gap-4"
+      },
+      "children": [
+        {
+          "tagName": "li",
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "/plus/ui-blocks?ref=footer",
+                "class": "hover:underline"
+              },
+              "textContent": "UI Blocks",
+              "style": {
+                "fontSize": "14px",
+                "lineHeight": "28px",
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            }
+          ],
+          "style": {
+            "fontSize": "14px",
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "listStyleType": "none",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tagName": "li",
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "/plus/templates?ref=footer",
+                "class": "hover:underline"
+              },
+              "textContent": "Templates",
+              "style": {
+                "fontSize": "14px",
+                "lineHeight": "28px",
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            }
+          ],
+          "style": {
+            "fontSize": "14px",
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "listStyleType": "none",
+            "pointerEvents": "auto"
+          }
+        },
+        {
+          "tagName": "li",
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "/plus/ui-kit?ref=footer",
+                "class": "hover:underline"
+              },
+              "textContent": "UI Kit",
+              "style": {
+                "fontSize": "14px",
+                "lineHeight": "28px",
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            }
+          ],
+          "style": {
+            "fontSize": "14px",
+            "lineHeight": "28px",
+            "visibility": "visible",
+            "listStyleType": "none",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "display": "grid",
+        "gap": "16px",
+        "rowGap": "16px",
+        "columnGap": "16px",
+        "marginTop": "16px",
+        "fontSize": "14px",
+        "lineHeight": "28px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "fontSize": "14px",
+    "lineHeight": "28px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv9"
+}

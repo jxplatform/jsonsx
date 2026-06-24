@@ -1,0 +1,159 @@
+{
+  "tagName": "component-span-42",
+  "attributes": {
+    "class": "line"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(65.5349 -2.25151 -14.5072)",
+        "borderTopColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderRightColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderBottomColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderLeftColor": "lab(65.5349 -2.25151 -14.5072)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(65.5349 -2.25151 -14.5072)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(65.5349 -2.25151 -14.5072)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "<"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(64.5597 64.3615 -12.7988)",
+        "borderTopColor": "lab(64.5597 64.3615 -12.7988)",
+        "borderRightColor": "lab(64.5597 64.3615 -12.7988)",
+        "borderBottomColor": "lab(64.5597 64.3615 -12.7988)",
+        "borderLeftColor": "lab(64.5597 64.3615 -12.7988)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(64.5597 64.3615 -12.7988)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(64.5597 64.3615 -12.7988)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "${state.text}"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(65.5349 -2.25151 -14.5072)",
+        "borderTopColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderRightColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderBottomColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderLeftColor": "lab(65.5349 -2.25151 -14.5072)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(65.5349 -2.25151 -14.5072)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(65.5349 -2.25151 -14.5072)",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(84.7652 -1.94535 -7.93337)",
+        "borderTopColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderRightColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderBottomColor": "lab(84.7652 -1.94535 -7.93337)",
+        "borderLeftColor": "lab(84.7652 -1.94535 -7.93337)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(84.7652 -1.94535 -7.93337)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(84.7652 -1.94535 -7.93337)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "class"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(65.5349 -2.25151 -14.5072)",
+        "borderTopColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderRightColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderBottomColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderLeftColor": "lab(65.5349 -2.25151 -14.5072)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(65.5349 -2.25151 -14.5072)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(65.5349 -2.25151 -14.5072)",
+        "pointerEvents": "auto"
+      },
+      "textContent": "="
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(80.3307 -20.2945 -31.385)",
+        "borderTopColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderRightColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderBottomColor": "lab(80.3307 -20.2945 -31.385)",
+        "borderLeftColor": "lab(80.3307 -20.2945 -31.385)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(80.3307 -20.2945 -31.385)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(80.3307 -20.2945 -31.385)",
+        "pointerEvents": "auto"
+      },
+      "children": ["\"flex", "\""]
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "lab(65.5349 -2.25151 -14.5072)",
+        "borderTopColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderRightColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderBottomColor": "lab(65.5349 -2.25151 -14.5072)",
+        "borderLeftColor": "lab(65.5349 -2.25151 -14.5072)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "textDecorationColor": "lab(65.5349 -2.25151 -14.5072)",
+        "whiteSpace": "pre",
+        "visibility": "visible",
+        "outlineColor": "lab(65.5349 -2.25151 -14.5072)",
+        "pointerEvents": "auto"
+      },
+      "textContent": ">"
+    }
+  ],
+  "style": {
+    "display": "block",
+    "width": "824.656px",
+    "height": "24px",
+    "minHeight": "24px",
+    "marginLeft": "36px",
+    "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+    "fontSize": "13px",
+    "whiteSpace": "pre",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentSpan42",
+  "state": {
+    "text": ""
+  }
+}

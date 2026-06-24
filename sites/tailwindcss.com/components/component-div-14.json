@@ -1,0 +1,70 @@
+{
+  "tagName": "component-div-14",
+  "attributes": {
+    "data-target": "true",
+    "class": "flex snap-center snap-always flex-col items-center gap-2"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "font-mono text-[13px]/7 text-gray-950 dark:text-white"
+      },
+      "textContent": "${state.text}",
+      "style": {
+        "width": "54.6094px",
+        "height": "28px",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "13px",
+        "lineHeight": "28px",
+        "visibility": "visible",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "shadow ring inset-ring ring-gray-950/10 inset-ring-white/20"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "attributes": {
+            "class": "${state.class}"
+          },
+          "style": {
+            "width": "288px",
+            "height": "288px",
+            "backgroundColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.15)",
+            "visibility": "visible",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "width": "288px",
+        "height": "288px",
+        "visibility": "visible",
+        "boxShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.999994 0.0000455678 0.0000200868 / 0.2) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.129999 -0.00404751 -0.027702 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "alignItems": "center",
+    "gap": "8px",
+    "rowGap": "8px",
+    "columnGap": "8px",
+    "width": "288px",
+    "height": "324px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv14",
+  "state": {
+    "text": "",
+    "class": ""
+  }
+}

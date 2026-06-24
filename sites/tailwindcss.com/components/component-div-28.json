@@ -1,0 +1,83 @@
+{
+  "tagName": "component-div-28",
+  "attributes": {
+    "aria-hidden": "true",
+    "class": "${state.class}"
+  },
+  "children": [
+    "${state.text}",
+    {
+      "tagName": "span",
+      "attributes": {
+        "class": "inline dark:hidden"
+      },
+      "textContent": "text-gray-950",
+      "style": {
+        "display": "none",
+        "borderTopColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderRightColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderBottomColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderLeftColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "12px",
+        "textDecorationColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "whiteSpace": "pre",
+        "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "visibility": "visible",
+        "outlineColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "pointerEvents": "auto"
+      }
+    },
+    {
+      "tagName": "span",
+      "attributes": {
+        "class": "hidden dark:inline"
+      },
+      "textContent": "text-white",
+      "style": {
+        "display": "block",
+        "width": "72.0156px",
+        "height": "24px",
+        "borderTopColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderRightColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderBottomColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "borderLeftColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+        "fontSize": "12px",
+        "textDecorationColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "whiteSpace": "pre",
+        "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "visibility": "visible",
+        "outlineColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+        "pointerEvents": "auto"
+      }
+    },
+    "${state.text2}"
+  ],
+  "style": {
+    "display": "flex",
+    "alignItems": "flex-end",
+    "width": "1360px",
+    "height": "40px",
+    "paddingRight": "8px",
+    "paddingLeft": "8px",
+    "borderTopColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "borderRightColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "borderBottomColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "borderLeftColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+    "fontSize": "12px",
+    "textDecorationColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "whiteSpace": "pre",
+    "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "visibility": "visible",
+    "outlineColor": "oklab(0.999994 0.0000455678 0.0000200868 / 0.25)",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv28",
+  "state": {
+    "class": "",
+    "text": "",
+    "text2": ""
+  }
+}

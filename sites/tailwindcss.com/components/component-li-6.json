@@ -1,0 +1,129 @@
+{
+  "tagName": "component-li-6",
+  "attributes": {
+    "class": "max-lg:nth-[2n+1]:line-y lg:max-xl:nth-[3n+1]:line-y xl:nth-[4n+1]:line-y"
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": {
+        "href": "${state.href}",
+        "target": "_blank",
+        "rel": "noopener sponsored",
+        "class": "grid place-content-center transition-colors hover:bg-gray-950/2.5 sm:px-2 sm:py-4 dark:hover:bg-white/2.5"
+      },
+      "children": [
+        {
+          "tagName": "svg",
+          "attributes": {
+            "fill": "currentColor",
+            "viewBox": "0 0 320 96",
+            "class": "w-full max-w-80",
+            "aria-label": "${state.arialabel}"
+          },
+          "children": [
+            {
+              "tagName": "path",
+              "attributes": {
+                "d": "${state.d}",
+                "fill": "${state.fill}"
+              },
+              "style": {
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            },
+            {
+              "tagName": "path",
+              "attributes": {
+                "d": "${state.d2}"
+              },
+              "style": {
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            },
+            {
+              "tagName": "path",
+              "attributes": {
+                "d": "${state.d3}",
+                "fillOpacity": "${state.fillOpacity}"
+              },
+              "style": {
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            },
+            {
+              "tagName": "path",
+              "attributes": {
+                "d": "${state.d4}"
+              },
+              "style": {
+                "visibility": "visible",
+                "cursor": "pointer",
+                "listStyleType": "none",
+                "pointerEvents": "auto"
+              }
+            }
+          ],
+          "style": {
+            "overflow": "hidden",
+            "overflowX": "hidden",
+            "overflowY": "hidden",
+            "width": "294px",
+            "height": "88.1875px",
+            "maxWidth": "320px",
+            "visibility": "visible",
+            "cursor": "pointer",
+            "listStyleType": "none",
+            "pointerEvents": "auto"
+          }
+        }
+      ],
+      "style": {
+        "display": "grid",
+        "justifyContent": "center",
+        "alignContent": "center",
+        "gridTemplateColumns": "294px",
+        "gridTemplateRows": "88.1875px",
+        "width": "310px",
+        "height": "120.188px",
+        "paddingTop": "16px",
+        "paddingRight": "8px",
+        "paddingBottom": "16px",
+        "paddingLeft": "8px",
+        "visibility": "visible",
+        "transition": "color 0.15s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), outline-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), text-decoration-color 0.15s cubic-bezier(0.4, 0, 0.2, 1), fill 0.15s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.15s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-from 0.15s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-via 0.15s cubic-bezier(0.4, 0, 0.2, 1), --tw-gradient-to 0.15s cubic-bezier(0.4, 0, 0.2, 1)",
+        "cursor": "pointer",
+        "listStyleType": "none",
+        "pointerEvents": "auto"
+      }
+    }
+  ],
+  "style": {
+    "position": "relative",
+    "width": "310px",
+    "height": "120.188px",
+    "visibility": "visible",
+    "listStyleType": "none",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentLi6",
+  "state": {
+    "href": "",
+    "arialabel": "",
+    "d": "",
+    "fill": "",
+    "d2": "",
+    "d3": "",
+    "fillOpacity": "",
+    "d4": ""
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "tagName": "component-div-1",
+  "children": [
+    {
+      "tagName": "div",
+      "attributes": {
+        "class": "pointer-events-none h-[calc(var(--width)*var(--sin)+var(--height)*var(--cos))] w-[calc(var(--width)*var(--cos)+var(--height)*var(--sin))] translate-x-5 translate-y-2 sm:translate-x-8 sm:translate-y-5"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "attributes": {
+            "class": "rotate-(--angle)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "attributes": {
+                "class": "font-mono text-[13px]/7 text-gray-950 dark:text-white"
+              },
+              "textContent": "${state.text}",
+              "style": {
+                "width": "73.5312px",
+                "height": "28px",
+                "fontFamily": "plexMono, \"plexMono Fallback\", monospace",
+                "fontSize": "13px",
+                "lineHeight": "28px",
+                "visibility": "visible"
+              }
+            }
+          ],
+          "style": {
+            "width": "73.5312px",
+            "height": "28px",
+            "visibility": "visible"
+          }
+        }
+      ],
+      "style": {
+        "width": "73.5312px",
+        "height": "73.5312px",
+        "visibility": "visible"
+      }
+    }
+  ],
+  "style": {
+    "width": "64px",
+    "height": "73.5312px",
+    "visibility": "visible",
+    "pointerEvents": "auto"
+  },
+  "$id": "ComponentDiv1",
+  "state": {
+    "text": ""
+  }
+}
