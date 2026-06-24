@@ -123,7 +123,7 @@ describe("removeRecentProject", () => {
 describe("clearRecentProjects", () => {
   test("removes all stored projects but leaves recent files alone", () => {
     addRecentProject("Demo", "/p/demo");
-    trackRecentFile({ name: "index.json", path: "/p/demo/index.json" });
+    trackRecentFile({ name: "index.json", path: "/p/demo/index.json", root: "/p/demo" });
     clearRecentProjects();
     expect(getRecentProjects()).toEqual([]);
     expect(getRecentFiles().length).toBe(1);
@@ -204,46 +204,73 @@ describe("getRecentFiles", () => {
     localStorage.setItem(
       FILES_KEY,
       JSON.stringify([
-        { name: "a.json", path: "/a.json", timestamp: 5 },
-        { name: "c.json", path: "/c.json", timestamp: 50 },
-        { name: "b.json", path: "/b.json", timestamp: 25 },
+        { name: "a.json", path: "/a.json", root: "/p", timestamp: 5 },
+        { name: "c.json", path: "/c.json", root: "/p", timestamp: 50 },
+        { name: "b.json", path: "/b.json", root: "/p", timestamp: 25 },
       ]),
     );
     expect(getRecentFiles().map((f) => f.name)).toEqual(["c.json", "b.json", "a.json"]);
   });
+
+  test("scopes the list to the given project root", () => {
+    trackRecentFile({ name: "a.md", path: "pages/a.md", root: "/p/alpha" });
+    trackRecentFile({ name: "b.md", path: "pages/b.md", root: "/p/beta" });
+    trackRecentFile({ name: "c.md", path: "pages/c.md", root: "/p/alpha" });
+    expect(getRecentFiles("/p/alpha").map((f) => f.name)).toEqual(["c.md", "a.md"]);
+    expect(getRecentFiles("/p/beta").map((f) => f.name)).toEqual(["b.md"]);
+    // No root → every project's files.
+    expect(getRecentFiles().length).toBe(3);
+  });
 });
 
 describe("trackRecentFile", () => {
-  test("adds an entry with path, name, and timestamp", () => {
-    trackRecentFile({ name: "page.json", path: "/site/page.json" });
+  test("adds an entry with path, name, root, and timestamp", () => {
+    trackRecentFile({ name: "page.json", path: "/site/page.json", root: "/site" });
     const files = getRecentFiles();
     expect(files.length).toBe(1);
     expect(files[0]!.path).toBe("/site/page.json");
     expect(files[0]!.name).toBe("page.json");
+    expect(files[0]!.root).toBe("/site");
     expect(typeof files[0]!.timestamp).toBe("number");
   });
 
-  test("re-tracking the same path dedupes and moves it to the front", () => {
-    trackRecentFile({ name: "a.json", path: "/a.json" });
-    trackRecentFile({ name: "b.json", path: "/b.json" });
-    trackRecentFile({ name: "a.json", path: "/a.json" });
+  test("re-tracking the same path within a project dedupes and moves it to the front", () => {
+    trackRecentFile({ name: "a.json", path: "/a.json", root: "/p" });
+    trackRecentFile({ name: "b.json", path: "/b.json", root: "/p" });
+    trackRecentFile({ name: "a.json", path: "/a.json", root: "/p" });
     const files = getRecentFiles();
     expect(files.length).toBe(2);
     expect(files.map((f) => f.path)).toEqual(["/a.json", "/b.json"]);
   });
 
-  test("caps the list at 10 entries, dropping the oldest", () => {
+  test("the same relative path in different projects is kept separately", () => {
+    trackRecentFile({ name: "index.md", path: "pages/index.md", root: "/p/alpha" });
+    trackRecentFile({ name: "index.md", path: "pages/index.md", root: "/p/beta" });
+    expect(getRecentFiles().length).toBe(2);
+    expect(getRecentFiles("/p/alpha").length).toBe(1);
+  });
+
+  test("caps each project at 10 entries, dropping that project's oldest", () => {
     for (let i = 1; i <= 12; i++) {
-      trackRecentFile({ name: `f${i}.json`, path: `/f/${i}.json` });
+      trackRecentFile({ name: `f${i}.json`, path: `/f/${i}.json`, root: "/p" });
     }
-    const files = getRecentFiles();
+    const files = getRecentFiles("/p");
     expect(files.length).toBe(10);
     expect(files[0]!.name).toBe("f12.json");
     expect(files[9]!.name).toBe("f3.json");
   });
 
+  test("the per-project cap does not evict another project's history", () => {
+    trackRecentFile({ name: "keep.md", path: "pages/keep.md", root: "/p/other" });
+    for (let i = 1; i <= 12; i++) {
+      trackRecentFile({ name: `f${i}.json`, path: `/f/${i}.json`, root: "/p" });
+    }
+    expect(getRecentFiles("/p/other").map((f) => f.name)).toEqual(["keep.md"]);
+    expect(getRecentFiles("/p").length).toBe(10);
+  });
+
   test("recent files do not interfere with recent projects storage", () => {
-    trackRecentFile({ name: "x.json", path: "/x.json" });
+    trackRecentFile({ name: "x.json", path: "/x.json", root: "/p" });
     expect(getRecentProjects()).toEqual([]);
   });
 });

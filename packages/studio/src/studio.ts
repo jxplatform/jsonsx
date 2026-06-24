@@ -338,7 +338,7 @@ toolbarPanel.mount(toolbarEl, {
 });
 
 initLayers();
-initQuickSearch();
+initQuickSearch({ openRecentProject: (root: string) => openRecentProject(root) });
 
 tabStrip.mount(document.querySelector("#tab-strip") as HTMLElement);
 

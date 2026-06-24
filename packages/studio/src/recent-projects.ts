@@ -5,6 +5,8 @@ import type { RecentProjectEntry } from "./types";
 interface RecentFile {
   path: string;
   name: string;
+  /** The project root the file belongs to, so recents can be scoped to the open project. */
+  root: string;
   timestamp: number;
 }
 
@@ -123,25 +125,44 @@ export function clearRecentProjects() {
   }
 }
 
-/** @returns {RecentFile[]} */
-export function getRecentFiles() {
+function loadRecentFiles(): RecentFile[] {
   try {
     const raw = localStorage.getItem(FILES_STORAGE_KEY);
     if (!raw) {
       return [];
     }
-    return (JSON.parse(raw) as RecentFile[]).toSorted((a, b) => b.timestamp - a.timestamp);
+    const parsed = JSON.parse(raw) as RecentFile[];
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-/** @param {{ path: string; name: string }} file */
-export function trackRecentFile(file: { path: string; name: string }) {
-  const recent = getRecentFiles().filter((f) => f.path !== file.path);
-  recent.unshift({ name: file.name, path: file.path, timestamp: Date.now() });
-  if (recent.length > MAX_RECENT_FILES) {
-    recent.length = MAX_RECENT_FILES;
+/**
+ * Recently-opened files, newest-first. Pass a project `root` to scope the list to that project (the
+ * Quick Access modal does this so it only ever shows files from the open project).
+ *
+ * @param {string} [root]
+ * @returns {RecentFile[]}
+ */
+export function getRecentFiles(root?: string) {
+  const all = loadRecentFiles().toSorted((a, b) => b.timestamp - a.timestamp);
+  return root == null ? all : all.filter((f) => f.root === root);
+}
+
+/** @param {{ path: string; name: string; root: string }} file */
+export function trackRecentFile(file: { path: string; name: string; root: string }) {
+  const all = loadRecentFiles().filter((f) => !(f.root === file.root && f.path === file.path));
+  all.unshift({ name: file.name, path: file.path, root: file.root, timestamp: Date.now() });
+  // Cap per project so a busy project can't evict another project's history.
+  const perRoot = new Map<string, number>();
+  const kept: RecentFile[] = [];
+  for (const f of all.toSorted((a, b) => b.timestamp - a.timestamp)) {
+    const n = (perRoot.get(f.root) ?? 0) + 1;
+    perRoot.set(f.root, n);
+    if (n <= MAX_RECENT_FILES) {
+      kept.push(f);
+    }
   }
-  localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(recent));
+  localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(kept));
 }

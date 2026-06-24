@@ -1054,7 +1054,11 @@ export async function openFileInTab(path: string) {
       sourceFormat: format?.name ?? null,
     });
     requireProjectState().selectedPath = path;
-    trackRecentFile({ name: path.split("/").pop() || path, path });
+    trackRecentFile({
+      name: path.split("/").pop() || path,
+      path,
+      root: requireProjectState().projectRoot,
+    });
 
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (error) {
