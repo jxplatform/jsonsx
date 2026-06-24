@@ -61,8 +61,8 @@ const toolbarIconMap = {
  */
 function tbBtnTpl(label: string, onClick: () => void, iconTag?: string) {
   return html`
-    <sp-action-button size="s" @click=${onClick}>
-      ${iconTag ? toolbarIconMap[iconTag] : nothing} ${label}
+    <sp-action-button size="s" title=${label} @click=${onClick}>
+      ${iconTag ? toolbarIconMap[iconTag] : nothing}<span class="tb-label">${label}</span>
     </sp-action-button>
   `;
 }
@@ -241,25 +241,36 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
 
   return html`
     <div class="tb-split-btn">
-      <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
-        ${toolbarIconMap["sp-icon-folder-open"]} Open Project
+      <sp-action-button
+        size="s"
+        class="tb-split-main"
+        title="Open Project"
+        @click=${ctx.openProject}
+      >
+        ${toolbarIconMap["sp-icon-folder-open"]}<span class="tb-label">Open Project</span>
       </sp-action-button>
       ${recentProjectsTpl}
     </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    <sp-action-button size="s" disabled>
-      ${toolbarIconMap["sp-icon-save-floppy"]} Save
+    <sp-action-button size="s" title="Save" disabled>
+      ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
     </sp-action-button>
     <sp-action-group compact size="s">
-      <sp-action-button size="s" disabled>
-        ${toolbarIconMap["sp-icon-undo"]} Undo
+      <sp-action-button size="s" title="Undo" disabled>
+        ${toolbarIconMap["sp-icon-undo"]}<span class="tb-label">Undo</span>
       </sp-action-button>
-      <sp-action-button size="s" disabled>
-        ${toolbarIconMap["sp-icon-redo"]} Redo
+      <sp-action-button size="s" title="Redo" disabled>
+        ${toolbarIconMap["sp-icon-redo"]}<span class="tb-label">Redo</span>
       </sp-action-button>
     </sp-action-group>
     <div class="tb-spacer"></div>
-    <sp-action-button class="tb-search-trigger" size="s" quiet @click=${openQuickSearch}>
+    <sp-action-button
+      class="tb-search-trigger"
+      size="s"
+      quiet
+      title="Search files (⌘P)"
+      @click=${openQuickSearch}
+    >
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
@@ -267,8 +278,8 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
     <sp-action-group selects="single" size="s" compact>
       ${modes.map(
         (m) => html`
-          <sp-action-button size="s" disabled ?selected=${m.key === "design"}>
-            ${toolbarIconMap[m.iconTag]}${m.label}
+          <sp-action-button size="s" title=${m.label} disabled ?selected=${m.key === "design"}>
+            ${toolbarIconMap[m.iconTag]}<span class="tb-label">${m.label}</span>
           </sp-action-button>
         `,
       )}
@@ -330,6 +341,7 @@ function toolbarTemplate() {
         (m) => html`
           <sp-action-button
             size="s"
+            title=${m.label}
             ?selected=${canvasMode === m.key}
             ?disabled=${!allowedModes.has(m.key)}
             @click=${() => {
@@ -358,7 +370,7 @@ function toolbarTemplate() {
               ctx.safeRenderRightPanel();
             }}
           >
-            ${toolbarIconMap[m.iconTag]}${m.label}
+            ${toolbarIconMap[m.iconTag]}<span class="tb-label">${m.label}</span>
           </sp-action-button>
         `,
       )}
@@ -448,38 +460,60 @@ function toolbarTemplate() {
   return html`
     ${isMac ? csdTpl : nothing}
     <div class="tb-split-btn">
-      <sp-action-button size="s" class="tb-split-main" @click=${ctx.openProject}>
-        ${toolbarIconMap["sp-icon-folder-open"]} Open Project
+      <sp-action-button
+        size="s"
+        class="tb-split-main"
+        title="Open Project"
+        @click=${ctx.openProject}
+      >
+        ${toolbarIconMap["sp-icon-folder-open"]}<span class="tb-label">Open Project</span>
       </sp-action-button>
       ${recentProjectsTpl}
     </div>
     ${tbBtnTpl("Manage", openBrowseModal, "sp-icon-view-list")}
-    <sp-action-button size="s" ?disabled=${!canSave} @click=${ctx.saveFile}>
-      ${toolbarIconMap["sp-icon-save-floppy"]} Save
+    <sp-action-button size="s" title="Save" ?disabled=${!canSave} @click=${ctx.saveFile}>
+      ${toolbarIconMap["sp-icon-save-floppy"]}<span class="tb-label">Save</span>
     </sp-action-button>
     <sp-action-group compact size="s">
-      <sp-action-button size="s" ?disabled=${!canUndo} @click=${() => tabUndo(activeTab.value!)}>
-        ${toolbarIconMap["sp-icon-undo"]} Undo
+      <sp-action-button
+        size="s"
+        title="Undo"
+        ?disabled=${!canUndo}
+        @click=${() => tabUndo(activeTab.value!)}
+      >
+        ${toolbarIconMap["sp-icon-undo"]}<span class="tb-label">Undo</span>
       </sp-action-button>
-      <sp-action-button size="s" ?disabled=${!canRedo} @click=${() => tabRedo(activeTab.value!)}>
-        ${toolbarIconMap["sp-icon-redo"]} Redo
+      <sp-action-button
+        size="s"
+        title="Redo"
+        ?disabled=${!canRedo}
+        @click=${() => tabRedo(activeTab.value!)}
+      >
+        ${toolbarIconMap["sp-icon-redo"]}<span class="tb-label">Redo</span>
       </sp-action-button>
     </sp-action-group>
     <div class="tb-spacer"></div>
-    <sp-action-button class="tb-search-trigger" size="s" quiet @click=${openQuickSearch}>
+    <sp-action-button
+      class="tb-search-trigger"
+      size="s"
+      quiet
+      title="Search files (⌘P)"
+      @click=${openQuickSearch}
+    >
       <sp-icon-search slot="icon"></sp-icon-search>
       <span class="tb-search-label">Search files… <kbd>⌘P</kbd></span>
     </sp-action-button>
     ${(activeTab.value?.session.ui.gitStatus?.behind ?? 0) > 0
       ? html`<sp-action-button
           size="s"
+          title="Sync Project"
           @click=${async () => {
             await getPlatform().gitPull();
             await refreshGitStatus();
           }}
         >
           <sp-icon-download slot="icon"></sp-icon-download>
-          Sync Project
+          <span class="tb-label">Sync Project</span>
         </sp-action-button>`
       : nothing}
     <div class="tb-spacer"></div>

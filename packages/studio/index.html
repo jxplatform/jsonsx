@@ -175,6 +175,9 @@
         border-bottom: 1px solid var(--border);
         overflow: hidden;
         min-width: 0;
+        /* Drive the responsive collapse below off the toolbar's own width. */
+        container-type: inline-size;
+        container-name: toolbar;
       }
       #toolbar > :not(.window-controls) {
         min-width: 0;
@@ -2251,6 +2254,33 @@
       .tb-search-label kbd {
         font-family: inherit;
         opacity: 0.6;
+      }
+      /* ─── Responsive toolbar collapse ──────────────────
+         As the window narrows the toolbar sheds width in two stages so the
+         window controls and every action stay reachable instead of clipping:
+           1. the quick-access (file search) bar collapses to a search icon
+           2. every button drops its text label, leaving an icon (the `title`
+              attribute supplies a tooltip with the full name)
+         The breakpoints are the toolbar widths at which each fuller layout
+         stops fitting (measured against the English labels); re-tune them if
+         the toolbar's buttons or labels change. */
+      @container toolbar (max-width: 1360px) {
+        .tb-search-trigger {
+          flex: 0 0 auto;
+          gap: 0;
+        }
+        .tb-search-label {
+          display: none;
+        }
+      }
+      @container toolbar (max-width: 1140px) {
+        #toolbar .tb-label {
+          display: none;
+        }
+        /* Collapse the icon-to-(now hidden)-label gap so buttons read as icons. */
+        #toolbar sp-action-button {
+          gap: 0;
+        }
       }
       .quick-search-overlay {
         position: fixed;
