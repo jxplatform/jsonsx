@@ -144,3 +144,5 @@ Props are passed via `$props` — the only mechanism for crossing component boun
 ```
 
 Signal scope is bounded at the component level. No implicit scope leaking.
+
+> To build components visually, see [Building Components in Studio](/docs/studio-components).

@@ -183,6 +183,8 @@ function platCalls(name: string) {
 
 describe("ai-panel (sequential scenario)", () => {
   test("mountQuikChat is a no-op before the panel container exists", () => {
+    // Switch to dev-agent mode — the sequential scenario tests the Stack A (Claude SSE) flow.
+    ai.setMode("dev-agent");
     ai.mountQuikChat();
     expect(FakeQuikChat.instances.length).toBe(0);
   });

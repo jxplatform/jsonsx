@@ -40,7 +40,6 @@ export function resolveLayout(
     return pageDoc;
   }
 
-  // Load the layout file
   const layoutPath = resolve(projectRoot, layoutRef as string);
   if (!existsSync(layoutPath)) {
     throw new Error(`Layout not found: ${layoutRef} (resolved to ${layoutPath})`);
@@ -57,7 +56,7 @@ export function resolveLayout(
 
   // Check for nested layouts (layout inheriting from another layout)
   if (layoutDoc.$layout) {
-    layoutDoc = resolveLayout(layoutDoc, projectConfig, projectRoot);
+    layoutDoc = resolveLayout(layoutDoc, projectConfig, projectRoot, layoutPath);
   }
 
   // Distribute page children into layout slots

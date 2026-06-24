@@ -116,3 +116,5 @@ Built-in prototypes for common web APIs:
 | `"client"`   | Resolved at runtime in the browser (default)    |
 | `"server"`   | Resolved at runtime on the server via RPC       |
 | `"compiler"` | Resolved at build time, baked into emitted HTML |
+
+> To manage state visually, see [State & Signals in Studio](/docs/studio-state).

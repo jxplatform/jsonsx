@@ -177,7 +177,7 @@ export function mountQuikChat() {
  *
  * @param {AiMode} next
  */
-function setMode(next: AiMode) {
+export function setMode(next: AiMode) {
   if (mode === next) {
     return;
   }

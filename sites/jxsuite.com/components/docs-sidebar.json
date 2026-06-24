@@ -130,6 +130,124 @@
         "transition": "color 0.15s, background-color 0.15s"
       },
       "children": ["Site Architecture"]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "fontSize": "0.6875rem",
+        "fontWeight": "600",
+        "color": "var(--color-text-muted)",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "fontFamily": "var(--font-mono)",
+        "padding": "0 0.75rem",
+        "margin": "1rem 0 0.5rem"
+      },
+      "children": ["Studio Guide"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-overview" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Studio Overview"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-interface" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Interface Walkthrough"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-components" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Building Components"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-styling" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Styling in Studio"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-state" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["State & Signals"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-site-building" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Site Building"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-shortcuts" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["Keyboard Shortcuts"]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "/docs/studio-ai-assistant" },
+      "style": {
+        "color": "var(--color-text-secondary)",
+        "textDecoration": "none",
+        "fontSize": "0.875rem",
+        "padding": "0.375rem 0.75rem",
+        "borderRadius": "6px",
+        "transition": "color 0.15s, background-color 0.15s"
+      },
+      "children": ["AI Assistant"]
     }
   ]
 }
