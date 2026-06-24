@@ -1,0 +1,678 @@
+{
+  "title": "Styling & Design Tokens in JX Studio",
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Master styling in JX Studio: CSS custom properties, design tokens, $media breakpoints, responsive patterns, stylebook, and the token-first approach."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Styling" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "Tokens first. Always."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.125rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "600px"
+              },
+              "textContent": "JX uses a token-first styling system. Define your design tokens once in project.json, reference them everywhere via var(--token), and override per breakpoint with $media."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Design Tokens (CSS Custom Properties)"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.5rem"
+          },
+          "textContent": "Design tokens are CSS custom properties defined in your project.json's style object. They create a consistent design system across your entire site. Define them once, reference them everywhere."
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-secondary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius-lg)",
+            "padding": "2rem",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "overflowX": "auto" },
+              "children": [
+                {
+                  "tagName": "pre",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8125rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)",
+                    "margin": "0"
+                  },
+                  "textContent": "// project.json\n{\n  \"style\": {\n    \"--color-bg-primary\": \"#0a0a0a\",\n    \"--color-bg-surface\": \"#1a1a1a\",\n    \"--color-accent\": \"#3b82f6\",\n    \"--color-text-primary\": \"#fafafa\",\n    \"--color-text-secondary\": \"#a1a1aa\",\n    \"--color-border\": \"#222222\",\n    \"--font-mono\": \"'JetBrains Mono', monospace\",\n    \"--radius\": \"8px\",\n    \"--radius-lg\": \"12px\",\n    \"--max-width\": \"1200px\"\n  }\n}\n\n// Any component can reference these:\n{\n  \"style\": {\n    \"backgroundColor\": \"var(--color-bg-surface)\",\n    \"color\": \"var(--color-text-primary)\",\n    \"borderRadius\": \"var(--radius)\",\n    \"fontFamily\": \"var(--font-mono)\"\n  }\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+            "gap": "0.75rem",
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Token Naming Convention"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Use --category-role-variant: --color-bg-primary, --font-mono, --radius-lg. Categories: color, font, radius, spacing, shadow, max-width."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Token Inheritance"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Tokens defined in project.json apply globally. Component-level style objects can add new tokens or override global ones for that component only."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Stylebook Integration"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Switch to Stylebook mode to see all your tokens visually. Edit values inline. See a component gallery showing every component with the current tokens applied."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Hardcoded Value Detection"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "The AI assistant warns when you use hardcoded hex colors or px values that have corresponding tokens. The token-lint system helps you stay token-first."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "CSS Properties in JX"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
+            "gap": "0.75rem",
+            "marginBottom": "1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.6875rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "CamelCase Properties"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "All CSS property names use camelCase: backgroundColor, fontSize, borderRadius, textAlign. This matches the DOM API convention. Never use kebab-case in style objects."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.6875rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "String Values"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "CSS values are always strings in JX: \"10px\", \"center\", \"block\", \"1px solid var(--color-border)\". Never use bare numbers for CSS values."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.6875rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Style Panel Categories"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "The Style inspector organizes properties by category: Layout (display, flex, grid), Typography (font, text), Background, Border, Spacing (padding, margin), and Effects."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.6875rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Template Expressions"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Style values support template expressions: \"backgroundColor\": \"${state.isPrimary ? 'var(--color-accent)' : 'transparent'}\". The style updates reactively."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "$media — Responsive Breakpoints"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.5rem"
+          },
+          "textContent": "$media breakpoints let you define responsive style overrides. Define breakpoints in project.json, then use @--breakpoint keys in any element's style object."
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-secondary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius-lg)",
+            "padding": "2rem",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "overflowX": "auto" },
+              "children": [
+                {
+                  "tagName": "pre",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8125rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)",
+                    "margin": "0"
+                  },
+                  "textContent": "// project.json\n{\n  \"$media\": {\n    \"--\": \"1280px\",\n    \"--lg\": \"(max-width: 1024px)\",\n    \"--md\": \"(max-width: 768px)\",\n    \"--sm\": \"(max-width: 640px)\"\n  }\n}\n\n// Component with responsive overrides\n{\n  \"tagName\": \"div\",\n  \"style\": {\n    \"display\": \"grid\",\n    \"gridTemplateColumns\": \"repeat(3, 1fr)\",\n    \"gap\": \"1.5rem\",\n    \"@--md\": { \"gridTemplateColumns\": \"repeat(2, 1fr)\" },\n    \"@--sm\": { \"gridTemplateColumns\": \"1fr\" }\n  }\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+            "gap": "0.75rem",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Breakpoint Tabs"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "When breakpoints are defined, tabs appear in the toolbar. Click a breakpoint tab to resize the canvas viewport and preview responsive behavior instantly."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Media-Based Style Editing"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Select a breakpoint tab, then edit styles in the inspector. Changes apply only to that breakpoint's @--override. The base styles remain unchanged."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Default Breakpoint (--)"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "The -- breakpoint is the default/base width. It sets the canvas viewport width. All other breakpoints activate when the viewport matches their media query."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Stylebook Mode"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "padding": "1.5rem",
+            "backgroundColor": "var(--color-bg-surface)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.9375rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "Stylebook mode (toolbar → Stylebook button) gives you a bird's-eye view of your entire design system:"
+            },
+            {
+              "tagName": "ul",
+              "style": {
+                "fontSize": "0.875rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "paddingLeft": "1.5rem",
+                "margin": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": { "marginBottom": "0.5rem" },
+                  "textContent": "Token list: Every CSS custom property with its current value. Edit inline."
+                },
+                {
+                  "tagName": "li",
+                  "style": { "marginBottom": "0.5rem" },
+                  "textContent": "Component gallery: Every component in your project rendered with the current tokens applied."
+                },
+                {
+                  "tagName": "li",
+                  "style": { "marginBottom": "0.5rem" },
+                  "textContent": "Color swatches: Visual preview of every color token. See the palette at a glance."
+                },
+                {
+                  "tagName": "li",
+                  "style": { "marginBottom": "0" },
+                  "textContent": "Typography preview: See how font tokens render at different sizes and weights."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Next: State & Reactivity"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Learn how state works in JX — reactive values, computed properties, event handlers, $ref bindings, and data sources."
+        },
+        {
+          "tagName": "cta-button",
+          "attributes": {
+            "props.href": "/learn/state",
+            "props.label": "State & Reactivity →",
+            "props.variant": "primary"
+          }
+        }
+      ]
+    }
+  ]
+}

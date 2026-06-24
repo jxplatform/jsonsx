@@ -1,0 +1,1227 @@
+{
+  "title": "JX Studio Keyboard Shortcuts — Complete Reference",
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Complete keyboard shortcuts reference for JX Studio: editing, canvas navigation, panel switching, file operations, and more."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Shortcuts" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "Every keyboard shortcut in Studio."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.125rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "600px"
+              },
+              "textContent": "Studio is designed for keyboard-driven workflows. Here's every shortcut, organized by category."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Editing"
+        },
+        {
+          "tagName": "div",
+          "style": { "overflowX": "auto", "marginBottom": "2rem" },
+          "children": [
+            {
+              "tagName": "table",
+              "style": { "width": "100%", "borderCollapse": "collapse", "fontSize": "0.875rem" },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Shortcut"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Action"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Z"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Undo last edit"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Y"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Redo last undone edit"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+S"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Save current file"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Delete"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Delete selected element"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+D"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Duplicate selected element"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+C"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Copy selected element"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+V"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Paste element (as child)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+V"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Paste as sibling"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Enter"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Start inline editing (on text elements)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Escape"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Exit inline editing / deselect"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+F"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Quick search (files, components, commands)"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Canvas Navigation"
+        },
+        {
+          "tagName": "div",
+          "style": { "overflowX": "auto", "marginBottom": "2rem" },
+          "children": [
+            {
+              "tagName": "table",
+              "style": { "width": "100%", "borderCollapse": "collapse", "fontSize": "0.875rem" },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Shortcut"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Action"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Middle-click drag"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Pan canvas"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Space + drag"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Pan canvas (alternative)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+scroll"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Zoom canvas in/out"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+0"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Reset zoom to 100%"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+F"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Fit canvas to viewport"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Click element"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Select element on canvas"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Panel & Navigation"
+        },
+        {
+          "tagName": "div",
+          "style": { "overflowX": "auto", "marginBottom": "2rem" },
+          "children": [
+            {
+              "tagName": "table",
+              "style": { "width": "100%", "borderCollapse": "collapse", "fontSize": "0.875rem" },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Shortcut"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Action"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+B"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Toggle left panel (activity bar)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+J"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Toggle right panel (inspector)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+L"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Toggle AI Assistant chat panel"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+W"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Close current tab"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Tab"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Switch to next tab"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+Tab"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Switch to previous tab"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+E"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Focus files explorer"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Source Control (Git)"
+        },
+        {
+          "tagName": "div",
+          "style": { "overflowX": "auto", "marginBottom": "2rem" },
+          "children": [
+            {
+              "tagName": "table",
+              "style": { "width": "100%", "borderCollapse": "collapse", "fontSize": "0.875rem" },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Shortcut"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Action"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+G"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Open source control panel"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Enter"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Commit (when commit message is focused)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+Shift+P"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Push to remote"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "AI Assistant"
+        },
+        {
+          "tagName": "div",
+          "style": { "overflowX": "auto", "marginBottom": "2rem" },
+          "children": [
+            {
+              "tagName": "table",
+              "style": { "width": "100%", "borderCollapse": "collapse", "fontSize": "0.875rem" },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Shortcut"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.08em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Action"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Ctrl+L"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Open AI Assistant panel"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Enter"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Send message (in chat input)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Shift+Enter"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "New line (in chat input)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Escape"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Stop AI streaming response"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Next: AI Assistant Guide"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Learn how to use the AI Assistant to build and edit components with natural language — directly on the live canvas."
+        },
+        {
+          "tagName": "cta-button",
+          "attributes": {
+            "props.href": "/learn/ai-assistant",
+            "props.label": "AI Assistant Guide →",
+            "props.variant": "primary"
+          }
+        }
+      ]
+    }
+  ]
+}

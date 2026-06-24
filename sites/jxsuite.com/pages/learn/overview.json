@@ -1,0 +1,834 @@
+{
+  "title": "JX Studio Overview — Architecture & Concepts",
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Understand JX Studio's architecture, design principles, three-column layout, data flow, and how it fits into the JX ecosystem."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Overview" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "JX Studio is a visual IDE for the web."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.125rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "600px"
+              },
+              "textContent": "Design on a canvas. Inspect and edit properties. Write event handlers. Everything saves as plain JSON files — the same files your compiler reads, your git tracks, and your team reviews."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Design Principles"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
+            "gap": "1rem",
+            "marginBottom": "3rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.5rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em"
+                  },
+                  "textContent": "JSON is the source of truth"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Studio reads and writes .json files. No proprietary intermediate format. Any editor can open them. Git diffs are readable. CI can validate them."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.5rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em"
+                  },
+                  "textContent": "Canvas is the runtime"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "The preview canvas renders via @jxsuite/runtime — the exact same engine that compiles your site. What you see is what ships."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.5rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em"
+                  },
+                  "textContent": "Zero lock-in"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Studio edits produce standard Jx files. The compiler reads those same files. No export step. No proprietary format. Your content is yours."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.5rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em"
+                  },
+                  "textContent": "Self-hosting"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Studio is itself a JX application served by @jxsuite/server. The visual builder is built with the same framework it helps you build."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.5rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em"
+                  },
+                  "textContent": "Developer-first"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Keyboard shortcuts for everything. Undo/redo with full history. Code editing with Monaco. Git integration built in. Designed for people who build websites for a living."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Three-Column Layout"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-secondary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius-lg)",
+            "padding": "1.5rem",
+            "marginBottom": "2rem",
+            "display": "grid",
+            "gridTemplateColumns": "48px 1fr 300px",
+            "gap": "0",
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.75rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border-subtle)",
+                "borderRadius": "var(--radius)",
+                "padding": "0.75rem 0.5rem",
+                "display": "flex",
+                "flexDirection": "column",
+                "alignItems": "center",
+                "gap": "0.5rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.625rem",
+                    "color": "var(--color-text-muted)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "textAlign": "center",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Activity Bar"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "width": "24px",
+                    "height": "24px",
+                    "backgroundColor": "var(--color-accent)",
+                    "borderRadius": "4px",
+                    "opacity": "0.3"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "width": "24px",
+                    "height": "24px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "4px",
+                    "opacity": "0.15"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "width": "24px",
+                    "height": "24px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "4px",
+                    "opacity": "0.15"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "width": "24px",
+                    "height": "24px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "4px",
+                    "opacity": "0.15"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border-subtle)",
+                "borderRadius": "var(--radius)",
+                "padding": "0.75rem",
+                "marginLeft": "0.5rem",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "textAlign": "center"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontSize": "0.625rem",
+                        "color": "var(--color-text-muted)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.1em",
+                        "marginBottom": "0.5rem"
+                      },
+                      "textContent": "Canvas + Toolbar"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "width": "200px",
+                        "height": "100px",
+                        "border": "1px dashed var(--color-border)",
+                        "borderRadius": "4px",
+                        "display": "flex",
+                        "alignItems": "center",
+                        "justifyContent": "center",
+                        "color": "var(--color-text-muted)",
+                        "fontSize": "0.625rem"
+                      },
+                      "textContent": "Live Preview"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border-subtle)",
+                "borderRadius": "var(--radius)",
+                "padding": "0.75rem",
+                "marginLeft": "0.5rem",
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "0.25rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.625rem",
+                    "color": "var(--color-text-muted)",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "textAlign": "center",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Inspector"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "height": "18px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "3px",
+                    "opacity": "0.1"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "height": "18px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "3px",
+                    "opacity": "0.08"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "height": "18px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "3px",
+                    "opacity": "0.08"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "height": "18px",
+                    "backgroundColor": "var(--color-text-muted)",
+                    "borderRadius": "3px",
+                    "opacity": "0.08"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+            "gap": "1rem",
+            "marginBottom": "3rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "letterSpacing": "0.05em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Left Column"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Activity bar switches between panels: Layers (tree view of elements), Files (project explorer), Imports (component registry), Source Control (git), Data Explorer, and Settings."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "letterSpacing": "0.05em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Center Column"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Canvas renders the live component preview. Toolbar above switches modes (Design, Stylebook, Preview, Source, Content), controls zoom, and manages media breakpoints."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "fontFamily": "var(--font-mono)",
+                    "letterSpacing": "0.05em",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Right Column"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0"
+                  },
+                  "textContent": "Inspector shows tabs for Properties (tagName, className, textContent), Style (CSS properties panel), Signals (state entries), Events, and AI Assistant chat."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Data Flow"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-secondary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius-lg)",
+            "padding": "2rem",
+            "marginBottom": "2rem",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "center",
+            "gap": "1rem",
+            "flexWrap": "wrap",
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.75rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "0.75rem 1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "textAlign": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": ".json file"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.625rem"
+                  },
+                  "textContent": "Source of truth"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "color": "var(--color-accent)",
+                "fontSize": "1rem",
+                "fontWeight": "700"
+              },
+              "textContent": "→"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "0.75rem 1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "textAlign": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Studio State"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.625rem"
+                  },
+                  "textContent": "Immutable + undo history"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "color": "var(--color-accent)",
+                "fontSize": "1rem",
+                "fontWeight": "700"
+              },
+              "textContent": "→"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "0.75rem 1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "textAlign": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Canvas Render"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.625rem"
+                  },
+                  "textContent": "@jxsuite/runtime"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "color": "var(--color-accent)",
+                "fontSize": "1rem",
+                "fontWeight": "700"
+              },
+              "textContent": "⇄"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "0.75rem 1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "textAlign": "center"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Inspector"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.625rem"
+                  },
+                  "textContent": "Properties / Style / State"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "padding": "1.25rem",
+            "backgroundColor": "var(--color-bg-surface)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.875rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 0.5rem"
+              },
+              "textContent": "The inspector panels read from the immutable state and write mutations through transactDoc(). Each mutation is a discrete undoable step. The canvas re-renders automatically via Vue reactivity — no manual refresh needed."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.875rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0"
+              },
+              "textContent": "When you save (Ctrl+S), the current state is serialized back to the .json file on disk. The compiler can then build from those same files — no export step, no format conversion."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Next: Interface Walkthrough"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Now that you understand the architecture, dive into the panel-by-panel interface walkthrough to learn where everything lives."
+        },
+        {
+          "tagName": "cta-button",
+          "attributes": {
+            "props.href": "/learn/interface",
+            "props.label": "Interface Walkthrough →",
+            "props.variant": "primary"
+          }
+        }
+      ]
+    }
+  ]
+}

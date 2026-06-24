@@ -1,0 +1,1037 @@
+{
+  "title": "Building Components in JX Studio — Complete Guide",
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Learn how to build components in JX Studio: tagName, state, props, children, styling, event handlers, and the full component lifecycle."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Building Components" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "From tagName to full component."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.125rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "600px"
+              },
+              "textContent": "Every JX component is a JSON object. Learn the structure, add state, wire up events, compose children — and see it all render live on the canvas."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Component Anatomy"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.5rem"
+          },
+          "textContent": "A JX component is a JSON object with a standard structure. Here are the key fields:"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-secondary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius-lg)",
+            "padding": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": { "overflowX": "auto" },
+              "children": [
+                {
+                  "tagName": "pre",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.8125rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)",
+                    "margin": "0"
+                  },
+                  "textContent": "{\n  \"$id\": \"Counter\",          // Component name (must have hyphen)\n  \"tagName\": \"my-counter\",    // Root HTML tag\n  \"state\": { ... },            // Reactive variables\n  \"children\": [ ... ],         // Child elements\n  \"style\": { ... },            // CSS properties (camelCase)\n  \"$elements\": [ ... ],        // Imported components\n  \"$media\": { ... }            // Responsive breakpoints\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
+            "gap": "0.75rem",
+            "marginTop": "1.5rem",
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "$id"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "The component's name. Custom elements MUST contain a hyphen (e.g. \"my-counter\", \"feature-card\"). Standard HTML elements use their exact tag name."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "tagName"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "The root HTML element. Can be a standard element (\"div\", \"section\", \"button\") or a custom element (\"my-counter\"). Every component must have one."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "children"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Array of child element definitions. Each child is itself a full element object with tagName, style, children, etc. Void elements (br, hr, img, input) cannot have children."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-accent)",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "state"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Reactive variables scoped to this component. Values can be scalars, typed objects, computed expressions, function bodies, or data sources. Changes auto-update the DOM."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Property Reference"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "overflowX": "auto",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "table",
+              "style": {
+                "width": "100%",
+                "borderCollapse": "collapse",
+                "fontSize": "0.875rem"
+              },
+              "children": [
+                {
+                  "tagName": "thead",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "children": [
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.1em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Property"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.1em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Type"
+                        },
+                        {
+                          "tagName": "th",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "textAlign": "left",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "fontWeight": "600",
+                            "color": "var(--color-text-muted)",
+                            "textTransform": "uppercase",
+                            "letterSpacing": "0.1em",
+                            "borderBottom": "1px solid var(--color-border)"
+                          },
+                          "textContent": "Description"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tagName": "tbody",
+                  "children": [
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "tagName"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "string"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "HTML tag name"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "className"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "string"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "CSS class string"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "textContent"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "string"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Text content (supports ${state.x} templates)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "hidden"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "boolean"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Hide element from display"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "tabIndex"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "number"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Tab order index"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "attributes"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "object"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "HTML attributes (href, src, aria-*, data-*)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "style"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "object"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "CSS properties (camelCase)"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "children"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "array"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Child element objects"
+                        }
+                      ]
+                    },
+                    {
+                      "tagName": "tr",
+                      "style": { "borderBottom": "1px solid var(--color-border-subtle)" },
+                      "children": [
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "onclick"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-muted)"
+                          },
+                          "textContent": "$ref"
+                        },
+                        {
+                          "tagName": "td",
+                          "style": {
+                            "padding": "0.75rem 1rem",
+                            "fontSize": "0.8125rem",
+                            "color": "var(--color-text-secondary)"
+                          },
+                          "textContent": "Event handler (references state function)"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Building a Button Component (Step by Step)"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Step 1: Create the component file"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0 0 0.75rem"
+                  },
+                  "textContent": "In the Files panel, right-click components/ → New File. Name it cta-button.json."
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "border": "1px solid var(--color-border-subtle)",
+                    "borderRadius": "var(--radius)",
+                    "padding": "1rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "pre",
+                      "style": {
+                        "margin": "0",
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.75rem",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "textContent": "{\n  \"$id\": \"CTAButton\",\n  \"tagName\": \"cta-button\"\n}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Step 2: Add state (props)"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0 0 0.75rem"
+                  },
+                  "textContent": "Add a state block with the props your component needs. Use the Signals panel in the inspector to add entries visually."
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "border": "1px solid var(--color-border-subtle)",
+                    "borderRadius": "var(--radius)",
+                    "padding": "1rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "pre",
+                      "style": {
+                        "margin": "0",
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.75rem",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "textContent": "\"state\": {\n  \"href\": \"/\",\n  \"label\": \"Click me\",\n  \"variant\": \"primary\"\n}"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "h3",
+                  "style": {
+                    "fontSize": "1rem",
+                    "fontWeight": "600",
+                    "margin": "0 0 0.5rem",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Step 3: Add children and styling"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.875rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.6",
+                    "margin": "0 0 0.75rem"
+                  },
+                  "textContent": "Add child elements and style them. Use ${state.x} template expressions to bind state to properties. Edit styles in the Style panel."
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "backgroundColor": "var(--color-bg-secondary)",
+                    "border": "1px solid var(--color-border-subtle)",
+                    "borderRadius": "var(--radius)",
+                    "padding": "1rem",
+                    "fontFamily": "var(--font-mono)",
+                    "fontSize": "0.75rem",
+                    "lineHeight": "1.7",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "pre",
+                      "style": {
+                        "margin": "0",
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.75rem",
+                        "color": "var(--color-text-secondary)"
+                      },
+                      "textContent": "\"children\": [{\n  \"tagName\": \"a\",\n  \"attributes\": { \"href\": \"${state.href}\" },\n  \"style\": {\n    \"padding\": \"0.75rem 1.5rem\",\n    \"backgroundColor\": \"var(--color-accent)\",\n    \"color\": \"white\",\n    \"borderRadius\": \"var(--radius)\"\n  },\n  \"textContent\": \"${state.label}\"\n}]"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1.5rem",
+            "paddingBottom": "0.5rem",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "textContent": "Working in the Layers Panel"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+            "gap": "0.75rem",
+            "marginBottom": "2rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Add Element"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Right-click any node → Add Child. Type a tagName (e.g. \"div\", \"button\", \"span\"). A new element appears in the tree and on the canvas."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Reorder Elements"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Drag any element to reorder within its parent. Drop zones appear between siblings. The canvas updates in real-time as you drag."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Duplicate & Delete"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Right-click → Duplicate to clone an element. Right-click → Delete or press Delete key to remove. Ctrl+Z to undo. All operations are undoable."
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "padding": "1.25rem",
+                "backgroundColor": "var(--color-bg-surface)",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontWeight": "600",
+                    "color": "var(--color-text-primary)",
+                    "fontSize": "0.875rem",
+                    "marginBottom": "0.5rem"
+                  },
+                  "textContent": "Reparent Elements"
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "fontSize": "0.8125rem",
+                    "color": "var(--color-text-secondary)",
+                    "lineHeight": "1.5",
+                    "margin": "0"
+                  },
+                  "textContent": "Drag an element onto another to reparent it. The element moves from its current parent to the target. Hold Alt while dragging to copy instead of move."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Next: Styling & Design Tokens"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Now learn how to style your components with CSS custom properties, $media breakpoints, and the token-first design approach."
+        },
+        {
+          "tagName": "cta-button",
+          "attributes": {
+            "props.href": "/learn/styling",
+            "props.label": "Styling & Design Tokens →",
+            "props.variant": "primary"
+          }
+        }
+      ]
+    }
+  ]
+}

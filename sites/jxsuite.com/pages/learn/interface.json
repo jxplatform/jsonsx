@@ -1,0 +1,1023 @@
+{
+  "title": "JX Studio Interface — Panel-by-Panel Walkthrough",
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "A detailed visual walkthrough of every panel in JX Studio: activity bar, layers, files, canvas, toolbar, inspector, and status bar."
+      }
+    }
+  ],
+  "$elements": [
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/cta-button.json" }
+  ],
+  "tagName": "div",
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(3rem, 6vw, 5rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
+        "textAlign": "center",
+        "background": "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.08), transparent)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "Interface" }
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontSize": "clamp(2rem, 5vw, 3.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.04em",
+                "lineHeight": "1.1",
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-primary)"
+              },
+              "textContent": "Where everything lives."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.125rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.7",
+                "margin": "0 auto",
+                "maxWidth": "600px"
+              },
+              "textContent": "A panel-by-panel tour of the JX Studio interface. Learn what each panel does, how to navigate between them, and which keyboard shortcuts to use."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "1.5rem",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "margin": "0 0 0.75rem",
+                "paddingBottom": "0.5rem",
+                "borderBottom": "1px solid var(--color-border)"
+              },
+              "textContent": "Activity Bar (Left Sidebar)"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.9375rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "The narrow vertical strip on the far left. Each icon switches the left panel to a different view. Click an icon to activate it, click again to collapse the left panel."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+                "gap": "0.75rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Layers"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Tree view of every element in the document. Click to select, drag to reorder, right-click for context menu. Shows tagName for each node. The root element is at the top."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Files"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Project file explorer. Browse pages/, components/, layouts/, content/, public/. Open any .json file by clicking. Create new files and folders. Drag files to reorder."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Imports"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Lists all registered components, classes, and modules. Shows what's available via $elements and what's been imported. Double-click to open the source."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Source Control"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Built-in git panel. Stage, unstage, commit, push, pull. View diffs. Switch branches. See changed files with status indicators."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Data Explorer"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Browse web platform API data: HTML elements, attributes, CSS properties, ARIA roles. Reference material for building standards-compliant components."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Settings"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Project configuration. AI provider settings (API key, model, endpoint). Component registry. Format class management."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "1.5rem",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "margin": "0 0 0.75rem",
+                "paddingBottom": "0.5rem",
+                "borderBottom": "1px solid var(--color-border)"
+              },
+              "textContent": "Canvas & Toolbar (Center)"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.9375rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "The canvas is a live render of your component using @jxsuite/runtime — the same engine that compiles your site. What you see on the canvas is exactly what ships."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(280px, 1fr))",
+                "gap": "0.75rem",
+                "marginBottom": "1.5rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Canvas Area"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Live rendered preview. Click elements to select them. Hover to see outlines. Pan with middle-click drag or Space+drag. Zoom with Ctrl+scroll or toolbar controls."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Toolbar"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Mode switcher (Design/Stylebook/Preview/Source/Content), zoom controls, media breakpoint tabs, component name display, and viewport controls at the top of the canvas area."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Media Breakpoints"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "When a project has $media breakpoints defined, tabs appear in the toolbar to preview each breakpoint. Click to resize the canvas viewport and see responsive behavior."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Selection Overlay"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Selected elements show a blue border overlay with padding/margin indicators. Hovered elements show a subtle gray overlay. Click the overlay handles to select children."
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "h3",
+              "style": {
+                "fontSize": "1.125rem",
+                "fontWeight": "600",
+                "margin": "0 0 0.75rem"
+              },
+              "textContent": "Canvas Modes"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(220px, 1fr))",
+                "gap": "0.75rem",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-accent)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.08em",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Design"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Default mode. Interactive editing with selection overlays, hover highlights, drag-and-drop, and inline text editing. Full WYSIWYG experience."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-accent)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.08em",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Stylebook"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Design token management. View all CSS custom properties, edit their values, and see a component gallery showing every component in context."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-accent)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.08em",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Preview"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Clean preview without any editing chrome. No selection overlays, no hover highlights. See exactly what the end user will see."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-accent)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.08em",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Source"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Raw JSON view with Monaco editor. Full syntax highlighting, code completion, and validation. Edit the document as plain JSON and see changes reflected on the canvas."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-mono)",
+                        "fontSize": "0.6875rem",
+                        "fontWeight": "600",
+                        "color": "var(--color-accent)",
+                        "textTransform": "uppercase",
+                        "letterSpacing": "0.08em",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Content"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Inline text editing mode for Markdown content. Click any text to edit directly on the canvas. Supports Markdown formatting shortcuts and slash commands."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "1.5rem",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "margin": "0 0 0.75rem",
+                "paddingBottom": "0.5rem",
+                "borderBottom": "1px solid var(--color-border)"
+              },
+              "textContent": "Inspector (Right Panel)"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.9375rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "The inspector shows detailed information about the currently selected element. It's tabbed — each tab edits a different aspect of the element."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(250px, 1fr))",
+                "gap": "0.75rem",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Properties"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Edit element properties: tagName, textContent, className, hidden, tabIndex, attributes. Each property has its own input field with type-appropriate controls."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Style"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Visual CSS property editor. Organized by category (Layout, Typography, Background, Border, Spacing). Supports all camelCase CSS properties. Responsive overrides per breakpoint."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Signals"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "View and edit the document's state entries. Add new signals, change types, edit default values. See computed dependencies. Inspect function bodies with Monaco."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Events"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "View and edit event handlers (onclick, oninput, etc.). Shows which state functions are bound to which events. Edit function bodies inline with Monaco."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "AI Assistant"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Chat interface for the AI document assistant. Use natural language to build and modify components. Changes are applied live to the canvas with full undo support."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "marginBottom": "2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "1.5rem",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "margin": "0 0 0.75rem",
+                "paddingBottom": "0.5rem",
+                "borderBottom": "1px solid var(--color-border)"
+              },
+              "textContent": "Status Bar (Bottom)"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "0.9375rem",
+                "color": "var(--color-text-secondary)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "The status bar at the bottom of the window shows contextual information about the current state."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "repeat(auto-fill, minmax(220px, 1fr))",
+                "gap": "0.75rem",
+                "marginBottom": "1rem"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Selection Info"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Shows the tag name and path of the currently selected element. Click to copy the path. Shows element count in the document."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Save Status"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Indicates whether the document has unsaved changes (dirty indicator). Shows last save time. Auto-save can be configured."
+                    }
+                  ]
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "padding": "1rem",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "border": "1px solid var(--color-border)",
+                    "borderRadius": "var(--radius)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontWeight": "600",
+                        "color": "var(--color-text-primary)",
+                        "fontSize": "0.875rem",
+                        "marginBottom": "0.25rem"
+                      },
+                      "textContent": "Zoom Level"
+                    },
+                    {
+                      "tagName": "p",
+                      "style": {
+                        "fontSize": "0.8125rem",
+                        "color": "var(--color-text-secondary)",
+                        "lineHeight": "1.5",
+                        "margin": "0"
+                      },
+                      "textContent": "Current canvas zoom percentage. Click to reset to 100%. Shows the viewport dimensions of the current media breakpoint."
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem)",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontSize": "1.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Next: Building Components"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.9375rem",
+            "color": "var(--color-text-secondary)",
+            "lineHeight": "1.6",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Now that you know the interface, learn how to build your first component — from tagName and children to state, props, and event handlers."
+        },
+        {
+          "tagName": "cta-button",
+          "attributes": {
+            "props.href": "/learn/building-components",
+            "props.label": "Building Components →",
+            "props.variant": "primary"
+          }
+        }
+      ]
+    }
+  ]
+}
