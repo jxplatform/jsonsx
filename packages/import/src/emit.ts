@@ -29,6 +29,12 @@ export interface MultiEmitOptions {
   componentizeOptions?: ComponentizeOptions | false;
   /** Pre-computed componentization result (from AI pass). Overrides componentizeOptions. */
   precomputedComponents?: ComponentizeResult;
+  /** Font-face CSS rule texts to emit as public/assets/fonts.css (R2). */
+  fontFaceRules?: string[];
+  /** URL rewrite map for fonts — maps original font URLs to local paths. */
+  fontRewriteMap?: Map<string, string>;
+  /** CSS custom property tokens to hoist into project.json.$style (R5). */
+  styleTokens?: Record<string, string>;
 }
 
 export async function emitProject({
@@ -58,6 +64,9 @@ export async function emitMultiPageProject({
   breakpoints,
   componentizeOptions,
   precomputedComponents,
+  fontFaceRules,
+  fontRewriteMap,
+  styleTokens,
 }: MultiEmitOptions): Promise<{ files: string[] }> {
   await mkdir(join(outDir, "pages"), { recursive: true });
   await mkdir(join(outDir, "layouts"), { recursive: true });
@@ -74,6 +83,10 @@ export async function emitMultiPageProject({
 
   if (breakpoints && Object.keys(breakpoints).length > 0) {
     projectJson.$media = breakpoints;
+  }
+
+  if (styleTokens && Object.keys(styleTokens).length > 0) {
+    projectJson.$style = styleTokens;
   }
 
   const files: string[] = [];
@@ -104,6 +117,34 @@ export async function emitMultiPageProject({
 
       componentFiles.set(fileName, compDoc);
     }
+  }
+
+  // R2: Emit @font-face CSS with URLs rewritten to local paths
+  if (fontFaceRules && fontFaceRules.length > 0) {
+    let fontCss = fontFaceRules.join("\n\n");
+    if (fontRewriteMap) {
+      for (const [originalUrl, localPath] of fontRewriteMap) {
+        // Rewrite absolute URLs in font-face rules to relative local paths
+        const relativePath = localPath.startsWith("public/")
+          ? localPath.slice("public/".length)
+          : localPath;
+        fontCss = fontCss.replaceAll(originalUrl, `/${relativePath}`);
+      }
+    }
+    const fontsDir = join(outDir, "public", "assets");
+    await mkdir(fontsDir, { recursive: true });
+    const fontsCssPath = join(fontsDir, "fonts.css");
+    await Bun.write(fontsCssPath, fontCss);
+    files.push(fontsCssPath);
+
+    // Add fonts.css to project head
+    if (!projectJson.$head) {
+      projectJson.$head = [];
+    }
+    (projectJson.$head as unknown[]).push({
+      tagName: "link",
+      attributes: { rel: "stylesheet", href: "/assets/fonts.css" },
+    });
   }
 
   const projectPath = join(outDir, "project.json");

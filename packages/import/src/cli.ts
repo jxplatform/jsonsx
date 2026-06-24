@@ -11,6 +11,7 @@ import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
 import { rewriteAssetUrls } from "./asset-rewrite.ts";
+import { applyTokens } from "./css-tokens.ts";
 import { crawlSite } from "./crawl.ts";
 import { detectLayout } from "./layout-detect.ts";
 import type { JxElement } from "@jxsuite/schema/types";
@@ -28,6 +29,7 @@ Options:
   --no-styles              Skip CSS capture
   --no-assets              Skip asset download
   --no-crawl               Single page only (equivalent to --depth 0)
+  --no-scroll              Skip scroll-to-bottom (faster, may miss lazy content)
   --no-robots              Ignore robots.txt
   --no-components          Skip component extraction (Phase 4)
   --min-instances <n>      Min recurring instances to extract a component (default: 2)
@@ -74,6 +76,7 @@ if (!url.startsWith("http://") && !url.startsWith("https://")) {
 const skipStyles = args.includes("--no-styles");
 const skipAssets = args.includes("--no-assets");
 const noCrawl = args.includes("--no-crawl");
+const noScroll = args.includes("--no-scroll");
 const noRobots = args.includes("--no-robots");
 const noComponents = args.includes("--no-components");
 const doAiComponents = args.includes("--ai-components");
@@ -119,7 +122,7 @@ if (maxDepth === 0) {
 
   try {
     console.log("  Capturing page...");
-    const capture = await capturePage(url, browser);
+    const capture = await capturePage(url, browser, { scrollToBottom: !noScroll });
     console.log(`  Captured: "${capture.title}" (${capture.links.length} links found)`);
 
     console.log("  Converting to Jx...");
@@ -135,6 +138,7 @@ if (maxDepth === 0) {
     }
 
     let breakpoints: Record<string, string> | undefined;
+    let styleTokens: Record<string, string> | undefined;
 
     if (!skipStyles) {
       console.log("  Capturing computed styles...");
@@ -146,6 +150,20 @@ if (maxDepth === 0) {
       console.log("  Diffing against UA defaults...");
       const diffed = diffAllStyles(styleResult.elements, styleResult.uaDefaults);
       console.log(`  ${diffed.length} elements with non-default styles`);
+
+      // R5: Replace resolved values with var(--name) references
+      const propCount = Object.keys(styleResult.customProperties).length;
+      if (propCount > 0) {
+        const tokenResult = applyTokens(diffed, styleResult.customProperties);
+        if (tokenResult.replacements > 0) {
+          styleTokens = tokenResult.tokens;
+          console.log(
+            `  Extracted ${Object.keys(tokenResult.tokens).length} design tokens (${tokenResult.replacements} replacements)`,
+          );
+        } else {
+          console.log(`  ${propCount} custom properties found, but none matched computed values`);
+        }
+      }
 
       if (styleResult.mediaQueries.length > 0) {
         console.log(
@@ -186,12 +204,22 @@ if (maxDepth === 0) {
       }
     }
 
+    let fontFaceRules: string[] | undefined;
+    let fontRewriteMap: Map<string, string> | undefined;
+
     if (!skipAssets) {
       console.log("  Collecting asset URLs...");
       const collected = await collectAssets(capture.page);
       console.log(
-        `  Found ${collected.assets.length} assets (${collected.inlineSvgCount} inline SVGs kept)`,
+        `  Found ${collected.assets.length} assets (${collected.inlineSvgCount} inline SVGs kept, ${collected.stylesheets.length} stylesheets retained)`,
       );
+
+      // Extract @font-face rules from retained stylesheets (R2)
+      const allFontRules = collected.stylesheets.flatMap((s) => s.fontFaceRules);
+      if (allFontRules.length > 0) {
+        fontFaceRules = allFontRules;
+        console.log(`  Found ${allFontRules.length} @font-face rules`);
+      }
 
       if (collected.assets.length > 0) {
         console.log("  Downloading assets...");
@@ -204,6 +232,16 @@ if (maxDepth === 0) {
         }
         if (downloaded.skipped.length > 0) {
           console.log(`  Skipped ${downloaded.skipped.length} tracking/analytics URLs`);
+        }
+
+        // Build font-specific rewrite map for R2
+        if (fontFaceRules) {
+          fontRewriteMap = new Map<string, string>();
+          for (const [originalUrl, localPath] of downloaded.rewriteMap) {
+            if (localPath.includes("/fonts/") || /\.(woff2?|ttf|otf|eot)$/i.test(localPath)) {
+              fontRewriteMap.set(originalUrl, localPath);
+            }
+          }
         }
 
         console.log("  Rewriting asset URLs...");
@@ -259,6 +297,9 @@ if (maxDepth === 0) {
       breakpoints,
       componentizeOptions: precomputedComponents ? false : componentizeOptions,
       precomputedComponents,
+      fontFaceRules,
+      fontRewriteMap,
+      styleTokens,
     });
     console.log(`  Wrote ${files.length} files`);
 
@@ -303,6 +344,7 @@ if (maxDepth === 0) {
       skipStyles,
       skipAssets,
       respectRobots: !noRobots,
+      noScroll,
       captureScreenshots: doVerify,
       onProgress: console.log,
     });
@@ -379,6 +421,9 @@ if (maxDepth === 0) {
       breakpoints: result.breakpoints,
       componentizeOptions: precomputedComponentsMulti ? false : componentizeOptions,
       precomputedComponents: precomputedComponentsMulti,
+      fontFaceRules: result.fontFaceRules.length > 0 ? result.fontFaceRules : undefined,
+      fontRewriteMap: result.fontRewriteMap.size > 0 ? result.fontRewriteMap : undefined,
+      styleTokens: result.styleTokens,
     });
 
     console.log(`  Wrote ${files.length} files:`);

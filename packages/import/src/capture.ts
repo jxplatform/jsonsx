@@ -61,16 +61,70 @@ export async function closeBrowser(): Promise<void> {
   }
 }
 
+export interface CaptureOptions {
+  /** Scroll to bottom before capture to trigger lazy-loaded content (default: true). */
+  scrollToBottom?: boolean;
+}
+
+/**
+ * Scroll the page to the bottom in steps to trigger lazy-loaded images and intersection-observer
+ * content, then scroll back to top. Settles between steps to let content render.
+ */
+async function scrollToRevealAll(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const delay = (ms: number) =>
+      new Promise<void>((r) => {
+        setTimeout(r, ms);
+      });
+    const scrollHeight = () => document.body.scrollHeight;
+    const viewportHeight = window.innerHeight;
+    let lastHeight = 0;
+    let currentPosition = 0;
+
+    // Scroll down in viewport-sized steps
+    while (currentPosition < scrollHeight()) {
+      currentPosition += viewportHeight;
+      window.scrollTo(0, currentPosition);
+      await delay(100);
+
+      // If the page grew (infinite scroll), keep going but cap at 20 iterations
+      if (scrollHeight() > lastHeight) {
+        lastHeight = scrollHeight();
+      }
+      if (currentPosition > viewportHeight * 20) {
+        break;
+      }
+    }
+
+    // Settle for lazy images that load on scroll
+    await delay(300);
+
+    // Scroll back to top for the reference screenshot
+    window.scrollTo(0, 0);
+    await delay(100);
+  });
+}
+
 /**
  * Capture a page's DOM. Returns the page object still open — the caller is responsible for closing
  * it (after style capture in Phase 1, or immediately).
  */
-export async function capturePage(url: string, browser?: Browser): Promise<CaptureResult> {
+export async function capturePage(
+  url: string,
+  browser?: Browser,
+  options?: CaptureOptions,
+): Promise<CaptureResult> {
+  const { scrollToBottom = true } = options ?? {};
   const br = browser ?? (await launchBrowser());
   const page: Page = await br.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
   await page.goto(url, { waitUntil: "networkidle0", timeout: 30_000 });
+
+  // R1: Scroll to bottom to trigger lazy-loaded content before capture
+  if (scrollToBottom) {
+    await scrollToRevealAll(page);
+  }
 
   const result = await page.evaluate(() => {
     // Strip scripts and noscript before capture

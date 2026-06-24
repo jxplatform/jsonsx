@@ -9,6 +9,7 @@ import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
 import { downloadAssets } from "./asset-download.ts";
 import { rewriteAssetUrls } from "./asset-rewrite.ts";
+import { applyTokens } from "./css-tokens.ts";
 
 export interface CrawlOptions {
   url: string;
@@ -19,6 +20,8 @@ export interface CrawlOptions {
   skipStyles: boolean;
   skipAssets: boolean;
   respectRobots: boolean;
+  /** Skip scroll-to-bottom before capture (default: false). */
+  noScroll?: boolean;
   /** Capture a reference screenshot of each page before closing (for --verify). */
   captureScreenshots?: boolean;
   onProgress?: (msg: string) => void;
@@ -40,6 +43,12 @@ export interface CrawlResult {
   breakpoints: Record<string, string> | undefined;
   skippedByRobots: string[];
   skippedByNodeCap: string[];
+  /** Collected @font-face rules from all pages (R2). */
+  fontFaceRules: string[];
+  /** Font URL → local path rewrite map (R2). */
+  fontRewriteMap: Map<string, string>;
+  /** CSS custom property tokens merged across all pages (R5). */
+  styleTokens: Record<string, string> | undefined;
 }
 
 /**
@@ -191,6 +200,10 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
   const skippedByRobots: string[] = [];
   const skippedByNodeCap: string[] = [];
   let mergedBreakpoints: Record<string, string> | undefined;
+  let mergedTokens: Record<string, string> | undefined;
+  const allFontFaceRules: string[] = [];
+  const fontRewriteMap = new Map<string, string>();
+  const seenFontRules = new Set<string>();
 
   while (queue.length > 0 && pages.length < maxPages) {
     const entry = queue.shift()!;
@@ -207,7 +220,7 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
 
     let capture: CaptureResult;
     try {
-      capture = await capturePage(entry.url, browser);
+      capture = await capturePage(entry.url, browser, { scrollToBottom: !options.noScroll });
     } catch (error) {
       onProgress(
         `  ⚠ Failed to capture ${entry.url}: ${error instanceof Error ? error.message : error}`,
@@ -246,6 +259,17 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       try {
         const styleResult = await captureStyles(capture.page);
         const diffed = diffAllStyles(styleResult.elements, styleResult.uaDefaults);
+
+        // R5: Replace resolved values with var(--name) references
+        if (Object.keys(styleResult.customProperties).length > 0) {
+          const tokenResult = applyTokens(diffed, styleResult.customProperties);
+          if (tokenResult.replacements > 0) {
+            if (!mergedTokens) {
+              mergedTokens = {};
+            }
+            Object.assign(mergedTokens, tokenResult.tokens);
+          }
+        }
 
         if (styleResult.mediaQueries.length > 0) {
           const media = await extractMedia(
@@ -286,10 +310,27 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     if (!skipAssets) {
       try {
         const collected = await collectAssets(capture.page);
+
+        // Accumulate @font-face rules (R2) — dedupe across pages
+        for (const sheet of collected.stylesheets) {
+          for (const rule of sheet.fontFaceRules) {
+            if (!seenFontRules.has(rule)) {
+              seenFontRules.add(rule);
+              allFontFaceRules.push(rule);
+            }
+          }
+        }
+
         if (collected.assets.length > 0) {
           const downloaded = await downloadAssets(collected.assets, outDir, entry.url);
           if (downloaded.rewriteMap.size > 0) {
             rewriteAssetUrls(jx.document, downloaded.rewriteMap, entry.url);
+            // Collect font rewrites (R2)
+            for (const [originalUrl, localPath] of downloaded.rewriteMap) {
+              if (localPath.includes("/fonts/") || /\.(woff2?|ttf|otf|eot)$/i.test(localPath)) {
+                fontRewriteMap.set(originalUrl, localPath);
+              }
+            }
           }
         }
       } catch (error) {
@@ -338,5 +379,8 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
     breakpoints: mergedBreakpoints,
     skippedByRobots,
     skippedByNodeCap,
+    fontFaceRules: allFontFaceRules,
+    fontRewriteMap,
+    styleTokens: mergedTokens,
   };
 }

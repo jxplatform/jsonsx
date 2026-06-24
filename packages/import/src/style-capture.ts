@@ -22,6 +22,8 @@ export interface StyleCaptureResult {
   uaDefaults: Record<string, Record<string, string>>;
   /** Media queries discovered in the page's stylesheets. */
   mediaQueries: string[];
+  /** CSS custom property declarations found in stylesheets (name → value). */
+  customProperties: Record<string, string>;
   /** Computed styles from <html> and <body>, diffed against UA defaults. */
   documentStyles: Record<string, string>;
 }
@@ -223,16 +225,10 @@ export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
     }
     sandbox.remove();
 
-    // Discover @media queries from stylesheets
+    // Discover @media queries from stylesheets (recurse into @layer, @supports, etc.)
     const mediaQueries: string[] = [];
     const mediaSeen = new Set<string>();
-    for (const sheet of document.styleSheets) {
-      let rules: CSSRuleList;
-      try {
-        rules = sheet.cssRules;
-      } catch {
-        continue;
-      }
+    function collectMediaRules(rules: CSSRuleList) {
       for (const rule of rules) {
         if (rule instanceof CSSMediaRule) {
           const q = rule.conditionText;
@@ -240,7 +236,49 @@ export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
             mediaSeen.add(q);
             mediaQueries.push(q);
           }
+          collectMediaRules(rule.cssRules);
+        } else if ("cssRules" in rule) {
+          collectMediaRules((rule as CSSGroupingRule).cssRules);
         }
+      }
+    }
+    for (const sheet of document.styleSheets) {
+      try {
+        collectMediaRules(sheet.cssRules);
+      } catch {
+        // Cross-origin stylesheet — cssRules inaccessible
+      }
+    }
+
+    // Extract CSS custom property declarations (R5 — design tokens)
+    const customProperties: Record<string, string> = {};
+    function collectCustomProps(rules: CSSRuleList) {
+      for (const rule of rules) {
+        if (rule instanceof CSSStyleRule) {
+          const { style } = rule;
+          for (const name of style) {
+            if (name.startsWith("--")) {
+              const val = style.getPropertyValue(name).trim();
+              if (val && !val.includes("var(")) {
+                customProperties[name] = val;
+              }
+            }
+          }
+        }
+        if ("cssRules" in rule) {
+          try {
+            collectCustomProps((rule as CSSGroupingRule).cssRules);
+          } catch {
+            /* Skip */
+          }
+        }
+      }
+    }
+    for (const sheet of document.styleSheets) {
+      try {
+        collectCustomProps(sheet.cssRules);
+      } catch {
+        /* Cross-origin */
       }
     }
 
@@ -291,7 +329,7 @@ export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
     }
     iframe.remove();
 
-    return { elements, uaDefaults, mediaQueries, documentStyles };
+    return { elements, uaDefaults, mediaQueries, customProperties, documentStyles };
   }, STYLE_ALLOWLIST);
 }
 

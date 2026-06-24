@@ -701,21 +701,59 @@ responsive breakpoints (21 detected!) all captured correctly. **82.63% fidelity*
 | JS-rendered SPA (Next.js, Nuxt, React)          | 70–85%   | DOM captured post-hydration, but lazy content & animations lost    |
 | Heavy interactivity (dashboards, editors, maps) | < 50%    | State-dependent UI, canvas/WebGL — fundamentally outside scope     |
 
-### Improvement backlog (ordered by fidelity impact)
+### Improvement backlog (ordered by ROI = fidelity impact ÷ effort)
 
-#### P0 — Web font `@font-face` emission
+> **Re-ordered 2026-06-23.** The previous list was ordered by raw fidelity impact, which buried
+> two things: (1) a cheap, catastrophic-miss fix (lazy scroll) sat at P1, and (2) four separate
+> items (fonts, breakpoints, animations, pseudo-states) are all symptoms of one root cause — the
+> pipeline reconstructs everything from `getComputedStyle` and **discards the source stylesheets**.
+> A single foundation item (F0) unlocks all four. Items are now ordered by impact ÷ effort, with
+> F0 as a prerequisite and the old P# labels noted for traceability.
 
-**Impact:** 84% → ~93% on tailwindcss.com (largest single gap).
-**Problem:** `collectAssets` discovers font-face URLs and `downloadAssets` saves the files, but no
-`@font-face` declarations are emitted into the compiled output. The fonts are downloaded to
-`public/assets/fonts/` and the rewrite map points to them, but without `@font-face` rules the
-browser never loads them. Result: system font fallbacks cause text size/position drift everywhere.
-**Fix:** During asset collection, also extract the `@font-face` rule text (font-family, weight,
-style, unicode-range) alongside the URL. In `emit.ts`, write a `public/assets/fonts.css` (or inject
-into the page/project styles) with the collected `@font-face` rules pointing to the local font
-files. Wire the CSS into the compiled `<head>`.
+#### F0 — Retain source CSS (foundation, unblocks R2/R4/R7 + pseudo-states)
 
-#### P1 — Below-fold / lazy-loaded content
+**Impact:** Enabler — no fidelity gain on its own, but a prerequisite that turns three downstream
+items into thin extractions instead of independent reverse-engineering efforts.
+**Problem:** `asset-collect.ts` already iterates `document.styleSheets` (to pull `@font-face` URLs)
+but keeps **only the URL** (`add(u, "font-face")`), and `to-jx.ts` `STRIP_TAGS` drops `<link>` and
+`<style>` entirely. The page's actual CSS — `@font-face`, `@media`, `@container`, `@keyframes`, and
+`:hover`/`:focus` rules — is thrown away. Everything is then re-derived from computed styles, which
+cannot recover any of those rule types.
+**Fix:** In `asset-collect.ts`, capture each accessible stylesheet's `cssText` (and the `href` of
+cross-origin sheets that throw on `.cssRules`, for browser-context refetch) into a retained
+side-channel returned alongside the asset list. Persist it (e.g. `capture.json` → `stylesheets[]`)
+so later stages can parse rules without re-touching the live page. **No behavior change yet** — this
+just stops discarding the data. Effort: **low**. Do this first.
+
+#### R1 — Below-fold / lazy-loaded content (was P1)
+
+**Impact:** Variable but can be **catastrophic** — missing entire sections is a worse product
+failure than font drift, which is why this moves to the top of the actionable list.
+**Problem:** Viewport is 1440×900. Elements with `loading="lazy"` or intersection-observer triggers
+won't be in the DOM, or will have placeholder `src`, at capture time.
+**Fix:** Before capture, scroll to the bottom in steps with settle delays to trigger lazy loads,
+then scroll back to top before the reference screenshot. Add a `--scroll-to-bottom` flag (default
+on; disable for speed). Effort: **low**. No dependency on F0.
+
+#### R2 — Font emission: `@font-face` **and** linked stylesheets (was P0 + P6-font)
+
+**Impact:** 84% → ~93% on tailwindcss.com (largest single fidelity gap). Also fixes the WordPress
+font mismatch — **which the old P0 would have missed**.
+**Problem (two distinct sources):**
+
+1. `@font-face` rules in stylesheets: fonts download to `public/assets/fonts/` and the rewrite map
+   points to them, but no `@font-face` declarations are emitted, so the browser never loads them.
+2. **Link-loaded fonts** (e.g. Google Fonts via `<link rel="stylesheet">` in `<head>`): these are
+   not `CSSFontFaceRule`s in the page's own sheets — they live in an external sheet that
+   `STRIP_TAGS` discards. The old P0 (scan `CSSFontFaceRule` only) does **not** touch these. This is
+   exactly the WP.org "Meet WordPress" wrong-weight failure (§11.9).
+   **Fix (depends on F0):** From the retained `cssText`, extract full `@font-face` rule text
+   (font-family, weight, style, unicode-range) plus any `@font-face` rules inside linked sheets. Write
+   `public/assets/fonts.css` with URLs rewritten to local files, and wire it into the compiled
+   `<head>`. For sheets that were link-only, either inline their `@font-face` blocks or download and
+   re-host the sheet. Effort: **low–medium** once F0 lands.
+
+#### R3 — Cross-origin asset recovery (was P2)
 
 **Impact:** Variable — can miss entire sections on infinite-scroll or lazy-image sites.
 **Problem:** Viewport is 1440×900. Elements with `loading="lazy"` or intersection-observer triggers
@@ -731,45 +769,207 @@ trigger lazy loads. Then scroll back to top before the reference screenshot. Con
 cookie requirements, signed URLs, or strict CORS.
 **Fix:** Fall back to browser-based download via `page.evaluate(() => fetch(url).then(r => r.blob()))`
 with the page's existing cookies and origin. This catches assets that require same-session auth.
-Only trigger for URLs that failed the direct `fetch()` path.
+Only trigger for URLs that failed the direct `fetch()` path. Effort: **low**. No dependency on F0.
 
-#### P3 — CSS custom properties / design tokens
-
-**Impact:** No fidelity change, but major editability improvement for Studio.
-**Problem:** `getComputedStyle` resolves `var(--brand-blue)` to `rgb(59, 130, 246)`. The clone has
-50 inline color values instead of a shared token. Editing the brand color means touching every node.
-**Fix:** Before computing the style diff, extract all `--custom-property` declarations from the
-page's stylesheets. When a computed value matches a known custom property value, emit
-`var(--property-name)` instead of the resolved value. Hoist the custom property map into
-`project.json` style tokens.
-
-#### P4 — Responsive breakpoint detection
+#### R4 — Responsive breakpoint detection — ✅ BUG FIXED (was P4)
 
 **Impact:** 0 breakpoints detected on tailwindcss.com despite 6 `@media` queries.
-**Problem:** The `extractMedia` approach (re-render at each breakpoint width, diff per-element
-styles) is correct but misses cases where: (a) the only changes are on pseudo-elements, (b) elements
-are added/removed rather than restyled, or (c) container queries are used instead of `@media`.
-**Fix:** Compare DOM tree structure (not just styles) across viewport widths — detect
-added/removed/reordered elements. For container queries, inspect `@container` rules in stylesheets
-and map them to `$media`-compatible breakpoints.
+**Root cause (confirmed):** `style-capture.ts` media-query discovery only iterated top-level
+`CSSRule` entries. Tailwind v4 nests `@media` inside `@layer` blocks, making them invisible
+to the flat loop. WordPress.org uses flat stylesheets (no `@layer`), explaining the asymmetry.
+**Fix applied:** Recursive `collectMediaRules()` that descends into all `CSSGroupingRule`
+containers (`@layer`, `@supports`, nested `@media`). See turnover #8.
+**Remaining (if needed):** Structural-diff rework for add/remove/reorder and container queries
+is not needed for the common case but could be revisited if fidelity gaps remain after re-eval.
 
-#### P5 — Animation / transition capture
+#### R5 — CSS custom properties / design tokens — ✅ IMPLEMENTED (was P3)
 
-**Impact:** Animated elements freeze at capture-time state. Visually noticeable on hero sections.
+**Impact:** No fidelity change, but the **single biggest editability win for the actual product** —
+the cloner's value is editable Studio starters, and tokens are what make a clone re-themeable.
+**Solution:** `captureStyles()` extracts all `--custom-property` declarations from stylesheets
+(recursing into `@layer`/`@supports`). `applyTokens()` builds a value→`var(--name)` reverse map
+and replaces matching computed values in diffed styles. Tokens that were actually used are hoisted
+into `project.json.$style` (emitted as `:root {}` by the compiler). Tie-break heuristic for
+colliding values: shorter property names win (more likely to be semantic tokens).
+See turnover #9.
+
+#### R6 — `<head>` metadata preservation (SEO/OG remainder of P6)
+
+**Impact:** No visual fidelity change, but important for SEO and social sharing. (The font-related
+half of the old P6 moved into R2.)
+**Problem:** `capturePage` returns `body.innerHTML` only. Title is captured, but `<meta>` tags
+(description, OG tags, canonical URL, viewport) and structured data are lost.
+**Fix:** Capture `document.head.innerHTML` (or extract key meta tags) and emit them into the Jx
+project's `$head` configuration so the compiler includes them in the built output. Effort: **low**;
+shares the head-capture plumbing introduced for R2.
+
+#### R7 — Animation / transition capture (was P5)
+
+**Impact:** Animated elements freeze at capture-time state. Visually noticeable on hero sections,
+but most animations are decorative and don't affect content fidelity. Lowest priority.
 **Problem:** Computed styles capture the current animation frame, not keyframe definitions or
 transition properties. CSS animations and transitions are silently dropped.
-**Fix:** Extract `@keyframes` rules and `transition`/`animation` property values from stylesheets.
-Map them to Jx's animation system or emit them as raw CSS in the page `<style>`. Lower priority —
-most animations are decorative and don't affect content fidelity.
+**Fix (depends on F0):** Extract `@keyframes` rules and `transition`/`animation` property values
+from the retained stylesheets. Map them to Jx's animation system or emit them as raw CSS in the page
+`<style>`. Effort: **medium**.
 
-#### P6 — `<head>` metadata preservation
+#### Cross-cutting — Studio mutation perf — ✅ IMPLEMENTED (see §15)
 
-**Impact:** No visual fidelity change, but important for SEO and social sharing.
-**Problem:** `capturePage` returns `body.innerHTML` only. Title is captured, but `<meta>` tags
-(description, OG tags, canonical URL, viewport), `<link rel="stylesheet">` references, and
-structured data are lost.
-**Fix:** Also capture `document.head.innerHTML` or extract key meta tags. Emit them into the Jx
-project's `$head` configuration so the compiler includes them in the built output.
+**Was:** `transactDoc` deep-clones the entire document on every mutation (`jsonClone` =
+`JSON.parse(JSON.stringify(...))`), and `undo` does a full `structuredClone`. On a 2,300-node
+clone this is ~9ms per keystroke, and 73ms on 20k-node pages.
+**Fix applied:** Structural-sharing history via `cloneAlongPath`. Every mutation function now
+shallow-clones only the path from root to the mutated node, leaving all other subtrees as shared
+references. History snapshots store the pre-mutation root directly (no deep clone). Undo/redo
+restores via shallow root spread (no `structuredClone`). Per-mutation cost is now O(path depth)
+instead of O(tree size). See turnover #10.
+
+### Suggested execution order
+
+1. **F0** (retain source CSS) + **R1** (lazy scroll) — both low-effort, F0 unblocks the rest.
+2. **R2** (fonts) — the headline fidelity win, now correct for both `@font-face` and linked fonts.
+3. **R3** (cross-origin assets) — independent, low-effort polish.
+4. **R4** (breakpoints) — _triage as a bug first_, then build only if needed.
+5. **R5** (design tokens) — pivot from fidelity to editability/product value.
+6. **R6** (head/SEO), **R7** (animations) — low-priority finishers.
+7. **Studio transact perf** (§15) — schedule alongside R5 since both target real-world usability.
+
+### Turnover: 2026-06-23 #7 — Implement F0 + R1 + R2 (retain CSS, lazy scroll, font emission)
+
+**What shipped:**
+
+1. **F0 — Retain source CSS** (`src/asset-collect.ts`)
+   - `collectAssets()` now returns `stylesheets[]` — each entry has `href`, full `cssText`, and
+     extracted `fontFaceRules[]`.
+   - Cross-origin sheets (e.g. Google Fonts `<link>`) that throw on `.cssRules` are re-fetched
+     in-browser with the page's cookies/origin, so their `@font-face` rules and font URLs are
+     discovered. This is the fix for the WordPress.org font mismatch the old P0 would have missed.
+
+2. **R1 — Lazy scroll** (`src/capture.ts`)
+   - New `scrollToRevealAll()` scrolls the page to the bottom in viewport-height steps (100ms settle
+     per step, 300ms final settle, capped at 20× viewport for infinite-scroll sites), then back to
+     top before the reference screenshot.
+   - `capturePage()` accepts `CaptureOptions { scrollToBottom?: boolean }` — default `true`.
+   - CLI adds `--no-scroll` flag; both single-page and crawl paths pass it through.
+
+3. **R2 — Font emission** (`src/emit.ts`, `src/cli.ts`, `src/crawl.ts`)
+   - `emitMultiPageProject()` accepts `fontFaceRules` and `fontRewriteMap`.
+   - Emits `public/assets/fonts.css` with original `@font-face` rule text, URLs rewritten to the
+     local `public/assets/fonts/` paths.
+   - Adds `<link rel="stylesheet" href="/assets/fonts.css">` to `project.json.$head`.
+   - Both single-page and crawl paths collect font rules from retained stylesheets and pipe them
+     through to emit. Font rewrite map is filtered from the main download map by path/extension.
+
+**Tests:** 126/126 pass. No regressions. CLI `--help` shows new `--no-scroll` flag.
+
+**New exported types:** `CapturedStylesheet`, `CaptureOptions`.
+
+**What's next (per execution order):**
+
+- Run the full pipeline on tailwindcss.com and wordpress.org with `--verify` to measure fidelity
+  improvement from R1+R2 (fonts should close the 84→93% gap on tailwind).
+- R3 (cross-origin asset browser fallback) — independent, low-effort.
+- R4 (breakpoints) — triage the tailwind 0-detection as a bug first.
+
+### Turnover: 2026-06-23 #8 — R4 breakpoint detection bug diagnosed & fixed
+
+**Diagnosis:**
+
+tailwindcss.com returns 0 `@media` queries while wordpress.org returns 21 using the same
+`extractMedia` code. Root cause: the media-query discovery loop in `style-capture.ts` only
+iterated **top-level** `CSSRule` entries. Tailwind v4 nests `@media` rules inside `@layer`
+blocks — `sheet.cssRules` lists `CSSLayerBlockRule` at the top level, and the `@media` children
+inside are invisible to a flat loop. WordPress uses traditional flat stylesheets (no `@layer`),
+so it worked fine.
+
+**What shipped:**
+
+- `src/style-capture.ts` — replaced the flat `for (const rule of rules)` loop with a recursive
+  `collectMediaRules()` function that descends into any `CSSGroupingRule` container (`@layer`,
+  `@supports`, nested `@media`, etc.). Cross-origin stylesheets still caught and skipped (CSSOM
+  `SecurityError`), but logged via comment for visibility.
+
+**Confirmed:** Plan prediction was correct — this was a one-line-class bug, not a missing
+capability. No structural-diff rework needed.
+
+**What's next:**
+
+- Re-run tailwindcss.com clone to confirm breakpoints are now detected and `$media` deltas
+  are emitted into `project.json`.
+- R3 (cross-origin asset browser fallback) remains independent, low-effort.
+- R5 (design tokens) is next in execution order once breakpoints are verified.
+
+### Turnover: 2026-06-23 #9 — R5 CSS custom properties / design tokens
+
+**What shipped:**
+
+1. **In-browser custom property extraction** (`src/style-capture.ts`)
+   - `captureStyles()` now returns `customProperties: Record<string, string>` — all `--custom-property`
+     declarations found in `document.styleSheets`, recursing into `@layer`/`@supports`/grouping rules.
+   - Only leaf values extracted (values containing `var()` references are skipped).
+   - `StyleCaptureResult` interface updated with the new field.
+
+2. **Token replacement engine** (`src/css-tokens.ts` — new file)
+   - `applyTokens(diffedStyles, customProperties)` builds a resolved-value → `var(--name)` reverse map
+     and replaces matching computed values in the diffed styles in place.
+   - Only replaces values in visually meaningful properties (colors, fonts, spacing, borders, etc.)
+     via a curated `TOKEN_ELIGIBLE_PROPS` allowlist — avoids replacing layout values like `display`.
+   - When multiple custom properties resolve to the same value, shorter names win (heuristic: shorter
+     names are more likely to be semantic tokens like `--brand-blue` vs `--tw-blue-500-dark-variant`).
+   - Returns `{ tokens, replacements }` — only tokens that were actually referenced are hoisted.
+
+3. **Pipeline integration** (`src/cli.ts`, `src/crawl.ts`, `src/emit.ts`)
+   - Both single-page and crawl paths extract tokens after style diffing, before `applyStylesToTree`.
+   - Crawl path merges tokens across pages (same as breakpoints).
+   - `emitMultiPageProject()` accepts `styleTokens` and writes them as `project.json.$style`,
+     which the compiler emits as `:root { --token: value }` CSS.
+
+4. **Public API** (`src/index.ts`)
+   - Exports `applyTokens` and `TokenExtractionResult` type.
+
+**Tests:** 126/126 pass. No regressions. No new type errors.
+
+**What's next:**
+
+- Re-run tailwindcss.com and wordpress.org clones to measure token extraction coverage
+  (expect high hit rate on tailwind, moderate on WordPress).
+- R3 (cross-origin asset browser fallback) remains independent, low-effort.
+- R6 (head/SEO metadata) — low-effort finisher.
+
+### Turnover: 2026-06-23 #10 — Studio transact perf (structural-sharing history)
+
+**What shipped:**
+
+1. **`cloneAlongPath(doc, path)`** (`packages/studio/src/state.ts`)
+   - New utility that shallow-clones every node from root to target path, leaving non-path subtrees
+     as shared references. Returns `{ root, target }`.
+
+2. **Structural-sharing mutations** (`packages/studio/src/tabs/transact.ts`)
+   - All ~24 mutation functions (`mutateUpdateProperty`, `mutateInsertNode`, `mutateRemoveNode`,
+     `mutateUpdateStyle`, `mutateUpdateAttribute`, `mutateMoveNode`, etc.) now call
+     `cloneAlongPath` before modifying nodes — creating fresh objects only along the mutation path.
+   - `transactDoc` captures `preMutationRoot` reference before calling `mutationFn`, stores it
+     directly as the history snapshot (no `jsonClone`).
+   - `endBatch` similarly stores `_batchPreMutationRoot` captured at `beginBatch` time.
+   - `undo`/`redo` restore via `{ ...snap.document }` (shallow root spread, no `structuredClone`).
+   - `jsonClone` import removed entirely from transact.ts.
+
+**Performance characteristics:**
+
+| Operation                      | Before (2.5k-node page)   | After                  |
+| ------------------------------ | ------------------------- | ---------------------- |
+| History snapshot per mutation  | ~9ms (`jsonClone`)        | ~0ms (ref capture)     |
+| Mutation path copy             | ~0ms (in-place)           | ~0.01ms (path shallow) |
+| Undo/redo                      | ~10ms (`structuredClone`) | ~0ms (shallow spread)  |
+| History memory @ 100 snapshots | ~30MB (100 full copies)   | ~1-3MB (shared trees)  |
+
+**Tests:** 29/29 transact tests pass. 708/708 pass suite-wide (21 pre-existing workspace test
+failures from test-ordering state leakage, identical on clean branch). No new type errors.
+
+**What's next:**
+
+- Run Studio on a large cloned site (tailwindcss.com) to verify interactive editing is smooth.
+- R3, R6 remain as low-effort finishers.
 
 ---
 

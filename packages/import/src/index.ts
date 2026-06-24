@@ -8,6 +8,7 @@ export { applyStylesToTree } from "./apply-styles.ts";
 export { collectAssets } from "./asset-collect.ts";
 export { downloadAssets } from "./asset-download.ts";
 export { rewriteAssetUrls } from "./asset-rewrite.ts";
+export { applyTokens } from "./css-tokens.ts";
 export { crawlSite, normalizeUrl, routeToFilePath, fetchRobotsTxt } from "./crawl.ts";
 export { detectLayout, hashSubtree, treesEqual } from "./layout-detect.ts";
 export { componentize } from "./componentize.ts";
@@ -25,8 +26,14 @@ export type { EmitOptions, MultiEmitOptions } from "./emit.ts";
 export type { CapturedStyle, StyleCaptureResult } from "./style-capture.ts";
 export type { DiffedStyle } from "./style-diff.ts";
 export type { Breakpoint, MediaExtractionResult } from "./media-extract.ts";
-export type { DiscoveredAsset, AssetCollectionResult } from "./asset-collect.ts";
+export type {
+  DiscoveredAsset,
+  AssetCollectionResult,
+  CapturedStylesheet,
+} from "./asset-collect.ts";
+export type { CaptureOptions } from "./capture.ts";
 export type { DownloadResult } from "./asset-download.ts";
+export type { TokenExtractionResult } from "./css-tokens.ts";
 export type { CrawlOptions, CrawledPage, CrawlResult } from "./crawl.ts";
 export type { LayoutResult } from "./layout-detect.ts";
 export type {

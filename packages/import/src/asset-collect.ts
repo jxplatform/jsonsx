@@ -24,10 +24,21 @@ export interface DiscoveredAsset {
     | "og-image";
 }
 
+export interface CapturedStylesheet {
+  /** The stylesheet's href (null for inline <style> blocks). */
+  href: string | null;
+  /** Full cssText of the sheet. Null if cross-origin and cssRules threw. */
+  cssText: string | null;
+  /** Individual @font-face rule texts extracted from the sheet. */
+  fontFaceRules: string[];
+}
+
 export interface AssetCollectionResult {
   assets: DiscoveredAsset[];
   /** Inline SVGs found (kept inline, not downloaded). */
   inlineSvgCount: number;
+  /** Retained source stylesheets (F0 foundation — enables font emission, breakpoint reading, etc). */
+  stylesheets: CapturedStylesheet[];
 }
 
 /**
@@ -35,7 +46,7 @@ export interface AssetCollectionResult {
  * page.evaluate() — no per-element round-trips.
  */
 export async function collectAssets(page: Page): Promise<AssetCollectionResult> {
-  return page.evaluate(() => {
+  const result = await page.evaluate(() => {
     const assets: { url: string; source: string }[] = [];
     const seen = new Set<string>();
     let inlineSvgCount = 0;
@@ -126,24 +137,37 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
       }
     }
 
-    // @font-face from stylesheets
+    // @font-face from stylesheets + retain full source CSS (F0)
+    const stylesheets: { href: string | null; cssText: string | null; fontFaceRules: string[] }[] =
+      [];
     for (const sheet of document.styleSheets) {
-      let rules: CSSRuleList;
+      let rules: CSSRuleList | null = null;
+      let fullCssText: string | null = null;
+      const fontFaceRules: string[] = [];
+      const { href } = sheet;
+
       try {
         rules = sheet.cssRules;
-      } catch {
-        continue;
-      }
-      for (const rule of rules) {
-        if (rule instanceof CSSFontFaceRule) {
-          const src = rule.style.getPropertyValue("src");
-          if (src) {
-            for (const u of extractCssUrls(src)) {
-              add(u, "font-face");
+        // Build full cssText from all rules
+        const parts: string[] = [];
+        for (const rule of rules) {
+          parts.push(rule.cssText);
+          if (rule instanceof CSSFontFaceRule) {
+            fontFaceRules.push(rule.cssText);
+            const src = rule.style.getPropertyValue("src");
+            if (src) {
+              for (const u of extractCssUrls(src)) {
+                add(u, "font-face");
+              }
             }
           }
         }
+        fullCssText = parts.join("\n");
+      } catch {
+        // Cross-origin sheet — cssRules inaccessible. Record href for browser-context refetch.
       }
+
+      stylesheets.push({ href, cssText: fullCssText, fontFaceRules });
     }
 
     // Favicon and other link icons
@@ -167,9 +191,67 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
     // Count inline SVGs (kept inline, not downloaded)
     inlineSvgCount = document.querySelectorAll("svg").length;
 
-    return { assets, inlineSvgCount } as {
+    return { assets, inlineSvgCount, stylesheets } as {
       assets: { url: string; source: string }[];
       inlineSvgCount: number;
+      stylesheets: { href: string | null; cssText: string | null; fontFaceRules: string[] }[];
     };
-  }) as Promise<AssetCollectionResult>;
+  });
+
+  // R2: For cross-origin sheets we couldn't access (cssText=null, has href), fetch them
+  // In-browser to get @font-face rules (e.g. Google Fonts loaded via <link>)
+  const inaccessibleSheets = result.stylesheets.filter((s) => s.cssText === null && s.href);
+  if (inaccessibleSheets.length > 0) {
+    const fetched = await page.evaluate(
+      async (hrefs: string[]) => {
+        const results: { href: string; cssText: string; fontFaceRules: string[] }[] = [];
+        for (const href of hrefs) {
+          try {
+            const res = await fetch(href);
+            if (res.ok) {
+              const text = await res.text();
+              // Parse @font-face rules from the raw CSS text
+              const fontFaceRules: string[] = [];
+              const re = /@font-face\s*\{[^}]*\}/g;
+              let match;
+              while ((match = re.exec(text)) !== null) {
+                fontFaceRules.push(match[0]);
+              }
+              results.push({ href, cssText: text, fontFaceRules });
+            }
+          } catch {
+            // Skip unreachable sheets
+          }
+        }
+        return results;
+      },
+      inaccessibleSheets.map((s) => s.href!),
+    );
+
+    // Merge fetched data back and discover font URLs
+    for (const fetched_sheet of fetched) {
+      const existing = result.stylesheets.find((s) => s.href === fetched_sheet.href);
+      if (existing) {
+        existing.cssText = fetched_sheet.cssText;
+        existing.fontFaceRules = fetched_sheet.fontFaceRules;
+      }
+
+      // Extract font URLs from the fetched @font-face rules
+      const urlRe = /url\(\s*(['"]?)(.+?)\1\s*\)/g;
+      for (const rule of fetched_sheet.fontFaceRules) {
+        let m;
+        while ((m = urlRe.exec(rule)) !== null) {
+          const fontUrl = m.at(2);
+          if (fontUrl && !fontUrl.startsWith("data:")) {
+            const abs = new URL(fontUrl, fetched_sheet.href).href;
+            if (!result.assets.some((a) => a.url === abs)) {
+              result.assets.push({ url: abs, source: "font-face" });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return result as AssetCollectionResult;
 }
