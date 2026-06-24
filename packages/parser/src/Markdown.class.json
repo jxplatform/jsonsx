@@ -17,7 +17,7 @@
 
   "$studio": {
     "icon": "markdown",
-    "modes": ["design", "preview", "source"],
+    "modes": ["edit", "design", "preview", "source"],
     "documentMode": {
       "default": "content",
       "componentWhen": { "frontmatterKey": "tagName", "matches": ".+-.+" }

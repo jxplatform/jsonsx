@@ -25,14 +25,7 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
-import {
-  activateTab,
-  activeTab,
-  openTab,
-  renameTab,
-  replaceAllTabs,
-  workspace,
-} from "../workspace/workspace";
+import { activateTab, openTab, renameTab, replaceAllTabs, workspace } from "../workspace/workspace";
 import { parseSourceForPath, serializeDocument } from "./file-ops";
 import {
   documentExtensions,
@@ -1059,13 +1052,6 @@ export async function openFileInTab(path: string) {
     });
     requireProjectState().selectedPath = path;
     trackRecentFile({ name: path.split("/").pop() || path, path });
-
-    if (path === "project.json") {
-      const tab = activeTab.value;
-      if (tab) {
-        tab.session.ui.canvasMode = "stylebook";
-      }
-    }
 
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (error) {

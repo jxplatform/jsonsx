@@ -90,12 +90,15 @@ export interface Tab {
   };
 }
 
-/** @returns {TabUi} */
-function createDefaultUi() {
+/**
+ * @param {string} canvasMode — initial canvas mode (the tab's first allowed mode)
+ * @returns {TabUi}
+ */
+function createDefaultUi(canvasMode: string) {
   return {
     activeMedia: null,
     activeSelector: null,
-    canvasMode: "edit",
+    canvasMode,
     editingFunction: null,
     featureToggles: {},
     gitBranches: null,
@@ -160,6 +163,9 @@ export function createTab({
   normalizeArrayChildren(document);
 
   const resolvedModes = capabilities?.modes ?? inferModes(documentPath, sourceFormat);
+  // A tab opens in its first allowed mode — never one the toolbar would disable.
+  // Formats author mode order so the default comes first (edit, stylebook, etc.).
+  const initialCanvasMode = resolvedModes[0] ?? "edit";
 
   const tab = scope.run(() => ({
     capabilities: { modes: resolvedModes },
@@ -190,7 +196,7 @@ export function createTab({
       documentStack: [],
       hover: null,
       selection: null,
-      ui: createDefaultUi(),
+      ui: createDefaultUi(initialCanvasMode),
     }),
   })) as unknown as Tab;
 

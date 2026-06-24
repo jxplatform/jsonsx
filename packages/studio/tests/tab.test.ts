@@ -38,6 +38,32 @@ describe("Tab primitive", () => {
     disposeTab(tab);
   });
 
+  test("markdown allows edit mode and opens in it", () => {
+    const tab = createTab({
+      document: { tagName: "main" },
+      documentPath: "pages/index.md",
+      id: "test-md-edit",
+    });
+
+    expect(tab.capabilities.modes).toContain("edit");
+    expect(tab.session.ui.canvasMode).toBe("edit");
+    disposeTab(tab);
+  });
+
+  test("a tab opens in its first allowed mode, never a disabled one", () => {
+    // Project.json excludes "edit" — it must not open in the hardcoded default.
+    const tab = createTab({
+      document: { name: "Demo" },
+      documentPath: "project.json",
+      id: "test-project",
+    });
+
+    expect(tab.capabilities.modes).not.toContain("edit");
+    expect(tab.capabilities.modes[0]).toBe("stylebook");
+    expect(tab.session.ui.canvasMode).toBe("stylebook");
+    disposeTab(tab);
+  });
+
   test("effects track reactive mutations on doc", () => {
     const tab = createTab({
       document: { tagName: "div" },

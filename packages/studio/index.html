@@ -62,8 +62,7 @@
            resolves to Source Code Pro/Monaco; the studio prefers the developer
            fonts SF Mono / Fira Code, so we keep those ahead of the Spectrum
            stack rather than regressing to Monaco. */
-        --font-mono: "SF Mono", "Fira Code",
-          var(--spectrum-code-font-family-stack, monospace);
+        --font-mono: "SF Mono", "Fira Code", var(--spectrum-code-font-family-stack, monospace);
         /* Hover wash and accent tints */
         --hover-bg: rgba(255, 255, 255, 0.04);
         --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -78,17 +77,61 @@
            The percentage is the black (foreground) or white (background) blend
            of each step; this keeps the canvas light even in the dark chrome
            while still being Spectrum-sourced. */
-        --canvas-fg: color-mix(in srgb, var(--spectrum-black, #000) 90%, var(--spectrum-white, #fff));
-        --canvas-fg-2: color-mix(in srgb, var(--spectrum-black, #000) 80%, var(--spectrum-white, #fff));
-        --canvas-fg-3: color-mix(in srgb, var(--spectrum-black, #000) 67%, var(--spectrum-white, #fff));
-        --canvas-dim: color-mix(in srgb, var(--spectrum-black, #000) 47%, var(--spectrum-white, #fff));
-        --canvas-muted: color-mix(in srgb, var(--spectrum-black, #000) 40%, var(--spectrum-white, #fff));
-        --canvas-light: color-mix(in srgb, var(--spectrum-black, #000) 27%, var(--spectrum-white, #fff));
-        --canvas-border: color-mix(in srgb, var(--spectrum-black, #000) 13%, var(--spectrum-white, #fff));
-        --canvas-rule: color-mix(in srgb, var(--spectrum-black, #000) 7%, var(--spectrum-white, #fff));
-        --canvas-bg-1: color-mix(in srgb, var(--spectrum-white, #fff) 96%, var(--spectrum-black, #000));
-        --canvas-bg-2: color-mix(in srgb, var(--spectrum-white, #fff) 94%, var(--spectrum-black, #000));
-        --canvas-track: color-mix(in srgb, var(--spectrum-white, #fff) 88%, var(--spectrum-black, #000));
+        --canvas-fg: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 90%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-fg-2: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 80%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-fg-3: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 67%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-dim: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 47%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-muted: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 40%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-light: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 27%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-border: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 13%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-rule: color-mix(
+          in srgb,
+          var(--spectrum-black, #000) 7%,
+          var(--spectrum-white, #fff)
+        );
+        --canvas-bg-1: color-mix(
+          in srgb,
+          var(--spectrum-white, #fff) 96%,
+          var(--spectrum-black, #000)
+        );
+        --canvas-bg-2: color-mix(
+          in srgb,
+          var(--spectrum-white, #fff) 94%,
+          var(--spectrum-black, #000)
+        );
+        --canvas-track: color-mix(
+          in srgb,
+          var(--spectrum-white, #fff) 88%,
+          var(--spectrum-black, #000)
+        );
         /* Data explorer syntax colors (mapped to nearest Spectrum hues) */
         --data-key: var(--spectrum-blue-700, #9cdcfe);
         --data-string: var(--spectrum-orange-700, #ce9178);
@@ -805,8 +848,7 @@
         font-size: 10px;
         background: var(--accent);
         color: var(--accent-fg);
-        border-radius: var(--spectrum-corner-radius-75)
-          var(--spectrum-corner-radius-75) 0 0;
+        border-radius: var(--spectrum-corner-radius-75) var(--spectrum-corner-radius-75) 0 0;
         white-space: nowrap;
         pointer-events: none;
       }
@@ -1408,10 +1450,7 @@
         border: none;
       }
       .elements-list sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: var(
-          --spectrum-font-size-50,
-          11px
-        );
+        --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
         border-bottom: 1px solid var(--border);
       }
 
@@ -1662,10 +1701,7 @@
         border: none;
       }
       .style-sidebar sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: var(
-          --spectrum-font-size-50,
-          11px
-        );
+        --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
       }
       .style-sidebar sp-accordion-item [slot="heading"] {
         display: flex;
@@ -1954,10 +1990,7 @@
         border: none;
       }
       .signals-panel sp-accordion-item {
-        --spectrum-accordion-item-header-font-size: var(
-          --spectrum-font-size-50,
-          11px
-        );
+        --spectrum-accordion-item-header-font-size: var(--spectrum-font-size-50, 11px);
       }
       .signals-add {
         display: flex;
