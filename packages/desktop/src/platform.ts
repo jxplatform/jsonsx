@@ -262,15 +262,14 @@ export function createDesktopPlatform() {
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
         const config = JSON.parse(content as string) as ProjectConfig;
-        // Resolve the absolute backend root so the recent-projects list gets a re-openable key.
-        const { root } = await rpc.request.getProjectRoot();
+        // `root` (the absolute backend root) is already resolved above and is the re-openable key.
         return {
           info: {
             directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config,
           },
-          meta: { name: config.name || "project", root: root || "." },
+          meta: { name: config.name || "project", root },
         };
       } catch {
         return {

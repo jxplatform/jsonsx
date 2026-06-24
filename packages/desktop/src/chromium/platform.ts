@@ -1,9 +1,13 @@
 /// <reference lib="dom" />
-import type { RecentProjectEntry, StudioPlatform } from "@jxsuite/studio/types";
+import type {
+  ComponentMeta,
+  RecentProjectEntry,
+  RenameResult,
+  StudioPlatform,
+} from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   CodeServiceResult,
-  ComponentMeta,
   DirEntry,
   GitBranchesResult,
   GitLogEntry,
@@ -134,7 +138,7 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("writeFile", { content, path }) as Promise<void>;
     },
 
-    async uploadFile(path: string, data: string) {
+    async uploadFile(path: string, data: string | File | Blob | ArrayBuffer) {
       return request("uploadFile", { data, path }) as Promise<unknown>;
     },
 
@@ -143,7 +147,7 @@ export function createDesktopPlatform(): StudioPlatform {
     },
 
     async renameFile(from: string, to: string) {
-      return request("renameFile", { from, to }) as Promise<void>;
+      return request("renameFile", { from, to }) as Promise<RenameResult>;
     },
 
     async createDirectory(path: string) {

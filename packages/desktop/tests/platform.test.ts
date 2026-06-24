@@ -318,7 +318,7 @@ describe("platform methods", () => {
     expect(probe).not.toBeNull();
     expect(probe!.info.isSiteProject).toBe(true);
     expect(probe!.info.projectConfig).toEqual({ name: "My Site" } as never);
-    expect(probe!.meta).toEqual({ name: "My Site", root: "." });
+    expect(probe!.meta).toEqual({ name: "My Site", root: "/proj" });
     expect(lastCall("readFile")!.args[0]).toEqual({ path: "project.json" });
     impls.delete("readFile");
     impls.delete("getProjectRoot");
