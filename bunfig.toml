@@ -7,6 +7,10 @@
 linker = "hoisted"
 
 [test]
+# `result` is the Nix build output symlink (-> /nix/store/...jx-studio). Without this, a root-level
+# `bun test` follows it and runs the stale built copy's ~680 test files. CI runs tests per-package
+# (cwd inside each package), so this only affects root-level runs.
+pathIgnorePatterns = ["**/result/**"]
 coverageReporter = ["text"]
 coverageSkipTestFiles = true
 coveragePathIgnorePatterns = ["**/dist/**", "**/tests/**", "./result/**"]
