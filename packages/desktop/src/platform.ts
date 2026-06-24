@@ -237,6 +237,18 @@ export function createDesktopPlatform() {
     },
 
     async probeRootProject() {
+      // A fresh welcome window owns a session with no project root. Report "no project" (null) so the
+      // Studio shows the welcome screen — returning a phantom non-site project instead would suppress
+      // The welcome screen and trigger a spurious "No project open" error from listFormats.
+      let root: string | null = null;
+      try {
+        ({ root } = await rpc.request.getProjectRoot());
+      } catch {
+        root = null;
+      }
+      if (!root) {
+        return null;
+      }
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
         const config = JSON.parse(content as string) as ProjectConfig;

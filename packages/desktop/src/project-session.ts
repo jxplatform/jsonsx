@@ -305,6 +305,12 @@ export function createProjectSession(initialRoot: string | null) {
 
   /** List the project's registered format classes (auto-discovered from imports). */
   async function listFormats() {
+    // No project open yet (e.g. a fresh welcome window): there are no imported formats to list, and
+    // Building a registry would throw "No project open". Return empty quietly instead of logging a
+    // Spurious error — the studio's welcome screen calls this before any project is loaded.
+    if (!projectRoot) {
+      return [];
+    }
     try {
       const registry = await getFormatRegistry();
       return registry.entries.map((e) => ({
