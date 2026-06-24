@@ -10,7 +10,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
-import { debouncedStyleCommit } from "../store";
+import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot } from "./layers";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
@@ -88,6 +88,10 @@ async function loadMediaCache() {
     m.path = m.path.replace(/^\/public\//, "/");
   }
   mediaCacheLoaded = true;
+  // Re-render the host panels so the Browse button (gated on mediaCache.length) appears once the
+  // Async listing resolves — including when an image value is already set, so the current image can
+  // Be replaced. Mirrors loadLayoutEntries()'s renderOnly() in head-panel.
+  renderOnly("leftPanel", "rightPanel");
 }
 
 /** Force media cache reload (e.g. after upload). */
