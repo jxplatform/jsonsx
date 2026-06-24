@@ -586,7 +586,7 @@ describe("function editor", () => {
     commitValue(fieldEl(editor, "Description", "sp-textfield"), "saves things");
     expect((docState().save! as { description: string }).description).toBe("saves things");
 
-    const body = editor.querySelector('textarea[style*="monospace"]') as ValueEl;
+    const body = editor.querySelector('textarea[style*="--font-mono"]') as ValueEl;
     inputValue(body, "console.log(1)");
     expect((docState().save! as { body: string }).body).toBe("console.log(1)");
 
@@ -603,7 +603,7 @@ describe("function editor", () => {
   test("external function shows Source/Export fields instead of a body", async () => {
     const h = setup({ run: { $export: "runIt", $prototype: "Function", $src: "./fns.js" } });
     const editor = await expand(h, "run");
-    expect(editor.querySelector('textarea[style*="monospace"]')).toBeNull();
+    expect(editor.querySelector('textarea[style*="--font-mono"]')).toBeNull();
 
     commitValue(fieldEl(editor, "Source", "sp-textfield"), "./other.js");
     commitValue(fieldEl(editor, "Export", "sp-textfield"), "main");

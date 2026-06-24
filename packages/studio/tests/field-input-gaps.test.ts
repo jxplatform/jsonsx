@@ -188,7 +188,7 @@ describe("rawTextArea", () => {
     );
     const style = container.querySelector("textarea")!.getAttribute("style")!;
     expect(style).toContain("min-height:120px");
-    expect(style).toContain("monospace");
+    expect(style).toContain("var(--font-mono)");
     expect(style).toContain("color:red");
   });
 
