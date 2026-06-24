@@ -14,6 +14,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
 import { applyRename } from "./refactor/apply.ts";
 import {
+  bunExecutable,
   dependenciesNeedInstall,
   installDependencies,
   outdatedPackages,
@@ -763,7 +764,7 @@ export async function handleStudioApi(
       if (body.dev) {
         args.splice(1, 0, "-d");
       }
-      const proc = Bun.spawn(["bun", ...args], {
+      const proc = Bun.spawn([bunExecutable(), ...args], {
         cwd,
         stderr: "pipe",
         stdout: "pipe",
@@ -792,7 +793,7 @@ export async function handleStudioApi(
       }
       const dir = body.dir || activeProjectRoot;
       const cwd = dir ? (isAbsolute(dir) ? dir : resolve(root, dir)) : root;
-      const proc = Bun.spawn(["bun", "remove", name], {
+      const proc = Bun.spawn([bunExecutable(), "remove", name], {
         cwd,
         stderr: "pipe",
         stdout: "pipe",
