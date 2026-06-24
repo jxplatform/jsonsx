@@ -16,7 +16,7 @@ function record(fn: string, value: () => unknown) {
   };
 }
 
-mock.module("@jxsuite/server/packages", () => ({
+void mock.module("@jxsuite/server/packages", () => ({
   addPackage: record("addPackage", () => Promise.resolve(opResult)),
   dependenciesNeedInstall: record("dependenciesNeedInstall", () => true),
   installDependencies: record("installDependencies", () => Promise.resolve(opResult)),

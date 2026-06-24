@@ -73,8 +73,12 @@ const gitMocks = {
 
 const packageMocks = {
   addPackage: mock(() => Promise.resolve({ added: true })),
+  dependenciesNeedInstall: mock(() => Promise.resolve(true)),
+  installDependencies: mock(() => Promise.resolve({ ok: true })),
   listPackages: mock(() => Promise.resolve([{ name: "left-pad" }])),
+  outdatedPackages: mock(() => Promise.resolve([])),
   removePackage: mock(() => Promise.resolve({ removed: true })),
+  setPackageVersions: mock(() => Promise.resolve({ ok: true })),
 };
 
 const openFileDialogMock = mock(() => Promise.resolve("/picked/project.json"));
@@ -313,6 +317,15 @@ describe("chromium launcher RPC dispatch", () => {
     expect(await rpc("removePackage", { name: "left-pad" })).toEqual({ removed: true });
     expect(await rpc("listPackages")).toEqual([{ name: "left-pad" }]);
     expect(packageMocks.addPackage).toHaveBeenCalledWith({ name: "left-pad" });
+  });
+
+  test("dependency-management methods dispatch to the packages module", async () => {
+    expect(await rpc("installDependencies")).toEqual({ ok: true });
+    expect(await rpc("dependenciesNeedInstall")).toBe(true);
+    expect(await rpc("outdatedPackages")).toEqual([]);
+    const updates = [{ name: "@jxsuite/runtime", version: "^0.30.1" }];
+    expect(await rpc("setPackageVersions", { updates })).toEqual({ ok: true });
+    expect(packageMocks.setPackageVersions).toHaveBeenCalledWith({ updates });
   });
 
   test("Error rejections are reported via error.message", async () => {

@@ -34,6 +34,10 @@ const responses: Record<string, unknown> = {
     },
   ],
   listPackages: [{ name: "lodash", version: "^4.0.0" }],
+  dependenciesNeedInstall: true,
+  installDependencies: { ok: true },
+  outdatedPackages: [{ current: "^4.0.0", latest: "4.17.21", name: "lodash" }],
+  setPackageVersions: { ok: true },
   locateFile: "found/file.json",
   openProject: {
     config: { name: "Test" },
@@ -333,5 +337,21 @@ describe("chromium desktop platform", () => {
     const packages = await platform.listPackages();
     expect(packages).toHaveLength(1);
     expect(packages[0].name).toBe("lodash");
+  });
+
+  test("installDependencies / dependenciesNeedInstall resolve", async () => {
+    expect(await platform.installDependencies!()).toEqual({ ok: true });
+    expect(await platform.dependenciesNeedInstall!()).toBe(true);
+  });
+
+  test("outdatedPackages returns the outdated list", async () => {
+    const out = await platform.outdatedPackages!();
+    expect(out).toEqual([{ current: "^4.0.0", latest: "4.17.21", name: "lodash" }]);
+  });
+
+  test("setPackageVersions resolves", async () => {
+    expect(await platform.setPackageVersions!([{ name: "lodash", version: "^4.17.21" }])).toEqual({
+      ok: true,
+    });
   });
 });

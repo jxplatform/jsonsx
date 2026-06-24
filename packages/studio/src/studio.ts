@@ -562,6 +562,7 @@ if (_projectParam) {
             selectedPath: siteCtx.fileRelPath || null,
           });
 
+          await ensureDependenciesInstalled();
           await loadComponentRegistry();
 
           // Load directory tree and populate projectDirs from conventional dirs found
@@ -586,6 +587,7 @@ if (_projectParam) {
             }
           }
           requireProjectState().projectDirs = foundDirs;
+          void maybePromptJxsuiteUpdate(siteCtx.sitePath);
         }
 
         // Read and open the file

@@ -95,9 +95,11 @@ export async function loadProject() {
     });
 
     if (info.isSiteProject) {
+      await ensureDependenciesInstalled();
       await loadDirectory(".");
       await loadComponentRegistry();
       await openHomePage();
+      void maybePromptJxsuiteUpdate(meta.root);
     }
     // If not a site project (monorepo) — show welcome prompt, don't load tree
   } catch {

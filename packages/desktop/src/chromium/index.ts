@@ -38,7 +38,15 @@ import {
   gitStatus,
   gitUnstage,
 } from "../git";
-import { addPackage, listPackages, removePackage } from "../packages";
+import {
+  addPackage,
+  dependenciesNeedInstall,
+  installDependencies,
+  listPackages,
+  outdatedPackages,
+  removePackage,
+  setPackageVersions,
+} from "../packages";
 import { openFileDialog } from "./utils";
 import { handleAiRoute } from "../ai";
 
@@ -53,6 +61,7 @@ setFileDialog(openFileDialog);
 const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   addPackage: (params) => addPackage(params as { name: string }),
   codeService: (params) => codeService(params),
+  dependenciesNeedInstall: () => dependenciesNeedInstall(),
   createDirectory: (params) => handleCreateDirectory(params as { path: string }),
   deleteFile: (params) => handleDeleteFile(params as { path: string }),
   discoverComponents: (params) => discoverComponents(params as { dir?: string }),
@@ -85,8 +94,12 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   gitUnstage: (params) => gitUnstage(params as { files: string[] }),
   listDirectory: (params) => listDirectory(params as { dir: string }),
   listFormats: () => listFormats(),
+  installDependencies: () => installDependencies(),
   listPackages: () => listPackages(),
   locateFile: (params) => locateFile(params as { name: string }),
+  outdatedPackages: () => outdatedPackages(),
+  setPackageVersions: (params) =>
+    setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),
   readFile: (params) => handleReadFile(params as { path: string }),
   removePackage: (params) => removePackage(params as { name: string }),

@@ -8,7 +8,9 @@ import type {
   GitBranchesResult,
   GitLogEntry,
   GitStatusResult,
+  OutdatedInfo,
   PackageInfo,
+  PackageOpResult,
 } from "../rpc-schema";
 
 export function createDesktopPlatform(): StudioPlatform {
@@ -235,6 +237,22 @@ export function createDesktopPlatform(): StudioPlatform {
 
     async listPackages() {
       return request("listPackages") as Promise<PackageInfo[]>;
+    },
+
+    async installDependencies() {
+      return request("installDependencies") as Promise<PackageOpResult>;
+    },
+
+    async dependenciesNeedInstall() {
+      return request("dependenciesNeedInstall") as Promise<boolean>;
+    },
+
+    async outdatedPackages() {
+      return request("outdatedPackages") as Promise<OutdatedInfo[]>;
+    },
+
+    async setPackageVersions(updates: { name: string; version: string; dev?: boolean }[]) {
+      return request("setPackageVersions", { updates }) as Promise<PackageOpResult>;
     },
 
     async createProject(opts: {

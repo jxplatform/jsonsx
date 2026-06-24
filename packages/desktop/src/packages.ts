@@ -90,3 +90,7 @@ const _legacy = createPackageOps({
 export const { addPackage } = _legacy;
 export const { removePackage } = _legacy;
 export const { listPackages } = _legacy;
+export const { installDependencies } = _legacy;
+export const { dependenciesNeedInstall } = _legacy;
+export const { outdatedPackages } = _legacy;
+export const { setPackageVersions } = _legacy;
