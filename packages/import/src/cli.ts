@@ -58,7 +58,7 @@ function parseIntArg(args: string[], flag: string, fallback: number): number {
   if (idx === -1 || !args[idx + 1]) {
     return fallback;
   }
-  const n = Number.parseInt(args[idx + 1], 10);
+  const n = Math.trunc(Number(args[idx + 1]));
   return Number.isNaN(n) ? fallback : n;
 }
 
@@ -86,7 +86,7 @@ const doVerify = args.includes("--verify");
 const verifyThresholdIdx = args.indexOf("--verify-threshold");
 const verifyThreshold =
   verifyThresholdIdx !== -1 && args[verifyThresholdIdx + 1]
-    ? Number.parseFloat(args[verifyThresholdIdx + 1]) || 0.15
+    ? Number(args[verifyThresholdIdx + 1]) || 0.15
     : 0.15;
 
 const maxDepth = noCrawl ? 0 : parseIntArg(args, "--depth", 2);

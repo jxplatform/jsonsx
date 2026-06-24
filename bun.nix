@@ -1413,6 +1413,10 @@
     url = "https://registry.npmjs.org/@types/parse-path/-/parse-path-7.1.0.tgz";
     hash = "sha512-EULJ8LApcVEPbrfND0cRQqutIOdiIgJ1Mgrhpy755r14xMohPTEpkV/k28SJvuOs9bHRFW8x+KeDAEPiGQPB9Q==";
   };
+  "@types/pngjs@6.0.5" = fetchurl {
+    url = "https://registry.npmjs.org/@types/pngjs/-/pngjs-6.0.5.tgz";
+    hash = "sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==";
+  };
   "@types/react@19.2.15" = fetchurl {
     url = "https://registry.npmjs.org/@types/react/-/react-19.2.15.tgz";
     hash = "sha512-eRwcGNHve+E8qtEQSSRl6urh+rFop4v8gm6O8rGv25CodbvFdLjA1vVQ1KkiFE0w0UPOnb8tDiFKL5lp0rtY5Q==";
