@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { resolve } from "node:path";
+import { homedir } from "node:os";
 import { capturePage, launchBrowser, closeBrowser } from "./capture.ts";
 import { convertToJx } from "./to-jx.ts";
 import { emitMultiPageProject } from "./emit.ts";
@@ -22,7 +23,7 @@ function usage(): never {
 Clone a live website into a Jx project.
 
 Options:
-  --out <dir>              Output directory (default: sites/<hostname>)
+  --out <dir>              Output directory (default: ~/jx-imports/<hostname>)
   --depth <n>              Max crawl depth (default: 2, 0 = single page)
   --max-pages <n>          Max pages to capture (default: 25)
   --max-nodes-per-page <n> Skip styles/assets for pages above this (default: 5000)
@@ -105,7 +106,7 @@ if (outIdx !== -1 && args[outIdx + 1]) {
   outDir = resolve(args[outIdx + 1]);
 } else {
   const hostname = new URL(url).hostname.replace(/^www\./, "");
-  outDir = resolve("sites", hostname);
+  outDir = resolve(homedir(), "jx-imports", hostname);
 }
 
 console.log(`Importing ${url} → ${outDir}`);
