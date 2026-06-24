@@ -26,7 +26,8 @@
     "build": "bun run scripts/build.ts",
     "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
-    "test": "bun test --isolate",
+    "lint:styles": "bun run scripts/check-styles.ts",
+    "test": "bun run lint:styles && bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
