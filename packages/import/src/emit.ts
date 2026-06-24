@@ -69,6 +69,7 @@ export async function emitMultiPageProject({
     title: title || "Imported Site",
     description: `Imported from ${sourceUrl}`,
     imports: {},
+    images: { optimize: false },
   };
 
   if (breakpoints && Object.keys(breakpoints).length > 0) {

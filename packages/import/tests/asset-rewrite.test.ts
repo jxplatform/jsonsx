@@ -157,6 +157,65 @@ describe("rewriteAssetUrls", () => {
     expect(count).toBe(0);
   });
 
+  test("resolves relative URLs against sourceUrl before lookup", () => {
+    const tree: JxElement = {
+      tagName: "div",
+      children: [
+        {
+          tagName: "img",
+          attributes: { src: "/_next/static/media/hero.jpg", alt: "Hero" },
+        },
+        {
+          tagName: "img",
+          attributes: { src: "/images/logo.svg" },
+        },
+        {
+          tagName: "div",
+          style: { backgroundImage: 'url("/_next/static/media/bg.png")' },
+        },
+      ],
+    };
+    const map = new Map([
+      ["https://tailwindcss.com/_next/static/media/hero.jpg", "public/assets/images/hero.jpg"],
+      ["https://tailwindcss.com/images/logo.svg", "public/assets/images/logo.svg"],
+      ["https://tailwindcss.com/_next/static/media/bg.png", "public/assets/images/bg.png"],
+    ]);
+
+    const count = rewriteAssetUrls(tree, map, "https://tailwindcss.com/");
+
+    expect(count).toBe(3);
+    expect((tree.children![0] as JxElement).attributes!.src).toBe("public/assets/images/hero.jpg");
+    expect((tree.children![1] as JxElement).attributes!.src).toBe("public/assets/images/logo.svg");
+    expect((tree.children![2] as JxElement).style!.backgroundImage).toBe(
+      'url("public/assets/images/bg.png")',
+    );
+  });
+
+  test("resolves protocol-relative URLs against sourceUrl", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { src: "//cdn.example.com/image.jpg" },
+    };
+    const map = new Map([["https://cdn.example.com/image.jpg", "public/assets/images/image.jpg"]]);
+
+    const count = rewriteAssetUrls(tree, map, "https://example.com/");
+
+    expect(count).toBe(1);
+    expect(tree.attributes!.src).toBe("public/assets/images/image.jpg");
+  });
+
+  test("still matches absolute URLs without sourceUrl", () => {
+    const tree: JxElement = {
+      tagName: "img",
+      attributes: { src: "https://example.com/hero.jpg" },
+    };
+    const map = new Map([["https://example.com/hero.jpg", "public/assets/images/hero.jpg"]]);
+
+    const count = rewriteAssetUrls(tree, map);
+
+    expect(count).toBe(1);
+  });
+
   test("rewrites multiple assets in one pass", () => {
     const tree: JxElement = {
       tagName: "div",

@@ -22,6 +22,8 @@ export interface StyleCaptureResult {
   uaDefaults: Record<string, Record<string, string>>;
   /** Media queries discovered in the page's stylesheets. */
   mediaQueries: string[];
+  /** Computed styles from <html> and <body>, diffed against UA defaults. */
+  documentStyles: Record<string, string>;
 }
 
 /** Visually meaningful CSS properties worth capturing. */
@@ -242,7 +244,54 @@ export async function captureStyles(page: Page): Promise<StyleCaptureResult> {
       }
     }
 
-    return { elements, uaDefaults, mediaQueries };
+    // Capture <html> and <body> styles that won't be in the element tree
+    // (the Jx tree starts from body.children, not body itself)
+    const documentStyles: Record<string, string> = {};
+
+    const TRANSPARENT = new Set(["rgba(0, 0, 0, 0)", "transparent", ""]);
+    function isDefault(val: string, probeVal: string): boolean {
+      return !val || val === probeVal || TRANSPARENT.has(val);
+    }
+
+    const htmlCs = window.getComputedStyle(document.documentElement);
+    const bodyCs = window.getComputedStyle(document.body);
+
+    // Create a clean probe in an iframe to get true UA defaults
+    // (a probe appended to body would inherit body's own styles)
+    const iframe = document.createElement("iframe");
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;";
+    document.body.append(iframe);
+    const iframeDoc = iframe.contentDocument!;
+    const probeDiv = iframeDoc.createElement("div");
+    iframeDoc.body.append(probeDiv);
+    const probeCs = iframe.contentWindow!.getComputedStyle(probeDiv);
+    const probeBodyCs = iframe.contentWindow!.getComputedStyle(iframeDoc.body);
+
+    const DOC_PROPS = [
+      "background-color",
+      "background-image",
+      "color",
+      "font-family",
+      "font-size",
+      "line-height",
+      "letter-spacing",
+    ];
+    for (const prop of DOC_PROPS) {
+      const bodyVal = bodyCs.getPropertyValue(prop);
+      const htmlVal = htmlCs.getPropertyValue(prop);
+      const probeDefault = probeCs.getPropertyValue(prop);
+      const probeBodyDefault = probeBodyCs.getPropertyValue(prop);
+
+      // Body takes priority, but skip transparent/default values
+      if (!isDefault(bodyVal, probeBodyDefault)) {
+        documentStyles[prop] = bodyVal;
+      } else if (!isDefault(htmlVal, probeDefault)) {
+        documentStyles[prop] = htmlVal;
+      }
+    }
+    iframe.remove();
+
+    return { elements, uaDefaults, mediaQueries, documentStyles };
   }, STYLE_ALLOWLIST);
 }
 

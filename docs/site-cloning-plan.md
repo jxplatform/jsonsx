@@ -566,7 +566,214 @@ content. The JS-heavy gap is a known architectural boundary, not a bug.
 
 ---
 
-## 12. Templates / themes portfolio (downstream of cloning)
+#### Turnover: 2026-06-23 #5 — Copilot (Fix pipeline bugs — tailwindcss.com 25% → 84%)
+
+**Bugs found and fixed:**
+
+1. **0 asset URL rewrites → 73 rewrites** — `rewriteAssetUrls` did exact `Map.get()` on relative
+   attribute URLs (e.g. `/_next/static/media/hero.avif`) against a rewrite map keyed by absolute
+   URLs (e.g. `https://tailwindcss.com/_next/static/media/hero.avif`). Root cause: `capturePage`
+   returns `body.innerHTML` with relative URLs, but `collectAssets` resolves to absolute in-browser.
+   Fix: `rewriteAssetUrls` now accepts `sourceUrl` and resolves relative URLs via `new URL()` before
+   lookup. Also added Referer/User-Agent headers to `downloadAssets` for CDN compatibility.
+
+2. **Build failure → "Not Found" rendered page** — `emit.ts` didn't set `images.optimize` in
+   project.json, so the compiler's default (`optimize: true`) tried to load Sharp, which isn't
+   installed. The compile error was caught and swallowed, producing no `index.html`. Fix: emitted
+   projects now set `images: { optimize: false }`.
+
+3. **White background (25% fidelity) → dark background (84%)** — `captureStyles` walked
+   `body.children` only, missing `<html>` and `<body>` computed styles. Tailwind CSS applies its dark
+   background to `<html>`. Fix: added `documentStyles` capture using an iframe probe for true UA
+   defaults (avoids inheriting the page's own body styles), then applies captured styles to the root
+   wrapper div.
+
+**Results after fixes:**
+
+| Metric             | Before      | After     |
+| ------------------ | ----------- | --------- |
+| Asset URL rewrites | 0           | 73        |
+| Build errors       | 1 (sharp)   | 0         |
+| Rendered page      | "Not Found" | Full page |
+| Fidelity           | 25.38%      | 84.34%    |
+
+**Remaining fidelity gaps (84% → 100%):**
+
+- Missing web fonts (Inter) — causes text positioning shifts in hero heading
+- 10 cross-origin CDN asset failures (album art, some images)
+- Minor layout drift from font metric differences
+
+**Files changed:** `asset-rewrite.ts`, `asset-download.ts`, `emit.ts`, `style-capture.ts`,
+`cli.ts`, `crawl.ts`, `asset-rewrite.test.ts` (3 new tests, 126 total passing).
+
+---
+
+#### Turnover: 2026-06-23 #6 — Copilot (WordPress.org E2E eval — 82.63% fidelity)
+
+**Site tested:** `https://wordpress.org` — server-rendered WordPress (Gutenberg block theme)
+**Flags:** `--depth 0 --verify`
+**Overall assessment:** The cloner handles WP's static HTML well — structure, images, grid layouts,
+responsive breakpoints (21 detected!) all captured correctly. **82.63% fidelity** on first pass.
+
+**Pipeline results:**
+
+| Stage   | Metric                           | Result                                       |
+| ------- | -------------------------------- | -------------------------------------------- |
+| Capture | Nodes                            | 410 (651 raw DOM elements)                   |
+| Capture | Links found                      | 26                                           |
+| CSS     | Elements with non-default styles | 410 (of 410)                                 |
+| CSS     | @media queries found             | 34 (21 produced responsive breakpoints)      |
+| CSS     | Document-level styles applied    | 4                                            |
+| Assets  | Discovered                       | 178 (20 inline SVGs kept)                    |
+| Assets  | Downloaded                       | 60 (5.2 MB)                                  |
+| Assets  | Failed                           | 118 (mostly bogus css-background URL parses) |
+| Assets  | URL rewrites                     | 58                                           |
+| Build   | Errors                           | 0                                            |
+| Verify  | Fidelity                         | 82.63% (225,159 mismatched pixels of 1.3M)   |
+
+**What worked well:**
+
+- Body text, paragraphs, section backgrounds render correctly
+- All 16 real images downloaded and rewritten (logos, feature cards, showcase)
+- 21 responsive breakpoints captured in `$media` — correct 3-column grid on feature cards
+- Document-level styles (white bg, dark text, font) captured via iframe probe
+- Clean build — no Sharp or other errors
+
+**What broke:**
+
+1. **Navigation** — WordPress.org uses Gutenberg's interactive nav block. Desktop menu items
+   (Showcase, Plugins, Themes, etc.) live inside a JS-toggled container with `display:none` at
+   capture time. The clone shows only hamburger menu icons. This is a fundamental limitation: the
+   cloner captures static DOM state, not JS interactivity.
+2. **YouTube embed** — the hero `<iframe>` is stripped by `to-jx.ts` (intentional — iframes are
+   excluded). Leaves a blank space where the video was.
+3. **Font mismatch** — WP.org uses custom fonts loaded via `<link>` in `<head>` (which the cloner
+   discards). "Meet WordPress" heading renders in wrong weight/size.
+4. **118 bogus asset "failures"** — `collectAssets` scans `getComputedStyle(el).backgroundImage`
+   for all `*` elements. CSS gradients like `linear-gradient(...)` get parsed by the `url()` regex
+   as URLs, producing invalid download attempts. Noisy but not harmful.
+5. **Decorative SVG patterns** — circular dot pattern around video area is a CSS background-image
+   that didn't survive the rewrite.
+
+**WordPress-specific observations:**
+
+- WP block themes are excellent clone targets when content is static. The Gutenberg block markup
+  translates cleanly to Jx elements.
+- The interactive nav block is a consistent WP-specific failure — the desktop menu is hidden behind
+  JS. Could be mitigated by clicking the nav toggle before capture, or by detecting
+  `wp-block-navigation` and special-casing it.
+- `<head>` metadata loss (P6 in roadmap) is more impactful for WP than other sites because WP
+  loads Google Fonts, theme CSS, and SEO meta via `<head>` tags.
+
+**Comparison with tailwindcss.com:**
+
+| Metric            | tailwindcss.com | wordpress.org  |
+| ----------------- | --------------- | -------------- |
+| Nodes             | 2,280           | 410            |
+| Breakpoints found | 0               | 21             |
+| Assets downloaded | 61              | 60             |
+| Fidelity          | 84.34%          | 82.63%         |
+| Main gap          | Font metrics    | JS-toggled nav |
+
+---
+
+## 12. Capability assessment & improvement roadmap
+
+### What the cloner is good at today
+
+- **Static content reproduction** — example.com scored **99.13%**. The computed-style diff approach
+  (snapshot `getComputedStyle`, subtract UA defaults) captures exactly what the browser renders.
+- **Structure preservation** — 2,280 nodes on tailwindcss.com faithfully converted; component
+  extraction found ~44 repeated patterns; layout detection works across multi-page crawls.
+- **Asset pipeline** — handles img src, srcset, CSS background-image, @font-face URLs, favicons, OG
+  images. Inline SVGs kept inline. Relative/protocol-relative URLs resolved correctly.
+- **Multi-page crawl** — BFS with depth/page caps, robots.txt respect, shared header/footer
+  detection for layout extraction, per-page reference screenshots for verification.
+- **Document-level styles** — `<html>` and `<body>` computed styles (background, color, font) now
+  captured via iframe probe and applied to root wrapper.
+
+### Expected fidelity by site type
+
+| Site type                                       | Expected | Why                                                                |
+| ----------------------------------------------- | -------- | ------------------------------------------------------------------ |
+| Static HTML/CSS (example.com, marketing)        | 95–99%   | Sweet spot — DOM = what you see                                    |
+| CSS-heavy, no JS (blogs, docs, portfolios)      | 85–95%   | Web font metrics cause small shifts; gradients/animations may drop |
+| JS-rendered SPA (Next.js, Nuxt, React)          | 70–85%   | DOM captured post-hydration, but lazy content & animations lost    |
+| Heavy interactivity (dashboards, editors, maps) | < 50%    | State-dependent UI, canvas/WebGL — fundamentally outside scope     |
+
+### Improvement backlog (ordered by fidelity impact)
+
+#### P0 — Web font `@font-face` emission
+
+**Impact:** 84% → ~93% on tailwindcss.com (largest single gap).
+**Problem:** `collectAssets` discovers font-face URLs and `downloadAssets` saves the files, but no
+`@font-face` declarations are emitted into the compiled output. The fonts are downloaded to
+`public/assets/fonts/` and the rewrite map points to them, but without `@font-face` rules the
+browser never loads them. Result: system font fallbacks cause text size/position drift everywhere.
+**Fix:** During asset collection, also extract the `@font-face` rule text (font-family, weight,
+style, unicode-range) alongside the URL. In `emit.ts`, write a `public/assets/fonts.css` (or inject
+into the page/project styles) with the collected `@font-face` rules pointing to the local font
+files. Wire the CSS into the compiled `<head>`.
+
+#### P1 — Below-fold / lazy-loaded content
+
+**Impact:** Variable — can miss entire sections on infinite-scroll or lazy-image sites.
+**Problem:** Viewport is 1440×900. Elements with `loading="lazy"` or intersection-observer triggers
+won't be in the DOM or will have placeholder `src` at capture time.
+**Fix:** Before capture, scroll the page to the bottom (with settle delays between scroll steps) to
+trigger lazy loads. Then scroll back to top before the reference screenshot. Consider a
+`--scroll-to-bottom` flag (default on, can disable for speed).
+
+#### P2 — Cross-origin asset recovery
+
+**Impact:** 10/71 assets failed on tailwindcss.com (album art, decorative images).
+**Problem:** Some CDNs reject server-side `fetch()` even with Referer/User-Agent headers due to
+cookie requirements, signed URLs, or strict CORS.
+**Fix:** Fall back to browser-based download via `page.evaluate(() => fetch(url).then(r => r.blob()))`
+with the page's existing cookies and origin. This catches assets that require same-session auth.
+Only trigger for URLs that failed the direct `fetch()` path.
+
+#### P3 — CSS custom properties / design tokens
+
+**Impact:** No fidelity change, but major editability improvement for Studio.
+**Problem:** `getComputedStyle` resolves `var(--brand-blue)` to `rgb(59, 130, 246)`. The clone has
+50 inline color values instead of a shared token. Editing the brand color means touching every node.
+**Fix:** Before computing the style diff, extract all `--custom-property` declarations from the
+page's stylesheets. When a computed value matches a known custom property value, emit
+`var(--property-name)` instead of the resolved value. Hoist the custom property map into
+`project.json` style tokens.
+
+#### P4 — Responsive breakpoint detection
+
+**Impact:** 0 breakpoints detected on tailwindcss.com despite 6 `@media` queries.
+**Problem:** The `extractMedia` approach (re-render at each breakpoint width, diff per-element
+styles) is correct but misses cases where: (a) the only changes are on pseudo-elements, (b) elements
+are added/removed rather than restyled, or (c) container queries are used instead of `@media`.
+**Fix:** Compare DOM tree structure (not just styles) across viewport widths — detect
+added/removed/reordered elements. For container queries, inspect `@container` rules in stylesheets
+and map them to `$media`-compatible breakpoints.
+
+#### P5 — Animation / transition capture
+
+**Impact:** Animated elements freeze at capture-time state. Visually noticeable on hero sections.
+**Problem:** Computed styles capture the current animation frame, not keyframe definitions or
+transition properties. CSS animations and transitions are silently dropped.
+**Fix:** Extract `@keyframes` rules and `transition`/`animation` property values from stylesheets.
+Map them to Jx's animation system or emit them as raw CSS in the page `<style>`. Lower priority —
+most animations are decorative and don't affect content fidelity.
+
+#### P6 — `<head>` metadata preservation
+
+**Impact:** No visual fidelity change, but important for SEO and social sharing.
+**Problem:** `capturePage` returns `body.innerHTML` only. Title is captured, but `<meta>` tags
+(description, OG tags, canonical URL, viewport), `<link rel="stylesheet">` references, and
+structured data are lost.
+**Fix:** Also capture `document.head.innerHTML` or extract key meta tags. Emit them into the Jx
+project's `$head` configuration so the compiler includes them in the built output.
+
+---
+
+## 13. Templates / themes portfolio (downstream of cloning)
 
 The cloner is the _factory_; the portfolio is its _output catalog_.
 
@@ -582,7 +789,7 @@ The cloner is the _factory_; the portfolio is its _output catalog_.
 
 ---
 
-## 13. Studio capability evaluation (can it receive cloned sites?)
+## 14. Studio capability evaluation (can it receive cloned sites?)
 
 What Studio already handles well (so the cloner should target these shapes):
 
@@ -615,7 +822,7 @@ doc before Phase 1 scope is locked.
 
 ---
 
-## 14. Scale-spike results (2026-06-22) — measured, not estimated
+## 15. Scale-spike results (2026-06-22) — measured, not estimated
 
 Ran the spike against the live debug Chrome (no `puppeteer-core` needed yet — drove the existing
 CDP session). Captured two real pages, converted with the production `htmlToJx`, and benchmarked the

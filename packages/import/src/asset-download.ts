@@ -130,6 +130,7 @@ function isBlocked(url: string): boolean {
 export async function downloadAssets(
   assets: DiscoveredAsset[],
   outDir: string,
+  sourceUrl?: string,
 ): Promise<DownloadResult> {
   const rewriteMap = new Map<string, string>();
   const failed: string[] = [];
@@ -177,7 +178,14 @@ export async function downloadAssets(
     const relativePath = `public/assets/${subdir}/${filename}`;
 
     try {
-      const response = await fetch(url);
+      const headers: Record<string, string> = {
+        "User-Agent":
+          "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      };
+      if (sourceUrl) {
+        headers["Referer"] = sourceUrl;
+      }
+      const response = await fetch(url, { headers, redirect: "follow" });
       if (!response.ok) {
         failed.push(url);
         continue;

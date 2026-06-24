@@ -3,7 +3,7 @@ import type { CaptureResult } from "./capture.ts";
 import { convertToJx } from "./to-jx.ts";
 import type { ToJxResult } from "./to-jx.ts";
 import { captureStyles } from "./style-capture.ts";
-import { diffAllStyles } from "./style-diff.ts";
+import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { extractMedia } from "./media-extract.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
@@ -267,6 +267,16 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
         } else {
           applyStylesToTree(jx.document, diffed);
         }
+
+        // Apply <html>/<body> computed styles to the root wrapper
+        if (Object.keys(styleResult.documentStyles).length > 0) {
+          if (!jx.document.style) {
+            jx.document.style = {};
+          }
+          for (const [prop, val] of Object.entries(styleResult.documentStyles)) {
+            jx.document.style[kebabToCamel(prop)] = val;
+          }
+        }
       } catch (error) {
         onProgress(`  ⚠ Style capture failed: ${error instanceof Error ? error.message : error}`);
       }
@@ -277,9 +287,9 @@ export async function crawlSite(options: CrawlOptions): Promise<CrawlResult> {
       try {
         const collected = await collectAssets(capture.page);
         if (collected.assets.length > 0) {
-          const downloaded = await downloadAssets(collected.assets, outDir);
+          const downloaded = await downloadAssets(collected.assets, outDir, entry.url);
           if (downloaded.rewriteMap.size > 0) {
-            rewriteAssetUrls(jx.document, downloaded.rewriteMap);
+            rewriteAssetUrls(jx.document, downloaded.rewriteMap, entry.url);
           }
         }
       } catch (error) {

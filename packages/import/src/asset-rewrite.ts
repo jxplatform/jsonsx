@@ -8,7 +8,11 @@
 import type { JxElement, JxStyle } from "@jxsuite/schema/types";
 
 /** Rewrite all asset URLs in a Jx tree in-place. Returns the count of rewrites performed. */
-export function rewriteAssetUrls(root: JxElement, rewriteMap: Map<string, string>): number {
+export function rewriteAssetUrls(
+  root: JxElement,
+  rewriteMap: Map<string, string>,
+  sourceUrl?: string,
+): number {
   let count = 0;
 
   function rewriteUrl(url: string): string | null {
@@ -22,6 +26,21 @@ export function rewriteAssetUrls(root: JxElement, rewriteMap: Map<string, string
     const alt = rewriteMap.get(trimmed);
     if (alt) {
       return alt;
+    }
+
+    // Resolve relative/protocol-relative URLs against the source page URL
+    if (sourceUrl) {
+      try {
+        const resolved = new URL(url, sourceUrl).href;
+        if (resolved !== url) {
+          const fromResolved = rewriteMap.get(resolved);
+          if (fromResolved) {
+            return fromResolved;
+          }
+        }
+      } catch {
+        // Invalid URL — skip
+      }
     }
 
     return null;

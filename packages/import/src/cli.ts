@@ -5,7 +5,7 @@ import { capturePage, launchBrowser, closeBrowser } from "./capture.ts";
 import { convertToJx } from "./to-jx.ts";
 import { emitMultiPageProject } from "./emit.ts";
 import { captureStyles } from "./style-capture.ts";
-import { diffAllStyles } from "./style-diff.ts";
+import { diffAllStyles, kebabToCamel } from "./style-diff.ts";
 import { extractMedia } from "./media-extract.ts";
 import { applyStylesToTree } from "./apply-styles.ts";
 import { collectAssets } from "./asset-collect.ts";
@@ -170,6 +170,20 @@ if (maxDepth === 0) {
         console.log("  No @media queries found");
         applyStylesToTree(jx.document, diffed);
       }
+
+      // Apply <html>/<body> computed styles to the root wrapper
+      if (Object.keys(styleResult.documentStyles).length > 0) {
+        if (!jx.document.style) {
+          jx.document.style = {};
+        }
+        for (const [prop, val] of Object.entries(styleResult.documentStyles)) {
+          const camel = kebabToCamel(prop);
+          jx.document.style[camel] = val;
+        }
+        console.log(
+          `  Applied ${Object.keys(styleResult.documentStyles).length} document-level styles to root`,
+        );
+      }
     }
 
     if (!skipAssets) {
@@ -181,7 +195,7 @@ if (maxDepth === 0) {
 
       if (collected.assets.length > 0) {
         console.log("  Downloading assets...");
-        const downloaded = await downloadAssets(collected.assets, outDir);
+        const downloaded = await downloadAssets(collected.assets, outDir, url);
         console.log(
           `  Downloaded ${downloaded.rewriteMap.size} assets (${formatBytes(downloaded.totalBytes)})`,
         );
@@ -193,7 +207,7 @@ if (maxDepth === 0) {
         }
 
         console.log("  Rewriting asset URLs...");
-        const rewrites = rewriteAssetUrls(jx.document, downloaded.rewriteMap);
+        const rewrites = rewriteAssetUrls(jx.document, downloaded.rewriteMap, url);
         console.log(`  Rewrote ${rewrites} URL references`);
       }
     }
