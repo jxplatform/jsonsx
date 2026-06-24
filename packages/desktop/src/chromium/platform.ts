@@ -1,5 +1,5 @@
 /// <reference lib="dom" />
-import type { StudioPlatform } from "@jxsuite/studio/types";
+import type { RecentProjectEntry, StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   CodeServiceResult,
@@ -71,13 +71,15 @@ export function createDesktopPlatform(): StudioPlatform {
       try {
         const content = await request("readFile", { path: "project.json" });
         const config = JSON.parse(content as string) as { name?: string };
+        // Resolve the absolute backend root so the recent-projects list gets a re-openable key.
+        const { root } = (await request("getProjectRoot")) as { root: string | null };
         return {
           info: {
             directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config as ProjectConfig,
           },
-          meta: { name: config.name || "project", root: "." },
+          meta: { name: config.name || "project", root: root || "." },
         };
       } catch {
         return {
@@ -89,6 +91,27 @@ export function createDesktopPlatform(): StudioPlatform {
           meta: { name: "project", root: "." },
         };
       }
+    },
+
+    async getProjectRoot() {
+      return request("getProjectRoot") as Promise<{ root: string | null }>;
+    },
+
+    async setWindowProject(root: string) {
+      return request("setWindowProject", { root }) as Promise<{
+        deduped: boolean;
+        config: ProjectConfig | null;
+      }>;
+    },
+
+    // ─── Recent projects (user-level store, shared across per-project profiles) ──
+
+    async getRecentProjects() {
+      return request("getRecentProjects") as Promise<RecentProjectEntry[]>;
+    },
+
+    async saveRecentProjects(projects: RecentProjectEntry[]) {
+      await request("saveRecentProjects", { projects });
     },
 
     async resolveSiteContext(filePath: string) {

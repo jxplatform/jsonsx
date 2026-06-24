@@ -95,6 +95,7 @@ export async function loadProject() {
     });
 
     if (info.isSiteProject) {
+      addRecentProject(requireProjectState().name, meta.root);
       await ensureDependenciesInstalled();
       await loadDirectory(".");
       await loadComponentRegistry();

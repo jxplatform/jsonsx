@@ -957,7 +957,8 @@ describe("openProject", () => {
       expect(result).not.toBeNull();
       expect(result!.config.name).toBe("My Project");
       expect(result!.handle.name).toBe("My Project");
-      expect(result!.handle.root).toBe(".");
+      // The handle now carries the absolute project root (the re-openable recent-projects key).
+      expect(result!.handle.root).toBe(FIXTURES);
       expect(getProjectRoot()).toBe(FIXTURES);
     } finally {
       setFileDialog(null as unknown as () => Promise<string | null>);

@@ -375,7 +375,10 @@ export function createProjectSession(initialRoot: string | null) {
       handle: {
         name: config.name || basename(projectRoot),
         projectConfig: config,
-        root: ".",
+        // Absolute project path: the canonical, re-openable identity used for the recent-projects
+        // List and multi-window dedup. File I/O is unaffected (handlers resolve relative paths
+        // Against this session's root regardless of the studio-side value).
+        root: projectRoot,
       },
     };
   }

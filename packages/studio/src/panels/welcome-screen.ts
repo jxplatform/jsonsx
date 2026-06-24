@@ -5,7 +5,8 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { getRecentProjects } from "../recent-projects";
+import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
+import { renderOnly } from "../store";
 import { platformSupportsClone } from "./git-panel";
 
 interface WelcomeCtx {
@@ -86,17 +87,40 @@ export function renderWelcome(host: HTMLElement) {
           ${recent.length > 0
             ? html`
                 <div class="welcome-section">
-                  <h2 class="welcome-section-title">Recent</h2>
+                  <div class="welcome-section-header">
+                    <h2 class="welcome-section-title">Recent</h2>
+                    <button
+                      class="welcome-clear"
+                      @click=${() => {
+                        clearRecentProjects();
+                        renderOnly("canvas");
+                      }}
+                    >
+                      Clear
+                    </button>
+                  </div>
                   ${recent.map(
                     (p) => html`
-                      <button
-                        class="welcome-recent"
-                        @click=${() => ctx.openRecentProject(p.root)}
-                        title=${p.root}
-                      >
-                        <span class="welcome-recent-name">${p.name}</span>
-                        <span class="welcome-recent-path">${shortenPath(p.root)}</span>
-                      </button>
+                      <div class="welcome-recent-row">
+                        <button
+                          class="welcome-recent"
+                          @click=${() => ctx.openRecentProject(p.root)}
+                          title=${p.root}
+                        >
+                          <span class="welcome-recent-name">${p.name}</span>
+                          <span class="welcome-recent-path">${shortenPath(p.root)}</span>
+                        </button>
+                        <button
+                          class="welcome-recent-remove"
+                          title="Remove from recent"
+                          @click=${() => {
+                            removeRecentProject(p.root);
+                            renderOnly("canvas");
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
                     `,
                   )}
                 </div>

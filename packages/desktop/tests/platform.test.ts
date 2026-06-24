@@ -415,6 +415,7 @@ describe("platform methods", () => {
     ["aiStreamUrl", ["sess-1"], "aiStreamUrl", { id: "sess-1" }],
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
     ["getProjectRoot", [], "getProjectRoot", undefined],
+    ["getRecentProjects", [], "getRecentProjects", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -450,6 +451,12 @@ describe("platform methods", () => {
     ["aiDeleteSession", ["sess-1"], "aiDeleteSession", { id: "sess-1" }],
     ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
     ["newWindow", [], "newWindow", undefined],
+    [
+      "saveRecentProjects",
+      [[{ name: "x", root: "/x", timestamp: 1 }]],
+      "saveRecentProjects",
+      { projects: [{ name: "x", root: "/x", timestamp: 1 }] },
+    ],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of voidDelegations) {

@@ -10,7 +10,7 @@ import { redo as tabRedo, undo as tabUndo } from "../tabs/transact";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
-import { getRecentProjects } from "../recent-projects";
+import { clearRecentProjects, getRecentProjects, removeRecentProject } from "../recent-projects";
 import { openQuickSearch } from "./quick-search";
 import { getPlatform } from "../platform";
 import { refreshGitStatus } from "./git-panel";
@@ -131,10 +131,15 @@ async function handleNewProject() {
   }
 }
 
-/** @param {ToolbarCtx} ctx */
-function minimalToolbarTemplate(ctx: ToolbarCtx) {
+/**
+ * The chevron dropdown beside "Open Project": New Project, the recent-projects list (each with a
+ * remove affordance), and a clear-all action. Shared by both the minimal and full toolbars.
+ *
+ * @param {ToolbarCtx} ctx
+ */
+function recentMenuTpl(ctx: ToolbarCtx) {
   const recentProjects = getRecentProjects();
-  const recentProjectsTpl = html`
+  return html`
     <overlay-trigger placement="bottom-start" triggered-by="click">
       <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
         <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
@@ -145,6 +150,9 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
             const val = (e.target as unknown as HTMLInputElement).value;
             if (val === "__new__") {
               void handleNewProject();
+            } else if (val === "__clear__") {
+              clearRecentProjects();
+              render();
             } else {
               void ctx.openRecentProject(val);
             }
@@ -152,14 +160,41 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
         >
           <sp-menu-item value="__new__">New Project…</sp-menu-item>
           ${recentProjects.length > 0
-            ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
-                  (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
-                )}`
+            ? html`
+                <sp-menu-divider></sp-menu-divider>
+                ${recentProjects.map(
+                  (p) => html`
+                    <sp-menu-item value=${p.root} title=${p.root}>
+                      ${p.name}
+                      <sp-action-button
+                        slot="end"
+                        quiet
+                        size="s"
+                        title="Remove from recent"
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          removeRecentProject(p.root);
+                          render();
+                        }}
+                      >
+                        <sp-icon-close slot="icon"></sp-icon-close>
+                      </sp-action-button>
+                    </sp-menu-item>
+                  `,
+                )}
+                <sp-menu-divider></sp-menu-divider>
+                <sp-menu-item value="__clear__">Clear recent projects</sp-menu-item>
+              `
             : nothing}
         </sp-menu>
       </sp-popover>
     </overlay-trigger>
   `;
+}
+
+/** @param {ToolbarCtx} ctx */
+function minimalToolbarTemplate(ctx: ToolbarCtx) {
+  const recentProjectsTpl = recentMenuTpl(ctx);
 
   const windowControls = (
     globalThis as unknown as {
@@ -408,33 +443,7 @@ function toolbarTemplate() {
         `
     : nothing;
 
-  const recentProjects = getRecentProjects();
-  const recentProjectsTpl = html`
-    <overlay-trigger placement="bottom-start" triggered-by="click">
-      <sp-action-button size="s" slot="trigger" title="Recent projects" class="tb-split-trigger">
-        <sp-icon-chevron-down slot="icon"></sp-icon-chevron-down>
-      </sp-action-button>
-      <sp-popover slot="click-content" tip>
-        <sp-menu
-          @change=${(e: Event) => {
-            const val = (e.target as unknown as HTMLInputElement).value;
-            if (val === "__new__") {
-              void handleNewProject();
-            } else {
-              void ctx.openRecentProject(val);
-            }
-          }}
-        >
-          <sp-menu-item value="__new__">New Project…</sp-menu-item>
-          ${recentProjects.length > 0
-            ? html`<sp-menu-divider></sp-menu-divider> ${recentProjects.map(
-                  (p) => html`<sp-menu-item value=${p.root}>${p.name}</sp-menu-item>`,
-                )}`
-            : nothing}
-        </sp-menu>
-      </sp-popover>
-    </overlay-trigger>
-  `;
+  const recentProjectsTpl = recentMenuTpl(ctx);
 
   return html`
     ${isMac ? csdTpl : nothing}

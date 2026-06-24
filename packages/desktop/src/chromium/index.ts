@@ -49,6 +49,8 @@ import {
 } from "../packages";
 import { openFileDialog } from "./utils";
 import { handleAiRoute } from "../ai";
+import { readRecents, writeRecents } from "../recent-store";
+import type { RecentProjectEntry } from "../rpc-schema";
 
 // ─── Project root ────────────────────────────────────────────────────────────
 
@@ -101,6 +103,16 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   setPackageVersions: (params) =>
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),
+  getProjectRoot: () => Promise.resolve({ root: getProjectRoot() }),
+  setWindowProject: (params) => {
+    // Single-window launcher: rebind the process-global root in place. Studio re-reads the
+    // Project.json itself, so no config is returned and dedup never applies.
+    setProjectRoot((params as { root: string }).root);
+    return Promise.resolve({ config: null, deduped: false });
+  },
+  getRecentProjects: () => readRecents(),
+  saveRecentProjects: (params) =>
+    writeRecents((params as { projects: RecentProjectEntry[] }).projects),
   readFile: (params) => handleReadFile(params as { path: string }),
   removePackage: (params) => removePackage(params as { name: string }),
   renameFile: (params) => handleRenameFile(params as { from: string; to: string }),

@@ -2,7 +2,7 @@
 /// <reference lib="dom.iterable" />
 import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
-import type { StudioRPC } from "./rpc-schema";
+import type { RecentProjectEntry, StudioRPC } from "./rpc-schema";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
 
@@ -236,17 +236,29 @@ export function createDesktopPlatform() {
       return rpc.request.getProjectRoot();
     },
 
+    // ─── Recent projects (process-shared, user-level store) ─────────────────────
+
+    async getRecentProjects() {
+      return rpc.request.getRecentProjects();
+    },
+
+    async saveRecentProjects(projects: RecentProjectEntry[]) {
+      await rpc.request.saveRecentProjects({ projects });
+    },
+
     async probeRootProject() {
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
         const config = JSON.parse(content as string) as ProjectConfig;
+        // Resolve the absolute backend root so the recent-projects list gets a re-openable key.
+        const { root } = await rpc.request.getProjectRoot();
         return {
           info: {
             directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config,
           },
-          meta: { name: config.name || "project", root: "." },
+          meta: { name: config.name || "project", root: root || "." },
         };
       } catch {
         return {

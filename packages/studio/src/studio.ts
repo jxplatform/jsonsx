@@ -106,7 +106,7 @@ import { initCssData } from "./panels/style-utils";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
 import { initPanelEvents } from "./panels/panel-events";
 import { initQuickSearch } from "./panels/quick-search";
-import { addRecentProject } from "./recent-projects";
+import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
 import { openNewProjectModal } from "./new-project/new-project-modal";
 import type { DocumentStackEntry, GitDiffState } from "./types";
@@ -662,6 +662,14 @@ if (_projectParam) {
   ensureFsSync();
 }
 
+// Hydrate the recent-projects list from the backend store (desktop/chromium), then refresh the
+// Toolbar dropdown + welcome screen, both of which read it synchronously.
+// oxlint-disable-next-line unicorn/prefer-top-level-await -- deliberate fire-and-forget: hydration must not block initial render
+void hydrateRecentProjects().then(() => {
+  toolbarPanel.render();
+  render();
+});
+
 // ─── Left panel: delegated to panels/left-panel.js ───────────────────────────
 
 function renderLeftPanel() {
@@ -748,6 +756,11 @@ async function openRecentProject(root: string) {
     ensureFsSync();
     void maybePromptJxsuiteUpdate(root);
   } catch (error) {
+    // The project likely moved or was deleted — drop the stale entry so it stops cluttering the
+    // List, and refresh the dropdown + welcome screen.
+    removeRecentProject(root);
+    toolbarPanel.render();
+    render();
     statusMessage(`Error: ${errorMessage(error)}`);
   }
 }

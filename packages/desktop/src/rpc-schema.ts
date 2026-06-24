@@ -39,6 +39,13 @@ export interface OpenProjectResult {
   handle: ProjectHandle;
 }
 
+/** A recently-opened project, keyed by its absolute `root` path. */
+export interface RecentProjectEntry {
+  name: string;
+  root: string;
+  timestamp: number;
+}
+
 export interface CodeServiceResult {
   code?: string;
   diagnostics?: unknown[];
@@ -394,6 +401,15 @@ export interface StudioRPC {
       listOpenWindows: {
         params: void;
         response: { id: number; projectRoot: string | null }[];
+      };
+      // Recent projects (process-shared, user-level store)
+      getRecentProjects: {
+        params: void;
+        response: RecentProjectEntry[];
+      };
+      saveRecentProjects: {
+        params: { projects: RecentProjectEntry[] };
+        response: void;
       };
     };
     messages: Record<string, never>;

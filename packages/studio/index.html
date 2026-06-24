@@ -3790,6 +3790,52 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .welcome-section-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .welcome-clear {
+        padding: 0 4px;
+        background: none;
+        border: none;
+        font: inherit;
+        font-size: var(--spectrum-font-size-75, 12px);
+        color: var(--fg-dim);
+        cursor: pointer;
+      }
+      .welcome-clear:hover {
+        color: var(--fg);
+        text-decoration: underline;
+      }
+      .welcome-recent-row {
+        display: flex;
+        align-items: center;
+      }
+      .welcome-recent-row .welcome-recent {
+        flex: 1;
+        min-width: 0;
+      }
+      .welcome-recent-remove {
+        flex-shrink: 0;
+        padding: 2px 6px;
+        background: none;
+        border: none;
+        font: inherit;
+        font-size: 12px;
+        color: var(--fg-dim);
+        cursor: pointer;
+        opacity: 0;
+        border-radius: var(--radius);
+      }
+      .welcome-recent-row:hover .welcome-recent-remove {
+        opacity: 1;
+      }
+      .welcome-recent-remove:hover {
+        color: var(--fg);
+        background: var(--hover-bg);
+      }
     </style>
   </head>
   <body>
