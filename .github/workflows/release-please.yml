@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.rp.outputs.releases_created }}
+      # Path-prefixed output for the root component ("." -> ".--tag_name").
+      tag_name: ${{ steps.rp.outputs['.--tag_name'] }}
+    steps:
+      - id: rp
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # The release tag is created by release-please using GITHUB_TOKEN, which does
+  # NOT trigger `on: push: tags` workflows. So we invoke the (now reusable)
+  # publish + desktop-bundler workflows directly once a release exists.
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  desktop-linux:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/bundle-desktop-linux.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  desktop-macos:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/bundle-desktop-macos.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  desktop-windows:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/bundle-desktop-windows.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  build-msix:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    uses: ./.github/workflows/build-msix.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
+
+  # Append the platform Downloads table to the release notes (preserves the
+  # previous release-it footer). Links are static and resolve once the bundlers
+  # upload their assets, so this can run in parallel with the build jobs.
+  release-notes-downloads:
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Append Downloads table to release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          base="https://github.com/jxsuite/jx/releases/download/v${version}"
+          body="$(gh release view "$TAG" --json body --jq .body)"
+          {
+            printf '%s\n\n' "$body"
+            printf '## Downloads\n\n'
+            printf '| Platform | Architecture | Installer | Archive |\n'
+            printf '|----------|-------------|-----------|--------|\n'
+            printf '| macOS | Apple Silicon | [DMG](%s/stable-macos-arm64-JxStudio.dmg) | [tar.zst](%s/stable-macos-arm64-JxStudio.app.tar.zst) |\n' "$base" "$base"
+            printf '| macOS | Intel | [DMG](%s/stable-macos-x64-JxStudio.dmg) | [tar.zst](%s/stable-macos-x64-JxStudio.app.tar.zst) |\n' "$base" "$base"
+            printf '| Linux | x64 | [tar.gz](%s/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](%s/stable-linux-x64-JxStudio.tar.zst) |\n' "$base" "$base"
+            printf '| Windows | x64 | [MSI](%s/Jx.Studio.msi) | [ZIP](%s/stable-win-x64-JxStudio-Setup.zip) |\n' "$base" "$base"
+          } > notes.md
+          gh release edit "$TAG" --notes-file notes.md
