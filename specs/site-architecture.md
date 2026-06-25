@@ -901,13 +901,26 @@ Later entries can override earlier entries. If both site and page define a `<tit
 
 The compiler automatically generates certain tags if not explicitly declared:
 
-| Auto-generated                   | Condition                                     |
-| -------------------------------- | --------------------------------------------- |
-| `<link rel="canonical">`         | Always, from `$site.url` + page path          |
-| `<meta property="og:url">`       | Always, matches canonical                     |
-| `<meta property="og:site_name">` | From `$site.name`                             |
-| `<html lang>`                    | From page or site `lang`                      |
-| Sitemap entry                    | All non-draft pages included in `sitemap.xml` |
+| Auto-generated                   | Condition                              |
+| -------------------------------- | -------------------------------------- |
+| `<link rel="canonical">`         | Always, from `$site.url` + page path   |
+| `<meta property="og:url">`       | Always, matches canonical              |
+| `<meta property="og:site_name">` | From `$site.name`                      |
+| `<html lang>`                    | From page or site `lang`               |
+| `sitemap.xml` entry              | Every page, when `url` is set (§8.4.1) |
+
+#### 8.4.1 Sitemap & `robots.txt`
+
+When `url` is set in `project.json`, the build emits `dist/sitemap.xml` from the route table — one `<url>` entry per compiled page, each with a `<loc>` (absolute, built from `url` + the route via `new URL(route, url)`, so it is identical to the page's `<link rel="canonical">`) and a `<lastmod>` (the page source file's modification date, `YYYY-MM-DD`).
+
+- **Requires `url`.** Absolute `<loc>` values cannot be built without it; if `url` is absent the sitemap is skipped with a build warning.
+- **Per-page opt-out.** A page sets `$sitemap: false` at its root to be excluded (e.g. thank-you pages, or drafts while build-time draft filtering is still pending). Every other page is included.
+- **Disable entirely.** Set `build.sitemap: false` (§14.1.1).
+- **Dynamic routes** are listed by their expanded concrete URLs. Pages generated from a single template share that template file's `<lastmod>`.
+- **`<loc>` form** follows the canonical URL exactly and is not re-normalized for `build.trailingSlash`, keeping sitemap and canonical URLs in agreement.
+- **`robots.txt`.** After the `public/` copy, a `Sitemap: <url>/sitemap.xml` line is appended to `dist/robots.txt` (creating a minimal `robots.txt` if none was provided). An existing `Sitemap:` line is left untouched.
+
+Redirect sources are not pages and never appear in the sitemap.
 
 ### 8.5 Structured Data (JSON-LD)
 
@@ -1430,6 +1443,7 @@ Configured in `project.json`:
 | `outDir`        | `string`         | `"./dist"`    | Output directory for static assets                                                  |
 | `format`        | `string`         | `"directory"` | URL format: `"directory"` (trailing slash) or `"file"`                              |
 | `trailingSlash` | `string`         | `"always"`    | `"always"` or `"never"`                                                             |
+| `sitemap`       | `boolean`        | `true`        | Generate `sitemap.xml` from the route table (requires `url`; §8.4.1)                |
 | `adapter`       | `string \| null` | `null`        | Deployment adapter: `"cloudflare-workers"`, `"cloudflare-pages"`, `"node"`, `"bun"` |
 
 When `adapter` is set and the site contains `timing: "server"` entries, the compiler:
@@ -1471,8 +1485,8 @@ dist/
 │       ├── hero-640-a1b2c3d4.webp
 │       ├── hero-320-a1b2c3d4.avif
 │       └── hero-640-a1b2c3d4.avif
-├── sitemap.xml                  # Auto-generated
-├── robots.txt                   # Copied from public/
+├── sitemap.xml                  # Auto-generated from the route table (when url is set)
+├── robots.txt                   # From public/, with a Sitemap: line appended
 ├── favicon.svg                  # Copied from public/
 ├── _redirects                   # Platform-specific
 └── worker.js                    # Server worker (when adapter set + server entries exist;
@@ -1518,16 +1532,17 @@ Jx elements support `$title` and `$description` as developer-facing annotation m
 
 This spec introduces the following new reserved keywords:
 
-| Keyword             | Context            | Purpose                                 |
-| ------------------- | ------------------ | --------------------------------------- |
-| `$layout`           | Page root          | Specifies the layout wrapping this page |
-| `$paths`            | Page root          | Dynamic route parameter generation      |
-| `$params`           | Template string    | Route parameters (read-only)            |
-| `$page`             | Template string    | Page metadata context                   |
-| `$site`             | Template string    | Site metadata context                   |
-| `$head`             | Page/site root     | `<head>` element declarations           |
-| `ContentCollection` | `$prototype` value | Collection query                        |
-| `ContentEntry`      | `$prototype` value | Single entry access                     |
+| Keyword             | Context            | Purpose                                   |
+| ------------------- | ------------------ | ----------------------------------------- |
+| `$layout`           | Page root          | Specifies the layout wrapping this page   |
+| `$paths`            | Page root          | Dynamic route parameter generation        |
+| `$params`           | Template string    | Route parameters (read-only)              |
+| `$page`             | Template string    | Page metadata context                     |
+| `$site`             | Template string    | Site metadata context                     |
+| `$head`             | Page/site root     | `<head>` element declarations             |
+| `$sitemap`          | Page root          | Set `false` to exclude from `sitemap.xml` |
+| `ContentCollection` | `$prototype` value | Collection query                          |
+| `ContentEntry`      | `$prototype` value | Single entry access                       |
 
 **Reused existing primitives (no new keywords needed):**
 
@@ -1589,7 +1604,7 @@ This spec builds on existing Jx primitives wherever possible:
 ### Phase 4: Build Pipeline
 
 - [x] Image optimization pipeline (WebP/AVIF, responsive srcset, lazy loading, caching)
-- [ ] Sitemap generation (`sitemap.xml` from route table)
+- [x] Sitemap generation (`sitemap.xml` from route table; `<lastmod>`, `robots.txt` reference, `$sitemap: false` opt-out, `build.sitemap` toggle)
 - [ ] Incremental builds (dependency tracking, selective recompilation)
 - [x] Platform adapters — `build.adapter` for site-wide server bundling (Cloudflare implemented)
 - [ ] Platform-specific file generation (Netlify `_headers`, Vercel `vercel.json`, GitHub Pages `.nojekyll`)

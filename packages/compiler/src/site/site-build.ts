@@ -13,8 +13,10 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -220,6 +222,12 @@ export async function buildSite(
     );
   }
 
+  // Sitemap is generated from the route table when a production `url` is configured
+  // (absolute <loc> URLs require it) and not explicitly disabled via build.sitemap: false.
+  const siteUrl = projectConfig.url;
+  const sitemapEnabled = Boolean(siteUrl) && projectConfig.build.sitemap !== false;
+  const sitemapEntries: { loc: string; lastmod: Date }[] = [];
+
   for (const route of routes) {
     try {
       log(`  Compiling ${route.urlPattern} ...`);
@@ -257,6 +265,17 @@ export async function buildSite(
       mkdirSync(dirname(outPath), { recursive: true });
       writeFileSync(outPath, result.html, "utf8");
       fileCount += 1;
+
+      // Record a sitemap entry for this concrete page (skip unexpanded dynamic routes and
+      // Pages that opted out via $sitemap: false). <loc> is built like the canonical URL so
+      // The two always agree.
+      const isConcrete = !route.urlPattern.includes(":") && !route.urlPattern.includes("*");
+      if (sitemapEnabled && !result.excludeFromSitemap && isConcrete) {
+        sitemapEntries.push({
+          lastmod: statSync(route.sourcePath).mtime,
+          loc: new URL(route.urlPattern, siteUrl).href,
+        });
+      }
 
       // Write serialized export sidecars alongside HTML (formats with exportTarget: true)
       for (const fmt of formatRegistry.withCapability("serialize")) {
@@ -378,10 +397,24 @@ export async function buildSite(
     fileCount += redirectFiles;
   }
 
-  // ── 7. Copy public/ assets ──────────────────────────────────────────────
+  // ── 7b. Generate sitemap.xml ────────────────────────────────────────────
+  if (sitemapEnabled) {
+    log(`Generating sitemap (${sitemapEntries.length} URL(s))...`);
+    fileCount += generateSitemap(sitemapEntries, outDir);
+  } else if (!siteUrl && projectConfig.build.sitemap !== false) {
+    console.warn("sitemap.xml skipped — set `url` in project.json to enable sitemap generation.");
+  }
+
+  // ── 7c. Copy public/ assets ─────────────────────────────────────────────
   if (existsSync(publicDir)) {
     log("Copying public/ assets...");
     cpSync(publicDir, outDir, { recursive: true });
+  }
+
+  // ── 7d. Reference the sitemap from robots.txt ───────────────────────────
+  // Runs after the public/ copy so it edits the deployed dist/robots.txt.
+  if (sitemapEnabled) {
+    fileCount += ensureRobotsSitemap(outDir, siteUrl);
   }
 
   // ── 8. Copy declarative file mappings ──────────────────────────────────
@@ -575,6 +608,9 @@ async function compilePage(
 
   return {
     doc: layoutDoc,
+    // A page opts out of the sitemap by setting `$sitemap: false` (interim escape hatch
+    // Until draft filtering lands in the build pipeline).
+    excludeFromSitemap: pageDoc.$sitemap === false,
     files: result.files,
     html: result.html,
     serverHandler,
@@ -1184,4 +1220,70 @@ function escapeHtml(str: string) {
  */
 function escapeAttr(str: string) {
   return String(str).replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;");
+}
+
+/**
+ * Escape a value for inclusion in XML text (e.g. a sitemap `<loc>`). Handles the five predefined
+ * XML entities — `&` must be first so the others aren't double-escaped.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+function escapeXml(str: string) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+/**
+ * Write a sitemap.xml from the collected page entries (sitemaps.org urlset 0.9). Each entry emits a
+ * `<loc>` plus a `<lastmod>` date (W3C YYYY-MM-DD).
+ *
+ * @param {{ loc: string; lastmod: Date }[]} entries
+ * @param {string} outDir
+ * @returns {number} Number of files written
+ */
+function generateSitemap(entries: { loc: string; lastmod: Date }[], outDir: string) {
+  if (entries.length === 0) {
+    return 0;
+  }
+  const urls = entries
+    .map(
+      (e) =>
+        `  <url>\n    <loc>${escapeXml(e.loc)}</loc>\n` +
+        `    <lastmod>${e.lastmod.toISOString().slice(0, 10)}</lastmod>\n  </url>`,
+    )
+    .join("\n");
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
+  writeFileSync(join(outDir, "sitemap.xml"), xml, "utf8");
+  return 1;
+}
+
+/**
+ * Ensure dist/robots.txt references the sitemap. Appends a `Sitemap:` line to an existing
+ * robots.txt (creating a permissive default if none was copied from public/), unless one is already
+ * present.
+ *
+ * @param {string} outDir
+ * @param {string} siteUrl
+ * @returns {number} Number of files newly created (0 if robots.txt already existed)
+ */
+function ensureRobotsSitemap(outDir: string, siteUrl: string) {
+  const robotsPath = join(outDir, "robots.txt");
+  const existed = existsSync(robotsPath);
+  let content = existed ? readFileSync(robotsPath, "utf8") : "User-agent: *\nAllow: /\n";
+  if (/^Sitemap:/im.test(content)) {
+    return 0;
+  }
+  if (!content.endsWith("\n")) {
+    content += "\n";
+  }
+  content += `\nSitemap: ${new URL("/sitemap.xml", siteUrl).href}\n`;
+  writeFileSync(robotsPath, content, "utf8");
+  return existed ? 0 : 1;
 }

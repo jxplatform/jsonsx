@@ -268,6 +268,33 @@ describe("buildSite", () => {
     expect(redirectHtml).toContain('http-equiv="refresh"');
     expect(redirectHtml).toContain("/new");
   });
+
+  it("generates sitemap.xml from the route table", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const sitemap = readFileSync(resolve(TMP, "dist/sitemap.xml"), "utf8");
+    expect(sitemap).toContain('<?xml version="1.0" encoding="UTF-8"?>');
+    expect(sitemap).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+
+    // <loc> matches the canonical-URL form (new URL — no trailing slash appended)
+    expect(sitemap).toContain("<loc>https://test.com/</loc>");
+    expect(sitemap).toContain("<loc>https://test.com/about</loc>");
+    expect(sitemap).toContain("<loc>https://test.com/blog</loc>");
+
+    // <lastmod> is a W3C date
+    expect(sitemap).toMatch(/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/);
+
+    // Redirect sources are not pages and must not appear
+    expect(sitemap).not.toContain("/old");
+  });
+
+  it("references the sitemap from robots.txt", async () => {
+    await buildSite(TMP, { verbose: false });
+
+    const robots = readFileSync(resolve(TMP, "dist/robots.txt"), "utf8");
+    expect(robots).toContain("User-agent: *"); // Preserved from public/robots.txt
+    expect(robots).toContain("Sitemap: https://test.com/sitemap.xml");
+  });
 });
 
 // ── Server worker generation ─────────────────────────────────────────────────
@@ -1914,5 +1941,60 @@ describe("buildSite — rich map template expansion", () => {
     expect(html).toContain("x-tone");
     // String child template resolving to an array of nodes is spliced in.
     expect(html).toContain("BOLD");
+  });
+});
+
+// ── Sitemap options ──────────────────────────────────────────────────────────
+
+describe("buildSite — sitemap options", () => {
+  const SM_TMP = resolve(import.meta.dir, "__test-site-sitemap__");
+
+  function writeSite(config: Record<string, unknown>) {
+    rmSync(SM_TMP, { force: true, recursive: true });
+    mkdirSync(resolve(SM_TMP, "pages"), { recursive: true });
+    writeFileSync(resolve(SM_TMP, "project.json"), JSON.stringify(config), "utf8");
+    writeFileSync(
+      resolve(SM_TMP, "pages/index.json"),
+      JSON.stringify({ children: [{ children: ["Home"], tagName: "h1" }], title: "Home" }),
+      "utf8",
+    );
+    writeFileSync(
+      resolve(SM_TMP, "pages/secret.json"),
+      JSON.stringify({
+        $sitemap: false,
+        children: [{ children: ["Secret"], tagName: "h1" }],
+        title: "Secret",
+      }),
+      "utf8",
+    );
+  }
+
+  afterAll(() => {
+    rmSync(SM_TMP, { force: true, recursive: true });
+  });
+
+  it("excludes pages that opt out with $sitemap: false", async () => {
+    writeSite({ build: { outDir: "./dist" }, name: "SM", url: "https://sm.test" });
+    await buildSite(SM_TMP);
+
+    const sitemap = readFileSync(resolve(SM_TMP, "dist/sitemap.xml"), "utf8");
+    expect(sitemap).toContain("<loc>https://sm.test/</loc>");
+    expect(sitemap).not.toContain("/secret");
+  });
+
+  it("skips sitemap.xml when build.sitemap is false", async () => {
+    writeSite({ build: { outDir: "./dist", sitemap: false }, name: "SM", url: "https://sm.test" });
+    await buildSite(SM_TMP);
+
+    expect(existsSync(resolve(SM_TMP, "dist/sitemap.xml"))).toBe(false);
+  });
+
+  it("skips sitemap generation when no url is configured", async () => {
+    writeSite({ build: { outDir: "./dist" }, name: "SM" });
+    await buildSite(SM_TMP);
+
+    expect(existsSync(resolve(SM_TMP, "dist/sitemap.xml"))).toBe(false);
+    // Robots.txt is not created just to add a Sitemap line we can't build
+    expect(existsSync(resolve(SM_TMP, "dist/robots.txt"))).toBe(false);
   });
 });

@@ -437,7 +437,7 @@ export interface ProjectConfig {
   $elements?: (string | JxElement)[];
   $head?: JxHeadEntry[];
   $defs?: Record<string, unknown>;
-  build?: { adapter?: string; [key: string]: unknown };
+  build?: { adapter?: string; sitemap?: boolean; [key: string]: unknown };
   images?: ImageConfig;
   imports?: Record<string, string>;
   contentTypes?: Record<string, ContentTypeDef>;

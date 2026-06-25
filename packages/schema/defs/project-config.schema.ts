@@ -82,6 +82,12 @@ export const projectConfigSchema = {
           description: "Output directory for compiled site.",
           type: "string",
         },
+        sitemap: {
+          default: true,
+          description:
+            "Generate sitemap.xml from the route table (requires `url`). Set false to disable.",
+          type: "boolean",
+        },
         trailingSlash: {
           default: "always",
           description: "Trailing slash behavior for generated URLs.",
