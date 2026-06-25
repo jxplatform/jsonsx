@@ -1,0 +1,30 @@
+{
+  "$schema": "../../packages/schema/schema.json",
+  "$id": "CardWithObservedAttrs",
+  "observedAttributes": ["card-title", "card-description", "card-accent"],
+  "state": {
+    "card-title": { "type": "string", "default": "Default Title" },
+    "card-description": { "type": "string", "default": "Default Description" },
+    "card-accent": { "type": "string", "default": "#007bff" }
+  },
+  "tagName": "div",
+  "style": {
+    "borderLeft": "5px solid ${state['card-accent']}",
+    "padding": "1em",
+    "borderRadius": "4px",
+    "boxShadow": "0 2px 4px rgba(0,0,0,0.1)",
+    "backgroundColor": "#ffffff"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "textContent": "${state['card-title']}",
+      "style": { "margin": "0 0 0.5em 0", "color": "${state['card-accent']}" }
+    },
+    {
+      "tagName": "p",
+      "textContent": "${state['card-description']}",
+      "style": { "margin": "0", "color": "#666" }
+    }
+  ]
+}

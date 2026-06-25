@@ -1,0 +1,35 @@
+{
+  "$head": [
+    {
+      "attributes": {
+        "content": "width=device-width, initial-scale=1",
+        "name": "viewport"
+      },
+      "tagName": "meta"
+    }
+  ],
+  "$media": {
+    "--": "1280px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "build": {
+    "format": "directory",
+    "outDir": "./dist",
+    "trailingSlash": "always"
+  },
+  "defaults": {
+    "lang": "en",
+    "layout": "./layouts/base.json"
+  },
+  "name": "llm test 1",
+  "style": {
+    "color": "#1a1a1a",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "margin": "0",
+    "padding": "0"
+  },
+  "url": "https://example.com"
+}

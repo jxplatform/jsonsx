@@ -18,10 +18,16 @@
       "body": "const text = state.newTaskText.trim(); if (!text) return; state.tasks.push({ id: state.nextId++, text, done: false }); state.newTaskText = ''"
     },
 
+    "updateNewTaskText": {
+      "$prototype": "Function",
+      "parameters": ["event"],
+      "body": "state.newTaskText = event.target.value"
+    },
+
     "handleKeydown": {
       "$prototype": "Function",
-      "parameters": ["state", "event"],
-      "body": "if (event.key === 'Enter') state.addTask(state)"
+      "parameters": ["event"],
+      "body": "if (event.key === 'Enter') state.addTask()"
     },
 
     "filteredTasks": {
@@ -68,11 +74,7 @@
               "tagName": "input",
               "attributes": { "type": "text", "placeholder": "Add a task..." },
               "value": { "$ref": "#/state/newTaskText" },
-              "oninput": {
-                "$prototype": "Function",
-                "parameters": ["state", "event"],
-                "body": "state.newTaskText = event.target.value"
-              },
+              "oninput": { "$ref": "#/state/updateNewTaskText" },
               "onkeydown": { "$ref": "#/state/handleKeydown" },
               "style": {
                 "flex": "1",

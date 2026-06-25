@@ -1,0 +1,382 @@
+{
+  "tagName": "div",
+  "attributes": {
+    "id": "index-page"
+  },
+  "children": [
+    {
+      "tagName": "h1",
+      "children": ["Pricing"],
+      "style": {
+        "textAlign": "center",
+        "fontSize": "2.5rem",
+        "fontWeight": "700",
+        "letterSpacing": "-0.03em",
+        "margin": "0 0 1rem"
+      }
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "1rem"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "textContent": "Choose the plan that fits your stage — start free, upgrade when you need more power.",
+          "style": {
+            "textAlign": "center",
+            "fontSize": "1rem",
+            "color": "var(--color-text-secondary)",
+            "margin": "0 0 2rem"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(3, 1fr)",
+            "gap": "1.5rem",
+            "@--md": {
+              "gridTemplateColumns": "1fr"
+            },
+            "@--sm": {
+              "gridTemplateColumns": "1fr"
+            }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "1.5rem",
+                "padding": "2rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "backgroundColor": "var(--color-bg-surface)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "h3",
+                      "textContent": "Free",
+                      "style": {
+                        "margin": "0",
+                        "fontSize": "1.5rem",
+                        "fontWeight": "600"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "textContent": "$0/mo",
+                      "style": {
+                        "fontSize": "2rem",
+                        "fontWeight": "700",
+                        "letterSpacing": "-0.03em"
+                      }
+                    },
+                    {
+                      "tagName": "p",
+                      "textContent": "Perfect for getting started.",
+                      "style": {
+                        "margin": "0",
+                        "color": "var(--color-text-secondary)",
+                        "fontSize": "0.875rem"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "margin": "0",
+                    "padding": "0 0 0 1.25rem",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "li",
+                      "textContent": "1 project"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Basic components"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Community support"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Standard hosting"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "#"
+                  },
+                  "textContent": "Start free",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "padding": "0.75rem 1rem",
+                    "borderRadius": "var(--radius)",
+                    "backgroundColor": "transparent",
+                    "border": "1px solid var(--color-border)",
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "1.5rem",
+                "padding": "2rem",
+                "border": "1px solid var(--color-accent)",
+                "borderRadius": "var(--radius)",
+                "backgroundColor": "var(--color-bg-surface)",
+                "position": "relative"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "textContent": "Recommended",
+                  "style": {
+                    "position": "absolute",
+                    "top": "-0.75rem",
+                    "right": "1.5rem",
+                    "padding": "0.25rem 0.75rem",
+                    "borderRadius": "999px",
+                    "backgroundColor": "var(--color-accent)",
+                    "color": "white",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "0.08em",
+                    "textTransform": "uppercase"
+                  }
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "h3",
+                      "textContent": "Pro",
+                      "style": {
+                        "margin": "0",
+                        "fontSize": "1.5rem",
+                        "fontWeight": "600"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "textContent": "$19/mo",
+                      "style": {
+                        "fontSize": "2rem",
+                        "fontWeight": "700",
+                        "letterSpacing": "-0.03em",
+                        "color": "var(--color-accent)"
+                      }
+                    },
+                    {
+                      "tagName": "p",
+                      "textContent": "For growing teams and serious projects.",
+                      "style": {
+                        "margin": "0",
+                        "color": "var(--color-text-secondary)",
+                        "fontSize": "0.875rem"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "margin": "0",
+                    "padding": "0 0 0 1.25rem",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "li",
+                      "textContent": "Unlimited projects"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Advanced components"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Priority support"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Custom domains"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "#"
+                  },
+                  "textContent": "Choose Pro",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "padding": "0.75rem 1rem",
+                    "borderRadius": "var(--radius)",
+                    "backgroundColor": "var(--color-accent)",
+                    "color": "white",
+                    "textDecoration": "none",
+                    "fontWeight": "600"
+                  }
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "1.5rem",
+                "padding": "2rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "backgroundColor": "var(--color-bg-surface)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.5rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "h3",
+                      "textContent": "Enterprise",
+                      "style": {
+                        "margin": "0",
+                        "fontSize": "1.5rem",
+                        "fontWeight": "600"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "textContent": "Contact us",
+                      "style": {
+                        "fontSize": "2rem",
+                        "fontWeight": "700",
+                        "letterSpacing": "-0.03em"
+                      }
+                    },
+                    {
+                      "tagName": "p",
+                      "textContent": "Tailored solutions for large organizations.",
+                      "style": {
+                        "margin": "0",
+                        "color": "var(--color-text-secondary)",
+                        "fontSize": "0.875rem"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tagName": "ul",
+                  "style": {
+                    "margin": "0",
+                    "padding": "0 0 0 1.25rem",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem",
+                    "color": "var(--color-text-secondary)"
+                  },
+                  "children": [
+                    {
+                      "tagName": "li",
+                      "textContent": "Dedicated infrastructure"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "SSO & advanced security"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Account manager"
+                    },
+                    {
+                      "tagName": "li",
+                      "textContent": "Custom integrations"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "a",
+                  "attributes": {
+                    "href": "#"
+                  },
+                  "textContent": "Contact sales",
+                  "style": {
+                    "display": "inline-flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "padding": "0.75rem 1rem",
+                    "borderRadius": "var(--radius)",
+                    "backgroundColor": "transparent",
+                    "border": "1px solid var(--color-border)",
+                    "color": "var(--color-text-primary)",
+                    "textDecoration": "none",
+                    "fontWeight": "600"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "components/simple-card.json"
+    }
+  ],
+  "style": {
+    "padding": "4rem 2rem",
+    "display": "block",
+    "justifyContent": "center"
+  }
+}
