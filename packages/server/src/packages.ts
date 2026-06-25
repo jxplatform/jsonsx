@@ -94,18 +94,8 @@ export function dependenciesNeedInstall(root: string): boolean {
   return !existsSync(resolve(root, "node_modules"));
 }
 
-/**
- * Path to the bun executable. Uses the bun running the current process (`process.execPath`) so a
- * packaged desktop app spawns the bun bundled with its Electrobun distribution rather than relying
- * on a system-wide `bun` in `$PATH` (which end users may not have). Falls back to a PATH lookup if
- * `execPath` is somehow unset.
- */
-export function bunExecutable(): string {
-  return process.execPath || "bun";
-}
-
 async function runBun(args: string[], cwd: string): Promise<PackageOpResult> {
-  const proc = Bun.spawn([bunExecutable(), ...args], { cwd, stderr: "pipe", stdout: "pipe" });
+  const proc = Bun.spawn(["bun", ...args], { cwd, stderr: "pipe", stdout: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

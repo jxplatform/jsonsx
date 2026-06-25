@@ -1,0 +1,14 @@
+{
+  "id": "style-card",
+  "prompt": "Give this card a white background, 16px of padding, and rounded 8px corners. Leave the heading text unchanged.",
+  "tags": ["intent", "set_property", "preserve"],
+  "intent": [
+    "sets style.backgroundColor, style.padding, style.borderRadius on the card",
+    "uses camelCase style keys and string values",
+    "does not change the existing heading textContent"
+  ],
+  "initialDoc": {
+    "tagName": "feature-card",
+    "children": [{ "tagName": "h2", "textContent": "Fast by default" }]
+  }
+}

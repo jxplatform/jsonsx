@@ -1,6 +1,6 @@
 {
   "name": "@jxsuite/studio",
-  "version": "0.32.0",
+  "version": "0.31.0",
   "description": "Jx Studio — visual builder for Jx documents",
   "license": "MIT",
   "repository": {
@@ -26,6 +26,8 @@
     "build": "bun run scripts/build.ts",
     "build:metafile": "bun build ./src/studio.ts --outdir dist --target browser --sourcemap=linked --metafile=metafile.json",
     "gen:webdata": "bun run scripts/gen-webdata.js",
+    "eval": "bun run evals/cli.js",
+    "eval:headless": "bun run tests/harness/run-eval.js",
     "lint:styles": "bun run scripts/check-styles.ts",
     "test": "bun run lint:styles && bun test --isolate",
     "test:coverage": "bun test --isolate --coverage",
@@ -34,6 +36,7 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
     "@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
+    "@jxsuite/ai": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/runtime": "workspace:^",
     "@jxsuite/schema": "workspace:^",

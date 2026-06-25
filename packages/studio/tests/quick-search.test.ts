@@ -3,7 +3,7 @@
  * search, recent files, keyboard navigation, selection side effects (recent tracking + tab open),
  * file icons, and dismissal paths. openFileInTab is mocked so selection stays side-effect free.
  */
-import { flush, installMockPlatform, resetStudioState } from "./harness";
+import { flush, installMockPlatform } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import type { StudioFormat } from "../src/format/format-host";
 
@@ -14,10 +14,7 @@ const { closeQuickSearch, initQuickSearch, openQuickSearch } =
   await import("../src/panels/quick-search");
 const { setFormats } = await import("../src/format/format-host");
 const { initLayers } = await import("../src/ui/layers");
-const { setProjectState } = await import("../src/store");
 const { getRecentFiles, trackRecentFile } = await import("../src/recent-projects");
-
-const PROJECT_ROOT = "/project";
 
 // Layer DOM is set up once — getLayerSlot caches its slot element, so the body must not be
 // Replaced between tests (the cached slot would keep pointing into a detached subtree).
@@ -82,8 +79,6 @@ beforeEach(() => {
   initQuickSearch();
   setFormats([MARKDOWN_FORMAT]);
   installMockPlatform({}, SEED_FILES);
-  // Default to a project being open: the modal searches/lists that project's files.
-  resetStudioState({ isSiteProject: true, name: "Test", projectRoot: PROJECT_ROOT });
   closeQuickSearch();
 });
 
@@ -229,9 +224,9 @@ describe("quick-search — keyboard navigation and selection", () => {
 });
 
 describe("quick-search — recent files", () => {
-  test("empty query lists the open project's recent files with badges and supports Enter", () => {
-    trackRecentFile({ name: "old.md", path: "/project/posts/old.md", root: PROJECT_ROOT });
-    trackRecentFile({ name: "fresh.json", path: "/project/pages/fresh.json", root: PROJECT_ROOT });
+  test("empty query lists recent files with badges and supports Enter", () => {
+    trackRecentFile({ name: "old.md", path: "/project/posts/old.md" });
+    trackRecentFile({ name: "fresh.json", path: "/project/pages/fresh.json" });
     openQuickSearch();
 
     expect(document.querySelector(".quick-search-section-label")?.textContent).toBe(
@@ -245,79 +240,5 @@ describe("quick-search — recent files", () => {
     keydown("Enter");
     expect(openFileInTab).toHaveBeenCalledWith("/project/pages/fresh.json");
     expect(overlay()).toBeNull();
-  });
-
-  test("recent files from other projects are never shown", () => {
-    trackRecentFile({ name: "mine.md", path: "pages/mine.md", root: PROJECT_ROOT });
-    trackRecentFile({ name: "theirs.md", path: "pages/theirs.md", root: "/other/project" });
-    openQuickSearch();
-    const names = items().map((el) => el.querySelector(".quick-search-name")?.textContent);
-    expect(names).toEqual(["mine.md"]);
-  });
-
-  test("selecting a file tracks it under the open project", () => {
-    trackRecentFile({ name: "a.md", path: "pages/a.md", root: PROJECT_ROOT });
-    openQuickSearch();
-    items()[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    expect(getRecentFiles(PROJECT_ROOT).map((f) => f.path)).toEqual(["pages/a.md"]);
-  });
-});
-
-describe("quick-search — no project open", () => {
-  const RECENT_PROJECTS_KEY = "jx-studio-recent-projects";
-
-  beforeEach(() => {
-    setProjectState(null);
-  });
-
-  function seedProjects() {
-    localStorage.setItem(
-      RECENT_PROJECTS_KEY,
-      JSON.stringify([
-        { name: "Alpha", root: "/home/u/alpha", timestamp: 2 },
-        { name: "Beta", root: "/srv/beta", timestamp: 1 },
-      ]),
-    );
-  }
-
-  test("lists recent projects (newest-first) and opens one on Enter", () => {
-    seedProjects();
-    const openRecentProject = mock((_root: string) => {});
-    initQuickSearch({ openRecentProject });
-    openQuickSearch();
-
-    expect(searchInput().placeholder).toBe("Open a recent project…");
-    expect(document.querySelector(".quick-search-section-label")?.textContent).toBe(
-      "Recent projects",
-    );
-    const rows = items();
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.querySelector(".quick-search-name")?.textContent).toBe("Alpha");
-    expect(rows[0]!.querySelector(".quick-search-path")?.textContent?.trim()).toBe("~/alpha");
-
-    keydown("Enter");
-    expect(openRecentProject).toHaveBeenCalledWith("/home/u/alpha");
-    expect(openFileInTab).not.toHaveBeenCalled();
-    expect(overlay()).toBeNull();
-  });
-
-  test("filters recent projects by query without hitting the file-search backend", async () => {
-    seedProjects();
-    const { state } = installMockPlatform({}, SEED_FILES);
-    initQuickSearch({ openRecentProject: mock((_root: string) => {}) });
-    openQuickSearch();
-    await search("beta");
-    const rows = items();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.querySelector(".quick-search-name")?.textContent).toBe("Beta");
-    expect(state.calls.some((c) => c[0] === "searchFiles")).toBe(false);
-  });
-
-  test("shows an empty hint when there are no recent projects", () => {
-    initQuickSearch({ openRecentProject: mock((_root: string) => {}) });
-    openQuickSearch();
-    expect(document.querySelector(".quick-search-empty")?.textContent).toContain(
-      "No recent projects",
-    );
   });
 });

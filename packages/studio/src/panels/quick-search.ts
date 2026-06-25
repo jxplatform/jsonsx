@@ -4,37 +4,15 @@ import { classMap } from "lit-html/directives/class-map.js";
 import { live } from "lit-html/directives/live.js";
 import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
-import { projectState } from "../store";
 import { documentExtensions, formatByExtension, loadFormats } from "../format/format-host";
 import { openFileInTab } from "../files/files";
-import { getRecentFiles, getRecentProjects, trackRecentFile } from "../recent-projects";
+import { getRecentFiles, trackRecentFile } from "../recent-projects";
 import { getLayerSlot } from "../ui/layers";
 
-/**
- * A row in the Quick Access modal. With a project open the modal lists/searches that project's
- * files; with no project open it lists recent projects to re-open. The two never mix — the modal
- * only ever shows files from the current project.
- */
-interface FileItem {
-  kind: "file";
-  path: string;
-  name: string;
-}
-interface ProjectItem {
-  kind: "project";
-  root: string;
-  name: string;
-}
-type QuickItem = FileItem | ProjectItem;
-
-interface QuickCtx {
-  openRecentProject: (root: string) => void | Promise<void>;
-}
-
-let _ctx: QuickCtx | null = null;
 let _open = false;
 let _query = "";
-let _results: FileItem[] = [];
+/** @type {{ path: string; name?: string }[]} */
+let _results: { path: string; name?: string }[] = [];
 let _selectedIndex = 0;
 let _debounceTimer = 0;
 
@@ -43,9 +21,8 @@ function getContainer() {
   return getLayerSlot("popover", "quick-search");
 }
 
-/** @param {QuickCtx} [ctx] */
-export function initQuickSearch(ctx?: QuickCtx) {
-  _ctx = ctx ?? null;
+export function initQuickSearch() {
+  // No-op — container is now provided by the layer system
 }
 
 export function openQuickSearch() {
@@ -61,39 +38,6 @@ export function closeQuickSearch() {
   renderOverlay();
 }
 
-/** The project root scoping the modal, or null when no project is open. */
-function scopeRoot(): string | null {
-  return projectState ? (projectState.projectRoot ?? null) : null;
-}
-
-/**
- * Resolve the rows to display for the current query/mode. File search is async (populates
- * `_results`); recent files and recent-project filtering are synchronous.
- */
-function currentItems(): { items: QuickItem[]; showingRecent: boolean } {
-  const q = _query.trim();
-  if (!projectState) {
-    // No project open → offer recent projects to re-open, filtered by the query.
-    const needle = q.toLowerCase();
-    const projects = getRecentProjects().filter(
-      (p) =>
-        !needle || p.name.toLowerCase().includes(needle) || p.root.toLowerCase().includes(needle),
-    );
-    return {
-      items: projects.map((p) => ({ kind: "project", name: p.name, root: p.root })),
-      showingRecent: !q,
-    };
-  }
-  if (!q) {
-    const recent = getRecentFiles(scopeRoot() ?? undefined);
-    return {
-      items: recent.map((f) => ({ kind: "file", name: f.name, path: f.path })),
-      showingRecent: true,
-    };
-  }
-  return { items: _results, showingRecent: false };
-}
-
 async function doSearch(query: string) {
   if (!query.trim()) {
     _results = [];
@@ -104,12 +48,7 @@ async function doSearch(query: string) {
   try {
     const platform = getPlatform();
     await loadFormats();
-    const hits = await platform.searchFiles(query.trim().toLowerCase(), documentExtensions());
-    _results = hits.map((h) => ({
-      kind: "file",
-      name: h.name ?? h.path.split("/").pop() ?? "",
-      path: h.path,
-    }));
+    _results = await platform.searchFiles(query.trim().toLowerCase(), documentExtensions());
     _selectedIndex = 0;
     renderOverlay();
   } catch {
@@ -121,16 +60,12 @@ async function doSearch(query: string) {
 function onInput(e: Event) {
   _query = (e.target as HTMLInputElement).value;
   clearTimeout(_debounceTimer);
-  // Only file search needs the backend (and debouncing); recent-project filtering is synchronous.
-  if (projectState) {
-    _debounceTimer = setTimeout(() => doSearch(_query), 150) as unknown as number;
-  }
-  _selectedIndex = 0;
+  _debounceTimer = setTimeout(() => doSearch(_query), 150) as unknown as number;
   renderOverlay();
 }
 
 function onKeydown(e: KeyboardEvent) {
-  const { items } = currentItems();
+  const items = _query.trim() ? _results : getRecentFiles();
   switch (e.key) {
     case "ArrowDown": {
       e.preventDefault();
@@ -162,14 +97,11 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-function selectItem(item: QuickItem) {
+function selectItem(item: { path: string; name?: string }) {
   closeQuickSearch();
-  if (item.kind === "project") {
-    void _ctx?.openRecentProject(item.root);
-    return;
-  }
-  trackRecentFile({ name: item.name, path: item.path, root: scopeRoot() ?? "" });
-  void openFileInTab(item.path);
+  const { path } = item;
+  trackRecentFile({ name: path.split("/").pop() || "", path });
+  void openFileInTab(path);
 }
 
 function fileIcon(name: string) {
@@ -189,14 +121,6 @@ function dirPart(path: string) {
   return parts.length > 0 ? parts.join("/") : "";
 }
 
-/** Collapse a home-prefixed absolute path for compact display. */
-function shortenPath(path: string) {
-  if (path.startsWith("/home/")) {
-    return `~/${path.split("/").slice(3).join("/")}`;
-  }
-  return path;
-}
-
 function renderOverlay() {
   const container = getContainer();
   if (!_open) {
@@ -204,15 +128,9 @@ function renderOverlay() {
     return;
   }
 
-  const hasProject = projectState != null;
-  const { items, showingRecent } = currentItems();
-  const hasQuery = _query.trim().length > 0;
-
-  const placeholder = hasProject ? "Search project files…" : "Open a recent project…";
-  const sectionLabel = hasProject ? "Recently opened" : "Recent projects";
-  const emptyHint = hasProject
-    ? "Type to search project files"
-    : "No recent projects — open one to get started";
+  const recentFiles = getRecentFiles();
+  const showRecent = !_query.trim();
+  const items = showRecent ? recentFiles : _results;
 
   const tpl = html`
     <div class="quick-search-overlay" @click=${closeQuickSearch}>
@@ -220,7 +138,7 @@ function renderOverlay() {
         <input
           class="quick-search-input"
           type="text"
-          placeholder=${placeholder}
+          placeholder="Search project files…"
           .value=${live(_query)}
           @input=${onInput}
           @keydown=${onKeydown}
@@ -231,22 +149,17 @@ function renderOverlay() {
           })}
         />
         <div class="quick-search-results">
-          ${items.length === 0 && hasQuery
+          ${items.length === 0 && _query.trim()
             ? html`<div class="quick-search-empty">No results</div>`
             : nothing}
-          ${items.length === 0 && !hasQuery
-            ? html`<div class="quick-search-empty">${emptyHint}</div>`
+          ${items.length === 0 && !_query.trim() && recentFiles.length === 0
+            ? html`<div class="quick-search-empty">Type to search project files</div>`
             : nothing}
-          ${showingRecent && items.length > 0
-            ? html`<div class="quick-search-section-label">${sectionLabel}</div>`
+          ${showRecent && recentFiles.length > 0
+            ? html`<div class="quick-search-section-label">Recently opened</div>`
             : nothing}
-          ${items.map((item, i) => {
-            const icon =
-              item.kind === "project"
-                ? html`<sp-icon-folder-open size="s"></sp-icon-folder-open>`
-                : fileIcon(item.name);
-            const pathText = item.kind === "project" ? shortenPath(item.root) : dirPart(item.path);
-            return html`
+          ${items.map(
+            (item, i) => html`
               <div
                 class=${classMap({
                   "quick-search-item": true,
@@ -258,13 +171,15 @@ function renderOverlay() {
                   renderOverlay();
                 }}
               >
-                <span class="quick-search-icon">${icon}</span>
-                <span class="quick-search-name">${item.name}</span>
-                <span class="quick-search-path">${pathText}</span>
-                ${showingRecent ? html`<span class="quick-search-badge">recent</span>` : nothing}
+                <span class="quick-search-icon"
+                  >${fileIcon(item.name || item.path.split("/").pop() || "")}</span
+                >
+                <span class="quick-search-name">${item.name || item.path.split("/").pop()}</span>
+                <span class="quick-search-path">${dirPart(item.path)}</span>
+                ${showRecent ? html`<span class="quick-search-badge">recent</span>` : nothing}
               </div>
-            `;
-          })}
+            `,
+          )}
         </div>
       </div>
     </div>

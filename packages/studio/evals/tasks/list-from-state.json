@@ -1,0 +1,17 @@
+{
+  "id": "list-from-state",
+  "prompt": "Render an unordered list of the three fruits in state as <li> items.",
+  "tags": ["intent", "map", "binding"],
+  "intent": [
+    "creates a ul that maps over state.fruits",
+    "each fruit becomes an li with its value bound via ${...}",
+    "renders without runtime errors"
+  ],
+  "initialDoc": {
+    "tagName": "fruit-list",
+    "state": {
+      "fruits": { "type": "array", "default": ["Apples", "Bananas", "Cherries"] }
+    },
+    "children": []
+  }
+}

@@ -154,55 +154,12 @@ describe("minimal toolbar (no open tab)", () => {
     await flush();
 
     const items = [...root.querySelectorAll("sp-menu-item")];
-    expect(items.map((i) => i.textContent?.trim())).toEqual([
-      "New Project…",
-      "Proj A",
-      "Proj B",
-      "Clear recent projects",
-    ]);
+    expect(items.map((i) => i.textContent?.trim())).toEqual(["New Project…", "Proj A", "Proj B"]);
 
     const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
     menu.value = "/b";
     menu.dispatchEvent(new Event("change", { bubbles: true }));
     expect(ctx.openRecentProject).toHaveBeenCalledWith("/b");
-  });
-
-  test("a recent project's remove button drops just that entry", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([
-        { name: "Proj A", root: "/a", timestamp: 2 },
-        { name: "Proj B", root: "/b", timestamp: 1 },
-      ]),
-    );
-    const ctx = makeCtx();
-    toolbar.mount(root, ctx);
-    await flush();
-
-    const removeBtns = [...root.querySelectorAll("sp-action-button[title='Remove from recent']")];
-    expect(removeBtns).toHaveLength(2);
-    click(removeBtns[0]!); // Proj A is newest-first
-    await flush();
-    expect(ctx.openRecentProject).not.toHaveBeenCalled();
-    const names = [...root.querySelectorAll("sp-menu-item")].map((i) => i.textContent?.trim());
-    expect(names).toEqual(["New Project…", "Proj B", "Clear recent projects"]);
-  });
-
-  test("Clear recent projects empties the list", async () => {
-    localStorage.setItem(
-      "jx-studio-recent-projects",
-      JSON.stringify([{ name: "Proj A", root: "/a", timestamp: 1 }]),
-    );
-    toolbar.mount(root, makeCtx());
-    await flush();
-
-    const menu = root.querySelector("sp-menu") as HTMLElement & { value: string };
-    menu.value = "__clear__";
-    menu.dispatchEvent(new Event("change", { bubbles: true }));
-    await flush();
-    const items = [...root.querySelectorAll("sp-menu-item")];
-    expect(items).toHaveLength(1);
-    expect(items[0]!.textContent?.trim()).toBe("New Project…");
   });
 
   test("menu without stored projects only offers New Project", async () => {

@@ -25,6 +25,7 @@ export const childrenValueSchema = {
         oneOf: [
           { $ref: "#/$defs/ElementDef" },
           { $ref: "#/$defs/ArrayNamespace" },
+          { $ref: "#/$defs/SwitchNode" },
           { type: "string" },
           { type: "number" },
         ],

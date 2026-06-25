@@ -4677,6 +4677,9 @@
                 "$ref": "#/$defs/ArrayNamespace"
               },
               {
+                "$ref": "#/$defs/SwitchNode"
+              },
+              {
                 "type": "string"
               },
               {
@@ -4731,7 +4734,7 @@
       "description": "Reactive $ref that drives which case to render.",
       "properties": {
         "$ref": {
-          "$ref": "#/$defs/InternalRef"
+          "$ref": "#/$defs/StateRef"
         }
       },
       "required": [
@@ -21103,6 +21106,11 @@
             "type": "array"
           },
           {
+            "not": {
+              "required": [
+                "$ref"
+              ]
+            },
             "type": "object"
           },
           {

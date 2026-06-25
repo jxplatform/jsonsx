@@ -220,6 +220,8 @@ export interface StudioPlatform {
   aiStreamUrl: (id: string) => string | Promise<string>;
   aiStopSession: (id: string) => Promise<void>;
   aiDeleteSession: (id: string) => Promise<void>;
+  /** Stack B (canonical document assistant): URL of the OpenAI-compatible SSE chat proxy. */
+  aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
   /** Open a project in a new window, focusing an existing window if it is already open. */
   openProjectInNewWindow?: (root: string) => Promise<void>;
@@ -232,22 +234,6 @@ export interface StudioPlatform {
   setWindowProject?: (root: string) => Promise<{ deduped: boolean; config: ProjectConfig | null }>;
   /** The project root this window's backend is currently bound to. */
   getProjectRoot?: () => Promise<{ root: string | null }>;
-  // ─── Recent projects (backend-persisted; undefined on dev-server) ───────────
-  /**
-   * Read the user-level recent-projects list from a backend store shared across all
-   * projects/windows. Platforms without a native backend (dev server) omit it and the studio falls
-   * back to localStorage.
-   */
-  getRecentProjects?: () => Promise<RecentProjectEntry[]>;
-  /** Persist the full recent-projects list to the backend store. */
-  saveRecentProjects?: (projects: RecentProjectEntry[]) => Promise<void>;
-}
-
-/** A recently-opened project, keyed by its re-openable `root` (platform-specific). */
-export interface RecentProjectEntry {
-  name: string;
-  root: string;
-  timestamp: number;
 }
 
 // ─── Studio Types ───────────────────────────────────────────────────────────

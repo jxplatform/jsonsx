@@ -1,0 +1,40 @@
+name: AI Assistant — Deterministic Tests
+
+on:
+  pull_request:
+    paths:
+      - "packages/ai/**"
+      - "packages/studio/src/services/**"
+      - "packages/studio/tests/**"
+      - "packages/schema/**"
+  push:
+    branches: [main]
+    paths:
+      - "packages/ai/**"
+      - "packages/studio/src/services/**"
+      - "packages/studio/tests/**"
+      - "packages/schema/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+
+      - name: Schema tests
+        run: bun test --cwd packages/schema
+
+      - name: AI package tests
+        run: bun test --cwd packages/ai
+
+      - name: Studio AI tests (fake client — no API key)
+        run: |
+          bun test --cwd packages/studio -- \
+            tests/ai-loop.test.js \
+            tests/ai-tools.test.js \
+            tests/jx-validate-smoke.test.js \
+            tests/render-critic.test.js \
+            tests/context-manager.test.js

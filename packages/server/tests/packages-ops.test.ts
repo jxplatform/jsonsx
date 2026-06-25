@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   addPackage,
-  bunExecutable,
   dependenciesNeedInstall,
   fetchLatestVersion,
   installDependencies,
@@ -15,8 +14,6 @@ import {
   setPackageVersions,
   stripRange,
 } from "../src/packages";
-
-const BUN = bunExecutable();
 
 let dir: string;
 
@@ -49,14 +46,6 @@ describe("stripRange / isRegistryRange", () => {
     expect(isRegistryRange("file:../x")).toBe(false);
     expect(isRegistryRange("*")).toBe(false);
     expect(isRegistryRange("latest")).toBe(false);
-  });
-});
-
-describe("bunExecutable", () => {
-  test("resolves to the bun running this process (not a bare PATH lookup)", () => {
-    // Packaged desktop apps have no system `bun`; we must spawn the bundled one via execPath.
-    expect(BUN).toBe(process.execPath);
-    expect(BUN).not.toBe("bun");
   });
 });
 
@@ -159,19 +148,19 @@ describe("install / set-versions with stubbed spawn", () => {
   test("installDependencies runs `bun install` and reports ok", async () => {
     const res = await installDependencies(dir);
     expect(res.ok).toBe(true);
-    expect(spawned[0]).toEqual([BUN, "install"]);
+    expect(spawned[0]).toEqual(["bun", "install"]);
   });
 
   test("addPackage runs `bun add`, with -d for dev deps", async () => {
     await addPackage(dir, "hono");
-    expect(spawned.at(-1)).toEqual([BUN, "add", "hono"]);
+    expect(spawned.at(-1)).toEqual(["bun", "add", "hono"]);
     await addPackage(dir, "vitest", true);
-    expect(spawned.at(-1)).toEqual([BUN, "add", "-d", "vitest"]);
+    expect(spawned.at(-1)).toEqual(["bun", "add", "-d", "vitest"]);
   });
 
   test("removePackage runs `bun remove`", async () => {
     await removePackage(dir, "hono");
-    expect(spawned.at(-1)).toEqual([BUN, "remove", "hono"]);
+    expect(spawned.at(-1)).toEqual(["bun", "remove", "hono"]);
   });
 
   test("setPackageVersions fails on an unparseable package.json", async () => {
@@ -194,7 +183,7 @@ describe("install / set-versions with stubbed spawn", () => {
     const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
     expect(pkg.devDependencies["@jxsuite/compiler"]).toBe("^0.30.1"); // Stayed in devDeps
     expect(pkg.dependencies["new-dep"]).toBe("^1.0.0"); // New -> deps
-    expect(spawned.at(-1)).toEqual([BUN, "install"]);
+    expect(spawned.at(-1)).toEqual(["bun", "install"]);
   });
 
   test("setPackageVersions no-ops on empty updates and fails without package.json", async () => {

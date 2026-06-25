@@ -121,35 +121,4 @@ describe("renderWelcome — recent projects", () => {
     pointer(row, "click");
     expect(ctx.openRecentProject).toHaveBeenCalledWith("/home/user/dev/alpha");
   });
-
-  test("each recent project has a remove button that drops just that entry", () => {
-    localStorage.setItem(
-      RECENT_KEY,
-      JSON.stringify([
-        { name: "Alpha", root: "/a", timestamp: 2 },
-        { name: "Beta", root: "/b", timestamp: 1 },
-      ]),
-    );
-    const ctx = makeCtx();
-    const host = renderScreen(ctx);
-    const removeBtns = [
-      ...host.querySelectorAll("button.welcome-recent-remove"),
-    ] as HTMLButtonElement[];
-    expect(removeBtns).toHaveLength(2);
-    pointer(removeBtns[0]!, "click"); // Alpha is newest-first
-    expect(ctx.openRecentProject).not.toHaveBeenCalled();
-    renderWelcome(host); // Reflect the mutation
-    const names = [...host.querySelectorAll(".welcome-recent-name")].map((n) => n.textContent);
-    expect(names).toEqual(["Beta"]);
-  });
-
-  test("the Clear button empties the recent list", () => {
-    localStorage.setItem(RECENT_KEY, JSON.stringify([{ name: "Alpha", root: "/a", timestamp: 1 }]));
-    const host = renderScreen(makeCtx());
-    const clearBtn = host.querySelector("button.welcome-clear") as HTMLButtonElement;
-    expect(clearBtn).toBeTruthy();
-    pointer(clearBtn, "click");
-    renderWelcome(host);
-    expect(host.querySelectorAll(".welcome-recent")).toHaveLength(0);
-  });
 });

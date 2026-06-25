@@ -498,11 +498,7 @@ const FM_SCHEMA = {
   required: ["description"],
 };
 
-function setupContentTab(
-  frontmatter: Record<string, unknown>,
-  withSchema = true,
-  documentPath = "posts/hello.json",
-) {
+function setupContentTab(frontmatter: Record<string, unknown>, withSchema = true) {
   installMockPlatform();
   resetStudioState({
     projectConfig: withSchema
@@ -510,7 +506,7 @@ function setupContentTab(
       : {},
   });
   closeAllTabs();
-  const tab = resetWorkspaceWithTab(undefined, { documentPath });
+  const tab = resetWorkspaceWithTab(undefined, { documentPath: "posts/hello.json" });
   (tab as any).doc.mode = "content";
   (tab as any).doc.content.frontmatter = frontmatter;
   return tab as any;
@@ -547,16 +543,6 @@ describe("frontmatter section", () => {
     );
     // Loose fm key not in schema still renders as a string field
     expect((row(section, "extra").querySelector("sp-textfield") as any).value).toBe("loose");
-  });
-
-  test("matches the content type when the document path uses Windows backslashes", async () => {
-    // The desktop platform on Windows hands the studio backslash paths.
-    // Format-driven widgets (e.g. the image picker) must still resolve from the schema.
-    setupContentTab({ hero: "x.png" }, true, String.raw`posts\hello.json`);
-    const { container } = await renderHead({ tagName: "div" });
-    const section = sectionByTitle(container, "Frontmatter (posts)")!;
-    expect(section).toBeTruthy();
-    expect(row(section, "hero").querySelector(".media-picker")).toBeTruthy();
   });
 
   test("checkbox toggles boolean frontmatter; unchecking deletes the field", async () => {

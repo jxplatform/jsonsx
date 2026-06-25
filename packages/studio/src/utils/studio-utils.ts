@@ -168,9 +168,6 @@ export function findContentTypeSchema(
   if (!documentPath || !projectConfig?.contentTypes) {
     return null;
   }
-  // Content-type `source` prefixes are always forward-slash. The desktop platform can hand us
-  // OS-native backslash paths on Windows, so normalize before prefix matching.
-  const docPath = documentPath.replaceAll("\\", "/");
   for (const [name, def] of Object.entries(
     projectConfig.contentTypes as Record<string, ContentTypeDef>,
   )) {
@@ -180,7 +177,7 @@ export function findContentTypeSchema(
     const src = def.source.replace(/^\.\//, "").replace(/\/$/, "");
     const hasExt = src.includes(".") && !src.endsWith("/");
     if (hasExt) {
-      if (docPath === src || docPath.endsWith(`/${src}`)) {
+      if (documentPath === src || documentPath.endsWith(`/${src}`)) {
         return { name, schema: def.schema };
       }
     } else {
@@ -190,7 +187,7 @@ export function findContentTypeSchema(
           : (formatByName(def.format)?.extensions[0] ??
             defaultContentFormat()?.extensions[0] ??
             ".json");
-      if (docPath.startsWith(`${src}/`) && docPath.endsWith(ext)) {
+      if (documentPath.startsWith(`${src}/`) && documentPath.endsWith(ext)) {
         return { name, schema: def.schema };
       }
     }

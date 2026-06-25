@@ -95,7 +95,6 @@ export async function loadProject() {
     });
 
     if (info.isSiteProject) {
-      addRecentProject(requireProjectState().name, meta.root);
       await ensureDependenciesInstalled();
       await loadDirectory(".");
       await loadComponentRegistry();
@@ -1054,11 +1053,7 @@ export async function openFileInTab(path: string) {
       sourceFormat: format?.name ?? null,
     });
     requireProjectState().selectedPath = path;
-    trackRecentFile({
-      name: path.split("/").pop() || path,
-      path,
-      root: requireProjectState().projectRoot,
-    });
+    trackRecentFile({ name: path.split("/").pop() || path, path });
 
     statusMessage(`Opened ${path.split("/").pop()}`);
   } catch (error) {
