@@ -1,0 +1,10 @@
+{
+  "tagName": "div",
+  "attributes": { "id": "index-page" },
+  "children": [
+    {
+      "tagName": "h1",
+      "children": ["Welcome Home"]
+    }
+  ]
+}

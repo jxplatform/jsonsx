@@ -105,3 +105,5 @@ Components reference tokens with standard `var()`:
 ```
 
 CSS custom properties cascade naturally through the DOM — every component can use them without importing anything.
+
+> To style visually in Studio, see [Styling in Studio](/docs/studio-styling).

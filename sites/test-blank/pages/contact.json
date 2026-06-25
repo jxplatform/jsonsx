@@ -1,0 +1,119 @@
+{
+  "$layout": "../layouts/base.json",
+  "$head": [
+    {
+      "tagName": "title",
+      "textContent": "Contact | Portfolio"
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Contact me for project inquiries or to say hello."
+      }
+    }
+  ],
+  "children": [
+    {
+      "tagName": "section",
+      "style": {
+        "textAlign": "center",
+        "padding": "4rem 0",
+        "maxWidth": "500px",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "h2",
+          "textContent": "Contact",
+          "style": {
+            "fontSize": "2rem",
+            "marginBottom": "1em"
+          }
+        },
+        {
+          "tagName": "p",
+          "textContent": "Feel free to reach out via the form below or email me at example@email.com.",
+          "style": {
+            "fontSize": "1.1rem",
+            "color": "var(--color-text-secondary)",
+            "marginBottom": "2em"
+          }
+        },
+        {
+          "tagName": "form",
+          "attributes": {
+            "action": "mailto:example@email.com",
+            "method": "POST"
+          },
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "1em"
+          },
+          "children": [
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "text",
+                "placeholder": "Your Name",
+                "name": "name",
+                "required": true
+              },
+              "style": {
+                "padding": "0.8em",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid #333"
+              }
+            },
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "email",
+                "placeholder": "Your Email",
+                "name": "email",
+                "required": true
+              },
+              "style": {
+                "padding": "0.8em",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid #333"
+              }
+            },
+            {
+              "tagName": "textarea",
+              "attributes": {
+                "placeholder": "Your Message",
+                "name": "message",
+                "required": true,
+                "rows": 5
+              },
+              "style": {
+                "padding": "0.8em",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid #333"
+              }
+            },
+            {
+              "tagName": "button",
+              "attributes": {
+                "type": "submit"
+              },
+              "textContent": "Send Message",
+              "style": {
+                "backgroundColor": "var(--color-accent)",
+                "color": "#fff",
+                "padding": "0.8em 2em",
+                "border": "none",
+                "borderRadius": "var(--radius)",
+                "fontWeight": "600",
+                "fontSize": "1.1rem",
+                "cursor": "pointer"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

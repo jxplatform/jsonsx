@@ -127,3 +127,5 @@ The build output supports platform-specific files:
 | Vercel           | `vercel.json`            |
 | Cloudflare Pages | `_redirects`, `_headers` |
 | GitHub Pages     | `.nojekyll`, `404.html`  |
+
+> To build sites visually, see [Site Building in Studio](/docs/studio-site-building).
