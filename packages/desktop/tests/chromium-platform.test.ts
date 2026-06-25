@@ -24,10 +24,6 @@ const responses: Record<string, unknown> = {
   gitStage: null,
   gitStatus: { ahead: 0, behind: 0, branch: "main", files: [] },
   gitUnstage: null,
-  getProjectRoot: { root: "/abs/proj" },
-  setWindowProject: { config: { name: "Test" }, deduped: false },
-  getRecentProjects: [{ name: "Recent", root: "/abs/recent", timestamp: 7 }],
-  saveRecentProjects: null,
   listDirectory: [
     {
       modified: "2025-01-01",
@@ -179,25 +175,6 @@ describe("chromium desktop platform", () => {
   test("probeRootProject reads project.json", async () => {
     const result = await platform.probeRootProject();
     expect(result!.info.isSiteProject).toBe(true);
-    // Absolute backend root is surfaced as the re-openable key.
-    expect(result!.meta.root).toBe("/abs/proj");
-  });
-
-  test("getProjectRoot returns the backend root", async () => {
-    const { root } = await platform.getProjectRoot!();
-    expect(root).toBe("/abs/proj");
-  });
-
-  test("setWindowProject rebinds in place and reports no dedup", async () => {
-    const res = await platform.setWindowProject!("/abs/proj");
-    expect(res.deduped).toBe(false);
-    expect(res.config).toEqual({ name: "Test" });
-  });
-
-  test("recent projects round-trip through the backend store", async () => {
-    const list = await platform.getRecentProjects!();
-    expect(list.map((p) => p.root)).toEqual(["/abs/recent"]);
-    await expect(platform.saveRecentProjects!(list)).resolves.toBeUndefined();
   });
 
   test("probeRootProject returns fallback when readFile fails", async () => {

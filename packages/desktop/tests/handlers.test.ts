@@ -137,23 +137,6 @@ describe("listDirectory", () => {
       cleanup();
     }
   });
-
-  test("returns forward-slash relative paths for nested entries", async () => {
-    setup();
-    try {
-      mkdirSync(join(FIXTURES, "content", "products"), { recursive: true });
-      writeFileSync(join(FIXTURES, "content", "products", "widget.md"), "---\n---\n");
-
-      const entries = await listDirectory({ dir: "content/products" });
-      const file = entries.find((e: DirEntry) => e.name === "widget.md")!;
-      // On Windows Node's relative() yields backslash paths.
-      // Studio code such as findContentTypeSchema expects forward slashes, so the handler normalizes.
-      expect(file.path).toBe("content/products/widget.md");
-      expect(file.path).not.toContain("\\");
-    } finally {
-      cleanup();
-    }
-  });
 });
 
 // ─── handleReadFile ─────────────────────────────────────────────────────────
@@ -339,25 +322,6 @@ describe("discoverComponents", () => {
       expect(btn.path).toContain("my-button.json");
       expect(btn.props!.find((p) => p.name === "label")).toBeDefined();
       expect(btn.props!.find((p) => p.name === "onClick")).toBeUndefined();
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("returns forward-slash paths for nested components", async () => {
-    setup();
-    try {
-      mkdirSync(join(FIXTURES, "components", "widgets"), { recursive: true });
-      writeFileSync(
-        join(FIXTURES, "components", "widgets", "my-button.json"),
-        JSON.stringify({ children: [], tagName: "my-button" }),
-      );
-
-      const components = await discoverComponents({ dir: "." });
-      const btn = components.find((c: ComponentMeta) => c.tagName === "my-button")!;
-      // Bun.Glob emits backslashes on Windows; the handler must normalize before returning.
-      expect(btn.path).toBe("components/widgets/my-button.json");
-      expect(btn.path).not.toContain("\\");
     } finally {
       cleanup();
     }
@@ -846,22 +810,6 @@ describe("handleResolveSiteContext", () => {
     }
   });
 
-  test("returns a forward-slash sitePath for a deeply nested site", async () => {
-    setup();
-    try {
-      mkdirSync(join(FIXTURES, "sites", "blog", "pages"), { recursive: true });
-      writeFileSync(join(FIXTURES, "sites", "blog", "project.json"), '{"name": "blog"}');
-      const result = await handleResolveSiteContext({
-        filePath: "sites/blog/pages/index.json",
-      });
-      // Node's relative() yields a backslash path on Windows; the handler must normalize.
-      expect(result.sitePath).toBe("sites/blog");
-      expect(result.sitePath).not.toContain("\\");
-    } finally {
-      cleanup();
-    }
-  });
-
   test("returns null when no project.json found", async () => {
     setup();
     try {
@@ -1009,8 +957,7 @@ describe("openProject", () => {
       expect(result).not.toBeNull();
       expect(result!.config.name).toBe("My Project");
       expect(result!.handle.name).toBe("My Project");
-      // The handle now carries the absolute project root (the re-openable recent-projects key).
-      expect(result!.handle.root).toBe(FIXTURES);
+      expect(result!.handle.root).toBe(".");
       expect(getProjectRoot()).toBe(FIXTURES);
     } finally {
       setFileDialog(null as unknown as () => Promise<string | null>);

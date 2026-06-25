@@ -75,7 +75,5 @@ export default {
 
   scripts: {
     preBuild: "./scripts/pre-build.ts",
-    // Workaround for electrobun's broken Windows icon embedding; see the script header.
-    postBuild: "./scripts/embed-windows-icon.ts",
   },
 } satisfies ElectrobunConfig;

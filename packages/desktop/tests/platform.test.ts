@@ -312,60 +312,32 @@ describe("platform methods", () => {
   });
 
   test("probeRootProject reads project.json when present", async () => {
-    impls.set("getProjectRoot", () => ({ root: "/proj" }));
     impls.set("readFile", () => JSON.stringify({ name: "My Site" }));
     const probe = await platform.probeRootProject();
-    expect(probe).not.toBeNull();
-    expect(probe!.info.isSiteProject).toBe(true);
-    expect(probe!.info.projectConfig).toEqual({ name: "My Site" } as never);
-    expect(probe!.meta).toEqual({ name: "My Site", root: "/proj" });
+    expect(probe.info.isSiteProject).toBe(true);
+    expect(probe.info.projectConfig).toEqual({ name: "My Site" } as never);
+    expect(probe.meta).toEqual({ name: "My Site", root: "." });
     expect(lastCall("readFile")!.args[0]).toEqual({ path: "project.json" });
     impls.delete("readFile");
-    impls.delete("getProjectRoot");
   });
 
   test("probeRootProject falls back to 'project' name when config has none", async () => {
-    impls.set("getProjectRoot", () => ({ root: "/proj" }));
     impls.set("readFile", () => "{}");
     const probe = await platform.probeRootProject();
-    expect(probe).not.toBeNull();
-    expect(probe!.info.isSiteProject).toBe(true);
-    expect(probe!.meta.name).toBe("project");
+    expect(probe.info.isSiteProject).toBe(true);
+    expect(probe.meta.name).toBe("project");
     impls.delete("readFile");
-    impls.delete("getProjectRoot");
   });
 
   test("probeRootProject reports non-site project on read failure", async () => {
-    impls.set("getProjectRoot", () => ({ root: "/proj" }));
     impls.set("readFile", () => {
       throw new Error("missing");
     });
     const probe = await platform.probeRootProject();
-    expect(probe).not.toBeNull();
-    expect(probe!.info.isSiteProject).toBe(false);
-    expect(probe!.info.projectConfig).toBeNull();
-    expect(probe!.meta).toEqual({ name: "project", root: "." });
+    expect(probe.info.isSiteProject).toBe(false);
+    expect(probe.info.projectConfig).toBeNull();
+    expect(probe.meta).toEqual({ name: "project", root: "." });
     impls.delete("readFile");
-    impls.delete("getProjectRoot");
-  });
-
-  test("probeRootProject returns null when the window has no project (welcome window)", async () => {
-    impls.set("getProjectRoot", () => ({ root: null }));
-    const readsBefore = callsFor("readFile").length;
-    const probe = await platform.probeRootProject();
-    // Null tells the studio to show the welcome screen; project.json is never read.
-    expect(probe).toBeNull();
-    expect(callsFor("readFile").length).toBe(readsBefore);
-    impls.delete("getProjectRoot");
-  });
-
-  test("probeRootProject returns null when getProjectRoot fails", async () => {
-    impls.set("getProjectRoot", () => {
-      throw new Error("rpc down");
-    });
-    const probe = await platform.probeRootProject();
-    expect(probe).toBeNull();
-    impls.delete("getProjectRoot");
   });
 
   const delegations: [string, unknown[], string, unknown][] = [
@@ -443,7 +415,6 @@ describe("platform methods", () => {
     ["aiStreamUrl", ["sess-1"], "aiStreamUrl", { id: "sess-1" }],
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
     ["getProjectRoot", [], "getProjectRoot", undefined],
-    ["getRecentProjects", [], "getRecentProjects", undefined],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of delegations) {
@@ -479,12 +450,6 @@ describe("platform methods", () => {
     ["aiDeleteSession", ["sess-1"], "aiDeleteSession", { id: "sess-1" }],
     ["openProjectInNewWindow", ["/proj/y"], "openProjectInNewWindow", { root: "/proj/y" }],
     ["newWindow", [], "newWindow", undefined],
-    [
-      "saveRecentProjects",
-      [[{ name: "x", root: "/x", timestamp: 1 }]],
-      "saveRecentProjects",
-      { projects: [{ name: "x", root: "/x", timestamp: 1 }] },
-    ],
   ];
 
   for (const [method, args, rpcMethod, expectedPayload] of voidDelegations) {

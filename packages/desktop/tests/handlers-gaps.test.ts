@@ -1,5 +1,5 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
-import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -145,19 +145,10 @@ describe("listFormats", () => {
     }
   });
 
-  test("returns [] quietly (no registry build, no error log) when no project is open", async () => {
+  test("returns [] when no project is open", async () => {
     setProjectRoot(null);
-    const errorSpy = spyOn(console, "error").mockImplementation(() => {});
-    try {
-      const formats = await listFormats();
-      expect(formats).toEqual([]);
-      // The welcome-screen path short-circuits before getFormatRegistry, so it neither builds a
-      // Registry nor logs the misleading "No project open" error that used to spam the terminal.
-      expect(mockBuildRegistry).not.toHaveBeenCalled();
-      expect(errorSpy).not.toHaveBeenCalled();
-    } finally {
-      errorSpy.mockRestore();
-    }
+    const formats = await listFormats();
+    expect(formats).toEqual([]);
   });
 
   test("returns [] when the registry builder throws", async () => {

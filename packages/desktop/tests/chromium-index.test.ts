@@ -87,20 +87,11 @@ const handleAiRouteMock = mock((_req: Request, path: string, _root: string) =>
   Promise.resolve(path === "/studio/ai/auth-status" ? Response.json({ ok: true }) : null),
 );
 
-const readRecentsMock = mock(() =>
-  Promise.resolve([{ name: "Recent", root: "/abs/recent", timestamp: 1 }]),
-);
-const writeRecentsMock = mock(() => Promise.resolve());
-
 void mock.module("../src/handlers", () => handlerMocks);
 void mock.module("../src/git", () => gitMocks);
 void mock.module("../src/packages", () => packageMocks);
 void mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
 void mock.module("../src/ai", () => ({ handleAiRoute: handleAiRouteMock }));
-void mock.module("../src/recent-store", () => ({
-  readRecents: readRecentsMock,
-  writeRecents: writeRecentsMock,
-}));
 
 // ─── Fake chromium child process ────────────────────────────────────────────
 
@@ -296,27 +287,6 @@ describe("chromium launcher RPC dispatch", () => {
       action: "parse",
       format: "markdown",
     });
-  });
-
-  test("getProjectRoot wraps the handler value in { root }", async () => {
-    expect(await rpc("getProjectRoot")).toEqual({ root: projectRootValue });
-  });
-
-  test("setWindowProject rebinds the root in place and reports no dedup", async () => {
-    expect(await rpc("setWindowProject", { root: "/abs/switch" })).toEqual({
-      config: null,
-      deduped: false,
-    });
-    expect(handlerMocks.setProjectRoot).toHaveBeenCalledWith("/abs/switch");
-  });
-
-  test("recent-projects handlers read from and write to the store", async () => {
-    expect(await rpc("getRecentProjects")).toEqual([
-      { name: "Recent", root: "/abs/recent", timestamp: 1 },
-    ]);
-    const projects = [{ name: "Saved", root: "/abs/saved", timestamp: 2 }];
-    await rpc("saveRecentProjects", { projects });
-    expect(writeRecentsMock).toHaveBeenCalledWith(projects);
   });
 
   test("git query methods return results", async () => {

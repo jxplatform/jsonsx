@@ -1,13 +1,9 @@
 /// <reference lib="dom" />
-import type {
-  ComponentMeta,
-  RecentProjectEntry,
-  RenameResult,
-  StudioPlatform,
-} from "@jxsuite/studio/types";
+import type { StudioPlatform } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type {
   CodeServiceResult,
+  ComponentMeta,
   DirEntry,
   GitBranchesResult,
   GitLogEntry,
@@ -75,15 +71,13 @@ export function createDesktopPlatform(): StudioPlatform {
       try {
         const content = await request("readFile", { path: "project.json" });
         const config = JSON.parse(content as string) as { name?: string };
-        // Resolve the absolute backend root so the recent-projects list gets a re-openable key.
-        const { root } = (await request("getProjectRoot")) as { root: string | null };
         return {
           info: {
             directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config as ProjectConfig,
           },
-          meta: { name: config.name || "project", root: root || "." },
+          meta: { name: config.name || "project", root: "." },
         };
       } catch {
         return {
@@ -95,27 +89,6 @@ export function createDesktopPlatform(): StudioPlatform {
           meta: { name: "project", root: "." },
         };
       }
-    },
-
-    async getProjectRoot() {
-      return request("getProjectRoot") as Promise<{ root: string | null }>;
-    },
-
-    async setWindowProject(root: string) {
-      return request("setWindowProject", { root }) as Promise<{
-        deduped: boolean;
-        config: ProjectConfig | null;
-      }>;
-    },
-
-    // ─── Recent projects (user-level store, shared across per-project profiles) ──
-
-    async getRecentProjects() {
-      return request("getRecentProjects") as Promise<RecentProjectEntry[]>;
-    },
-
-    async saveRecentProjects(projects: RecentProjectEntry[]) {
-      await request("saveRecentProjects", { projects });
     },
 
     async resolveSiteContext(filePath: string) {
@@ -138,7 +111,7 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("writeFile", { content, path }) as Promise<void>;
     },
 
-    async uploadFile(path: string, data: string | File | Blob | ArrayBuffer) {
+    async uploadFile(path: string, data: string) {
       return request("uploadFile", { data, path }) as Promise<unknown>;
     },
 
@@ -147,7 +120,7 @@ export function createDesktopPlatform(): StudioPlatform {
     },
 
     async renameFile(from: string, to: string) {
-      return request("renameFile", { from, to }) as Promise<RenameResult>;
+      return request("renameFile", { from, to }) as Promise<void>;
     },
 
     async createDirectory(path: string) {
@@ -323,6 +296,10 @@ export function createDesktopPlatform(): StudioPlatform {
     },
     async aiDeleteSession(id: string) {
       await fetch(`/studio/ai/session/${id}`, { method: "DELETE" });
+    },
+    // Stack B: same-origin OpenAI-compatible chat proxy.
+    aiChatUrl() {
+      return "/studio/ai/chat";
     },
   };
 }

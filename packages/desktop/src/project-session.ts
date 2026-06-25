@@ -123,23 +123,7 @@ export function setFileDialog(fn: () => Promise<string | null>) {
 
 // ─── Pure helpers (no session state) ──────────────────────────────────────────
 
-// Path convention: every path returned to the studio MUST be forward-slash and project-relative.
-// Node's relative() and Bun.Glob.scan() emit OS-native backslashes on Windows.
-// Those break the studio's forward-slash assumptions (e.g. findContentTypeSchema's prefix match).
-// Route ALL studio-facing paths through toPosix()/relPosix(); a guard test enforces this.
-
-/** Normalize an OS-native path to the studio's forward-slash convention. */
-function toPosix(p: string): string {
-  return p.replaceAll("\\", "/");
-}
-
-/** Project-relative, forward-slash path — the canonical form for every studio-facing path. */
-function relPosix(root: string, absPath: string): string {
-  return toPosix(relative(root, absPath));
-}
-
 function assertUnderRoot(absPath: string, root: string) {
-  // Guard only — the raw separator is irrelevant to the "../" and "/" escape checks below.
   const rel = relative(root, absPath);
   if (rel.startsWith("..") || rel.startsWith("/")) {
     throw new Error("Path outside project root");
@@ -321,12 +305,6 @@ export function createProjectSession(initialRoot: string | null) {
 
   /** List the project's registered format classes (auto-discovered from imports). */
   async function listFormats() {
-    // No project open yet (e.g. a fresh welcome window): there are no imported formats to list, and
-    // Building a registry would throw "No project open". Return empty quietly instead of logging a
-    // Spurious error — the studio's welcome screen calls this before any project is loaded.
-    if (!projectRoot) {
-      return [];
-    }
     try {
       const registry = await getFormatRegistry();
       return registry.entries.map((e) => ({
@@ -397,10 +375,7 @@ export function createProjectSession(initialRoot: string | null) {
       handle: {
         name: config.name || basename(projectRoot),
         projectConfig: config,
-        // Absolute project path: the canonical, re-openable identity used for the recent-projects
-        // List and multi-window dedup. File I/O is unaffected (handlers resolve relative paths
-        // Against this session's root regardless of the studio-side value).
-        root: projectRoot,
+        root: ".",
       },
     };
   }
@@ -423,7 +398,7 @@ export function createProjectSession(initialRoot: string | null) {
         result.push({
           modified: s.mtime.toISOString(),
           name: entry.name,
-          path: relPosix(root, absPath),
+          path: relative(root, absPath),
           size: s.size,
           type: entry.isDirectory() ? "directory" : "file",
         });
@@ -500,7 +475,7 @@ export function createProjectSession(initialRoot: string | null) {
       const registry = await getFormatRegistry();
       return await applyRename({ absFrom, absTo, registry, root });
     } catch {
-      const rel = (p: string) => relPosix(root, p);
+      const rel = (p: string) => relative(root, p).replaceAll("\\", "/");
       return {
         errors: [],
         from: rel(absFrom),
@@ -542,7 +517,7 @@ export function createProjectSession(initialRoot: string | null) {
 
       const candidate = join(dir, "project.json");
       if (existsSync(candidate)) {
-        return { sitePath: relPosix(root, dir) || "." };
+        return { sitePath: relative(root, dir) || "." };
       }
 
       const parent = dirname(dir);
@@ -565,10 +540,7 @@ export function createProjectSession(initialRoot: string | null) {
     const glob = new Bun.Glob("**/*.json");
     const components: ComponentMeta[] = [];
 
-    for await (const rawMatch of glob.scan({ cwd: scanRoot, dot: false })) {
-      // Normalize first: Bun.Glob emits backslashes on Windows, which would both leak to the studio
-      // And defeat the forward-slash "dist/" / ".claude/" exclusion checks below.
-      const match = toPosix(rawMatch);
+    for await (const match of glob.scan({ cwd: scanRoot, dot: false })) {
       if (match.includes("node_modules") || match.includes("dist/") || match.includes(".claude/")) {
         continue;
       }
@@ -633,12 +605,11 @@ export function createProjectSession(initialRoot: string | null) {
     const glob = new Bun.Glob(`**/${params.name}`);
     const matches: string[] = [];
 
-    for await (const rawMatch of glob.scan({ cwd: root, dot: false })) {
-      const match = toPosix(rawMatch);
+    for await (const match of glob.scan({ cwd: root, dot: false })) {
       if (match.includes("node_modules") || match.includes("dist/")) {
         continue;
       }
-      matches.push(match);
+      matches.push(match.split("\\").join("/"));
     }
 
     return matches.length > 0 ? matches[0] : null;

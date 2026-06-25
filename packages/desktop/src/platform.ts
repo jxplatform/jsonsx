@@ -2,7 +2,7 @@
 /// <reference lib="dom.iterable" />
 import { Electroview } from "electrobun/view";
 import { html, render as litRender } from "lit-html";
-import type { RecentProjectEntry, StudioRPC } from "./rpc-schema";
+import type { StudioRPC } from "./rpc-schema";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload } from "@jxsuite/server/refactor";
 
@@ -236,40 +236,17 @@ export function createDesktopPlatform() {
       return rpc.request.getProjectRoot();
     },
 
-    // ─── Recent projects (process-shared, user-level store) ─────────────────────
-
-    async getRecentProjects() {
-      return rpc.request.getRecentProjects();
-    },
-
-    async saveRecentProjects(projects: RecentProjectEntry[]) {
-      await rpc.request.saveRecentProjects({ projects });
-    },
-
     async probeRootProject() {
-      // A fresh welcome window owns a session with no project root. Report "no project" (null) so the
-      // Studio shows the welcome screen — returning a phantom non-site project instead would suppress
-      // The welcome screen and trigger a spurious "No project open" error from listFormats.
-      let root: string | null = null;
-      try {
-        ({ root } = await rpc.request.getProjectRoot());
-      } catch {
-        root = null;
-      }
-      if (!root) {
-        return null;
-      }
       try {
         const content = await rpc.request.readFile({ path: "project.json" });
         const config = JSON.parse(content as string) as ProjectConfig;
-        // `root` (the absolute backend root) is already resolved above and is the re-openable key.
         return {
           info: {
             directories: [] as string[],
             isSiteProject: true as const,
             projectConfig: config,
           },
-          meta: { name: config.name || "project", root },
+          meta: { name: config.name || "project", root: "." },
         };
       } catch {
         return {
@@ -533,6 +510,10 @@ export function createDesktopPlatform() {
     },
     async aiDeleteSession(id: string) {
       await rpc.request.aiDeleteSession({ id });
+    },
+    // Stack B: same-origin proxy mounted by the Electrobun local AI server (handleAiApi).
+    aiChatUrl() {
+      return "/__studio/ai/chat";
     },
   };
 }

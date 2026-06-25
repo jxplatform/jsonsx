@@ -19,7 +19,6 @@ import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } 
 import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
 import { createProjectSession } from "./project-session";
-import { readRecents, writeRecents } from "./recent-store";
 import type { ProjectSession } from "./project-session";
 import type { SiteConfig, StudioRPC } from "./rpc-schema";
 
@@ -274,10 +273,6 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         gitStage: (params) => git.gitStage(params),
         gitStatus: () => git.gitStatus(),
         gitUnstage: (params) => git.gitUnstage(params),
-
-        // Recent projects (process-shared, user-level store)
-        getRecentProjects: () => readRecents(),
-        saveRecentProjects: (params) => writeRecents(params.projects),
 
         // Updater (process-shared)
         updaterApplyUpdate: () => applyUpdate(),
