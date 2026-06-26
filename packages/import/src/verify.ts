@@ -303,7 +303,7 @@ export async function verifyProject(opts: VerifyOptions): Promise<VerifyResult> 
 
     return { pages: results, averageFidelity, reportDir };
   } finally {
-    server.stop();
+    void server.stop();
     if (!opts.browser) {
       await closeBrowser();
     }

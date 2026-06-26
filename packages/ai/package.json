@@ -14,23 +14,23 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.js",
-    "./streaming-client": "./src/streaming-client.js",
-    "./tools": "./src/tools.js",
-    "./chat-state": "./src/chat-state.js"
+    ".": "./src/index.ts",
+    "./streaming-client": "./src/streaming-client.ts",
+    "./tools": "./src/tools.ts",
+    "./chat-state": "./src/chat-state.ts"
   },
   "publishConfig": {
     "provenance": true
   },
   "scripts": {
-    "build": "bun build ./src/index.js --outdir dist --target browser --sourcemap=linked",
+    "build": "bun build ./src/index.ts --outdir dist --target browser --sourcemap=linked",
     "test": "bun test",
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "dependencies": {
-    "@vue/reactivity": "^3.5.34"
+    "@vue/reactivity": "^3.5.39"
   },
   "devDependencies": {
-    "@happy-dom/global-registrator": "^20.9.0"
+    "@happy-dom/global-registrator": "^20.10.6"
   }
 }

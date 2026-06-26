@@ -596,7 +596,7 @@ function domNodeToJx(node: Node) {
     for (const child of childNodes) {
       const jsx = domNodeToJx(child);
       if (jsx) {
-        result.children.push(/** @type {JxMutableNode} */ jsx);
+        result.children.push(jsx as JxMutableNode);
       }
     }
   }

@@ -14,11 +14,11 @@ export interface DiffedStyle {
 export function kebabToCamel(prop: string): string {
   if (prop.startsWith("-webkit-") || prop.startsWith("-moz-") || prop.startsWith("-ms-")) {
     const withoutPrefix = prop.replace(/^-(?:webkit|moz|ms)-/, "");
-    const camel = withoutPrefix.replaceAll(/-([a-z])/g, (_, c) => c.toUpperCase());
+    const camel = withoutPrefix.replaceAll(/-([a-z])/g, (_, c: string) => c.toUpperCase());
     const vendor = prop.startsWith("-webkit-") ? "webkit" : prop.startsWith("-moz-") ? "moz" : "ms";
-    return `${vendor}${camel[0].toUpperCase()}${camel.slice(1)}`;
+    return `${vendor}${camel[0]!.toUpperCase()}${camel.slice(1)}`;
   }
-  return prop.replaceAll(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return prop.replaceAll(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
 /**

@@ -125,6 +125,7 @@ export function installMockPlatform(
     activate: log("activate", async () => {}),
     addPackage: log("addPackage", async () => ({})),
     aiAuthStatus: log("aiAuthStatus", async () => ({ authenticated: false })),
+    aiChatUrl: log("aiChatUrl", () => "/__mock/ai/chat"),
     aiCreateSession: log("aiCreateSession", async () => ({ id: "mock-session" })),
     aiDeleteSession: log("aiDeleteSession", async () => {}),
     aiSendMessage: log("aiSendMessage", async () => {}),

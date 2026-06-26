@@ -102,7 +102,7 @@ export function applyCanvasStyle(
       continue;
     }
     if (activeBreakpoints.has(mediaName) || featureToggles[mediaName]) {
-      for (const [prop, v] of Object.entries(/** @type {Record<string, unknown>} */ val)) {
+      for (const [prop, v] of Object.entries(val as Record<string, unknown>)) {
         if (typeof v === "string" || typeof v === "number") {
           try {
             if (prop.startsWith("--")) {

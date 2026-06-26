@@ -230,7 +230,7 @@ describe("renderComponentPreview", () => {
   test("npm component not registered → does not throw", async () => {
     // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().resolves.toBeDefined() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for resolution.
     await expect(
-      renderComponentPreview(/** @type {any} */ { source: "npm", tagName: "sl-nonexistent" }),
+      renderComponentPreview({ source: "npm", tagName: "sl-nonexistent" } as any),
     ).resolves.toBeDefined();
   });
 

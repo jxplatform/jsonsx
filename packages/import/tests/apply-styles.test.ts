@@ -26,13 +26,13 @@ describe("applyStylesToTree", () => {
 
     applyStylesToTree(tree, styles);
 
-    const container = tree.children![0] as JxElement;
+    const container = (tree.children as JxElement[])[0]!;
     expect(container.style).toEqual({ display: "flex", gap: "16px" });
 
-    const h1 = container.children![0] as JxElement;
+    const h1 = (container.children as JxElement[])[0]!;
     expect(h1.style).toEqual({ fontSize: "32px", fontWeight: 700 });
 
-    const p = container.children![1] as JxElement;
+    const p = (container.children as JxElement[])[1]!;
     expect(p.style).toEqual({ color: "rgb(100, 100, 100)" });
   });
 
@@ -46,7 +46,7 @@ describe("applyStylesToTree", () => {
 
     applyStylesToTree(tree, styles);
 
-    const p = tree.children![0] as JxElement;
+    const p = (tree.children as JxElement[])[0]!;
     expect(p.style).toEqual({ color: "red", fontSize: "14px", fontWeight: 400 });
   });
 
@@ -67,7 +67,7 @@ describe("applyStylesToTree", () => {
 
     applyStylesToTree(tree, baseStyles, mediaDeltas);
 
-    const container = tree.children![0] as JxElement;
+    const container = (tree.children as JxElement[])[0]!;
     expect(container.style).toEqual({
       display: "flex",
       flexDirection: "row",
@@ -94,10 +94,10 @@ describe("applyStylesToTree", () => {
 
     applyStylesToTree(tree, styles);
 
-    const p1 = tree.children![1] as JxElement;
+    const p1 = (tree.children as JxElement[])[1]!;
     expect(p1.style).toEqual({ color: "blue" });
 
-    const p2 = tree.children![3] as JxElement;
+    const p2 = (tree.children as JxElement[])[3]!;
     expect(p2.style).toEqual({ color: "green" });
   });
 
@@ -118,7 +118,7 @@ describe("applyStylesToTree", () => {
 
     applyStylesToTree(tree, []);
 
-    const p = tree.children![0] as JxElement;
+    const p = (tree.children as JxElement[])[0]!;
     expect(p.style).toBeUndefined();
   });
 });

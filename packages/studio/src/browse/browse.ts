@@ -702,7 +702,7 @@ async function loadPreview(el: Element, file: { path: string; category: string }
         ? ((await renderComponentPreview(comp)) as HTMLElement | undefined)
         : ((await renderDocPreview(file.path)) as HTMLElement | undefined) || undefined;
       if (preview) {
-        _previewCache.set(file.path, /** @type {HTMLElement} */ preview);
+        _previewCache.set(file.path, preview as HTMLElement);
       }
     } catch {
       return;

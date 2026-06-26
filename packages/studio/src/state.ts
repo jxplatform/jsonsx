@@ -85,16 +85,18 @@ export function cloneAlongPath(
   path: JxPath,
 ): { root: JxMutableNode; target: JxMutableNode } {
   const root = Array.isArray(doc) ? [...doc] : { ...doc };
-  let node: Record<string | number, unknown> = root;
+  let node: Record<string | number, unknown> = root as Record<string | number, unknown>;
 
   for (const key of path) {
     const child = node[key];
     if (child == null) {
       return { root: root as JxMutableNode, target: node as JxMutableNode };
     }
-    const cloned = Array.isArray(child) ? [...child] : { ...(child as Record<string, unknown>) };
+    const cloned = Array.isArray(child)
+      ? [...(child as unknown[])]
+      : { ...(child as Record<string, unknown>) };
     node[key] = cloned;
-    node = cloned;
+    node = cloned as Record<string | number, unknown>;
   }
 
   return { root: root as JxMutableNode, target: node as JxMutableNode };

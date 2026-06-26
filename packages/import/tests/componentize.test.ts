@@ -42,7 +42,7 @@ describe("componentize", () => {
     const result = componentize(pages);
     expect(result.components.size).toBe(1);
 
-    const [[fileName, comp]] = [...result.components.entries()];
+    const [fileName, comp] = [...result.components.entries()][0]!;
     expect(fileName).toMatch(/\.json$/);
     expect(comp.$id).toBeTruthy();
     expect(comp.tagName).toMatch(/^component-/);
@@ -61,7 +61,7 @@ describe("componentize", () => {
       ],
     ]);
     const result = componentize(pages);
-    const [comp] = [...result.components.values()];
+    const comp = [...result.components.values()][0]!;
 
     expect(comp.template.state).toBeUndefined();
 
@@ -112,13 +112,13 @@ describe("componentize", () => {
     const result = componentize(pages);
     expect(result.components.size).toBe(1);
 
-    const [comp] = [...result.components.values()];
+    const comp = [...result.components.values()][0]!;
     expect(comp.instanceCount).toBe(2);
 
     const indexPage = result.rewrittenPages.get("pages/index.json")!;
     const aboutPage = result.rewrittenPages.get("pages/about.json")!;
-    expect((indexPage.children as JxElement[])[0].tagName).toMatch(/^component-/);
-    expect((aboutPage.children as JxElement[])[0].tagName).toMatch(/^component-/);
+    expect((indexPage.children as JxElement[])[0]!.tagName).toMatch(/^component-/);
+    expect((aboutPage.children as JxElement[])[0]!.tagName).toMatch(/^component-/);
   });
 
   test("respects minInstances threshold", () => {
@@ -164,7 +164,7 @@ describe("componentize", () => {
       ],
     ]);
     const result = componentize(pages);
-    const [comp] = [...result.components.values()];
+    const comp = [...result.components.values()][0]!;
     const templateStr = JSON.stringify(comp.template);
     // "Learn More" is the same across both cards, should NOT be interpolated
     expect(templateStr).toContain("Learn More");
@@ -210,8 +210,8 @@ describe("componentize", () => {
     const page = result.rewrittenPages.get("pages/index.json")!;
     const children = page.children as JxElement[];
 
-    const props0 = children[0].$props as Record<string, string>;
-    const props1 = children[1].$props as Record<string, string>;
+    const props0 = children[0]!.$props as Record<string, string>;
+    const props1 = children[1]!.$props as Record<string, string>;
 
     const allValues0 = Object.values(props0);
     const allValues1 = Object.values(props1);

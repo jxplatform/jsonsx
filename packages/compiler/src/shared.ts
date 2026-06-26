@@ -847,9 +847,7 @@ export function collectStyles(
         if (atBaseProps) {
           rules.push(`${atRule} { ${selector} { ${atBaseProps} } }`);
         }
-        for (const [sel, nestedRules] of Object.entries(
-          /** @type {Record<string, unknown>} */ val,
-        )) {
+        for (const [sel, nestedRules] of Object.entries(val as Record<string, unknown>)) {
           if (
             nestedRules === null ||
             typeof nestedRules !== "object" ||
@@ -873,12 +871,7 @@ export function collectStyles(
           : prop.startsWith(":") || prop.startsWith(".") || prop.startsWith("[")
             ? `${selector}${prop}`
             : `${selector} ${prop}`;
-        emitNestedElement(
-          resolved,
-          /** @type {Record<string, unknown>} */ val,
-          rules,
-          mediaQueries,
-        );
+        emitNestedElement(resolved, val as Record<string, unknown>, rules, mediaQueries);
       }
     }
   }

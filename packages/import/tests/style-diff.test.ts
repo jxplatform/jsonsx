@@ -84,8 +84,8 @@ describe("diffAllStyles", () => {
     const result = diffAllStyles(elements, uaDefaults);
 
     expect(result).toHaveLength(1);
-    expect(result[0].path).toEqual([0, 0]);
-    expect(result[0].style.color).toBe("rgb(255, 0, 0)");
+    expect(result[0]!.path).toEqual([0, 0]);
+    expect(result[0]!.style.color).toBe("rgb(255, 0, 0)");
   });
 });
 
@@ -124,8 +124,8 @@ describe("computeMediaDelta", () => {
     const deltas = computeMediaDelta(base, bp, uaDefaults);
 
     expect(deltas).toHaveLength(1);
-    expect(deltas[0].style).toHaveProperty("flexDirection", "column");
-    expect(deltas[0].style).not.toHaveProperty("display");
+    expect(deltas[0]!.style).toHaveProperty("flexDirection", "column");
+    expect(deltas[0]!.style).not.toHaveProperty("display");
   });
 
   test("handles elements only in base (removed at breakpoint)", () => {

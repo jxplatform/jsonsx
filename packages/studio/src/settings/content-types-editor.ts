@@ -13,7 +13,7 @@ import { projectState } from "../store";
 import { addFieldFormTpl, detectFieldFormat, fieldCardTpl, schemaForType } from "./schema-field-ui";
 import { toCamelCase } from "../utils/studio-utils";
 
-import type { FieldHandlers } from "./schema-field-ui.js";
+import type { FieldHandlers, SchemaProperty } from "./schema-field-ui.js";
 import type {
   ContentTypeSchema,
   ContentTypeSchemaField,
@@ -537,7 +537,7 @@ export function renderContentTypesEditor(container: HTMLElement) {
       ([name, def]) =>
         fieldCardTpl(
           name,
-          /** @type {import("./schema-field-ui.js").SchemaProperty} */ def,
+          def as SchemaProperty,
           required.includes(name),
           handlers,
           contentTypeNames,

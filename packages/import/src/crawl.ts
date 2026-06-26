@@ -35,7 +35,7 @@ export interface CrawledPage {
   depth: number;
   links: string[];
   /** Reference screenshot PNG buffer, present when captureScreenshots is true. */
-  screenshot?: Buffer;
+  screenshot?: Buffer | undefined;
 }
 
 export interface CrawlResult {
@@ -113,7 +113,7 @@ export function routeToFilePath(url: string, _baseOrigin?: string): string {
     .map((s) => s.replaceAll(/[^a-zA-Z0-9._-]/g, "_"));
 
   // If the last segment has an extension (like .html), strip it
-  const last = segments.at(-1);
+  const last = segments.at(-1)!;
   const dotIdx = last.lastIndexOf(".");
   if (dotIdx > 0) {
     segments[segments.length - 1] = last.slice(0, dotIdx);

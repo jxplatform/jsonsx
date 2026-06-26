@@ -86,14 +86,15 @@ export function detectLayout(pages: Map<string, JxElement>): LayoutResult | null
   const allRoots = entries.map(([, doc]) =>
     Array.isArray(doc.children) ? (doc.children as (JxElement | string)[]) : [],
   );
+  const firstRoot = allRoots[0]!;
 
   // Find shared prefix (header elements)
   let sharedPrefixLen = 0;
   const minLen = Math.min(...allRoots.map((c) => c.length));
 
   for (let i = 0; i < minLen; i++) {
-    const reference = allRoots[0][i];
-    const allMatch = allRoots.every((children) => treesEqual(children[i], reference));
+    const reference = firstRoot[i]!;
+    const allMatch = allRoots.every((children) => treesEqual(children[i]!, reference));
     if (allMatch) {
       sharedPrefixLen = i + 1;
     } else {
@@ -104,9 +105,9 @@ export function detectLayout(pages: Map<string, JxElement>): LayoutResult | null
   // Find shared suffix (footer elements), not overlapping with prefix
   let sharedSuffixLen = 0;
   for (let i = 0; i < minLen - sharedPrefixLen; i++) {
-    const reference = allRoots[0][allRoots[0].length - 1 - i];
+    const reference = firstRoot[firstRoot.length - 1 - i]!;
     const allMatch = allRoots.every((children) =>
-      treesEqual(children[children.length - 1 - i], reference),
+      treesEqual(children[children.length - 1 - i]!, reference),
     );
     if (allMatch) {
       sharedSuffixLen = i + 1;
@@ -120,9 +121,9 @@ export function detectLayout(pages: Map<string, JxElement>): LayoutResult | null
   }
 
   // Build layout: shared prefix + $slot + shared suffix
-  const headerChildren = allRoots[0].slice(0, sharedPrefixLen);
+  const headerChildren = firstRoot.slice(0, sharedPrefixLen);
   const footerChildren =
-    sharedSuffixLen > 0 ? allRoots[0].slice(allRoots[0].length - sharedSuffixLen) : [];
+    sharedSuffixLen > 0 ? firstRoot.slice(firstRoot.length - sharedSuffixLen) : [];
 
   const slot: JxElement = { tagName: "slot" };
 

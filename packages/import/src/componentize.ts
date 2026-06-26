@@ -157,7 +157,8 @@ function setNodeAt(root: JxElement, path: number[], replacement: JxElement): JxE
   const result: JxElement = { ...root };
   if (Array.isArray(root.children)) {
     result.children = [...root.children] as JxElement[];
-    const [head, ...rest] = path;
+    const head = path[0]!;
+    const rest = path.slice(1);
     if (rest.length === 0) {
       (result.children as JxElement[])[head] = replacement;
     } else {
@@ -215,8 +216,8 @@ export function componentize(
   const candidates = [...byHash.entries()]
     .filter(([, locs]) => locs.length >= minInstances)
     .toSorted((a, b) => {
-      const depthA = nodeDepth(a[1][0].node);
-      const depthB = nodeDepth(b[1][0].node);
+      const depthA = nodeDepth(a[1][0]!.node);
+      const depthB = nodeDepth(b[1][0]!.node);
       if (depthB !== depthA) {
         return depthB - depthA;
       }
@@ -284,18 +285,18 @@ export function componentize(
       nameMap.set(vp, name);
     }
 
-    const baseTag = unclaimed[0].node.tagName ?? "div";
+    const baseTag = unclaimed[0]!.node.tagName ?? "div";
     const kebabName = toKebabCase(baseTag, compIndex);
     const pascalName = toPascalCase(kebabName);
     compIndex += 1;
 
     const state: Record<string, string> = {};
     for (const [leafPath, stateName] of nameMap) {
-      state[stateName] = allLeaves[0].get(leafPath) ?? "";
+      state[stateName] = allLeaves[0]!.get(leafPath) ?? "";
     }
 
     const template = applyStateInterpolation(
-      unclaimed[0].node,
+      unclaimed[0]!.node,
       "root",
       varyingPaths,
       nameMap,

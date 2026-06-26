@@ -69,12 +69,9 @@ function classifyAsset(
     return "icons";
   }
 
-  const [ext] = extname(new URL(url).pathname).toLowerCase().split("?");
+  const [ext = ""] = extname(new URL(url).pathname).toLowerCase().split("?");
   if (FONT_EXTENSIONS.has(ext)) {
     return "fonts";
-  }
-  if ((ext === ".ico" || ext === ".svg") && source === "favicon") {
-    return "icons";
   }
   if (IMAGE_EXTENSIONS.has(ext)) {
     return "images";

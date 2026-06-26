@@ -177,7 +177,7 @@ export async function runCli(src: string, out?: string) {
   }
   if (server && out) {
     const serverOut = out.replace(/(\.[^.]+)?$/, "-server.js");
-    writeFileSync(serverOut, /** @type {string} */ server, "utf8");
+    writeFileSync(serverOut, server as string, "utf8");
     console.error(`Server handler written to ${serverOut}`);
   }
 }

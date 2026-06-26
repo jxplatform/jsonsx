@@ -169,7 +169,7 @@ export function fieldCardTpl(
                 nestedFieldCardTpl(
                   fieldName,
                   name,
-                  /** @type {SchemaProperty} */ sub,
+                  sub as SchemaProperty,
                   nestedRequired.includes(name),
                   handlers,
                 ),

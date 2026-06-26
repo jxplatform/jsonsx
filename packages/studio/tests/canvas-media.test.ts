@@ -236,8 +236,8 @@ describe("applyCanvasStyle", () => {
 
   test("skips null/undefined style defs gracefully", () => {
     const el = document.createElement("div");
-    applyCanvasStyle(el, /** @type {any} */ null, new Set(), {});
-    applyCanvasStyle(el, /** @type {any} */ undefined, new Set(), {});
+    applyCanvasStyle(el, null as any, new Set(), {});
+    applyCanvasStyle(el, undefined as any, new Set(), {});
     expect(el.style.length).toBe(0);
   });
 

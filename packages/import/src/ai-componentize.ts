@@ -14,8 +14,8 @@ import type { ExtractedComponent, ComponentizeResult } from "./componentize.ts";
 
 export interface AiComponentizeOptions {
   apiKey: string;
-  baseUrl?: string;
-  model?: string;
+  baseUrl?: string | undefined;
+  model?: string | undefined;
 }
 
 interface RenameResult {
@@ -285,8 +285,8 @@ function rewriteCallSites(
 
     const propRenames = propRenamesByTag.get(oldTag);
     if (propRenames && result.$props) {
-      const newProps: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(result.$props as Record<string, unknown>)) {
+      const newProps: NonNullable<typeof result.$props> = {};
+      for (const [k, v] of Object.entries(result.$props)) {
         const newKey = propRenames[k] ?? k;
         newProps[newKey] = v;
       }

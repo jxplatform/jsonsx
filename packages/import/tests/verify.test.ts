@@ -47,7 +47,7 @@ describe("verify - serveDirectory", () => {
       const text = await res.text();
       expect(text).toContain("Hello");
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 
@@ -59,7 +59,7 @@ describe("verify - serveDirectory", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/html");
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 
@@ -71,7 +71,7 @@ describe("verify - serveDirectory", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("text/css");
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 
@@ -83,7 +83,7 @@ describe("verify - serveDirectory", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("Content-Type")).toContain("application/javascript");
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 
@@ -93,7 +93,7 @@ describe("verify - serveDirectory", () => {
       const res = await fetch(`${baseUrl}/nonexistent`);
       expect(res.status).toBe(404);
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 
@@ -107,7 +107,7 @@ describe("verify - serveDirectory", () => {
       const text = await res.text();
       expect(text).toContain("Blog");
     } finally {
-      server.stop();
+      void server.stop();
     }
   });
 });
@@ -125,7 +125,7 @@ describe("verify - verifyProject (build-failure path)", () => {
 
     expect(result.averageFidelity).toBe(0);
     expect(result.pages.length).toBe(1);
-    expect(result.pages[0].error).toBeTruthy();
-    expect(result.pages[0].error).toMatch(/build|not found|missing/i);
+    expect(result.pages[0]!.error).toBeTruthy();
+    expect(result.pages[0]!.error).toMatch(/build|not found|missing/i);
   });
 });

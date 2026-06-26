@@ -5,7 +5,7 @@ import type { JxElement } from "@jxsuite/schema/types";
 import type { ExtractedComponent } from "../src/componentize.ts";
 
 function firstEntry(map: Map<string, ExtractedComponent>): [string, ExtractedComponent] {
-  const [[k, v]] = map;
+  const [k, v] = [...map][0]!;
   return [k, v];
 }
 
@@ -35,7 +35,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  mockServer.stop();
+  void mockServer.stop();
 });
 
 function makeRepeatedCards(): Map<string, JxElement> {

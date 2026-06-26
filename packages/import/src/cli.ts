@@ -69,7 +69,7 @@ if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
 }
 
 const [url] = args;
-if (!url.startsWith("http://") && !url.startsWith("https://")) {
+if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) {
   console.error("Error: URL must start with http:// or https://");
   process.exit(1);
 }
@@ -102,8 +102,9 @@ const componentizeOptions = noComponents
 
 let outDir: string;
 const outIdx = args.indexOf("--out");
-if (outIdx !== -1 && args[outIdx + 1]) {
-  outDir = resolve(args[outIdx + 1]);
+const outArg = args[outIdx + 1];
+if (outIdx !== -1 && outArg) {
+  outDir = resolve(outArg);
 } else {
   const hostname = new URL(url).hostname.replace(/^www\./, "");
   outDir = resolve(homedir(), "jx-imports", hostname);

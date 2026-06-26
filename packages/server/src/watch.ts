@@ -191,10 +191,11 @@ export function createWatcher(
 
   // Gracefully handle watch errors (e.g. EINVAL on transient Bun test dirs)
   watcher.on("error", (err) => {
-    if (err.message?.includes("EINVAL")) {
+    const error = err as Error;
+    if (error.message?.includes("EINVAL")) {
       return;
     }
-    console.error("[watch] chokidar error:", err.message ?? err);
+    console.error("[watch] chokidar error:", error.message ?? error);
   });
 
   return { broadcast, broadcastEvent, handleSSE, watcher };

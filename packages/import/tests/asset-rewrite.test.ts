@@ -18,7 +18,9 @@ describe("rewriteAssetUrls", () => {
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(1);
-    expect((tree.children![0] as JxElement).attributes!.src).toBe("public/assets/images/hero.jpg");
+    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe(
+      "public/assets/images/hero.jpg",
+    );
   });
 
   test("rewrites srcset attribute", () => {
@@ -41,7 +43,7 @@ describe("rewriteAssetUrls", () => {
     const count = rewriteAssetUrls(tree, map);
 
     expect(count).toBe(2);
-    expect((tree.children![0] as JxElement).attributes!.srcset).toBe(
+    expect((tree.children as JxElement[])[0]!.attributes!.srcset).toBe(
       "public/assets/images/small.jpg 320w, public/assets/images/large.jpg 1024w",
     );
   });
@@ -184,9 +186,13 @@ describe("rewriteAssetUrls", () => {
     const count = rewriteAssetUrls(tree, map, "https://tailwindcss.com/");
 
     expect(count).toBe(3);
-    expect((tree.children![0] as JxElement).attributes!.src).toBe("public/assets/images/hero.jpg");
-    expect((tree.children![1] as JxElement).attributes!.src).toBe("public/assets/images/logo.svg");
-    expect((tree.children![2] as JxElement).style!.backgroundImage).toBe(
+    expect((tree.children as JxElement[])[0]!.attributes!.src).toBe(
+      "public/assets/images/hero.jpg",
+    );
+    expect((tree.children as JxElement[])[1]!.attributes!.src).toBe(
+      "public/assets/images/logo.svg",
+    );
+    expect((tree.children as JxElement[])[2]!.style!.backgroundImage).toBe(
       'url("public/assets/images/bg.png")',
     );
   });

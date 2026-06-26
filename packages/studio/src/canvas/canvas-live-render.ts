@@ -556,12 +556,12 @@ export async function renderCanvasLive(
     // Render inside a detached effect scope so the tree's reactive effects (template bindings,
     // $map/$switch containers) can be disposed when the panel is rebuilt, instead of leaking.
     renderScope = effectScope(true);
-    const el = /** @type {HTMLElement} */ renderScope.run(() =>
+    const el = renderScope.run(() =>
       runtimeRenderNode(renderDoc, $defs, {
         _path: [],
         onNodeCreated: pathMapper,
       }),
-    )!;
+    )! as HTMLElement;
     if ((canvasMode === "design" || canvasMode === "edit") && el instanceof HTMLElement) {
       // Disable pointer events on all rendered elements for edit mode
       el.style.pointerEvents = "none";

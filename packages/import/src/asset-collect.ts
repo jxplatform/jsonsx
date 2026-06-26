@@ -74,10 +74,7 @@ export async function collectAssets(page: Page): Promise<AssetCollectionResult> 
     function parseSrcset(srcset: string): string[] {
       return srcset
         .split(",")
-        .map((entry) => {
-          const [first] = entry.trim().split(/\s+/);
-          return first;
-        })
+        .map((entry) => entry.trim().split(/\s+/)[0] ?? "")
         .filter(Boolean);
     }
 

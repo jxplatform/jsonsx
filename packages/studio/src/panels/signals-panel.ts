@@ -505,13 +505,9 @@ export function renderSignalsTemplate(S: SignalsPanelState, ctx: SignalsPanelCtx
                 i += 1;
               }
               transactDoc(activeTab.value, (t) =>
-                mutateAddDef(
-                  t,
-                  n,
-                  /** @type {Record<string, JsonValue>} */ {
-                    $prototype: protoName,
-                  },
-                ),
+                mutateAddDef(t, n, {
+                  $prototype: protoName,
+                } as Record<string, JsonValue>),
               );
               expandedSignal = n;
               if (src) {

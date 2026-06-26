@@ -241,11 +241,11 @@ export function renderStylebookMode(ctx: StylebookCtx) {
         ${panelEntries.map((e) => e.tpl)}
       </div>
     `,
-    /** @type {HTMLElement} */ canvasWrap,
+    canvasWrap as HTMLElement,
   );
 
   for (const { panel, activeSet } of panelEntries) {
-    canvasPanels.push(/** @type {import("./canvas-dnd.js").CanvasPanel} */ panel);
+    canvasPanels.push(panel as CanvasPanel);
     renderIntoPanel(panel, activeSet);
   }
   if (hasMedia) {
@@ -338,10 +338,7 @@ export function refreshStylebookStyles() {
             continue;
           }
           if (activeBreakpoints.has(mediaName)) {
-            const mediaTagStyle = _resolveNestedStyle(
-              /** @type {Record<string, unknown>} */ val,
-              tag,
-            );
+            const mediaTagStyle = _resolveNestedStyle(val as Record<string, unknown>, tag);
             if (mediaTagStyle && typeof mediaTagStyle === "object") {
               for (const [prop, v] of Object.entries(mediaTagStyle)) {
                 if (typeof v === "string" || typeof v === "number") {
@@ -478,7 +475,7 @@ export function buildStylebookElement(
   if (entry.attributes) {
     for (const [k, v] of Object.entries(entry.attributes)) {
       try {
-        el.setAttribute(k, /** @type {string} */ v);
+        el.setAttribute(k, v as string);
       } catch {}
     }
   }

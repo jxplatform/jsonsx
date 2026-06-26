@@ -29,8 +29,8 @@
     "test:coverage": "bun test --isolate --coverage"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.3.190",
-    "@anthropic-ai/sdk": "^0.105.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.191",
+    "@anthropic-ai/sdk": "^0.106.0",
     "@jxsuite/compiler": "workspace:^",
     "@jxsuite/create": "workspace:^",
     "@jxsuite/parser": "workspace:^",

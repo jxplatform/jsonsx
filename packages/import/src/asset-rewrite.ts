@@ -51,7 +51,7 @@ export function rewriteAssetUrls(
       .split(",")
       .map((entry) => {
         const parts = entry.trim().split(/\s+/);
-        const [url] = parts;
+        const [url = ""] = parts;
         const rewritten = rewriteUrl(url);
         if (rewritten) {
           count += 1;
@@ -63,7 +63,7 @@ export function rewriteAssetUrls(
   }
 
   function rewriteCssUrls(value: string): string {
-    return value.replaceAll(/url\(\s*(['"]?)(.+?)\1\s*\)/g, (_match, quote, url) => {
+    return value.replaceAll(/url\(\s*(['"]?)(.+?)\1\s*\)/g, (_match, quote, url: string) => {
       const rewritten = rewriteUrl(url);
       if (rewritten) {
         count += 1;

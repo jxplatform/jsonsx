@@ -56,7 +56,7 @@ export function resolveLayout(
 
   // Check for nested layouts (layout inheriting from another layout)
   if (layoutDoc.$layout) {
-    layoutDoc = resolveLayout(layoutDoc, projectConfig, projectRoot, layoutPath);
+    layoutDoc = resolveLayout(layoutDoc, projectConfig, projectRoot);
   }
 
   // Distribute page children into layout slots

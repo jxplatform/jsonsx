@@ -22,19 +22,19 @@ export interface MultiEmitOptions {
   /** Map of route path (e.g. "pages/index.json") → Jx document. */
   pages: Map<string, JxElement>;
   /** Optional layout to write to layouts/base.json. */
-  layout?: JxElement;
+  layout?: JxElement | undefined;
   /** $media breakpoints to seed into project.json. */
-  breakpoints?: Record<string, string>;
+  breakpoints?: Record<string, string> | undefined;
   /** Phase 4: componentization options. Pass false to skip. */
-  componentizeOptions?: ComponentizeOptions | false;
+  componentizeOptions?: ComponentizeOptions | false | undefined;
   /** Pre-computed componentization result (from AI pass). Overrides componentizeOptions. */
-  precomputedComponents?: ComponentizeResult;
+  precomputedComponents?: ComponentizeResult | undefined;
   /** Font-face CSS rule texts to emit as public/assets/fonts.css (R2). */
-  fontFaceRules?: string[];
+  fontFaceRules?: string[] | undefined;
   /** URL rewrite map for fonts — maps original font URLs to local paths. */
-  fontRewriteMap?: Map<string, string>;
+  fontRewriteMap?: Map<string, string> | undefined;
   /** CSS custom property tokens to hoist into project.json.$style (R5). */
-  styleTokens?: Record<string, string>;
+  styleTokens?: Record<string, string> | undefined;
 }
 
 export async function emitProject({
@@ -170,7 +170,10 @@ export async function emitMultiPageProject({
   for (const [route, doc] of finalPages) {
     const pageDoc = { ...doc };
     if (elementRefs.length > 0) {
-      pageDoc.$elements = [...elementRefs, ...(pageDoc.$elements ?? [])] as JxElement[];
+      pageDoc.$elements = [
+        ...elementRefs,
+        ...((pageDoc.$elements as JxElement[]) ?? []),
+      ] as JxElement[];
     }
     const pagePath = join(outDir, route);
     await mkdir(dirname(pagePath), { recursive: true });
@@ -198,24 +201,24 @@ export async function emitMultiPageProject({
 
 function extractStateDefaults(node: JxElement | string, out: Record<string, string>) {
   if (typeof node === "string") {
-    const match = node.match(/^\$\{state\.([^}]+)\}$/);
-    if (match && !(match[1] in out)) {
-      out[match[1]] = "";
+    const key = node.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+    if (key && !(key in out)) {
+      out[key] = "";
     }
     return;
   }
   if (typeof node.textContent === "string") {
-    const match = node.textContent.match(/^\$\{state\.([^}]+)\}$/);
-    if (match && !(match[1] in out)) {
-      out[match[1]] = "";
+    const key = node.textContent.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+    if (key && !(key in out)) {
+      out[key] = "";
     }
   }
   if (node.attributes) {
     for (const v of Object.values(node.attributes)) {
       if (typeof v === "string") {
-        const match = v.match(/^\$\{state\.([^}]+)\}$/);
-        if (match && !(match[1] in out)) {
-          out[match[1]] = "";
+        const key = v.match(/^\$\{state\.([^}]+)\}$/)?.[1];
+        if (key && !(key in out)) {
+          out[key] = "";
         }
       }
     }

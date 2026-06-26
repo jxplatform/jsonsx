@@ -576,7 +576,7 @@ function renderFrontmatterSection() {
   const fields = [];
   if (schemaProps) {
     for (const [field, fieldSchema] of Object.entries(
-      /** @type {Record<string, FmSchemaEntry>} */ schemaProps,
+      schemaProps as Record<string, FmSchemaEntry>,
     )) {
       if (RESERVED_FM_KEYS.has(field)) {
         continue;

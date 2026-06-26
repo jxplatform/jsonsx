@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { convertToJx } from "../src/to-jx.ts";
+import type { JxElement } from "@jxsuite/schema/types";
 
 describe("convertToJx", () => {
   test("converts basic HTML to a valid Jx document", () => {
@@ -16,7 +17,7 @@ describe("convertToJx", () => {
     expect(result.collectedStyles).toEqual([]);
 
     // The wrapper div should contain the converted tree
-    const children = result.document.children!;
+    const children = result.document.children as JxElement[];
     expect(children.length).toBeGreaterThan(0);
   });
 
@@ -81,7 +82,7 @@ describe("convertToJx", () => {
   test("handles inline styles on elements", () => {
     const html = `<div style="color: red; font-size: 16px"><p>Styled</p></div>`;
     const result = convertToJx(html);
-    const outerDiv = result.document.children![0] as any;
+    const [outerDiv] = result.document.children as any[];
     expect(outerDiv.style).toBeDefined();
     expect(outerDiv.style.color).toBe("red");
     expect(outerDiv.style["font-size"]).toBe("16px");

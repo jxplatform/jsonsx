@@ -22,6 +22,7 @@ import {
   setOpenAiKey,
 } from "../services/ai-settings";
 
+import type { ChatState } from "@jxsuite/ai/chat-state";
 import type { EffectScope } from "@vue/reactivity";
 
 /** Which agent backs the panel. "assistant" (Stack B, canonical) is the default. */
@@ -138,7 +139,7 @@ export function mountQuikChat() {
     container,
     (_chat: unknown, msg: string) => {
       if (mode === "assistant") {
-        handleAssistantSend(msg);
+        void handleAssistantSend(msg);
       } else {
         void handleUserSend(msg);
       }
@@ -200,7 +201,7 @@ function startEditApiKey() {
   rerenderPanel();
   // Auto-fetch available models if not already loaded.
   if (availableModels.length === 0 && !modelsLoading) {
-    fetchModels();
+    void fetchModels();
   }
 }
 
@@ -257,7 +258,7 @@ async function fetchModels() {
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
     }
-    const data = await resp.json();
+    const data = (await resp.json()) as { models?: { id: string; name?: string }[] };
     availableModels = (data.models || []).map((m: { id: string; name?: string }) => ({
       id: m.id,
       name: m.name || m.id,
@@ -374,7 +375,7 @@ async function handleAssistantSend(text: string) {
   // Always re-enable input after the send attempt completes (or fails).
   // WatchAssistant() also re-enables it when status !== "streaming", but if
   // The assistant threw before chatState entered "streaming", we need this.
-  if (assistant.chatState.status !== "streaming") {
+  if ((assistant.chatState.status as ChatState) !== "streaming") {
     chatInstance?.inputAreaSetEnabled(true);
   }
 }
@@ -419,7 +420,7 @@ function replayAssistantMessages() {
   // Render every message except a still-streaming trailing assistant message.
   const lastIdx = msgs.length - 1;
   for (let i = 0; i < msgs.length; i++) {
-    const m = msgs[i];
+    const m = msgs[i]!;
     if (isStreaming && i === lastIdx && m.role === "assistant") {
       break;
     }
@@ -446,7 +447,7 @@ function watchAssistant() {
 
       const lastIdx = msgs.length - 1;
       for (let i = assistantRenderedCount; i < msgs.length; i++) {
-        const m = msgs[i];
+        const m = msgs[i]!;
         const isStreamingTail = status === "streaming" && i === lastIdx && m.role === "assistant";
         if (isStreamingTail) {
           // Stream this message's text into a live bubble rather than finalizing it.
@@ -503,11 +504,13 @@ function watchAssistant() {
  * @param {string} content
  * @returns {{ success: boolean; error?: string } | null}
  */
-function tryParseToolResult(content: string) {
+function tryParseToolResult(
+  content: string,
+): { success: boolean; error?: string; summary?: string } | null {
   try {
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(content) as { success?: unknown; error?: string; summary?: string };
     if (parsed && typeof parsed.success === "boolean") {
-      return parsed;
+      return parsed as { success: boolean; error?: string; summary?: string };
     }
   } catch {
     /* Not JSON — not a tool result */
@@ -519,7 +522,10 @@ function tryParseToolResult(content: string) {
 function formatAssistantToolLabel(tc: { name: string; arguments: string }) {
   let detail = "";
   try {
-    const args = tc.arguments ? JSON.parse(tc.arguments) : {};
+    const args = (tc.arguments ? JSON.parse(tc.arguments) : {}) as {
+      path?: unknown;
+      parentPath?: unknown;
+    };
     if (Array.isArray(args.path)) {
       detail = `: ${JSON.stringify(args.path)}`;
     } else if (Array.isArray(args.parentPath)) {

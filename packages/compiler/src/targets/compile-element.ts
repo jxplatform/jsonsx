@@ -119,8 +119,7 @@ export async function compileElement(
           await processElement(refPath, currentDir);
         }
 
-        /** @type {string} */
-        const importPath = resolveElementPath
+        const importPath: string = resolveElementPath
           ? resolveElementPath(refPath, currentDir)
           : refPath.replace(/\.json$/, ".js");
         elementImports.push(importPath);

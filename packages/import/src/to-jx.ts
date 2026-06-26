@@ -42,7 +42,7 @@ function stripTags(nodes: (JxElement | string)[]): {
 
     // Collect inline <style> content for Phase 1
     if (tag === "style") {
-      if (node.textContent) {
+      if (typeof node.textContent === "string") {
         styles.push(node.textContent);
       }
       if (Array.isArray(node.children)) {
