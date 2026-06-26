@@ -12,6 +12,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { effectiveZoom, findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 import { layoutElements } from "../canvas/canvas-live-render";
+import { rectOf } from "../utils/geometry";
 import type { EffectScope } from "@vue/reactivity";
 
 interface OverlayBox {
@@ -124,7 +125,7 @@ function _flush() {
     if (!p.viewport) {
       continue;
     }
-    const vpRect = p.viewport.getBoundingClientRect();
+    const vpRect = rectOf(p.viewport);
     const { scrollTop } = p.viewport;
     const { scrollLeft } = p.viewport;
     const scale = effectiveZoom();
@@ -132,7 +133,7 @@ function _flush() {
     if (hover && !pathsEqual(hover, selection)) {
       const el = findCanvasElement(hover, p.canvas);
       if (el) {
-        const elRect = el.getBoundingClientRect();
+        const elRect = rectOf(el);
         const desc: OverlayBox = {
           cls: "overlay-box overlay-hover",
           height: `${elRect.height / scale}px`,
@@ -150,7 +151,7 @@ function _flush() {
     if (selection && p === getActivePanel()) {
       const el = findCanvasElement(selection, p.canvas);
       if (el) {
-        const elRect = el.getBoundingClientRect();
+        const elRect = rectOf(el);
         const desc: OverlayBox = {
           cls: "overlay-box overlay-selection",
           height: `${elRect.height / scale}px`,

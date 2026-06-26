@@ -15,6 +15,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { applyDropInstruction } from "../panels/dnd";
 import { effectiveZoom } from "../canvas/canvas-helpers";
+import { rectOf } from "../utils/geometry";
 
 import type { CanvasPanel } from "../types";
 
@@ -213,7 +214,7 @@ function getCanvasDropResult(el: HTMLElement, elPath: JxPath, isLeaf: boolean): 
     return nearestChildEdge(children, y, elPath);
   }
 
-  const rect = el.getBoundingClientRect();
+  const rect = rectOf(el);
   const relY = (y - rect.top) / rect.height;
 
   if (isLeaf) {
@@ -258,7 +259,7 @@ function nearestChildEdge(children: HTMLElement[], cursorY: number, parentPath: 
   let closestIdx = children.length - 1;
 
   for (let i = 0; i < children.length; i++) {
-    const rect = children[i]!.getBoundingClientRect();
+    const rect = rectOf(children[i]!);
     const topDist = Math.abs(cursorY - rect.top);
     const bottomDist = Math.abs(cursorY - rect.bottom);
 
@@ -298,8 +299,8 @@ function showCanvasDropIndicator(
   const { dropLine, viewport } = panel;
 
   const scale = effectiveZoom();
-  const wrapRect = viewport.getBoundingClientRect();
-  const refRect = referenceEl.getBoundingClientRect();
+  const wrapRect = rectOf(viewport);
+  const refRect = rectOf(referenceEl);
   const left = (refRect.left - wrapRect.left + viewport.scrollLeft) / scale;
   const width = refRect.width / scale;
 

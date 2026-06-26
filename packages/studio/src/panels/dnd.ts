@@ -34,6 +34,7 @@ import {
 } from "../files/components";
 import { renderComponentPreview } from "./stylebook-panel";
 import { defaultDef, unsafeTags } from "./shared";
+import { elementAtPoint } from "../utils/geometry";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
@@ -75,7 +76,7 @@ export function registerLayersDnD() {
       const cleanup = combine(
         draggable({
           canDrag({ element: _el, input }: DragCanDragArgs) {
-            const target = document.elementFromPoint(input.clientX, input.clientY) as HTMLElement;
+            const target = elementAtPoint(input.clientX, input.clientY) as HTMLElement;
             if (target?.closest(".layer-actions")) {
               return false;
             }

@@ -18,6 +18,7 @@ import type { SchemaProperty } from "../settings/schema-field-ui";
 import { invalidateMediaCache } from "../ui/media-picker";
 import { statusMessage } from "../panels/statusbar";
 import { componentRegistry } from "../files/components";
+import { rectOf } from "../utils/geometry";
 
 import { renderPopover, showDialog } from "../ui/layers";
 import { renderComponentPreview } from "../panels/stylebook-panel";
@@ -448,7 +449,7 @@ function showBrowseContextMenu(
         }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
-          const menuRect = popover.getBoundingClientRect();
+          const menuRect = rectOf(popover);
           if (x + menuRect.width > window.innerWidth) {
             x = window.innerWidth - menuRect.width - 4;
           }

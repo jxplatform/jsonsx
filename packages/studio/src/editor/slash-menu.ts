@@ -11,6 +11,7 @@
 import { html, render as litRender, nothing } from "lit-html";
 import { ref } from "lit-html/directives/ref.js";
 import { getLayerSlot } from "../ui/layers";
+import { rectOf } from "../utils/geometry";
 
 interface SlashCommand {
   label: string;
@@ -87,7 +88,7 @@ export function showSlashMenu(
 ) {
   callbacks = cbs;
   _anchorEl = anchorEl;
-  _anchorRect = anchorEl.getBoundingClientRect();
+  _anchorRect = rectOf(anchorEl);
 
   const source = cbs.commands || SLASH_COMMANDS;
   filteredItems = filter
@@ -145,7 +146,7 @@ export function dismissSlashMenu() {
  * @param {boolean} showFilter
  */
 function render(anchorEl: HTMLElement, showFilter: boolean) {
-  const rect = _anchorRect || anchorEl.getBoundingClientRect();
+  const rect = _anchorRect || rectOf(anchorEl);
 
   litRender(
     html`

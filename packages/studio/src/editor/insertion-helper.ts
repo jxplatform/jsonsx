@@ -7,6 +7,7 @@
  */
 
 import { showSlashMenu } from "./slash-menu";
+import { rectOf, elementAtPoint } from "../utils/geometry";
 import { activeTab } from "../workspace/workspace";
 import { mutateInsertNode, transactDoc } from "../tabs/transact";
 import type { CanvasPanel } from "../types";
@@ -131,7 +132,7 @@ function onMouseMove(e: MouseEvent) {
 
   const { panel, withPanelPointerEvents, elToPath } = _ctx;
   const el = withPanelPointerEvents(() =>
-    document.elementFromPoint(e.clientX, e.clientY),
+    elementAtPoint(e.clientX, e.clientY),
   ) as HTMLElement | null;
 
   if (!el || !panel.canvas.contains(el)) {
@@ -173,7 +174,7 @@ function onMouseMove(e: MouseEvent) {
     (isGrid && parentStyle.gridAutoFlow?.startsWith("column"));
 
   // Calculate relative position within element
-  const rect = el.getBoundingClientRect();
+  const rect = rectOf(el);
   const parentPath = _ctx.parentElementPath(path);
   if (!parentPath) {
     hide();

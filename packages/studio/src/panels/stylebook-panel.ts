@@ -28,6 +28,7 @@ import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
 import { activeBreakpointsForWidth, parseMediaEntries } from "../utils/canvas-media";
 import { mediaDisplayName } from "./shared";
 import { panToCanvasEl } from "../canvas/canvas-utils";
+import { elementsAtPoint } from "../utils/geometry";
 import stylebookMeta from "../../data/stylebook-meta.json";
 import type { TemplateResult } from "lit-html";
 import type { CanvasPanel } from "../types";
@@ -780,7 +781,7 @@ function registerStylebookPanelEvents(panel: StylebookPanel) {
       (el as HTMLElement).style.pointerEvents = "auto";
     }
     overlayClk.style.display = "none";
-    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    const elements = elementsAtPoint(e.clientX, e.clientY);
     overlayClk.style.display = "";
     for (const el of els) {
       (el as HTMLElement).style.pointerEvents = "none";
@@ -814,7 +815,7 @@ function registerStylebookPanelEvents(panel: StylebookPanel) {
       (el as HTMLElement).style.pointerEvents = "auto";
     }
     overlayClk.style.display = "none";
-    const elements = document.elementsFromPoint(e.clientX, e.clientY);
+    const elements = elementsAtPoint(e.clientX, e.clientY);
     overlayClk.style.display = "";
     for (const el of els) {
       (el as HTMLElement).style.pointerEvents = "none";

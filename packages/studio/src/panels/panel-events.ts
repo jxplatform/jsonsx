@@ -27,6 +27,7 @@ import {
   panelMediaToActiveMedia,
 } from "../canvas/canvas-helpers";
 import { activeLayoutPath, layoutElements } from "../canvas/canvas-live-render";
+import { elementAtPoint, elementsAtPoint, rectOf } from "../utils/geometry";
 import type { CanvasPanel } from "./canvas-dnd";
 import type { JxPath } from "../state";
 
@@ -77,7 +78,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
     (e: MouseEvent) => {
       const barInner = view.blockActionBarEl?.firstElementChild;
       if (barInner) {
-        const r = barInner.getBoundingClientRect();
+        const r = rectOf(barInner);
         if (
           e.clientX >= r.left &&
           e.clientX <= r.right &&
@@ -95,7 +96,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
       const canvasMode = ctx.getCanvasMode();
 
       const elements = withPanelPointerEvents(() =>
-        document.elementsFromPoint(e.clientX, e.clientY),
+        elementsAtPoint(e.clientX, e.clientY),
       ) as Element[];
 
       if (!tab) {
@@ -157,7 +158,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
     (e: MouseEvent) => {
       const barInner = view.blockActionBarEl?.firstElementChild;
       if (barInner) {
-        const r = barInner.getBoundingClientRect();
+        const r = rectOf(barInner);
         if (
           e.clientX >= r.left &&
           e.clientX <= r.right &&
@@ -174,7 +175,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
 
       const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
-        document.elementsFromPoint(e.clientX, e.clientY),
+        elementsAtPoint(e.clientX, e.clientY),
       ) as Element[];
 
       if (!tab) {
@@ -210,7 +211,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
     (e: MouseEvent) => {
       const barInner = view.blockActionBarEl?.firstElementChild;
       if (barInner) {
-        const r = barInner.getBoundingClientRect();
+        const r = rectOf(barInner);
         if (
           e.clientX >= r.left &&
           e.clientX <= r.right &&
@@ -222,7 +223,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
       }
       const tab = activeTab.value;
       const elements = withPanelPointerEvents(() =>
-        document.elementsFromPoint(e.clientX, e.clientY),
+        elementsAtPoint(e.clientX, e.clientY),
       ) as Element[];
       for (const el of elements) {
         if (canvas.contains(el) && el !== canvas) {
@@ -246,7 +247,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
     (e: MouseEvent) => {
       const barInner = view.blockActionBarEl?.firstElementChild;
       if (barInner) {
-        const r = barInner.getBoundingClientRect();
+        const r = rectOf(barInner);
         if (
           e.clientX >= r.left &&
           e.clientX <= r.right &&
@@ -261,7 +262,7 @@ export function registerPanelEvents(panel: CanvasPanel) {
         return;
       }
       const el = withPanelPointerEvents(() =>
-        document.elementFromPoint(e.clientX, e.clientY),
+        elementAtPoint(e.clientX, e.clientY),
       ) as Element | null;
       if (el && canvas.contains(el) && el !== canvas) {
         let path = elToPath.get(el);

@@ -20,6 +20,7 @@ import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
 import { showConfirmDialog } from "../ui/layers";
+import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
 
@@ -69,7 +70,7 @@ export function initShortcuts(
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom towards cursor
-        const rect = canvasWrap.getBoundingClientRect();
+        const rect = rectOf(canvasWrap);
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
         const oldZoom = activeTab.value?.session.ui.zoom ?? 1;

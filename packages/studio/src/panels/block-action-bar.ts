@@ -30,6 +30,7 @@ import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 import { getLayerSlot } from "../ui/layers";
 import { showSlashMenu } from "../editor/slash-menu";
 import { getConvertTargets } from "../editor/convert-targets";
+import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
 import type { TemplateResult } from "lit-html";
@@ -317,7 +318,7 @@ function showLinkPopover(anchorBtn: HTMLElement) {
     }
   }
 
-  const rect = anchorBtn.getBoundingClientRect();
+  const rect = rectOf(anchorBtn);
 
   let _linkField: HTMLInputElement | null = null;
 
@@ -460,7 +461,7 @@ export function renderBlockActionBar() {
   }
 
   const tag = (node.tagName ?? "div").toLowerCase();
-  const elRect = el.getBoundingClientRect();
+  const elRect = rectOf(el);
   const topPos = elRect.top < 80 ? elRect.bottom + 4 : elRect.top - 38;
 
   // Inline format state
@@ -600,7 +601,7 @@ export function renderBlockActionBar() {
       return;
     }
     // Clamp to window
-    const barRect = bar.getBoundingClientRect();
+    const barRect = rectOf(bar);
     if (barRect.right > window.innerWidth) {
       bar.style.left = `${Math.max(0, window.innerWidth - barRect.width)}px`;
     }

@@ -12,6 +12,7 @@ import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
 import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot } from "./layers";
+import { rectOf } from "../utils/geometry";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
 
@@ -142,7 +143,7 @@ function onPopoverOutsideClick(e: MouseEvent) {
 
 function renderMediaPickerPopover() {
   const host = getLayerSlot("popover", "media-picker");
-  const rect = _popoverAnchorEl?.getBoundingClientRect();
+  const rect = _popoverAnchorEl ? rectOf(_popoverAnchorEl) : undefined;
   if (!rect) {
     return;
   }
@@ -232,7 +233,7 @@ function renderMediaPickerPopover() {
   // Fine-tune position after render using actual measured dimensions
   requestAnimationFrame(() => {
     if (_popoverEl) {
-      const popoverRect = _popoverEl.getBoundingClientRect();
+      const popoverRect = rectOf(_popoverEl);
       let adjLeft = popoverRect.left;
       let adjTop = popoverRect.top;
       let needsAdjust = false;

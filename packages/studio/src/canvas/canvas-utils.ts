@@ -16,6 +16,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getLayerSlot } from "../ui/layers";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
+import { rectOf } from "../utils/geometry";
 import type { TemplateResult } from "lit-html";
 
 let _ctx: {
@@ -218,7 +219,7 @@ export function fitToScreen() {
   totalPanelWidth += gap * Math.max(0, canvasPanels.length - 1) + padding;
 
   const zoom = _ctx.getZoom();
-  const wrapRect = view.panzoomWrap.getBoundingClientRect();
+  const wrapRect = rectOf(view.panzoomWrap);
   const unscaledHeight = wrapRect.height / zoom;
   const maxPanelHeight = unscaledHeight + padding;
 
@@ -258,8 +259,8 @@ export function resetZoomIndicator() {
  * @param {{ scrollContainer?: HTMLElement | null }} [panel]
  */
 function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | null }) {
-  const wrapRect = canvasWrap.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
+  const wrapRect = rectOf(canvasWrap);
+  const elRect = rectOf(el);
   const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
   const vpCenterY = wrapRect.height / 2;
   const offsetY = vpCenterY - elCenterY;
@@ -368,7 +369,7 @@ export function positionZoomIndicator() {
   if (!_zoomIndicatorEl) {
     return;
   }
-  const rect = canvasWrap.getBoundingClientRect();
+  const rect = rectOf(canvasWrap);
   _zoomIndicatorEl.style.left = `${rect.left + rect.width / 2}px`;
   _zoomIndicatorEl.style.top = `${rect.bottom - 32}px`;
   _zoomIndicatorEl.style.transform = "translateX(-50%)";

@@ -26,6 +26,7 @@ import { panelMediaToActiveMedia } from "../canvas/canvas-helpers";
 import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "./slash-menu";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { defaultDef } from "../panels/shared";
+import { elementsAtPoint } from "../utils/geometry";
 
 /**
  * Initialize the component inline edit module.
@@ -138,7 +139,7 @@ export function enterComponentInlineEdit(el: HTMLElement, path: JxPath) {
         child.style.pointerEvents = "auto";
       }
       p.overlayClk.style.display = "none";
-      const found = document.elementsFromPoint(evt.clientX, evt.clientY);
+      const found = elementsAtPoint(evt.clientX, evt.clientY);
       p.overlayClk.style.display = "";
       for (const child of els) {
         child.style.pointerEvents = "none";

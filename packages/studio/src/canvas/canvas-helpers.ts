@@ -6,6 +6,7 @@
  */
 
 import { canvasPanels, elToPath, getNodeAtPath, parentElementPath, pathsEqual } from "../store";
+import { rectOf } from "../utils/geometry";
 import { activeTab } from "../workspace/workspace";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { JxPath } from "../state";
@@ -162,8 +163,8 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
  */
 export function overlayBoxDescriptor(el: Element, type: string, panel: CanvasPanel) {
   const viewport = panel.viewport as HTMLElement;
-  const vpRect = viewport.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
+  const vpRect = rectOf(viewport);
+  const elRect = rectOf(el);
   const scale = effectiveZoom();
   return {
     cls: `overlay-box overlay-${type}`,
