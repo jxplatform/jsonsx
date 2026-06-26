@@ -33,6 +33,8 @@ import {
 } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
 import { renderCanvasLive } from "./canvas-live-render";
+import { isIframeCanvas } from "./canvas-host";
+import { mountIframeCanvas } from "./iframe-host";
 import { canvasPerf } from "./canvas-perf";
 import { renderCanvasNode } from "../panels/preview-render";
 import { registerPanelDnD } from "../panels/canvas-dnd";
@@ -702,6 +704,23 @@ function renderCanvasIntoPanel(
   panel.ready = false;
   panel.liveCtx = null;
   panel.activeBreakpoints = activeBreakpoints;
+
+  // Iframe canvas host (opt-in via ?canvasHost=iframe): render the document inside a same-runtime
+  // Iframe served from the real origin instead of in the editor's realm. The legacy path below is
+  // Left untouched for the default host.
+  if (isIframeCanvas()) {
+    void mountIframeCanvas(gen, docToRender, canvas)
+      .then(() => {
+        if (gen === view.renderGeneration) {
+          updateCanvas({ error: null, scope: null, status: "ready" });
+          statusMessage("Iframe render OK", 1500);
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn("mountIframeCanvas failed:", error instanceof Error ? error.message : error);
+      });
+    return;
+  }
 
   renderCanvasLive(gen, docToRender, canvas, panel)
     .then((scope: Record<string, unknown> | null) => {

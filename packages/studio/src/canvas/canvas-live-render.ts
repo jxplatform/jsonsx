@@ -36,6 +36,7 @@ import type { JxDocument, JxElement, JxMutableNode } from "@jxsuite/schema/types
 import type { ComponentEntry } from "../files/components.js";
 import type { CanvasPanel } from "../types";
 import type { EffectScope } from "../reactivity";
+import type { WireMapperCtx } from "./iframe-protocol";
 
 export { buildNestedSiteCSS } from "./nested-site-style";
 
@@ -584,4 +585,160 @@ export async function renderCanvasLive(
     console.warn("renderCanvasLive failed:", errorMessage(error), error);
     return null;
   }
+}
+
+/**
+ * Resolve a document into the form the iframe canvas renders: layout-distributed, edit-transformed,
+ * with components/imports/$media/$head merged in, plus the path-mapper context and site style. This
+ * is the "parent resolves, iframe renders" split — the realm-specific work (defineElement,
+ * injecting $head/site-style into the DOM, buildScope/renderNode) happens inside the iframe from
+ * this result.
+ *
+ * Mirrors the resolution phase of {@link renderCanvasLive} (kept separate so the legacy in-realm
+ * path is untouched while the iframe host stabilises; the two should be de-duplicated once the
+ * iframe canvas graduates).
+ */
+export async function resolveCanvasDocument(
+  gen: number,
+  doc: JxMutableNode,
+): Promise<{
+  renderDoc: JxMutableNode;
+  docBase: string | undefined;
+  mapperCtx: WireMapperCtx;
+  siteStyle: Record<string, unknown> | null;
+} | null> {
+  const tab = activeTab.value;
+  const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode };
+  const canvasMode = _ctx!.getCanvasMode();
+
+  let renderDoc =
+    canvasMode === "preview"
+      ? structuredClone(toRaw(doc))
+      : prepareForEditMode(stripEventHandlers(doc));
+
+  let layoutWrapped = false;
+  const isPage =
+    S.documentPath &&
+    projectState?.isSiteProject &&
+    (S.documentPath.startsWith("pages/") || S.documentPath.startsWith("./pages/"));
+  let pageContentPrefix: (string | number)[] | null = null;
+  let pageContentOffset = 0;
+
+  if (isPage) {
+    const layoutPath = getEffectiveLayoutPath(doc.$layout);
+    if (layoutPath) {
+      const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
+      if (layoutDoc) {
+        if (gen !== view.renderGeneration) {
+          return null;
+        }
+        markLayoutNodes(layoutDoc);
+        const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
+        const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
+        renderDoc =
+          canvasMode === "preview" ? merged : prepareForEditMode(stripEventHandlers(merged));
+        layoutWrapped = true;
+        const pageContent = findPageContentPrefix(merged);
+        pageContentPrefix = pageContent?.prefix ?? null;
+        pageContentOffset = pageContent?.offset ?? 0;
+      }
+    }
+  }
+
+  const arrayPaths = new Set<string>();
+  if (canvasMode === "design" || canvasMode === "edit") {
+    (function findArrayPaths(node: JxMutableNode, path: (string | number)[]) {
+      if (!node || typeof node !== "object") {
+        return;
+      }
+      if ((node as unknown as { $prototype?: string }).$prototype === "Array") {
+        arrayPaths.add(path.join("/"));
+        const mapDef = (node as JxMutableNode).map;
+        if (mapDef && typeof mapDef === "object") {
+          findArrayPaths(mapDef, [...path, "map"]);
+        }
+        return;
+      }
+      if (Array.isArray(node.children)) {
+        for (let i = 0; i < node.children.length; i++) {
+          const child = node.children[i];
+          if (typeof child === "string") {
+            continue;
+          }
+          findArrayPaths(child!, [...path, "children", i]);
+        }
+      } else if (
+        node.children &&
+        typeof node.children === "object" &&
+        (node.children as unknown as { $prototype?: string }).$prototype === "Array"
+      ) {
+        findArrayPaths(node.children as JxMutableNode, [...path, "children"]);
+      }
+      if (node.$switch && node.cases) {
+        for (const [k, v] of Object.entries(node.cases)) {
+          findArrayPaths(v, [...path, "cases", k]);
+        }
+      }
+    })(doc, []);
+  }
+
+  const root = projectState?.projectRoot || "";
+  const docPrefix = root ? `${root}/` : "";
+  const docBase = S.documentPath ? `${location.origin}/${docPrefix}${S.documentPath}` : undefined;
+
+  // Component auto-discovery (content mode or layout) — mirrors the legacy render path.
+  const effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);
+  if ((S.mode === "content" || layoutWrapped) && componentRegistry.length > 0) {
+    const existingRefs = new Set(
+      effectiveElements.map((e: JxElement | string) => (typeof e === "string" ? e : e?.$ref)),
+    );
+    const collectTags = (node: JxMutableNode): Set<string> => {
+      const tags = new Set<string>();
+      if (!node || typeof node !== "object") {
+        return tags;
+      }
+      if (node.tagName) {
+        tags.add(node.tagName);
+      }
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) {
+          if (typeof child !== "string") {
+            for (const t of collectTags(child)) {
+              tags.add(t);
+            }
+          }
+        }
+      }
+      return tags;
+    };
+    for (const tag of collectTags(renderDoc)) {
+      const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
+      if (comp && comp.source !== "npm" && comp.path) {
+        const relPath = computeRelativePath(S.documentPath ?? null, comp.path);
+        if (!existingRefs.has(relPath)) {
+          effectiveElements.push({ $ref: relPath });
+          existingRefs.add(relPath);
+        }
+      }
+    }
+  }
+  if (effectiveElements.length > 0) {
+    renderDoc.$elements = effectiveElements as (string | JxMutableNode | { $ref: string })[];
+  }
+  renderDoc.imports = getEffectiveImports(renderDoc.imports);
+  renderDoc.$media = getEffectiveMedia(renderDoc.$media) as JxMutableNode["$media"];
+  renderDoc.$head = getEffectiveHead(renderDoc.$head) as JxMutableNode["$head"];
+
+  return {
+    docBase,
+    mapperCtx: {
+      arrayPaths: [...arrayPaths],
+      canvasMode,
+      layoutWrapped,
+      pageContentOffset,
+      pageContentPrefix,
+    },
+    renderDoc,
+    siteStyle: (projectState?.projectConfig?.style as Record<string, unknown>) ?? null,
+  };
 }

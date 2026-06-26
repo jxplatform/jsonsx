@@ -119,6 +119,7 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
   makePathMapper: () => () => null,
   renderCanvasLive: (gen: number, doc: JxMutableNode, canvas: HTMLElement, panel: unknown) =>
     liveImpl(gen, doc, canvas, panel),
+  resolveCanvasDocument: () => Promise.resolve(null),
 }));
 
 void mock.module("../src/panels/welcome-screen.js", () => ({

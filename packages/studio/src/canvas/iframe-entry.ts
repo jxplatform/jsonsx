@@ -46,6 +46,7 @@ export function startCanvasIframe(opts: {
             pageContentPrefix: mapperCtx.pageContentPrefix,
           },
           mode: msg.mode,
+          siteStyle: msg.siteStyle,
         });
         if (gen === latestGen) {
           channel.post({ gen, kind: "renderComplete" });

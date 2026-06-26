@@ -39,6 +39,7 @@ export type ParentToIframe =
       mode: CanvasMode;
       docBase: string;
       mapperCtx: WireMapperCtx;
+      siteStyle: Record<string, unknown> | null;
       gen: number;
     };
 
