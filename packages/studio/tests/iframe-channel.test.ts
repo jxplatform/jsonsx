@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fakeChannelPair } from "../src/canvas/iframe-channel";
+import { fakeChannelPair, postMessageChannel } from "../src/canvas/iframe-channel";
 
 interface P2I {
   kind: "render";
@@ -77,5 +77,113 @@ describe("fakeChannelPair", () => {
     pair.iframe.post({ kind: "ready" });
     pair.flush();
     expect(fromIframe).toHaveLength(0);
+  });
+});
+
+function makeFakeSource() {
+  const listeners = new Set<(e: MessageEvent) => void>();
+  return {
+    addEventListener: (_t: "message", l: (e: MessageEvent) => void) => listeners.add(l),
+    count: () => listeners.size,
+    dispatch: (e: { origin: string; data: unknown }) => {
+      for (const l of listeners) {
+        l(e as MessageEvent);
+      }
+    },
+    removeEventListener: (_t: "message", l: (e: MessageEvent) => void) => listeners.delete(l),
+  };
+}
+
+function makePostMessageChannel(opts: { acceptOrigin?: string } = {}) {
+  const posted: { message: unknown; targetOrigin: string }[] = [];
+  const target = {
+    postMessage: (message: unknown, targetOrigin: string) => posted.push({ message, targetOrigin }),
+  };
+  const source = makeFakeSource();
+  const channel = postMessageChannel<P2I, I2P>({
+    acceptOrigin: opts.acceptOrigin ?? "https://peer.test",
+    source,
+    target,
+    targetOrigin: "https://peer.test",
+    token: "secret-123",
+  });
+  return { channel, posted, source };
+}
+
+describe("postMessageChannel", () => {
+  test("posts an envelope tagged with the token to the target origin", () => {
+    const { channel, posted } = makePostMessageChannel();
+    channel.post({ kind: "render", n: 5 });
+    expect(posted).toEqual([
+      {
+        message: { "jx:canvas": "secret-123", payload: { kind: "render", n: 5 } },
+        targetOrigin: "https://peer.test",
+      },
+    ]);
+  });
+
+  test("delivers inbound messages with the right origin and token", () => {
+    const { channel, source } = makePostMessageChannel();
+    const got: I2P[] = [];
+    channel.onMessage((m) => got.push(m));
+    source.dispatch({
+      data: { "jx:canvas": "secret-123", payload: { kind: "ready" } },
+      origin: "https://peer.test",
+    });
+    expect(got).toEqual([{ kind: "ready" }]);
+  });
+
+  test("drops messages from the wrong origin", () => {
+    const { channel, source } = makePostMessageChannel();
+    const got: I2P[] = [];
+    channel.onMessage((m) => got.push(m));
+    source.dispatch({
+      data: { "jx:canvas": "secret-123", payload: { kind: "ready" } },
+      origin: "https://evil.test",
+    });
+    expect(got).toEqual([]);
+  });
+
+  test("drops messages with a wrong or missing token, and non-object data", () => {
+    const { channel, source } = makePostMessageChannel();
+    const got: I2P[] = [];
+    channel.onMessage((m) => got.push(m));
+    source.dispatch({
+      data: { "jx:canvas": "wrong", payload: { kind: "ready" } },
+      origin: "https://peer.test",
+    });
+    source.dispatch({ data: { payload: { kind: "ready" } }, origin: "https://peer.test" });
+    source.dispatch({ data: null, origin: "https://peer.test" });
+    source.dispatch({ data: "hello", origin: "https://peer.test" });
+    expect(got).toEqual([]);
+  });
+
+  test("acceptOrigin '*' skips the origin check but still requires the token", () => {
+    const { channel, source } = makePostMessageChannel({ acceptOrigin: "*" });
+    const got: I2P[] = [];
+    channel.onMessage((m) => got.push(m));
+    source.dispatch({
+      data: { "jx:canvas": "secret-123", payload: { kind: "ready" } },
+      origin: "https://anywhere.test",
+    });
+    source.dispatch({
+      data: { "jx:canvas": "wrong", payload: { kind: "ready" } },
+      origin: "https://anywhere.test",
+    });
+    expect(got).toEqual([{ kind: "ready" }]);
+  });
+
+  test("dispose removes the source listener and stops delivery", () => {
+    const { channel, source } = makePostMessageChannel();
+    const got: I2P[] = [];
+    channel.onMessage((m) => got.push(m));
+    expect(source.count()).toBe(1);
+    channel.dispose();
+    expect(source.count()).toBe(0);
+    source.dispatch({
+      data: { "jx:canvas": "secret-123", payload: { kind: "ready" } },
+      origin: "https://peer.test",
+    });
+    expect(got).toEqual([]);
   });
 });

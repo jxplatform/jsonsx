@@ -23,6 +23,67 @@ export interface IframeChannel<TOut, TIn> {
   dispose: () => void;
 }
 
+/** Envelope key that tags every cross-frame message so foreign `message` events are ignored. */
+const ENVELOPE = "jx:canvas";
+
+interface PostMessageTarget {
+  postMessage: (message: unknown, targetOrigin: string) => void;
+}
+
+interface MessageSource {
+  addEventListener: (type: "message", listener: (event: MessageEvent) => void) => void;
+  removeEventListener: (type: "message", listener: (event: MessageEvent) => void) => void;
+}
+
+/**
+ * A real `IframeChannel` over `window.postMessage`. Outbound messages are wrapped in an envelope
+ * tagged with a shared `token`; inbound messages are dropped unless their `event.origin` matches
+ * `acceptOrigin` (pass `"*"` to skip the origin check) AND they carry the same token. This is the
+ * origin + secret-token authentication that keeps other local pages from driving the canvas.
+ *
+ * Parent side: `target` = the iframe's `contentWindow`, `source` = `window`, origins = the iframe
+ * origin. Iframe side: `target` = `window.parent`, `source` = `window`, origins = the editor
+ * origin.
+ */
+export function postMessageChannel<TOut, TIn>(opts: {
+  target: PostMessageTarget;
+  source: MessageSource;
+  targetOrigin: string;
+  acceptOrigin: string;
+  token: string;
+}): IframeChannel<TOut, TIn> {
+  const { target, source, targetOrigin, acceptOrigin, token } = opts;
+  const handlers = new Set<(message: TIn) => void>();
+
+  const listener = (event: MessageEvent) => {
+    if (acceptOrigin !== "*" && event.origin !== acceptOrigin) {
+      return;
+    }
+    const data = event.data as { [ENVELOPE]?: string; payload?: TIn } | null;
+    if (!data || typeof data !== "object" || data[ENVELOPE] !== token) {
+      return;
+    }
+    for (const handler of handlers) {
+      handler(data.payload as TIn);
+    }
+  };
+  source.addEventListener("message", listener);
+
+  return {
+    dispose() {
+      handlers.clear();
+      source.removeEventListener("message", listener);
+    },
+    onMessage(handler) {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+    post(message) {
+      target.postMessage({ [ENVELOPE]: token, payload: message }, targetOrigin);
+    },
+  };
+}
+
 /**
  * Two in-memory channels wired to each other for tests. A message `parent.post(x)` is delivered to
  * the `iframe` side's handlers (and vice versa) only when `flush()` is called — so tests drive the
