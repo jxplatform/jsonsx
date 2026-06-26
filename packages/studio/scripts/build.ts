@@ -22,7 +22,9 @@ try {
 }
 
 const result = await Bun.build({
-  entrypoints: ["./src/studio.ts"],
+  // Studio.ts is the editor shell; iframe-entry.ts is the slim canvas-iframe bundle (the document
+  // Renderer that runs inside the iframe canvas host).
+  entrypoints: ["./src/studio.ts", "./src/canvas/iframe-entry.ts"],
   outdir: "dist",
   target: "browser",
   sourcemap: "linked",

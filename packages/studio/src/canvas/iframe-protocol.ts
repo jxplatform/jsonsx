@@ -18,10 +18,32 @@ export function isCanvasMode(value: unknown): value is CanvasMode {
   return typeof value === "string" && (CANVAS_MODES as readonly string[]).includes(value);
 }
 
+/**
+ * Serializable form of the render path-mapping context. `arrayPaths` is a `Set` in the renderer but
+ * crosses the boundary as a string array (Sets aren't structured-clone-friendly across our wire).
+ */
+export interface WireMapperCtx {
+  canvasMode: string;
+  layoutWrapped: boolean;
+  pageContentPrefix: (string | number)[] | null;
+  pageContentOffset: number | null;
+  arrayPaths: string[];
+}
+
 /** Messages the editor (parent) sends into the canvas iframe. */
 export type ParentToIframe =
   | { kind: "init"; gen: number }
-  | { kind: "render"; doc: unknown; mode: CanvasMode; gen: number };
+  | {
+      kind: "render";
+      doc: unknown;
+      mode: CanvasMode;
+      docBase: string;
+      mapperCtx: WireMapperCtx;
+      gen: number;
+    };
 
 /** Messages the canvas iframe sends back to the editor (parent). */
-export type IframeToParent = { kind: "ready" } | { kind: "renderComplete"; gen: number };
+export type IframeToParent =
+  | { kind: "ready" }
+  | { kind: "renderComplete"; gen: number }
+  | { kind: "renderError"; gen: number; message: string };
