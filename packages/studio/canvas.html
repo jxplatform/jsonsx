@@ -17,6 +17,9 @@
   </head>
   <body>
     <div id="jx-canvas-root"></div>
-    <script type="module" src="./dist/iframe-entry.js"></script>
+    <!-- Dev: cache-bust so each iframe mount loads the freshest canvas bundle. -->
+    <script type="module">
+      import(`./dist/iframe-entry.js?t=${Date.now()}`);
+    </script>
   </body>
 </html>

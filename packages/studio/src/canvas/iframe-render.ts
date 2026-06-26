@@ -158,7 +158,6 @@ export async function renderResolvedDocument(opts: {
   siteStyle?: Record<string, unknown> | null;
 }): Promise<RenderHandle> {
   setSkipServerFunctions(opts.mode !== "preview");
-  await registerElements(opts.doc, opts.docBase);
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
   const scope: EffectScope = effectScope(true);
@@ -168,6 +167,9 @@ export async function renderResolvedDocument(opts: {
     renderNode(opts.doc, $defs, { _path: [], onNodeCreated }),
   ) as HTMLElement;
   opts.container.replaceChildren(el);
+  // Register components AFTER the first paint so a slow/recursive/hanging component graph never
+  // Blocks the render — custom elements auto-upgrade in place once defined.
+  void registerElements(opts.doc, opts.docBase);
   return {
     dispose: () => scope.stop(),
   };

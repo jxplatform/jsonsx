@@ -9,7 +9,6 @@
 
 import { postMessageChannel } from "./iframe-channel";
 import { resolveCanvasDocument } from "./canvas-live-render";
-import { view } from "../view";
 import type { CanvasMode, IframeToParent, ParentToIframe } from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -67,8 +66,8 @@ function ensureHost(canvasEl: HTMLElement): HostState {
 }
 
 /**
- * Render `doc` into the iframe canvas mounted in `canvasEl`. Resolves the document parent-side and
- * posts it (queued until the iframe is `ready`). Stale generations are dropped.
+ * Render `doc` into the iframe canvas mounted in `canvasEl`: resolve the document parent-side and
+ * post it (queued until the iframe is `ready`).
  */
 export async function mountIframeCanvas(
   gen: number,
@@ -76,12 +75,18 @@ export async function mountIframeCanvas(
   canvasEl: HTMLElement,
 ): Promise<void> {
   const state = ensureHost(canvasEl);
-  const resolved = await resolveCanvasDocument(gen, doc);
-  if (!resolved || gen !== view.renderGeneration) {
-    return;
-  }
+  // Always resolve and post the latest render. The iframe drops stale generations itself (via its
+  // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
+  // Renders fire and the generation is usually stale by the time resolution finishes, which would
+  // Otherwise drop every post.
+  const resolved = await resolveCanvasDocument(doc);
+  // The doc must be structured-cloneable to cross postMessage. A Jx document is JSON by contract, so
+  // A JSON round-trip (NOT structuredClone, which would throw) drops residual functions / reactive
+  // Proxy artifacts that would otherwise raise DataCloneError and silently drop the entire message.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const cloneableDoc = JSON.parse(JSON.stringify(resolved.renderDoc)) as unknown;
   const message: ParentToIframe = {
-    doc: resolved.renderDoc,
+    doc: cloneableDoc,
     docBase: resolved.docBase ?? `${location.origin}/`,
     gen,
     kind: "render",

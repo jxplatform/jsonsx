@@ -598,15 +598,12 @@ export async function renderCanvasLive(
  * path is untouched while the iframe host stabilises; the two should be de-duplicated once the
  * iframe canvas graduates).
  */
-export async function resolveCanvasDocument(
-  gen: number,
-  doc: JxMutableNode,
-): Promise<{
+export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
   renderDoc: JxMutableNode;
   docBase: string | undefined;
   mapperCtx: WireMapperCtx;
   siteStyle: Record<string, unknown> | null;
-} | null> {
+}> {
   const tab = activeTab.value;
   const S = { documentPath: tab?.documentPath, mode: tab?.doc.mode };
   const canvasMode = _ctx!.getCanvasMode();
@@ -629,9 +626,6 @@ export async function resolveCanvasDocument(
     if (layoutPath) {
       const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
       if (layoutDoc) {
-        if (gen !== view.renderGeneration) {
-          return null;
-        }
         markLayoutNodes(layoutDoc);
         const pageForSlots = canvasMode === "preview" ? structuredClone(toRaw(doc)) : renderDoc;
         const merged = distributePageIntoLayout(layoutDoc, pageForSlots);
