@@ -1,6 +1,12 @@
 import "./with-dom.js";
-import { describe, expect, test } from "bun:test";
-import { makeStamper, renderResolvedDocument } from "../src/canvas/iframe-render";
+import { afterEach, describe, expect, test } from "bun:test";
+import {
+  applySiteStyle,
+  injectHead,
+  makeStamper,
+  registerElements,
+  renderResolvedDocument,
+} from "../src/canvas/iframe-render";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
 
 const ctx: PathMapCtx = {
@@ -89,5 +95,81 @@ describe("makeStamper", () => {
     const el = document.createElement("div");
     stamp(el, ["children", 2], { tagName: "div" });
     expect(el.dataset.jxPath).toBe('["children",2]');
+  });
+});
+
+describe("applySiteStyle", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+  });
+
+  test("sets custom properties on :root and plain properties on <body>", () => {
+    applySiteStyle({ "--brand": "#0f0", color: "red", margin: {} as unknown });
+    expect(document.documentElement.style.getPropertyValue("--brand")).toBe("#0f0");
+    expect(document.body.style.color).toBe("red");
+    // Nested object values (selector rules) are skipped.
+    expect(document.body.style.margin).toBe("");
+  });
+
+  test("is a no-op for null/non-object", () => {
+    expect(() => applySiteStyle(null)).not.toThrow();
+    expect(document.documentElement.getAttribute("style")).toBeNull();
+  });
+});
+
+describe("injectHead", () => {
+  afterEach(() => {
+    document.head.innerHTML = "";
+  });
+
+  test("injects link/meta, rewrites bare specifiers, skips inline scripts, and de-dupes", () => {
+    const doc = {
+      $head: [
+        { attributes: { href: "/x.css", rel: "stylesheet" }, tagName: "link" },
+        { attributes: { content: "bar", name: "foo" }, tagName: "meta" },
+        { attributes: {}, tagName: "script", textContent: "alert(1)" },
+        { attributes: { href: "pkg/y.css", rel: "stylesheet" }, tagName: "link" },
+      ],
+    };
+    injectHead(doc as never);
+    expect(document.head.querySelector('link[href="/x.css"]')).not.toBeNull();
+    expect(document.head.querySelector('meta[name="foo"]')).not.toBeNull();
+    expect(document.head.querySelector("script")).toBeNull(); // Inline script skipped.
+    // Bare specifier rewritten under /node_modules/.
+    expect(document.head.querySelector('link[href="/node_modules/pkg/y.css"]')).not.toBeNull();
+
+    // Re-injecting the same head de-dupes by href/src (no duplicate /x.css link).
+    injectHead(doc as never);
+    expect(document.head.querySelectorAll('link[href="/x.css"]')).toHaveLength(1);
+  });
+
+  test("is a no-op when there is no $head array", () => {
+    expect(() => injectHead({} as never)).not.toThrow();
+    expect(document.head.children).toHaveLength(0);
+  });
+});
+
+describe("registerElements", () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  test("registers $ref/inline components, tolerates failures, and skips non-array $elements", async () => {
+    // Reject all fetches so $ref resolution fails fast (exercises the catch path without a hang).
+    globalThis.fetch = (() => Promise.reject(new Error("no network"))) as typeof fetch;
+    const doc = {
+      $elements: [
+        "nonexistent-pkg-xyz", // String → dynamic import (fails) → caught.
+        { $ref: "comp.json" }, //  $ref → defineElement(fetch fails) → caught.
+        { tagName: "x-inline-comp" }, // Inline def → defineElement registers it.
+      ],
+    };
+    await registerElements(doc as never, "http://localhost:3000/page.json");
+    expect(customElements.get("x-inline-comp")).toBeDefined();
+
+    // Missing/non-array $elements is a no-op.
+    await expect(registerElements({} as never, "http://localhost:3000/")).resolves.toBeUndefined();
   });
 });

@@ -34,7 +34,7 @@ interface HeadEntry {
  * Register the document's `$elements` (components) in this iframe realm so the runtime can render
  * them.
  */
-async function registerElements(doc: JxDocument, docBase: string): Promise<void> {
+export async function registerElements(doc: JxDocument, docBase: string): Promise<void> {
   const elements = (doc as { $elements?: unknown[] }).$elements;
   if (!Array.isArray(elements)) {
     return;
@@ -69,7 +69,7 @@ async function registerElements(doc: JxDocument, docBase: string): Promise<void>
 }
 
 /** Apply the project's site style: custom properties on :root, plain properties on <body>. */
-function applySiteStyle(siteStyle: Record<string, unknown> | null | undefined): void {
+export function applySiteStyle(siteStyle: Record<string, unknown> | null | undefined): void {
   if (!siteStyle || typeof siteStyle !== "object") {
     return;
   }
@@ -88,7 +88,7 @@ function applySiteStyle(siteStyle: Record<string, unknown> | null | undefined): 
 }
 
 /** Inject the document's `$head` (link/meta/script) into the iframe's <head>, de-duped by href/src. */
-function injectHead(doc: JxDocument): void {
+export function injectHead(doc: JxDocument): void {
   const head = (doc as { $head?: HeadEntry[] }).$head;
   if (!Array.isArray(head)) {
     return;

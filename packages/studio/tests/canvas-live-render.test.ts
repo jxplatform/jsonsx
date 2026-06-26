@@ -13,6 +13,7 @@ import {
   layoutElements,
   makePathMapper,
   renderCanvasLive,
+  resolveCanvasDocument,
 } from "../src/canvas/canvas-live-render";
 import { elToPath, elToScope } from "../src/store";
 import { view } from "../src/view";
@@ -673,6 +674,84 @@ describe("component auto-discovery", () => {
     expect(customElements.get("x-card-live")).toBeDefined();
     expect(canvas.querySelector("x-card-live")).not.toBeNull();
     expect(canvas.dataset.contentMode).toBe("");
+  });
+});
+
+// ─── resolveCanvasDocument (parent-side resolution for the iframe host) ─────────
+
+describe("resolveCanvasDocument", () => {
+  async function resolve(docDef: JxMutableNode, opts: RenderOpts = {}) {
+    const tab = resetWorkspaceWithTab(docDef, {
+      documentPath: opts.documentPath ?? "doc.json",
+    }) as Tab;
+    if (opts.mode) {
+      tab.doc.mode = opts.mode;
+    }
+    return resolveCanvasDocument(tab.doc.document as JxMutableNode);
+  }
+
+  test("resolves a simple page-less doc into renderDoc + docBase + mapperCtx", async () => {
+    const result = await resolve({
+      children: [{ children: ["hi"], tagName: "p" }],
+      tagName: "div",
+    } as JxMutableNode);
+    expect(result.renderDoc.tagName).toBe("div");
+    expect(result.docBase).toContain("doc.json");
+    expect(result.mapperCtx).toMatchObject({
+      arrayPaths: [],
+      canvasMode: "design",
+      layoutWrapped: false,
+      pageContentPrefix: null,
+    });
+    expect(result.siteStyle).toBeNull();
+  });
+
+  test("returns the project's site style", async () => {
+    resetStudioState({ projectConfig: { style: { "--brand": "#0f0", color: "red" } } });
+    const result = await resolve({ children: [], tagName: "div" } as JxMutableNode);
+    expect(result.siteStyle).toEqual({ "--brand": "#0f0", color: "red" });
+  });
+
+  test("collects mapped-array document paths in edit mode", async () => {
+    canvasMode = "edit";
+    const result = await resolve({
+      children: [{ $prototype: "Array", map: { tagName: "li" } }],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    expect(result.mapperCtx.canvasMode).toBe("edit");
+    expect(result.mapperCtx.arrayPaths).toContain("children/0");
+  });
+
+  test("wraps page documents in their layout", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/base.json": JSON.stringify(LAYOUT) });
+    const result = await resolve(
+      {
+        $layout: "./layouts/base.json",
+        children: [{ tagName: "p", textContent: "Page content" }],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/home.json" },
+    );
+    expect(result.mapperCtx.layoutWrapped).toBe(true);
+    expect(result.mapperCtx.pageContentPrefix).not.toBeNull();
+  });
+
+  test("auto-discovers project components in content mode and adds them to $elements", async () => {
+    installMockPlatform({
+      discoverComponents: async () => [
+        { path: "components/x-card-live.json", source: "jx", tagName: "x-card-live" },
+      ],
+    });
+    await loadComponentRegistry();
+    const result = await resolve(
+      { children: [{ tagName: "x-card-live" }], tagName: "div" } as JxMutableNode,
+      { documentPath: "content/home.md", mode: "content" },
+    );
+    const refs = ((result.renderDoc as { $elements?: { $ref?: string }[] }).$elements ?? []).map(
+      (e) => e.$ref,
+    );
+    expect(refs.some((r) => r?.includes("components/x-card-live.json"))).toBe(true);
   });
 });
 
