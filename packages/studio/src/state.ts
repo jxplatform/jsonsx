@@ -74,6 +74,35 @@ export function getNodeAtPath(doc: JxMutableNode, path: JxPath) {
 }
 
 /**
+ * Shallow-clone every node along `path` from root to target, leaving non-path subtrees as shared
+ * references. Returns the new root and the mutable target node at the end of the path.
+ *
+ * Used by mutation functions for structural-sharing history: the old root becomes an immutable
+ * snapshot (shared subtrees are never mutated), and the new root is the live document.
+ */
+export function cloneAlongPath(
+  doc: JxMutableNode,
+  path: JxPath,
+): { root: JxMutableNode; target: JxMutableNode } {
+  const root = Array.isArray(doc) ? [...doc] : { ...doc };
+  let node: Record<string | number, unknown> = root as Record<string | number, unknown>;
+
+  for (const key of path) {
+    const child = node[key];
+    if (child == null) {
+      return { root: root as JxMutableNode, target: node as JxMutableNode };
+    }
+    const cloned = Array.isArray(child)
+      ? [...(child as unknown[])]
+      : { ...(child as Record<string, unknown>) };
+    node[key] = cloned;
+    node = cloned as Record<string | number, unknown>;
+  }
+
+  return { root: root as JxMutableNode, target: node as JxMutableNode };
+}
+
+/**
  * The node's children when they are a static array (the edit-mode invariant); an empty array for
  * mapped-array or absent children.
  *

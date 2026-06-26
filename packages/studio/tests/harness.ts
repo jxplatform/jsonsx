@@ -124,12 +124,7 @@ export function installMockPlatform(
   const platform: StudioPlatform = {
     activate: log("activate", async () => {}),
     addPackage: log("addPackage", async () => ({})),
-    aiAuthStatus: log("aiAuthStatus", async () => ({ authenticated: false })),
-    aiCreateSession: log("aiCreateSession", async () => ({ id: "mock-session" })),
-    aiDeleteSession: log("aiDeleteSession", async () => {}),
-    aiSendMessage: log("aiSendMessage", async () => {}),
-    aiStopSession: log("aiStopSession", async () => {}),
-    aiStreamUrl: log("aiStreamUrl", () => "/__mock/ai/stream"),
+    aiChatUrl: log("aiChatUrl", () => "/__mock/ai/chat"),
     codeService: log("codeService", async () => null),
     createDirectory: log("createDirectory", async () => {}),
     createProject: log("createProject", async (opts) => ({

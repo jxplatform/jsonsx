@@ -1,0 +1,36 @@
+{
+  "name": "@jxsuite/ai",
+  "version": "0.1.0",
+  "description": "AI infrastructure for Jx Suite — streaming LLM client abstraction, tool registry, and reactive chat state",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/ai"
+  },
+  "files": [
+    "src/",
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./streaming-client": "./src/streaming-client.ts",
+    "./tools": "./src/tools.ts",
+    "./chat-state": "./src/chat-state.ts"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir dist --target browser --sourcemap=linked",
+    "test": "bun test",
+    "upgrade": "bunx npm-check-updates -u && bun install"
+  },
+  "dependencies": {
+    "@vue/reactivity": "3.5.38"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "^20.10.6"
+  }
+}

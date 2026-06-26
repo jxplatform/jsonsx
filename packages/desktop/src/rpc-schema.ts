@@ -356,30 +356,10 @@ export interface StudioRPC {
         params: { x: number; y: number; width: number; height: number };
         response: void;
       };
-      // AI Assistant
-      aiAuthStatus: {
+      // AI Assistant (Stack B)
+      aiChatUrl: {
         params: void;
-        response: { authenticated: boolean; error?: string };
-      };
-      aiCreateSession: {
-        params: { message: string; systemPrompt?: string };
-        response: { id: string };
-      };
-      aiSendMessage: {
-        params: { id: string; message: string };
-        response: void;
-      };
-      aiStreamUrl: {
-        params: { id: string };
         response: string;
-      };
-      aiStopSession: {
-        params: { id: string };
-        response: void;
-      };
-      aiDeleteSession: {
-        params: { id: string };
-        response: void;
       };
       // Window management (multi-window)
       newWindow: {

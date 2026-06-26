@@ -1,0 +1,16 @@
+{
+  "tagName": "div",
+  "attributes": {
+    "id": "about-page"
+  },
+  "children": [
+    {
+      "tagName": "h1",
+      "children": ["Meet the Team"]
+    },
+    {
+      "tagName": "p",
+      "children": ["We are a small team building great things."]
+    }
+  ]
+}

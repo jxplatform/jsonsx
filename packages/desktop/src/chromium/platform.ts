@@ -295,34 +295,9 @@ export function createDesktopPlatform(): StudioPlatform {
       }>;
     },
 
-    // AI Assistant
-    async aiAuthStatus() {
-      const res = await fetch("/studio/ai/auth-status");
-      return res.json() as Promise<{ authenticated: boolean; error?: string }>;
-    },
-    async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
-      const res = await fetch("/studio/ai/session", {
-        body: JSON.stringify(opts),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      return res.json() as Promise<{ id: string }>;
-    },
-    async aiSendMessage(id: string, message: string) {
-      await fetch(`/studio/ai/session/${id}/message`, {
-        body: JSON.stringify({ message }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-    },
-    aiStreamUrl(id: string) {
-      return `/studio/ai/session/${id}/stream`;
-    },
-    async aiStopSession(id: string) {
-      await fetch(`/studio/ai/session/${id}/stop`, { method: "POST" });
-    },
-    async aiDeleteSession(id: string) {
-      await fetch(`/studio/ai/session/${id}`, { method: "DELETE" });
+    // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)
+    aiChatUrl() {
+      return "/studio/ai/chat";
     },
   };
 }

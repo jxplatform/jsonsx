@@ -1,0 +1,15 @@
+{
+  "id": "counter-button",
+  "prompt": "Add a button that increments a counter, and show the current count above it. Wire up the reactive state.",
+  "tags": ["intent", "state", "binding"],
+  "intent": [
+    "declares numeric state for the count",
+    "a button increments the count on click",
+    "the count is shown via a ${...} template binding"
+  ],
+  "initialDoc": {
+    "tagName": "counter-widget",
+    "state": { "count": { "type": "integer", "default": 0 } },
+    "children": []
+  }
+}

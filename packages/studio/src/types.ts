@@ -214,12 +214,8 @@ export interface StudioPlatform {
     adapter?: string;
     directory: string;
   }) => Promise<{ root: string; config: ProjectConfig }>;
-  aiAuthStatus: () => Promise<{ authenticated: boolean; error?: string }>;
-  aiCreateSession: (opts: { message: string; systemPrompt?: string }) => Promise<{ id: string }>;
-  aiSendMessage: (id: string, message: string) => Promise<void>;
-  aiStreamUrl: (id: string) => string | Promise<string>;
-  aiStopSession: (id: string) => Promise<void>;
-  aiDeleteSession: (id: string) => Promise<void>;
+  /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */
+  aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────
   /** Open a project in a new window, focusing an existing window if it is already open. */
   openProjectInNewWindow?: (root: string) => Promise<void>;

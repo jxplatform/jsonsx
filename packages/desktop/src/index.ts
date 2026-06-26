@@ -2,7 +2,7 @@ import Electrobun from "electrobun/bun";
 import { setFileDialog } from "./project-session";
 import { setNotifyWebview, startBackgroundChecks } from "./updater";
 import { init as initUtils, openFileDialog } from "./utils";
-import { handleAiRoute } from "./ai";
+import { handleAiApi } from "@jxsuite/server/ai-api";
 import { installApplicationMenu } from "./menu";
 import {
   broadcastUpdateReady,
@@ -27,8 +27,7 @@ async function main() {
   const aiServer = Bun.serve({
     async fetch(req) {
       const url = new URL(req.url);
-      const path = url.pathname.replace(/^\/{2,}/, "/");
-      const aiResponse = await handleAiRoute(req, path, null);
+      const aiResponse = await handleAiApi(req, url);
       if (aiResponse) {
         return aiResponse;
       }

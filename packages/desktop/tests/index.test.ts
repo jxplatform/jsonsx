@@ -52,13 +52,13 @@ void mock.module("../src/utils", () => ({
   openFileDialog: openFileDialogSentinel,
 }));
 
-const handleAiRoute = mock(async (_req: Request, path: string, _root: string | null) => {
-  if (path === "/studio/ai/hit") {
+const handleAiApi = mock(async (_req: Request, url: URL) => {
+  if (url.pathname === "/__studio/ai/hit") {
     return new Response("ai-ok", { status: 200 });
   }
   return null;
 });
-void mock.module("../src/ai", () => ({ handleAiRoute }));
+void mock.module("@jxsuite/server/ai-api", () => ({ handleAiApi }));
 
 // ─── Stub Bun.serve, then import the module under test ───────────────────────
 
@@ -115,22 +115,15 @@ describe("boot sequence", () => {
 // ─── AI HTTP server fetch handler ───────────────────────────────────────────
 
 describe("AI server fetch handler", () => {
-  test("delegates matching routes to handleAiRoute with a null root", async () => {
-    const res = await serveOpts!.fetch(new Request("http://localhost/studio/ai/hit"));
+  test("delegates matching routes to handleAiApi with the request URL", async () => {
+    const res = await serveOpts!.fetch(new Request("http://localhost/__studio/ai/hit"));
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ai-ok");
-    const [, path, root] = handleAiRoute.mock.calls.at(-1)!;
-    expect(path).toBe("/studio/ai/hit");
-    expect(root).toBeNull();
+    const [, url] = handleAiApi.mock.calls.at(-1)!;
+    expect((url as URL).pathname).toBe("/__studio/ai/hit");
   });
 
-  test("normalizes duplicate leading slashes", async () => {
-    const res = await serveOpts!.fetch(new Request("http://localhost//studio/ai/hit"));
-    expect(res.status).toBe(200);
-    expect(handleAiRoute.mock.calls.at(-1)![1]).toBe("/studio/ai/hit");
-  });
-
-  test("returns 404 for unhandled routes", async () => {
+  test("returns 404 when handleAiApi does not handle the route", async () => {
     const res = await serveOpts!.fetch(new Request("http://localhost/nope"));
     expect(res.status).toBe(404);
     expect(await res.text()).toBe("Not Found");

@@ -21,7 +21,6 @@ import {
   setPackageVersions,
 } from "./packages.ts";
 import type { FormatRegistry } from "@jxsuite/schema/format-registry";
-import * as claude from "./claude-session.ts";
 import type { ClassJsonDef } from "./types.ts";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 
@@ -1436,79 +1435,6 @@ export async function handleStudioApi(
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 500 });
     }
-  }
-
-  // ─── AI Assistant ─────────────────────────────────────────────────────────
-
-  if (path === "/__studio/ai/auth-status" && req.method === "GET") {
-    const status = await claude.getAuthStatus();
-    return Response.json(status);
-  }
-
-  if (path === "/__studio/ai/session" && req.method === "POST") {
-    try {
-      const body = (await req.json()) as { message?: string; systemPrompt?: string };
-      const projectDir = activeProjectRoot || root;
-      const opts: { systemPrompt?: string } = {};
-      if (body.systemPrompt !== undefined) {
-        opts.systemPrompt = body.systemPrompt;
-      }
-      const result = claude.createSession(projectDir, body.message!, opts);
-      return Response.json(result);
-    } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : String(error) },
-        { status: 500 },
-      );
-    }
-  }
-
-  if (
-    path.startsWith("/__studio/ai/session/") &&
-    path.endsWith("/stream") &&
-    req.method === "GET"
-  ) {
-    const id = path.split("/").slice(4)[0]!;
-    return claude.streamSession(id);
-  }
-
-  if (
-    path.startsWith("/__studio/ai/session/") &&
-    path.endsWith("/message") &&
-    req.method === "POST"
-  ) {
-    try {
-      const id = path.split("/").slice(4)[0]!;
-      const body = (await req.json()) as { message?: string };
-      claude.sendMessage(id, body.message!);
-      return Response.json({ ok: true });
-    } catch (error) {
-      return Response.json(
-        { error: error instanceof Error ? error.message : String(error) },
-        { status: 500 },
-      );
-    }
-  }
-
-  if (path.startsWith("/__studio/ai/session/") && path.endsWith("/stop") && req.method === "POST") {
-    const id = path.split("/").slice(4)[0]!;
-    claude.stopSession(id);
-    return Response.json({ ok: true });
-  }
-
-  if (path.startsWith("/__studio/ai/session/") && req.method === "DELETE") {
-    const id = path.split("/").slice(4)[0]!;
-    claude.deleteSession(id);
-    return Response.json({ ok: true });
-  }
-
-  if (path.startsWith("/__studio/ai/session/") && req.method === "GET") {
-    const id = path.split("/").slice(4)[0]!;
-    const info = claude.getSession(id);
-    if (!info) {
-      return Response.json({ error: "Not found" }, { status: 404 });
-    }
-    return Response.json(info);
   }
 
   return null;

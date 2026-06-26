@@ -512,27 +512,9 @@ export function createDesktopPlatform() {
         rpc.request.windowSetFrame({ height: h, width: w, x, y }),
     },
 
-    // AI Assistant
-    async aiAuthStatus() {
-      return rpc.request.aiAuthStatus() as Promise<{
-        authenticated: boolean;
-        error?: string;
-      }>;
-    },
-    async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
-      return rpc.request.aiCreateSession(opts) as Promise<{ id: string }>;
-    },
-    async aiSendMessage(id: string, message: string) {
-      await rpc.request.aiSendMessage({ id, message });
-    },
-    aiStreamUrl(id: string) {
-      return rpc.request.aiStreamUrl({ id }) as Promise<string>;
-    },
-    async aiStopSession(id: string) {
-      await rpc.request.aiStopSession({ id });
-    },
-    async aiDeleteSession(id: string) {
-      await rpc.request.aiDeleteSession({ id });
+    // AI Assistant (Stack B: absolute SSE proxy URL from the shared local server, via RPC)
+    async aiChatUrl() {
+      return rpc.request.aiChatUrl() as Promise<string>;
     },
   };
 }

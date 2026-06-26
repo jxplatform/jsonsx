@@ -169,4 +169,33 @@ describe("createWatcher — rebuild integration", () => {
       rmSync(dir, { force: true, recursive: true });
     }
   });
+
+  test("swallows transient EINVAL watch errors but logs the rest", async () => {
+    const dir = setup("watch-errors");
+    try {
+      const { watcher } = createWatcher(dir, [], { debounce: 10 });
+      await waitReady(watcher);
+      const emit = (watcher as unknown as { emit: (e: string, a: unknown) => void }).emit.bind(
+        watcher,
+      );
+
+      const logged: unknown[][] = [];
+      const origError = console.error;
+      console.error = (...args: unknown[]) => void logged.push(args);
+      try {
+        // EINVAL on transient Bun test dirs is expected churn — silently ignored.
+        emit("error", new Error("EINVAL: invalid argument, watch"));
+        expect(logged).toHaveLength(0);
+        // Any other error is surfaced to the console.
+        emit("error", new Error("EACCES: permission denied"));
+        expect(logged).toHaveLength(1);
+      } finally {
+        console.error = origError;
+      }
+      await watcher.close();
+      await sleep(50);
+    } finally {
+      rmSync(dir, { force: true, recursive: true });
+    }
+  });
 });
