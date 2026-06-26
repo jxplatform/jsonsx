@@ -30,6 +30,7 @@ import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
 import { getActiveElement } from "../editor/inline-edit";
 import { buildNestedSiteCSS } from "./nested-site-style";
+import { classifyRenderNode } from "./path-mapping";
 
 import type { JxDocument, JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
@@ -168,59 +169,22 @@ export function makePathMapper(ctx: PathMapperCtx) {
     if (state) {
       elToScope.set(created, state);
     }
-    // Track layout-originated elements — don't store in elToPath to avoid
-    // Path collisions with remapped page content paths
-    if (layoutWrapped && typeof def === "object" && (def as JxMutableNode)?.$__layout) {
+    // Shared with the iframe host (which stamps data-jx-path instead of the elToPath WeakMap).
+    const classified = classifyRenderNode(path, def, {
+      arrayPaths,
+      canvasMode,
+      layoutWrapped,
+      pageContentOffset,
+      pageContentPrefix,
+    });
+    if (classified.kind === "layout") {
+      // Layout-originated elements are tracked separately, not in elToPath, to avoid path
+      // Collisions with remapped page content paths.
       layoutElements.add(created);
       created.dataset.jxLayout = "";
       return;
     }
-
-    // Remap layout-wrapped paths: strip the layout prefix so paths are
-    // Relative to the original page document (which is what S.document holds)
-    let mappedPath = path;
-    if (layoutWrapped && pageContentPrefix) {
-      const pfx = pageContentPrefix;
-      if (
-        path.length >= pfx.length &&
-        pfx.every((seg: string | number, i: number) => path[i] === seg)
-      ) {
-        // Page children render at container indices [offset, offset+1, …] when the layout places
-        // Sibling nodes before the <slot>. Subtract the offset so they map back to the page
-        // Document's 0-based child indices (what flattenTree / the layers panel use).
-        const rest = path.slice(pfx.length);
-        const [containerIdx] = rest;
-        mappedPath =
-          typeof containerIdx === "number"
-            ? ["children", containerIdx - (pageContentOffset ?? 0), ...rest.slice(1)]
-            : ["children", ...rest];
-      }
-    }
-
-    // Remap repeater perimeters: prepareForEditMode renders each mapped-array node as a
-    // `<div class="repeater-perimeter">` at the array's own child index, with the map template as
-    // Its single child[0]. The perimeter's render path already equals the array's document path,
-    // So only the template hop needs collapsing: for any array document path P, a render path of
-    // `[...P, "children", 0, ...rest]` maps to `[...P, "map", ...rest]`. Looping handles nested
-    // Repeaters (an array whose template contains another array).
-    if ((canvasMode === "design" || canvasMode === "edit") && arrayPaths.size > 0) {
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (let i = 1; i < mappedPath.length - 1; i++) {
-          if (
-            mappedPath[i] === "children" &&
-            mappedPath[i + 1] === 0 &&
-            arrayPaths.has(mappedPath.slice(0, i).join("/"))
-          ) {
-            mappedPath = [...mappedPath.slice(0, i), "map", ...mappedPath.slice(i + 2)];
-            changed = true;
-            break;
-          }
-        }
-      }
-    }
-    elToPath.set(created, mappedPath);
+    elToPath.set(created, classified.path);
   };
 }
 
