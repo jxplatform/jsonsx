@@ -25,6 +25,16 @@
            shown behind the app before sp-theme fills the viewport. */
         background: var(--spectrum-background-layer-1-color, #1e1e1e);
       }
+      /* Panel layout widths. These must live on :root (the <html> element),
+         not on sp-theme or #app, because the resize logic in
+         src/ui/panel-resize.ts reads and writes them as inline styles on
+         document.documentElement. A definition on any closer ancestor of #app
+         (sp-theme or body) would shadow that inline override and freeze the
+         sidebars. The #app.left/right-collapsed rules override per instance. */
+      :root {
+        --panel-w-left: 240px;
+        --panel-w-right: 280px;
+      }
       /* Studio semantic token layer.
          Declared on sp-theme — not :root — so each var(--spectrum-*) reference
          resolves against the tokens sp-theme exposes via its :host rules. At
@@ -137,9 +147,6 @@
         --data-string: var(--spectrum-orange-700, #ce9178);
         --data-number: var(--spectrum-celery-700, #b5cea8);
         --data-boolean: var(--tag);
-        /* Layout */
-        --panel-w-left: 240px;
-        --panel-w-right: 280px;
         /* Typography — align the chrome with the Spectrum sans stack used by
            the SWC components; 12px maps exactly to font-size-75. line-height
            stays 1.5 (a deliberate reading height; the Spectrum body token is
@@ -3853,7 +3860,7 @@
         background: none;
         border: none;
         font: inherit;
-        font-size: 12px;
+        font-size: var(--spectrum-font-size-75, 12px);
         color: var(--fg-dim);
         cursor: pointer;
         opacity: 0;
