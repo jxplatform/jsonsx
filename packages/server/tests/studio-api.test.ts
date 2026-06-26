@@ -897,12 +897,26 @@ describe("find-project", () => {
   });
 
   test("returns null path when project not found", async () => {
-    const url = new URL("http://localhost/__studio/find-project?name=nonexistent-xyz-project-404");
-    const req = new Request(url, { method: "GET" });
-    const res = await callApi(req, url, FIXTURES);
-    const data = await res.json();
-    expect(data.path).toBeNull();
-  }, 15_000);
+    // Scope the recursive project glob to the small fixtures dir instead of the real $HOME,
+    // Which can be enormous (the handler scans `$HOME/**/<name>/project.json`) and times out.
+    const prevHome = process.env.HOME;
+    process.env.HOME = FIXTURES;
+    try {
+      const url = new URL(
+        "http://localhost/__studio/find-project?name=nonexistent-xyz-project-404",
+      );
+      const req = new Request(url, { method: "GET" });
+      const res = await callApi(req, url, FIXTURES);
+      const data = await res.json();
+      expect(data.path).toBeNull();
+    } finally {
+      if (prevHome === undefined) {
+        delete process.env.HOME;
+      } else {
+        process.env.HOME = prevHome;
+      }
+    }
+  });
 });
 
 // ─── components — markdown discovery ────────────────────────────────────────

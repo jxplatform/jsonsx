@@ -203,40 +203,44 @@ describe("POST /__studio/ai/chat — error handling", () => {
 
 describe("POST /__studio/ai/chat — SSE streaming", () => {
   it("returns SSE content-type on success", async () => {
-    // This test verifies the response has correct SSE headers.
-    // We mock the upstream by setting OPENAI_API_KEY and a valid base URL
-    // That will fail with a clean error (we test the pipeline shape, not OpenAI)
+    // Verify the response has correct SSE headers and that the upstream stream is normalized.
+    // The upstream fetch is mocked so the test never depends on a real network endpoint — a real
+    // URL (e.g. httpstat.us) makes this hang and time out under load or offline.
     process.env.OPENAI_API_KEY = "test-key";
-    process.env.OPENAI_BASE_URL = "https://httpstat.us"; // Returns 200 for any path
+    const realFetch = globalThis.fetch;
+    // A non-SSE 200 body: the proxy reads the (data-less) stream to completion and emits `done`.
+    globalThis.fetch = (() =>
+      Promise.resolve(
+        new Response("200 OK", { status: 200, headers: { "Content-Type": "text/plain" } }),
+      )) as unknown as typeof fetch;
 
-    const req = mockReq("/__studio/ai/chat", {
-      method: "POST",
-      body: {
-        messages: [{ role: "user", content: "Hello" }],
-        tools: [],
-        systemPrompt: "Be helpful.",
-        model: "gpt-4o",
-      },
-      headers: { "X-Api-Key": "test-key" },
-    });
-    const url = new URL("http://localhost/__studio/ai/chat");
-    const res = await handleAiApi(req, url);
+    try {
+      const req = mockReq("/__studio/ai/chat", {
+        method: "POST",
+        body: {
+          messages: [{ role: "user", content: "Hello" }],
+          tools: [],
+          systemPrompt: "Be helpful.",
+          model: "gpt-4o",
+        },
+        headers: { "X-Api-Key": "test-key" },
+      });
+      const url = new URL("http://localhost/__studio/ai/chat");
+      const res = await handleAiApi(req, url);
 
-    expect(res).not.toBeNull();
-    // The upstream will fail (not an actual OpenAI endpoint) but the
-    // Response shape should be SSE with an error event
-    expect(res!.headers.get("Content-Type")).toBe("text/event-stream");
-    expect(res!.headers.get("Cache-Control")).toBe("no-cache");
+      expect(res).not.toBeNull();
+      expect(res!.headers.get("Content-Type")).toBe("text/event-stream");
+      expect(res!.headers.get("Cache-Control")).toBe("no-cache");
 
-    const events = await readSSEEvents(res!);
-    // Should contain an error event since httpstat.us isn't OpenAI
-    expect(events.length).toBeGreaterThan(0);
-    const errorEvents = events.filter((e) => e.type === "error");
-    const doneEvents = events.filter((e) => e.type === "done");
-    expect(errorEvents.length + doneEvents.length).toBeGreaterThan(0);
-
-    delete process.env.OPENAI_API_KEY;
-    delete process.env.OPENAI_BASE_URL;
+      const events = await readSSEEvents(res!);
+      expect(events.length).toBeGreaterThan(0);
+      const errorEvents = events.filter((e) => e.type === "error");
+      const doneEvents = events.filter((e) => e.type === "done");
+      expect(errorEvents.length + doneEvents.length).toBeGreaterThan(0);
+    } finally {
+      globalThis.fetch = realFetch;
+      delete process.env.OPENAI_API_KEY;
+    }
   });
 
   it("respects X-Api-Key header over Bearer token", async () => {
