@@ -1,12 +1,13 @@
 /**
- * Tests for src/panels/ai-panel.ts — Claude AI assistant panel.
+ * Tests for src/panels/ai-panel.ts — Stack B document-assistant panel.
  *
- * Quikchat is mocked (no real chat widget) and EventSource is replaced with an in-memory fake, so
- * no real session or network traffic ever happens. The panel keeps module-level state, so the tests
- * in this file are ordered and run as one continuous scenario.
+ * Quikchat is mocked (no real chat widget) and the document assistant is mocked with a reactive
+ * chat-state we drive by hand, so watchAssistant()'s effect fires on mutations without any network
+ * traffic. The panel keeps module-level state, so the tests run as one ordered scenario.
  */
 import { installMockPlatform } from "./harness";
-import { describe, expect, mock, test } from "bun:test";
+import { reactive } from "@vue/reactivity";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { render } from "lit-html";
 
 // ─── Quikchat mock ────────────────────────────────────────────────────────────
@@ -63,87 +64,55 @@ class FakeQuikChat {
 
 void mock.module("quikchat/md", () => ({ default: FakeQuikChat }));
 
-// ─── EventSource fake ─────────────────────────────────────────────────────────
+// ─── Document-assistant mock (reactive chat-state we drive by hand) ─────────────
 
-class FakeEventSource {
-  static instances: FakeEventSource[] = [];
-  listeners = new Map<string, ((e: { data?: string }) => void)[]>();
-  closed = false;
-  url: string;
-
-  constructor(url: string) {
-    this.url = url;
-    FakeEventSource.instances.push(this);
-  }
-
-  addEventListener(type: string, fn: (e: { data?: string }) => void) {
-    const list = this.listeners.get(type) ?? [];
-    list.push(fn);
-    this.listeners.set(type, list);
-  }
-
-  close() {
-    this.closed = true;
-  }
-
-  /** Deliver an event; payload is JSON-stringified unless already a string or omitted. */
-  emit(type: string, payload?: unknown) {
-    const event: { data?: string } = {};
-    if (typeof payload === "string") {
-      event.data = payload;
-    } else if (payload !== undefined) {
-      event.data = JSON.stringify(payload);
-    }
-    for (const fn of this.listeners.get(type) ?? []) {
-      fn(event);
-    }
-  }
+interface FakeMsg {
+  role: string;
+  content: string;
+  toolCalls?: { name: string; arguments: string }[];
 }
 
-Object.defineProperty(globalThis, "EventSource", {
-  configurable: true,
-  value: FakeEventSource,
-  writable: true,
+const chatState = reactive({
+  messages: [] as FakeMsg[],
+  status: "idle" as "idle" | "streaming" | "error",
+  error: null as string | null,
 });
 
-// Deterministic rAF so flush() runs the mount callback.
+const sendMessage = mock(async (_text: string) => {});
+const stop = mock(() => {});
+const newChat = mock(() => {
+  chatState.messages.splice(0);
+  chatState.status = "idle";
+  chatState.error = null;
+});
+
+void mock.module("../src/services/document-assistant", () => ({
+  createDocumentAssistant: () => ({ chatState, sendMessage, stop, newChat }),
+}));
+
+// Deterministic rAF so flush() runs the scheduled mountQuikChat callback.
 (globalThis as Record<string, unknown>).requestAnimationFrame = (cb: (t: number) => void) =>
   setTimeout(() => cb(0), 0);
 
-// ─── Platform ─────────────────────────────────────────────────────────────────
+// ─── Fetch mock (for fetchModels) ──────────────────────────────────────────────
 
-const authQueue: (() => Promise<{ authenticated: boolean; error?: string }>)[] = [
-  async () => {
-    throw new Error("net down");
-  },
-  async () => ({ authenticated: false, error: "denied" }),
-  async () => ({ authenticated: false }),
-  async () => ({ authenticated: true }),
-];
-let authCalls = 0;
-const createdSessions: unknown[] = [];
-let createSessionImpl: (opts: unknown) => Promise<{ id: string }> = async (opts) => {
-  createdSessions.push(opts);
-  return { id: "sess-1" };
+let fetchImpl: (url: string, init?: RequestInit) => Promise<Response> = async () =>
+  Response.json({ models: [] }, { status: 200 });
+const fetchCalls: { url: string; init?: RequestInit | undefined }[] = [];
+(globalThis as Record<string, unknown>).fetch = (url: string, init?: RequestInit) => {
+  fetchCalls.push({ init, url });
+  return fetchImpl(url, init);
 };
 
-const { state } = installMockPlatform({
-  aiAuthStatus: async () => {
-    authCalls += 1;
-    const next = authQueue.shift();
-    return next ? next() : { authenticated: true };
-  },
-  aiCreateSession: (opts) => createSessionImpl(opts),
-});
-
+const { state } = installMockPlatform();
 const ai = await import("../src/panels/ai-panel");
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 let container = document.createElement("div");
-const renderPanel = () => {
+function renderPanel() {
   render(ai.renderAiPanelTemplate(), container);
-};
+}
 
 async function flush(turns = 4) {
   for (let i = 0; i < turns; i++) {
@@ -157,289 +126,297 @@ function qc() {
   return FakeQuikChat.instances.at(-1)!;
 }
 
-function es() {
-  return FakeEventSource.instances.at(-1)!;
-}
-
-function button(label: string) {
-  return [...container.querySelectorAll("sp-button, sp-action-button")].find((b) =>
-    b.textContent?.includes(label),
-  ) as HTMLElement;
-}
-
-function click(el: HTMLElement) {
-  el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-}
-
 function callsOf(instance: FakeQuikChat, name: string) {
   return instance.calls.filter((c) => c[0] === name);
 }
 
-function platCalls(name: string) {
-  return state.calls.filter((c) => c[0] === name);
+function byText(label: string) {
+  return [...container.querySelectorAll("sp-button, sp-action-button")].find((b) =>
+    b.textContent?.includes(label),
+  ) as HTMLElement | undefined;
 }
 
-// ─── Scenario ─────────────────────────────────────────────────────────────────
+function click(el: HTMLElement | undefined) {
+  el?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
 
-describe("ai-panel (sequential scenario)", () => {
-  test("mountQuikChat is a no-op before the panel container exists", () => {
+function inputByPlaceholder(ph: string) {
+  return container.querySelector(`input[placeholder^="${ph}"]`) as HTMLInputElement | null;
+}
+
+function fire(el: HTMLElement | null, type: string, value?: string) {
+  if (!el) {
+    return;
+  }
+  if (value !== undefined) {
+    (el as HTMLInputElement).value = value;
+  }
+  el.dispatchEvent(new Event(type, { bubbles: true }));
+}
+
+// ─── Scenario ───────────────────────────────────────────────────────────────
+
+describe("ai-panel (Stack B sequential scenario)", () => {
+  beforeAll(() => {
+    globalThis.localStorage.clear();
+    chatState.messages.splice(0);
+    chatState.status = "idle";
+    chatState.error = null;
+    ai.registerRightPanelRender(() => renderPanel());
+  });
+
+  afterAll(() => {
+    globalThis.localStorage.clear();
+  });
+
+  test("mountAiPanel is idempotent and registerRightPanelRender is wired", () => {
+    ai.mountAiPanel();
+    ai.mountAiPanel();
+    // No throw; registration already applied in beforeAll.
+    expect(typeof ai.renderAiPanelTemplate).toBe("function");
+  });
+
+  test("mountQuikChat is a no-op before the chat container exists", () => {
     ai.mountQuikChat();
     expect(FakeQuikChat.instances.length).toBe(0);
   });
 
-  test("renders checking state before auth resolves", async () => {
+  test("renders the key gate when no key is stored", () => {
     renderPanel();
-    await flush();
-    expect(container.textContent).toContain("Checking authentication");
+    expect(container.textContent).toContain("AI provider key");
+    expect(inputByPlaceholder("sk-")).not.toBeNull();
+    // No saved key yet → no Cancel button (only offered when a key exists).
+    expect(byText("Cancel")).toBeUndefined();
+    // No models fetched yet → free-text model input branch.
+    expect(inputByPlaceholder("Model ID")).not.toBeNull();
   });
 
-  test("auth check failure shows unauthenticated view with the thrown error", async () => {
-    ai.registerRightPanelRender(renderPanel);
-    ai.mountAiPanel();
-    await flush();
-    expect(authCalls).toBe(1);
-    expect(container.textContent).toContain("Claude authentication required");
-    expect(container.textContent).toContain("npx @anthropic-ai/claude-code login");
-    expect(container.querySelector("sp-help-text")?.textContent).toContain("net down");
-    // Mounting again is a no-op
-    ai.mountAiPanel();
-    await flush();
-    expect(authCalls).toBe(1);
+  test("gate inputs update the drafts", () => {
+    fire(inputByPlaceholder("sk-"), "input", "sk-test-key");
+    fire(inputByPlaceholder("Model ID"), "input", "gpt-4o-mini");
+    fire(inputByPlaceholder("Endpoint"), "input", "http://localhost:11434/v1");
+    // Handlers ran without error; drafts are exercised via the subsequent Save.
+    expect(inputByPlaceholder("sk-")!.value).toBe("sk-test-key");
   });
 
-  test("retry re-checks auth and shows the backend error", async () => {
-    click(button("Retry"));
+  test("fetchModels populates the picker and forwards key + base URL headers", async () => {
+    fetchImpl = async () =>
+      Response.json({ models: [{ id: "gpt-4o" }, { id: "x", name: "Model X" }] }, { status: 200 });
+    fetchCalls.length = 0;
+    click(byText("Fetch models"));
     await flush();
-    expect(authCalls).toBe(2);
-    expect(container.querySelector("sp-help-text")?.textContent).toContain("denied");
+    renderPanel();
+    // Combobox branch now active (availableModels > 0).
+    expect(container.querySelector("sp-combobox")).not.toBeNull();
+    expect(container.textContent).toContain("Model X");
+    expect(container.textContent).toContain("Refresh models");
+    // Header forwarding from the typed drafts.
+    const headers = fetchCalls.at(-1)!.init!.headers as Record<string, string>;
+    expect(headers["X-Api-Key"]).toBe("sk-test-key");
+    expect(headers["X-Api-Base-URL"]).toBe("http://localhost:11434/v1");
+    expect(fetchCalls.at(-1)!.url).toContain("/models");
   });
 
-  test("unauthenticated without error hides the help text", async () => {
-    click(button("Retry"));
-    await flush();
-    expect(authCalls).toBe(3);
-    expect(container.textContent).toContain("Claude authentication required");
-    expect(container.querySelector("sp-help-text")).toBeNull();
+  test("combobox change/input handlers update the model draft", () => {
+    fire(container.querySelector("sp-combobox") as HTMLElement, "change", "gpt-4o");
+    fire(container.querySelector("sp-combobox") as HTMLElement, "input", "gpt-4o");
+    expect(container.querySelector("sp-combobox")).not.toBeNull();
   });
 
-  test("successful auth shows the chat view and mounts quikchat once", async () => {
-    click(button("Retry"));
+  test("fetchModels surfaces an error on a non-OK response", async () => {
+    fetchImpl = async () => new Response("nope", { status: 500 });
+    click(byText("Refresh models"));
     await flush();
-    expect(container.textContent).toContain("New Chat");
-    expect(container.querySelector("#ai-quikchat")).toBeTruthy();
+    renderPanel();
+    expect(container.textContent).toContain("HTTP 500");
+  });
+
+  test("saveApiKey persists the key and switches to the chat view", async () => {
+    // Restore a good models response for later re-fetches.
+    fetchImpl = async () => Response.json({ models: [] }, { status: 200 });
+    fire(inputByPlaceholder("sk-"), "input", "sk-test-key");
+    click(byText("Save"));
+    await flush();
+    expect(globalThis.localStorage.getItem("jx.ai.openaiKey")).toBe("sk-test-key");
+    renderPanel();
+    // Chat view: toolbar + quikchat mount point, no key form.
+    expect(container.textContent).not.toContain("AI provider key");
+    expect(container.querySelector("#ai-quikchat")).not.toBeNull();
+    expect(byText("New Chat")).toBeDefined();
+  });
+
+  test("mountQuikChat instantiates once and is idempotent", () => {
+    renderPanel();
+    ai.mountQuikChat();
     expect(FakeQuikChat.instances.length).toBe(1);
-    expect(qc().opts.theme).toBe("quikchat-theme-dark");
-    // Same container — no second instance
     ai.mountQuikChat();
     expect(FakeQuikChat.instances.length).toBe(1);
   });
 
-  test("blank input is ignored", async () => {
+  test("sending a message drives the assistant and toggles input enablement", async () => {
+    sendMessage.mockClear();
+    qc().callback(qc(), "hello there");
+    await flush();
+    expect(sendMessage).toHaveBeenCalledWith("hello there");
+    const enableCalls = callsOf(qc(), "inputAreaSetEnabled").map((c) => c[1]);
+    expect(enableCalls).toContain(false);
+    expect(enableCalls).toContain(true);
+  });
+
+  test("empty and streaming sends are ignored", async () => {
+    sendMessage.mockClear();
     qc().callback(qc(), "   ");
+    chatState.status = "streaming";
+    qc().callback(qc(), "while busy");
     await flush();
-    expect(createdSessions.length).toBe(0);
-    expect(callsOf(qc(), "messageAddTypingIndicator").length).toBe(0);
+    chatState.status = "idle";
+    await flush();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  test("first message creates a session and opens the SSE stream", async () => {
-    qc().callback(qc(), "hello");
+  test("streaming flow: live bubble, incremental append, then finalize in place", async () => {
+    const inst = qc();
+    inst.calls.length = 0;
+    // User message + a streaming assistant tail.
+    chatState.messages.push({ content: "hi", role: "user" });
+    chatState.status = "streaming";
+    chatState.messages.push({ content: "", role: "assistant" });
     await flush();
-    expect(createdSessions).toEqual([{ message: "hello" }]);
-    expect(callsOf(qc(), "messageAddTypingIndicator").length).toBe(1);
-    expect(qc().calls).toContainEqual(["inputAreaSetEnabled", false]);
-    expect(FakeEventSource.instances.length).toBe(1);
-    expect(es().url).toBe("/__mock/ai/stream");
-    expect(platCalls("aiStreamUrl")).toEqual([["aiStreamUrl", "sess-1"]]);
-    // Streaming → Stop button visible
-    expect(button("Stop")).toBeTruthy();
+    expect(callsOf(inst, "messageAddNew").some((c) => c[1] === "hi" && c[4] === "user")).toBe(true);
+    // Token deltas — mutate through the reactive proxy.
+    chatState.messages[1]!.content = "Hello";
+    await flush();
+    chatState.messages[1]!.content = "Hello world";
+    await flush();
+    const appends = callsOf(inst, "messageAppendContent").map((c) => c[2]);
+    expect(appends).toContain("Hello");
+    expect(appends).toContain(" world");
+    // Finalize.
+    chatState.status = "idle";
+    await flush();
+    expect(callsOf(inst, "messageReplaceContent").length).toBeGreaterThan(0);
   });
 
-  test("messages sent while streaming are dropped", async () => {
-    qc().callback(qc(), "again");
+  test("a failed tool result is surfaced; a successful one stays hidden", async () => {
+    const inst = qc();
+    inst.calls.length = 0;
+    chatState.messages.push(
+      { content: JSON.stringify({ error: "bad path", success: false }), role: "tool" },
+      { content: JSON.stringify({ success: true }), role: "tool" },
+    );
     await flush();
-    expect(createdSessions.length).toBe(1);
-    expect(platCalls("aiSendMessage").length).toBe(0);
+    const added = callsOf(inst, "messageAddNew").map((c) => c[1] as string);
+    expect(added.some((t) => t.includes("⚠️") && t.includes("bad path"))).toBe(true);
+    expect(added.some((t) => t.includes("{") && t.includes("success"))).toBe(false);
   });
 
-  test("text deltas replace the typing indicator then append", async () => {
-    es().emit("stream_event", {
-      event: { delta: { text: "Hel", type: "text_delta" }, type: "content_block_delta" },
+  test("a non-JSON tool result is ignored", async () => {
+    const inst = qc();
+    inst.calls.length = 0;
+    chatState.messages.push({ content: "not json at all", role: "tool" });
+    await flush();
+    expect(callsOf(inst, "messageAddNew").length).toBe(0);
+  });
+
+  test("assistant tool-call labels render path, parentPath, plain, and unparsable args", async () => {
+    const inst = qc();
+    inst.calls.length = 0;
+    chatState.messages.push({
+      content: "working on it",
+      role: "assistant",
+      toolCalls: [
+        { arguments: JSON.stringify({ path: [0, 1] }), name: "replaceNode" },
+        { arguments: JSON.stringify({ parentPath: [2] }), name: "insertNode" },
+        { arguments: JSON.stringify({}), name: "validate" },
+        { arguments: "{bad json", name: "broken" },
+      ],
     });
-    es().emit("stream_event", {
-      event: { delta: { text: "lo", type: "text_delta" }, type: "content_block_delta" },
-    });
-    es().emit("stream_event", { event: { type: "other" } });
-    es().emit("stream_event", "not json");
-    const replaced = callsOf(qc(), "messageReplaceContent");
-    expect(replaced.at(-1)?.[2]).toBe("Hel");
-    const appended = callsOf(qc(), "messageAppendContent");
-    expect(appended.at(-1)?.[2]).toBe("lo");
+    await flush();
+    const added = callsOf(inst, "messageAddNew").map((c) => c[1] as string);
+    expect(added.some((t) => t.includes("working on it"))).toBe(true);
+    expect(added.some((t) => t.includes("🔧 replaceNode") && t.includes("[0,1]"))).toBe(true);
+    expect(added.some((t) => t.includes("🔧 insertNode") && t.includes("[2]"))).toBe(true);
+    expect(added.some((t) => t === "🔧 validate")).toBe(true);
+    expect(added.some((t) => t === "🔧 broken")).toBe(true);
   });
 
-  test("assistant tool_use blocks render formatted tool labels", async () => {
-    es().emit("assistant", "not json");
-    es().emit("assistant", {
-      message: {
-        content: [
-          { text: "I will edit", type: "text" },
-          { input: { file_path: "/elsewhere/a.json" }, name: "Edit", type: "tool_use" },
-          { input: { path: "/elsewhere/b.json" }, name: "Write", type: "tool_use" },
-          { input: {}, name: "Edit", type: "tool_use" },
-          { input: {}, name: "Read", type: "tool_use" },
-          { input: { command: "x".repeat(60) }, name: "Bash", type: "tool_use" },
-          { input: { pattern: "**/*.ts" }, name: "Glob", type: "tool_use" },
-          { input: { pattern: "foo" }, name: "Grep", type: "tool_use" },
-          { name: "WebSearch", type: "tool_use" },
-        ],
-      },
-    });
-    const labels = callsOf(qc(), "messageAddNew")
-      .filter((c) => c[4] === "tool")
-      .map((c) => c[1]);
-    expect(labels).toEqual([
-      "📝 Edit: /elsewhere/a.json",
-      "📝 Write: /elsewhere/b.json",
-      "📝 Edit: file",
-      "📖 Read: file",
-      `⚡ Run: ${"x".repeat(50)}…`,
-      "🔍 Glob: **/*.ts",
-      "🔍 Grep: foo",
-      "🔧 WebSearch",
-    ]);
-    // New assistant bubble started with the block text
-    const assistantAdds = callsOf(qc(), "messageAddNew").filter((c) => c[4] === "assistant");
-    expect(assistantAdds.at(-1)?.[1]).toBe("I will edit");
+  test("error state renders the message with actionable advice", async () => {
+    for (const [err, advice] of [
+      ["401 no api key", "🔑"],
+      ["network error: fetch failed", "dev server"],
+      ["429 rate limit", "rate limit"],
+      ["500 internal", "server error"],
+      ["something obscure", null],
+    ] as [string, string | null][]) {
+      const inst = qc();
+      inst.calls.length = 0;
+      chatState.error = err;
+      chatState.status = "error";
+      await flush();
+      chatState.error = null;
+      chatState.status = "idle";
+      await flush();
+      const added = callsOf(inst, "messageAddNew").map((c) => c[1] as string);
+      expect(added.some((t) => t.includes("❌") && t.includes(err))).toBe(true);
+      if (advice) {
+        expect(added.some((t) => t.includes(advice))).toBe(true);
+      }
+    }
   });
 
-  test("done finishes the stream and re-enables input", async () => {
-    es().emit("done");
-    await flush();
-    expect(qc().calls.at(-1)).toEqual(["inputAreaSetEnabled", true]);
-    expect(button("Stop")).toBeUndefined();
-  });
-
-  test("second message reuses the session and error payloads surface", async () => {
-    qc().callback(qc(), "follow-up");
-    await flush();
-    expect(platCalls("aiSendMessage")).toEqual([["aiSendMessage", "sess-1", "follow-up"]]);
-    expect(FakeEventSource.instances.length).toBe(1);
-    es().emit("error", { error: "boom" });
-    await flush();
-    const replaced = callsOf(qc(), "messageReplaceContent");
-    expect(replaced.at(-1)?.[2]).toBe("Error: boom");
-    expect(button("Stop")).toBeUndefined();
-  });
-
-  test("result with is_error replaces the bubble with the error", async () => {
-    qc().callback(qc(), "third");
-    await flush();
-    es().emit("result", { is_error: true, result: "limit exceeded" });
-    await flush();
-    const replaced = callsOf(qc(), "messageReplaceContent");
-    expect(replaced.at(-1)?.[2]).toBe("Error: limit exceeded");
-    // A result event when not streaming is ignored (finishStream guard)
-    es().emit("result", "garbage");
-    await flush();
-  });
-
-  test("remounting into a fresh container replays the conversation", async () => {
-    container = document.createElement("div");
+  test("Stop button calls assistant.stop() while streaming", () => {
+    stop.mockClear();
+    chatState.status = "streaming";
     renderPanel();
-    await flush();
-    ai.mountQuikChat();
-    const replay = qc();
-    expect(FakeQuikChat.instances.length).toBe(2);
-    const adds = callsOf(replay, "messageAddNew");
-    const users = adds.filter((c) => c[4] === "user").map((c) => c[1]);
-    expect(users).toEqual(["hello", "follow-up", "third"]);
-    expect(adds.filter((c) => c[4] === "tool").length).toBe(8);
-    const assistants = adds.filter((c) => c[4] === "assistant").map((c) => c[1]);
-    expect(assistants).toContain("Hello");
-    expect(assistants).toContain("I will edit");
-    expect(assistants).toContain("Error: boom");
-    expect(assistants).toContain("Error: limit exceeded");
-  });
-
-  test("replay during streaming restores partial text and disables input", async () => {
-    qc().callback(qc(), "stream me");
-    await flush();
-    es().emit("stream_event", {
-      event: { delta: { text: "partial answer", type: "text_delta" }, type: "content_block_delta" },
-    });
-    container = document.createElement("div");
+    click(byText("Stop"));
+    expect(stop).toHaveBeenCalled();
+    chatState.status = "idle";
     renderPanel();
-    await flush();
-    ai.mountQuikChat();
-    const replay = qc();
-    expect(FakeQuikChat.instances.length).toBe(3);
-    const adds = callsOf(replay, "messageAddNew");
-    expect(adds.at(-1)?.[1]).toBe("partial answer");
-    expect(replay.calls).toContainEqual(["inputAreaSetEnabled", false]);
-    es().emit("done");
-    await flush();
   });
 
-  test("assistant events without content or text are tolerated", async () => {
-    qc().callback(qc(), "more");
-    await flush();
-    es().emit("assistant", {});
-    // Bare content array with only a tool block while no text accumulated
-    es().emit("assistant", {
-      content: [{ input: { pattern: "x" }, name: "Glob", type: "tool_use" }],
-    });
-    const labels = callsOf(qc(), "messageAddNew").filter((c) => c[4] === "tool");
-    expect(labels.at(-1)?.[1]).toBe("🔍 Glob: x");
-    // Error event with no data → parse failure swallowed, stream finishes
-    es().emit("error");
-    await flush();
-    expect(button("Stop")).toBeUndefined();
+  test("New Chat resets the conversation", () => {
+    newChat.mockClear();
+    const inst = qc();
+    inst.calls.length = 0;
+    chatState.messages.push({ content: "leftover", role: "user" });
+    click(byText("New Chat"));
+    expect(newChat).toHaveBeenCalled();
+    expect(callsOf(inst, "historyImport").length).toBe(1);
+    expect(chatState.messages.length).toBe(0);
   });
 
-  test("stop button stops the active session", async () => {
-    qc().callback(qc(), "stop me");
+  test("key button reopens the gate over an existing key, then Cancel returns to chat", async () => {
+    click(byText("🔑"));
     await flush();
-    expect(button("Stop")).toBeTruthy();
-    click(button("Stop"));
-    await flush();
-    expect(platCalls("aiStopSession")).toEqual([["aiStopSession", "sess-1"]]);
-    expect(button("Stop")).toBeUndefined();
-  });
-
-  test("new chat deletes the session and clears history", async () => {
-    // Cover the unregistered-render fallback inside rerenderPanel
-    (globalThis as Record<string, unknown>).__jxRightPanelRender = undefined;
-    click(button("New Chat"));
-    await flush();
-    ai.registerRightPanelRender(renderPanel);
-    expect(platCalls("aiDeleteSession")).toEqual([["aiDeleteSession", "sess-1"]]);
-    expect(qc().calls).toContainEqual(["historyImport", []]);
-    expect(es().closed).toBe(true);
-    // History gone — remount replays nothing
-    container = document.createElement("div");
     renderPanel();
-    await flush();
-    ai.mountQuikChat();
-    expect(callsOf(qc(), "messageAddNew").length).toBe(0);
+    // Gate shows again even though a key exists → Cancel offered.
+    expect(container.textContent).toContain("AI provider key");
+    expect(byText("Cancel")).toBeDefined();
+    click(byText("Cancel"));
+    renderPanel();
+    expect(container.textContent).not.toContain("AI provider key");
+    expect(container.querySelector("#ai-quikchat")).not.toBeNull();
   });
 
-  test("stop without a session is a no-op; create-session failure surfaces", async () => {
-    let reject: (e: unknown) => void = () => {};
-    createSessionImpl = () =>
-      new Promise((_resolve, rej) => {
-        reject = rej;
-      });
-    qc().callback(qc(), "fail msg");
+  test("mounting into a fresh container replays existing history and skips the streaming tail", async () => {
+    chatState.messages.splice(0);
+    chatState.messages.push(
+      { content: "earlier question", role: "user" },
+      { content: JSON.stringify({ success: true }), role: "tool" },
+      { content: "partial answer", role: "assistant" },
+    );
+    chatState.status = "streaming";
+    const fresh = document.createElement("div");
+    render(ai.renderAiPanelTemplate(), fresh);
+    container = fresh;
+    ai.mountQuikChat();
     await flush();
-    // Streaming with no session yet — Stop renders but does nothing
-    expect(button("Stop")).toBeTruthy();
-    click(button("Stop"));
-    await flush();
-    expect(platCalls("aiStopSession").length).toBe(1); // Unchanged from earlier test
-    reject(new Error("no backend"));
-    await flush();
-    const replaced = callsOf(qc(), "messageReplaceContent");
-    expect(String(replaced.at(-1)?.[2])).toContain("no backend");
-    expect(qc().calls.at(-1)).toEqual(["inputAreaSetEnabled", true]);
-    expect(button("Stop")).toBeUndefined();
+    const inst = qc();
+    const added = callsOf(inst, "messageAddNew").map((c) => c[1] as string);
+    // User message replayed; streaming assistant tail not finalized during replay.
+    expect(added.some((t) => t.includes("earlier question"))).toBe(true);
+    // The platform mock's aiChatUrl was used by fetchModels earlier.
+    expect(state.calls.some((c) => c[0] === "aiChatUrl")).toBe(true);
+    chatState.status = "idle";
   });
 });

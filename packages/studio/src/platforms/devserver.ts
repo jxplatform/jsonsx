@@ -793,54 +793,10 @@ export function createDevServerPlatform() {
       }
     },
 
-    // ─── AI Assistant ───────────────────────────────────
+    // ─── AI Assistant (Stack B: OpenAI-compatible SSE proxy) ───────────────────
 
-    async aiAuthStatus() {
-      const res = await fetch("/__studio/ai/auth-status");
-      return await res.json();
-    },
-
-    /** @param {{ message: string; systemPrompt?: string }} opts */
-    async aiCreateSession(opts: { message: string; systemPrompt?: string }) {
-      const res = await fetch("/__studio/ai/session", {
-        body: JSON.stringify(opts),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      if (!res.ok) {
-        const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
-      }
-      return await res.json();
-    },
-
-    /** @param {string} id @param {string} message */
-    async aiSendMessage(id: string, message: string) {
-      const res = await fetch(`/__studio/ai/session/${id}/message`, {
-        body: JSON.stringify({ message }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      });
-      if (!res.ok) {
-        const body = await readJson<ErrorBody>(res);
-        throw new Error(body.error);
-      }
-      return await res.json();
-    },
-
-    /** @param {string} id */
-    aiStreamUrl(id: string) {
-      return `/__studio/ai/session/${id}/stream`;
-    },
-
-    /** @param {string} id */
-    async aiStopSession(id: string) {
-      await fetch(`/__studio/ai/session/${id}/stop`, { method: "POST" });
-    },
-
-    /** @param {string} id */
-    async aiDeleteSession(id: string) {
-      await fetch(`/__studio/ai/session/${id}`, { method: "DELETE" });
+    aiChatUrl() {
+      return "/__studio/ai/chat";
     },
   };
 }

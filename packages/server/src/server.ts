@@ -19,6 +19,7 @@ import { createWatcher, injectSSE } from "./watch.ts";
 import { handleResolve, handleServerFunction } from "./resolve.ts";
 import { handleStudioApi } from "./studio-api.ts";
 import { handleCodeApi } from "./code-api.ts";
+import { handleAiApi } from "./ai-api.ts";
 import { existsSync, readFileSync } from "node:fs";
 
 /**
@@ -252,6 +253,12 @@ export async function createDevServer(options: {
           return Response.json({ ok: true, root: activeProjectRoot });
         }
 
+        // AI proxy endpoints (/__studio/ai/chat, /__studio/ai/models)
+        const aiRes = await handleAiApi(req, url);
+        if (aiRes) {
+          return aiRes;
+        }
+
         const codeRes = await handleCodeApi(req, url);
         if (codeRes) {
           return codeRes;
@@ -332,7 +339,11 @@ export async function createDevServer(options: {
         return new Response("Not found", { status: 404 });
       }
 
-      if (handleSSE && path.endsWith(".html")) {
+      // Inject the live-reload script into served HTML — but NOT into the Studio editor.
+      // Studio manages its own state (open tabs, undo history, chat) and refreshes edited
+      // Files in-place; a blanket location.reload() would destroy that, e.g. when the AI
+      // Assistant writes a file matching a build glob inside the watched root.
+      if (handleSSE && path.endsWith(".html") && !path.startsWith("/packages/studio/")) {
         const html = await file.text();
         return new Response(injectSSE(html), {
           headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -343,6 +354,9 @@ export async function createDevServer(options: {
     },
 
     port,
+    // Keep SSE connections alive — heartbeats are every 15 s, and AI streaming can take
+    // 30+ s. The default 10 s idleTimeout kills them prematurely.
+    idleTimeout: 120,
   });
 
   console.log(`\n@jxsuite/server listening on http://localhost:${server.port}`);

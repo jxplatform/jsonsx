@@ -215,52 +215,7 @@ describe("chromium platform: search, formats and packages", () => {
 // ─── AI assistant helpers (HTTP, not WebSocket) ─────────────────────────────
 
 describe("chromium platform: AI assistant endpoints", () => {
-  test("aiAuthStatus fetches auth status", async () => {
-    const status = await platform.aiAuthStatus();
-    expect(status).toEqual({ authenticated: true });
-    expect(fetchCalls.at(-1)?.url).toBe("/studio/ai/auth-status");
-  });
-
-  test("aiCreateSession posts message and returns session id", async () => {
-    const session = await platform.aiCreateSession({
-      message: "hello",
-      systemPrompt: "be brief",
-    });
-    expect(session).toEqual({ id: "sess-1" });
-    const call = fetchCalls.at(-1)!;
-    expect(call.url).toBe("/studio/ai/session");
-    expect(call.init?.method).toBe("POST");
-    expect(JSON.parse(call.init?.body as string)).toEqual({
-      message: "hello",
-      systemPrompt: "be brief",
-    });
-    const headers = (call.init?.headers ?? {}) as Record<string, string>;
-    expect(headers["Content-Type"]).toBe("application/json");
-  });
-
-  test("aiSendMessage posts to the session message endpoint", async () => {
-    await platform.aiSendMessage("sess-1", "follow-up");
-    const call = fetchCalls.at(-1)!;
-    expect(call.url).toBe("/studio/ai/session/sess-1/message");
-    expect(call.init?.method).toBe("POST");
-    expect(JSON.parse(call.init?.body as string)).toEqual({ message: "follow-up" });
-  });
-
-  test("aiStreamUrl builds the SSE stream URL", () => {
-    expect(platform.aiStreamUrl("sess-1")).toBe("/studio/ai/session/sess-1/stream");
-  });
-
-  test("aiStopSession posts to the stop endpoint", async () => {
-    await platform.aiStopSession("sess-1");
-    const call = fetchCalls.at(-1)!;
-    expect(call.url).toBe("/studio/ai/session/sess-1/stop");
-    expect(call.init?.method).toBe("POST");
-  });
-
-  test("aiDeleteSession issues a DELETE", async () => {
-    await platform.aiDeleteSession("sess-1");
-    const call = fetchCalls.at(-1)!;
-    expect(call.url).toBe("/studio/ai/session/sess-1");
-    expect(call.init?.method).toBe("DELETE");
+  test("aiChatUrl points at the chromium AI chat route", () => {
+    expect(platform.aiChatUrl()).toBe("/studio/ai/chat");
   });
 });

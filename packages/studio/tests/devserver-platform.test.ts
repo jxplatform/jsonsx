@@ -948,49 +948,9 @@ describe("git write operations", () => {
 // ─── AI assistant ────────────────────────────────────────────────────────────
 
 describe("AI assistant", () => {
-  test("aiAuthStatus returns the parsed body", async () => {
-    route("/__studio/ai/auth-status", () => json({ authenticated: true }));
+  test("aiChatUrl points at the proxy chat endpoint synchronously", () => {
     const p = createDevServerPlatform();
-    expect(await p.aiAuthStatus()).toEqual({ authenticated: true });
-  });
-
-  test("aiCreateSession posts options and surfaces errors", async () => {
-    route("/__studio/ai/session", (c) => {
-      expect(c.body).toEqual({ message: "hi", systemPrompt: "be nice" });
-      return json({ id: "s1" });
-    });
-    const p = createDevServerPlatform();
-    expect(await p.aiCreateSession({ message: "hi", systemPrompt: "be nice" })).toEqual({
-      id: "s1",
-    });
-    route("/__studio/ai/session", () => json({ error: "not authenticated" }, 401));
-    expect(p.aiCreateSession({ message: "hi" })).rejects.toThrow("not authenticated");
-  });
-
-  test("aiSendMessage posts to the session endpoint and surfaces errors", async () => {
-    route("/__studio/ai/session/s1/message", (c) => {
-      expect(c.body).toEqual({ message: "next" });
-      return json({ accepted: true });
-    });
-    const p = createDevServerPlatform();
-    expect(await p.aiSendMessage("s1", "next")).toEqual({ accepted: true });
-    route("/__studio/ai/session/s1/message", () => json({ error: "session gone" }, 404));
-    expect(p.aiSendMessage("s1", "again")).rejects.toThrow("session gone");
-  });
-
-  test("aiStreamUrl builds the stream URL synchronously", () => {
-    const p = createDevServerPlatform();
-    expect(p.aiStreamUrl("abc")).toBe("/__studio/ai/session/abc/stream");
+    expect(p.aiChatUrl()).toBe("/__studio/ai/chat");
     expect(calls.length).toBe(0);
-  });
-
-  test("aiStopSession and aiDeleteSession hit their endpoints", async () => {
-    route("/__studio/ai/session/s2/stop", () => json({}), "POST");
-    route("/__studio/ai/session/s2", () => json({}), "DELETE");
-    const p = createDevServerPlatform();
-    await p.aiStopSession("s2");
-    await p.aiDeleteSession("s2");
-    expect(callsTo("/__studio/ai/session/s2/stop")[0]!.method).toBe("POST");
-    expect(callsTo("/__studio/ai/session/s2")[0]!.method).toBe("DELETE");
   });
 });

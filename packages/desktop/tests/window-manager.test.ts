@@ -135,7 +135,7 @@ const createPackageOps = mock(() => {
 });
 void mock.module("../src/packages", () => ({ createPackageOps }));
 
-// ─── Mock updater + claude-session ───────────────────────────────────────────
+// ─── Mock updater ────────────────────────────────────────────────────────────
 
 void mock.module("../src/updater", () => ({
   applyUpdate: mock(() => "apply"),
@@ -143,18 +143,6 @@ void mock.module("../src/updater", () => ({
   downloadUpdate: mock(() => "download"),
   getLocalInfo: mock(() => "local"),
   getStatus: mock(() => "status"),
-}));
-
-const createSession = mock((_root: string, _msg: string, _opts: unknown) => ({ id: "sess-1" }));
-const deleteSession = mock((_id: string) => {});
-const sendMessage = mock((_id: string, _msg: string) => {});
-const stopSession = mock((_id: string) => {});
-void mock.module("@jxsuite/server/claude-session", () => ({
-  createSession,
-  deleteSession,
-  getAuthStatus: mock(async () => ({ authenticated: true })),
-  sendMessage,
-  stopSession,
 }));
 
 // ─── Import module under test ────────────────────────────────────────────────
@@ -305,7 +293,7 @@ describe("per-window RPC", () => {
     expect(pkg.listPackages).toHaveBeenCalledTimes(1);
 
     // Process-shared handlers.
-    expect(await reqs.aiAuthStatus()).toEqual({ authenticated: true } as never);
+    expect(reqs.aiChatUrl()).toBe("http://localhost:9000/__studio/ai/chat");
     expect(reqs.updaterApplyUpdate()).toBe("apply");
     expect(reqs.updaterCheckForUpdate()).toBe("check");
     expect(reqs.updaterDownloadUpdate()).toBe("download");
@@ -333,15 +321,10 @@ describe("per-window RPC", () => {
     expect(win.setFrame).toHaveBeenLastCalledWith(1, 2, 20, 10); // Restored from getFrame()
   });
 
-  test("aiCreateSession binds the window's root and aiStreamUrl uses the shared server", () => {
+  test("aiChatUrl resolves to the shared AI server's proxy endpoint", () => {
     openProjectWindow("/proj/ai");
     const reqs = lastRequests();
-    const result = reqs.aiCreateSession({ message: "hi" } as never);
-    expect(createSession).toHaveBeenLastCalledWith("/proj/ai", "hi", {});
-    expect(result).toEqual({ id: "sess-1" } as never);
-    expect(reqs.aiStreamUrl({ id: "abc" } as never)).toBe(
-      "http://localhost:9000/studio/ai/session/abc/stream",
-    );
+    expect(reqs.aiChatUrl()).toBe("http://localhost:9000/__studio/ai/chat");
   });
 
   test("getProjectRoot reports this window's root", () => {
@@ -386,41 +369,13 @@ describe("setWindowProject", () => {
 // ─── Disposal on close ──────────────────────────────────────────────────────
 
 describe("disposeWindow", () => {
-  test("clears the session root and AI sessions when a window closes", () => {
+  test("clears the session root when a window closes", () => {
     const win = openProjectWindow("/proj/dispose") as unknown as MockWindow;
-    const reqs = lastRequests();
     const session = sessions.at(-1)!;
-    reqs.aiCreateSession({ message: "hi" } as never); // Records sess-1
 
     win._closeHandler!();
     expect(session.setProjectRoot).toHaveBeenCalledWith(null);
-    expect(deleteSession).toHaveBeenCalledWith("sess-1");
     expect(listOpenWindows().map((w) => w.projectRoot)).not.toContain("/proj/dispose");
-  });
-});
-
-// ─── AI session request handlers ────────────────────────────────────────────
-
-describe("AI session request handlers", () => {
-  test("aiCreateSession throws when the window has no project open", () => {
-    openProjectWindow(null);
-    const reqs = lastRequests();
-    expect(() => reqs.aiCreateSession({ message: "hi" } as never)).toThrow("No project open");
-  });
-
-  test("aiSendMessage / aiStopSession / aiDeleteSession delegate to claude-session", () => {
-    openProjectWindow("/proj/ai-ops");
-    const reqs = lastRequests();
-    reqs.aiCreateSession({ message: "hi" } as never); // Records sess-1
-
-    reqs.aiSendMessage({ id: "sess-1", message: "yo" } as never);
-    expect(sendMessage).toHaveBeenCalledWith("sess-1", "yo");
-
-    reqs.aiStopSession({ id: "sess-1" } as never);
-    expect(stopSession).toHaveBeenCalledWith("sess-1");
-
-    reqs.aiDeleteSession({ id: "sess-1" } as never);
-    expect(deleteSession).toHaveBeenCalledWith("sess-1");
   });
 });
 

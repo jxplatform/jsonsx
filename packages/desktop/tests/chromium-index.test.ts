@@ -83,8 +83,8 @@ const packageMocks = {
 
 const openFileDialogMock = mock(() => Promise.resolve("/picked/project.json"));
 
-const handleAiRouteMock = mock((_req: Request, path: string, _root: string) =>
-  Promise.resolve(path === "/studio/ai/auth-status" ? Response.json({ ok: true }) : null),
+const handleAiApiMock = mock((_req: Request, url: URL) =>
+  Promise.resolve(url.pathname === "/__studio/ai/auth-status" ? Response.json({ ok: true }) : null),
 );
 
 const readRecentsMock = mock(() =>
@@ -96,7 +96,7 @@ void mock.module("../src/handlers", () => handlerMocks);
 void mock.module("../src/git", () => gitMocks);
 void mock.module("../src/packages", () => packageMocks);
 void mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
-void mock.module("../src/ai", () => ({ handleAiRoute: handleAiRouteMock }));
+void mock.module("@jxsuite/server/ai-api", () => ({ handleAiApi: handleAiApiMock }));
 void mock.module("../src/recent-store", () => ({
   readRecents: readRecentsMock,
   writeRecents: writeRecentsMock,
@@ -398,14 +398,17 @@ describe("chromium launcher HTTP server", () => {
     expect(await res.text()).toContain("studio-shell");
   });
 
-  test("delegates /studio/ai/ routes to handleAiRoute", async () => {
+  test("delegates /studio/ai/ routes to handleAiApi, rewriting to /__studio/ai/", async () => {
     const res = await fetch(`${baseUrl}/studio/ai/auth-status`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
-    expect(handleAiRouteMock).toHaveBeenCalled();
+    expect(handleAiApiMock).toHaveBeenCalled();
+    expect((handleAiApiMock.mock.calls.at(-1)![1] as URL).pathname).toBe(
+      "/__studio/ai/auth-status",
+    );
   });
 
-  test("falls through to 404 when handleAiRoute returns null", async () => {
+  test("falls through to 404 when handleAiApi returns null", async () => {
     const res = await fetch(`${baseUrl}/studio/ai/not-a-route`);
     expect(res.status).toBe(404);
   });

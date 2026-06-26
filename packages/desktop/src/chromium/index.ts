@@ -48,7 +48,7 @@ import {
   setPackageVersions,
 } from "../packages";
 import { openFileDialog } from "./utils";
-import { handleAiRoute } from "../ai";
+import { handleAiApi } from "@jxsuite/server/ai-api";
 import { readRecents, writeRecents } from "../recent-store";
 import type { RecentProjectEntry } from "../rpc-schema";
 
@@ -134,9 +134,12 @@ const server = Bun.serve({
     const url = new URL(req.url);
     const path = url.pathname.replace(/^\/{2,}/, "/");
 
-    // AI routes (SSE streaming + REST)
+    // AI routes (SSE streaming). handleAiApi matches the dev-server's /__studio/ai/* paths;
+    // Rewrite the chromium /studio prefix onto it.
     if (path.startsWith("/studio/ai/")) {
-      const aiResponse = await handleAiRoute(req, path, projectRoot);
+      const aiUrl = new URL(req.url);
+      aiUrl.pathname = path.replace("/studio/ai/", "/__studio/ai/");
+      const aiResponse = await handleAiApi(req, aiUrl);
       if (aiResponse) {
         return aiResponse;
       }

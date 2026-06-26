@@ -8,13 +8,6 @@
 import { BrowserView, BrowserWindow, Screen } from "electrobun/bun";
 import { realpathSync } from "node:fs";
 import { resolve } from "node:path";
-import {
-  createSession,
-  deleteSession,
-  getAuthStatus,
-  sendMessage,
-  stopSession,
-} from "@jxsuite/server/claude-session";
 import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } from "./updater";
 import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
@@ -32,7 +25,6 @@ interface WindowEntry {
     maximized: boolean;
     restoreFrame: { x: number; y: number; width: number; height: number };
   };
-  aiSessionIds: Set<string>;
 }
 
 const windows = new Map<number, WindowEntry>();
@@ -144,7 +136,6 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
     session,
     projectRoot,
     maximize: { maximized: false, restoreFrame: { height: 900, width: 1400, x: 0, y: 0 } },
-    aiSessionIds: new Set<string>(),
   };
 
   // The window is constructed after its rpc, so handlers read entry.win lazily via getWin().
@@ -175,12 +166,6 @@ function disposeWindow(id: number) {
     return;
   }
   entry.session.setProjectRoot(null); // Drops the format-registry cache
-  for (const sid of entry.aiSessionIds) {
-    try {
-      deleteSession(sid); // Aborts the in-flight query via stopSession
-    } catch {}
-  }
-  entry.aiSessionIds.clear();
   windows.delete(id);
 }
 
@@ -204,30 +189,8 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         removePackage: (params) => pkg.removePackage(params),
         setPackageVersions: (params) => pkg.setPackageVersions(params),
 
-        // AI (sessions are id-keyed and process-global; record ids for cleanup on close)
-        aiAuthStatus: () => getAuthStatus(),
-        aiCreateSession: (params) => {
-          const root = session.projectRoot;
-          if (!root) {
-            throw new Error("No project open");
-          }
-          const result = createSession(root, params.message, {
-            ...(params.systemPrompt != null && { systemPrompt: params.systemPrompt }),
-          });
-          entry.aiSessionIds.add(result.id);
-          return result;
-        },
-        aiDeleteSession: (params) => {
-          entry.aiSessionIds.delete(params.id);
-          deleteSession(params.id);
-        },
-        aiSendMessage: (params) => {
-          sendMessage(params.id, params.message);
-        },
-        aiStopSession: (params) => {
-          stopSession(params.id);
-        },
-        aiStreamUrl: (params) => `${aiServerUrl}/studio/ai/session/${params.id}/stream`,
+        // AI (Stack B: hand the webview the absolute SSE proxy URL on the shared local server)
+        aiChatUrl: () => `${aiServerUrl}/__studio/ai/chat`,
 
         // Files / project (bound to this window's session)
         codeService: (params) => session.codeService(params),

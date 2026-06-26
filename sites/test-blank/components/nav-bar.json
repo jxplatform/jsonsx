@@ -1,0 +1,52 @@
+{
+  "tagName": "nav-bar",
+  "children": [
+    {
+      "tagName": "nav",
+      "style": {
+        "display": "flex",
+        "gap": "2rem",
+        "padding": "1.5rem 0",
+        "justifyContent": "center"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": {
+            "href": "/"
+          },
+          "textContent": "Home",
+          "style": {
+            "color": "var(--color-text-primary)",
+            "fontWeight": "600",
+            "textDecoration": "none"
+          }
+        },
+        {
+          "tagName": "a",
+          "attributes": {
+            "href": "/projects"
+          },
+          "textContent": "Projects",
+          "style": {
+            "color": "var(--color-text-primary)",
+            "fontWeight": "600",
+            "textDecoration": "none"
+          }
+        },
+        {
+          "tagName": "a",
+          "attributes": {
+            "href": "/contact"
+          },
+          "textContent": "Contact",
+          "style": {
+            "color": "var(--color-text-primary)",
+            "fontWeight": "600",
+            "textDecoration": "none"
+          }
+        }
+      ]
+    }
+  ]
+}
