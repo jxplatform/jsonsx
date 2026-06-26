@@ -12,6 +12,7 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { effectiveZoom, findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 import { layoutElements } from "../canvas/canvas-live-render";
+import { isIframeCanvas } from "../canvas/canvas-host";
 import { rectOf } from "../utils/geometry";
 import type { EffectScope } from "@vue/reactivity";
 
@@ -88,6 +89,17 @@ function _flush() {
   const { selection, hover } = tab.session;
   const { stylebookTab } = tab.session.ui;
   const canvasMode = _ctx.getCanvasMode();
+
+  if (isIframeCanvas()) {
+    // The iframe owns hit-testing and draws its own selection/hover overlays (from posted rects).
+    // Disable the legacy click-catcher so pointer events reach the iframe, and skip legacy box
+    // Drawing (findCanvasElement can't see nodes across the frame boundary).
+    for (const p of canvasPanels) {
+      litRender(nothing, p.overlay);
+      p.overlayClk.style.pointerEvents = "none";
+    }
+    return;
+  }
 
   if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "stylebook") {
     for (const p of canvasPanels) {

@@ -158,7 +158,7 @@ describe("registerElements", () => {
 
   test("registers $ref/inline components, tolerates failures, and skips non-array $elements", async () => {
     // Reject all fetches so $ref resolution fails fast (exercises the catch path without a hang).
-    globalThis.fetch = (() => Promise.reject(new Error("no network"))) as typeof fetch;
+    globalThis.fetch = (() => Promise.reject(new Error("no network"))) as unknown as typeof fetch;
     const doc = {
       $elements: [
         "nonexistent-pkg-xyz", // String → dynamic import (fails) → caught.
@@ -170,6 +170,6 @@ describe("registerElements", () => {
     expect(customElements.get("x-inline-comp")).toBeDefined();
 
     // Missing/non-array $elements is a no-op.
-    await expect(registerElements({} as never, "http://localhost:3000/")).resolves.toBeUndefined();
+    expect(await registerElements({} as never, "http://localhost:3000/")).toBeUndefined();
   });
 });

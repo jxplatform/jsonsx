@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mount, render, unmount } from "../src/panels/overlays";
 import { canvasPanels, elToPath } from "../src/store";
 import { initCanvasHelpers } from "../src/canvas/canvas-helpers";
+import { setCanvasHostOverride } from "../src/canvas/canvas-host";
 import { layoutElements } from "../src/canvas/canvas-live-render";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
@@ -88,7 +89,22 @@ afterEach(() => {
   unmount();
   canvasPanels.length = 0;
   closeAllTabs();
+  setCanvasHostOverride(null);
   document.body.innerHTML = "";
+});
+
+describe("overlays — iframe canvas host", () => {
+  test("disables the legacy click-catcher and draws no legacy boxes", async () => {
+    setCanvasHostOverride("iframe");
+    const { panel } = makePanel();
+    activeTab.value!.session.selection = ["children", 0];
+    await mountAndFlush();
+    // The iframe owns hit-testing and draws its own overlays, so the legacy catcher is off and the
+    // Legacy overlay layer stays empty.
+    expect(panel.overlayClk.style.pointerEvents).toBe("none");
+    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
+    expect(panel.overlay.querySelector(".overlay-hover")).toBeNull();
+  });
 });
 
 describe("overlays — design mode boxes", () => {

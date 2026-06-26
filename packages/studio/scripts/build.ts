@@ -21,25 +21,30 @@ try {
   // No git available (e.g. published tarball) — leave the fallback.
 }
 
-const result = await Bun.build({
-  // Studio.ts is the editor shell; iframe-entry.ts is the slim canvas-iframe bundle (the document
-  // Renderer that runs inside the iframe canvas host).
-  entrypoints: ["./src/studio.ts", "./src/canvas/iframe-entry.ts"],
-  outdir: "dist",
-  target: "browser",
-  sourcemap: "linked",
-  define: {
-    __JX_VERSION__: JSON.stringify(version),
-    __JX_BUILD_DATE__: JSON.stringify(buildDate),
-    __JX_GIT_COMMIT__: JSON.stringify(gitCommit),
-  },
-});
+const define = {
+  __JX_VERSION__: JSON.stringify(version),
+  __JX_BUILD_DATE__: JSON.stringify(buildDate),
+  __JX_GIT_COMMIT__: JSON.stringify(gitCommit),
+};
 
-if (!result.success) {
-  for (const log of result.logs) {
-    console.error(log);
+// Build the editor shell and the slim canvas-iframe bundle in SEPARATE passes. A single multi-entry
+// Build roots its output at the entrypoints' common ancestor (src/), which would nest the iframe
+// Bundle under dist/canvas/ and break canvas.html's flat `./dist/iframe-entry.js` import. Two
+// Single-entry builds each emit flat at dist/<name>.js.
+for (const entry of ["./src/studio.ts", "./src/canvas/iframe-entry.ts"]) {
+  const result = await Bun.build({
+    entrypoints: [entry],
+    outdir: "dist",
+    target: "browser",
+    sourcemap: "linked",
+    define,
+  });
+  if (!result.success) {
+    for (const log of result.logs) {
+      console.error(log);
+    }
+    process.exit(1);
   }
-  process.exit(1);
 }
 
 // Bundle Monaco's web workers into dist/workers.

@@ -175,7 +175,7 @@ export function makePathMapper(ctx: PathMapperCtx) {
       arrayPaths,
       canvasMode,
       layoutWrapped,
-      pageContentOffset,
+      pageContentOffset: pageContentOffset ?? null,
       pageContentPrefix,
     });
     if (classified.kind === "layout") {
@@ -720,8 +720,21 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
     renderDoc.$elements = effectiveElements as (string | JxMutableNode | { $ref: string })[];
   }
   renderDoc.imports = getEffectiveImports(renderDoc.imports);
-  renderDoc.$media = getEffectiveMedia(renderDoc.$media) as JxMutableNode["$media"];
-  renderDoc.$head = getEffectiveHead(renderDoc.$head) as JxMutableNode["$head"];
+  // The effective-media/head getters return the merged value or undefined. Optional properties
+  // Cannot be assigned undefined under exactOptionalPropertyTypes, so clear them by deleting the key
+  // When the getter yields nothing.
+  const media = getEffectiveMedia(renderDoc.$media);
+  if (media === undefined) {
+    delete renderDoc.$media;
+  } else {
+    renderDoc.$media = media as NonNullable<JxMutableNode["$media"]>;
+  }
+  const head = getEffectiveHead(renderDoc.$head);
+  if (head === undefined) {
+    delete renderDoc.$head;
+  } else {
+    renderDoc.$head = head as NonNullable<JxMutableNode["$head"]>;
+  }
 
   return {
     docBase,

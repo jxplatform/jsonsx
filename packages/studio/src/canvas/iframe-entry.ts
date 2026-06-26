@@ -7,6 +7,7 @@
 
 import { postMessageChannel } from "./iframe-channel";
 import { renderResolvedDocument } from "./iframe-render";
+import { measureHits, startInteraction } from "./iframe-interaction";
 import type { IframeChannel } from "./iframe-channel";
 import type { IframeToParent, ParentToIframe } from "./iframe-protocol";
 import type { JxDocument } from "@jxsuite/schema/types";
@@ -25,7 +26,19 @@ export function startCanvasIframe(opts: {
   let handle: RenderHandle | null = null;
   let latestGen = -1;
 
+  // Report pointer hit/hover (resolved to data-jx-path) to the parent, which owns selection +
+  // Overlays — the cross-origin bridge means the parent never reads our DOM directly.
+  const stopInteraction = startInteraction(channel, container.ownerDocument);
+
   const off = channel.onMessage((msg) => {
+    if (msg.kind === "measure") {
+      channel.post({
+        hits: measureHits(msg.paths, container.ownerDocument),
+        kind: "geometry",
+        reqId: msg.reqId,
+      });
+      return;
+    }
     if (msg.kind !== "render" || msg.gen < latestGen) {
       return;
     }
@@ -64,6 +77,7 @@ export function startCanvasIframe(opts: {
   channel.post({ kind: "ready" });
   return () => {
     off();
+    stopInteraction();
     handle?.dispose();
   };
 }

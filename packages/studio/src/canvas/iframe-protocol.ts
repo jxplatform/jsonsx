@@ -41,10 +41,33 @@ export type ParentToIframe =
       mapperCtx: WireMapperCtx;
       siteStyle: Record<string, unknown> | null;
       gen: number;
-    };
+    }
+  // Ask the iframe to measure the given document paths and post their current rects back. Used to
+  // Draw the selection overlay regardless of where the selection change originated (canvas click,
+  // Layers panel, keyboard) — the parent can't measure iframe nodes itself (cross-origin bridge).
+  | { kind: "measure"; paths: (string | number)[][]; reqId: number };
+
+/** A node's bounding box, in the iframe's own viewport coordinates. */
+export interface SerializableRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** A document path plus the iframe-space rect of the node it resolves to. */
+export interface NodeHit {
+  path: (string | number)[];
+  rect: SerializableRect;
+}
 
 /** Messages the canvas iframe sends back to the editor (parent). */
 export type IframeToParent =
   | { kind: "ready" }
   | { kind: "renderComplete"; gen: number }
-  | { kind: "renderError"; gen: number; message: string };
+  | { kind: "renderError"; gen: number; message: string }
+  | { kind: "hit"; hit: NodeHit }
+  | { kind: "hover"; hit: NodeHit | null }
+  // Response to `measure`: the rects of whichever requested paths resolved to a node (missing paths
+  // Are simply omitted). `reqId` echoes the request so the parent can drop stale responses.
+  | { kind: "geometry"; reqId: number; hits: NodeHit[] };

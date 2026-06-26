@@ -21,6 +21,7 @@ function renderMsg(gen: number, doc: unknown): ParentToIframe {
     kind: "render",
     mapperCtx: WIRE_CTX,
     mode: "design",
+    siteStyle: null,
   };
 }
 
@@ -28,6 +29,7 @@ let teardown: (() => void) | undefined;
 afterEach(() => {
   teardown?.();
   teardown = undefined;
+  document.body.innerHTML = "";
 });
 
 describe("startCanvasIframe", () => {
@@ -95,6 +97,29 @@ describe("startCanvasIframe", () => {
     pair.flush();
 
     expect(acks.some((m) => m.kind === "renderError")).toBe(true);
+  });
+
+  test("answers a measure request with the matching node's geometry", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+    document.body.append(container); // The measure handler queries the owning document.
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+
+    pair.parent.post(
+      renderMsg(1, { children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" }),
+    );
+    pair.flush();
+    await flush();
+
+    pair.parent.post({ kind: "measure", paths: [["children", 0]], reqId: 42 });
+    pair.flush(); // Deliver the measure into the iframe entry.
+    pair.flush(); // Deliver the geometry reply back to the parent.
+
+    const geo = fromIframe.find((m) => m.kind === "geometry");
+    expect(geo).toMatchObject({ kind: "geometry", reqId: 42 });
+    expect((geo as { hits: { path: unknown }[] }).hits[0]!.path).toEqual(["children", 0]);
   });
 
   test("bootCanvasIframe wires a channel from the window and announces ready", () => {
