@@ -9,6 +9,17 @@
  * the cross-frame analog of the legacy renderer's `renderGeneration` staleness guard.
  */
 
+import type { JxDocOp } from "../tabs/patch-ops";
+
+/**
+ * The wire form of a value-carrying document op (the `forward` half of a recorded
+ * {@link JxDocOpPair} — see {@link file://../tabs/patch-ops.ts}). It is structurally a
+ * {@link JxDocOp}: it carries the inserted/replaced `node` and the set `value`, NOT just a path, so
+ * the iframe can fold it into its shadow doc and re-render subtrees without ever reading the
+ * parent's reactive document.
+ */
+export type WireDocOp = JxDocOp;
+
 export const CANVAS_MODES = ["preview", "design", "edit"] as const;
 
 /** How the iframe renders the document: live `preview`, or instrumented `design`/`edit`. */
@@ -36,6 +47,11 @@ export type ParentToIframe =
   | {
       kind: "render";
       doc: unknown;
+      // The RAW (pre-resolution) page document the forward ops are recorded against. The iframe
+      // Keeps it as a non-reactive shadow doc — its patch source-of-truth. `doc` above is the
+      // Resolved render doc (layout-wrapped); this raw doc's paths match the forward-op paths and
+      // The stamped data-jx-path attributes.
+      shadowDoc: unknown;
       mode: CanvasMode;
       docBase: string;
       mapperCtx: WireMapperCtx;
@@ -45,7 +61,10 @@ export type ParentToIframe =
   // Ask the iframe to measure the given document paths and post their current rects back. Used to
   // Draw the selection overlay regardless of where the selection change originated (canvas click,
   // Layers panel, keyboard) — the parent can't measure iframe nodes itself (cross-origin bridge).
-  | { kind: "measure"; paths: (string | number)[][]; reqId: number };
+  | { kind: "measure"; paths: (string | number)[][]; reqId: number }
+  // Apply a surgical edit: fold each value-carrying forward op into the shadow doc and patch the DOM
+  // In place. `gen` matches the last render so the iframe drops patches superseded by a re-render.
+  | { kind: "patch"; forwardOps: WireDocOp[]; gen: number };
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -70,4 +89,8 @@ export type IframeToParent =
   | { kind: "hover"; hit: NodeHit | null }
   // Response to `measure`: the rects of whichever requested paths resolved to a node (missing paths
   // Are simply omitted). `reqId` echoes the request so the parent can drop stale responses.
-  | { kind: "geometry"; reqId: number; hits: NodeHit[] };
+  | { kind: "geometry"; reqId: number; hits: NodeHit[] }
+  // A patch applied cleanly (echoes gen so the host can re-measure the selection overlay).
+  | { kind: "patchComplete"; gen: number }
+  // A patch could not be applied surgically — the parent escalates to a full render.
+  | { kind: "patchError"; gen: number; message: string };

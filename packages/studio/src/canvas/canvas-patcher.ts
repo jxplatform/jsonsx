@@ -27,6 +27,8 @@ import { toRaw } from "../reactivity";
 import { elementStyleTags, reapplyStyle } from "@jxsuite/runtime";
 import { getEffectiveMedia } from "../site-context";
 import { findCanvasElement } from "./canvas-helpers";
+import { isIframeCanvas } from "./canvas-host";
+import { postPatchToHosts } from "./iframe-host";
 import { domChildReference, renderSubtree } from "./canvas-subtree-render";
 import { canvasPerf, perfLog, recordEscalation } from "./canvas-perf";
 import {
@@ -37,7 +39,7 @@ import {
 import { getActiveElement } from "../editor/inline-edit";
 import { setPatchConsumer } from "../tabs/patch-ops";
 
-import type { JxPatchOp } from "../tabs/patch-ops";
+import type { JxPatchOp, TransactionRecord } from "../tabs/patch-ops";
 import type { Tab } from "../tabs/tab.js";
 import type { JxPath } from "../state";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
@@ -184,6 +186,18 @@ function isStructuralOp(op: JxPatchOp) {
 }
 
 /**
+ * Whether the iframe canvas can apply this op surgically TODAY (Phase 3a: pure in-place writes).
+ * Anything else (structural ops, attribute/prop edits needing a subtree re-render — Phase 3b) is
+ * rejected in iframe mode so it falls through to a full render instead of a patch the iframe would
+ * bounce back as a `patchError`.
+ */
+function isIframePatchable(op: JxPatchOp) {
+  return (
+    op.op === "set-style" || op.op === "set-text" || (op.op === "set-prop" && op.isEvent === true)
+  );
+}
+
+/**
  * Per-op patchability in the current document. Returns null when patchable, else the reason.
  *
  * @param {Tab} tab
@@ -287,6 +301,16 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
       return reject(reason);
     }
   }
+  // The iframe canvas applies a narrower op set surgically than the legacy DOM patcher; the rest
+  // Full-render (until Phase 3b). Gating here means the iframe only ever receives patchable ops, so
+  // No wasted patch→patchError→render round-trip.
+  if (isIframeCanvas()) {
+    for (const op of ops) {
+      if (!isIframePatchable(op)) {
+        return reject(`iframe-unsupported-${op.op}`);
+      }
+    }
+  }
   return { patchable: true, reason: "" };
 }
 
@@ -298,8 +322,20 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
  *
  * @param {Tab} tab
  * @param {JxPatchOp[]} ops
+ * @param {TransactionRecord} [record] Value-carrying ops, used by the iframe host.
  */
-export function applyPatchBatch(tab: Tab, ops: JxPatchOp[]) {
+export function applyPatchBatch(tab: Tab, ops: JxPatchOp[], record?: TransactionRecord) {
+  // Iframe canvas host: the parent has no DOM to mutate — post the value-carrying forward ops over
+  // The bridge for the iframe to apply against its shadow doc. Throwing when no host received it
+  // Escalates to a full render (the suppressed render then runs), so an edit is never dropped.
+  if (isIframeCanvas()) {
+    const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
+    if (postPatchToHosts(forwardOps, view.renderGeneration) === 0) {
+      throw new Error("no-ready-iframe-host");
+    }
+    return;
+  }
+
   const doc = toRaw(tab.doc.document) as JxMutableNode;
   const mediaQueries = getEffectiveMedia(doc.$media || {});
 

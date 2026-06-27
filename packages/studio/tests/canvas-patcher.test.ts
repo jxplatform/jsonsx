@@ -17,6 +17,7 @@ import {
   initCanvasPatcher,
 } from "../src/canvas/canvas-patcher";
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
+import { setCanvasHostOverride } from "../src/canvas/canvas-host";
 import { makePathMapper } from "../src/canvas/canvas-live-render";
 import { toRaw } from "../src/reactivity";
 
@@ -511,5 +512,56 @@ describe("consumed-document handshake", () => {
     expect(ctxCalls.scheduled).toBe(1);
     expect(canvasPerf.escalations).toBe(1);
     expect(canvasPerf.lastEscalationReason).toBe("test-reason");
+  });
+});
+
+// ─── Iframe canvas host (Phase 3a): narrower classify gate + post-over-bridge apply ─────
+
+describe("iframe canvas host gating", () => {
+  beforeEach(() => {
+    setCanvasHostOverride("iframe");
+  });
+  afterEach(() => {
+    setCanvasHostOverride(null);
+  });
+
+  test("rejects ops the iframe can't patch surgically yet (structural / attr / prop)", () => {
+    // These all pass the legacy verdicts but the iframe gate rejects them (Phase 3b territory).
+    expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).reason).toBe(
+      "iframe-unsupported-remove",
+    );
+    expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).reason).toBe(
+      "iframe-unsupported-insert",
+    );
+    expect(classifyOps(tab, [{ key: "id", op: "set-prop", path: ["children", 0] }]).reason).toBe(
+      "iframe-unsupported-set-prop",
+    );
+  });
+
+  test("still admits the in-place style / text / event ops the iframe can patch", () => {
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+    expect(classifyOps(tab, [{ op: "set-text", path: ["children", 0] }]).patchable).toBe(true);
+    expect(
+      classifyOps(tab, [{ isEvent: true, key: "onclick", op: "set-prop", path: ["children", 0] }])
+        .patchable,
+    ).toBe(true);
+  });
+
+  test("apply leaves the parent DOM untouched and throws when no iframe host is ready", () => {
+    const before = pEl.textContent;
+    expect(() =>
+      applyPatchBatch(tab, [{ op: "set-text", path: ["children", 0] }], {
+        docOps: [
+          {
+            forward: { key: "textContent", op: "set-key", path: ["children", 0], value: "X" },
+            inverse: { key: "textContent", op: "set-key", path: ["children", 0], value: "hello" },
+          },
+        ],
+        invertible: true,
+        ops: [{ op: "set-text", path: ["children", 0] }],
+      }),
+    ).toThrow(/no-ready-iframe-host/);
+    // In iframe mode the parent owns no canvas DOM — the edit crosses the bridge, never mutates here.
+    expect(pEl.textContent).toBe(before);
   });
 });

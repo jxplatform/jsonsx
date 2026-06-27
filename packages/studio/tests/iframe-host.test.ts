@@ -2,6 +2,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetWorkspaceWithTab } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
+import type { WireDocOp } from "../src/canvas/iframe-protocol";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -56,7 +57,8 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
   resolveCanvasDocument: () => Promise.resolve(resolved),
 }));
 
-const { mountIframeCanvas } = await import("../src/canvas/iframe-host");
+const { mountIframeCanvas, postPatchToHosts, setIframePatchEscalation } =
+  await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -98,6 +100,18 @@ describe("mountIframeCanvas", () => {
     expect(posted.doc.onClick).toBeUndefined();
     expect(posted.doc.tagName).toBe("div");
     expect(posted.doc.children).toEqual(["hi"]);
+  });
+
+  test("posts the raw page doc as the iframe's shadow doc (patch source-of-truth)", async () => {
+    const canvasEl = document.createElement("div");
+    // The raw doc differs from the resolved render doc — it's what forward ops are recorded against.
+    await mountIframeCanvas(1, { children: ["raw"], tagName: "section" } as never, canvasEl);
+    channels[0]!.deliver({ kind: "ready" });
+
+    const posted = channels[0]!.posts[0] as { doc: unknown; shadowDoc: unknown };
+    expect(posted.shadowDoc).toEqual({ children: ["raw"], tagName: "section" });
+    // It's a clone, not the resolved render doc (which the live-render mock returns as DEFAULT_RESOLVED).
+    expect(posted.doc).toEqual(DEFAULT_RESOLVED.renderDoc);
   });
 
   test("reuses a single iframe + channel across re-renders of the same canvas", async () => {
@@ -249,5 +263,62 @@ describe("iframe canvas interaction", () => {
 
     channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
     expect(channels[0]!.posts.some((p) => p.kind === "measure")).toBe(true);
+  });
+});
+
+// ─── Cross-frame surgical patch bridge (Phase 3a) ───────────────────────────────
+
+describe("iframe canvas patch bridge", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  const OPS: WireDocOp[] = [
+    { key: "textContent", op: "set-key", path: ["children", 0], value: "hi" },
+  ];
+
+  test("postPatchToHosts posts the forward ops to every ready host and counts them", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+
+    const count = postPatchToHosts(OPS, 7);
+    expect(count).toBe(1);
+    expect(channels[0]!.posts).toContainEqual({ forwardOps: OPS, gen: 7, kind: "patch" });
+  });
+
+  test("postPatchToHosts returns 0 when no host is ready, so the caller escalates", async () => {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, {} as never, canvasEl);
+    // No `ready` delivered → the host can't apply a patch yet.
+    expect(postPatchToHosts(OPS, 1)).toBe(0);
+    expect(channels[0]!.posts.some((p) => p.kind === "patch")).toBe(false);
+  });
+
+  test("postPatchToHosts drops a host whose iframe has been disconnected", async () => {
+    const canvasEl = await mountReady();
+    canvasEl.remove(); // Detach the canvas → the iframe is no longer connected.
+    expect(postPatchToHosts(OPS, 1)).toBe(0);
+  });
+
+  test("patchComplete re-measures the current selection", async () => {
+    const tab = resetWorkspaceWithTab();
+    await mountReady();
+    tab.session.selection = ["children", 0];
+    await flush();
+    channels[0]!.posts.length = 0;
+
+    channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
+    expect(channels[0]!.posts.some((p) => p.kind === "measure")).toBe(true);
+  });
+
+  test("patchError escalates to a full render via the injected fallback", async () => {
+    let escalated = 0;
+    setIframePatchEscalation(() => {
+      escalated += 1;
+    });
+    await mountReady();
+    channels[0]!.deliver({ gen: 1, kind: "patchError", message: "nope" });
+    expect(escalated).toBe(1);
   });
 });

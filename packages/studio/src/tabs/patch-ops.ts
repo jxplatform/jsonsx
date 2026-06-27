@@ -78,8 +78,12 @@ export interface PatchConsumer {
   classify: (tab: Tab, ops: JxPatchOp[]) => { patchable: boolean; reason: string };
   /** Mark a document root reference as surgically consumed (checked by the canvas doc-effect). */
   markConsumed: (docRef: object) => void;
-  /** Apply the batch to all ready canvas panels. Throws on any failure (caller escalates). */
-  apply: (tab: Tab, ops: JxPatchOp[]) => void;
+  /**
+   * Apply the batch to all ready canvas panels. Throws on any failure (caller escalates). `record`
+   * carries the value-carrying `docOps` the iframe consumer posts across the frame boundary; the
+   * legacy (parent-DOM) consumer ignores it and reads the post-mutation reactive doc instead.
+   */
+  apply: (tab: Tab, ops: JxPatchOp[], record?: TransactionRecord) => void;
   /** Schedule a full canvas render as the fallback path, recording the reason. */
   escalate: (reason: string) => void;
 }

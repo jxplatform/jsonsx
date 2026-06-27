@@ -8,9 +8,10 @@
 import { postMessageChannel } from "./iframe-channel";
 import { renderResolvedDocument } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
+import { applyIframePatch } from "./iframe-patch";
 import type { IframeChannel } from "./iframe-channel";
 import type { IframeToParent, ParentToIframe } from "./iframe-protocol";
-import type { JxDocument } from "@jxsuite/schema/types";
+import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 import type { RenderHandle } from "./iframe-render";
 
 /**
@@ -25,6 +26,11 @@ export function startCanvasIframe(opts: {
   const { channel, container } = opts;
   let handle: RenderHandle | null = null;
   let latestGen = -1;
+  // The raw page doc the current DOM was rendered from — the patch source-of-truth. `renderedGen`
+  // Tracks which generation it (and the DOM) reflect, so patches for an in-flight/superseded render
+  // Are handled correctly rather than applied against the wrong tree.
+  let shadowDoc: JxMutableNode | null = null;
+  let renderedGen = -1;
 
   // Report pointer hit/hover (resolved to data-jx-path) to the parent, which owns selection +
   // Overlays — the cross-origin bridge means the parent never reads our DOM directly.
@@ -39,11 +45,35 @@ export function startCanvasIframe(opts: {
       });
       return;
     }
+    if (msg.kind === "patch") {
+      const { gen } = msg;
+      if (gen < renderedGen) {
+        // A newer full render already supersedes this edit — drop it.
+        return;
+      }
+      if (gen > renderedGen || !shadowDoc) {
+        // The render this patch targets hasn't landed yet; let the parent escalate to a full render.
+        channel.post({ gen, kind: "patchError", message: "patch-ahead-of-render" });
+        return;
+      }
+      try {
+        applyIframePatch(shadowDoc, msg.forwardOps, container);
+        channel.post({ gen, kind: "patchComplete" });
+      } catch (error) {
+        channel.post({
+          gen,
+          kind: "patchError",
+          message: String((error as Error)?.message ?? error),
+        });
+      }
+      return;
+    }
     if (msg.kind !== "render" || msg.gen < latestGen) {
       return;
     }
     latestGen = msg.gen;
     const { gen, mapperCtx } = msg;
+    const rawDoc = msg.shadowDoc as JxMutableNode;
     void (async () => {
       try {
         handle?.dispose();
@@ -62,6 +92,9 @@ export function startCanvasIframe(opts: {
           siteStyle: msg.siteStyle,
         });
         if (gen === latestGen) {
+          // Adopt this generation's shadow doc only once it's the live render (not superseded).
+          shadowDoc = rawDoc;
+          renderedGen = gen;
           channel.post({ gen, kind: "renderComplete" });
         }
       } catch (error) {

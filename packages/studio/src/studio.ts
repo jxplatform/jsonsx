@@ -41,6 +41,7 @@ import {
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
+import { setIframePatchEscalation } from "./canvas/iframe-host";
 import { registerSubtreeDnD } from "./panels/canvas-dnd";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
@@ -394,6 +395,8 @@ initCanvasPatcher({
   scheduleCanvasRender,
   updateForcedPseudoPreview,
 });
+// When the iframe canvas can't apply a posted patch surgically, fall back to a full render.
+setIframePatchEscalation(scheduleCanvasRender);
 initCanvasRender({
   getCanvasMode,
   get gitDiffState() {

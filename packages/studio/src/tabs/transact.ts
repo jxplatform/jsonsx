@@ -2,6 +2,7 @@
 import { toRaw } from "../reactivity";
 import { jsonClone } from "../utils/studio-utils";
 import { childIndex, getNodeAtPath, isAncestor, parentElementPath, pathsEqual } from "../state";
+import { applyDocOpToDoc, childArray, cloneValue } from "./doc-op-apply";
 import {
   beginRecording,
   endRecording,
@@ -31,11 +32,6 @@ function patchHistoryEnabled() {
   } catch {
     return true;
   }
-}
-
-/** Deep-clone a recorded value (undefined passes through; reactive proxies are read through). */
-function cloneValue<T>(v: T): T {
-  return v === undefined || v === null ? v : (jsonClone(v as object) as T);
 }
 
 /** Forward/inverse pair for a single-key change on the node at path. */
@@ -80,26 +76,6 @@ export type JxNodeValue =
   | (JxMutableNode | string)[]
   | JxEventBinding
   | undefined;
-
-/**
- * The editable children array of a node, created when absent. Mapped-array children (`$prototype:
- * "Array"`) cannot be index-mutated — fail loudly instead of corrupting.
- */
-function childArray(node: JxMutableNode): (JxMutableNode | string)[] {
-  // Defense-in-depth: a path that resolves to a children array (rather than a node) would
-  // Otherwise get a bogus `.children` property tacked on here, silently storing the insert where
-  // Nothing renders. Callers must pass a node; fail loudly if they don't.
-  if (Array.isArray(node)) {
-    throw new TypeError("Cannot insert into a children array; parentPath must point at a node");
-  }
-  if (!node.children) {
-    node.children = [];
-  }
-  if (!Array.isArray(node.children)) {
-    throw new TypeError("Cannot insert into mapped-array children; edit the map template instead");
-  }
-  return node.children;
-}
 
 // ─── Transactional layer ─────────────────────────────────────────────────────
 
@@ -152,7 +128,7 @@ export function transactDoc(
 
   if (verdict.patchable) {
     try {
-      consumer!.apply(tab, record.ops);
+      consumer!.apply(tab, record.ops, record);
     } catch (error) {
       consumer!.escalate(
         `patch-apply-failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -253,54 +229,6 @@ export function transact(
 
 /** Document-level keys whose changes require a full scope/panel rebuild on the canvas. */
 const DOC_META_KEYS = new Set(["state", "$media", "$head", "$elements", "imports", "$layout"]);
-
-/**
- * Apply a replayable doc op to a bare document tree (history replay — no canvas recording).
- *
- * @param {JxMutableNode} doc
- * @param {JxDocOp} op
- */
-function applyDocOpToDoc(doc: JxMutableNode, op: JxDocOp) {
-  switch (op.op) {
-    case "set-key": {
-      const node = getNodeAtPath(doc, op.path);
-      if (!node) {
-        throw new Error(`doc-op-node-not-found:${op.path.join("/")}`);
-      }
-      if (op.value === undefined) {
-        delete node[op.key];
-      } else {
-        node[op.key] = cloneValue(op.value) as JxNodeValue;
-      }
-      return;
-    }
-    case "insert-child": {
-      const parent = getNodeAtPath(doc, op.parentPath);
-      childArray(parent).splice(op.index, 0, cloneValue(op.node) as JxMutableNode);
-      return;
-    }
-    case "remove-child": {
-      const parent = getNodeAtPath(doc, op.parentPath);
-      childArray(parent).splice(op.index, 1);
-      return;
-    }
-    case "set-child": {
-      const parent = getNodeAtPath(doc, op.parentPath);
-      childArray(parent).splice(op.index, 1, cloneValue(op.node) as JxMutableNode);
-      return;
-    }
-    case "move-child": {
-      const fromParent = getNodeAtPath(doc, op.fromParentPath);
-      const toParent = getNodeAtPath(doc, op.toParentPath);
-      const [node] = childArray(fromParent).splice(op.fromIndex, 1);
-      childArray(toParent).splice(op.toIndex, 0, node!);
-      return;
-    }
-    default: {
-      throw new Error(`unknown-doc-op:${(op as JxDocOp).op}`);
-    }
-  }
-}
 
 /**
  * Apply a doc op to the live document AND record the matching canvas patch op, so undo/redo

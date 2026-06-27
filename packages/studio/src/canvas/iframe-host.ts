@@ -13,7 +13,13 @@ import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual } from "../store";
 import { activeTab } from "../workspace/workspace";
-import type { CanvasMode, IframeToParent, NodeHit, ParentToIframe } from "./iframe-protocol";
+import type {
+  CanvasMode,
+  IframeToParent,
+  NodeHit,
+  ParentToIframe,
+  WireDocOp,
+} from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
 import type { OverlayLayer } from "./iframe-overlay";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -36,6 +42,34 @@ const hosts = new WeakMap<HTMLElement, HostState>();
 const liveHosts = new Set<HostState>();
 
 let selectionWatch: { stop: () => void } | null = null;
+
+/** Full-render escalation, injected by studio init (a patchError can't apply surgically). */
+let patchEscalation: (() => void) | null = null;
+
+/** Register the full-render fallback the host invokes when the iframe reports a `patchError`. */
+export function setIframePatchEscalation(fn: () => void): void {
+  patchEscalation = fn;
+}
+
+/**
+ * Post a surgical patch (value-carrying forward ops) to every ready live iframe host. Returns how
+ * many hosts received it; the caller escalates to a full render when that's zero (no host could
+ * apply the edit in place, so the suppressed full render must run after all).
+ */
+export function postPatchToHosts(forwardOps: WireDocOp[], gen: number): number {
+  let posted = 0;
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready) {
+      host.channel.post({ forwardOps, gen, kind: "patch" });
+      posted += 1;
+    }
+  }
+  return posted;
+}
 
 /** Lazily start one reactive watcher that re-measures the selection in every live iframe host. */
 function ensureSelectionWatch(): void {
@@ -159,9 +193,15 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       }
       return;
     }
-    case "renderComplete": {
+    case "renderComplete":
+    case "patchComplete": {
       // The DOM (and so all geometry) just changed — re-measure the selection box.
       requestSelection(state, state.selectionPath);
+      return;
+    }
+    case "patchError": {
+      // The iframe couldn't apply the edit surgically — fall back to a full render of the live doc.
+      patchEscalation?.();
       return;
     }
     default: {
@@ -199,6 +239,9 @@ export async function mountIframeCanvas(
   // Proxy artifacts that would otherwise raise DataCloneError and silently drop the entire message.
   // oxlint-disable-next-line unicorn/prefer-structured-clone
   const cloneableDoc = JSON.parse(JSON.stringify(resolved.renderDoc)) as unknown;
+  // The RAW page doc (forward-op + data-jx-path coordinate space) crosses as the iframe's shadow doc.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
   const message: ParentToIframe = {
     doc: cloneableDoc,
     docBase: resolved.docBase ?? `${location.origin}/`,
@@ -206,6 +249,7 @@ export async function mountIframeCanvas(
     kind: "render",
     mapperCtx: resolved.mapperCtx,
     mode: resolved.mapperCtx.canvasMode as CanvasMode,
+    shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
   };
   if (state.ready) {

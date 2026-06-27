@@ -13,7 +13,7 @@ const WIRE_CTX: WireMapperCtx = {
   pageContentPrefix: null,
 };
 
-function renderMsg(gen: number, doc: unknown): ParentToIframe {
+function renderMsg(gen: number, doc: unknown, shadowDoc: unknown = doc): ParentToIframe {
   return {
     doc,
     docBase: "http://localhost:3000/",
@@ -21,6 +21,7 @@ function renderMsg(gen: number, doc: unknown): ParentToIframe {
     kind: "render",
     mapperCtx: WIRE_CTX,
     mode: "design",
+    shadowDoc,
     siteStyle: null,
   };
 }
@@ -133,5 +134,108 @@ describe("startCanvasIframe", () => {
     };
     teardown = bootCanvasIframe(win);
     expect(posted).toEqual([{ "jx:canvas": "tok", payload: { kind: "ready" } }]);
+  });
+});
+
+describe("startCanvasIframe — patch", () => {
+  /** A fresh doc per render: an h1 child the patches target by path `["children", 0]`. */
+  const freshH1 = () => ({ children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" });
+
+  /** Boot the iframe and land a render at `gen` so the shadow doc + DOM are ready to patch. */
+  async function bootRendered(gen: number): Promise<{
+    acks: IframeToParent[];
+    container: HTMLElement;
+    pair: ReturnType<typeof fakeChannelPair<ParentToIframe, IframeToParent>>;
+  }> {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    // The render doc and the shadow doc are independent clones (as the host posts them), so folding a
+    // Patch into the shadow never mutates the render tree.
+    pair.parent.post(renderMsg(gen, freshH1(), freshH1()));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return { acks, container, pair };
+  }
+
+  test("applies a value-carrying patch in place and acks patchComplete", async () => {
+    const { acks, container, pair } = await bootRendered(1);
+    pair.parent.post({
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 0], value: "Edited" }],
+      gen: 1,
+      kind: "patch",
+    });
+    pair.flush(); // Deliver the patch into the entry (applied synchronously).
+    pair.flush(); // Deliver the patchComplete ack back to the parent.
+
+    expect((container.querySelector("h1") as HTMLElement).textContent).toBe("Edited");
+    expect(acks).toContainEqual({ gen: 1, kind: "patchComplete" });
+  });
+
+  test("drops a patch whose generation is older than the rendered one", async () => {
+    const { acks, container, pair } = await bootRendered(5);
+    pair.parent.post({
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 0], value: "Stale" }],
+      gen: 3,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    expect((container.querySelector("h1") as HTMLElement).textContent).toBe("Hi"); // Unchanged.
+    expect(acks.some((m) => m.kind === "patchComplete" || m.kind === "patchError")).toBe(false);
+  });
+
+  test("reports patchError when the patch is ahead of the rendered generation", async () => {
+    const { acks, pair } = await bootRendered(1);
+    pair.parent.post({
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 0], value: "x" }],
+      gen: 2,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    expect(acks).toContainEqual({ gen: 2, kind: "patchError", message: "patch-ahead-of-render" });
+  });
+
+  test("reports patchError for a patch that arrives before any render", () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    teardown = startCanvasIframe({
+      channel: pair.iframe,
+      container: document.createElement("div"),
+    });
+
+    pair.parent.post({
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 0], value: "x" }],
+      gen: 0,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    expect(acks).toContainEqual({ gen: 0, kind: "patchError", message: "patch-ahead-of-render" });
+  });
+
+  test("reports patchError (with the thrown reason) when an op can't be applied surgically", async () => {
+    const { acks, pair } = await bootRendered(1);
+    pair.parent.post({
+      forwardOps: [{ key: "tagName", op: "set-key", path: ["children", 0], value: "h2" }],
+      gen: 1,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    const err = acks.find((m) => m.kind === "patchError") as
+      | { gen: number; kind: "patchError"; message: string }
+      | undefined;
+    expect(err?.gen).toBe(1);
+    expect(err?.message).toMatch(/iframe-patch-unsupported-key:tagName/);
   });
 });
