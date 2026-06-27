@@ -525,24 +525,30 @@ describe("iframe canvas host gating", () => {
     setCanvasHostOverride(null);
   });
 
-  test("rejects ops the iframe can't patch surgically yet (structural / attr / prop)", () => {
-    // These all pass the legacy verdicts but the iframe gate rejects them (Phase 3b territory).
-    expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).reason).toBe(
-      "iframe-unsupported-remove",
-    );
+  test("rejects ops the iframe can't patch surgically yet (need a subtree re-render — Phase 3b-2)", () => {
+    // These pass the legacy verdicts but the iframe gate rejects them (they need rendering).
     expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).reason).toBe(
       "iframe-unsupported-insert",
+    );
+    expect(classifyOps(tab, [{ op: "replace", path: ["children", 0] }]).reason).toBe(
+      "iframe-unsupported-replace",
     );
     expect(classifyOps(tab, [{ key: "id", op: "set-prop", path: ["children", 0] }]).reason).toBe(
       "iframe-unsupported-set-prop",
     );
   });
 
-  test("still admits the in-place style / text / event ops the iframe can patch", () => {
+  test("admits in-place ops plus the no-render structural ops (remove / move)", () => {
     expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
     expect(classifyOps(tab, [{ op: "set-text", path: ["children", 0] }]).patchable).toBe(true);
     expect(
       classifyOps(tab, [{ isEvent: true, key: "onclick", op: "set-prop", path: ["children", 0] }])
+        .patchable,
+    ).toBe(true);
+    // Phase 3b-1: remove + move are pure DOM relocation in the iframe — no render needed.
+    expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).patchable).toBe(true);
+    expect(
+      classifyOps(tab, [{ fromPath: ["children", 0], op: "move", toIndex: 1, toParentPath: [] }])
         .patchable,
     ).toBe(true);
   });

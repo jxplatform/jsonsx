@@ -186,14 +186,18 @@ function isStructuralOp(op: JxPatchOp) {
 }
 
 /**
- * Whether the iframe canvas can apply this op surgically TODAY (Phase 3a: pure in-place writes).
- * Anything else (structural ops, attribute/prop edits needing a subtree re-render — Phase 3b) is
- * rejected in iframe mode so it falls through to a full render instead of a patch the iframe would
- * bounce back as a `patchError`.
+ * Whether the iframe canvas can apply this op surgically TODAY. Phase 3a: pure in-place writes
+ * (style/text/inert events). Phase 3b-1: structural ops that need no rendering — `remove` and
+ * `move` are pure DOM relocation + `data-jx-path` remap in the iframe. Still rejected (→ full
+ * render): `insert`/`replace`/`set-attr`/`set-prop` (need a subtree re-render — Phase 3b-2).
  */
 function isIframePatchable(op: JxPatchOp) {
   return (
-    op.op === "set-style" || op.op === "set-text" || (op.op === "set-prop" && op.isEvent === true)
+    op.op === "set-style" ||
+    op.op === "set-text" ||
+    op.op === "remove" ||
+    op.op === "move" ||
+    (op.op === "set-prop" && op.isEvent === true)
   );
 }
 

@@ -8,6 +8,7 @@ import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { applyIframePatch } from "../src/canvas/iframe-patch";
 import { serializeJxPath } from "../src/canvas/path-mapping";
+import { getNodeAtPath } from "../src/state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 
@@ -250,5 +251,126 @@ describe("applyIframePatch — event bindings and escalation", () => {
         container,
       ),
     ).toThrow(/doc-op-node-not-found/);
+  });
+});
+
+// ─── Structural ops (Phase 3b-1: remove / move — no subtree render) ──────────────
+
+/** Mount a doc as DOM with `data-jx-path` stamped recursively (the iframe full render's shape). */
+function mountTree(doc: JxMutableNode): { container: HTMLElement; shadow: JxMutableNode } {
+  const shadow = structuredClone(doc);
+  const container = document.createElement("div");
+  const build = (node: JxMutableNode, path: (string | number)[]): HTMLElement => {
+    const el = document.createElement(node.tagName as string);
+    el.dataset.jxPath = serializeJxPath(path);
+    if (typeof node.textContent === "string") {
+      el.append(document.createTextNode(node.textContent));
+    }
+    const kids = node.children;
+    if (Array.isArray(kids)) {
+      for (const [i, k] of kids.entries()) {
+        el.append(build(k as JxMutableNode, [...path, "children", i]));
+      }
+    }
+    return el;
+  };
+  container.append(build(doc, []));
+  return { container, shadow };
+}
+
+/** Every stamped element resolves to a same-tag node in the shadow doc → DOM and shadow agree. */
+function expectConsistent(container: HTMLElement, shadow: JxMutableNode): void {
+  for (const el of container.querySelectorAll<HTMLElement>("[data-jx-path]")) {
+    const node = getNodeAtPath(shadow, JSON.parse(el.dataset.jxPath!)) as JxMutableNode | undefined;
+    expect(node, `no shadow node for ${el.dataset.jxPath}`).toBeDefined();
+    expect((node!.tagName as string).toLowerCase()).toBe(el.tagName.toLowerCase());
+  }
+}
+
+const TREE: JxMutableNode = {
+  children: [
+    { tagName: "p", textContent: "a" },
+    { tagName: "span", textContent: "b" },
+    { children: [{ tagName: "em", textContent: "c" }], tagName: "div" },
+  ],
+  tagName: "div",
+} as unknown as JxMutableNode;
+
+function rootChildTags(container: HTMLElement): string[] {
+  return [...container.firstElementChild!.children].map((c) => c.tagName.toLowerCase());
+}
+
+describe("applyIframePatch — remove-child", () => {
+  test("removes the element and shifts later siblings' paths (and descendants) down", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(shadow, [{ index: 0, op: "remove-child", parentPath: [] }], container);
+
+    expect(container.querySelector("p")).toBeNull();
+    expect(rootChildTags(container)).toEqual(["span", "div"]);
+    expect(elAt(container, ["children", 0]).tagName.toLowerCase()).toBe("span");
+    expect(elAt(container, ["children", 1]).tagName.toLowerCase()).toBe("div");
+    // The descendant under the shifted div re-paths too.
+    expect(elAt(container, ["children", 1, "children", 0]).tagName.toLowerCase()).toBe("em");
+    expectConsistent(container, shadow);
+  });
+});
+
+describe("applyIframePatch — move-child", () => {
+  test("same-parent forward move re-paths the siblings between the slots", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(
+      shadow,
+      [{ fromIndex: 0, fromParentPath: [], op: "move-child", toIndex: 1, toParentPath: [] }],
+      container,
+    );
+    // Shadow folds to [span, p, div]; the DOM order and paths must match.
+    expect(rootChildTags(container)).toEqual(["span", "p", "div"]);
+    expect(elAt(container, ["children", 0]).tagName.toLowerCase()).toBe("span");
+    expect(elAt(container, ["children", 1]).tagName.toLowerCase()).toBe("p");
+    expect(elAt(container, ["children", 2]).tagName.toLowerCase()).toBe("div");
+    expectConsistent(container, shadow);
+  });
+
+  test("same-parent backward move carries the moved subtree's descendants", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(
+      shadow,
+      [{ fromIndex: 2, fromParentPath: [], op: "move-child", toIndex: 0, toParentPath: [] }],
+      container,
+    );
+    // Shadow folds to [div, p, span].
+    expect(rootChildTags(container)).toEqual(["div", "p", "span"]);
+    expect(elAt(container, ["children", 0]).tagName.toLowerCase()).toBe("div");
+    expect(elAt(container, ["children", 0, "children", 0]).tagName.toLowerCase()).toBe("em");
+    expectConsistent(container, shadow);
+  });
+
+  test("cross-parent move reinserts the subtree under the destination and re-paths both", () => {
+    const { container, shadow } = mountTree(TREE);
+    // Move p (children/0) into the div (children/2, pre-mutation path) at index 0.
+    applyIframePatch(
+      shadow,
+      [
+        {
+          fromIndex: 0,
+          fromParentPath: [],
+          op: "move-child",
+          toIndex: 0,
+          toParentPath: ["children", 2],
+        },
+      ],
+      container,
+    );
+    // Shadow folds to [span, div[p, em]]; the div is now children/1.
+    expect(rootChildTags(container)).toEqual(["span", "div"]);
+    expect(elAt(container, ["children", 0]).tagName.toLowerCase()).toBe("span");
+    expect(elAt(container, ["children", 1]).tagName.toLowerCase()).toBe("div");
+    expect(elAt(container, ["children", 1, "children", 0]).tagName.toLowerCase()).toBe("p");
+    expect(elAt(container, ["children", 1, "children", 1]).tagName.toLowerCase()).toBe("em");
+    // DOM order inside the div: the moved p precedes the original em.
+    expect(
+      [...elAt(container, ["children", 1]).children].map((c) => c.tagName.toLowerCase()),
+    ).toEqual(["p", "em"]);
+    expectConsistent(container, shadow);
   });
 });
