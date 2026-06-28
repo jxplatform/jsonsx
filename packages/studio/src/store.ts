@@ -59,12 +59,6 @@ export const elToPath = new WeakMap<Element, JxPath>();
  */
 export const elToScope = new WeakMap<Element, Record<string, unknown>>();
 
-/**
- * Subtree root element → the effect scope created for its surgical render. Stopped when the subtree
- * is replaced or removed so render-time reactive effects don't accumulate.
- */
-export const elToRenderScope = new WeakMap<Element, { stop: () => void }>();
-
 export const canvasPanels: CanvasPanel[] = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────

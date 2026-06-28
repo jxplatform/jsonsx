@@ -34,7 +34,8 @@ function canvasHostFromUrl(): CanvasHost | null {
 
 /**
  * The active canvas host. Defaults to `legacy-div`; opt into the iframe canvas via
- * `?canvasHost=iframe`.
+ * `?canvasHost=iframe`. (The legacy path is being removed; the default flips to `iframe` once the
+ * render spine is gone.)
  */
 export function canvasHost(): CanvasHost {
   return override ?? canvasHostFromUrl() ?? "legacy-div";
