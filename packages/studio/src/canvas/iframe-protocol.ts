@@ -80,6 +80,20 @@ export interface NodeHit {
   rect: SerializableRect;
 }
 
+/**
+ * A keyboard event flattened for the bridge. The iframe forwards the global-shortcut subset (so
+ * undo/redo/save/delete/… still fire when focus is inside the canvas iframe); the parent rebuilds a
+ * synthetic `keydown` from these fields and dispatches it to its existing shortcut handler.
+ */
+export interface SerializedKey {
+  key: string;
+  code: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}
+
 /** Messages the canvas iframe sends back to the editor (parent). */
 export type IframeToParent =
   | { kind: "ready" }
@@ -93,4 +107,6 @@ export type IframeToParent =
   // A patch applied cleanly (echoes gen so the host can re-measure the selection overlay).
   | { kind: "patchComplete"; gen: number }
   // A patch could not be applied surgically — the parent escalates to a full render.
-  | { kind: "patchError"; gen: number; message: string };
+  | { kind: "patchError"; gen: number; message: string }
+  // A global-shortcut keystroke captured inside the iframe, for the parent to re-dispatch.
+  | { kind: "forwardKey"; event: SerializedKey };

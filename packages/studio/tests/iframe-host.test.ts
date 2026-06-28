@@ -321,4 +321,28 @@ describe("iframe canvas patch bridge", () => {
     channels[0]!.deliver({ gen: 1, kind: "patchError", message: "nope" });
     expect(escalated).toBe(1);
   });
+
+  test("forwardKey re-dispatches a synthetic keydown on the editor document", async () => {
+    await mountReady();
+    const seen: KeyboardEvent[] = [];
+    const onKey = (e: KeyboardEvent) => seen.push(e);
+    document.addEventListener("keydown", onKey);
+    channels[0]!.deliver({
+      event: {
+        altKey: false,
+        code: "KeyZ",
+        ctrlKey: true,
+        key: "z",
+        metaKey: false,
+        shiftKey: false,
+      },
+      kind: "forwardKey",
+    });
+    document.removeEventListener("keydown", onKey);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.key).toBe("z");
+    expect(seen[0]!.ctrlKey).toBe(true);
+    expect(seen[0]!.code).toBe("KeyZ");
+  });
 });

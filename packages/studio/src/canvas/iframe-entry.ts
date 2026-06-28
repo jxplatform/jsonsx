@@ -8,6 +8,7 @@
 import { postMessageChannel } from "./iframe-channel";
 import { renderResolvedDocument } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
+import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import type { IframeChannel } from "./iframe-channel";
@@ -39,6 +40,9 @@ export function startCanvasIframe(opts: {
   // Report pointer hit/hover (resolved to data-jx-path) to the parent, which owns selection +
   // Overlays — the cross-origin bridge means the parent never reads our DOM directly.
   const stopInteraction = startInteraction(channel, container.ownerDocument);
+  // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
+  // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
+  const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
@@ -118,6 +122,7 @@ export function startCanvasIframe(opts: {
   return () => {
     off();
     stopInteraction();
+    stopKeyForwarding();
     handle?.dispose();
   };
 }

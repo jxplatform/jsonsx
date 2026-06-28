@@ -18,6 +18,7 @@ import type {
   IframeToParent,
   NodeHit,
   ParentToIframe,
+  SerializedKey,
   WireDocOp,
 } from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
@@ -204,10 +205,31 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       patchEscalation?.();
       return;
     }
+    case "forwardKey": {
+      // A global shortcut pressed while the iframe had focus — replay it for the editor's handler.
+      redispatchKey(msg.event);
+      return;
+    }
     default: {
       break;
     }
   }
+}
+
+/** Rebuild and dispatch a synthetic `keydown` on the editor document from a forwarded keystroke. */
+function redispatchKey(event: SerializedKey): void {
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", {
+      altKey: event.altKey,
+      bubbles: true,
+      cancelable: true,
+      code: event.code,
+      ctrlKey: event.ctrlKey,
+      key: event.key,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+    }),
+  );
 }
 
 /** Draw the hover box, hidden when there's no hover or it coincides with the current selection. */
