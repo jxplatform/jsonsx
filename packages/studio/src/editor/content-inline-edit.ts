@@ -1,13 +1,18 @@
 /// <reference lib="dom" />
 import { canvasPanels, renderOnly } from "../store";
 import { view } from "../view";
-import { isEditableBlock, startEditing } from "./inline-edit";
+import { isEditableBlock, setSlashController, startEditing } from "./inline-edit";
 import { applyInlineCommit, applyInlineInsert, applyInlineSplit } from "./inline-edit-apply";
+import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "./slash-menu";
 import { restoreTemplateExpressions } from "../utils/edit-display";
 import { renderBlockActionBar } from "../panels/block-action-bar";
 import { findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
 
 import type { JxPath } from "../state";
+
+// Wire the editor realm's inline editing to the real (lit-html) slash menu. The canvas iframe
+// Supplies its own controller instead — inline-edit.ts itself imports neither.
+setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
 
 /**
  * Enter rich-text inline editing on a canvas element (edit/content mode).

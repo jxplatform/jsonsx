@@ -12,11 +12,37 @@ import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
-import {
-  showSlashMenu as sharedShowSlashMenu,
-  dismissSlashMenu as sharedDismissSlashMenu,
-  isSlashMenuOpen,
-} from "./slash-menu";
+/**
+ * The slash-menu surface inline editing drives. Injected (rather than imported) so this module
+ * stays free of the menu's heavy `lit-html` / `ui/layers` dependencies — the editor realm wires the
+ * real menu, the canvas iframe supplies its own (or a no-op) without bloating the slim iframe
+ * bundle.
+ */
+export interface SlashController {
+  show: (
+    anchorEl: HTMLElement,
+    filter: string,
+    cbs: { onSelect: (cmd: SlashCommand) => void; showFilter?: boolean; commands?: SlashCommand[] },
+  ) => void;
+  dismiss: () => void;
+  isOpen: () => boolean;
+}
+
+const noopSlash: SlashController = {
+  dismiss: () => {
+    // No slash controller wired in this realm.
+  },
+  isOpen: () => false,
+  show: () => {
+    // No slash controller wired in this realm.
+  },
+};
+let slash: SlashController = noopSlash;
+
+/** Inject the slash-menu controller inline editing should drive (call once at realm init). */
+export function setSlashController(controller: SlashController): void {
+  slash = controller;
+}
 
 export interface InlineAction {
   tag: string;
@@ -269,7 +295,7 @@ export function stopEditing() {
   }
 
   commitChanges();
-  sharedDismissSlashMenu();
+  slash.dismiss();
 
   activeEl.contentEditable = "false";
   activeEl.style.pointerEvents = "";
@@ -325,7 +351,7 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === "Enter" && !e.shiftKey) {
-    if (isSlashMenuOpen()) {
+    if (slash.isOpen()) {
       return;
     } // Shared slash menu captures Enter
     e.preventDefault();
@@ -374,17 +400,14 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   // Dismiss slash menu on non-matching keys
-  if (
-    isSlashMenuOpen() &&
-    !["ArrowUp", "ArrowDown", "Enter", "Backspace", "Delete"].includes(e.key)
-  ) {
+  if (slash.isOpen() && !["ArrowUp", "ArrowDown", "Enter", "Backspace", "Delete"].includes(e.key)) {
     // Let the input handler deal with filtering
   }
 }
 
 function handleInput() {
   // Check if slash menu should update or dismiss
-  if (isSlashMenuOpen()) {
+  if (slash.isOpen()) {
     updateSlashMenu();
   }
 }
@@ -392,7 +415,7 @@ function handleInput() {
 /** @param {FocusEvent} _e */
 function handleBlur(_e: FocusEvent) {
   // Don't close if focus moved to slash menu
-  if (isSlashMenuOpen()) {
+  if (slash.isOpen()) {
     return;
   }
 
@@ -669,7 +692,7 @@ function openSlashMenu() {
   const range = sel.getRangeAt(0);
   _slashFilterStart = getTextBeforeCursor(range).length;
 
-  sharedShowSlashMenu(activeEl, "", { onSelect: handleSlashSelect });
+  slash.show(activeEl, "", { onSelect: handleSlashSelect });
 }
 
 function updateSlashMenu() {
@@ -679,7 +702,7 @@ function updateSlashMenu() {
 
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) {
-    sharedDismissSlashMenu();
+    slash.dismiss();
     return;
   }
 
@@ -688,12 +711,12 @@ function updateSlashMenu() {
   const slashIdx = fullText.lastIndexOf("/");
 
   if (slashIdx === -1 || fullText.length < _slashFilterStart - 1) {
-    sharedDismissSlashMenu();
+    slash.dismiss();
     return;
   }
 
   const filter = fullText.slice(slashIdx + 1).toLowerCase();
-  sharedShowSlashMenu(activeEl, filter, { onSelect: handleSlashSelect });
+  slash.show(activeEl, filter, { onSelect: handleSlashSelect });
 }
 
 /** @param {SlashCommand} cmd */

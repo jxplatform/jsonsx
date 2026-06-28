@@ -9,9 +9,15 @@ import {
   isInlineElement,
   isInlineInContext,
   normalizeChildren,
+  setSlashController,
   startEditing,
   stopEditing,
 } from "../src/editor/inline-edit";
+import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "../src/editor/slash-menu";
+
+// Inline-edit no longer hard-imports the slash menu (so it can live in the slim iframe bundle);
+// Wire the real one for the tests that exercise slash commands.
+setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
 
 // ─── Pure function tests ─────────────────────────────────────────────────────
 
