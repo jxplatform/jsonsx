@@ -543,6 +543,15 @@ describe("iframe canvas host gating", () => {
     );
   });
 
+  test("admits patches with a null liveCtx — the real iframe-mode panel state", () => {
+    // In iframe mode the parent never runs the legacy render, so the panel has no `liveCtx`. The
+    // Classifier must NOT reject on that (it did once, escalating every iframe edit to a full render).
+    panel.liveCtx = null;
+    expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
+    expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).patchable).toBe(true);
+    expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).patchable).toBe(true);
+  });
+
   test("apply leaves the parent DOM untouched and throws when no iframe host is ready", () => {
     const before = pEl.textContent;
     expect(() =>

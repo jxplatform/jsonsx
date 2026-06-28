@@ -712,6 +712,10 @@ function renderCanvasIntoPanel(
     void mountIframeCanvas(gen, docToRender, canvas)
       .then(() => {
         if (gen === view.renderGeneration) {
+          // Mark the panel patchable once the real document is mounted (not a diff/preview
+          // Override) so classifyOps admits surgical patches; the iframe holds the render context,
+          // So unlike the legacy path this panel needs no `liveCtx`.
+          panel.ready = !docOverride;
           updateCanvas({ error: null, scope: null, status: "ready" });
           statusMessage("Iframe render OK", 1500);
         }

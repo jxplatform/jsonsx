@@ -275,7 +275,10 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
   if (canvasPanels.length === 0) {
     return reject("no-panels");
   }
-  if (!canvasPanels.every((p) => p.ready && p.liveCtx)) {
+  // The iframe canvas keeps its render context inside the iframe (not on the parent panel's
+  // `liveCtx`), so only require `liveCtx` for the legacy in-realm patcher; both require `ready`.
+  const iframe = isIframeCanvas();
+  if (!canvasPanels.every((p) => p.ready && (iframe || p.liveCtx))) {
     return reject("panels-not-ready");
   }
   // Structural changes while an inline edit session is live would pull the DOM out from under
