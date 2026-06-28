@@ -10,7 +10,6 @@
 // ─── Re-exports from state.js ────────────────────────────────────────────────
 
 import { activeTab } from "./workspace/workspace";
-import { isEventBinding } from "@jxsuite/schema/guards";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { CanvasPanel } from "./panels/canvas-dnd.js";
@@ -139,52 +138,9 @@ export function cancelStyleDebounce(prop: string) {
   _styleDebounceTimers.delete(prop);
 }
 
-/**
- * Strip all on* event handler properties from a Jx document tree (deep clone).
- *
- * @param {JxMutableNode} node
- * @returns {JxMutableNode}
- */
-export function stripEventHandlers(node: JxMutableNode): JxMutableNode {
-  if (!node || typeof node !== "object") {
-    return node;
-  }
-  if (Array.isArray(node)) {
-    // Arrays of nodes round-trip element-wise; the array itself is not a node.
-    return node.map((n: JxMutableNode) => stripEventHandlers(n)) as unknown as JxMutableNode;
-  }
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(node)) {
-    if (k.startsWith("on") && isEventBinding(v)) {
-      continue;
-    }
-    if (k === "children") {
-      out.children = Array.isArray(v)
-        ? v.map((c: JxMutableNode) => stripEventHandlers(c))
-        : stripEventHandlers(v as JxMutableNode);
-    } else if (k === "cases" && typeof v === "object") {
-      const cases: Record<string, unknown> = {};
-      for (const [ck, cv] of Object.entries(v as Record<string, unknown>)) {
-        cases[ck] = stripEventHandlers(cv as JxMutableNode);
-      }
-      out.cases = cases;
-    } else if (k === "state" && typeof v === "object" && v !== null) {
-      const state: Record<string, unknown> = {};
-      for (const [sk, sv] of Object.entries(v as Record<string, unknown>)) {
-        if (sv && typeof sv === "object" && (sv as Record<string, unknown>).timing === "server") {
-          continue;
-        }
-        state[sk] = sv;
-      }
-      out.state = state;
-    } else if (k === "style" || k === "attributes" || k === "$media") {
-      out[k] = v;
-    } else {
-      out[k] = v;
-    }
-  }
-  return out;
-}
+// `stripEventHandlers` moved to ./utils/strip-events (dependency-light, shared with the iframe
+// Subtree renderer); re-exported here so existing `from "../store"` imports keep working.
+export { stripEventHandlers } from "./utils/strip-events";
 
 // ─── Render orchestration ────────────────────────────────────────────────────
 

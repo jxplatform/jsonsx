@@ -186,22 +186,6 @@ function isStructuralOp(op: JxPatchOp) {
 }
 
 /**
- * Whether the iframe canvas can apply this op surgically TODAY. Phase 3a: pure in-place writes
- * (style/text/inert events). Phase 3b-1: structural ops that need no rendering — `remove` and
- * `move` are pure DOM relocation + `data-jx-path` remap in the iframe. Still rejected (→ full
- * render): `insert`/`replace`/`set-attr`/`set-prop` (need a subtree re-render — Phase 3b-2).
- */
-function isIframePatchable(op: JxPatchOp) {
-  return (
-    op.op === "set-style" ||
-    op.op === "set-text" ||
-    op.op === "remove" ||
-    op.op === "move" ||
-    (op.op === "set-prop" && op.isEvent === true)
-  );
-}
-
-/**
  * Per-op patchability in the current document. Returns null when patchable, else the reason.
  *
  * @param {Tab} tab
@@ -305,16 +289,10 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
       return reject(reason);
     }
   }
-  // The iframe canvas applies a narrower op set surgically than the legacy DOM patcher; the rest
-  // Full-render (until Phase 3b). Gating here means the iframe only ever receives patchable ops, so
-  // No wasted patch→patchError→render round-trip.
-  if (isIframeCanvas()) {
-    for (const op of ops) {
-      if (!isIframePatchable(op)) {
-        return reject(`iframe-unsupported-${op.op}`);
-      }
-    }
-  }
+  // Classification is host-agnostic: the iframe canvas applies the SAME op set surgically as the
+  // Legacy DOM patcher (in-place style/text, structural relocation, and subtree re-renders for
+  // Insert/replace/attr/prop — see iframe-patch.ts). An op the iframe somehow can't apply throws and
+  // The parent escalates to a full render — so a stricter gate here would only forgo optimization.
   return { patchable: true, reason: "" };
 }
 

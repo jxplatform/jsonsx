@@ -525,32 +525,22 @@ describe("iframe canvas host gating", () => {
     setCanvasHostOverride(null);
   });
 
-  test("rejects ops the iframe can't patch surgically yet (need a subtree re-render — Phase 3b-2)", () => {
-    // These pass the legacy verdicts but the iframe gate rejects them (they need rendering).
-    expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).reason).toBe(
-      "iframe-unsupported-insert",
-    );
-    expect(classifyOps(tab, [{ op: "replace", path: ["children", 0] }]).reason).toBe(
-      "iframe-unsupported-replace",
-    );
-    expect(classifyOps(tab, [{ key: "id", op: "set-prop", path: ["children", 0] }]).reason).toBe(
-      "iframe-unsupported-set-prop",
-    );
-  });
-
-  test("admits in-place ops plus the no-render structural ops (remove / move)", () => {
+  test("classification is host-agnostic: the iframe admits the full surgical op set", () => {
+    // After Phase 3b the iframe applies every op the legacy patcher does (in-place, structural
+    // Relocation, and subtree re-renders), so classify no longer rejects anything extra in iframe
+    // Mode — an op the iframe can't apply escalates at apply time instead.
     expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
     expect(classifyOps(tab, [{ op: "set-text", path: ["children", 0] }]).patchable).toBe(true);
-    expect(
-      classifyOps(tab, [{ isEvent: true, key: "onclick", op: "set-prop", path: ["children", 0] }])
-        .patchable,
-    ).toBe(true);
-    // Phase 3b-1: remove + move are pure DOM relocation in the iframe — no render needed.
     expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).patchable).toBe(true);
     expect(
       classifyOps(tab, [{ fromPath: ["children", 0], op: "move", toIndex: 1, toParentPath: [] }])
         .patchable,
     ).toBe(true);
+    expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).patchable).toBe(true);
+    expect(classifyOps(tab, [{ op: "replace", path: ["children", 0] }]).patchable).toBe(true);
+    expect(classifyOps(tab, [{ key: "id", op: "set-prop", path: ["children", 0] }]).patchable).toBe(
+      true,
+    );
   });
 
   test("apply leaves the parent DOM untouched and throws when no iframe host is ready", () => {

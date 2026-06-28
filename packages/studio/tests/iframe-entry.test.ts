@@ -224,8 +224,9 @@ describe("startCanvasIframe — patch", () => {
 
   test("reports patchError (with the thrown reason) when an op can't be applied surgically", async () => {
     const { acks, pair } = await bootRendered(1);
+    // A forward op targeting a path absent from the shadow doc — the fold throws, the iframe reports it.
     pair.parent.post({
-      forwardOps: [{ key: "tagName", op: "set-key", path: ["children", 0], value: "h2" }],
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 9], value: "x" }],
       gen: 1,
       kind: "patch",
     });
@@ -236,6 +237,22 @@ describe("startCanvasIframe — patch", () => {
       | { gen: number; kind: "patchError"; message: string }
       | undefined;
     expect(err?.gen).toBe(1);
-    expect(err?.message).toMatch(/iframe-patch-unsupported-key:tagName/);
+    expect(err?.message).toMatch(/doc-op-node-not-found/);
+  });
+
+  test("applies a tag-change (set-key tagName) as a surgical subtree re-render", async () => {
+    const { acks, container, pair } = await bootRendered(1);
+    pair.parent.post({
+      forwardOps: [{ key: "tagName", op: "set-key", path: ["children", 0], value: "h2" }],
+      gen: 1,
+      kind: "patch",
+    });
+    pair.flush();
+    pair.flush();
+
+    // The h1 was re-rendered in place as an h2 (Phase 3b-2), not escalated.
+    expect(container.querySelector("h1")).toBeNull();
+    expect(container.querySelector("h2")?.textContent).toBe("Hi");
+    expect(acks).toContainEqual({ gen: 1, kind: "patchComplete" });
   });
 });

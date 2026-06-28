@@ -6,22 +6,25 @@
  * forward (value-carrying) half; the iframe folds them into its non-reactive shadow doc and mutates
  * the DOM it owns.
  *
- * Phase 3a handles the pure in-place ops (`set-key` on `style`/`textContent`, and event bindings
- * which are inert in edit mode). Structural ops (insert/remove/move/replace) and attribute/prop
- * edits that need a subtree re-render are gated OFF in the parent's iframe classifier and fall
- * through to a full render; they land in Phase 3b. Any op this module can't apply throws, which the
- * caller reports as `patchError` so the parent escalates to a full render.
+ * It applies the full op set the legacy patcher does: in-place `set-key` writes (`style`/
+ * `textContent`, and inert event bindings); structural relocation (`remove-child`/`move-child`) as
+ * pure DOM moves with `data-jx-path` remapping; and subtree re-renders (`insert-child`/`set-child`,
+ * and any other `set-key` that changes rendered output) via {@link renderSubtreeIframe}. Any op it
+ * can't apply throws, which the caller reports as `patchError` so the parent escalates to a full
+ * render.
  */
 
 import { reapplyStyle } from "@jxsuite/runtime";
 import { getNodeAtPath } from "../state";
 import { applyDocOpToDoc } from "../tabs/doc-op-apply";
 import { parseJxPath, serializeJxPath } from "./path-mapping";
+import { disposeSubtree, renderSubtreeIframe } from "./iframe-subtree";
 import {
   computeEmptyPlaceholderClass,
   EMPTY_PLACEHOLDER_CLASSES,
   templateToEditDisplay,
 } from "../utils/edit-display";
+import type { IframeRenderCtx } from "./iframe-render";
 import type { WireDocOp } from "./iframe-protocol";
 import type { JxPath } from "../state";
 import type { JxMutableNode, JxStyle } from "@jxsuite/schema/types";
@@ -35,16 +38,30 @@ export function applyIframePatch(
   shadowDoc: JxMutableNode,
   forwardOps: WireDocOp[],
   container: HTMLElement,
+  ctx?: IframeRenderCtx,
 ): void {
   for (const op of forwardOps) {
     applyDocOpToDoc(shadowDoc, op);
   }
   for (const op of forwardOps) {
-    applyOpToDom(shadowDoc, op, container);
+    applyOpToDom(shadowDoc, op, container, ctx);
   }
 }
 
-function applyOpToDom(doc: JxMutableNode, op: WireDocOp, container: HTMLElement): void {
+/** The render context, asserted present for ops that re-render a subtree (the caller always has it). */
+function requireCtx(ctx: IframeRenderCtx | undefined): IframeRenderCtx {
+  if (!ctx) {
+    throw new Error("iframe-patch-no-render-ctx");
+  }
+  return ctx;
+}
+
+function applyOpToDom(
+  doc: JxMutableNode,
+  op: WireDocOp,
+  container: HTMLElement,
+  ctx: IframeRenderCtx | undefined,
+): void {
   switch (op.op) {
     case "set-key": {
       if (op.key === "style") {
@@ -59,10 +76,21 @@ function applyOpToDom(doc: JxMutableNode, op: WireDocOp, container: HTMLElement)
       if (op.key.startsWith("on")) {
         return;
       }
-      throw new Error(`iframe-patch-unsupported-key:${op.key}`);
+      // Any other key (attributes / $props / cases / tagName / a non-event prop) changes rendered
+      // Output, so re-render the node's subtree in place — mirrors the legacy patcher's replace.
+      replaceSubtree(doc, op.path, container, requireCtx(ctx));
+      return;
+    }
+    case "insert-child": {
+      insertChild(doc, op.parentPath, op.index, container, requireCtx(ctx));
+      return;
+    }
+    case "set-child": {
+      replaceSubtree(doc, [...op.parentPath, "children", op.index], container, requireCtx(ctx));
+      return;
     }
     case "remove-child": {
-      removeChild(op.parentPath, op.index, container);
+      removeChild(doc, op.parentPath, op.index, container);
       return;
     }
     case "move-child": {
@@ -70,18 +98,61 @@ function applyOpToDom(doc: JxMutableNode, op: WireDocOp, container: HTMLElement)
       return;
     }
     default: {
-      throw new Error(`iframe-patch-unsupported-op:${op.op}`);
+      // The WireDocOp union is exhaustively handled above; this guards a future op kind.
+      throw new Error(`iframe-patch-unsupported-op:${JSON.stringify(op)}`);
     }
   }
 }
 
+// ─── Structural ops needing a subtree render (Phase 3b-2) ───────────────────────
+
+/** Render the inserted node and splice it into the parent's DOM, shifting later siblings up. */
+function insertChild(
+  doc: JxMutableNode,
+  parentPath: JxPath,
+  index: number,
+  container: HTMLElement,
+  ctx: IframeRenderCtx,
+): void {
+  const parentEl = requireElement(container, parentPath);
+  const parentNode = getNodeAtPath(doc, parentPath);
+  const newEl = renderSubtreeIframe(doc, [...parentPath, "children", index], ctx);
+  // Remap existing siblings BEFORE attaching the new subtree so it isn't itself remapped.
+  remapChildPaths(container, parentPath, index, 1);
+  insertAt(parentEl, newEl, domChildReference(parentEl, parentNode, index));
+  syncContainerPlaceholder(parentEl, parentNode);
+}
+
+/** Re-render the node at `docPath` and swap it into the DOM in place (disposing the old subtree). */
+function replaceSubtree(
+  doc: JxMutableNode,
+  docPath: JxPath,
+  container: HTMLElement,
+  ctx: IframeRenderCtx,
+): void {
+  const oldEl = requireElement(container, docPath);
+  const newEl = renderSubtreeIframe(doc, docPath, ctx);
+  disposeSubtree(oldEl);
+  oldEl.replaceWith(newEl);
+}
+
 // ─── Structural ops (no subtree render: pure DOM move + data-jx-path remap) ──────
 
-/** Remove the element at `parentPath/children/index` and shift later siblings' paths down by one. */
-function removeChild(parentPath: JxPath, index: number, container: HTMLElement): void {
+/** Remove the element at `parentPath/children/index`, shift later siblings down, dispose its scope. */
+function removeChild(
+  doc: JxMutableNode,
+  parentPath: JxPath,
+  index: number,
+  container: HTMLElement,
+): void {
   const el = requireElement(container, [...parentPath, "children", index]);
+  const parentEl = el.parentElement;
+  disposeSubtree(el);
   el.remove();
   remapChildPaths(container, parentPath, index + 1, -1);
+  if (parentEl) {
+    syncContainerPlaceholder(parentEl, getNodeAtPath(doc, parentPath));
+  }
 }
 
 /**
@@ -100,6 +171,7 @@ function moveChild(
 ): void {
   const fromPath = [...fromParentPath, "children", fromIndex];
   const el = requireElement(container, fromPath);
+  const fromParentEl = el.parentElement;
   // Resolve the destination element before any remap renames it out from under us.
   const toParentEl = requireElement(container, toParentPath);
 
@@ -112,6 +184,30 @@ function moveChild(
 
   const toParentNode = getNodeAtPath(doc, toPrefix);
   insertAt(toParentEl, el, domChildReference(toParentEl, toParentNode, toIndex));
+
+  // Emptiness may have changed at either end (e.g. moved the last/only child out, or into an empty
+  // Container) — keep both parents' placeholder classes in sync with the folded doc.
+  if (fromParentEl) {
+    syncContainerPlaceholder(
+      fromParentEl,
+      getNodeAtPath(doc, elementPath(fromParentEl) ?? fromParentPath),
+    );
+  }
+  syncContainerPlaceholder(toParentEl, toParentNode);
+}
+
+/**
+ * Keep a container's empty-placeholder class in sync with its (folded) doc node after a child
+ * change.
+ */
+function syncContainerPlaceholder(parentEl: Element, parentNode: JxMutableNode | undefined): void {
+  for (const cls of EMPTY_PLACEHOLDER_CLASSES) {
+    parentEl.classList.remove(cls);
+  }
+  const placeholder = parentNode ? computeEmptyPlaceholderClass(parentNode) : null;
+  if (placeholder) {
+    parentEl.classList.add(placeholder);
+  }
 }
 
 /** Insert `node` before `ref`, or append when `ref` is null (inserting at the end). */

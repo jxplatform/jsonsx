@@ -19,9 +19,24 @@ import type { EffectScope } from "../reactivity";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { PathMapCtx } from "./path-mapping";
 
+/**
+ * The retained render context a full render leaves behind so the surgical patcher can re-render an
+ * individual subtree (insert/replace/attr edits) with the SAME scope, doc base, path mapping, and
+ * mode — making a patched subtree indistinguishable from a full re-render.
+ */
+export interface IframeRenderCtx {
+  /** The `$defs` scope built for the document (resolves `$ref`/state/`$media` bindings). */
+  defs: Awaited<ReturnType<typeof buildScope>>;
+  docBase: string;
+  mapperCtx: PathMapCtx;
+  mode: CanvasMode;
+}
+
 export interface RenderHandle {
   /** Stop the render's reactive effect scope (call before re-rendering to avoid effect leaks). */
   dispose: () => void;
+  /** Context for surgical subtree re-renders against this generation's scope/mapping. */
+  ctx: IframeRenderCtx;
 }
 
 interface HeadEntry {
@@ -171,6 +186,7 @@ export async function renderResolvedDocument(opts: {
   // Blocks the render — custom elements auto-upgrade in place once defined.
   void registerElements(opts.doc, opts.docBase);
   return {
+    ctx: { defs: $defs, docBase: opts.docBase, mapperCtx: opts.mapperCtx, mode: opts.mode },
     dispose: () => scope.stop(),
   };
 }

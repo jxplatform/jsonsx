@@ -5,12 +5,32 @@
  * reports a `patchError` and the parent escalates to a full render).
  */
 import "./with-dom.js";
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
+import { buildScope } from "@jxsuite/runtime";
 import { applyIframePatch } from "../src/canvas/iframe-patch";
 import { serializeJxPath } from "../src/canvas/path-mapping";
 import { getNodeAtPath } from "../src/state";
-import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { IframeRenderCtx } from "../src/canvas/iframe-render";
+import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
+
+// A render context for the subtree-render ops (insert / set-child / re-render). The scope is empty
+// (the test nodes carry no `$ref`/state bindings) and the mapper is the unwrapped page-doc default.
+let CTX: IframeRenderCtx;
+beforeAll(async () => {
+  CTX = {
+    defs: await buildScope({} as JxDocument, {}, "http://localhost/"),
+    docBase: "http://localhost/",
+    mapperCtx: {
+      arrayPaths: new Set(),
+      canvasMode: "design",
+      layoutWrapped: false,
+      pageContentOffset: null,
+      pageContentPrefix: null,
+    },
+    mode: "design",
+  };
+});
 
 /**
  * Build a container whose elements carry `data-jx-path` (as the iframe's full render stamps them)
@@ -206,26 +226,16 @@ describe("applyIframePatch — event bindings and escalation", () => {
     expect((shadow.children as JxMutableNode[])[0]!.onclick).toBe("doThing()");
   });
 
-  test("throws on an unsupported set-key key so the caller escalates", () => {
+  test("throws when a subtree-render op arrives without a render context (caller escalates)", () => {
     const { container, shadow } = mount(BASE);
+    // A `set-key` on a key that needs re-rendering, but no ctx passed (e.g. patch before a render).
     expect(() =>
       applyIframePatch(
         shadow,
-        [{ key: "tagName", op: "set-key", path: ["children", 0], value: "h2" }],
+        [{ key: "attributes", op: "set-key", path: ["children", 0], value: { title: "x" } }],
         container,
       ),
-    ).toThrow(/iframe-patch-unsupported-key:tagName/);
-  });
-
-  test("throws on a structural (non set-key) op so the caller escalates", () => {
-    const { container, shadow } = mount(BASE);
-    expect(() =>
-      applyIframePatch(
-        shadow,
-        [{ index: 0, node: { tagName: "b" }, op: "insert-child", parentPath: [] }],
-        container,
-      ),
-    ).toThrow(/iframe-patch-unsupported-op:insert-child/);
+    ).toThrow(/iframe-patch-no-render-ctx/);
   });
 
   test("throws when the target element is missing from the DOM (shadow has it, DOM doesn't)", () => {
@@ -371,6 +381,101 @@ describe("applyIframePatch — move-child", () => {
     expect(
       [...elAt(container, ["children", 1]).children].map((c) => c.tagName.toLowerCase()),
     ).toEqual(["p", "em"]);
+    expectConsistent(container, shadow);
+  });
+});
+
+// ─── Subtree-render ops (Phase 3b-2: insert / set-child / re-render) ─────────────
+
+describe("applyIframePatch — subtree render", () => {
+  test("insert-child renders the new node and splices it in, shifting siblings up", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(
+      shadow,
+      [
+        {
+          index: 1,
+          node: { tagName: "b", textContent: "NEW" },
+          op: "insert-child",
+          parentPath: [],
+        },
+      ],
+      container,
+      CTX,
+    );
+    expect(rootChildTags(container)).toEqual(["p", "b", "span", "div"]);
+    const inserted = elAt(container, ["children", 1]);
+    expect(inserted.tagName.toLowerCase()).toBe("b");
+    expect(inserted.textContent).toBe("NEW");
+    expect(inserted.dataset.jxPath).toBe(serializeJxPath(["children", 1]));
+    expect(elAt(container, ["children", 2]).tagName.toLowerCase()).toBe("span");
+    // The descendant under the shifted div re-paths to children/3.
+    expect(elAt(container, ["children", 3, "children", 0]).tagName.toLowerCase()).toBe("em");
+    expectConsistent(container, shadow);
+  });
+
+  test("set-child re-renders and replaces the node in place", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(
+      shadow,
+      [
+        {
+          index: 0,
+          node: { tagName: "h2", textContent: "Replaced" },
+          op: "set-child",
+          parentPath: [],
+        },
+      ],
+      container,
+      CTX,
+    );
+    expect(rootChildTags(container)).toEqual(["h2", "span", "div"]);
+    const el = elAt(container, ["children", 0]);
+    expect(el.tagName.toLowerCase()).toBe("h2");
+    expect(el.textContent).toBe("Replaced");
+    expectConsistent(container, shadow);
+  });
+
+  test("set-key on a non-style/text key re-renders the node's subtree", () => {
+    const { container, shadow } = mountTree(TREE);
+    applyIframePatch(
+      shadow,
+      [{ key: "attributes", op: "set-key", path: ["children", 0], value: { title: "hi" } }],
+      container,
+      CTX,
+    );
+    const el = elAt(container, ["children", 0]);
+    expect(el.tagName.toLowerCase()).toBe("p"); // Same tag, re-rendered with the new attribute.
+    expect(el.getAttribute("title")).toBe("hi");
+    expect(el.textContent).toBe("a"); // Existing text preserved.
+    expectConsistent(container, shadow);
+  });
+
+  test("inserting into an empty container clears its empty-container placeholder", () => {
+    // A doc whose div child is empty (gets the placeholder class in mountTree-equivalent render).
+    const doc: JxMutableNode = {
+      children: [{ children: [], tagName: "div" }],
+      tagName: "div",
+    } as unknown as JxMutableNode;
+    const { container, shadow } = mountTree(doc);
+    const emptyDiv = elAt(container, ["children", 0]);
+    emptyDiv.classList.add("empty-container-placeholder");
+
+    applyIframePatch(
+      shadow,
+      [
+        {
+          index: 0,
+          node: { tagName: "span", textContent: "x" },
+          op: "insert-child",
+          parentPath: ["children", 0],
+        },
+      ],
+      container,
+      CTX,
+    );
+    expect(emptyDiv.classList.contains("empty-container-placeholder")).toBe(false);
+    expect(elAt(container, ["children", 0, "children", 0]).tagName.toLowerCase()).toBe("span");
     expectConsistent(container, shadow);
   });
 });
