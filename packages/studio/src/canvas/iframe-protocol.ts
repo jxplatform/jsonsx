@@ -68,7 +68,26 @@ export type ParentToIframe =
   // In place. `gen` matches the last render so the iframe drops patches superseded by a re-render.
   | { kind: "patch"; forwardOps: WireDocOp[]; gen: number }
   // Enter inline editing on the node at `path` (used to re-enter after a split/insert re-renders).
-  | { kind: "enterEdit"; path: (string | number)[] };
+  | { kind: "enterEdit"; path: (string | number)[] }
+  // Apply a format/link/insert intent to the iframe's cached selection range (4b-2 format toolbar).
+  // The parent toolbar lives in the parent realm but never touches the iframe Selection — it posts
+  // The author's intent and the iframe applies it where the edited DOM (and its Selection) live.
+  | {
+      kind: "applyFormat";
+      intent:
+        | {
+            command:
+              | "bold"
+              | "italic"
+              | "underline"
+              | "strikethrough"
+              | "subscript"
+              | "superscript"
+              | "code";
+          }
+        | { command: "link"; href: string | null } // Null/"" = remove
+        | { command: "insertData"; token: string };
+    };
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -137,5 +156,27 @@ export type IframeToParent =
       cmd: SlashCommand;
       commitData: JxContentResult | undefined;
     }
+  // A serializable selection snapshot for the parent format toolbar (4b-2). The iframe owns the
+  // Selection; the parent renders pressed-state/position from this and never reads the iframe DOM.
+  | {
+      kind: "selectionChanged";
+      // Monotonic per edit session; the parent drops snapshots with a stale (<=) seq.
+      seq: number;
+      path: (string | number)[];
+      // Strong/em/u/del/sub/sup/code/a active across the WHOLE selection (both endpoints).
+      activeTags: string[];
+      // Caret/selection bbox in IFRAME-VIEWPORT coords (null when unmeasurable).
+      rect: SerializableRect | null;
+      collapsed: boolean;
+      link: { active: boolean; href: string | null };
+      // D-B: always null this phase — repeater item/index merge-tag scope is a follow-up.
+      localScope: null;
+    }
   // The inline-edit session ended.
   | { kind: "editEnd" };
+
+/** The iframe→parent selection snapshot that drives the parent format toolbar. */
+export type SelectionSnapshot = Extract<IframeToParent, { kind: "selectionChanged" }>;
+
+/** The author's format/link/insert intent the parent toolbar posts back to the iframe. */
+export type ApplyFormatIntent = Extract<ParentToIframe, { kind: "applyFormat" }>["intent"];

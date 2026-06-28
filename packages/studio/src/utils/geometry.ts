@@ -14,6 +14,16 @@ export function rectOf(el: Element): DOMRect {
   return el.getBoundingClientRect();
 }
 
+/**
+ * Bounding rect of a Range, in viewport coordinates. Lives here (the one allowlisted home for
+ * `getBoundingClientRect`) so the `geometry.test.ts` textual guard passes — the iframe-side
+ * selection snapshot funnels its caret/selection geometry through this, never calling
+ * `range.getBoundingClientRect()` directly.
+ */
+export function rectOfRange(r: Range): DOMRect {
+  return r.getBoundingClientRect();
+}
+
 /** Topmost element at a viewport point, in `root` (defaults to the global document). */
 export function elementAtPoint(
   x: number,

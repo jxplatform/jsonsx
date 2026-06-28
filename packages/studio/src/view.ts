@@ -44,7 +44,6 @@ interface ViewState {
   } | null;
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
-  savedRange: Range | null;
   _completionRegistered: boolean;
   stylebookElToTag: WeakMap<Element, string>;
   showAddBreakpointForm: boolean;
@@ -97,7 +96,6 @@ export const view: ViewState = {
   layerDragSourceHeight: 0,
 
   // Editor state
-  savedRange: null,
   _completionRegistered: false,
 
   // Canvas / stylebook

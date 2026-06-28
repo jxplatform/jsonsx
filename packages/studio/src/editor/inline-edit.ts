@@ -186,6 +186,24 @@ let insertFn:
 let endFn: (() => void) | null = null; // Function() called when editing stops
 
 /**
+ * When a parent toolbar (or its link popover) may take focus during a live session, the iframe sets
+ * this so {@link handleBlur} does NOT schedule a `stopEditing()` (the BLOCKER focus-loss race fix —
+ * a parent-toolbar click blurs the iframe editable, which must NOT tear the session down). Only an
+ * explicit commit (Escape/Enter/click-away-in-iframe) ends the session while suspended.
+ */
+let _blurCloseSuspended = false;
+
+/** Suspend blur-driven `stopEditing` (call while the parent toolbar/popover may steal focus). */
+export function suspendBlurClose() {
+  _blurCloseSuspended = true;
+}
+
+/** Resume blur-driven `stopEditing` (call on real editEnd/teardown). */
+export function resumeBlurClose() {
+  _blurCloseSuspended = false;
+}
+
+/**
  * Check if an element is a text-bearing editable block.
  *
  * @param {HTMLElement} el
@@ -254,7 +272,9 @@ export function startEditing(
   },
 ) {
   if (activeEl) {
-    stopEditing();
+    // Re-enter (e.g. after a split/insert re-render): tear the old session down WITHOUT firing the
+    // User-visible `onEnd` — a re-enter must not reset the parent toolbar via a stray `editEnd`.
+    stopEditing(true);
   }
 
   activeEl = el;
@@ -288,8 +308,13 @@ export function startEditing(
   el.addEventListener("paste", handlePaste);
 }
 
-/** Stop editing and commit changes. */
-export function stopEditing() {
+/**
+ * Stop editing and commit changes. Pass `silent` to skip the `onEnd` callback (used by the re-enter
+ * path so a stop→start sequence doesn't post a user-visible `editEnd`).
+ *
+ * @param {boolean} [silent]
+ */
+export function stopEditing(silent = false) {
   if (!activeEl) {
     return;
   }
@@ -314,7 +339,9 @@ export function stopEditing() {
   splitFn = null;
   insertFn = null;
 
-  if (endFn) {
+  if (silent) {
+    endFn = null;
+  } else if (endFn) {
     const fn = endFn;
     endFn = null;
     fn();
@@ -419,8 +446,17 @@ function handleBlur(_e: FocusEvent) {
     return;
   }
 
+  // The parent format toolbar/link popover may have taken focus across the bridge — blur must NOT
+  // Tear the session down (Phase 4b-2 focus-loss BLOCKER). Only an explicit commit ends it.
+  if (_blurCloseSuspended) {
+    return;
+  }
+
   // Delay to allow click events to fire
   setTimeout(() => {
+    if (_blurCloseSuspended) {
+      return;
+    }
     if (activeEl && document.activeElement !== activeEl) {
       stopEditing();
     }

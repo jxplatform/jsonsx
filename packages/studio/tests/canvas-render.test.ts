@@ -123,8 +123,12 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
 }));
 
 void mock.module("../src/canvas/iframe-host.js", () => ({
+  getEditBarAnchorRect: () => null,
+  getEditSnapshot: () => ({ editing: false, snapshot: null }),
   mountIframeCanvas: (gen: number, doc: JxMutableNode, canvas: HTMLElement) =>
     iframeImpl(gen, doc, canvas),
+  postApplyFormat: () => {},
+  setToolbarRefresh: () => {},
 }));
 
 void mock.module("../src/panels/welcome-screen.js", () => ({

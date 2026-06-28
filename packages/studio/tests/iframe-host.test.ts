@@ -1,8 +1,10 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { flush, resetWorkspaceWithTab } from "./harness";
+import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
+import { canvasPanels } from "../src/store";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
+import type { CanvasPanel } from "../src/panels/canvas-dnd";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -57,8 +59,16 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
   resolveCanvasDocument: () => Promise.resolve(resolved),
 }));
 
-const { mountIframeCanvas, postPatchToHosts, setIframePatchEscalation } =
-  await import("../src/canvas/iframe-host");
+const {
+  getActiveEditHost,
+  getEditBarAnchorRect,
+  getEditSnapshot,
+  mountIframeCanvas,
+  postApplyFormat,
+  postPatchToHosts,
+  setIframePatchEscalation,
+  setToolbarRefresh,
+} = await import("../src/canvas/iframe-host");
 
 beforeEach(() => {
   channels.length = 0;
@@ -393,5 +403,201 @@ describe("iframe canvas inline-edit bridge", () => {
     });
     expect(docChildren()[1]!.tagName).toBe("h2");
     expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+});
+
+// ─── Format-toolbar bridge: editing state + snapshot + applyFormat (Phase 4b-2) ──
+
+describe("iframe canvas format-toolbar bridge", () => {
+  let refreshCount = 0;
+
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+    refreshCount = 0;
+    setToolbarRefresh(() => {
+      refreshCount += 1;
+    });
+  });
+
+  /** End any active edit session so module-global `activeEditHost` starts clean per test. */
+  function endActiveSession() {
+    const host = getActiveEditHost();
+    if (host) {
+      // Find this host's channel and deliver an editEnd through it.
+      for (const ch of channels) {
+        ch.deliver({ kind: "editEnd" });
+      }
+    }
+  }
+
+  test("editStart sets editing, makes the active host, and calls the refresh spy", async () => {
+    await mountReady();
+    expect(getEditSnapshot().editing).toBe(false);
+
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    expect(getEditSnapshot().editing).toBe(true);
+    expect(getActiveEditHost()).not.toBeNull();
+    expect(refreshCount).toBeGreaterThan(0);
+    endActiveSession();
+  });
+
+  test("selectionChanged stores the snapshot and drops a stale (<= seq) one", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+
+    channels[0]!.deliver({
+      activeTags: ["strong"],
+      collapsed: false,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: { height: 10, width: 20, x: 1, y: 2 },
+      seq: 2,
+    });
+    expect(getEditSnapshot().snapshot?.activeTags).toEqual(["strong"]);
+
+    // A stale (lower seq) snapshot is ignored.
+    channels[0]!.deliver({
+      activeTags: ["em"],
+      collapsed: false,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: null,
+      seq: 1,
+    });
+    expect(getEditSnapshot().snapshot?.activeTags).toEqual(["strong"]);
+    endActiveSession();
+  });
+
+  test("editEnd clears editing and the active host; a superseded editEnd is ignored", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    expect(getEditSnapshot().editing).toBe(true);
+
+    channels[0]!.deliver({ kind: "editEnd" });
+    expect(getEditSnapshot().editing).toBe(false);
+    expect(getActiveEditHost()).toBeNull();
+
+    // A second (superseded) editEnd is a no-op (does not throw, stays cleared).
+    refreshCount = 0;
+    channels[0]!.deliver({ kind: "editEnd" });
+    expect(refreshCount).toBe(0);
+  });
+
+  test("postApplyFormat posts an applyFormat intent to the active edit host", async () => {
+    await mountReady();
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    channels[0]!.posts.length = 0;
+
+    postApplyFormat({ command: "bold" });
+    expect(channels[0]!.posts).toContainEqual({ intent: { command: "bold" }, kind: "applyFormat" });
+    endActiveSession();
+  });
+
+  test("postApplyFormat is a no-op when no session is active", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    postApplyFormat({ command: "bold" });
+    expect(channels[0]!.posts.some((p) => p.kind === "applyFormat")).toBe(false);
+  });
+
+  test("getEditBarAnchorRect adds the iframe viewport offset to the snapshot rect", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 100, top: 50, width: 800 });
+
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    channels[0]!.deliver({
+      activeTags: [],
+      collapsed: false,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: { height: 12, width: 30, x: 7, y: 8 },
+      seq: 1,
+    });
+
+    expect(getEditBarAnchorRect()).toEqual({ height: 12, left: 107, top: 58, width: 30 });
+    endActiveSession();
+  });
+
+  test("getEditBarAnchorRect returns null with no active edit host", async () => {
+    await mountReady();
+    expect(getEditBarAnchorRect()).toBeNull();
+  });
+
+  test("getEditBarAnchorRect falls back to the last selection rect + iframe offset", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 200, top: 60, width: 800 });
+
+    // A hit stores lastSelectionRect (overlay-local) on the host.
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 14, width: 40, x: 5, y: 9 } },
+      kind: "hit",
+    });
+    // Editing with a snapshot that has a NULL rect → anchor falls back to lastSelectionRect.
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    channels[0]!.deliver({
+      activeTags: [],
+      collapsed: true,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: null,
+      seq: 1,
+    });
+
+    expect(getEditBarAnchorRect()).toEqual({ height: 14, left: 205, top: 69, width: 40 });
+    endActiveSession();
+  });
+
+  test("getEditBarAnchorRect positions from the active panel's selection rect when NOT editing", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 200, top: 60, width: 800 });
+    // The structural bar (badge/move/convert) must position on a plain selection with no edit
+    // Session: register the panel so the host resolves via getActivePanel, deliver a hit (no
+    // EditStart), and confirm the anchor comes from the host's lastSelectionRect + iframe offset.
+    canvasPanels.push({ canvas: canvasEl, mediaName: "base" } as unknown as CanvasPanel);
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 14, width: 40, x: 5, y: 9 } },
+      kind: "hit",
+    });
+
+    expect(getActiveEditHost()).toBeNull();
+    expect(getEditBarAnchorRect()).toEqual({ height: 14, left: 205, top: 69, width: 40 });
+    canvasPanels.length = 0;
+  });
+
+  test("multi-panel: editStart on host B (not the active-media A) reflects B everywhere", async () => {
+    const canvasA = await mountReady();
+    const chA = channels[0]!;
+    const canvasB = document.createElement("div");
+    document.body.append(canvasB);
+    await mountIframeCanvas(1, {} as never, canvasB);
+    const chB = channels[1]!;
+    chB.deliver({ kind: "ready" });
+
+    // A starts editing, then B takes over.
+    chA.deliver({ kind: "editStart", path: ["children", 0] });
+    chB.deliver({ kind: "editStart", path: ["children", 1] });
+
+    expect(getEditSnapshot().editing).toBe(true);
+
+    chB.posts.length = 0;
+    postApplyFormat({ command: "italic" });
+    // The intent goes to B (the active edit host), not A.
+    expect(chB.posts).toContainEqual({ intent: { command: "italic" }, kind: "applyFormat" });
+    expect(chA.posts.some((p) => p.kind === "applyFormat")).toBe(false);
+
+    canvasA.remove();
+    canvasB.remove();
+    endActiveSession();
   });
 });

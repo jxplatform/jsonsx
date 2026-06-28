@@ -2,7 +2,7 @@ import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { elementAtPoint, elementsAtPoint, rectOf } from "../src/utils/geometry";
+import { elementAtPoint, elementsAtPoint, rectOf, rectOfRange } from "../src/utils/geometry";
 
 describe("geometry funnel helpers", () => {
   test("rectOf returns the element's bounding rect", () => {
@@ -22,6 +22,27 @@ describe("geometry funnel helpers", () => {
     const marker = document.createElement("span");
     const root = { elementsFromPoint: () => [marker] } as unknown as Document;
     expect(elementsAtPoint(10, 20, root)).toEqual([marker]);
+  });
+
+  test("rectOfRange returns a rect with the DOMRect shape", () => {
+    // Happy-dom returns a zero rect for ranges, so assert the SHAPE (keys) — not non-zero values.
+    const el = document.createElement("p");
+    el.textContent = "hello";
+    document.body.append(el);
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const rect = rectOfRange(range);
+    expect(rect).toHaveProperty("x");
+    expect(rect).toHaveProperty("y");
+    expect(rect).toHaveProperty("width");
+    expect(rect).toHaveProperty("height");
+    el.remove();
+  });
+
+  test("rectOfRange delegates to the range's getBoundingClientRect", () => {
+    const fake = { height: 9, width: 8, x: 6, y: 7 } as DOMRect;
+    const range = { getBoundingClientRect: () => fake } as unknown as Range;
+    expect(rectOfRange(range)).toBe(fake);
   });
 });
 

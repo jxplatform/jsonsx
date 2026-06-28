@@ -15,20 +15,27 @@ import {
   applyInlineSplit,
 } from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
+import { getActivePanel } from "./canvas-helpers";
+import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual } from "../store";
 import { activeTab } from "../workspace/workspace";
 import type {
+  ApplyFormatIntent,
   CanvasMode,
   IframeToParent,
   NodeHit,
   ParentToIframe,
+  SelectionSnapshot,
   SerializedKey,
   WireDocOp,
 } from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
-import type { OverlayLayer } from "./iframe-overlay";
+import type { OverlayLayer, OverlayPlacement } from "./iframe-overlay";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+
+/** A rect in PARENT coordinates (overlay-local from {@link canvasRectToParent}, same field shape). */
+type ParentRect = OverlayPlacement;
 
 interface HostState {
   iframe: HTMLIFrameElement;
@@ -40,12 +47,35 @@ interface HostState {
   selectionPath: (string | number)[] | null;
   /** Id of the most recent selection `measure` request, so stale `geometry` replies are dropped. */
   selReqId: number;
+  /** Whether an inline-edit session is live in this host's iframe (drives the format toolbar). */
+  editing: boolean;
+  /** The latest selection snapshot from this host's iframe (active tags + caret rect + link). */
+  snapshot: SelectionSnapshot | null;
+  /** Highest snapshot `seq` seen, so stale (re-ordered) snapshots are dropped. */
+  lastSnapshotSeq: number;
+  /** The last non-null selection rect drawn (parent/overlay coords) — toolbar position fallback. */
+  lastSelectionRect: ParentRect | null;
 }
 
 const hosts = new WeakMap<HTMLElement, HostState>();
 
 /** Every live host, so the selection watcher can re-measure each one when selection changes. */
 const liveHosts = new Set<HostState>();
+
+/**
+ * The single host whose iframe currently owns the inline-edit session. Only one editable can be
+ * active across all panels, so the parent format toolbar reads/writes through this (fixes the
+ * multi-panel bug where two hosts' editing state could fight).
+ */
+let activeEditHost: HostState | null = null;
+
+/** Injected toolbar re-render (set by studio.ts → renderBlockActionBar); avoids a panel→host cycle. */
+let toolbarRefresh: (() => void) | null = null;
+
+/** Register the parent toolbar's refresh fn (mirrors {@link setIframePatchEscalation}). */
+export function setToolbarRefresh(fn: () => void): void {
+  toolbarRefresh = fn;
+}
 
 let selectionWatch: { stop: () => void } | null = null;
 
@@ -150,12 +180,16 @@ function ensureHost(canvasEl: HTMLElement): HostState {
 
   const state: HostState = {
     channel,
+    editing: false,
     iframe,
+    lastSelectionRect: null,
+    lastSnapshotSeq: 0,
     overlay,
     pending: null,
     ready: false,
     selectionPath: null,
     selReqId: 0,
+    snapshot: null,
   };
   channel.onMessage((msg) => handleMessage(state, msg));
   hosts.set(canvasEl, state);
@@ -185,7 +219,11 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         tab.session.selection = msg.hit.path;
       }
       // Draw immediately from the posted rect for snappiness (the measure round-trip confirms it).
-      state.overlay.setSelection(canvasRectToParent(msg.hit.rect));
+      {
+        const rect = canvasRectToParent(msg.hit.rect);
+        state.overlay.setSelection(rect);
+        state.lastSelectionRect = rect;
+      }
       return;
     }
     case "hover": {
@@ -195,7 +233,11 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     case "geometry": {
       if (msg.reqId === state.selReqId) {
         const [hit] = msg.hits;
-        state.overlay.setSelection(hit ? canvasRectToParent(hit.rect) : null);
+        const rect = hit ? canvasRectToParent(hit.rect) : null;
+        state.overlay.setSelection(rect);
+        if (rect) {
+          state.lastSelectionRect = rect;
+        }
       }
       return;
     }
@@ -216,7 +258,27 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "editStart": {
-      // Inline editing began in the iframe. The format toolbar bridge hooks in here (a later step).
+      // Inline editing began in this host's iframe. Only one editable is active across all panels —
+      // Tear down any other host's editing state and make this the single active edit host.
+      if (activeEditHost && activeEditHost !== state) {
+        activeEditHost.editing = false;
+        activeEditHost.snapshot = null;
+      }
+      activeEditHost = state;
+      state.editing = true;
+      state.snapshot = null;
+      state.lastSnapshotSeq = 0;
+      toolbarRefresh?.();
+      return;
+    }
+    case "selectionChanged": {
+      // Drop stale (re-ordered) snapshots; otherwise store the latest and refresh the toolbar.
+      if (msg.seq <= state.lastSnapshotSeq) {
+        return;
+      }
+      state.lastSnapshotSeq = msg.seq;
+      state.snapshot = msg;
+      toolbarRefresh?.();
       return;
     }
     case "editCommit": {
@@ -234,6 +296,17 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "editEnd": {
+      // Ignore a superseded late editEnd (a re-enter's stop→start can deliver a stale one): only act
+      // When this host is still the one editing.
+      if (!state.editing) {
+        return;
+      }
+      state.editing = false;
+      state.snapshot = null;
+      if (activeEditHost === state) {
+        activeEditHost = null;
+      }
+      toolbarRefresh?.();
       return;
     }
     default: {
@@ -310,4 +383,73 @@ export async function mountIframeCanvas(
   } else {
     state.pending = message;
   }
+}
+
+// ─── Format-toolbar bridge (Phase 4b-2) ─────────────────────────────────────────
+
+/** The host whose iframe currently owns the inline-edit session (or null). */
+export function getActiveEditHost(): HostState | null {
+  return activeEditHost;
+}
+
+/** The current edit session's editing flag + latest selection snapshot, for the parent toolbar. */
+export function getEditSnapshot(): { editing: boolean; snapshot: SelectionSnapshot | null } {
+  if (!activeEditHost) {
+    return { editing: false, snapshot: null };
+  }
+  return { editing: activeEditHost.editing, snapshot: activeEditHost.snapshot };
+}
+
+/** Post an `applyFormat` intent to the active edit host's iframe (no-op when none/not ready). */
+export function postApplyFormat(intent: ApplyFormatIntent): void {
+  const host = activeEditHost;
+  if (!host || !host.ready) {
+    return;
+  }
+  host.channel.post({ intent, kind: "applyFormat" });
+}
+
+/** The live host backing the active panel's canvas (for non-edit selection-bar positioning). */
+function hostForActivePanel(): HostState | null {
+  const panel = getActivePanel();
+  return panel ? (hosts.get(panel.canvas as HTMLElement) ?? null) : null;
+}
+
+/**
+ * The format toolbar's anchor rect, in PARENT-VIEWPORT space (the bar is `position:fixed`). The
+ * snapshot's rect is in IFRAME-VIEWPORT coords; convert by the same zoom `scale`
+ * {@link canvasRectToParent} uses (always 1 in edit mode) and add the iframe's own viewport offset.
+ * Falls back to the last selection rect mapped to viewport, else null.
+ */
+export function getEditBarAnchorRect(): ParentRect | null {
+  // The format toolbar follows the live caret/selection snapshot of the active edit session; the
+  // Structural bar (tag badge / parent selector / move / convert / drag handle) must still position
+  // On a plain selection with no inline-edit session, so fall back to the active panel's host and
+  // Its last measured selection rect.
+  const editHost = activeEditHost;
+  const host = editHost ?? hostForActivePanel();
+  if (!host) {
+    return null;
+  }
+  const ifr = rectOf(host.iframe);
+  const scale = 1;
+  const snapRect = host === editHost ? host.snapshot?.rect : null;
+  if (snapRect) {
+    return {
+      height: snapRect.height * scale,
+      left: snapRect.x * scale + ifr.left,
+      top: snapRect.y * scale + ifr.top,
+      width: snapRect.width * scale,
+    };
+  }
+  if (host.lastSelectionRect) {
+    // The fallback rect is overlay-local (same top-left as the iframe) → add the iframe offset.
+    return {
+      height: host.lastSelectionRect.height,
+      left: host.lastSelectionRect.left + ifr.left,
+      top: host.lastSelectionRect.top + ifr.top,
+      width: host.lastSelectionRect.width,
+    };
+  }
+  return null;
 }

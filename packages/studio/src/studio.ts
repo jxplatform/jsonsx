@@ -39,7 +39,7 @@ import {
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
-import { setIframePatchEscalation } from "./canvas/iframe-host";
+import { setIframePatchEscalation, setToolbarRefresh } from "./canvas/iframe-host";
 import { registerSubtreeDnD } from "./panels/canvas-dnd";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
@@ -100,7 +100,7 @@ import { renderStylebookOverlays } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { defaultDef } from "./panels/shared";
 import { registerFunctionCompletions } from "./panels/editors";
-import { renderBlockActionBar, initBlockActionBar } from "./panels/block-action-bar";
+import { initBlockActionBar, renderBlockActionBar } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
 import { initQuickSearch } from "./panels/quick-search";
@@ -359,6 +359,8 @@ initBlockActionBar({
   getCanvasMode,
   navigateToComponent,
 });
+// The iframe's re-emitted selection snapshot drives the parent format toolbar refresh (4b-2).
+setToolbarRefresh(renderBlockActionBar);
 
 initCanvasHelpers({
   getCanvasMode,
