@@ -50,8 +50,6 @@ const applyTransform = mock(() => {});
 const positionZoomIndicator = mock(() => {});
 const saveFile = mock(() => {});
 const openProject = mock(() => {});
-const enterEditOnPath = mock((_path: unknown) => {});
-let componentInlineEdit: Record<string, unknown> | null = null;
 
 function freshDoc() {
   return {
@@ -92,8 +90,6 @@ beforeAll(() => {
   initShortcuts(() => ({
     applyTransform,
     canvasMode,
-    componentInlineEdit,
-    enterEditOnPath,
     openProject,
     panX,
     panY,
@@ -107,14 +103,12 @@ beforeEach(() => {
   canvasMode = "design";
   panX = 0;
   panY = 0;
-  componentInlineEdit = null;
   for (const m of [
     setPan,
     applyTransform,
     positionZoomIndicator,
     saveFile,
     openProject,
-    enterEditOnPath,
     openQuickSearch,
     copyNode,
     cutNode,
@@ -340,21 +334,6 @@ describe("keydown guards", () => {
     stopEditing();
     p.remove();
   });
-
-  test("ctrl+s with componentInlineEdit active saves", () => {
-    componentInlineEdit = { el: document.body };
-    pressDoc("s", { ctrlKey: true });
-    expect(saveFile).toHaveBeenCalledTimes(1);
-  });
-
-  test("ctrl+w with componentInlineEdit active is prevented, other keys ignored", () => {
-    componentInlineEdit = { el: document.body };
-    const e = pressDoc("w", { ctrlKey: true });
-    expect(e.defaultPrevented).toBe(true);
-    activeTab.value!.session.selection = ["children", 0];
-    pressDoc("Escape");
-    expect(activeTab.value!.session.selection).toEqual(["children", 0]);
-  });
 });
 
 // ─── Keydown: mod shortcuts ───────────────────────────────────────────────────
@@ -498,15 +477,16 @@ describe("plain shortcuts", () => {
     expect(activeTab.value!.session.selection).toBeNull();
   });
 
-  test("Enter inserts a paragraph after the selection and enters edit", () => {
+  test("Enter inserts a paragraph after the selection and selects it", () => {
     const tab = activeTab.value!;
     tab.session.selection = ["children", 0];
     pressDoc("Enter");
     const children = tab.doc.document.children as { tagName?: string; textContent?: string }[];
     expect(children.length).toBe(4);
     expect(children[1]).toEqual({ tagName: "p", textContent: "" });
+    // The new node is selected; the iframe canvas re-enters inline edit for it via its own posted
+    // EnterEdit flow (no parent-side enterEditOnPath callback anymore).
     expect(tab.session.selection).toEqual(["children", 1]);
-    expect(enterEditOnPath).toHaveBeenCalledWith(["children", 1]);
   });
 
   test("ArrowDown moves selection to the next sibling", () => {

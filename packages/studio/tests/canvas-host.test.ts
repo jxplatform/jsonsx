@@ -9,17 +9,23 @@ afterEach(() => {
   happyDOM.setURL("http://localhost:3000/");
 });
 
-describe("canvasHost", () => {
-  test("defaults to legacy-div with no override or URL param", () => {
+describe("isIframeCanvas", () => {
+  test("is unconditionally true — the iframe is the only canvas now", () => {
     happyDOM.setURL("http://localhost:3000/");
-    expect(canvasHost()).toBe("legacy-div");
-    expect(isIframeCanvas()).toBe(false);
+    expect(isIframeCanvas()).toBe(true);
+    // The legacy host machinery is retained only for the patch-wire test's override; it no longer
+    // Influences whether the iframe canvas is used.
+    happyDOM.setURL("http://localhost:3000/?canvasHost=legacy-div");
+    expect(isIframeCanvas()).toBe(true);
+    setCanvasHostOverride("legacy-div");
+    expect(isIframeCanvas()).toBe(true);
   });
+});
 
+describe("canvasHost (legacy override plumbing, retained for the patch-wire test)", () => {
   test("the override forces the value and clearing falls back to default", () => {
     setCanvasHostOverride("iframe");
     expect(canvasHost()).toBe("iframe");
-    expect(isIframeCanvas()).toBe(true);
     setCanvasHostOverride(null);
     expect(canvasHost()).toBe("legacy-div");
   });
@@ -27,12 +33,6 @@ describe("canvasHost", () => {
   test("?canvasHost=iframe selects the iframe host", () => {
     happyDOM.setURL("http://localhost:3000/?canvasHost=iframe");
     expect(canvasHost()).toBe("iframe");
-    expect(isIframeCanvas()).toBe(true);
-  });
-
-  test("?canvasHost=legacy-div is honored explicitly", () => {
-    happyDOM.setURL("http://localhost:3000/?canvasHost=legacy-div");
-    expect(canvasHost()).toBe("legacy-div");
   });
 
   test("an invalid ?canvasHost value falls back to the default", () => {

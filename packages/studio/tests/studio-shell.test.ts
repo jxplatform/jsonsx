@@ -11,7 +11,6 @@ import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { view } from "../src/view";
-import { canvasPanels } from "../src/store";
 import { resetZoom } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
 
@@ -710,45 +709,6 @@ describe("shortcuts context", () => {
     expect(view.panX).toBe(12);
     expect(view.panY).toBe(34);
     expect(view.needsCenter).toBe(false);
-  });
-
-  test("enterEditOnPath defers via rAF and tolerates a missing canvas panel", async () => {
-    openShellTab();
-    const origRaf = globalThis.requestAnimationFrame;
-    let ran = false;
-    (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
-      ran = true;
-      cb(0);
-      return 0;
-    };
-    try {
-      const ctx = shortcutsGet!();
-      expect(() => ctx.enterEditOnPath(["children", 0])).not.toThrow();
-    } finally {
-      globalThis.requestAnimationFrame = origRaf;
-    }
-    expect(ran).toBe(true);
-  });
-
-  test("enterEditOnPath resolves the element through the active canvas panel", () => {
-    openShellTab();
-    const canvas = document.createElement("div");
-    canvas.innerHTML = "<div><jx-widget>nope</jx-widget></div>";
-    canvasPanels.push({ canvas, mediaName: "base" } as any);
-    const origRaf = globalThis.requestAnimationFrame;
-    (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
-      cb(0);
-      return 0;
-    };
-    try {
-      const ctx = shortcutsGet!();
-      // Path resolves to <jx-widget>, which is not an editable block — no edit session starts.
-      expect(() => ctx.enterEditOnPath(["children", 0])).not.toThrow();
-      expect(view.componentInlineEdit).toBeNull();
-    } finally {
-      globalThis.requestAnimationFrame = origRaf;
-      canvasPanels.length = 0;
-    }
   });
 });
 

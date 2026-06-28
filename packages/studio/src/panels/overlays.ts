@@ -4,27 +4,11 @@
  * bar rendering to studio.js via ctx callback.
  */
 
-import { html, render as litRender, nothing } from "lit-html";
-import { styleMap } from "lit-html/directives/style-map.js";
-import { canvasPanels, pathsEqual } from "../store";
+import { render as litRender, nothing } from "lit-html";
+import { canvasPanels } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { view } from "../view";
-import { effectiveZoom, findCanvasElement, getActivePanel } from "../canvas/canvas-helpers";
-import { layoutElements } from "../canvas/canvas-live-render";
-import { isIframeCanvas } from "../canvas/canvas-host";
-import { rectOf } from "../utils/geometry";
 import type { EffectScope } from "@vue/reactivity";
-
-interface OverlayBox {
-  cls: string;
-  top: string;
-  left: string;
-  width: string;
-  height: string;
-  border?: string;
-  isLayout?: boolean;
-}
 
 interface OverlaysCtx {
   getCanvasMode: () => string;
@@ -86,123 +70,13 @@ function _flush() {
   if (!tab) {
     return;
   }
-  const { selection, hover } = tab.session;
-  const { stylebookTab } = tab.session.ui;
-  const canvasMode = _ctx.getCanvasMode();
 
-  if (isIframeCanvas()) {
-    // The iframe owns hit-testing and draws its own selection/hover overlays (from posted rects).
-    // Disable the legacy click-catcher so pointer events reach the iframe, and skip legacy box
-    // Drawing (findCanvasElement can't see nodes across the frame boundary).
-    for (const p of canvasPanels) {
-      litRender(nothing, p.overlay);
-      p.overlayClk.style.pointerEvents = "none";
-    }
-    return;
-  }
-
-  if (canvasMode !== "design" && canvasMode !== "edit" && canvasMode !== "stylebook") {
-    for (const p of canvasPanels) {
-      litRender(nothing, p.overlay);
-      p.overlayClk.style.pointerEvents = "none";
-    }
-    if (view.selDragCleanup) {
-      view.selDragCleanup();
-      view.selDragCleanup = null;
-    }
-    return;
-  }
-
-  if (canvasMode === "stylebook") {
-    const enable = stylebookTab === "elements";
-    for (const p of canvasPanels) {
-      p.overlayClk.style.pointerEvents = enable ? "" : "none";
-    }
-    return;
-  }
-
+  // The iframe owns hit-testing and draws its own selection/hover overlays (from posted rects).
+  // Clear any parent-side overlay layer and disable the legacy click-catcher so pointer events
+  // Reach the iframe.
   for (const p of canvasPanels) {
-    p.overlayClk.style.pointerEvents = view.componentInlineEdit || _ctx.isEditing() ? "none" : "";
-  }
-
-  if (view.selDragCleanup) {
-    view.selDragCleanup();
-    view.selDragCleanup = null;
-  }
-
-  for (const p of canvasPanels) {
-    const boxes: OverlayBox[] = [];
-
-    // Batch layout reads: read viewport geometry once per panel
-    if (!p.viewport) {
-      continue;
-    }
-    const vpRect = rectOf(p.viewport);
-    const { scrollTop } = p.viewport;
-    const { scrollLeft } = p.viewport;
-    const scale = effectiveZoom();
-
-    if (hover && !pathsEqual(hover, selection)) {
-      const el = findCanvasElement(hover, p.canvas);
-      if (el) {
-        const elRect = rectOf(el);
-        const desc: OverlayBox = {
-          cls: "overlay-box overlay-hover",
-          height: `${elRect.height / scale}px`,
-          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
-          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
-          width: `${elRect.width / scale}px`,
-        };
-        if (layoutElements.has(el)) {
-          desc.isLayout = true;
-        }
-        boxes.push(desc);
-      }
-    }
-
-    if (selection && p === getActivePanel()) {
-      const el = findCanvasElement(selection, p.canvas);
-      if (el) {
-        const elRect = rectOf(el);
-        const desc: OverlayBox = {
-          cls: "overlay-box overlay-selection",
-          height: `${elRect.height / scale}px`,
-          left: `${(elRect.left - vpRect.left + scrollLeft) / scale}px`,
-          top: `${(elRect.top - vpRect.top + scrollTop) / scale}px`,
-          width: `${elRect.width / scale}px`,
-        };
-        if (view.componentInlineEdit || _ctx.isEditing()) {
-          desc.border = "none";
-        }
-        if (layoutElements.has(el)) {
-          desc.isLayout = true;
-        }
-        boxes.push(desc);
-      }
-    }
-
-    litRender(
-      html`
-        ${p.dropLine}
-        ${boxes.map(
-          (b) => html`
-            <div
-              class="${b.cls}${b.isLayout ? " overlay-layout" : ""}"
-              style=${styleMap({
-                border: b.border,
-                height: b.height,
-                left: b.left,
-                top: b.top,
-                width: b.width,
-              })}
-            >
-              ${b.isLayout ? html`<span class="overlay-layout-badge">Layout</span>` : nothing}
-            </div>
-          `,
-        )}
-      `,
-      p.overlay,
-    );
+    litRender(nothing, p.overlay);
+    p.overlayClk.style.pointerEvents = "none";
   }
 
   _ctx.renderBlockActionBar();

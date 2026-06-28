@@ -6,7 +6,6 @@
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { canvasPanels, elToPath } from "../src/store";
-import { view } from "../src/view";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { getPatchConsumer, setPatchConsumer } from "../src/tabs/patch-ops";
 import {
@@ -18,7 +17,6 @@ import {
 } from "../src/canvas/canvas-patcher";
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
 import { setCanvasHostOverride } from "../src/canvas/canvas-host";
-import { makePathMapper } from "../src/canvas/canvas-live-render";
 import { toRaw } from "../src/reactivity";
 
 import type { CanvasPanel } from "../src/types";
@@ -36,7 +34,6 @@ let emEl: HTMLElement;
 let canvasMode = "design";
 const ctxCalls = {
   dndRegistered: 0,
-  inlineEdits: [] as unknown[],
   overlays: 0,
   pseudo: 0,
   scheduled: 0,
@@ -54,7 +51,6 @@ beforeEach(() => {
   resetCanvasPerf();
   canvasMode = "design";
   ctxCalls.dndRegistered = 0;
-  ctxCalls.inlineEdits = [];
   ctxCalls.overlays = 0;
   ctxCalls.pseudo = 0;
   ctxCalls.scheduled = 0;
@@ -96,19 +92,6 @@ beforeEach(() => {
   panel = {
     activeBreakpoints: new Set<string>(),
     canvas,
-    liveCtx: {
-      canvasMode: "design",
-      layoutWrapped: false,
-      arrayPaths: new Set(),
-      pageContentPrefix: null,
-      pathMapper: makePathMapper({
-        canvasMode: "design",
-        layoutWrapped: false,
-        arrayPaths: new Set(),
-        pageContentPrefix: null,
-      }),
-      scope: {},
-    },
     mediaName: "",
     ready: true,
   } as unknown as CanvasPanel;
@@ -116,9 +99,6 @@ beforeEach(() => {
 
   initCanvasPatcher({
     applyCanvasMediaOverrides: () => {},
-    enterComponentInlineEdit: (el, path) => {
-      ctxCalls.inlineEdits.push([el, path]);
-    },
     getCanvasMode: () => canvasMode,
     registerSubtreeDnD: () => {
       ctxCalls.dndRegistered += 1;
@@ -246,24 +226,6 @@ describe("classifyOps", () => {
       "structure-in-custom-element",
     );
   });
-
-  test("rejects structural ops while an inline edit session is live", () => {
-    view.componentInlineEdit = {
-      el: pEl,
-      mediaName: null,
-      originalText: "hello",
-      path: ["children", 0],
-    };
-    try {
-      expect(classifyOps(tab, [{ op: "remove", path: ["children", 1] }]).reason).toBe(
-        "inline-edit-active",
-      );
-      // Non-structural ops are still fine during inline editing
-      expect(classifyOps(tab, [{ op: "set-style", path: ["children", 1] }]).patchable).toBe(true);
-    } finally {
-      view.componentInlineEdit = null;
-    }
-  });
 });
 
 describe("consumed-document handshake", () => {
@@ -311,10 +273,10 @@ describe("iframe canvas host gating", () => {
     );
   });
 
-  test("admits patches with a null liveCtx — the real iframe-mode panel state", () => {
-    // In iframe mode the parent never runs the legacy render, so the panel has no `liveCtx`. The
-    // Classifier must NOT reject on that (it did once, escalating every iframe edit to a full render).
-    panel.liveCtx = null;
+  test("admits patches on a panel with no parent-side render context — iframe-mode panel state", () => {
+    // In iframe mode the parent never runs a legacy in-realm render, so the panel holds no
+    // Parent-side render scope; classification keys only off `ready`, never escalating on its
+    // Absence (it did once, escalating every iframe edit to a full render).
     expect(classifyOps(tab, [{ op: "set-style", path: ["children", 0] }]).patchable).toBe(true);
     expect(classifyOps(tab, [{ op: "remove", path: ["children", 0] }]).patchable).toBe(true);
     expect(classifyOps(tab, [{ index: 0, op: "insert", parentPath: [] }]).patchable).toBe(true);

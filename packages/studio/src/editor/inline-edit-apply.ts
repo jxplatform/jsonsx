@@ -1,10 +1,10 @@
 /// <reference lib="dom" />
 /**
  * Inline-edit apply logic — turns the serializable result of a contenteditable session (committed
- * children/text, a split, or a slash-insert) into `transactDoc` mutations. Extracted from
- * `content-inline-edit.ts` so the SAME apply runs whether the editing session lives in the editor
- * realm (legacy `<div>` canvas) or inside the canvas iframe (which posts these results across the
- * bridge). Every input here is plain JSON — no DOM, no Range — so it crosses the frame boundary.
+ * children/text, a split, or a slash-insert) into `transactDoc` mutations. The inline editing
+ * session lives inside the canvas iframe, which posts these plain-JSON results across the bridge
+ * for this apply. Every input here is plain JSON — no DOM, no Range — so it crosses the frame
+ * boundary.
  */
 
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";

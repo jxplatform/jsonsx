@@ -32,7 +32,6 @@ interface CanvasPatcherCtx {
   applyCanvasMediaOverrides: (canvasEl: Element, activeBreakpoints: Set<string>) => void;
   renderOverlays: () => void;
   updateForcedPseudoPreview: () => void;
-  enterComponentInlineEdit: (el: HTMLElement, path: JxPath) => void;
   registerSubtreeDnD: (rootEl: HTMLElement) => void;
 }
 
@@ -158,13 +157,6 @@ function replaceVerdict(tab: Tab, path: JxPath): string | null {
   return getNodeAtPath(tab.doc.document, path) === undefined ? "node-not-found" : null;
 }
 
-const STRUCTURAL_OPS = new Set(["insert", "move", "remove", "replace", "set-attr", "set-prop"]);
-
-/** Whether an op changes DOM structure (vs in-place style/text writes). */
-function isStructuralOp(op: JxPatchOp) {
-  return STRUCTURAL_OPS.has(op.op) && !(op.op === "set-prop" && op.isEvent);
-}
-
 /**
  * Per-op patchability in the current document. Returns null when patchable, else the reason.
  *
@@ -260,11 +252,9 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
   if (!canvasPanels.every((p) => p.ready)) {
     return reject("panels-not-ready");
   }
-  // Structural changes while an inline edit session is live would pull the DOM out from under
-  // The editor — rare (commit flows tear down first), so escalate conservatively.
-  if (view.componentInlineEdit && ops.some((op) => isStructuralOp(op))) {
-    return reject("inline-edit-active");
-  }
+  // Inline editing now lives inside the iframe canvas, which the parent patcher can't observe; the
+  // Iframe escalates to a full render itself if a posted patch can't apply mid-edit. So there is no
+  // Parent-side inline-edit guard here anymore.
   for (const op of ops) {
     const reason = opVerdict(tab, op);
     if (reason) {

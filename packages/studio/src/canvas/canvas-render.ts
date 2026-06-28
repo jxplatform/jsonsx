@@ -5,7 +5,6 @@
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { errorMessage } from "@jxsuite/schema/parse";
 import { ref } from "lit-html/directives/ref.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 
@@ -24,7 +23,7 @@ import {
   resetZoomIndicator,
   updateActivePanelHeaders,
 } from "./canvas-utils";
-import { effectiveZoom, findCanvasElement, overlayBoxDescriptor } from "./canvas-helpers";
+import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
 import {
   activeBreakpointsForWidth,
   applyOverridesToCanvas,
@@ -32,16 +31,8 @@ import {
   parseMediaEntries,
 } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
-import { renderCanvasLive } from "./canvas-live-render";
-import { isIframeCanvas } from "./canvas-host";
 import { mountIframeCanvas } from "./iframe-host";
 import { canvasPerf } from "./canvas-perf";
-import { renderCanvasNode } from "../panels/preview-render";
-import { registerPanelDnD } from "../panels/canvas-dnd";
-import { registerPanelEvents } from "../panels/panel-events";
-import { computeDocumentDiff } from "./canvas-diff";
-import { updateForcedPseudoPreview } from "../panels/pseudo-preview";
-import { enterComponentInlineEdit } from "../editor/component-inline-edit";
 import { refreshStylebookStyles, renderStylebookMode } from "../panels/stylebook-panel";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
 import { dismissContextMenu } from "../editor/context-menu";
@@ -52,7 +43,7 @@ import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
 
 import type { CanvasPanel } from "../panels/canvas-dnd";
-import type { GitDiffState, InlineEditDef } from "../types";
+import type { GitDiffState } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
 
@@ -677,23 +668,26 @@ export function renderCanvas() {
 }
 
 /**
- * Render document into a single canvas panel. Tries runtime rendering first, falls back to
- * structural preview.
+ * Render a document into a single canvas panel via the iframe canvas: the document renders inside a
+ * same-runtime iframe served from the real origin (the iframe holds the render context, stamps
+ * `data-jx-path`/`data-jx-layout`, and draws its own overlays). Git-diff/preview overrides render
+ * but stay un-patchable (`ready` only flips for the real tab document).
  *
  * @param {CanvasPanel} panel
  * @param {Set<string>} activeBreakpoints
- * @param {Record<string, boolean>} featureToggles
+ * @param {Record<string, boolean>} _featureToggles - Accepted for call-site symmetry (the iframe
+ *   render needs no structural-preview fallback); unused.
  * @param {JxMutableNode | null} [docOverride] - Optional document to render (for diff mode). Uses
  *   active tab doc if not provided.
- * @param {GitDiffState | null} [gitDiffState] - Optional diff state. If provided, computes and
- *   applies diff highlighting.
+ * @param {GitDiffState | null} [_gitDiffState] - Accepted for call-site symmetry; the iframe path
+ *   does not apply parent-side diff highlighting.
  */
 function renderCanvasIntoPanel(
   panel: CanvasPanel,
   activeBreakpoints: Set<string>,
-  featureToggles: Record<string, boolean>,
+  _featureToggles: Record<string, boolean>,
   docOverride: JxMutableNode | null = null,
-  gitDiffState: GitDiffState | null = null,
+  _gitDiffState: GitDiffState | null = null,
 ) {
   const gen = view.renderGeneration;
   const tab = activeTab.value;
@@ -702,149 +696,22 @@ function renderCanvasIntoPanel(
 
   canvasPerf.panelRenders += 1;
   panel.ready = false;
-  panel.liveCtx = null;
   panel.activeBreakpoints = activeBreakpoints;
 
-  // Iframe canvas host (opt-in via ?canvasHost=iframe): render the document inside a same-runtime
-  // Iframe served from the real origin instead of in the editor's realm. The legacy path below is
-  // Left untouched for the default host.
-  if (isIframeCanvas()) {
-    void mountIframeCanvas(gen, docToRender, canvas)
-      .then(() => {
-        if (gen === view.renderGeneration) {
-          // Mark the panel patchable once the real document is mounted (not a diff/preview
-          // Override) so classifyOps admits surgical patches; the iframe holds the render context,
-          // So unlike the legacy path this panel needs no `liveCtx`.
-          panel.ready = !docOverride;
-          updateCanvas({ error: null, scope: null, status: "ready" });
-          statusMessage("Iframe render OK", 1500);
-        }
-      })
-      .catch((error: unknown) => {
-        console.warn("mountIframeCanvas failed:", error instanceof Error ? error.message : error);
-      });
-    return;
-  }
-
-  renderCanvasLive(gen, docToRender, canvas, panel)
-    .then((scope: Record<string, unknown> | null) => {
-      // Skip post-render setup if a newer render has started
-      if (gen !== view.renderGeneration) {
-        return;
-      }
-      if (scope) {
-        updateCanvas({ error: null, scope, status: "ready" });
-        applyCanvasMediaOverrides(canvas, activeBreakpoints);
-        statusMessage("Runtime render OK", 1500);
-        // Panel is patchable only when the live runtime path rendered the real document
+  void mountIframeCanvas(gen, docToRender, canvas)
+    .then(() => {
+      if (gen === view.renderGeneration) {
+        // Mark the panel patchable once the real document is mounted (not a diff/preview override)
+        // So classifyOps admits surgical patches; the iframe holds the render context, so this
+        // Panel needs no parent-side render scope.
         panel.ready = !docOverride;
-        scheduleStyleTagSweep();
-
-        // Apply diff highlighting if in git-diff mode
-        if (gitDiffState && docOverride) {
-          // Determine which document is original and which is current
-          const isOriginal = docOverride === (gitDiffState.originalDoc || gitDiffState.original);
-          const _tab = activeTab.value;
-          const origDoc = isOriginal ? docOverride : gitDiffState.currentDoc || _tab?.doc.document;
-          const currDoc = isOriginal ? gitDiffState.currentDoc || _tab?.doc.document : docOverride;
-
-          const { byPath: diffMap } = computeDocumentDiff(origDoc, currDoc);
-
-          // Can't iterate WeakMap, so apply styling by walking the canvas
-          const { elToPath } = scope;
-          if (elToPath instanceof WeakMap) {
-            applyDiffHighlightToCanvas(canvas, diffMap);
-          }
-        }
-      } else {
-        // Fallback to structural preview
         updateCanvas({ error: null, scope: null, status: "ready" });
-        canvas.innerHTML = "";
-        renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
-      }
-      try {
-        registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (dndError) {
-        console.warn("registerPanelDnD failed:", errorMessage(dndError));
-      }
-      registerPanelEvents(panel as unknown as CanvasPanel);
-      renderOverlays();
-      updateForcedPseudoPreview();
-
-      // Process pending inline edit when canvas becomes ready
-      const currentTab = activeTab.value;
-      if (currentTab?.session.ui?.pendingInlineEdit) {
-        const { path, mediaName: mn } = currentTab.session.ui.pendingInlineEdit as InlineEditDef;
-        currentTab.session.ui.pendingInlineEdit = null;
-        const targetPanel = canvasPanels.find((p) => p.mediaName === mn) || canvasPanels[0];
-        if (targetPanel) {
-          const el = findCanvasElement(path, targetPanel.canvas);
-          if (el) {
-            enterComponentInlineEdit(el, path);
-          }
-        }
+        statusMessage("Iframe render OK", 1500);
       }
     })
     .catch((error: unknown) => {
-      if (gen !== view.renderGeneration) {
-        return;
-      }
-      console.warn("renderCanvasLive rejected:", error instanceof Error ? error.message : error);
-      updateCanvas({ error: null, scope: null, status: "ready" });
-      canvas.innerHTML = "";
-      renderCanvasNode(docToRender, [], canvas, activeBreakpoints, featureToggles);
-      try {
-        registerPanelDnD(panel as unknown as CanvasPanel);
-      } catch (dndError) {
-        console.warn("registerPanelDnD failed:", errorMessage(dndError));
-      }
-      registerPanelEvents(panel as unknown as CanvasPanel);
-      renderOverlays();
-      updateForcedPseudoPreview();
+      console.warn("mountIframeCanvas failed:", error instanceof Error ? error.message : error);
     });
-}
-
-/**
- * Apply diff highlighting to canvas elements based on elToPath mapping. Walks the canvas DOM and
- * applies classes based on diff status.
- *
- * @param {HTMLElement} canvas
- * @param {Map<string, "added" | "removed" | "modified">} diffMap
- */
-function applyDiffHighlightToCanvas(
-  canvas: HTMLElement,
-  diffMap: Map<string, "added" | "removed" | "modified">,
-) {
-  if (!diffMap || diffMap.size === 0) {
-    return;
-  }
-
-  // Walk all elements in canvas and check their data attributes or other markers
-  const walkCanvas = (el: HTMLElement, /** @type {string} */ path = "") => {
-    const pathKey = path || "/";
-
-    if (diffMap.has(pathKey)) {
-      const status = diffMap.get(pathKey);
-      if (status === "added") {
-        el.classList.add("element-diff-added");
-      } else if (status === "removed") {
-        el.classList.add("element-diff-removed");
-      } else if (status === "modified") {
-        el.classList.add("element-diff-modified");
-      }
-    }
-
-    // Check for child elements (heuristic: children array markers)
-    let childIdx = 0;
-    for (const child of el.children) {
-      const childPath =
-        pathKey === "/" ? `children/${childIdx}` : `${pathKey}/children/${childIdx}`;
-      walkCanvas(child as HTMLElement, childPath);
-      childIdx += 1;
-    }
-  };
-
-  walkCanvas(canvas, "");
 }
 
 /**
@@ -877,25 +744,4 @@ export function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: 
 
 export function renderOverlays() {
   overlaysPanel.render();
-}
-
-// ─── Style-tag hygiene ────────────────────────────────────────────────────────
-
-let _sweepTimer: ReturnType<typeof setTimeout> | undefined;
-
-/**
- * Remove scoped <style> tags whose owner elements are no longer in the document. The runtime emits
- * one tag per styled element (nested selectors / media rules) and full re-renders orphan the
- * previous tree's tags. Debounced so in-flight panel renders finish attaching first.
- */
-function scheduleStyleTagSweep() {
-  clearTimeout(_sweepTimer);
-  _sweepTimer = setTimeout(() => {
-    for (const tag of document.head.querySelectorAll("style[data-jx-owner]")) {
-      const uid = (tag as HTMLElement).dataset.jxOwner;
-      if (uid && !document.querySelector(`[data-jx="${uid}"]`)) {
-        tag.remove();
-      }
-    }
-  }, 250);
 }

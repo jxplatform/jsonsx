@@ -28,15 +28,6 @@ interface ViewState {
         _editingTarget?: string | null;
       })
     | null;
-  componentInlineEdit: {
-    el: HTMLElement;
-    path: (string | number)[];
-    originalText: string;
-    mediaName: string | null;
-    _outsideHandler?: ((e: MouseEvent) => void) | null;
-    [k: string]: unknown;
-  } | null;
-  inlineEditCleanup: (() => void) | null;
   blockActionBarEl: HTMLElement | null;
   selDragCleanup: (() => void) | null;
   dndCleanups: (() => void)[];
@@ -80,10 +71,6 @@ export const view: ViewState = {
   // Editor instances
   monacoEditor: null,
   functionEditor: null,
-
-  // Inline editing
-  componentInlineEdit: null,
-  inlineEditCleanup: null,
 
   // Floating UI containers
   blockActionBarEl: null,

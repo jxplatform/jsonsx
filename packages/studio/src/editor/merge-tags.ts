@@ -74,8 +74,8 @@ function walk(value: unknown, prefix: string, category: string, depth: number, o
  *
  * @param state - The document's `state` definitions (`tab.doc.document.state`), used for names and
  *   classification (functions are skipped — they are not text-insertable values).
- * @param scope - The live resolved scope (`panel.liveCtx.scope`) for type/preview hints and the
- *   nested-property walk. May be null before the canvas has rendered.
+ * @param scope - The live resolved scope for type/preview hints and the nested-property walk. May
+ *   be null (the iframe canvas holds the render scope, so the parent passes null).
  * @param localScope - The editing element's recorded render scope (`elToScope.get(el)`). When it
  *   carries a `$map` (repeater) context, `item` / `item.*` / `index` tags are appended.
  */

@@ -41,7 +41,12 @@ export function canvasHost(): CanvasHost {
   return override ?? canvasHostFromUrl() ?? "legacy-div";
 }
 
-/** Convenience predicate for the iframe canvas host. */
+/**
+ * Convenience predicate for the iframe canvas host. The legacy in-realm canvas has been removed, so
+ * the iframe is now the only canvas — this is unconditionally true. (The host machinery above is
+ * retained only because `setCanvasHostOverride` is still referenced by the iframe patch-wire
+ * test.)
+ */
 export function isIframeCanvas(): boolean {
-  return canvasHost() === "iframe";
+  return true;
 }

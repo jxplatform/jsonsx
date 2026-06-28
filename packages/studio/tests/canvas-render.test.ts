@@ -5,7 +5,7 @@
  */
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { canvasPanels, canvasWrap, elToPath, initShellRefs, setProjectState } from "../src/store";
+import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
 import { closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
@@ -17,13 +17,22 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // ─── Controllable mock behavior ───────────────────────────────────────────────
 
-type LiveRender = (
-  gen: number,
-  doc: JxMutableNode,
-  canvas: HTMLElement,
-  panel: unknown,
-) => Promise<Record<string, unknown> | null>;
-let liveImpl: LiveRender = async () => null;
+// The iframe canvas is the only canvas now: renderCanvasIntoPanel calls mountIframeCanvas(gen, doc,
+// Canvas). The default stub stamps the doc's text into the canvas so DOM assertions still work; a
+// Test can swap `iframeImpl` to drive staleness/rejection.
+type IframeMount = (gen: number, doc: JxMutableNode, canvas: HTMLElement) => Promise<void>;
+let iframeImpl: IframeMount = async (_gen, doc, canvas) => {
+  canvas.innerHTML = "";
+  const root = document.createElement("div");
+  for (const child of (doc.children as JxMutableNode[] | undefined) ?? []) {
+    const el = document.createElement(child.tagName ?? "span");
+    if (child.textContent) {
+      el.textContent = child.textContent as string;
+    }
+    root.append(el);
+  }
+  canvas.append(root);
+};
 
 const renderWelcome = mock((host: HTMLElement) => {
   host.textContent = "welcome";
@@ -31,10 +40,7 @@ const renderWelcome = mock((host: HTMLElement) => {
 const renderFunctionEditor = mock(() => {});
 const statusMessage = mock((_msg: string, _duration?: number) => {});
 const overlaysRender = mock(() => {});
-const registerPanelDnD = mock((_panel: unknown) => {});
-const registerPanelEvents = mock((_panel: unknown) => {});
 const updateForcedPseudoPreview = mock(() => {});
-const enterComponentInlineEdit = mock((_el: HTMLElement, _path: unknown) => {});
 const renderStylebookMode = mock((_helpers: unknown) => {});
 const refreshStylebookStyles = mock(() => {});
 const parseSourceForPathMock = mock(async (_path: string, _source: string) => ({
@@ -112,14 +118,13 @@ void mock.module("monaco-editor/esm/vs/editor/editor.api.js", () => ({
 }));
 
 void mock.module("../src/canvas/canvas-live-render.js", () => ({
-  activeLayoutPath: null,
-  buildNestedSiteCSS: () => "",
   initCanvasLiveRender: () => {},
-  layoutElements: new WeakSet(),
-  makePathMapper: () => () => null,
-  renderCanvasLive: (gen: number, doc: JxMutableNode, canvas: HTMLElement, panel: unknown) =>
-    liveImpl(gen, doc, canvas, panel),
   resolveCanvasDocument: () => Promise.resolve(null),
+}));
+
+void mock.module("../src/canvas/iframe-host.js", () => ({
+  mountIframeCanvas: (gen: number, doc: JxMutableNode, canvas: HTMLElement) =>
+    iframeImpl(gen, doc, canvas),
 }));
 
 void mock.module("../src/panels/welcome-screen.js", () => ({
@@ -146,23 +151,8 @@ void mock.module("../src/panels/overlays.js", () => ({
   unmount: () => {},
 }));
 
-void mock.module("../src/panels/canvas-dnd.js", () => ({
-  registerPanelDnD,
-  registerSubtreeDnD: () => {},
-}));
-
-void mock.module("../src/panels/panel-events.js", () => ({
-  initPanelEvents: () => {},
-  registerPanelEvents,
-}));
-
 void mock.module("../src/panels/pseudo-preview.js", () => ({
   updateForcedPseudoPreview,
-}));
-
-void mock.module("../src/editor/component-inline-edit.js", () => ({
-  enterComponentInlineEdit,
-  initComponentInlineEdit: () => {},
 }));
 
 void mock.module("../src/panels/stylebook-panel.js", () => ({
@@ -275,16 +265,24 @@ beforeEach(() => {
   canvasModeFn = () => canvasMode;
   zoom = 1;
   ctx.gitDiffState = null;
-  liveImpl = async () => null;
+  iframeImpl = async (_gen, doc, canvas) => {
+    canvas.innerHTML = "";
+    const root = document.createElement("div");
+    for (const child of (doc.children as JxMutableNode[] | undefined) ?? []) {
+      const el = document.createElement(child.tagName ?? "span");
+      if (child.textContent) {
+        el.textContent = child.textContent as string;
+      }
+      root.append(el);
+    }
+    canvas.append(root);
+  };
   for (const m of [
     renderWelcome,
     renderFunctionEditor,
     statusMessage,
     overlaysRender,
-    registerPanelDnD,
-    registerPanelEvents,
     updateForcedPseudoPreview,
-    enterComponentInlineEdit,
     renderStylebookMode,
     refreshStylebookStyles,
     parseSourceForPathMock,
@@ -741,87 +739,6 @@ describe("git-diff mode", () => {
     expect(curr!.ready).toBe(false);
   });
 
-  test("applies diff highlight classes when the live renderer provides elToPath", async () => {
-    resetWorkspaceWithTab();
-    liveImpl = async (_gen, _doc, canvas) => {
-      canvas.innerHTML = "";
-      const root = document.createElement("div");
-      root.append(document.createElement("p"));
-      canvas.append(root);
-      return { elToPath: new WeakMap() };
-    };
-    canvasMode = "git-diff";
-    ctx.gitDiffState = {
-      currentContent: JSON.stringify({
-        children: [{ tagName: "p", textContent: "changed" }],
-        tagName: "div",
-      }),
-      filePath: "/project/index.json",
-      originalContent: JSON.stringify({
-        children: [{ tagName: "p", textContent: "Hello" }],
-        tagName: "div",
-      }),
-    };
-    renderCanvas();
-    await flush();
-
-    const highlighted = canvasWrap.querySelectorAll(
-      ".element-diff-modified, .element-diff-added, .element-diff-removed",
-    );
-    expect(highlighted.length).toBeGreaterThan(0);
-  });
-
-  test("marks removed elements with the removed diff class", async () => {
-    resetWorkspaceWithTab(); // Tab doc has one paragraph child
-    liveImpl = async (_gen, _doc, canvas) => {
-      // The diff walker treats the canvas itself as the root, so children sit at children/N
-      canvas.innerHTML = "";
-      canvas.append(document.createElement("p"));
-      return { elToPath: new WeakMap() };
-    };
-    canvasMode = "git-diff";
-    ctx.gitDiffState = {
-      // Current document dropped the paragraph → children/0 is "removed"
-      currentContent: JSON.stringify({ children: [], tagName: "div" }),
-      filePath: "/project/index.json",
-      originalContent: JSON.stringify({
-        children: [{ tagName: "p", textContent: "Hello" }],
-        tagName: "div",
-      }),
-    };
-    renderCanvas();
-    await flush();
-    expect(canvasWrap.querySelector(".element-diff-removed")).not.toBeNull();
-  });
-
-  test("marks added elements with the added diff class", async () => {
-    resetWorkspaceWithTab();
-    liveImpl = async (_gen, _doc, canvas) => {
-      canvas.innerHTML = "";
-      canvas.append(document.createElement("p"), document.createElement("p"));
-      return { elToPath: new WeakMap() };
-    };
-    canvasMode = "git-diff";
-    ctx.gitDiffState = {
-      // Current document gained a second paragraph → children/1 is "added"
-      currentContent: JSON.stringify({
-        children: [
-          { tagName: "p", textContent: "Hello" },
-          { tagName: "p", textContent: "Extra" },
-        ],
-        tagName: "div",
-      }),
-      filePath: "/project/index.json",
-      originalContent: JSON.stringify({
-        children: [{ tagName: "p", textContent: "Hello" }],
-        tagName: "div",
-      }),
-    };
-    renderCanvas();
-    await flush();
-    expect(canvasWrap.querySelector(".element-diff-added")).not.toBeNull();
-  });
-
   test("unparseable JSON falls back to a parse-failure document", async () => {
     resetWorkspaceWithTab();
     canvasMode = "git-diff";
@@ -855,7 +772,7 @@ describe("git-diff mode", () => {
 // ─── Edit (content) mode ──────────────────────────────────────────────────────
 
 describe("edit mode", () => {
-  test("renders a centered column with the structural preview fallback", async () => {
+  test("renders a centered column with the iframe-rendered content", async () => {
     resetWorkspaceWithTab();
     canvasMode = "edit";
     renderCanvas();
@@ -870,10 +787,9 @@ describe("edit mode", () => {
     const panel = canvasPanels[0] as unknown as CanvasPanel;
     expect(panel.scrollContainer?.classList.contains("content-edit-canvas")).toBe(true);
     expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
-    expect(registerPanelDnD).toHaveBeenCalled();
-    expect(registerPanelEvents).toHaveBeenCalled();
-    expect(overlaysRender).toHaveBeenCalled();
-    expect(updateForcedPseudoPreview).toHaveBeenCalled();
+    // The real tab document mounted, so the panel is patchable.
+    expect(panel.ready).toBe(true);
+    expect(statusMessage).toHaveBeenCalledWith("Iframe render OK", 1500);
   });
 
   test("uses the document base width for the content column", async () => {
@@ -890,165 +806,56 @@ describe("edit mode", () => {
   });
 });
 
-// ─── Live render success / failure ────────────────────────────────────────────
+// ─── Iframe render pipeline (success / staleness / rejection) ──────────────────
 
-describe("live render pipeline", () => {
-  test("successful live render marks the panel ready and stores the scope", async () => {
+describe("iframe render pipeline", () => {
+  test("a successful iframe mount marks the panel ready and reports status", async () => {
     const tab = resetWorkspaceWithTab();
-    const scope = { elToPath: new WeakMap() };
-    liveImpl = async (_gen, _doc, canvas) => {
-      canvas.innerHTML = "<div><p>live</p></div>";
-      return scope;
-    };
     canvasMode = "edit";
     renderCanvas();
     await flush();
 
     expect(tab.session.canvas.status).toBe("ready");
-    // The session tree is reactive, so the stored scope is a proxy wrapping the original
-    expect(tab.session.canvas.scope?.elToPath).toBeInstanceOf(WeakMap);
+    expect(tab.session.canvas.scope).toBeNull();
     expect(tab.session.canvas.error).toBeNull();
-    expect(statusMessage).toHaveBeenCalledWith("Runtime render OK", 1500);
+    expect(statusMessage).toHaveBeenCalledWith("Iframe render OK", 1500);
     expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(true);
   });
 
-  test("rejected live render falls back to the structural preview", async () => {
+  test("a stale iframe mount bails without touching state", async () => {
     const tab = resetWorkspaceWithTab();
-    liveImpl = async () => {
-      throw new Error("runtime exploded");
-    };
-    const warn = spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      canvasMode = "edit";
-      renderCanvas();
-      await flush();
-      expect(tab.session.canvas.status).toBe("ready");
-      expect(tab.session.canvas.scope).toBeNull();
-      const panel = canvasPanels[0] as unknown as CanvasPanel;
-      expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
-      expect(registerPanelEvents).toHaveBeenCalled();
-      expect(updateForcedPseudoPreview).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  test("registerPanelDnD failures in the fallback path are also caught", async () => {
-    resetWorkspaceWithTab();
-    liveImpl = async () => {
-      throw new Error("runtime exploded");
-    };
-    registerPanelDnD.mockImplementationOnce(() => {
-      throw new Error("dnd boom");
-    });
-    const warn = spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      canvasMode = "edit";
-      renderCanvas();
-      await flush();
-      expect(warn.mock.calls.some((c) => String(c[0]).includes("registerPanelDnD failed"))).toBe(
-        true,
-      );
-      expect(registerPanelEvents).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  test("registerPanelDnD failures are caught and rendering continues", async () => {
-    resetWorkspaceWithTab();
-    registerPanelDnD.mockImplementationOnce(() => {
-      throw new Error("dnd boom");
-    });
-    const warn = spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      canvasMode = "edit";
-      renderCanvas();
-      await flush();
-      expect(warn.mock.calls.some((c) => String(c[0]).includes("registerPanelDnD failed"))).toBe(
-        true,
-      );
-      expect(registerPanelEvents).toHaveBeenCalled();
-    } finally {
-      warn.mockRestore();
-    }
-  });
-
-  test("stale successful renders bail without touching state", async () => {
-    const tab = resetWorkspaceWithTab();
-    let resolveLive: (v: Record<string, unknown> | null) => void = () => {};
-    liveImpl = () =>
+    let resolveMount: () => void = () => {};
+    iframeImpl = () =>
       new Promise((resolve) => {
-        resolveLive = resolve;
+        resolveMount = resolve;
       });
     canvasMode = "edit";
     renderCanvas();
     view.renderGeneration += 1; // A newer render started
-    resolveLive({});
+    resolveMount();
     await flush();
     expect(tab.session.canvas.status).toBe("idle");
     expect(statusMessage).not.toHaveBeenCalled();
-    expect(registerPanelEvents).not.toHaveBeenCalled();
+    expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(false);
   });
 
-  test("stale rejected renders bail without falling back", async () => {
+  test("a rejected iframe mount warns and leaves the panel un-ready", async () => {
     resetWorkspaceWithTab();
-    let rejectLive: (e: Error) => void = () => {};
-    liveImpl = () =>
-      new Promise((_resolve, reject) => {
-        rejectLive = reject;
-      });
-    canvasMode = "edit";
-    renderCanvas();
-    view.renderGeneration += 1;
-    rejectLive(new Error("stale"));
-    await flush();
-    expect((canvasPanels[0] as unknown as CanvasPanel).canvas?.children.length).toBe(0);
-    expect(registerPanelEvents).not.toHaveBeenCalled();
-  });
-
-  test("processes a pending inline edit once the canvas is ready", async () => {
-    const tab = resetWorkspaceWithTab();
-    let target: HTMLElement | null = null;
-    liveImpl = async (_gen, _doc, canvas) => {
-      canvas.innerHTML = "";
-      const root = document.createElement("div");
-      target = document.createElement("p");
-      root.append(target);
-      canvas.append(root);
-      elToPath.set(target, ["children", 0]);
-      return { elToPath: new WeakMap() };
+    iframeImpl = async () => {
+      throw new Error("iframe exploded");
     };
-    tab.session.ui.pendingInlineEdit = { mediaName: "", path: ["children", 0] } as never;
-    canvasMode = "edit";
-    renderCanvas();
-    await flush();
-    expect(enterComponentInlineEdit).toHaveBeenCalledWith(target, ["children", 0]);
-    expect(tab.session.ui.pendingInlineEdit).toBeNull();
-  });
-
-  test("sweeps orphaned scoped style tags after a live render", async () => {
-    resetWorkspaceWithTab();
-    liveImpl = async () => ({ elToPath: new WeakMap() });
-
-    const orphan = document.createElement("style");
-    orphan.dataset.jxOwner = "orphan-uid";
-    document.head.append(orphan);
-    const live = document.createElement("style");
-    live.dataset.jxOwner = "live-uid";
-    document.head.append(live);
-    const owner = document.createElement("div");
-    owner.dataset.jx = "live-uid";
-    document.body.append(owner);
-
-    await withFastTimers(async (runPending) => {
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
       canvasMode = "edit";
       renderCanvas();
       await flush();
-      await runPending();
-      expect(orphan.isConnected).toBe(false);
-      expect(live.isConnected).toBe(true);
-    });
+      expect(warn.mock.calls.some((c) => String(c[0]).includes("mountIframeCanvas failed"))).toBe(
+        true,
+      );
+      expect((canvasPanels[0] as unknown as CanvasPanel).ready).toBe(false);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

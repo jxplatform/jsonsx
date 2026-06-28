@@ -28,11 +28,9 @@ import { effect } from "./reactivity";
 
 import { view } from "./view";
 
-import { isEditableBlock, isEditing } from "./editor/inline-edit";
-import { enterComponentInlineEdit, initComponentInlineEdit } from "./editor/component-inline-edit";
-import { enterInlineEdit } from "./editor/content-inline-edit";
+import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
-import { findCanvasElement, getActivePanel, initCanvasHelpers } from "./canvas/canvas-helpers";
+import { initCanvasHelpers } from "./canvas/canvas-helpers";
 import {
   applyCanvasMediaOverrides,
   initCanvasRender,
@@ -105,7 +103,6 @@ import { registerFunctionCompletions } from "./panels/editors";
 import { renderBlockActionBar, initBlockActionBar } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
-import { initPanelEvents } from "./panels/panel-events";
 import { initQuickSearch } from "./panels/quick-search";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
@@ -363,7 +360,6 @@ initBlockActionBar({
   navigateToComponent,
 });
 
-initComponentInlineEdit({ findCanvasElement });
 initCanvasHelpers({
   getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
@@ -378,17 +374,11 @@ initCanvasUtils({
     }
   },
 });
-initPanelEvents({
-  enterInlineEdit,
-  getCanvasMode,
-  navigateToComponent,
-});
 initCanvasLiveRender({
   getCanvasMode,
 });
 initCanvasPatcher({
   applyCanvasMediaOverrides,
-  enterComponentInlineEdit,
   getCanvasMode,
   registerSubtreeDnD,
   renderOverlays,
@@ -782,18 +772,6 @@ function openFileFromTree(path: string) {
 initShortcuts(() => ({
   applyTransform,
   canvasMode: getCanvasMode(),
-  componentInlineEdit: view.componentInlineEdit,
-  enterEditOnPath(path) {
-    requestAnimationFrame(() => {
-      const activePanel = getActivePanel();
-      if (activePanel) {
-        const el = findCanvasElement(path, activePanel.canvas);
-        if (el && isEditableBlock(el)) {
-          enterInlineEdit(el, path);
-        }
-      }
-    });
-  },
   openProject,
   panX: view.panX,
   panY: view.panY,

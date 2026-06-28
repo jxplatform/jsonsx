@@ -245,7 +245,10 @@ function onMergeTagClick(e: MouseEvent) {
   const tab = activeTab.value;
   const editable = getActiveElement();
   const state = (tab?.doc.document.state ?? {}) as Record<string, unknown>;
-  const scope = getActivePanel()?.liveCtx?.scope ?? null;
+  // The live resolved scope lives inside the iframe canvas now, so the parent has no panel-side
+  // Scope to offer for type/preview hints — merge tags fall back to document `state` + the editing
+  // Element's recorded local scope.
+  const scope = null;
   const localScope = editable ? (elToScope.get(editable) ?? null) : null;
 
   const commands = buildMergeTags(state, scope, localScope).map((t) => ({

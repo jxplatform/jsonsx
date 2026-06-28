@@ -34,10 +34,8 @@ import type { JxPath } from "../state";
  *   setPan: (x: number, y: number) => void;
  *   applyTransform: () => void;
  *   positionZoomIndicator: () => void;
- *   componentInlineEdit: object | null;
  *   saveFile: () => void;
  *   openProject: () => void;
- *   enterEditOnPath: (path: JxPath) => void;
  * }} getContext
  */
 export function initShortcuts(
@@ -48,10 +46,8 @@ export function initShortcuts(
     setPan: (x: number, y: number) => void;
     applyTransform: () => void;
     positionZoomIndicator: () => void;
-    componentInlineEdit: Record<string, unknown> | null;
     saveFile: () => void;
     openProject: () => void;
-    enterEditOnPath: (path: JxPath) => void;
   },
 ) {
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
@@ -125,15 +121,7 @@ export function initShortcuts(
   window.addEventListener("resize", () => getContext().positionZoomIndicator());
 
   document.addEventListener("keydown", (e) => {
-    const {
-      canvasMode,
-      setPan,
-      applyTransform,
-      componentInlineEdit,
-      saveFile,
-      openProject,
-      enterEditOnPath,
-    } = getContext();
+    const { canvasMode, setPan, applyTransform, saveFile, openProject } = getContext();
     const tab = activeTab.value;
     const mod = e.ctrlKey || e.metaKey;
 
@@ -164,18 +152,6 @@ export function initShortcuts(
       }
       return;
     }
-    if (componentInlineEdit) {
-      if (mod && e.key === "s") {
-        e.preventDefault();
-        stopEditing();
-        saveFile();
-      }
-      if (mod && e.key === "w") {
-        e.preventDefault();
-      }
-      return;
-    }
-
     if (mod) {
       switch (e.key) {
         case "w": {
@@ -306,7 +282,8 @@ export function initShortcuts(
             mutateInsertNode(t, pp, idx + 1, { tagName: "p", textContent: "" });
             t.session.selection = newPath;
           });
-          enterEditOnPath(newPath);
+          // The iframe canvas re-enters inline edit for the freshly-selected node via its own
+          // Posted enterEdit flow, so no parent-side enterEditOnPath is needed here.
         }
         break;
       }

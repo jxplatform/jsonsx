@@ -69,7 +69,6 @@ export function canvasPanelTemplate(
     canvas: null,
     dropLine: null,
     element: null,
-    liveCtx: null,
     mediaName: mediaName || "",
     overlay: null,
     overlayClk: null,
