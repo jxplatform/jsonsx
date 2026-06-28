@@ -10,6 +10,8 @@
  */
 
 import type { JxDocOp } from "../tabs/patch-ops";
+import type { JxContentResult, SlashCommand } from "../editor/inline-edit";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /**
  * The wire form of a value-carrying document op (the `forward` half of a recorded
@@ -64,7 +66,9 @@ export type ParentToIframe =
   | { kind: "measure"; paths: (string | number)[][]; reqId: number }
   // Apply a surgical edit: fold each value-carrying forward op into the shadow doc and patch the DOM
   // In place. `gen` matches the last render so the iframe drops patches superseded by a re-render.
-  | { kind: "patch"; forwardOps: WireDocOp[]; gen: number };
+  | { kind: "patch"; forwardOps: WireDocOp[]; gen: number }
+  // Enter inline editing on the node at `path` (used to re-enter after a split/insert re-renders).
+  | { kind: "enterEdit"; path: (string | number)[] };
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -109,4 +113,29 @@ export type IframeToParent =
   // A patch could not be applied surgically — the parent escalates to a full render.
   | { kind: "patchError"; gen: number; message: string }
   // A global-shortcut keystroke captured inside the iframe, for the parent to re-dispatch.
-  | { kind: "forwardKey"; event: SerializedKey };
+  | { kind: "forwardKey"; event: SerializedKey }
+  // Inline editing started in the iframe (the parent shows the format toolbar from here).
+  | { kind: "editStart"; path: (string | number)[] }
+  // Committed inline-edit content (rich `children` else `textContent`) for the parent to persist.
+  | {
+      kind: "editCommit";
+      path: (string | number)[];
+      children: (JxMutableNode | string)[] | null;
+      textContent: string | null;
+    }
+  // Enter split a paragraph: keep `before` in the node, insert a new one with `after`.
+  | {
+      kind: "editSplit";
+      path: (string | number)[];
+      before: JxContentResult;
+      after: JxContentResult;
+    }
+  // Slash-insert: swap the tag in place when empty, else commit + insert a new element after.
+  | {
+      kind: "editInsert";
+      path: (string | number)[];
+      cmd: SlashCommand;
+      commitData: JxContentResult | undefined;
+    }
+  // The inline-edit session ended.
+  | { kind: "editEnd" };

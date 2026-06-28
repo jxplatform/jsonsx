@@ -346,3 +346,52 @@ describe("iframe canvas patch bridge", () => {
     expect(seen[0]!.code).toBe("KeyZ");
   });
 });
+
+// ─── Inline-edit bridge: the iframe runs the session, the parent applies (Phase 4b) ─────
+
+describe("iframe canvas inline-edit bridge", () => {
+  const docChildren = () =>
+    activeTab.value!.doc.document.children as { tagName?: string; textContent?: string }[];
+
+  beforeEach(() => {
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+  });
+
+  test("editCommit applies the committed content to the live document", async () => {
+    await mountReady();
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "Edited",
+    });
+    expect(docChildren()[0]!.textContent).toBe("Edited");
+  });
+
+  test("editSplit applies and asks the iframe to re-enter on the new paragraph", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({
+      after: { textContent: "lo" },
+      before: { textContent: "Hi" },
+      kind: "editSplit",
+      path: ["children", 0],
+    });
+    expect(docChildren()).toHaveLength(2);
+    expect(docChildren()[1]).toMatchObject({ tagName: "p", textContent: "lo" });
+    expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+
+  test("editInsert applies and re-enters on the resulting path", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({
+      cmd: { tag: "h2" },
+      commitData: { textContent: "Hi" },
+      kind: "editInsert",
+      path: ["children", 0],
+    });
+    expect(docChildren()[1]!.tagName).toBe("h2");
+    expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+});

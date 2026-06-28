@@ -8,6 +8,7 @@
 import { postMessageChannel } from "./iframe-channel";
 import { renderResolvedDocument } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
+import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
@@ -43,6 +44,8 @@ export function startCanvasIframe(opts: {
   // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
+  // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
+  const stopInlineEdit = startIframeInlineEdit(channel, container);
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
@@ -123,6 +126,7 @@ export function startCanvasIframe(opts: {
     off();
     stopInteraction();
     stopKeyForwarding();
+    stopInlineEdit();
     handle?.dispose();
   };
 }

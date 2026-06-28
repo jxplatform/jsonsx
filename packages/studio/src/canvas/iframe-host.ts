@@ -9,6 +9,11 @@
 
 import { postMessageChannel } from "./iframe-channel";
 import { resolveCanvasDocument } from "./canvas-live-render";
+import {
+  applyInlineCommit,
+  applyInlineInsert,
+  applyInlineSplit,
+} from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual } from "../store";
@@ -210,10 +215,36 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       redispatchKey(msg.event);
       return;
     }
+    case "editStart": {
+      // Inline editing began in the iframe. The format toolbar bridge hooks in here (a later step).
+      return;
+    }
+    case "editCommit": {
+      applyInlineCommit(msg.path, msg.children, msg.textContent);
+      return;
+    }
+    case "editSplit": {
+      // The split's transactDoc patch was already posted to this host; re-enter on the new paragraph
+      // (delivered after the patch, so the element exists by the time the iframe handles it).
+      reenterEdit(state, applyInlineSplit(msg.path, msg.before, msg.after));
+      return;
+    }
+    case "editInsert": {
+      reenterEdit(state, applyInlineInsert(msg.path, msg.cmd, msg.commitData));
+      return;
+    }
+    case "editEnd": {
+      return;
+    }
     default: {
       break;
     }
   }
+}
+
+/** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
+function reenterEdit(state: HostState, path: (string | number)[]): void {
+  state.channel.post({ kind: "enterEdit", path: [...path] });
 }
 
 /** Rebuild and dispatch a synthetic `keydown` on the editor document from a forwarded keystroke. */
