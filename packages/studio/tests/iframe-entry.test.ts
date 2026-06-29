@@ -317,4 +317,148 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
       preview: null,
     });
   });
+
+  test("dragEnd forgets the session: a later dragMove posts a null preview (no over-fire)", async () => {
+    const { acks, pair } = await bootRendered(7);
+    pair.parent.post({ dragSeq: 3, gen: 7, kind: "dragStart", src: { type: "block" } });
+    pair.parent.post({ dragSeq: 3, kind: "dragEnd" });
+    pair.flush();
+    acks.length = 0;
+    pair.parent.post({ cursor: { x: 5, y: 5 }, dragSeq: 3, kind: "dragMove" });
+    pair.flush();
+    pair.flush();
+    // Session forgotten → dragSrc + dragGen cleared, so the preview is null and gen resets to -1.
+    expect(acks.find((m) => m.kind === "dragOver")).toEqual({
+      dragSeq: 3,
+      gen: -1,
+      kind: "dragOver",
+      preview: null,
+    });
+  });
+
+  test("dragCancel also forgets the session (same teardown as dragEnd)", async () => {
+    const { acks, pair } = await bootRendered(7);
+    pair.parent.post({ dragSeq: 4, gen: 7, kind: "dragStart", src: { type: "block" } });
+    pair.parent.post({ dragSeq: 4, kind: "dragCancel" });
+    pair.flush();
+    acks.length = 0;
+    pair.parent.post({ cursor: { x: 5, y: 5 }, dragSeq: 4, kind: "dragMove" });
+    pair.flush();
+    pair.flush();
+    expect((acks.find((m) => m.kind === "dragOver") as { preview: unknown }).preview).toBeNull();
+  });
+
+  test("a dragMove landing in the top edge band arms auto-scroll without throwing", async () => {
+    // Auto-scroll's rAF/scrollBy body is CDP-only (happy-dom has no layout/scroll); here we only
+    // Prove arming the loop from a band cursor is safe and still posts the dragOver preview.
+    const { acks, pair } = await bootRendered(7);
+    pair.parent.post({ dragSeq: 5, gen: 7, kind: "dragStart", src: { type: "block" } });
+    acks.length = 0;
+    pair.parent.post({ cursor: { x: 5, y: 2 }, dragSeq: 5, kind: "dragMove" });
+    pair.flush();
+    pair.flush();
+    expect(acks.find((m) => m.kind === "dragOver")).toBeTruthy();
+    // Stop the armed loop by ending the session (teardown also cancels it).
+    pair.parent.post({ dragSeq: 5, kind: "dragEnd" });
+    pair.flush();
+  });
+
+  /**
+   * Drive the self-sustaining auto-scroll TICK deterministically: capture the rAF callback and make
+   * `scrollBy` actually advance `scrollY` so the tick proceeds PAST the extent-reached guard and
+   * re-posts a dragOver, then re-arms. Covers the tick's post-scroll body without a real layout (it
+   * is otherwise CDP-only).
+   */
+  test("the auto-scroll tick re-posts dragOver and self-sustains while held in a band", async () => {
+    const win = window as unknown as {
+      requestAnimationFrame: (cb: () => void) => number;
+      cancelAnimationFrame: (h: number) => void;
+      scrollBy: (x: number, y: number) => void;
+      scrollY: number;
+      innerHeight: number;
+    };
+    const origRaf = win.requestAnimationFrame;
+    const origCancel = win.cancelAnimationFrame;
+    const origScrollBy = win.scrollBy;
+    const rafCbs: (() => void)[] = [];
+    win.requestAnimationFrame = (cb: () => void) => {
+      rafCbs.push(cb);
+      return rafCbs.length;
+    };
+    win.cancelAnimationFrame = () => {};
+    let scrollY = 0;
+    Object.defineProperty(win, "scrollY", { configurable: true, get: () => scrollY });
+    win.scrollBy = (_x: number, y: number) => {
+      scrollY += y;
+    };
+    Object.defineProperty(win, "innerHeight", { configurable: true, value: 800 });
+
+    try {
+      const { acks, pair } = await bootRendered(7);
+      pair.parent.post({ dragSeq: 8, gen: 7, kind: "dragStart", src: { type: "block" } });
+      // A bottom-band cursor (y near innerHeight) arms the loop and queues the first rAF.
+      pair.parent.post({ cursor: { x: 5, y: 790 }, dragSeq: 8, kind: "dragMove" });
+      pair.flush();
+      acks.length = 0;
+      // Fire the queued tick: scrollBy advances scrollY (≠ before), so it re-posts + re-arms.
+      expect(rafCbs).toHaveLength(1);
+      rafCbs.shift()!();
+      pair.flush();
+      expect(acks.find((m) => m.kind === "dragOver")).toBeTruthy();
+      // The loop re-armed (still in the band); fire once more to exercise the self-sustain edge.
+      expect(rafCbs).toHaveLength(1);
+      rafCbs.shift()!();
+      pair.flush();
+      pair.parent.post({ dragSeq: 8, kind: "dragEnd" });
+      pair.flush();
+    } finally {
+      win.requestAnimationFrame = origRaf;
+      win.cancelAnimationFrame = origCancel;
+      win.scrollBy = origScrollBy;
+    }
+  });
+
+  // Flow 3 is fully iframe-driven: the detector (wired with the entry's previewAt/gen/auto-scroll
+  // Deps) computes + posts dragOver/dropResult LOCALLY from its own pointer. Happy-dom has no
+  // ElementFromPoint, so previewAt resolves null — this proves the message FLOW + the deps wiring
+  // (cursor carried, gen threaded, auto-scroll armed), not the (CDP-only) geometry.
+  test("a body-grab pointer gesture drives dragOriginate → dragOver(cursor) → dropResult locally", async () => {
+    const { acks, container, pair } = await bootRendered(7);
+    const h1 = container.querySelector("h1")!;
+    acks.length = 0;
+
+    h1.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 200 }),
+    );
+    // A move past threshold (and into the bottom edge band, y large) originates + drives + arms.
+    container.ownerDocument.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 200 }),
+    );
+    pair.flush();
+
+    const originate = acks.find((m) => m.kind === "dragOriginate") as
+      | { dragSeq: number; path: unknown }
+      | undefined;
+    expect(originate).toMatchObject({ kind: "dragOriginate", path: ["children", 0] });
+    const over = acks.find((m) => m.kind === "dragOver") as
+      | { cursor?: { x: number; y: number }; gen: number }
+      | undefined;
+    // The dragOver carries the iframe-local cursor (for the parent ghost) + the rendered gen.
+    expect(over?.cursor).toEqual({ x: 40, y: 200 });
+    expect(over?.gen).toBe(7);
+
+    container.ownerDocument.dispatchEvent(
+      new MouseEvent("pointerup", { bubbles: true, clientX: 40, clientY: 210 }),
+    );
+    pair.flush();
+    const result = acks.find((m) => m.kind === "dropResult");
+    // Null target (no layout) → null instruction, but the result is posted with the session seq+gen.
+    expect(result).toMatchObject({
+      dragSeq: originate!.dragSeq,
+      gen: 7,
+      instruction: null,
+      kind: "dropResult",
+      targetPath: null,
+    });
+  });
 });

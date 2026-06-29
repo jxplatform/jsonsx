@@ -9,13 +9,32 @@
 import { resetWorkspaceWithTab, stubRect } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { DragSrcKind, DropPreview } from "../src/canvas/iframe-protocol";
 
 // Stylebook is pulled in transitively via panels/dnd (applyDropInstruction); stub it light.
 void mock.module("../src/panels/stylebook-panel", () => ({
   renderComponentPreview: async () => document.createElement("div"),
 }));
 
-const { computeDropInstruction } = await import("../src/canvas/iframe-drop");
+// The inline-edit guard (grabCandidatePath returns null while editing) is unit-proven by toggling
+// This mock's `editing` flag; the real inline-edit module is irrelevant to the grab math.
+let editing = false;
+void mock.module("../src/editor/inline-edit", () => ({
+  isEditing: () => editing,
+}));
+
+const {
+  AUTO_SCROLL_BAND,
+  beginIframeDrag,
+  cancelIframeDrag,
+  clearIframeDrag,
+  computeDropInstruction,
+  grabCandidatePath,
+  isDragActive,
+  passedGrabThreshold,
+  scrollDirection,
+  startGrabDetector,
+} = await import("../src/canvas/iframe-drop");
 const { applyDropInstruction } = await import("../src/panels/dnd");
 const { serializeJxPath } = await import("../src/canvas/path-mapping");
 const { getNodeAtPath } = await import("../src/state");
@@ -50,6 +69,10 @@ function makeDoc(): JxMutableNode {
 }
 
 beforeEach(() => {
+  editing = false;
+  // Reset the module-global flow-3 drag-active flag so a detector in one test never leaks `dragActive`
+  // Into the next (each test wires a fresh detector with its own closure `src`).
+  clearIframeDrag();
   resetWorkspaceWithTab(makeDoc());
 });
 
@@ -203,5 +226,288 @@ describe("targetPath parity through REAL applyDropInstruction", () => {
     // Section had 1 child (h2) → now 2, the span appended last.
     expect(kids.length).toBe(2);
     expect(kids[1]!.tagName).toBe("span");
+  });
+});
+
+describe("scrollDirection (pure)", () => {
+  test("top band → -1 (scroll up)", () => {
+    expect(scrollDirection(10, 800, 40)).toBe(-1);
+  });
+  test("bottom band → +1 (scroll down)", () => {
+    expect(scrollDirection(790, 800, 40)).toBe(1);
+  });
+  test("middle → 0 (no auto-scroll)", () => {
+    expect(scrollDirection(400, 800, 40)).toBe(0);
+  });
+  test("exactly at the band edges is outside the band (boundary)", () => {
+    // At y === band it is NOT < band; at y === viewportH - band it is NOT > that → both 0.
+    expect(scrollDirection(40, 800, 40)).toBe(0);
+    expect(scrollDirection(760, 800, 40)).toBe(0);
+  });
+  test("defaults to AUTO_SCROLL_BAND when no band passed", () => {
+    expect(scrollDirection(AUTO_SCROLL_BAND - 1, 800)).toBe(-1);
+  });
+});
+
+describe("passedGrabThreshold (pure)", () => {
+  const origin = { x: 100, y: 100 };
+  test("within threshold → false", () => {
+    expect(passedGrabThreshold(origin, { x: 102, y: 101 })).toBe(false);
+  });
+  test("past threshold on X → true", () => {
+    expect(passedGrabThreshold(origin, { x: 105, y: 100 })).toBe(true);
+  });
+  test("past threshold on Y → true", () => {
+    expect(passedGrabThreshold(origin, { x: 100, y: 95 })).toBe(true);
+  });
+});
+
+describe("grabCandidatePath", () => {
+  test("resolves the nearest [data-jx-path] ancestor's path", () => {
+    const outer = el(["children", 0], { height: 50, top: 0 });
+    const inner = document.createElement("span");
+    outer.append(inner);
+    expect(grabCandidatePath(inner)).toEqual(["children", 0]);
+  });
+
+  test("returns null when the target has no addressable ancestor", () => {
+    expect(grabCandidatePath(document.createElement("div"))).toBeNull();
+  });
+
+  test("returns null for a non-Element target", () => {
+    expect(grabCandidatePath(null)).toBeNull();
+  });
+});
+
+describe("iframe drag-active state (flow 3 cancel single-source)", () => {
+  test("begin → active; clear → inactive (no hook fired)", () => {
+    let cancelled = 0;
+    beginIframeDrag(() => {
+      cancelled += 1;
+    });
+    expect(isDragActive()).toBe(true);
+    clearIframeDrag();
+    expect(isDragActive()).toBe(false);
+    expect(cancelled).toBe(0);
+  });
+
+  test("cancelIframeDrag runs the hook once and goes inactive", () => {
+    let cancelled = 0;
+    beginIframeDrag(() => {
+      cancelled += 1;
+    });
+    cancelIframeDrag();
+    expect(cancelled).toBe(1);
+    expect(isDragActive()).toBe(false);
+    // A second cancel is a no-op (single-source: the hook never double-fires).
+    cancelIframeDrag();
+    expect(cancelled).toBe(1);
+  });
+});
+
+describe("startGrabDetector (flow 3 — iframe-driven)", () => {
+  /** A recording channel + a stub deps whose previewAt returns a fixed preview (or null). */
+  function setup(preview: DropPreview | null = null) {
+    const posts: Record<string, unknown>[] = [];
+    const channel = { post: (m: Record<string, unknown>) => posts.push(m) };
+    const seen: { previews: { cursor: { x: number; y: number }; src: DragSrcKind }[] } = {
+      previews: [],
+    };
+    const armed: { cursor: { x: number; y: number }; dragSeq: number; src: DragSrcKind }[] = [];
+    let stopped = 0;
+    const deps = {
+      armAutoScroll: (cursor: { x: number; y: number }, dragSeq: number, src: DragSrcKind) =>
+        armed.push({ cursor, dragSeq, src }),
+      gen: () => 7,
+      previewAt: (cursor: { x: number; y: number }, src: DragSrcKind) => {
+        seen.previews.push({ cursor, src });
+        return preview;
+      },
+      stopAutoScroll: () => {
+        stopped += 1;
+      },
+    };
+    return { armed, channel, deps, posts, seen, stopped: () => stopped };
+  }
+
+  test("originate then drive: dragOriginate + a dragOver carrying the cursor (gen + preview)", () => {
+    const preview: DropPreview = {
+      edge: "top",
+      instruction: "reorder-above",
+      referenceRect: { height: 50, width: 100, x: 0, y: 0 },
+      targetPath: ["children", 1],
+    };
+    const { armed, channel, deps, posts, seen } = setup(preview);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    // A move past threshold originates AND drives the first move in one event.
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+
+    const originate = posts.find((p) => p.kind === "dragOriginate");
+    expect(originate).toMatchObject({ kind: "dragOriginate", path: ["children", 1] });
+    const over = posts.find((p) => p.kind === "dragOver");
+    // The cursor is iframe-local (no parentCursorToIframe — the iframe owns its coords); gen + preview
+    // Come straight from the injected deps.
+    expect(over).toMatchObject({ cursor: { x: 20, y: 30 }, gen: 7, kind: "dragOver", preview });
+    // The originate seq tags both messages (the parent adopts it).
+    expect(over!.dragSeq).toBe(originate!.dragSeq);
+    // The injected previewAt saw the iframe-local cursor + the tree-node src for the grabbed path.
+    expect(seen.previews[0]).toEqual({
+      cursor: { x: 20, y: 30 },
+      src: { path: ["children", 1], type: "tree-node" },
+    });
+    expect(armed[0]!.src).toEqual({ path: ["children", 1], type: "tree-node" });
+    expect(isDragActive()).toBe(true);
+
+    stop();
+    target.remove();
+  });
+
+  test("a later move (after originating) drives another dragOver from its own cursor", () => {
+    const { channel, deps, posts } = setup(null);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 90 }),
+    );
+    const overs = posts.filter((p) => p.kind === "dragOver");
+    expect(overs).toHaveLength(2);
+    // The second dragOver carries the second cursor; preview is null (no target) but cursor present.
+    expect(overs[1]).toMatchObject({ cursor: { x: 60, y: 90 }, kind: "dragOver", preview: null });
+
+    stop();
+    target.remove();
+  });
+
+  test("pointerup posts dropResult computed FRESH and tears the drag down", () => {
+    const preview: DropPreview = {
+      edge: "bottom",
+      instruction: "reorder-below",
+      referenceRect: { height: 50, width: 100, x: 0, y: 0 },
+      targetPath: ["children", 1],
+    };
+    const { channel, deps, posts, stopped } = setup(preview);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointerup", { bubbles: true, clientX: 25, clientY: 40 }),
+    );
+
+    const result = posts.find((p) => p.kind === "dropResult");
+    expect(result).toMatchObject({
+      gen: 7,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 1],
+    });
+    // The drag is no longer active and auto-scroll was stopped on the drop.
+    expect(isDragActive()).toBe(false);
+    expect(stopped()).toBeGreaterThan(0);
+
+    stop();
+    target.remove();
+  });
+
+  test("a null-target pointerup posts a dropResult with null instruction/targetPath", () => {
+    const { channel, deps, posts } = setup(null);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointerup", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    expect(posts.find((p) => p.kind === "dropResult")).toMatchObject({
+      instruction: null,
+      kind: "dropResult",
+      targetPath: null,
+    });
+    stop();
+    target.remove();
+  });
+
+  test("a pointerdown that doesn't move past threshold never originates", () => {
+    const { channel, deps, posts } = setup();
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 11, clientY: 11 }),
+    );
+    expect(posts.find((p) => p.kind === "dragOriginate")).toBeUndefined();
+    expect(posts.find((p) => p.kind === "dragOver")).toBeUndefined();
+    stop();
+    target.remove();
+  });
+
+  test("a non-primary button never arms a candidate", () => {
+    const { channel, deps, posts } = setup();
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 2, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 40 }),
+    );
+    expect(posts.find((p) => p.kind === "dragOriginate")).toBeUndefined();
+    stop();
+    target.remove();
+  });
+
+  test("INLINE-EDIT GUARD: a pointerdown+move while editing originates nothing", () => {
+    editing = true;
+    // The guard returns null during an inline-edit session (typing must not start a reorder).
+    const inner = document.createElement("span");
+    const wrap = el(["children", 1], { height: 50, top: 0 });
+    wrap.append(inner);
+    expect(grabCandidatePath(inner)).toBeNull();
+
+    const { channel, deps, posts } = setup();
+    document.body.append(wrap);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+    inner.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 40, clientY: 40 }),
+    );
+    expect(posts).toHaveLength(0);
+    stop();
+    wrap.remove();
   });
 });

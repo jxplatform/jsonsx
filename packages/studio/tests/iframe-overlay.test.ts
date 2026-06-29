@@ -116,3 +116,47 @@ describe("createOverlayLayer", () => {
     expect(layer.root.isConnected).toBe(false);
   });
 });
+
+describe("setDropIndicator (Phase 4c)", () => {
+  const drop = () => {
+    const layer = createOverlayLayer(document);
+    return { box: layer.root.querySelector(".canvas-drop-indicator") as HTMLElement, layer };
+  };
+
+  test("starts hidden", () => {
+    expect(drop().box.style.display).toBe("none");
+  });
+
+  test("edge=inside draws a dashed box over the reference rect", () => {
+    const { box, layer } = drop();
+    layer.setDropIndicator({ height: 40, left: 10, top: 20, width: 120 }, "inside");
+    expect(box.style.display).toBe("block");
+    expect(box.className).toContain("inside");
+    expect(box.style.left).toBe("10px");
+    expect(box.style.top).toBe("20px");
+    expect(box.style.width).toBe("120px");
+    expect(box.style.height).toBe("40px");
+  });
+
+  test("edge=top draws a thin line at the reference's top", () => {
+    const { box, layer } = drop();
+    layer.setDropIndicator({ height: 40, left: 10, top: 20, width: 120 }, "top");
+    expect(box.className).toContain("line");
+    expect(box.style.top).toBe("20px");
+    expect(box.style.height).toBe("");
+  });
+
+  test("edge=bottom draws a thin line at the reference's bottom (top+height)", () => {
+    const { box, layer } = drop();
+    layer.setDropIndicator({ height: 40, left: 10, top: 20, width: 120 }, "bottom");
+    expect(box.className).toContain("line");
+    expect(box.style.top).toBe("60px");
+  });
+
+  test("null hides the indicator", () => {
+    const { box, layer } = drop();
+    layer.setDropIndicator({ height: 40, left: 10, top: 20, width: 120 }, "inside");
+    layer.setDropIndicator(null);
+    expect(box.style.display).toBe("none");
+  });
+});

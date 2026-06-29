@@ -40,7 +40,6 @@ import {
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import { setIframePatchEscalation, setToolbarRefresh } from "./canvas/iframe-host";
-import { registerSubtreeDnD } from "./panels/canvas-dnd";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
   mountStatusbar,
@@ -383,7 +382,6 @@ initCanvasLiveRender({
 initCanvasPatcher({
   applyCanvasMediaOverrides,
   getCanvasMode,
-  registerSubtreeDnD,
   renderOverlays,
   scheduleCanvasRender,
   updateForcedPseudoPreview,

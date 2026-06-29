@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
 import { canvasPanels } from "../src/store";
+import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
-import type { CanvasPanel } from "../src/panels/canvas-dnd";
+import type { CanvasPanel } from "../src/types";
 
 const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
 happyDOM.setURL("http://localhost:3000/");
@@ -65,7 +66,9 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
 }));
 
 const {
+  adoptDragSession,
   beginDragSession,
+  clearDropIndicator,
   currentDragSession,
   endDragSession,
   getActiveEditHost,
@@ -78,6 +81,7 @@ const {
   postApplyFormat,
   postDragMessage,
   postPatchToHosts,
+  setIframeOriginateHandler,
   setIframePatchEscalation,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
@@ -766,6 +770,196 @@ describe("cross-frame drag session (Phase 4c)", () => {
       dragSeq: 1,
       kind: "dragMove",
     });
+  });
+
+  /** The host's overlay drop-indicator box (Phase 4c). */
+  const indicator = (canvasEl: HTMLElement) =>
+    canvasEl.querySelector(".canvas-drop-indicator") as HTMLElement;
+
+  test("dragOver with a preview draws the indicator at scale=1 (no double-scale)", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const seq = beginDragSession(host, { type: "block" }, { fragment: {}, type: "block" });
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: {
+        edge: "top",
+        instruction: "reorder-above",
+        referenceRect: { height: 30, width: 120, x: 10, y: 40 },
+        targetPath: ["children", 0],
+      },
+    });
+    const box = indicator(canvasEl);
+    expect(box.style.display).toBe("block");
+    // The canvasRectToParent scale=1 map is straight through (D-2): top is the rect y, not y*zoom.
+    expect(box.style.top).toBe("40px");
+    expect(box.style.left).toBe("10px");
+    expect(box.className).toContain("line");
+    endDragSession(seq);
+  });
+
+  test("dragOver with a null preview hides the indicator", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const seq = beginDragSession(host, { type: "block" }, { fragment: {}, type: "block" });
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: {
+        edge: "inside",
+        instruction: "make-child",
+        referenceRect: { height: 30, width: 120, x: 10, y: 40 },
+        targetPath: ["children", 0],
+      },
+    });
+    channels[0]!.deliver({ dragSeq: seq, gen: 4, kind: "dragOver", preview: null });
+    expect(indicator(canvasEl).style.display).toBe("none");
+    endDragSession(seq);
+  });
+
+  test("dropResult clears the indicator after applying", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: {
+        edge: "top",
+        instruction: "reorder-above",
+        referenceRect: { height: 30, width: 120, x: 10, y: 40 },
+        targetPath: ["children", 0],
+      },
+    });
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    expect(indicator(canvasEl).style.display).toBe("none");
+  });
+
+  test("dragEnd (iframe-originated cancel) clears the indicator + releases the retained data", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { path: ["children", 0], type: "tree-node" },
+      { path: ["children", 0], type: "tree-node" },
+    );
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: {
+        edge: "inside",
+        instruction: "make-child",
+        referenceRect: { height: 30, width: 120, x: 10, y: 40 },
+        targetPath: ["children", 0],
+      },
+    });
+    channels[0]!.deliver({ dragSeq: seq, kind: "dragEnd" });
+    expect(indicator(canvasEl).style.display).toBe("none");
+    // The retained data was released — a late non-stale dropResult applies nothing.
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
+  });
+
+  test("dragOriginate routes to the installed coordinator handler with the host + path + seq", async () => {
+    const { host } = await readyHostAt(4);
+    const seen: { host: unknown; path: unknown; seq: unknown }[] = [];
+    setIframeOriginateHandler((h, p, s) => seen.push({ host: h, path: p, seq: s }));
+    channels[0]!.deliver({ dragSeq: 11, kind: "dragOriginate", path: ["children", 0] });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.host).toBe(host as never);
+    expect(seen[0]!.path).toEqual(["children", 0]);
+    // The iframe's seq is threaded through so the parent can adopt it (replies pass the seq gate).
+    expect(seen[0]!.seq).toBe(11);
+    setIframeOriginateHandler(() => {});
+  });
+
+  test("adoptDragSession sets the seq + retains data so a matching dropResult applies", async () => {
+    const { host } = await readyHostAt(4);
+    // Adopt an iframe-driven session at seq 77 (no dragStart posted), then a matching dropResult.
+    // Use a block fragment so the drop INSERTS (a tree-node move of a node below itself is a no-op).
+    const seq = adoptDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+      77,
+    );
+    expect(seq).toBe(77);
+    expect(currentDragSession()).toBe(77);
+    channels[0]!.deliver({
+      dragSeq: 77,
+      gen: 4,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    // The retained (adopted) source data drove the insert — the dropResult applied.
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(2);
+  });
+
+  test("flow-3 dragOver WITH a cursor moves the ghost to the forward-converted position", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const iframe = canvasEl.querySelector("iframe")! as HTMLIFrameElement;
+    // Scale = rect.width / clientWidth = 600 / 300 = 2; rect left/top = 10/20.
+    stubRect(iframe, { height: 240, left: 10, top: 20, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+
+    const seq = adoptDragSession(
+      host,
+      { path: ["children", 0], type: "tree-node" },
+      { path: ["children", 0], type: "tree-node" },
+      88,
+    );
+    // Show the ghost so moveDragGhost (no-op while hidden) actually positions it.
+    setDragGhost("p", 0, 0);
+    channels[0]!.deliver({
+      cursor: { x: 100, y: 50 },
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: null,
+    });
+    const ghost = document.querySelector(".jx-drag-ghost") as HTMLElement;
+    // Forward-convert iframe→parent: x*scale+left = 100*2+10 = 210; y*scale+top = 50*2+20 = 120.
+    expect(ghost.style.left).toBe("210px");
+    expect(ghost.style.top).toBe("120px");
+    clearDragGhost();
+    endDragSession(seq);
+  });
+
+  test("clearDropIndicator hides the host's indicator", async () => {
+    const { canvasEl, host } = await readyHostAt(4);
+    const seq = beginDragSession(host, { type: "block" }, { fragment: {}, type: "block" });
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: {
+        edge: "inside",
+        instruction: "make-child",
+        referenceRect: { height: 30, width: 120, x: 10, y: 40 },
+        targetPath: ["children", 0],
+      },
+    });
+    clearDropIndicator(host);
+    expect(indicator(canvasEl).style.display).toBe("none");
+    endDragSession(seq);
   });
 });
 

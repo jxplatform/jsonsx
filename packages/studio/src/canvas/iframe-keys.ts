@@ -10,6 +10,7 @@
  * is focused inside the iframe are left alone so typing still works.
  */
 
+import { cancelIframeDrag, isDragActive } from "./iframe-drop";
 import type { IframeChannel } from "./iframe-channel";
 import type { IframeToParent, ParentToIframe, SerializedKey } from "./iframe-protocol";
 
@@ -65,6 +66,14 @@ export function startKeyForwarding(
   doc: Document = document,
 ): () => void {
   const onKey = (e: KeyboardEvent) => {
+    // Escape during a flow-3 (iframe-originated) drag cancels locally — the iframe owns cancel for
+    // That case (single-sourced through iframe-drop), so it must NOT also forward Escape to the
+    // Parent (which would tear down via a second path and double-fire).
+    if (e.key === "Escape" && isDragActive()) {
+      e.preventDefault();
+      cancelIframeDrag();
+      return;
+    }
     if (!shouldForwardKey(e)) {
       return;
     }

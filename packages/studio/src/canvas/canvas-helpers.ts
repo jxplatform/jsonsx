@@ -11,7 +11,7 @@ import { activeTab } from "../workspace/workspace";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { CanvasPanel } from "../panels/canvas-dnd.js";
+import type { CanvasPanel } from "../types";
 
 let _ctx: { getCanvasMode: () => string; getZoom: () => number } | null = null;
 
@@ -159,7 +159,7 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
  *
  * @param {Element} el
  * @param {string} type
- * @param {import("../panels/canvas-dnd.js").CanvasPanel} panel
+ * @param {import("../types").CanvasPanel} panel
  */
 export function overlayBoxDescriptor(el: Element, type: string, panel: CanvasPanel) {
   const viewport = panel.viewport as HTMLElement;

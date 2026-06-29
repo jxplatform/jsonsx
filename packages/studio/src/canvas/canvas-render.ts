@@ -42,8 +42,7 @@ import { mediaDisplayName } from "../panels/shared";
 import { statusMessage } from "../panels/statusbar";
 import * as overlaysPanel from "../panels/overlays";
 
-import type { CanvasPanel } from "../panels/canvas-dnd";
-import type { GitDiffState } from "../types";
+import type { CanvasPanel, GitDiffState } from "../types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { Tab } from "../tabs/tab.js";
 

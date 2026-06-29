@@ -33,7 +33,6 @@ let divEl: HTMLElement;
 let emEl: HTMLElement;
 let canvasMode = "design";
 const ctxCalls = {
-  dndRegistered: 0,
   overlays: 0,
   pseudo: 0,
   scheduled: 0,
@@ -50,7 +49,6 @@ function child(i: number): JxMutableNode {
 beforeEach(() => {
   resetCanvasPerf();
   canvasMode = "design";
-  ctxCalls.dndRegistered = 0;
   ctxCalls.overlays = 0;
   ctxCalls.pseudo = 0;
   ctxCalls.scheduled = 0;
@@ -100,9 +98,6 @@ beforeEach(() => {
   initCanvasPatcher({
     applyCanvasMediaOverrides: () => {},
     getCanvasMode: () => canvasMode,
-    registerSubtreeDnD: () => {
-      ctxCalls.dndRegistered += 1;
-    },
     renderOverlays: () => {
       ctxCalls.overlays += 1;
     },

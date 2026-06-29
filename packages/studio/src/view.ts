@@ -37,11 +37,6 @@ interface ViewState {
   forcedAttrEl: HTMLElement | null;
   elementsCollapsed: Set<string>;
   elementsFilter: string;
-  lastDragInput: {
-    clientX: number;
-    clientY: number;
-    [k: string]: unknown;
-  } | null;
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
   _completionRegistered: boolean;
@@ -91,7 +86,6 @@ export const view: ViewState = {
   elementsFilter: "",
 
   // Drag interaction
-  lastDragInput: null,
   _currentDropTargetRow: null,
   layerDragSourceHeight: 0,
 

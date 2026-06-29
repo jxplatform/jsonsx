@@ -24,13 +24,21 @@ const fakeHost = { id: "host" } as unknown as AnyRec;
 const calls: AnyRec[] = [];
 let hostAt: AnyRec | null = fakeHost;
 let dragSeq = 5;
+// The flow-3 handler the bridge installs via setIframeOriginateHandler (captured for direct drive).
+let originateHandler: ((host: AnyRec, path: AnyRec, seq: number) => void) | null = null;
 
 void mock.module("../src/canvas/iframe-host", () => ({
+  adoptDragSession: (host: AnyRec, src: AnyRec, srcData: AnyRec, seq: number) => {
+    dragSeq = seq;
+    calls.push({ fn: "adopt", host, seq, src, srcData });
+    return seq;
+  },
   beginDragSession: (host: AnyRec, src: AnyRec, srcData: AnyRec) => {
-    calls.push({ fn: "begin", host, src, srcData });
     dragSeq += 1;
+    calls.push({ fn: "begin", host, seq: dragSeq, src, srcData });
     return dragSeq;
   },
+  clearDropIndicator: (host: AnyRec) => calls.push({ fn: "clearIndicator", host }),
   currentDragSession: () => dragSeq,
   endDragSession: (seq: number) => calls.push({ fn: "end", seq }),
   hostDragGeometry: (host: AnyRec) => {
@@ -42,9 +50,21 @@ void mock.module("../src/canvas/iframe-host", () => ({
     return hostAt;
   },
   postDragMessage: (host: AnyRec, msg: AnyRec) => calls.push({ fn: "post", host, msg }),
+  setIframeOriginateHandler: (fn: (host: AnyRec, path: AnyRec, seq: number) => void) => {
+    originateHandler = fn;
+  },
 }));
 
-const { buildDragMessages, registerCanvasDndBridge } =
+// The drag-ghost module touches document.body; record show/move/clear without asserting DOM here
+// (the DOM placement is covered by the drag-ghost unit test).
+void mock.module("../src/panels/drag-ghost", () => ({
+  clearDragGhost: () => calls.push({ fn: "ghostClear" }),
+  moveDragGhost: (x: number, y: number) => calls.push({ fn: "ghostMove", x, y }),
+  setDragGhost: (label: string, x: number, y: number) =>
+    calls.push({ fn: "ghostShow", label, x, y }),
+}));
+
+const { buildDragMessages, isCancelDrop, registerCanvasDndBridge } =
   await import("../src/panels/canvas-dnd-bridge");
 
 /** A pragmatic monitor location with the cursor at (clientX, clientY). */
@@ -55,8 +75,12 @@ beforeEach(() => {
   calls.length = 0;
   hostAt = fakeHost;
   dragSeq = 5;
+  originateHandler = null;
   registerCanvasDndBridge();
 });
+
+/** Drive a full parent-source drag: start over fakeHost, then return the captured monitor. */
+const m = () => monitors[0]!;
 
 afterEach(() => {
   monitors.length = 0;
@@ -90,10 +114,27 @@ describe("registerCanvasDndBridge — coordinator", () => {
     expect(begin!.srcData).toBe(src); // The full fragment is retained (never crosses the wire).
   });
 
-  test("onDragStart ignores non-block (tree-node) sources this slice", () => {
+  test("onDragStart begins a session for a tree-node source, retaining its path", () => {
+    const src = { path: ["children", 0], type: "tree-node" };
+    monitors[0]!.onDragStart({ location: loc(300, 250), source: { data: src } });
+    const begin = calls.find((c) => c.fn === "begin");
+    expect(begin).toBeTruthy();
+    expect(begin!.src).toEqual({ path: ["children", 0], type: "tree-node" });
+    expect(begin!.srcData).toBe(src);
+  });
+
+  test("onDragStart ignores a tree-node source missing a path (e.g. an unselected handle)", () => {
     monitors[0]!.onDragStart({
       location: loc(300, 250),
-      source: { data: { path: ["children", 0], type: "tree-node" } },
+      source: { data: { type: "tree-node" } },
+    });
+    expect(calls.find((c) => c.fn === "begin")).toBeUndefined();
+  });
+
+  test("onDragStart ignores unrelated sources (no recognized type)", () => {
+    monitors[0]!.onDragStart({
+      location: loc(300, 250),
+      source: { data: { type: "something-else" } },
     });
     expect(calls.find((c) => c.fn === "begin")).toBeUndefined();
   });
@@ -109,12 +150,15 @@ describe("registerCanvasDndBridge — coordinator", () => {
     expect(post!.msg.cursor).toEqual({ x: 100, y: 100 });
   });
 
-  test("onDrag over no host posts nothing", () => {
-    monitors[0]!.onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+  test("onDrag crossing OUT of the bound canvas posts dragEnd to the old host, then no move", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
     hostAt = null;
     calls.length = 0;
-    monitors[0]!.onDrag({ location: loc(5, 5), source: { data: { type: "block" } } });
-    expect(calls.find((c) => c.fn === "post")).toBeUndefined();
+    m().onDrag({ location: loc(5, 5), source: { data: { type: "block" } } });
+    // Inside→outside transition: dragEnd to the previously-bound host, no dragMove.
+    const ended = calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd");
+    expect(ended!.host).toBe(fakeHost);
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "dragMove")).toBeUndefined();
   });
 
   test("onDrop posts a drop to the host at the DROP cursor", () => {
@@ -126,19 +170,34 @@ describe("registerCanvasDndBridge — coordinator", () => {
     expect(post!.msg.cursor).toEqual({ x: 100, y: 100 });
   });
 
-  test("onDrop off every canvas releases the retained source data (no post)", () => {
-    monitors[0]!.onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+  test("onDrop off every canvas releases the retained source data (dragEnd old, no drop)", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
     hostAt = null;
     calls.length = 0;
-    monitors[0]!.onDrop({ location: loc(5, 5), source: { data: { type: "block" } } });
-    expect(calls.find((c) => c.fn === "post")).toBeUndefined();
+    m().onDrop({ location: loc(5, 5), source: { data: { type: "block" } } });
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "drop")).toBeUndefined();
     expect(calls.find((c) => c.fn === "end")).toBeTruthy();
+    expect(calls.find((c) => c.fn === "ghostClear")).toBeTruthy();
   });
 
-  test("onDrop ignores non-block sources", () => {
+  test("onDrop posts a drop for a tree-node source (a move)", () => {
+    monitors[0]!.onDragStart({
+      location: loc(300, 250),
+      source: { data: { path: ["children", 1], type: "tree-node" } },
+    });
+    calls.length = 0;
     monitors[0]!.onDrop({
       location: loc(300, 250),
-      source: { data: { path: [], type: "tree-node" } },
+      source: { data: { path: ["children", 1], type: "tree-node" } },
+    });
+    const post = calls.find((c) => c.fn === "post" && c.msg.kind === "drop");
+    expect(post!.host).toBe(fakeHost);
+  });
+
+  test("onDrop ignores unrecognized sources", () => {
+    monitors[0]!.onDrop({
+      location: loc(300, 250),
+      source: { data: { type: "something-else" } },
     });
     expect(calls).toHaveLength(0);
   });
@@ -155,5 +214,122 @@ describe("registerCanvasDndBridge — coordinator", () => {
     monitors[0]!.onDrop({ location: loc(900, 60), source: { data: { type: "block" } } });
     const post = calls.find((c) => c.fn === "post" && c.msg.kind === "drop");
     expect(post!.host).toBe(hostB);
+  });
+
+  test("onDragStart shows the ghost with the block fragment's tag label", () => {
+    m().onDragStart({
+      location: loc(300, 250),
+      source: { data: { fragment: { tagName: "section" }, type: "block" } },
+    });
+    const show = calls.find((c) => c.fn === "ghostShow");
+    expect(show!.label).toBe("section");
+    expect({ x: show!.x, y: show!.y }).toEqual({ x: 300, y: 250 });
+  });
+
+  test("onDrag moves the ghost to the raw cursor 1:1 (not the converted iframe coord)", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    m().onDrag({ location: loc(321, 222), source: { data: { type: "block" } } });
+    const moved = calls.find((c) => c.fn === "ghostMove");
+    expect({ x: moved!.x, y: moved!.y }).toEqual({ x: 321, y: 222 });
+  });
+
+  test("MIGRATION: onDrag crossing into a DIFFERENT panel dragEnds old + dragStarts new", () => {
+    const hostA = { id: "A" } as unknown as AnyRec;
+    const hostB = { id: "B" } as unknown as AnyRec;
+    hostAt = hostA;
+    m().onDragStart({ location: loc(150, 60), source: { data: { type: "block" } } });
+    hostAt = hostB;
+    calls.length = 0;
+    m().onDrag({ location: loc(900, 60), source: { data: { type: "block" } } });
+    const ended = calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd");
+    const begun = calls.find((c) => c.fn === "begin");
+    expect(ended!.host).toBe(hostA);
+    expect(begun!.host).toBe(hostB);
+    // A dragMove to the NEW host follows the migration so the new iframe drives the preview.
+    const moved = calls.find((c) => c.fn === "post" && c.msg.kind === "dragMove");
+    expect(moved!.host).toBe(hostB);
+  });
+
+  test("CANCEL (Escape snap-back): onDrop with current==initial tears down without a drop", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    // Pragmatic resets current to initial on cancel → equal coords.
+    m().onDrop({
+      location: {
+        current: { input: { clientX: 9, clientY: 9 } },
+        initial: { input: { clientX: 9, clientY: 9 } },
+      },
+      source: { data: { type: "block" } },
+    });
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "drop")).toBeUndefined();
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd")).toBeTruthy();
+    expect(calls.find((c) => c.fn === "ghostClear")).toBeTruthy();
+  });
+
+  test("TIMEOUT fallback: no dropResult within the window clears ghost + indicator", async () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    m().onDrop({ location: loc(300, 250), source: { data: { type: "block" } } });
+    // The drop was posted; the iframe never replies, so after the timeout the affordances clear.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 300);
+    });
+    expect(calls.find((c) => c.fn === "ghostClear")).toBeTruthy();
+    expect(calls.find((c) => c.fn === "clearIndicator")).toBeTruthy();
+  });
+});
+
+describe("isCancelDrop (pure)", () => {
+  test("no initial → not a cancel", () => {
+    expect(isCancelDrop(loc(10, 10))).toBe(false);
+  });
+  test("current==initial → cancel", () => {
+    expect(
+      isCancelDrop({
+        current: { input: { clientX: 5, clientY: 6 } },
+        initial: { input: { clientX: 5, clientY: 6 } },
+      }),
+    ).toBe(true);
+  });
+  test("current!=initial → real drop", () => {
+    expect(
+      isCancelDrop({
+        current: { input: { clientX: 5, clientY: 6 } },
+        initial: { input: { clientX: 5, clientY: 99 } },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("startIframeOriginatedDrag (flow 3 — iframe-driven)", () => {
+  test("the bridge installs an originate handler that ADOPTS the iframe's seq + session", () => {
+    expect(originateHandler).toBeTruthy();
+    // The handler receives (host, path, seq); the iframe drives, so the parent adopts the seq.
+    originateHandler!(fakeHost, ["children", 2], 42);
+    const adopt = calls.find((c) => c.fn === "adopt");
+    expect(adopt).toBeTruthy();
+    expect(adopt!.host).toBe(fakeHost);
+    expect(adopt!.seq).toBe(42);
+    expect(adopt!.src).toEqual({ path: ["children", 2], type: "tree-node" });
+    expect(adopt!.srcData).toEqual({ path: ["children", 2], type: "tree-node" });
+    // It does NOT begin a parent-driven session (no dragStart for an iframe-driven drag).
+    expect(calls.find((c) => c.fn === "begin")).toBeUndefined();
+    // It shows the ghost (the host's dragOver handler then moves it from the posted cursor).
+    expect(calls.find((c) => c.fn === "ghostShow")).toBeTruthy();
+  });
+
+  test("attaches NO parent-document listeners: a parent pointermove posts nothing", () => {
+    originateHandler!(fakeHost, ["children", 0], 7);
+    calls.length = 0;
+    // The iframe owns the pointer it started; the parent must not synthesize any move/drop.
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 300, clientY: 250 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointerup", { bubbles: true, clientX: 300, clientY: 250 }),
+    );
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "dragMove")).toBeUndefined();
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "drop")).toBeUndefined();
   });
 });

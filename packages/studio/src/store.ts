@@ -12,7 +12,7 @@
 import { activeTab } from "./workspace/workspace";
 import type { JxPath } from "./state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { CanvasPanel } from "./panels/canvas-dnd.js";
+import type { CanvasPanel } from "./types";
 
 export {
   createState,

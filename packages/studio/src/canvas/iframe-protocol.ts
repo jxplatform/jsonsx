@@ -96,7 +96,12 @@ export type ParentToIframe =
   // The pointer moved over the canvas. `cursor` is already converted to IFRAME-VIEWPORT coords.
   | { kind: "dragMove"; cursor: { x: number; y: number }; dragSeq: number }
   // The pointer was released over the canvas — the iframe computes the drop FRESH and posts dropResult.
-  | { kind: "drop"; cursor: { x: number; y: number }; dragSeq: number };
+  | { kind: "drop"; cursor: { x: number; y: number }; dragSeq: number }
+  // The pointer left this canvas (dropped elsewhere / migrated to another panel): the iframe forgets
+  // The session + stops any auto-scroll. `dragMove`/`drop` arriving after are no-ops.
+  | { kind: "dragEnd"; dragSeq: number }
+  // The drag was cancelled (Escape/abort from the parent realm) — same teardown as dragEnd.
+  | { kind: "dragCancel"; dragSeq: number };
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -213,9 +218,28 @@ export type IframeToParent =
   // The inline-edit session ended.
   | { kind: "editEnd" }
   // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
+  // Flow 3 (grab-anywhere): the iframe detected a drag begin on an element body (pointerdown past a
+  // Movement threshold on a `[data-jx-path]`, NOT during an inline-edit). The parent starts a
+  // Coordinator session as a `tree-node` source with this `path` and synthesizes dragMove from its
+  // Own pointermove over the iframe. `dragSeq` is the iframe's pre-allocated session hint; the parent
+  // Bumps its own authoritative seq in beginDragSession.
+  | { kind: "dragOriginate"; path: (string | number)[]; dragSeq: number }
+  // The iframe cancelled a flow-3 (iframe-originated) drag locally (Escape during a body-grab): the
+  // Parent tears down its ghost/indicator. Single-sourced through the iframe for that case so cancel
+  // Never double-fires (the parent-source flows cancel via pragmatic instead).
+  | { kind: "dragEnd"; dragSeq: number }
   // A display-only drop preview for the parent's indicator. `gen` lets the parent drop previews
   // Computed against a superseded render; `preview` is null when the cursor resolves to no drop.
-  | { kind: "dragOver"; dragSeq: number; gen: number; preview: DropPreview | null }
+  // `cursor` is present ONLY for flow-3 (iframe-driven) drags, in IFRAME-VIEWPORT coords: the parent
+  // Has no pointer during an iframe-originated drag, so it positions the ghost by forward-converting
+  // This cursor. Parent-driven flows (1/2/4) omit it (the parent already has the raw cursor).
+  | {
+      kind: "dragOver";
+      dragSeq: number;
+      gen: number;
+      preview: DropPreview | null;
+      cursor?: { x: number; y: number };
+    }
   // The resolved drop, computed FRESH from the current DOM. The parent (if non-stale, non-null)
   // Applies it via applyDropInstruction with the retained source data.
   | {

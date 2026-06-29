@@ -8,7 +8,14 @@
 import { postMessageChannel } from "./iframe-channel";
 import { renderResolvedDocument } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
-import { computeDropInstruction, resolveDropTarget } from "./iframe-drop";
+import {
+  AUTO_SCROLL_STEP,
+  clearIframeDrag,
+  computeDropInstruction,
+  resolveDropTarget,
+  scrollDirection,
+  startGrabDetector,
+} from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
@@ -62,6 +69,95 @@ export function startCanvasIframe(opts: {
   let dragSrc: DragSrcKind | null = null;
   let dragGen = -1;
 
+  // ─── Auto-scroll (commit 6) — a SELF-SUSTAINING rAF loop. When a dragMove lands in an edge band,
+  // The loop each frame scrolls the viewport AND re-hit-tests the CACHED cursor (elementFromPoint is
+  // Viewport-relative, so the same x,y now resolves to a different node after the scroll) and re-posts
+  // The over-preview. It is NOT driven by dragMove (the pointer is stationary at an edge-hold). Stops
+  // On: band exit (next dragMove, dir 0), drop/dragEnd/dragCancel, or scroll extent reached (scrollY
+  // Unchanged). The win/rAF body is the only uncovered line; scrollDirection is PURE + unit-tested.
+  let autoScrollFrame = 0;
+  // The cached edge-hold cursor. For a flow-3 (iframe-driven) drag it also carries the drag `src`
+  // (the parent never posts a dragStart, so `dragSrc`/`dragGen` are null) and `withCursor`, so the
+  // Loop re-posts dragOver WITH the cursor to keep the parent's ghost tracking during an edge-hold
+  // (the parent has no pointer of its own then). Parent-driven flows (1/2/4) leave `src` undefined
+  // And `withCursor` false — the tick falls back to `dragSrc`/`dragGen` and the parent moves the
+  // Ghost from its own raw pointer.
+  let autoScrollCursor: {
+    x: number;
+    y: number;
+    dragSeq: number;
+    withCursor: boolean;
+    src?: DragSrcKind;
+    gen?: number;
+  } | null = null;
+  const win = container.ownerDocument.defaultView;
+
+  function stopAutoScroll(): void {
+    if (autoScrollFrame && win) {
+      win.cancelAnimationFrame(autoScrollFrame);
+    }
+    autoScrollFrame = 0;
+    autoScrollCursor = null;
+  }
+
+  function autoScrollTick(): void {
+    autoScrollFrame = 0;
+    // Flow 3 supplies its own src on the cached cursor; flows 1/2/4 use the session's dragSrc.
+    const src = autoScrollCursor?.src ?? dragSrc;
+    if (!win || !autoScrollCursor || !src || !shadowDoc) {
+      return;
+    }
+    const dir = scrollDirection(autoScrollCursor.y, win.innerHeight);
+    if (dir === 0) {
+      return;
+    }
+    const before = win.scrollY;
+    win.scrollBy(0, dir * AUTO_SCROLL_STEP);
+    if (win.scrollY === before) {
+      // Scroll extent reached — nothing more to reveal, so stop the loop.
+      return;
+    }
+    const preview = previewAt(autoScrollCursor, src, shadowDoc, container.ownerDocument);
+    channel.post({
+      // Flow 3 (withCursor) re-posts the cursor so the parent keeps tracking the ghost at an edge-hold.
+      ...(autoScrollCursor.withCursor
+        ? { cursor: { x: autoScrollCursor.x, y: autoScrollCursor.y } }
+        : {}),
+      dragSeq: autoScrollCursor.dragSeq,
+      gen: autoScrollCursor.gen ?? dragGen,
+      kind: "dragOver",
+      preview,
+    });
+    autoScrollFrame = win.requestAnimationFrame(autoScrollTick);
+  }
+
+  /**
+   * (Re)evaluate auto-scroll for a dragMove cursor: arm the loop in a band, stop it outside. The
+   * optional `flow3` carries the iframe-driven drag's src/gen (and forces the cursor to be
+   * re-posted during edge-holds); parent-driven flows pass nothing and the loop uses
+   * `dragSrc`/`dragGen`.
+   */
+  function updateAutoScroll(
+    cursor: { x: number; y: number },
+    dragSeq: number,
+    flow3?: { src: DragSrcKind; gen: number },
+  ): void {
+    if (!win || scrollDirection(cursor.y, win.innerHeight) === 0) {
+      stopAutoScroll();
+      return;
+    }
+    autoScrollCursor = {
+      dragSeq,
+      withCursor: flow3 != null,
+      x: cursor.x,
+      y: cursor.y,
+      ...(flow3 ? { gen: flow3.gen, src: flow3.src } : {}),
+    };
+    if (!autoScrollFrame) {
+      autoScrollFrame = win.requestAnimationFrame(autoScrollTick);
+    }
+  }
+
   // Report pointer hit/hover (resolved to data-jx-path) to the parent, which owns selection +
   // Overlays — the cross-origin bridge means the parent never reads our DOM directly.
   const stopInteraction = startInteraction(channel, container.ownerDocument);
@@ -70,6 +166,19 @@ export function startCanvasIframe(opts: {
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
   const stopInlineEdit = startIframeInlineEdit(channel, container);
+  // Flow 3 (grab-anywhere): detect an element-body drag and DRIVE it locally. A drag that begins in
+  // The iframe gets its held-button moves in the IFRAME document (not the parent), so the iframe
+  // Computes the preview/drop from its own cursor and posts dragOver/dropResult directly; the parent
+  // Only adopts the seq, draws the indicator, and positions the ghost from the posted cursor. The
+  // Detector reuses the SAME previewAt + auto-scroll loop the dragMove/drop handlers use.
+  const stopGrabDetector = startGrabDetector(channel, container.ownerDocument, {
+    armAutoScroll: (cursor, dragSeq, src) =>
+      updateAutoScroll(cursor, dragSeq, { gen: renderedGen, src }),
+    gen: () => renderedGen,
+    previewAt: (cursor, src) =>
+      shadowDoc ? previewAt(cursor, src, shadowDoc, container.ownerDocument) : null,
+    stopAutoScroll,
+  });
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
@@ -110,6 +219,15 @@ export function startCanvasIframe(opts: {
       dragGen = msg.gen;
       return;
     }
+    if (msg.kind === "dragEnd" || msg.kind === "dragCancel") {
+      // The pointer left the canvas / the session was cancelled: forget the session so a late move
+      // Or drop is a no-op, and clear any flow-3 (iframe-originated) drag state + auto-scroll.
+      dragSrc = null;
+      dragGen = -1;
+      stopAutoScroll();
+      clearIframeDrag();
+      return;
+    }
     if (msg.kind === "dragMove") {
       // Display-only preview: hit-test the forwarded cursor, compute the placement, post dragOver.
       // Null target/instruction → post a null preview so the parent clears any stale indicator.
@@ -118,6 +236,8 @@ export function startCanvasIframe(opts: {
           ? previewAt(msg.cursor, dragSrc, shadowDoc, container.ownerDocument)
           : null;
       channel.post({ dragSeq: msg.dragSeq, gen: dragGen, kind: "dragOver", preview });
+      // Arm/stop the self-sustaining auto-scroll for this cursor (an edge-hold keeps scrolling).
+      updateAutoScroll(msg.cursor, msg.dragSeq);
       return;
     }
     if (msg.kind === "drop") {
@@ -135,6 +255,8 @@ export function startCanvasIframe(opts: {
       });
       dragSrc = null;
       dragGen = -1;
+      stopAutoScroll();
+      clearIframeDrag();
       return;
     }
     if (msg.kind !== "render" || msg.gen < latestGen) {
@@ -185,6 +307,8 @@ export function startCanvasIframe(opts: {
     stopInteraction();
     stopKeyForwarding();
     stopInlineEdit();
+    stopGrabDetector();
+    stopAutoScroll();
     handle?.dispose();
   };
 }

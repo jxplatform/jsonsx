@@ -10,6 +10,7 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 import {
   attachInstruction,
   extractInstruction,
@@ -42,6 +43,11 @@ import type { ComponentEntry } from "../files/components.js";
 interface DragCanDragArgs {
   element: HTMLElement;
   input: { clientX: number; clientY: number };
+}
+
+/** The `onGenerateDragPreview` argument subset we forward to {@link disableNativeDragPreview}. */
+interface DragPreviewArgs {
+  nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
 }
 
 interface DragDropSourceArgs {
@@ -85,6 +91,11 @@ export function registerLayersDnD() {
           element: row,
           getInitialData() {
             return { path: rowPath, type: "tree-node" };
+          },
+          onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+            // Suppress the browser's native drag image — the cross-frame ghost (Phase 4c) is the
+            // Only drag affordance, so a duplicate native preview would double up.
+            disableNativeDragPreview({ nativeSetDragImage });
           },
           onDragStart() {
             row.classList.add("dragging");
@@ -222,6 +233,9 @@ export function registerComponentsDnD() {
         getInitialData() {
           return { fragment: structuredClone(instanceDef), type: "block" };
         },
+        onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+          disableNativeDragPreview({ nativeSetDragImage });
+        },
       });
       view.dndCleanups.push(cleanup);
     }
@@ -248,6 +262,9 @@ export function registerElementsDnD() {
         element: row,
         getInitialData() {
           return { fragment: structuredClone(def), type: "block" };
+        },
+        onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+          disableNativeDragPreview({ nativeSetDragImage });
         },
       });
       view.dndCleanups.push(cleanup);

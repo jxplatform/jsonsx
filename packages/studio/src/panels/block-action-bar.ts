@@ -8,6 +8,7 @@ import { html, render as litRender, nothing } from "lit-html";
 import { styleMap } from "lit-html/directives/style-map.js";
 import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 
 import { childIndex, childList, getNodeAtPath, nodeLabel, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
@@ -519,6 +520,14 @@ export function renderBlockActionBar() {
                     path: activeTab.value?.session.selection,
                     type: "tree-node",
                   }),
+                  onGenerateDragPreview: ({
+                    nativeSetDragImage,
+                  }: {
+                    nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
+                  }) => {
+                    // Suppress the native drag image; the cross-frame ghost is the drag affordance.
+                    disableNativeDragPreview({ nativeSetDragImage });
+                  },
                 });
               })}
               >⠿</span

@@ -32,7 +32,6 @@ interface CanvasPatcherCtx {
   applyCanvasMediaOverrides: (canvasEl: Element, activeBreakpoints: Set<string>) => void;
   renderOverlays: () => void;
   updateForcedPseudoPreview: () => void;
-  registerSubtreeDnD: (rootEl: HTMLElement) => void;
 }
 
 let _ctx: CanvasPatcherCtx | null = null;

@@ -4,8 +4,9 @@
  * shortcuts keep working when focus is inside the canvas iframe.
  */
 import "./with-dom.js";
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { serializeKey, shouldForwardKey, startKeyForwarding } from "../src/canvas/iframe-keys";
+import { beginIframeDrag, clearIframeDrag, isDragActive } from "../src/canvas/iframe-drop";
 import type { IframeToParent } from "../src/canvas/iframe-protocol";
 
 function key(init: KeyboardEventInit): KeyboardEvent {
@@ -115,5 +116,43 @@ describe("startKeyForwarding", () => {
     stop();
     document.body.dispatchEvent(key({ ctrlKey: true, key: "s" }));
     expect(posts).toEqual([]);
+  });
+});
+
+describe("Escape guard during a flow-3 drag (cancel single-source)", () => {
+  afterEach(() => {
+    clearIframeDrag();
+  });
+
+  test("Escape during an iframe-originated drag cancels LOCALLY and does NOT forward", () => {
+    const posts: IframeToParent[] = [];
+    let cancelled = 0;
+    // Mark a flow-3 drag active with its local cancel hook (what the entry installs).
+    beginIframeDrag(() => {
+      cancelled += 1;
+    });
+    const stop = startKeyForwarding(
+      { post: (m: IframeToParent) => posts.push(m) } as never,
+      document,
+    );
+    const e = key({ key: "Escape" });
+    document.body.dispatchEvent(e);
+    // Local cancel ran; nothing forwarded (single source — no double-fire with the parent).
+    expect(cancelled).toBe(1);
+    expect(isDragActive()).toBe(false);
+    expect(posts.find((p) => p.kind === "forwardKey")).toBeUndefined();
+    expect(e.defaultPrevented).toBe(true);
+    stop();
+  });
+
+  test("Escape with no active drag forwards normally", () => {
+    const posts: IframeToParent[] = [];
+    const stop = startKeyForwarding(
+      { post: (m: IframeToParent) => posts.push(m) } as never,
+      document,
+    );
+    document.body.dispatchEvent(key({ key: "Escape" }));
+    expect(posts.find((p) => p.kind === "forwardKey")).toBeTruthy();
+    stop();
   });
 });

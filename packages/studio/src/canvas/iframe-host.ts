@@ -16,6 +16,7 @@ import {
 } from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
 import { getActivePanel } from "./canvas-helpers";
+import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
@@ -64,6 +65,13 @@ interface HostState {
    */
   lastRenderedGen: number;
 }
+
+/**
+ * Opaque drag-target host handle for the coordinator bridge. The bridge passes it back to the
+ * session API ({@link beginDragSession}/{@link hostDragGeometry}/{@link postDragMessage}) without
+ * reading its fields.
+ */
+export type DragHost = HostState;
 
 const hosts = new WeakMap<HTMLElement, HostState>();
 
@@ -121,6 +129,24 @@ export function beginDragSession(
   return currentDragSeq;
 }
 
+/**
+ * Adopt an IFRAME-DRIVEN (flow 3) drag session: the iframe already owns the pointer it started and
+ * drives the whole gesture, so the parent does NOT post a `dragStart` — it only sets the
+ * authoritative `currentDragSeq` to the iframe's seq and retains the (path-only) source data keyed
+ * by it, so the iframe's `dragOver`/`dropResult` (which carry that same seq) pass the parent's seq
+ * gate and the drop applies with the retained source. Returns the adopted seq.
+ */
+export function adoptDragSession(
+  _host: HostState,
+  _src: DragSrcKind,
+  srcData: Record<string, unknown>,
+  seq: number,
+): number {
+  currentDragSeq = seq;
+  retainedSrcData.set(seq, srcData);
+  return seq;
+}
+
 /** The current drag session id, for the coordinator to tag its move/drop posts. */
 export function currentDragSession(): number {
   return currentDragSeq;
@@ -151,6 +177,30 @@ export function postDragMessage(host: HostState, msg: ParentToIframe): void {
 /** Abandon the current session's retained source data (e.g. a drop landed off-canvas). */
 export function endDragSession(dragSeq: number): void {
   retainedSrcData.delete(dragSeq);
+}
+
+/** Hide `host`'s drop indicator (the coordinator's timeout fallback when no dropResult arrives). */
+export function clearDropIndicator(host: HostState): void {
+  host.overlay.setDropIndicator(null);
+}
+
+/**
+ * The coordinator's handler for an iframe-originated (flow 3) drag. Installed by the bridge to
+ * avoid a host→bridge import cycle; invoked from the `dragOriginate` message case with the host,
+ * the grabbed node path, AND the iframe's pre-allocated dragSeq. The iframe DRIVES the gesture
+ * itself (its held-button moves stay in the iframe document), so the coordinator only ADOPTS this
+ * seq (no dragStart, no parent-document listeners) and shows the ghost — the iframe's
+ * dragOver/dropResult carry the same seq and so pass the parent's seq gate.
+ */
+let iframeOriginateHandler:
+  | ((host: HostState, path: (string | number)[], dragSeq: number) => void)
+  | null = null;
+
+/** Register the coordinator's iframe-originated-drag handler (see {@link iframeOriginateHandler}). */
+export function setIframeOriginateHandler(
+  fn: (host: HostState, path: (string | number)[], dragSeq: number) => void,
+): void {
+  iframeOriginateHandler = fn;
 }
 
 /**
@@ -343,11 +393,42 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     }
     case "dragOver": {
       // Display-only drop indicator (Phase 4c). Drop stale replies: a different drag session
-      // (dragSeq) or a superseded render (gen). The indicator draw side uses scale=1 (D-2).
+      // (dragSeq) or a superseded render (gen). The indicator draw side uses scale=1 (D-2) — the
+      // Overlay is inside the scaled panzoom-wrap, so the browser already applies the zoom.
       if (msg.dragSeq !== currentDragSeq || msg.gen !== state.lastRenderedGen) {
         return;
       }
-      // Indicator drawing lands in a later slice; the preview is plumbed but not drawn yet.
+      if (msg.preview) {
+        state.overlay.setDropIndicator(
+          canvasRectToParent(msg.preview.referenceRect),
+          msg.preview.edge,
+        );
+      } else {
+        state.overlay.setDropIndicator(null);
+      }
+      // Flow 3 (iframe-driven) posts a `cursor` in iframe-viewport coords: the parent has no pointer
+      // Of its own during an iframe-originated drag, so position the ghost by FORWARD-converting the
+      // Cursor to parent-viewport space (the inverse of parentCursorToIframe). Parent-driven flows
+      // (1/2/4) omit `cursor` — the bridge moves their ghost from the raw parent pointer.
+      if (msg.cursor) {
+        const g = hostDragGeometry(state);
+        moveDragGhost(msg.cursor.x * g.scale + g.rect.left, msg.cursor.y * g.scale + g.rect.top);
+      }
+      return;
+    }
+    case "dragOriginate": {
+      // Flow 3: the iframe began a body-grab drag and DRIVES it locally. Hand off to the coordinator,
+      // Which ADOPTS the iframe's seq (so its dragOver/dropResult pass the gate) and shows the ghost
+      // — it attaches NO parent-document listeners (the iframe owns the pointer it started).
+      iframeOriginateHandler?.(state, msg.path, msg.dragSeq);
+      return;
+    }
+    case "dragEnd": {
+      // The iframe cancelled a flow-3 drag locally (Escape). Tear down the indicator/ghost and
+      // Release the retained source data so no drop is applied.
+      state.overlay.setDropIndicator(null);
+      clearDragGhost();
+      retainedSrcData.delete(msg.dragSeq);
       return;
     }
     case "dropResult": {
@@ -363,6 +444,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
         }
       }
       retainedSrcData.delete(msg.dragSeq);
+      // The drop resolved (or was empty) — tear down the display affordances on this host.
+      state.overlay.setDropIndicator(null);
+      clearDragGhost();
       return;
     }
     case "patchError": {

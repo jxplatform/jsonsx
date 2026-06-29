@@ -54,12 +54,24 @@ export function parentCursorToIframe(
   };
 }
 
+/** The geometric side a drop indicator draws on (mirrors {@link DropPreview}'s `edge`). */
+export type DropEdge = "top" | "bottom" | "inside";
+
 /** A floating overlay layer over the iframe that draws a selection box and a hover box. */
 export interface OverlayLayer {
   /** Position the selection box (or hide it when `placement` is null). */
   setSelection: (placement: OverlayPlacement | null) => void;
   /** Position the hover box (or hide it when `placement` is null). */
   setHover: (placement: OverlayPlacement | null) => void;
+  /**
+   * Draw the drop indicator for a drag-over (Phase 4c). `placement` is the reference node's rect in
+   * overlay-local coords (the caller maps the iframe-space `referenceRect` via
+   * {@link canvasRectToParent} at scale=1 — the overlay is INSIDE the scaled panzoom-wrap, so the
+   * browser already scales it; multiplying by zoom would double-scale, D-2). `edge` "inside" → a
+   * dashed box over the reference; "top"/"bottom" → a thin line at the reference's top/bottom edge.
+   * Pass null to hide.
+   */
+  setDropIndicator: (placement: OverlayPlacement | null, edge?: DropEdge) => void;
   /** The layer root element (caller appends it over the iframe). */
   readonly root: HTMLElement;
   /** Remove the layer from the DOM. */
@@ -93,12 +105,46 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   hoverBox.className = "overlay-box overlay-hover";
   hoverBox.style.display = "none";
 
-  root.append(hoverBox, selectionBox);
+  // Reuses the legacy `.canvas-drop-indicator` CSS (`.line` = thin bar, `.inside` = dashed box).
+  const dropBox = doc.createElement("div");
+  dropBox.className = "canvas-drop-indicator";
+  dropBox.style.display = "none";
+
+  root.append(hoverBox, selectionBox, dropBox);
 
   return {
     dispose: () => root.remove(),
     root,
+    setDropIndicator: (placement, edge = "inside") => placeDropIndicator(dropBox, placement, edge),
     setHover: (placement) => place(hoverBox, placement),
     setSelection: (placement) => place(selectionBox, placement),
   };
+}
+
+/**
+ * Position the drop indicator box. `inside` → a dashed box over the reference rect; `top`/`bottom`
+ * → a thin horizontal line at the reference's top/bottom (full reference width, zero-height bar).
+ * The placement is already in overlay-local coords at scale=1 (D-2).
+ */
+function placeDropIndicator(
+  box: HTMLElement,
+  placement: OverlayPlacement | null,
+  edge: DropEdge,
+): void {
+  if (!placement) {
+    box.style.display = "none";
+    return;
+  }
+  box.style.display = "block";
+  box.style.left = `${placement.left}px`;
+  box.style.width = `${placement.width}px`;
+  if (edge === "inside") {
+    box.className = "canvas-drop-indicator inside";
+    box.style.top = `${placement.top}px`;
+    box.style.height = `${placement.height}px`;
+    return;
+  }
+  box.className = "canvas-drop-indicator line";
+  box.style.height = "";
+  box.style.top = `${edge === "top" ? placement.top : placement.top + placement.height}px`;
 }
