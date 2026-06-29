@@ -62,6 +62,15 @@ export default {
       "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
       "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
       "assets/studio/index.html": "views/studio/index.html",
+      // Phase 7: ship the iframe canvas under views:// so the DEFAULT_CANVAS_URL fallback
+      // (/packages/studio/canvas.html → views/studio/packages/studio/canvas.html) resolves on the
+      // Gate-off path AND under MSIX. canvas.html imports ./dist/iframe-entry.js relative to ITSELF,
+      // So the bundle lands beside it at views/studio/packages/studio/dist/ (the spec's
+      // "views/studio/dist/" target predates the nested canvas.html location).
+      "assets/studio/canvas.html": "views/studio/packages/studio/canvas.html",
+      "assets/studio/dist/iframe-entry.js": "views/studio/packages/studio/dist/iframe-entry.js",
+      "assets/studio/dist/iframe-entry.js.map":
+        "views/studio/packages/studio/dist/iframe-entry.js.map",
     },
   },
 

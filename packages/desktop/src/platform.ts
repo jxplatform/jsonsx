@@ -70,7 +70,10 @@ export function createDesktopPlatform() {
       }
     }
 
-    if (url.startsWith("views://")) {
+    // Phase 7: the views:// readFile shim stays ONLY on the views:// path. On loopback the canvas
+    // Doc + assets are served natively over http, so this shim must not shadow them. loopbackOrigin()
+    // Is null with the gate off (canvasUrl unset) → the shim stays installed, byte-identical to today.
+    if (url.startsWith("views://") && !loopbackOrigin()) {
       const path = url.replace(/^views:\/\/[^/]+\//, "");
       try {
         const content = await rpc.request.readFile({ path });
@@ -102,6 +105,25 @@ export function createDesktopPlatform() {
   // ─── Global MutationObserver: resolve relative asset URLs everywhere ────────
   // Catches <img src>, <video src>, <source src>, <video poster> in any part of
   // The DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
+  //
+  // Phase 7: the observer is ALWAYS installed; only its REWRITE TARGET switches by the loopback gate.
+  // The view-side gate signal is platform.canvasUrl: undefined on the views:// path (gate off /
+  // GetCanvasUrl null) → rewrite to a data-URL exactly as today; an absolute loopback origin when the
+  // Per-window server is up → rewrite to an absolute loopback URL (fetch-free, no readFileAsDataUrl).
+  // With the gate off, canvasUrl is never set, so this is byte-identical to before.
+  function loopbackOrigin(): string | null {
+    const { canvasUrl } = platform;
+    if (!canvasUrl) {
+      return null;
+    }
+    try {
+      const { protocol, origin } = new URL(canvasUrl, location.href);
+      return protocol === "http:" || protocol === "https:" ? origin : null;
+    } catch {
+      return null;
+    }
+  }
+
   const resolving = new WeakSet<Element>();
 
   function resolveElementAssets(el: Element) {
@@ -122,9 +144,16 @@ export function createDesktopPlatform() {
         !val.startsWith("http") &&
         !val.startsWith("views://")
       ) {
+        const path = val.replace(/^\.?\//, "");
+        const origin = loopbackOrigin();
+        if (origin) {
+          // Loopback: point the panel <img> straight at the loopback server (a cross-origin image
+          // Load, allowed without CORS). No fetch, no readFileAsDataUrl round-trip.
+          el.setAttribute(attr, `${origin}/${path}`);
+          continue;
+        }
         resolving.add(el);
         el.removeAttribute(attr);
-        const path = val.replace(/^\.?\//, "");
         rpc.request
           .readFileAsDataUrl({ path })
           .then((dataUrl: string) => {
@@ -156,6 +185,12 @@ export function createDesktopPlatform() {
       return;
     }
     const path = val.replace(/^\.?\//, "");
+    const origin = loopbackOrigin();
+    if (origin) {
+      // Loopback: rewrite the background-image url() to the loopback origin (cross-origin image load).
+      htmlEl.style.backgroundImage = `url(${origin}/${path})`;
+      return;
+    }
     rpc.request
       .readFileAsDataUrl({ path })
       .then((dataUrl: string) => {
@@ -204,13 +239,28 @@ export function createDesktopPlatform() {
     subtree: true,
   });
 
-  return {
+  const platform = {
     id: "desktop" as const,
 
     projectRoot: "",
 
+    /**
+     * Phase 7: the cross-origin loopback canvas URL for this window, fetched in {@link activate}
+     * (awaited at studio boot, before the first canvas mount). Stays undefined on the views:// path
+     * (gate off / getCanvasUrl returns null) → iframe-host falls back to DEFAULT_CANVAS_URL, so the
+     * shipped behavior is byte-identical until the gate flips.
+     */
+    canvasUrl: undefined as string | undefined,
+
     async activate() {
-      /* No-op */
+      // Request this window's canvas URL over RPC (kills the preload/executeJavascript race). Null
+      // On the views:// path; an absolute loopback URL when the per-window server is up.
+      try {
+        const { canvasUrl } = await rpc.request.getCanvasUrl();
+        platform.canvasUrl = canvasUrl ?? undefined;
+      } catch {
+        // RPC unavailable (e.g. older host): keep the views:// fallback.
+      }
     },
 
     async openProject() {
@@ -293,14 +343,6 @@ export function createDesktopPlatform() {
 
     async readFile(path: string) {
       return rpc.request.readFile({ path });
-    },
-
-    async resolveAssetUrl(path: string): Promise<string | null> {
-      try {
-        return await rpc.request.readFileAsDataUrl({ path });
-      } catch {
-        return null;
-      }
     },
 
     async writeFile(path: string, content: string) {
@@ -517,6 +559,8 @@ export function createDesktopPlatform() {
       return rpc.request.aiChatUrl() as Promise<string>;
     },
   };
+
+  return platform;
 }
 
 function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: () => unknown } }) {

@@ -305,6 +305,29 @@ describe("platform methods", () => {
     await platform.activate();
   });
 
+  test("activate stores the loopback canvasUrl returned by getCanvasUrl", async () => {
+    impls.set("getCanvasUrl", () => ({
+      canvasUrl: "http://127.0.0.1:51234/__studio__/canvas.html",
+    }));
+    await platform.activate();
+    expect(platform.canvasUrl).toBe("http://127.0.0.1:51234/__studio__/canvas.html");
+    // Null from the views:// path clears it back to undefined.
+    impls.set("getCanvasUrl", () => ({ canvasUrl: null }));
+    await platform.activate();
+    expect(platform.canvasUrl).toBeUndefined();
+    impls.delete("getCanvasUrl");
+  });
+
+  test("activate keeps the views:// fallback when getCanvasUrl RPC throws", async () => {
+    impls.set("getCanvasUrl", () => {
+      throw new Error("rpc down");
+    });
+    platform.canvasUrl = undefined;
+    await platform.activate();
+    expect(platform.canvasUrl).toBeUndefined();
+    impls.delete("getCanvasUrl");
+  });
+
   test("openProject delegates with no arguments", async () => {
     const result = await platform.openProject();
     expect(result).toEqual({ method: "openProject", ok: true });
@@ -498,22 +521,6 @@ describe("platform methods", () => {
       expect(result).toBeUndefined();
     });
   }
-
-  test("resolveAssetUrl returns the data url on success", async () => {
-    impls.set("readFileAsDataUrl", () => "data:image/png;base64,QUJD");
-    const url = await platform.resolveAssetUrl("img.png");
-    expect(url).toBe("data:image/png;base64,QUJD");
-    impls.delete("readFileAsDataUrl");
-  });
-
-  test("resolveAssetUrl returns null on failure", async () => {
-    impls.set("readFileAsDataUrl", () => {
-      throw new Error("nope");
-    });
-    const url = await platform.resolveAssetUrl("img.png");
-    expect(url).toBeNull();
-    impls.delete("readFileAsDataUrl");
-  });
 
   test("discoverComponents includes dir only when provided", async () => {
     await platform.discoverComponents("components");

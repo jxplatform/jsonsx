@@ -65,4 +65,43 @@ describe("geometry funnel invariant (regression guard)", () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  test("no parent module reads getComputedStyle/contentDocument on a cross-origin iframe handle", () => {
+    // Cross-origin guard: when the canvas iframe loads from a loopback origin (Phase 7), the parent
+    // Cannot touch its contentDocument or call getComputedStyle on a node inside it without throwing.
+    // GetComputedStyle + elementFromPoint live in iframe-BUNDLED modules (insertion-helper / the
+    // Geometry funnel run INSIDE the iframe), not in the parent host. The only parent → iframe
+    // ContentWindow touch is iframe-host's postMessage (a WRITE). Assert no parent canvas module
+    // Reads contentDocument or calls getComputedStyle on an iframe handle.
+    const srcDir = join(import.meta.dir, "..", "src");
+    const forbidden = /\.(contentDocument|getComputedStyle)\b/;
+    // These modules execute inside the iframe realm (their getComputedStyle reads are same-realm).
+    const iframeBundled = new Set([
+      "canvas/iframe-entry.ts",
+      "canvas/iframe-render.ts",
+      "canvas/iframe-interaction.ts",
+      "canvas/iframe-inline-edit.ts",
+      "canvas/iframe-subtree.ts",
+      "canvas/iframe-patch.ts",
+      "canvas/iframe-keys.ts",
+      "canvas/iframe-overlay.ts",
+      "canvas/iframe-drop.ts",
+      "utils/insertion-helper.ts",
+      "utils/geometry.ts",
+    ]);
+    const offenders: string[] = [];
+    for (const rel of new Bun.Glob("canvas/**/*.ts").scanSync({ cwd: srcDir, dot: false })) {
+      const posix = rel.replaceAll("\\", "/");
+      if (iframeBundled.has(posix)) {
+        continue;
+      }
+      const lines = readFileSync(join(srcDir, rel), "utf8").split("\n");
+      for (const [i, line] of lines.entries()) {
+        if (forbidden.test(line)) {
+          offenders.push(`${posix}:${i + 1}: ${line.trim()}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

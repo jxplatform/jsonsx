@@ -18,6 +18,7 @@ import {
   getEffectiveMedia,
   resolveLayoutDoc,
 } from "../site-context";
+import { canvasBaseOrigin } from "./canvas-origin";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
 
@@ -191,7 +192,9 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
 
   const root = projectState?.projectRoot || "";
   const docPrefix = root ? `${root}/` : "";
-  const docBase = S.documentPath ? `${location.origin}/${docPrefix}${S.documentPath}` : undefined;
+  const docBase = S.documentPath
+    ? `${canvasBaseOrigin()}/${docPrefix}${S.documentPath}`
+    : undefined;
 
   // Component auto-discovery (content mode or layout) — mirrors the legacy render path.
   const effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);

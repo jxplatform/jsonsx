@@ -8,6 +8,7 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
+import { canvasBaseOrigin } from "./canvas-origin";
 import { resolveCanvasDocument } from "./canvas-live-render";
 import {
   applyInlineCommit,
@@ -297,16 +298,28 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   if (existing) {
     return existing;
   }
-  const { origin } = location;
+  // ParentOrigin is the parent's real origin, passed into the iframe URL so the cross-origin iframe
+  // Can target a postMessage back at it.
+  const parentOrigin = location.origin;
   const token = crypto.randomUUID();
   // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
   // Dev server and electrobun leave it unset, and some tests mount without a platform registered.
   const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
+  // IframeOrigin is the iframe's own origin. For a RELATIVE canvasUrl (dev / chromium / electrobun
+  // Gate-off) it resolves to location.origin — IDENTICAL behavior. For an absolute loopback
+  // CanvasUrl it is the loopback origin, so the channel accepts/targets the right cross-origin peer.
+  const iframeOrigin = new URL(canvasUrl, location.href).origin;
   const iframe = document.createElement("iframe");
   iframe.className = "jx-canvas-iframe";
   iframe.style.cssText =
     "width:100%;min-height:480px;height:100%;border:0;display:block;background:#fff";
-  iframe.src = `${canvasUrl}?parentOrigin=${encodeURIComponent(origin)}&token=${token}`;
+  // Preserve any query already on canvasUrl (e.g. electrobun's ?win=7) and append parentOrigin+token.
+  const srcUrl = new URL(canvasUrl, location.href);
+  srcUrl.searchParams.set("parentOrigin", parentOrigin);
+  srcUrl.searchParams.set("token", token);
+  // Keep a relative canvasUrl relative in the src attribute (emit only path+query, not the resolved
+  // Absolute URL) so the same-origin path stays byte-identical.
+  iframe.src = iframeOrigin === parentOrigin ? `${srcUrl.pathname}${srcUrl.search}` : srcUrl.href;
   // Overlay boxes are positioned within the canvas element, so it must be a positioned ancestor.
   if (!canvasEl.style.position) {
     canvasEl.style.position = "relative";
@@ -315,14 +328,14 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   canvasEl.replaceChildren(iframe, overlay.root);
 
   const channel = postMessageChannel<ParentToIframe, IframeToParent>({
-    acceptOrigin: origin,
+    acceptOrigin: iframeOrigin,
     source: window,
     // Read contentWindow lazily: a freshly-navigated iframe swaps its window, so never capture it.
     target: {
       postMessage: (message, targetOrigin) =>
         iframe.contentWindow?.postMessage(message, targetOrigin),
     },
-    targetOrigin: origin,
+    targetOrigin: iframeOrigin,
     token,
   });
 
@@ -589,7 +602,7 @@ export async function mountIframeCanvas(
   const cloneableShadow = JSON.parse(JSON.stringify(doc)) as unknown;
   const message: ParentToIframe = {
     doc: cloneableDoc,
-    docBase: resolved.docBase ?? `${location.origin}/`,
+    docBase: resolved.docBase ?? `${canvasBaseOrigin()}/`,
     gen,
     kind: "render",
     mapperCtx: resolved.mapperCtx,

@@ -378,6 +378,11 @@ export interface StudioRPC {
         params: void;
         response: { root: string | null };
       };
+      // Phase 7: the cross-origin loopback canvas URL for this window, or null on the views:// path.
+      getCanvasUrl: {
+        params: void;
+        response: { canvasUrl: string | null };
+      };
       listOpenWindows: {
         params: void;
         response: { id: number; projectRoot: string | null }[];

@@ -133,6 +133,49 @@ describe("mountIframeCanvas", () => {
     }
   });
 
+  test("a relative canvasUrl keeps the iframe same-origin (channel origin === location.origin)", async () => {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+
+    const iframe = canvasEl.querySelector("iframe")!;
+    const src = iframe.getAttribute("src")!;
+    // The src attribute stays RELATIVE (path-only, no scheme://host) — byte-identical same-origin.
+    expect(src.startsWith("/packages/studio/canvas.html?")).toBe(true);
+    const u = new URL(src, location.href);
+    expect(u.searchParams.get("parentOrigin")).toBe(location.origin);
+    expect(u.searchParams.get("token")).toBeTruthy();
+    // IframeOrigin === location.origin → the channel accepts/targets the parent's own origin.
+    expect(channels[0]!.opts.acceptOrigin).toBe(location.origin);
+    expect(channels[0]!.opts.targetOrigin).toBe(location.origin);
+  });
+
+  test("a cross-origin canvasUrl carrying ?win=7 preserves win and appends parentOrigin+token", async () => {
+    const g = globalThis as unknown as { __jxPlatform?: { canvasUrl?: string } | undefined };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = {
+      canvasUrl: "http://127.0.0.1:54321/__studio__/canvas.html?win=7",
+    } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+      const iframe = canvasEl.querySelector("iframe")!;
+      const src = iframe.getAttribute("src")!;
+      // Absolute loopback origin is emitted verbatim (cross-origin), with all three query params.
+      const u = new URL(src);
+      expect(u.origin).toBe("http://127.0.0.1:54321");
+      expect(u.searchParams.get("win")).toBe("7");
+      expect(u.searchParams.get("parentOrigin")).toBe(location.origin);
+      expect(u.searchParams.get("token")).toBeTruthy();
+      // Channel accepts/targets the loopback origin, NOT the parent's views:// origin.
+      expect(channels[0]!.opts.acceptOrigin).toBe("http://127.0.0.1:54321");
+      expect(channels[0]!.opts.targetOrigin).toBe("http://127.0.0.1:54321");
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
   test("JSON round-trips the doc so non-cloneable values (functions) are dropped", async () => {
     resolved = {
       ...DEFAULT_RESOLVED,

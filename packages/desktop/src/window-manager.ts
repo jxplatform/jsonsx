@@ -11,8 +11,11 @@ import { resolve } from "node:path";
 import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } from "./updater";
 import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
+import { createProjectServer } from "@jxsuite/server/project-server";
 import { createProjectSession } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
+import { studioDir, useLoopbackCanvas } from "./canvas-runtime";
+import type { ProjectServerHandle } from "@jxsuite/server/project-server";
 import type { ProjectSession } from "./project-session";
 import type { SiteConfig, StudioRPC } from "./rpc-schema";
 
@@ -21,6 +24,13 @@ interface WindowEntry {
   rpc: ReturnType<typeof buildWindowRpc>;
   session: ProjectSession;
   projectRoot: string | null;
+  /**
+   * This window's own loopback createProjectServer (Phase 7), stood up only when
+   * {@link useLoopbackCanvas} is on. Its single session is THIS window's session, so an asset GET is
+   * unambiguous (no ?win= needed) and a token from window A cannot drive window B. Torn down in
+   * {@link disposeWindow}.
+   */
+  server?: ProjectServerHandle;
   maximize: {
     maximized: boolean;
     restoreFrame: { x: number; y: number; width: number; height: number };
@@ -148,7 +158,7 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
   });
   entry.win = new BrowserWindow({
     frame: { height: 900, width: 1400, x: 0, y: 0 },
-    navigationRules: "views://*,^*",
+    navigationRules: "^*,views://*,http://127.0.0.1:*",
     rpc: entry.rpc,
     title: titleFor(projectRoot),
     titleBarStyle: "hidden",
@@ -156,8 +166,43 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
   });
 
   windows.set(entry.win.id, entry);
+  // Phase 7 (gated OFF by default): stand up THIS window's own loopback project server. Its single
+  // Session tracks this window's session.projectRoot, so an asset GET is unambiguous and no
+  // Cross-window token reuse is possible. With useLoopbackCanvas() false, nothing runs.
+  if (useLoopbackCanvas()) {
+    const handlers = buildWsHandlers(entry);
+    const windowSession = {
+      get projectRoot(): string | null {
+        return entry.session.projectRoot;
+      },
+      handlers,
+    };
+    entry.server = createProjectServer({
+      resolveSession: () => windowSession,
+      studioDir: studioDir(),
+    });
+  }
   entry.win.on("close", () => disposeWindow(entry.win.id));
   return entry.win;
+}
+
+/**
+ * The canvas-facing WS-RPC handler subset for a window's loopback server: jxResolve /
+ * jxServerFunction (the canvas live-render path) plus the read paths. Window controls, git,
+ * dialogs, and writes stay ONLY on the Electroview RPC (never exposed on the loopback surface).
+ */
+function buildWsHandlers(
+  entry: WindowEntry,
+): Record<string, (params: unknown) => Promise<unknown>> {
+  const { session } = entry;
+  return {
+    jxResolve: (params) => session.jxResolve(params as { body: string }),
+    jxServerFunction: (params) => session.jxServerFunction(params as { body: string }),
+    readFile: (params) => session.handleReadFile(params as { path: string }),
+    readFileAsDataUrl: (params) => session.handleReadFileAsDataUrl(params as { path: string }),
+    resolveSiteContext: (params) =>
+      session.handleResolveSiteContext(params as { filePath: string }),
+  };
 }
 
 function disposeWindow(id: number) {
@@ -165,6 +210,7 @@ function disposeWindow(id: number) {
   if (!entry) {
     return;
   }
+  entry.server?.stop(); // Per-window teardown (tab close does NOT call this)
   entry.session.setProjectRoot(null); // Drops the format-registry cache
   windows.delete(id);
 }
@@ -283,6 +329,8 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
           openProjectWindow(params.root);
         },
         getProjectRoot: () => ({ root: session.projectRoot }),
+        // Phase 7: hand the studio shell this window's cross-origin canvas URL (null = views:// path).
+        getCanvasUrl: () => ({ canvasUrl: entry.server?.canvasUrl ?? null }),
         listOpenWindows: () => listOpenWindows(),
         setWindowProject: async (params) => {
           // Dedupe: if another window already owns this project, focus it and tell the caller.

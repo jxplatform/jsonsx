@@ -770,7 +770,9 @@ export function createProjectSession(initialRoot: string | null) {
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    const res = await handleResolve(req, root, null);
+    // ActiveProjectRoot defaults to the project root (parity with project-server.ts:311).
+    // Resolve.ts falls back null||root, so this is low-risk and correct for a nested-site $base.
+    const res = await handleResolve(req, root, root);
     return { body: await res.text(), status: res.status };
   }
 

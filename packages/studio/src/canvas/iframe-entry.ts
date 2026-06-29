@@ -328,7 +328,18 @@ interface BootWindow {
  */
 export function bootCanvasIframe(win: BootWindow): () => void {
   const params = new URLSearchParams(win.location.search);
-  const parentOrigin = params.get("parentOrigin") || "*";
+  // ParentOrigin authenticates the parent peer. The host (iframe-host.ts) always passes it, so a
+  // Missing value means the parent origin could not round-trip (e.g. a custom scheme that CEF does
+  // Not surface as a postMessage origin). Fall back to "*" — token-gated, NOT a silent omission —
+  // And log it loudly so the looser origin check is visible (Phase 7 §2.6).
+  const explicitParentOrigin = params.get("parentOrigin");
+  const parentOrigin = explicitParentOrigin || "*";
+  if (!explicitParentOrigin) {
+    console.warn(
+      "[jx-canvas] no parentOrigin in iframe URL — accepting messages from any origin (token-gated). " +
+        "The parent origin did not round-trip; the channel relies on the shared token alone.",
+    );
+  }
   const container = (win.document.querySelector("#jx-canvas-root") ??
     win.document.body) as HTMLElement;
   const channel = postMessageChannel<IframeToParent, ParentToIframe>({

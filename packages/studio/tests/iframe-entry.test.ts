@@ -135,6 +135,32 @@ describe("startCanvasIframe", () => {
     teardown = bootCanvasIframe(win);
     expect(posted).toEqual([{ "jx:canvas": "tok", payload: { kind: "ready" } }]);
   });
+
+  test("bootCanvasIframe warns and falls back to '*' when parentOrigin is absent", () => {
+    const warnings: unknown[][] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+    const posted: unknown[] = [];
+    const win = {
+      addEventListener: () => {},
+      document: { body: document.createElement("div"), querySelector: () => null },
+      // No parentOrigin in the URL → the explicit "*" fallback fires + logs.
+      location: { search: "?token=tok" },
+      parent: { postMessage: (m: unknown) => posted.push(m) },
+      removeEventListener: () => {},
+    };
+    try {
+      teardown = bootCanvasIframe(win);
+    } finally {
+      console.warn = origWarn;
+    }
+    // Still announces ready (the channel works token-gated), and logged the loosened origin check.
+    expect(posted).toEqual([{ "jx:canvas": "tok", payload: { kind: "ready" } }]);
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]![0])).toContain("no parentOrigin");
+  });
 });
 
 describe("startCanvasIframe — patch", () => {
