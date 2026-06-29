@@ -11,7 +11,13 @@
  * migration, with no data: URL rewriting.
  */
 
-import { buildScope, defineElement, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
+import {
+  buildScope,
+  defineElement,
+  renderNode,
+  setRootMedia,
+  setSkipServerFunctions,
+} from "@jxsuite/runtime";
 import { effectScope } from "../reactivity";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
 import type { CanvasMode } from "./iframe-protocol";
@@ -175,6 +181,11 @@ export async function renderResolvedDocument(opts: {
   setSkipServerFunctions(opts.mode !== "preview");
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
+  // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
+  // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope
+  // Directly and never the runtime's `Jx()` entry, which is the only other place _rootMedia is set).
+  // Set it every render (even to `{}`) so a stale map from a previous document cannot leak.
+  setRootMedia((opts.doc as { $media?: Record<string, string> }).$media ?? {});
   const scope: EffectScope = effectScope(true);
   const $defs = await buildScope(opts.doc, {}, opts.docBase);
   const onNodeCreated = makeStamper(opts.mapperCtx);

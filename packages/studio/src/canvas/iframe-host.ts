@@ -550,13 +550,23 @@ function drawHover(state: HostState, hit: NodeHit | null): void {
 /**
  * Render `doc` into the iframe canvas mounted in `canvasEl`: resolve the document parent-side and
  * post it (queued until the iframe is `ready`).
+ *
+ * `widthPx` makes the panel's breakpoint width an EXPLICIT lever on the iframe element itself (only
+ * `style.width` is touched — the rest of cssText, incl. `min-height:480px; height:100%`, is kept).
+ * The iframe is a real viewport, so its CSS width is the layout viewport `@media` evaluates
+ * against; setting it here survives iframe reuse and any future container-styling change. Null
+ * (edit-mode / git-diff / full-width panels) falls back to `100%`. The iframe stays FIXED-HEIGHT —
+ * content scrolls inside it like a real device viewport; narrowing the width does not auto-grow
+ * it.
  */
 export async function mountIframeCanvas(
   gen: number,
   doc: JxMutableNode,
   canvasEl: HTMLElement,
+  widthPx?: number | null,
 ): Promise<void> {
   const state = ensureHost(canvasEl);
+  state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
   // Always resolve and post the latest render. The iframe drops stale generations itself (via its
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
   // Renders fire and the generation is usually stale by the time resolution finishes, which would

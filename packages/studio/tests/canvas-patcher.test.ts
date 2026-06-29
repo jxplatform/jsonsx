@@ -88,7 +88,6 @@ beforeEach(() => {
   elToPath.set(emEl, ["children", 2, "children", 0]);
 
   panel = {
-    activeBreakpoints: new Set<string>(),
     canvas,
     mediaName: "",
     ready: true,
@@ -96,7 +95,6 @@ beforeEach(() => {
   canvasPanels.push(panel);
 
   initCanvasPatcher({
-    applyCanvasMediaOverrides: () => {},
     getCanvasMode: () => canvasMode,
     renderOverlays: () => {
       ctxCalls.overlays += 1;

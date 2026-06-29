@@ -1858,8 +1858,23 @@ export function toCSSText(rules: Record<string, unknown> | object) {
 
 // ─── Custom Element Registration ──────────────────────────────────────────────
 
-let _rootMedia = {};
+let _rootMedia: Record<string, string> = {};
 const _elementDefs = new Map();
+
+/**
+ * Seed the module-level root `$media` map used as the fallback for components that declare their
+ * own `@--name` style blocks but carry no own `$media` (buildScope ~279-280). `Jx()` sets this from
+ * the document during a full top-level render, but the Studio iframe canvas calls `buildScope`/
+ * `renderNode` directly (never `Jx()`), so without seeding it a component's `@--md` would resolve
+ * to the invalid `@media md`. Callers on the direct path MUST set it (with the merged `$media`)
+ * before `buildScope`, and re-set it every render so a stale map from a previous document cannot
+ * leak.
+ *
+ * @param {Record<string, string>} map
+ */
+export function setRootMedia(map: Record<string, string>): void {
+  _rootMedia = map ?? {};
+}
 
 /**
  * Resolve and register $elements entries (depth-first).

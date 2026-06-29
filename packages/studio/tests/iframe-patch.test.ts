@@ -126,6 +126,38 @@ describe("applyIframePatch — set-style", () => {
     );
     expect(elAt(container, ["children", 0]).style.color).toBe("");
   });
+
+  test("threads the doc's $media so an @--md block keeps a valid @media query (not `@media md`)", async () => {
+    const { container, shadow } = mount(BASE);
+    // The render ctx's built scope carries the merged $media (as resolveCanvasDocument → buildScope
+    // Set state["$media"]). A surgical set-style on a media-bearing node must re-emit through it.
+    const mediaCtx: IframeRenderCtx = {
+      ...CTX,
+      defs: await buildScope(
+        { $media: { "--md": "(min-width: 768px)" } } as JxDocument,
+        {},
+        "http://localhost/",
+      ),
+    };
+    const op: WireDocOp = {
+      key: "style",
+      op: "set-key",
+      path: ["children", 0],
+      value: { "@--md": { color: "blue" }, color: "red" },
+    };
+    applyIframePatch(shadow, [op], container, mediaCtx);
+
+    const el = elAt(container, ["children", 0]);
+    const styleTag = document.head.querySelector(
+      `style[data-jx-owner="${el.dataset.jx}"]`,
+    ) as HTMLStyleElement;
+    expect(styleTag).toBeTruthy();
+    const css = styleTag.textContent ?? "";
+    // The named breakpoint resolved to its real query — NOT the invalid `@media --md` (the form
+    // Emitted when the map is empty / not threaded).
+    expect(css).toContain("@media (min-width: 768px)");
+    expect(css).not.toContain("@media --md");
+  });
 });
 
 describe("applyIframePatch — set-text", () => {

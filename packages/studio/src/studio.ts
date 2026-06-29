@@ -32,7 +32,6 @@ import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
 import { initCanvasHelpers } from "./canvas/canvas-helpers";
 import {
-  applyCanvasMediaOverrides,
   initCanvasRender,
   renderCanvas,
   renderOverlays,
@@ -380,7 +379,6 @@ initCanvasLiveRender({
   getCanvasMode,
 });
 initCanvasPatcher({
-  applyCanvasMediaOverrides,
   getCanvasMode,
   renderOverlays,
   scheduleCanvasRender,

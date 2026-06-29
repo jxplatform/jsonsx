@@ -6,6 +6,8 @@ import {
   renderNode as _renderNode,
   buildScope,
   RESERVED_KEYS,
+  applyStyle,
+  setRootMedia,
 } from "../src/runtime";
 
 try {
@@ -164,5 +166,57 @@ describe("Custom Elements", () => {
     expect((el as any).myLabel).toBe("updated");
 
     el.remove();
+  });
+});
+
+// ─── Phase 5: component @media via the buildScope-direct (iframe) path ────────────
+
+describe("component @media (setRootMedia seeds the iframe path)", () => {
+  test("equal-specificity cascade: base prop → stylesheet rule (not inline) + a real @media rule", () => {
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
+    const el = document.createElement("div");
+    // A base prop that is ALSO overridden under @--md routes to a stylesheet baseDecls rule (NOT
+    // Inline), so the @media rule can win at equal specificity — the whole Phase-5 premise.
+    applyStyle(el, { "@--md": { color: "blue" }, color: "red" }, { "--md": "(min-width: 768px)" });
+    expect(el.style.color).toBe(""); // No inline color.
+    const jxUid = el.dataset.jx;
+    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
+      .textContent;
+    expect(css).toContain(`[data-jx="${jxUid}"] { color: red }`);
+    expect(css).toContain(`@media (min-width: 768px) { [data-jx="${jxUid}"] { color: blue } }`);
+  });
+
+  test("a component with its own @--md and no own $media resolves the real query after setRootMedia", async () => {
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
+    const tag = uniqueTag();
+    // The component carries an @--md block but NO own $media — it must inherit the root map.
+    await defineElement({
+      state: {},
+      style: { "@--md": { color: "blue" }, color: "red" },
+      tagName: tag,
+    });
+
+    // The iframe path calls buildScope directly (never Jx()); seed the root media first.
+    setRootMedia({ "--md": "(min-width: 768px)" });
+
+    const el = document.createElement(tag);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    const jxUid = el.dataset.jx;
+    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
+      .textContent;
+    // The named breakpoint resolved to its real query — NOT the invalid `@media --md`.
+    expect(css).toContain("@media (min-width: 768px)");
+    expect(css).not.toContain("@media --md");
+
+    el.remove();
+    setRootMedia({}); // Reset so the map can't leak into other tests.
   });
 });

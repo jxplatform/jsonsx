@@ -29,7 +29,6 @@ import type { JxPath } from "../state";
 interface CanvasPatcherCtx {
   getCanvasMode: () => string;
   scheduleCanvasRender: () => void;
-  applyCanvasMediaOverrides: (canvasEl: Element, activeBreakpoints: Set<string>) => void;
   renderOverlays: () => void;
   updateForcedPseudoPreview: () => void;
 }

@@ -148,6 +148,25 @@ describe("mountIframeCanvas", () => {
     expect(channels).toHaveLength(1);
   });
 
+  test("sets the iframe width to the breakpoint widthPx, and 100% when null", async () => {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+
+    // A breakpoint panel passes its explicit width → the iframe's layout viewport is that wide, so
+    // The real @media inside the iframe evaluates against the breakpoint width.
+    await mountIframeCanvas(1, {} as never, canvasEl, 768);
+    const iframe = canvasEl.querySelector("iframe")!;
+    expect(iframe.style.width).toBe("768px");
+    // The rest of cssText is untouched (fixed-height viewport; content scrolls inside).
+    expect(iframe.style.minHeight).toBe("480px");
+    expect(iframe.style.height).toBe("100%");
+
+    // A full-width / edit-mode / git-diff panel (null width) falls back to 100%, reusing the iframe.
+    await mountIframeCanvas(2, {} as never, canvasEl, null);
+    expect(canvasEl.querySelectorAll("iframe")).toHaveLength(1);
+    expect(iframe.style.width).toBe("100%");
+  });
+
   test("posts immediately (no queue) once the iframe is ready", async () => {
     const canvasEl = document.createElement("div");
     await mountIframeCanvas(1, {} as never, canvasEl);

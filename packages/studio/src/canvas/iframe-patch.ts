@@ -65,7 +65,7 @@ function applyOpToDom(
   switch (op.op) {
     case "set-key": {
       if (op.key === "style") {
-        patchStyle(doc, op.path, container);
+        patchStyle(doc, op.path, container, ctx);
         return;
       }
       if (op.key === "textContent") {
@@ -282,11 +282,24 @@ function elementPath(el: HTMLElement): JxPath | null {
   return raw === undefined ? null : parseJxPath(raw);
 }
 
-/** Re-emit the node's style onto its element, matching the full render's edit-mode style transform. */
-function patchStyle(doc: JxMutableNode, path: (string | number)[], container: HTMLElement): void {
+/**
+ * Re-emit the node's style onto its element, matching the full render's edit-mode style transform.
+ * Pass the document's merged `$media` map (the same one resolveCanvasDocument put on the render
+ * doc, carried on the render ctx's built scope) through to reapplyStyle so an `@--name` block
+ * resolves to its real `@media (min-width:…)` query — otherwise a surgical edit on a media-bearing
+ * node would re-emit an invalid `@media name` and silently drop the responsive rule until the next
+ * full render.
+ */
+function patchStyle(
+  doc: JxMutableNode,
+  path: (string | number)[],
+  container: HTMLElement,
+  ctx: IframeRenderCtx | undefined,
+): void {
   const el = requireElement(container, path);
   const node = getNodeAtPath(doc, path);
-  reapplyStyle(el, editModeStyle(node?.style));
+  const mediaQueries = (ctx?.defs?.["$media"] as Record<string, string> | undefined) ?? {};
+  reapplyStyle(el, editModeStyle(node?.style), mediaQueries);
 }
 
 /** Write the node's display text, syncing the empty-placeholder class like the full render. */

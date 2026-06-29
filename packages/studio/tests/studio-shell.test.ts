@@ -138,7 +138,6 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
-  applyCanvasMediaOverrides: mock(() => {}),
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
   },

@@ -260,8 +260,6 @@ export interface CanvasPanel {
   _width: number | null;
   /** True when the panel's DOM reflects the current document via a successful live render. */
   ready: boolean;
-  /** Breakpoints active for this panel's width (persisted for surgical patch re-application). */
-  activeBreakpoints: Set<string> | null;
   /**
    * Effect scope owning the reactive effects created while rendering this panel's content
    * (including child scopes from surgical subtree renders). Stopped when panels are rebuilt.

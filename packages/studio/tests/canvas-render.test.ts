@@ -18,9 +18,14 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 // ─── Controllable mock behavior ───────────────────────────────────────────────
 
 // The iframe canvas is the only canvas now: renderCanvasIntoPanel calls mountIframeCanvas(gen, doc,
-// Canvas). The default stub stamps the doc's text into the canvas so DOM assertions still work; a
-// Test can swap `iframeImpl` to drive staleness/rejection.
-type IframeMount = (gen: number, doc: JxMutableNode, canvas: HTMLElement) => Promise<void>;
+// Canvas, widthPx). The default stub stamps the doc's text into the canvas so DOM assertions still
+// Work; a test can swap `iframeImpl` to drive staleness/rejection.
+type IframeMount = (
+  gen: number,
+  doc: JxMutableNode,
+  canvas: HTMLElement,
+  widthPx?: number | null,
+) => Promise<void>;
 let iframeImpl: IframeMount = async (_gen, doc, canvas) => {
   canvas.innerHTML = "";
   const root = document.createElement("div");
@@ -125,8 +130,12 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
 void mock.module("../src/canvas/iframe-host.js", () => ({
   getEditBarAnchorRect: () => null,
   getEditSnapshot: () => ({ editing: false, snapshot: null }),
-  mountIframeCanvas: (gen: number, doc: JxMutableNode, canvas: HTMLElement) =>
-    iframeImpl(gen, doc, canvas),
+  mountIframeCanvas: (
+    gen: number,
+    doc: JxMutableNode,
+    canvas: HTMLElement,
+    widthPx?: number | null,
+  ) => iframeImpl(gen, doc, canvas, widthPx),
   postApplyFormat: () => {},
   setToolbarRefresh: () => {},
 }));
@@ -169,13 +178,8 @@ void mock.module("../src/files/file-ops.js", () => ({
   serializeDocument: serializeDocumentMock,
 }));
 
-const {
-  applyCanvasMediaOverrides,
-  initCanvasRender,
-  renderCanvas,
-  renderOverlays,
-  scheduleCanvasRender,
-} = await import("../src/canvas/canvas-render");
+const { initCanvasRender, renderCanvas, renderOverlays, scheduleCanvasRender } =
+  await import("../src/canvas/canvas-render");
 
 // ─── Test context ─────────────────────────────────────────────────────────────
 
@@ -918,7 +922,9 @@ describe("design mode", () => {
     for (const panel of canvasPanels as unknown as CanvasPanel[]) {
       expect(panel.canvas?.querySelector("p")?.textContent).toBe("Hello");
     }
-    expect((canvasPanels[1] as unknown as CanvasPanel).activeBreakpoints?.has("md")).toBe(true);
+    // The md(768) panel's viewport is sized to its breakpoint width (observable without a layout
+    // Engine; the real @media now evaluates natively inside each panel's iframe viewport).
+    expect((canvasPanels[1] as unknown as CanvasPanel).viewport?.style.width).toBe("768px");
   });
 
   test("mode transitions run cleanup callbacks and stop panel scopes", () => {
@@ -1022,31 +1028,7 @@ describe("scheduleCanvasRender", () => {
   });
 });
 
-// ─── applyCanvasMediaOverrides / renderOverlays ───────────────────────────────
-
-describe("applyCanvasMediaOverrides", () => {
-  test("no-op when no breakpoints are active", () => {
-    resetWorkspaceWithTab();
-    const el = document.createElement("div");
-    expect(() => applyCanvasMediaOverrides(el, new Set())).not.toThrow();
-  });
-
-  test("no-op when there is no active tab", () => {
-    closeAllTabs();
-    const el = document.createElement("div");
-    expect(() => applyCanvasMediaOverrides(el, new Set(["md"]))).not.toThrow();
-  });
-
-  test("collects conditions for active breakpoints from the document media map", () => {
-    resetWorkspaceWithTab({
-      $media: { md: "(min-width: 768px)" },
-      children: [],
-      tagName: "div",
-    } as never);
-    const el = document.createElement("div");
-    expect(() => applyCanvasMediaOverrides(el, new Set(["md", "unknown"]))).not.toThrow();
-  });
-});
+// ─── renderOverlays ───────────────────────────────────────────────────────────
 
 describe("renderOverlays", () => {
   test("delegates to the overlays panel renderer", () => {

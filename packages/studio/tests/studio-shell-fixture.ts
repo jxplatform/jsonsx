@@ -148,7 +148,6 @@ export async function bootStudio(opts: {
   }));
 
   void mock.module("../src/canvas/canvas-render.ts", () => ({
-    applyCanvasMediaOverrides: mock(() => {}),
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
     },

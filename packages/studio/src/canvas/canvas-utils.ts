@@ -65,7 +65,6 @@ export function canvasPanelTemplate(
   // Which lit runs synchronously during render — before any consumer reads them.
   const panel = {
     _width: width || null,
-    activeBreakpoints: null,
     canvas: null,
     dropLine: null,
     element: null,

@@ -24,12 +24,7 @@ import {
   updateActivePanelHeaders,
 } from "./canvas-utils";
 import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
-import {
-  activeBreakpointsForWidth,
-  applyOverridesToCanvas,
-  collectMediaOverrides,
-  parseMediaEntries,
-} from "../utils/canvas-media";
+import { parseMediaEntries } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
 import { mountIframeCanvas } from "./iframe-host";
 import { canvasPerf } from "./canvas-perf";
@@ -498,14 +493,12 @@ export function renderCanvas() {
     ]).then(([originalDoc, currentDoc]) => {
       renderCanvasIntoPanel(
         origPanel as unknown as CanvasPanel,
-        new Set<string>(),
         featureToggles,
         originalDoc,
         gitDiffState,
       );
       renderCanvasIntoPanel(
         currPanel as unknown as CanvasPanel,
-        new Set<string>(),
         featureToggles,
         currentDoc,
         gitDiffState,
@@ -544,7 +537,7 @@ export function renderCanvas() {
     `;
     litRender(editTpl, canvasWrap);
     canvasPanels.push(panel as unknown as CanvasPanel);
-    renderCanvasIntoPanel(panel as unknown as CanvasPanel, new Set<string>(), S.ui.featureToggles);
+    renderCanvasIntoPanel(panel as unknown as CanvasPanel, S.ui.featureToggles);
     return;
   }
 
@@ -591,7 +584,7 @@ export function renderCanvas() {
       canvasWrap,
     );
     canvasPanels.push(panel as unknown as CanvasPanel);
-    renderCanvasIntoPanel(panel as unknown as CanvasPanel, new Set<string>(), featureToggles);
+    renderCanvasIntoPanel(panel as unknown as CanvasPanel, featureToggles);
     applyTransform();
     if (modeChanged) {
       observeCenterUntilStable();
@@ -604,7 +597,6 @@ export function renderCanvas() {
   // Descending for max-width — matching the direction of the design's media queries).
   const allPanelDefs = [
     {
-      activeSet: activeBreakpointsForWidth(sizeBreakpoints, baseWidth),
       displayName: mediaDisplayName("--"),
       name: "base",
       width: baseWidth,
@@ -612,7 +604,6 @@ export function renderCanvas() {
   ];
   for (const bp of sizeBreakpoints) {
     allPanelDefs.push({
-      activeSet: activeBreakpointsForWidth(sizeBreakpoints, bp.width),
       displayName: mediaDisplayName(bp.name),
       name: bp.name,
       width: bp.width,
@@ -622,7 +613,7 @@ export function renderCanvas() {
   const panelEntries = allPanelDefs.map((def) => {
     const label = `${def.displayName} (${def.width}px)`;
     const { tpl, panel } = canvasPanelTemplate(def.name, label, false, def.width);
-    return { activeSet: def.activeSet, panel, tpl };
+    return { panel, tpl };
   });
 
   litRender(
@@ -643,13 +634,13 @@ export function renderCanvas() {
   );
 
   for (let i = 0; i < panelEntries.length; i++) {
-    const { panel, activeSet } = panelEntries[i]!;
+    const { panel } = panelEntries[i]!;
     const p = panel as CanvasPanel;
     canvasPanels.push(p);
     if (i === 0) {
-      renderCanvasIntoPanel(p, activeSet, featureToggles);
+      renderCanvasIntoPanel(p, featureToggles);
     } else {
-      setTimeout(() => renderCanvasIntoPanel(p, activeSet, featureToggles), 0);
+      setTimeout(() => renderCanvasIntoPanel(p, featureToggles), 0);
     }
   }
 
@@ -673,7 +664,6 @@ export function renderCanvas() {
  * but stay un-patchable (`ready` only flips for the real tab document).
  *
  * @param {CanvasPanel} panel
- * @param {Set<string>} activeBreakpoints
  * @param {Record<string, boolean>} _featureToggles - Accepted for call-site symmetry (the iframe
  *   render needs no structural-preview fallback); unused.
  * @param {JxMutableNode | null} [docOverride] - Optional document to render (for diff mode). Uses
@@ -683,7 +673,6 @@ export function renderCanvas() {
  */
 function renderCanvasIntoPanel(
   panel: CanvasPanel,
-  activeBreakpoints: Set<string>,
   _featureToggles: Record<string, boolean>,
   docOverride: JxMutableNode | null = null,
   _gitDiffState: GitDiffState | null = null,
@@ -695,9 +684,8 @@ function renderCanvasIntoPanel(
 
   canvasPerf.panelRenders += 1;
   panel.ready = false;
-  panel.activeBreakpoints = activeBreakpoints;
 
-  void mountIframeCanvas(gen, docToRender, canvas)
+  void mountIframeCanvas(gen, docToRender, canvas, panel._width)
     .then(() => {
       if (gen === view.renderGeneration) {
         // Mark the panel patchable once the real document is mounted (not a diff/preview override)
@@ -711,34 +699,6 @@ function renderCanvasIntoPanel(
     .catch((error: unknown) => {
       console.warn("mountIframeCanvas failed:", error instanceof Error ? error.message : error);
     });
-}
-
-/**
- * Apply media query overrides as inline styles on matching canvas elements. Needed because the
- * runtime renders base styles as inline — @media CSS rules in the injected stylesheet can't win
- * against inline specificity.
- *
- * @param {Element} canvasEl
- * @param {Set<string>} activeBreakpoints
- */
-export function applyCanvasMediaOverrides(canvasEl: Element, activeBreakpoints: Set<string>) {
-  if (activeBreakpoints.size === 0) {
-    return;
-  }
-  const tab = activeTab.value;
-  if (!tab) {
-    return;
-  }
-  const docMedia = getEffectiveMedia(tab.doc.document.$media || {});
-  // Build a set of CSS condition texts that match active breakpoints
-  const activeConditions = new Set<string>();
-  for (const name of activeBreakpoints) {
-    if (docMedia[name]) {
-      activeConditions.add(docMedia[name]);
-    }
-  }
-  const overrides = collectMediaOverrides(document.styleSheets, activeConditions);
-  applyOverridesToCanvas(canvasEl, overrides);
 }
 
 export function renderOverlays() {
