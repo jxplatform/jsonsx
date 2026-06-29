@@ -98,6 +98,7 @@ import * as tabStrip from "./panels/tab-strip";
 import * as tabBar from "./panels/tab-bar";
 import { renderStylebookOverlays } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
+import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
 import { registerFunctionCompletions } from "./panels/editors";
 import { initBlockActionBar, renderBlockActionBar } from "./panels/block-action-bar";
@@ -389,6 +390,8 @@ initCanvasPatcher({
 });
 // When the iframe canvas can't apply a posted patch surgically, fall back to a full render.
 setIframePatchEscalation(scheduleCanvasRender);
+// One global coordinator monitor drives cross-frame palette→canvas drops (Phase 4c).
+registerCanvasDndBridge();
 initCanvasRender({
   getCanvasMode,
   get gitDiffState() {

@@ -16,6 +16,7 @@ import {
 } from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
 import { getActivePanel } from "./canvas-helpers";
+import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual } from "../store";
@@ -23,6 +24,7 @@ import { activeTab } from "../workspace/workspace";
 import type {
   ApplyFormatIntent,
   CanvasMode,
+  DragSrcKind,
   IframeToParent,
   NodeHit,
   ParentToIframe,
@@ -55,12 +57,101 @@ interface HostState {
   lastSnapshotSeq: number;
   /** The last non-null selection rect drawn (parent/overlay coords) — toolbar position fallback. */
   lastSelectionRect: ParentRect | null;
+  /**
+   * The gen of the render/patch this iframe's DOM currently reflects (set from `renderComplete`/
+   * `patchComplete`). Cross-frame drag replies (`dragOver`/`dropResult`) are dropped unless their
+   * `gen` matches, so a drop computed against a superseded render is never applied (Phase 4c).
+   */
+  lastRenderedGen: number;
 }
 
 const hosts = new WeakMap<HTMLElement, HostState>();
 
 /** Every live host, so the selection watcher can re-measure each one when selection changes. */
 const liveHosts = new Set<HostState>();
+
+// ─── Cross-frame drag session (Phase 4c) ────────────────────────────────────────
+// The parent owns the drag session id and the source data (which never crosses the wire). The
+// Coordinator bridge drives the session through the exported API below; the host's dragOver/dropResult
+// Handlers stale-gate replies by `currentDragSeq` and the target host's `lastRenderedGen`.
+
+/** Monotonic session id, bumped on each {@link beginDragSession}. Stale replies carry an older seq. */
+let currentDragSeq = 0;
+
+/** Parent-retained source data keyed by `dragSeq` (the block fragment never crosses the boundary). */
+const retainedSrcData = new Map<number, Record<string, unknown>>();
+
+/** The host backing a given canvas element (or null), for the coordinator's host resolution. */
+export function hostForCanvas(canvasEl: HTMLElement): HostState | null {
+  return hosts.get(canvasEl) ?? null;
+}
+
+/**
+ * Resolve the live host whose iframe's parent-viewport rect ({@link rectOf}) contains `cursor`.
+ * Used by the coordinator to pick the drop target by pointer position (NOT the active panel), so a
+ * drag over any panel's canvas targets that panel. Returns null when the cursor is over no live
+ * iframe.
+ */
+export function liveDragHostAt(cursor: { x: number; y: number }): HostState | null {
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      continue;
+    }
+    const r = rectOf(host.iframe);
+    if (cursor.x >= r.left && cursor.x <= r.right && cursor.y >= r.top && cursor.y <= r.bottom) {
+      return host;
+    }
+  }
+  return null;
+}
+
+/**
+ * Begin a drag session against `host`: bump the session id, retain `srcData` (keyed by the new
+ * seq), and post `dragStart` with the source kind and the host's current rendered gen. Returns the
+ * seq so the coordinator can tag subsequent move/drop posts.
+ */
+export function beginDragSession(
+  host: HostState,
+  src: DragSrcKind,
+  srcData: Record<string, unknown>,
+): number {
+  currentDragSeq += 1;
+  retainedSrcData.set(currentDragSeq, srcData);
+  host.channel.post({ dragSeq: currentDragSeq, gen: host.lastRenderedGen, kind: "dragStart", src });
+  return currentDragSeq;
+}
+
+/** The current drag session id, for the coordinator to tag its move/drop posts. */
+export function currentDragSession(): number {
+  return currentDragSeq;
+}
+
+/**
+ * The EMPIRICAL zoom scale for `host`'s iframe — `rectOf(iframe).width / iframe.clientWidth` (D-2),
+ * read FRESH so a pan/zoom mid-drag is reflected. NOT `effectiveZoom()` (a separate path that can
+ * desync). The matching iframe parent-viewport rect is returned so the cursor map cancels the pan.
+ */
+export function hostDragGeometry(host: HostState): {
+  scale: number;
+  rect: { left: number; top: number };
+} {
+  const rect = rectOf(host.iframe);
+  const scale = host.iframe.clientWidth > 0 ? rect.width / host.iframe.clientWidth : 1;
+  return { rect, scale };
+}
+
+/** Post a parent→iframe drag message to `host`'s channel (the coordinator builds it purely). */
+export function postDragMessage(host: HostState, msg: ParentToIframe): void {
+  if (!host.iframe.isConnected) {
+    return;
+  }
+  host.channel.post(msg);
+}
+
+/** Abandon the current session's retained source data (e.g. a drop landed off-canvas). */
+export function endDragSession(dragSeq: number): void {
+  retainedSrcData.delete(dragSeq);
+}
 
 /**
  * The single host whose iframe currently owns the inline-edit session. Only one editable can be
@@ -182,6 +273,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     channel,
     editing: false,
     iframe,
+    lastRenderedGen: -1,
     lastSelectionRect: null,
     lastSnapshotSeq: 0,
     overlay,
@@ -243,8 +335,34 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     }
     case "renderComplete":
     case "patchComplete": {
-      // The DOM (and so all geometry) just changed — re-measure the selection box.
+      // The DOM (and so all geometry) just changed — re-measure the selection box. Record the gen
+      // The DOM now reflects so cross-frame drag replies can be stale-gated against it (Phase 4c).
+      state.lastRenderedGen = msg.gen;
       requestSelection(state, state.selectionPath);
+      return;
+    }
+    case "dragOver": {
+      // Display-only drop indicator (Phase 4c). Drop stale replies: a different drag session
+      // (dragSeq) or a superseded render (gen). The indicator draw side uses scale=1 (D-2).
+      if (msg.dragSeq !== currentDragSeq || msg.gen !== state.lastRenderedGen) {
+        return;
+      }
+      // Indicator drawing lands in a later slice; the preview is plumbed but not drawn yet.
+      return;
+    }
+    case "dropResult": {
+      // The authoritative, freshly-computed drop (Phase 4c). Apply through the realm-agnostic
+      // Mutation helper with the PARENT-retained source data, unless stale or empty.
+      if (msg.dragSeq !== currentDragSeq || msg.gen !== state.lastRenderedGen) {
+        return;
+      }
+      if (msg.instruction && msg.targetPath) {
+        const srcData = retainedSrcData.get(msg.dragSeq);
+        if (srcData) {
+          applyDropInstruction({ type: msg.instruction }, srcData, msg.targetPath);
+        }
+      }
+      retainedSrcData.delete(msg.dragSeq);
       return;
     }
     case "patchError": {

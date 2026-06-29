@@ -87,7 +87,16 @@ export type ParentToIframe =
           }
         | { command: "link"; href: string | null } // Null/"" = remove
         | { command: "insertData"; token: string };
-    };
+    }
+  // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
+  // Begin a drag session in the iframe: `src` is the realm-agnostic source kind, `dragSeq` is the
+  // Per-session id (parent drops any reply with a different seq), `gen` is the render the session
+  // Started against (parent drops dragOver/dropResult whose gen != the iframe's last-rendered gen).
+  | { kind: "dragStart"; src: DragSrcKind; dragSeq: number; gen: number }
+  // The pointer moved over the canvas. `cursor` is already converted to IFRAME-VIEWPORT coords.
+  | { kind: "dragMove"; cursor: { x: number; y: number }; dragSeq: number }
+  // The pointer was released over the canvas — the iframe computes the drop FRESH and posts dropResult.
+  | { kind: "drop"; cursor: { x: number; y: number }; dragSeq: number };
 
 /** A node's bounding box, in the iframe's own viewport coordinates. */
 export interface SerializableRect {
@@ -95,6 +104,35 @@ export interface SerializableRect {
   y: number;
   width: number;
   height: number;
+}
+
+// ─── Cross-frame drag-and-drop (Phase 4c) ──────────────────────────────────────
+
+/**
+ * The structural placement a drop resolves to, applied via the realm-agnostic
+ * `applyDropInstruction`.
+ */
+export type DropInstructionType = "reorder-above" | "reorder-below" | "make-child";
+
+/**
+ * The kind of thing being dragged. `tree-node` carries the source's existing document path (a
+ * move); `block` carries nothing on the wire — its full `fragment` (a {@link JxMutableNode}) is
+ * retained PARENT-SIDE keyed by `dragSeq` and never crosses the boundary.
+ */
+export type DragSrcKind = { type: "tree-node"; path: (string | number)[] } | { type: "block" };
+
+/**
+ * A display-only drop preview the iframe posts on `dragOver`: where the drop indicator should draw
+ * (`referenceRect`, in iframe-viewport coords) and the resolved structural placement. `edge` is the
+ * geometric side (added for the indicator slice; unused in the spike). The actual drop is
+ * recomputed FRESH in the `drop` handler — a preview is never the source of truth for the applied
+ * mutation.
+ */
+export interface DropPreview {
+  instruction: DropInstructionType;
+  targetPath: (string | number)[];
+  referenceRect: SerializableRect;
+  edge: "top" | "bottom" | "inside";
 }
 
 /** A document path plus the iframe-space rect of the node it resolves to. */
@@ -173,10 +211,29 @@ export type IframeToParent =
       localScope: null;
     }
   // The inline-edit session ended.
-  | { kind: "editEnd" };
+  | { kind: "editEnd" }
+  // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
+  // A display-only drop preview for the parent's indicator. `gen` lets the parent drop previews
+  // Computed against a superseded render; `preview` is null when the cursor resolves to no drop.
+  | { kind: "dragOver"; dragSeq: number; gen: number; preview: DropPreview | null }
+  // The resolved drop, computed FRESH from the current DOM. The parent (if non-stale, non-null)
+  // Applies it via applyDropInstruction with the retained source data.
+  | {
+      kind: "dropResult";
+      dragSeq: number;
+      gen: number;
+      instruction: DropInstructionType | null;
+      targetPath: (string | number)[] | null;
+    };
 
 /** The iframe→parent selection snapshot that drives the parent format toolbar. */
 export type SelectionSnapshot = Extract<IframeToParent, { kind: "selectionChanged" }>;
 
 /** The author's format/link/insert intent the parent toolbar posts back to the iframe. */
 export type ApplyFormatIntent = Extract<ParentToIframe, { kind: "applyFormat" }>["intent"];
+
+/** The parent→iframe drag-session start message (Phase 4c). */
+export type DragStartMsg = Extract<ParentToIframe, { kind: "dragStart" }>;
+
+/** The iframe→parent display-only drop-preview message (Phase 4c). */
+export type DragOverMsg = Extract<IframeToParent, { kind: "dragOver" }>;

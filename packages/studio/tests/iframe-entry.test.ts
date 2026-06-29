@@ -256,3 +256,65 @@ describe("startCanvasIframe — patch", () => {
     expect(acks).toContainEqual({ gen: 1, kind: "patchComplete" });
   });
 });
+
+describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
+  const freshH1 = () => ({ children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" });
+
+  async function bootRendered(gen: number) {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(gen, freshH1(), freshH1()));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return { acks, container, pair };
+  }
+
+  // Happy-dom's elementFromPoint returns null (no layout), so resolveDropTarget can't find a target
+  // Here — the preview is therefore null. This test proves the MESSAGE FLOW + the seq/gen tagging,
+  // Not the geometry (the non-null placement math is proven in iframe-drop.test.ts; the real
+  // Point-resolution is CDP-only).
+  test("dragStart→dragMove→dragOver and drop→dropResult carry the session dragSeq + gen", async () => {
+    const { acks, pair } = await bootRendered(7);
+    acks.length = 0;
+
+    pair.parent.post({ dragSeq: 3, gen: 7, kind: "dragStart", src: { type: "block" } });
+    pair.parent.post({ cursor: { x: 5, y: 5 }, dragSeq: 3, kind: "dragMove" });
+    pair.flush();
+    pair.flush();
+
+    const over = acks.find((m) => m.kind === "dragOver");
+    expect(over).toEqual({ dragSeq: 3, gen: 7, kind: "dragOver", preview: null });
+
+    pair.parent.post({ cursor: { x: 5, y: 5 }, dragSeq: 3, kind: "drop" });
+    pair.flush();
+    pair.flush();
+
+    const result = acks.find((m) => m.kind === "dropResult");
+    expect(result).toEqual({
+      dragSeq: 3,
+      gen: 7,
+      instruction: null,
+      kind: "dropResult",
+      targetPath: null,
+    });
+  });
+
+  test("dragMove before any dragStart posts a null preview (no retained source)", async () => {
+    const { acks, pair } = await bootRendered(1);
+    acks.length = 0;
+    pair.parent.post({ cursor: { x: 1, y: 1 }, dragSeq: 9, kind: "dragMove" });
+    pair.flush();
+    pair.flush();
+    expect(acks.find((m) => m.kind === "dragOver")).toEqual({
+      dragSeq: 9,
+      gen: -1,
+      kind: "dragOver",
+      preview: null,
+    });
+  });
+});

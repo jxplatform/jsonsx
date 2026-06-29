@@ -33,6 +33,27 @@ export function canvasRectToParent(rect: SerializableRect, scale = 1): OverlayPl
   };
 }
 
+/**
+ * Map a parent-viewport cursor (e.g. a pragmatic `location.current.input`, in true post-transform
+ * parent px) into the iframe's own viewport coordinates. The iframe + overlay are descendants of
+ * the scaled `panzoom-wrap`, so the cursor must be DIVIDED by the zoom `scale` (the inverse of the
+ * CSS `transform: scale()` the browser already applied). `iframeRect` is `rectOf(iframe)` (its GBCR
+ * bakes in pan + scale, so subtracting its `left`/`top` cancels the pan offset). Pure, so the
+ * sign/order of the transform is unit-tested independently of the DOM. Empirical `scale` is derived
+ * by the caller as `rectOf(iframe).width / iframe.clientWidth` (NOT `effectiveZoom()` — a separate
+ * path that can desync).
+ */
+export function parentCursorToIframe(
+  cursor: { x: number; y: number },
+  iframeRect: { left: number; top: number },
+  scale = 1,
+): { x: number; y: number } {
+  return {
+    x: (cursor.x - iframeRect.left) / scale,
+    y: (cursor.y - iframeRect.top) / scale,
+  };
+}
+
 /** A floating overlay layer over the iframe that draws a selection box and a hover box. */
 export interface OverlayLayer {
   /** Position the selection box (or hide it when `placement` is null). */

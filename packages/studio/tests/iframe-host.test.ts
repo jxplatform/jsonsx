@@ -42,6 +42,11 @@ void mock.module("../src/canvas/iframe-channel", () => ({
   },
 }));
 
+// The host now imports applyDropInstruction (panels/dnd → stylebook-panel); stub it light.
+void mock.module("../src/panels/stylebook-panel", () => ({
+  renderComponentPreview: async () => document.createElement("div"),
+}));
+
 const DEFAULT_RESOLVED = {
   docBase: "http://localhost:3000/doc.json",
   mapperCtx: {
@@ -60,11 +65,18 @@ void mock.module("../src/canvas/canvas-live-render", () => ({
 }));
 
 const {
+  beginDragSession,
+  currentDragSession,
+  endDragSession,
   getActiveEditHost,
   getEditBarAnchorRect,
   getEditSnapshot,
+  hostDragGeometry,
+  hostForCanvas,
+  liveDragHostAt,
   mountIframeCanvas,
   postApplyFormat,
+  postDragMessage,
   postPatchToHosts,
   setIframePatchEscalation,
   setToolbarRefresh,
@@ -601,3 +613,161 @@ describe("iframe canvas format-toolbar bridge", () => {
     endActiveSession();
   });
 });
+
+describe("cross-frame drag session (Phase 4c)", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab({
+      children: [{ tagName: "p", textContent: "a" }],
+      tagName: "div",
+    });
+  });
+
+  /** Mount + ready a host and record the render gen via renderComplete. */
+  async function readyHostAt(gen: number): Promise<{ canvasEl: HTMLElement; host: AnyHost }> {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ gen, kind: "renderComplete" });
+    const host = hostForCanvas(canvasEl) as unknown as AnyHost;
+    return { canvasEl, host };
+  }
+
+  test("beginDragSession bumps the seq, retains data, and posts dragStart with the host gen", async () => {
+    const { host } = await readyHostAt(4);
+    channels[0]!.posts.length = 0;
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    expect(seq).toBe(currentDragSession());
+    expect(channels[0]!.posts).toContainEqual({
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragStart",
+      src: { type: "block" },
+    });
+    endDragSession(seq);
+  });
+
+  test("dropResult applies the drop through applyDropInstruction with the retained source data", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    // Fresh, non-stale dropResult: reorder-below child 0 → insert at index 1.
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    const doc = activeTab.value!.doc.document;
+    const kids = doc.children as { tagName: string }[];
+    expect(kids.length).toBe(2);
+    expect(kids[1]!.tagName).toBe("hr");
+  });
+
+  test("dropResult with a stale dragSeq is dropped (no mutation)", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    channels[0]!.deliver({
+      dragSeq: seq + 99,
+      gen: 4,
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
+    endDragSession(seq);
+  });
+
+  test("dropResult with a stale gen is dropped (no mutation)", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 3, // != host.lastRenderedGen (4)
+      instruction: "reorder-below",
+      kind: "dropResult",
+      targetPath: ["children", 0],
+    });
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
+    endDragSession(seq);
+  });
+
+  test("a null-instruction dropResult is a no-op and releases the retained data", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    channels[0]!.deliver({
+      dragSeq: seq,
+      gen: 4,
+      instruction: null,
+      kind: "dropResult",
+      targetPath: null,
+    });
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
+  });
+
+  test("dragOver (matching seq+gen) is accepted; a stale one is ignored — neither throws", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(
+      host,
+      { type: "block" },
+      { fragment: { tagName: "hr" }, type: "block" },
+    );
+    // No assertion on drawing this slice; just exercise both stale-gates without throwing.
+    channels[0]!.deliver({ dragSeq: seq, gen: 4, kind: "dragOver", preview: null });
+    channels[0]!.deliver({ dragSeq: seq, gen: 3, kind: "dragOver", preview: null });
+    channels[0]!.deliver({ dragSeq: seq + 1, gen: 4, kind: "dragOver", preview: null });
+    expect((activeTab.value!.doc.document.children as unknown[]).length).toBe(1);
+    endDragSession(seq);
+  });
+
+  test("liveDragHostAt resolves the host whose iframe rect contains the cursor", async () => {
+    const { canvasEl, host } = await readyHostAt(1);
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 100, left: 200, top: 50, width: 300 });
+    expect(liveDragHostAt({ x: 250, y: 80 })).toBe(host as never);
+    expect(liveDragHostAt({ x: 10, y: 10 })).toBeNull();
+  });
+
+  test("hostDragGeometry derives the EMPIRICAL scale from rect.width / iframe.clientWidth", async () => {
+    const { canvasEl } = await readyHostAt(1);
+    const iframe = canvasEl.querySelector("iframe")! as HTMLIFrameElement;
+    stubRect(iframe, { height: 240, left: 10, top: 20, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+    const host = hostForCanvas(canvasEl) as unknown as AnyHost;
+    const geo = hostDragGeometry(host);
+    expect(geo.scale).toBe(2); // 600 / 300
+    expect(geo.rect.left).toBe(10);
+    expect(geo.rect.top).toBe(20);
+  });
+
+  test("postDragMessage forwards to the host channel", async () => {
+    const { host } = await readyHostAt(1);
+    channels[0]!.posts.length = 0;
+    postDragMessage(host, { cursor: { x: 1, y: 2 }, dragSeq: 1, kind: "dragMove" });
+    expect(channels[0]!.posts).toContainEqual({
+      cursor: { x: 1, y: 2 },
+      dragSeq: 1,
+      kind: "dragMove",
+    });
+  });
+});
+
+/** Opaque host handle for the drag-session API tests (its internals aren't asserted directly). */
+type AnyHost = Parameters<typeof beginDragSession>[0];
