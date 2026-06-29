@@ -14,6 +14,8 @@ import {
   handleResolveSiteContext,
   handleUploadFile,
   handleWriteFile,
+  jxResolve,
+  jxServerFunction,
   listDirectory,
   listFormats,
   locateFile,
@@ -48,7 +50,7 @@ import {
   setPackageVersions,
 } from "../packages";
 import { openFileDialog } from "./utils";
-import { handleAiApi } from "@jxsuite/server/ai-api";
+import { createProjectServer } from "@jxsuite/server/project-server";
 import { readRecents, writeRecents } from "../recent-store";
 import type { RecentProjectEntry } from "../rpc-schema";
 
@@ -113,6 +115,8 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   getRecentProjects: () => readRecents(),
   saveRecentProjects: (params) =>
     writeRecents((params as { projects: RecentProjectEntry[] }).projects),
+  jxResolve: (params) => jxResolve(params as { body: string }),
+  jxServerFunction: (params) => jxServerFunction(params as { body: string }),
   readFile: (params) => handleReadFile(params as { path: string }),
   removePackage: (params) => removePackage(params as { name: string }),
   renameFile: (params) => handleRenameFile(params as { from: string; to: string }),
@@ -125,105 +129,22 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
 
 const studioDir = process.env.JX_STUDIO_ASSETS || resolve(import.meta.dir, "../../assets/studio");
 
-const server = Bun.serve({
-  async fetch(req, srv) {
-    if (srv.upgrade(req)) {
-      return;
-    }
-
-    const url = new URL(req.url);
-    const path = url.pathname.replace(/^\/{2,}/, "/");
-
-    // AI routes (SSE streaming). handleAiApi matches the dev-server's /__studio/ai/* paths;
-    // Rewrite the chromium /studio prefix onto it.
-    if (path.startsWith("/studio/ai/")) {
-      const aiUrl = new URL(req.url);
-      aiUrl.pathname = path.replace("/studio/ai/", "/__studio/ai/");
-      const aiResponse = await handleAiApi(req, aiUrl);
-      if (aiResponse) {
-        return aiResponse;
-      }
-    }
-
-    if (path.startsWith("/studio/")) {
-      const assetPath = resolve(studioDir, `.${path.replace("/studio/", "/")}`);
-      const file = Bun.file(assetPath);
-      if (await file.exists()) {
-        return new Response(file);
-      }
-    }
-
-    const root = getProjectRoot();
-    if (root) {
-      // Map the URL pathname back to a filesystem path. On Windows the browser requests absolute
-      // Paths as /C:/Users/… (leading slash + forward slashes), so drop the slash before the drive
-      // Letter and compare with separators normalized; on POSIX both transforms are no-ops.
-      const fsPath = path.replace(/^\/([A-Za-z]:)/, "$1");
-      const normalize = (p: string) => p.replaceAll("\\", "/");
-
-      // Serve absolute paths that fall under the project root
-      if (normalize(fsPath).startsWith(normalize(root))) {
-        const file = Bun.file(fsPath);
-        if (await file.exists()) {
-          return new Response(file);
-        }
-      }
-
-      // Serve relative paths from project root
-      const projectFile = Bun.file(resolve(root, `.${path}`));
-      if (await projectFile.exists()) {
-        return new Response(projectFile);
-      }
-
-      // Serve from public/ subdirectory
-      const publicFile = Bun.file(resolve(root, "public", `.${path}`));
-      if (await publicFile.exists()) {
-        return new Response(publicFile);
-      }
-    }
-
-    return new Response("Not Found", { status: 404 });
+// Single-window chromium launcher: one default session whose root tracks the process-global root.
+// The factory re-resolves this on every request/message, so setWindowProject takes effect live.
+const defaultSession = {
+  get projectRoot(): string | null {
+    return getProjectRoot();
   },
-  port: 0,
-  websocket: {
-    async message(ws, raw) {
-      let msg: { id: number; method: string; params?: unknown };
-      try {
-        msg = JSON.parse(raw as string) as { id: number; method: string; params?: unknown };
-      } catch {
-        ws.send(JSON.stringify({ error: "Invalid JSON", id: 0 }));
-        return;
-      }
+  handlers,
+};
 
-      const handler = handlers[msg.method];
-      if (!handler) {
-        ws.send(
-          JSON.stringify({
-            error: `Unknown method: ${msg.method}`,
-            id: msg.id,
-          }),
-        );
-        return;
-      }
-
-      try {
-        const result = await handler(msg.params);
-        ws.send(JSON.stringify({ id: msg.id, result: result ?? null }));
-      } catch (error: unknown) {
-        ws.send(
-          JSON.stringify({
-            error: error instanceof Error ? error.message : String(error),
-            id: msg.id,
-          }),
-        );
-      }
-    },
-  },
+const { url: serverUrl, rpcToken } = createProjectServer({
+  resolveSession: () => defaultSession,
+  studioDir,
 });
 
-const serverUrl = `http://localhost:${server.port}`;
 console.log(`[chromium] Studio server at ${serverUrl}`);
-console.log(`[chromium] WebSocket RPC at ws://localhost:${server.port}`);
+console.log(`[chromium] WebSocket RPC at ${serverUrl.replace(/^http/, "ws")}`);
 console.log(`[chromium] Project root: ${projectRoot}`);
 
 // ─── Launch Chromium ─────────────────────────────────────────────────────────
@@ -257,7 +178,7 @@ if (!chromiumBin) {
 console.log(`[chromium] Launching: ${chromiumBin}`);
 
 const chromiumArgs = [
-  `--app=${serverUrl}/studio/index.html`,
+  `--app=${serverUrl}/__studio__/index.html?token=${rpcToken}`,
   "--no-first-run",
   "--no-default-browser-check",
   "--window-size=1400,900",

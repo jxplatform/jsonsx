@@ -32,6 +32,21 @@ await copyFile(
   join(assetsDir, "studio", "dist", "studio.js"),
 );
 
+// Iframe canvas: the chromium project server serves the canvas doc + its bundle from assets/studio.
+// Without these, the packaged chromium iframe 404s at boot (/__studio__/canvas.html and its entry).
+await copyFile(join(studioDir, "canvas.html"), join(assetsDir, "studio", "canvas.html"));
+await copyFile(
+  join(studioDir, "dist", "iframe-entry.js"),
+  join(assetsDir, "studio", "dist", "iframe-entry.js"),
+);
+// The sourcemap is optional (dev convenience); copy it when present.
+try {
+  await copyFile(
+    join(studioDir, "dist", "iframe-entry.js.map"),
+    join(assetsDir, "studio", "dist", "iframe-entry.js.map"),
+  );
+} catch {}
+
 const html = await readFile(join(studioDir, "index.html"), "utf8");
 const patched = html.replace(
   '<script type="module" src="./dist/studio.js"></script>',

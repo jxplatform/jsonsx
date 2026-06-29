@@ -113,6 +113,26 @@ describe("mountIframeCanvas", () => {
     expect(channels[0]!.posts[0]).toMatchObject({ gen: 1, kind: "render", mode: "design" });
   });
 
+  test("uses the platform's canvasUrl when set, default otherwise", async () => {
+    const g = globalThis as unknown as {
+      __jxPlatform?: { canvasUrl?: string } | undefined;
+    };
+    const saved = g.__jxPlatform;
+    // With a platform that sets canvasUrl, the iframe boots from that URL.
+    g.__jxPlatform = { canvasUrl: "/__studio__/canvas.html" } as never;
+    try {
+      const canvasEl = document.createElement("div");
+      document.body.append(canvasEl);
+      await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+      const iframe = canvasEl.querySelector("iframe")!;
+      expect(iframe.getAttribute("src")).toMatch(
+        /\/__studio__\/canvas\.html\?parentOrigin=.+&token=.+/,
+      );
+    } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
   test("JSON round-trips the doc so non-cloneable values (functions) are dropped", async () => {
     resolved = {
       ...DEFAULT_RESOLVED,

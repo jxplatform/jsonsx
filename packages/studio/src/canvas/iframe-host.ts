@@ -22,6 +22,7 @@ import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
 import { pathsEqual } from "../store";
 import { activeTab } from "../workspace/workspace";
+import { getPlatform, hasPlatform } from "../platform";
 import type {
   ApplyFormatIntent,
   CanvasMode,
@@ -285,8 +286,11 @@ function requestSelection(host: HostState, sel: (string | number)[] | null): voi
   host.channel.post({ kind: "measure", paths: [[...sel]], reqId: host.selReqId });
 }
 
-/** The iframe document URL (a static shell that boots the slim canvas bundle). */
-const CANVAS_URL = "/packages/studio/canvas.html";
+/**
+ * The default iframe document URL (a static shell that boots the slim canvas bundle). Used when the
+ * platform does not provide its own canvasUrl — i.e. the dev server and electrobun keep this path.
+ */
+const DEFAULT_CANVAS_URL = "/packages/studio/canvas.html";
 
 function ensureHost(canvasEl: HTMLElement): HostState {
   const existing = hosts.get(canvasEl);
@@ -295,11 +299,14 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   }
   const { origin } = location;
   const token = crypto.randomUUID();
+  // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
+  // Dev server and electrobun leave it unset, and some tests mount without a platform registered.
+  const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
   const iframe = document.createElement("iframe");
   iframe.className = "jx-canvas-iframe";
   iframe.style.cssText =
     "width:100%;min-height:480px;height:100%;border:0;display:block;background:#fff";
-  iframe.src = `${CANVAS_URL}?parentOrigin=${encodeURIComponent(origin)}&token=${token}`;
+  iframe.src = `${canvasUrl}?parentOrigin=${encodeURIComponent(origin)}&token=${token}`;
   // Overlay boxes are positioned within the canvas element, so it must be a positioned ancestor.
   if (!canvasEl.style.position) {
     canvasEl.style.position = "relative";

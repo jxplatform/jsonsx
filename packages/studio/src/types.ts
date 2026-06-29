@@ -126,6 +126,13 @@ export interface RenameResult {
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
+  /**
+   * URL of the canvas iframe document. Optional: when set (chromium serves it from the project
+   * server under the studio namespace), the iframe host uses it; otherwise the host falls back to
+   * the default dev-server path. Not keyed on `id` — chromium and electrobun both report `id:
+   * "desktop"`, but only chromium sets this.
+   */
+  canvasUrl?: string;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;

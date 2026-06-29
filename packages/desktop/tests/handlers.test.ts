@@ -73,6 +73,31 @@ describe("guards", () => {
       cleanup();
     }
   });
+
+  test.skipIf(process.platform === "win32")(
+    "write-path realpath check blocks a symlinked dir that escapes the root",
+    async () => {
+      setup();
+      const { mkdirSync: mkdir, symlinkSync, rmSync: rmTree } = await import("node:fs");
+      const outside = join(import.meta.dir, "_fixtures_handlers_outside");
+      rmTree(outside, { force: true, recursive: true });
+      mkdir(outside, { recursive: true });
+      try {
+        // A symlink INSIDE the project that points to a directory OUTSIDE it. The lexical guard
+        // Alone ("evil/x.txt" has no "..") would pass; the realpath re-check must catch it.
+        symlinkSync(outside, join(FIXTURES, "evil"));
+        await expect(handleWriteFile({ content: "x", path: "evil/x.txt" })).rejects.toThrow(
+          "Path outside project root",
+        );
+        await expect(handleDeleteFile({ path: "evil/x.txt" })).rejects.toThrow(
+          "Path outside project root",
+        );
+      } finally {
+        rmTree(outside, { force: true, recursive: true });
+        cleanup();
+      }
+    },
+  );
 });
 
 // ─── listDirectory ──────────────────────────────────────────────────────────

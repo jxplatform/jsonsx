@@ -18,7 +18,10 @@ import type {
 } from "../rpc-schema";
 
 export function createDesktopPlatform(): StudioPlatform {
-  const ws = new WebSocket(`ws://${location.host}`);
+  // The project server gates the WS upgrade on the token. The launcher passes it in the shell URL
+  // (?token=…); read it here before the shell strips it from the address bar after boot.
+  const token = new URLSearchParams(location.search).get("token") ?? "";
+  const ws = new WebSocket(`ws://${location.host}/?token=${encodeURIComponent(token)}`);
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
@@ -59,6 +62,10 @@ export function createDesktopPlatform(): StudioPlatform {
     id: "desktop" as const,
 
     projectRoot: "",
+
+    // The chromium project server serves the canvas iframe doc under /__studio__/. Only chromium
+    // Sets this; electrobun and the dev server leave it unset and keep their default canvas path.
+    canvasUrl: "/__studio__/canvas.html",
 
     async activate() {
       // No-op: the chromium platform needs no activation step
@@ -297,7 +304,7 @@ export function createDesktopPlatform(): StudioPlatform {
 
     // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)
     aiChatUrl() {
-      return "/studio/ai/chat";
+      return "/__studio__/ai/chat";
     },
   };
 }

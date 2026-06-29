@@ -10,7 +10,7 @@
 
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { handleResolve, handleServerFunction } from "@jxsuite/server/resolve";
 import { applyRename, createFsWatcher } from "@jxsuite/server/refactor";
 import { buildProjectFormatRegistry } from "@jxsuite/compiler/format-host";
@@ -138,10 +138,56 @@ function relPosix(root: string, absPath: string): string {
   return toPosix(relative(root, absPath));
 }
 
+/** Normalize a path for cross-platform containment comparison (separators + case on Windows). */
+function normalizeForCompare(p: string): string {
+  const slashed = toPosix(p);
+  return process.platform === "win32" ? slashed.toLowerCase() : slashed;
+}
+
+/**
+ * The deepest ancestor of `absPath` (inclusive) that exists on disk. Used so the realpath symlink
+ * check below applies even when the leaf does not exist yet (a brand-new file/dir being written).
+ */
+function deepestExisting(absPath: string): string {
+  let p = absPath;
+  while (!existsSync(p)) {
+    const parent = dirname(p);
+    if (parent === p) {
+      return p;
+    }
+    p = parent;
+  }
+  return p;
+}
+
 function assertUnderRoot(absPath: string, root: string) {
-  // Guard only — the raw separator is irrelevant to the "../" and "/" escape checks below.
+  // (1) Lexical guard — the raw separator is irrelevant to the "../" and "/" escape checks.
   const rel = relative(root, absPath);
   if (rel.startsWith("..") || rel.startsWith("/")) {
+    throw new Error("Path outside project root");
+  }
+  // (2) Symlink containment (mirrors the project server's containedFile read-path hardening):
+  // Realpath the project root and the deepest existing ancestor of the target, then re-check the
+  // Resolved target is still under the resolved root. A symlink INSIDE the project that points
+  // Outside would otherwise let the file mutators escape root.
+  let realRoot: string;
+  try {
+    realRoot = realpathSync(root);
+  } catch {
+    // Root itself is unresolvable — the lexical guard already passed; do not block.
+    return;
+  }
+  let realTarget: string;
+  try {
+    realTarget = realpathSync(deepestExisting(absPath));
+  } catch {
+    return;
+  }
+  const nRoot = normalizeForCompare(realRoot);
+  const nTarget = normalizeForCompare(realTarget);
+  const contained =
+    nTarget === nRoot || nTarget.startsWith(nRoot.endsWith("/") ? nRoot : `${nRoot}/`);
+  if (!contained) {
     throw new Error("Path outside project root");
   }
 }
