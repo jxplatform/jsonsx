@@ -482,7 +482,10 @@ export function renderBlockActionBar() {
     !node.textContent &&
     (children.length === 0 ||
       (children.length === 1 && typeof children[0] === "object" && children[0]?.tagName === "br"));
-  const convertTargets = !isComponent ? getConvertTargets(tag, isEmpty) : [];
+  // Repeater ($prototype:"Array") pseudo-elements have no tagName — show the "Repeater → items" label
+  // (not a bare "div") and don't offer tag-conversion targets, which are meaningless for a repeater.
+  const isRepeater = node.$prototype === "Array";
+  const convertTargets = !isComponent && !isRepeater ? getConvertTargets(tag, isEmpty) : [];
   const badgeInteractive = convertTargets.length > 0;
 
   litRender(
@@ -499,7 +502,7 @@ export function renderBlockActionBar() {
           @click=${badgeInteractive
             ? (e: MouseEvent) => onTagBadgeClick(e, convertTargets, selection)
             : nothing}
-          >${node.$id || (node.tagName ?? "div")}</span
+          >${isRepeater ? nodeLabel(node) : node.$id || (node.tagName ?? "div")}</span
         >
 
         ${selection.length >= 2

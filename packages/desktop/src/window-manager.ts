@@ -325,7 +325,17 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
         },
         getProjectRoot: () => ({ root: session.projectRoot }),
         // Hand the studio shell this window's cross-origin loopback canvas URL.
-        getCanvasUrl: () => ({ canvasUrl: entry.server?.canvasUrl ?? null }),
+        getCanvasUrl: () => {
+          const srv = entry.server;
+          if (!srv) {
+            return { canvasUrl: null };
+          }
+          // Append the server rpcToken so the in-iframe runtime can authenticate its dev-proxy
+          // Resolve/server fetches (the host adds the separate channel `token` param on top).
+          const u = new URL(srv.canvasUrl);
+          u.searchParams.set("rpcToken", srv.rpcToken);
+          return { canvasUrl: u.href };
+        },
         listOpenWindows: () => listOpenWindows(),
         setWindowProject: async (params) => {
           // Dedupe: if another window already owns this project, focus it and tell the caller.

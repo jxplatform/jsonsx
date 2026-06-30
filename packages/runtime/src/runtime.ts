@@ -140,6 +140,20 @@ export function setSkipServerFunctions(v: boolean) {
   _serverFnConfig.skip = v;
 }
 
+// ─── Dev-proxy auth token (Studio cross-origin canvas) ────────────────────────
+// The Studio canvas iframe is served from a token-gated loopback origin (createProjectServer): its
+// POST /__jx_resolve__ + /__jx_server__ routes 403 without ?token=<rpcToken>. The iframe boot reads
+// The token from its URL and calls setResolveToken so these dev-proxy fetches authenticate. Unset by
+// Default, leaving production + same-origin dev untouched (bare path, no query appended).
+let _resolveToken: string | null = null;
+export function setResolveToken(token: string | null) {
+  _resolveToken = token || null;
+}
+/** Append the dev-proxy auth token to a privileged resolve path when one is configured. */
+function resolveProxyPath(path: string): string {
+  return _resolveToken ? `${path}?token=${encodeURIComponent(_resolveToken)}` : path;
+}
+
 /** @deprecated No longer needed — ContentCollection/ContentEntry resolve via generic class path */
 export function setSkipContentResolution(_v: boolean) {
   // No-op retained for API compatibility
@@ -1612,7 +1626,7 @@ async function resolveViaDevProxy(def: JxPrototypeDef, state: JxScope, key: stri
 
   /** @param {JxScope} resolvedConfig */
   const doResolve = (resolvedConfig: JxScope) =>
-    fetch("/__jx_resolve__", {
+    fetch(resolveProxyPath("/__jx_resolve__"), {
       body: JSON.stringify({
         $base: base,
         $export: def.$export,
@@ -1763,7 +1777,7 @@ async function resolveServerFunctionViaProxy(
 
   /** @param {JxScope} args */
   const doResolve = (args: JxScope) =>
-    fetch("/__jx_server__", {
+    fetch(resolveProxyPath("/__jx_server__"), {
       body: JSON.stringify({
         $base: base,
         $export: def.$export,

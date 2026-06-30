@@ -20,6 +20,7 @@ import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
+import { setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
 import type { DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
 import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
@@ -371,6 +372,10 @@ interface BootWindow {
  */
 export function bootCanvasIframe(win: BootWindow): () => void {
   const params = new URLSearchParams(win.location.search);
+  // Authenticate the runtime dev-proxy resolve/server fetches to the token-gated loopback server.
+  // The server rpcToken rides the iframe URL as `rpcToken`; the `token` param is the separate
+  // PostMessage channel secret (set by the host). Absent on dev/chromium, where setResolveToken no-ops.
+  setResolveToken(params.get("rpcToken"));
   // ParentOrigin authenticates the parent peer. The host (iframe-host.ts) passes it ONLY for an
   // Http(s) parent (dev / chromium — same-origin, the origin round-trips). It OMITS it for a
   // Non-http(s) parent (electrobun views://), whose custom scheme may not surface as a postMessage

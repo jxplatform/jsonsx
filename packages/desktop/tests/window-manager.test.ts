@@ -154,6 +154,7 @@ interface FakeServer {
   resolveSession: () => { projectRoot: string | null; handlers: Record<string, unknown> } | null;
   url: string;
   canvasUrl: string;
+  rpcToken: string;
   stop: ReturnType<typeof mock>;
 }
 const createdServers: FakeServer[] = [];
@@ -165,6 +166,7 @@ const createProjectServer = mock((opts: { resolveSession: () => never; studioDir
   const handle: FakeServer = {
     canvasUrl: `${url}/__studio__/canvas.html`,
     resolveSession: opts.resolveSession,
+    rpcToken: `tok-${port}`,
     stop: mock(() => {}),
     url,
   };
@@ -418,8 +420,39 @@ describe("loopback canvas server", () => {
     expect(createProjectServer).toHaveBeenCalledTimes(1);
     expect(createdServers).toHaveLength(1);
     const server = createdServers[0]!;
-    expect(lastRequests().getCanvasUrl()).toEqual({ canvasUrl: server.canvasUrl });
+    // GetCanvasUrl returns the server canvasUrl with the per-window rpcToken appended as a query
+    // Param, so the in-iframe runtime can authenticate its loopback dev-proxy fetches.
+    const got = (lastRequests().getCanvasUrl() as { canvasUrl: string }).canvasUrl;
+    const gotUrl = new URL(got);
+    const expectedUrl = new URL(server.canvasUrl);
+    expect(`${gotUrl.origin}${gotUrl.pathname}`).toBe(
+      `${expectedUrl.origin}${expectedUrl.pathname}`,
+    );
+    expect(gotUrl.searchParams.get("rpcToken")).toBe(server.rpcToken);
     expect(server.canvasUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/__studio__\/canvas\.html$/);
+  });
+
+  test("getCanvasUrl appends the server rpcToken to the canvas URL", () => {
+    openProjectWindow("/proj/token");
+    // Pin a known canvasUrl + rpcToken on this window's server so the assertion is exact.
+    const server = createdServers[0]!;
+    server.canvasUrl = "http://127.0.0.1:5555/__studio__/canvas.html";
+    server.rpcToken = "TOK123";
+
+    const { canvasUrl } = lastRequests().getCanvasUrl() as { canvasUrl: string };
+    const parsed = new URL(canvasUrl);
+    expect(parsed.pathname).toBe("/__studio__/canvas.html");
+    expect(parsed.host).toBe("127.0.0.1:5555");
+    expect(parsed.searchParams.get("rpcToken")).toBe("TOK123");
+  });
+
+  test("getCanvasUrl returns { canvasUrl: null } when there is no server", () => {
+    // This window's loopback server fails to stand up, so entry.server stays undefined and the
+    // Handler must take the null branch instead of constructing a URL from `undefined`.
+    createProjectServer.mockImplementationOnce(() => undefined as never);
+    openProjectWindow("/proj/noserver");
+    expect(createdServers).toHaveLength(0);
+    expect(lastRequests().getCanvasUrl()).toEqual({ canvasUrl: null });
   });
 
   test("the server's session tracks THIS window's projectRoot, no ?win= needed", () => {

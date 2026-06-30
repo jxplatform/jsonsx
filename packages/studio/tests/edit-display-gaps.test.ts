@@ -173,19 +173,49 @@ describe("prepareForEditMode $props", () => {
   test("processes template strings, url props, refs and passthrough values", () => {
     const out = prep({
       $props: {
+        href: "${s}",
         label: "${t}",
         link: { $ref: "#/state/url" },
         other: { $ref: "raw.path" },
         plain: 5,
-        src: "${s}",
       },
       tagName: "x-card",
     });
     expect(out.$props.label).toBe("❪ t ❫");
-    expect(out.$props.src).toBe("");
+    // A url-target prop (href/action) blanks to "". Image-like keys (e.g. `src`) instead become the
+    // Placeholder image — covered separately below.
+    expect(out.$props.href).toBe("");
     expect(out.$props.link).toBe("{url}");
     expect(out.$props.other).toBe("{raw.path}");
     expect(out.$props.plain).toBe(5);
+  });
+
+  test("image-like template props become the neutral gray placeholder image", () => {
+    const out = prep({
+      $props: {
+        featuredImage: "${x}",
+        heroBg: "${y}",
+        href: "${item.h}",
+        image: "${item.data.featuredImage}",
+        title: "${item.t}",
+      },
+      tagName: "eer-category",
+    });
+    // Image-like keys (exact or camelCase suffix) → a data:image/svg+xml gray box, not a ❪ ❫ glyph.
+    expect(out.$props.image.startsWith("data:image/svg+xml")).toBe(true);
+    expect(out.$props.featuredImage.startsWith("data:image/svg+xml")).toBe(true);
+    expect(out.$props.heroBg.startsWith("data:image/svg+xml")).toBe(true);
+    // Non-image text prop → the readable ❪ expr ❫ binding glyph.
+    expect(out.$props.title).toBe("❪ item.t ❫");
+    expect(out.$props.title).toContain("❪");
+    expect(out.$props.title).toContain("❫");
+    // Link target prop → inert empty string.
+    expect(out.$props.href).toBe("");
+  });
+
+  test("a static (non-template) image prop is left untouched", () => {
+    const out = prep({ $props: { image: "/photo.png" }, tagName: "eer-category" });
+    expect(out.$props.image).toBe("/photo.png");
   });
 });
 

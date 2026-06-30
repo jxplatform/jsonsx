@@ -392,6 +392,42 @@ describe("block action bar", () => {
     expect(navigated).toEqual(["components/card.json"]);
   });
 
+  // ─── Repeater ($prototype:"Array") pseudo-element badge ────────────────────
+
+  test("repeater (Array) node shows the nodeLabel badge and is not interactive", () => {
+    setup(
+      {
+        children: [
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/excavators" },
+            map: { tagName: "li", textContent: "${item}" },
+          } as never,
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    renderBlockActionBar();
+
+    const badge = bar()!.querySelector(".bar-tag")!;
+    // NodeLabel(node) → "Repeater → <items-ref>" instead of falling through to "div".
+    expect(badge.textContent!.trim()).toBe("Repeater → #/state/excavators");
+    // Repeaters offer no tag-conversion targets, so the badge is inert (no slash menu on click).
+    expect(badge.classList.contains("bar-tag--interactive")).toBe(false);
+    expect(bar()!.querySelector(".bar-tag--interactive")).toBeNull();
+  });
+
+  test("a normal div node still shows its tag name and is interactive", () => {
+    // Contrast with the repeater: a plain element keeps the bare tag badge + convert targets.
+    setup({ children: [{ children: [], tagName: "div" }], tagName: "section" }, ["children", 0]);
+    renderBlockActionBar();
+
+    const badge = bar()!.querySelector(".bar-tag")!;
+    expect(badge.textContent!.trim()).toBe("div");
+    expect(badge.classList.contains("bar-tag--interactive")).toBe(true);
+  });
+
   // ─── Drag handle ───────────────────────────────────────────────────────────
 
   test("drag handle registers a draggable carrying the selection path", () => {

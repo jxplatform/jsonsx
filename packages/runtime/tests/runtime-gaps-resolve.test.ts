@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
-import { describe, test, expect, mock, spyOn } from "bun:test";
-import { buildScope, resolvePrototype } from "../src/runtime";
+import { afterEach, describe, test, expect, mock, spyOn } from "bun:test";
+import { buildScope, resolvePrototype, setResolveToken } from "../src/runtime";
 import { reactive } from "@vue/reactivity";
 import type { JxDocument } from "@jxsuite/schema/types";
 
@@ -533,5 +533,104 @@ describe("resolveServerFunction", () => {
     expect(state.remoteReactive).toBe(null);
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+// ─── setResolveToken / resolveProxyPath (dev-proxy auth token) ────────────────
+//
+// `_resolveToken` is MODULE-GLOBAL state. The afterEach below resets it after
+// Every test, so a leaked token cannot bleed into the bare-path suites above.
+
+describe("setResolveToken / resolveProxyPath", () => {
+  afterEach(() => {
+    setResolveToken(null);
+  });
+
+  /** A bare-specifier $src that always falls through to resolveViaDevProxy. */
+  function bareSpecifierDoc(key: string) {
+    return {
+      state: { v: { $prototype: "Search", $src: `@fake/pkg/${key}.class.json`, q: "x" } },
+    } as unknown as JxDocument;
+  }
+
+  test("calling the setter directly returns undefined (covers the exported setter)", () => {
+    expect(setResolveToken("anything")).toBeUndefined();
+    expect(setResolveToken(null)).toBeUndefined();
+    expect(setResolveToken("")).toBeUndefined();
+  });
+
+  test("default (no token): dev-proxy resolve posts to the BARE /__jx_resolve__", async () => {
+    const posts = installFetch({ proxyValue: () => "ok" });
+    const state = await buildScope(bareSpecifierDoc("default"), {}, BASE);
+    await wait(5);
+    expect(state.v).toBe("ok");
+    expect(posts.length).toBe(1);
+    // No token configured → no "?token=" query appended.
+    expect(posts[0]!.url).toBe("/__jx_resolve__");
+    expect(posts[0]!.url).not.toContain("?token=");
+  });
+
+  test('setResolveToken("abc123"): dev-proxy resolve posts to /__jx_resolve__?token=abc123', async () => {
+    setResolveToken("abc123");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    const state = await buildScope(bareSpecifierDoc("tokened"), {}, BASE);
+    await wait(5);
+    expect(state.v).toBe("ok");
+    expect(posts[0]!.url).toBe("/__jx_resolve__?token=abc123");
+  });
+
+  test("token value is encodeURIComponent-escaped in the query", async () => {
+    // Characters that MUST be percent-encoded: space, &, =, /, +, #.
+    setResolveToken("a b&c=d/e+f#g");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    await buildScope(bareSpecifierDoc("encoded"), {}, BASE);
+    await wait(5);
+    expect(posts[0]!.url).toBe(`/__jx_resolve__?token=${encodeURIComponent("a b&c=d/e+f#g")}`);
+    // Sanity: the raw, un-escaped token must NOT appear verbatim.
+    expect(posts[0]!.url).not.toContain("a b&c=d/e+f#g");
+  });
+
+  test("server-function proxy (/__jx_server__) is token-gated too", async () => {
+    setResolveToken("srv-tok");
+    const posts = installFetch({ proxyValue: () => "served" });
+    const doc = {
+      state: {
+        remote: {
+          $export: "anyFn",
+          $src: "./__gaps_token_missing_server__.js",
+          arguments: { a: "x" },
+          timing: "server",
+        },
+      },
+    } as unknown as JxDocument;
+    const state = await buildScope(doc, {}, "file:///nonexistent/tok/");
+    await wait(5);
+    expect(state.remote).toBe("served");
+    expect(posts[0]!.url).toBe("/__jx_server__?token=srv-tok");
+  });
+
+  test("is idempotent/resettable: setting back to null restores the bare path", async () => {
+    setResolveToken("temp");
+    const first = installFetch({ proxyValue: () => "with-token" });
+    await buildScope(bareSpecifierDoc("reset-a"), {}, BASE);
+    await wait(5);
+    expect(first[0]!.url).toBe("/__jx_resolve__?token=temp");
+
+    // Reset to null mid-test → next resolve must drop the query entirely.
+    setResolveToken(null);
+    const second = installFetch({ proxyValue: () => "no-token" });
+    await buildScope(bareSpecifierDoc("reset-b"), {}, BASE);
+    await wait(5);
+    expect(second[0]!.url).toBe("/__jx_resolve__");
+    expect(second[0]!.url).not.toContain("?token=");
+  });
+
+  test('empty-string token is treated as unset (setResolveToken("") → bare path)', async () => {
+    // The setter normalizes falsy input to null (`token || null`).
+    setResolveToken("");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    await buildScope(bareSpecifierDoc("empty"), {}, BASE);
+    await wait(5);
+    expect(posts[0]!.url).toBe("/__jx_resolve__");
   });
 });
