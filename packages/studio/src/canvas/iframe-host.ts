@@ -21,7 +21,7 @@ import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
-import { pathsEqual } from "../store";
+import { canvasWrap, pathsEqual } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
@@ -519,6 +519,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       redispatchKey(msg.event);
       return;
     }
+    case "forwardWheel": {
+      // A wheel over the iframe — replay it on canvasWrap so the editor's zoom/pan handler fires (the
+      // Cursor is mapped from iframe-viewport coords to parent-viewport via this host's scale + offset).
+      redispatchWheel(state, msg);
+      return;
+    }
     case "editStart": {
       // Inline editing began in this host's iframe. Only one editable is active across all panels —
       // Tear down any other host's editing state and make this the single active edit host.
@@ -580,6 +586,33 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
 function reenterEdit(state: HostState, path: (string | number)[]): void {
   state.channel.post({ kind: "enterEdit", path: [...path] });
+}
+
+/**
+ * Replay a forwarded wheel on `canvasWrap` so the editor's zoom/pan handler fires. The forwarded
+ * cursor is in iframe-viewport CSS px; map it to parent-viewport space by the host's empirical zoom
+ * scale ({@link hostDragGeometry}) plus the iframe's on-screen offset, so ctrl+wheel zooms toward
+ * the real cursor. A synthetic event triggers no native scroll, which is fine — the handler does
+ * the work.
+ */
+function redispatchWheel(
+  state: HostState,
+  msg: Extract<IframeToParent, { kind: "forwardWheel" }>,
+): void {
+  const { rect, scale } = hostDragGeometry(state);
+  canvasWrap.dispatchEvent(
+    new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + msg.x * scale,
+      clientY: rect.top + msg.y * scale,
+      ctrlKey: msg.ctrlKey,
+      deltaX: msg.deltaX,
+      deltaY: msg.deltaY,
+      metaKey: msg.metaKey,
+      shiftKey: msg.shiftKey,
+    }),
+  );
 }
 
 /** Rebuild and dispatch a synthetic `keydown` on the editor document from a forwarded keystroke. */

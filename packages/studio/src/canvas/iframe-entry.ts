@@ -200,6 +200,25 @@ export function startCanvasIframe(opts: {
   const heightObserver = ResizeObs ? new ResizeObs(() => postContentHeight()) : null;
   heightObserver?.observe(container);
 
+  // ─── Wheel forwarding (canvas zoom/pan) ─────────────────────────────────────
+  // The iframe is sized to its content (never scrolls itself), so wheel events over it are meant for
+  // The parent canvas: ctrl/cmd+wheel = zoom, plain = pan. A cross-origin OOPIF doesn't bubble wheel to
+  // The parent, so forward the deltas + modifiers + cursor; the host redispatches to its wheel handler.
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    channel.post({
+      ctrlKey: e.ctrlKey,
+      deltaX: e.deltaX,
+      deltaY: e.deltaY,
+      kind: "forwardWheel",
+      metaKey: e.metaKey,
+      shiftKey: e.shiftKey,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+  container.ownerDocument.addEventListener("wheel", onWheel, { passive: false });
+
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
       channel.post({
@@ -332,6 +351,7 @@ export function startCanvasIframe(opts: {
     stopGrabDetector();
     stopAutoScroll();
     heightObserver?.disconnect();
+    container.ownerDocument.removeEventListener("wheel", onWheel);
     handle?.dispose();
   };
 }

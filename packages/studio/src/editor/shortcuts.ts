@@ -55,8 +55,16 @@ export function initShortcuts(
     "wheel",
     (e: WheelEvent) => {
       const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
-      // Edit (content) mode: let the scroll container handle scrolling natively
+      // Edit (content) mode: scroll the edit-mode container ourselves. The canvas iframe is sized to
+      // Its content (no internal scroll) and a cross-origin OOPIF doesn't bubble wheel to the parent,
+      // So the wheel reaches us forwarded (or over the canvas chrome) but never triggers native scroll.
       if (canvasMode === "edit") {
+        const sc = canvasWrap.querySelector<HTMLElement>(".content-edit-canvas");
+        if (sc) {
+          e.preventDefault();
+          sc.scrollTop += e.deltaY;
+          sc.scrollLeft += e.deltaX;
+        }
         return;
       }
       // Manage mode: browse table handles its own scrolling

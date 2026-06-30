@@ -184,6 +184,27 @@ export function transposeCanvasUnits(value: string): string {
 }
 
 /**
+ * Studio-canvas anchor de-linking. In the editor canvas a rendered `<a href>` would navigate the
+ * iframe when clicked, fighting element selection. When this is on, the runtime stamps the value on
+ * `data-jx-href` instead of `href` so the anchor is inert (selectable, not a live link) while the
+ * original target stays recoverable for richer link handling later. Off (the default) leaves
+ * production rendering untouched; the studio sets it for design/edit (not preview — see
+ * iframe-render).
+ */
+let _canvasDelinkAnchors = false;
+export function setCanvasDelinkAnchors(on: boolean) {
+  _canvasDelinkAnchors = on;
+}
+
+/** The attribute name to stamp `key` on `el` under — `href` → `data-jx-href` on de-linked anchors. */
+function canvasAttrName(el: HTMLElement, key: string): string {
+  if (_canvasDelinkAnchors && key === "href" && (el.tagName === "A" || el.tagName === "AREA")) {
+    return "data-jx-href";
+  }
+  return key;
+}
+
+/**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
  *
  * @param {JxDocument} doc
@@ -900,12 +921,13 @@ export function reapplyStyle(
  */
 function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue>, state: JxScope) {
   for (const [k, v] of Object.entries(attrs)) {
+    const attr = canvasAttrName(el, k);
     if (isRefObj(v)) {
-      effect(() => el.setAttribute(k, String(resolveRef(v.$ref, state) ?? "")));
+      effect(() => el.setAttribute(attr, String(resolveRef(v.$ref, state) ?? "")));
     } else if (isTemplateString(v)) {
-      effect(() => el.setAttribute(k, String(evaluateTemplate(v, state))));
+      effect(() => el.setAttribute(attr, String(evaluateTemplate(v, state))));
     } else {
-      el.setAttribute(k, String(v));
+      el.setAttribute(attr, String(v));
     }
   }
 }

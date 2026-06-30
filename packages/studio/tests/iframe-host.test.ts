@@ -2,7 +2,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
-import { canvasPanels } from "../src/store";
+import { canvasPanels, canvasWrap, initShellRefs } from "../src/store";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 import type { CanvasPanel } from "../src/types";
@@ -1090,6 +1090,75 @@ describe("cross-frame drag session (Phase 4c)", () => {
     clearDropIndicator(host);
     expect(indicator(canvasEl).style.display).toBe("none");
     endDragSession(seq);
+  });
+});
+
+// ─── Host viewport plumbing: contentHeight + forwardWheel + catcher neutralize ──
+
+describe("iframe canvas host viewport plumbing", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("contentHeight sizes the host iframe element to the document height", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    channels[0]!.deliver({ height: 1234, kind: "contentHeight" });
+    expect(iframe.style.height).toBe("1234px");
+  });
+
+  test("forwardWheel re-dispatches a wheel on canvasWrap with the deltas and mapped cursor", async () => {
+    // RedispatchWheel reads { rect, scale } = hostDragGeometry(state): scale = rect.width /
+    // Iframe.clientWidth = 600 / 300 = 2, and rect left/top = 10/20. So clientX = left + x*scale =
+    // 10 + 100*2 = 210 and clientY = top + y*scale = 20 + 50*2 = 120 (happy-dom drops the MouseEvent
+    // Mixin props on a WheelEvent, so only the deltas/type/target are asserted off the live event).
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")! as HTMLIFrameElement;
+    stubRect(iframe, { height: 240, left: 10, top: 20, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+
+    // CanvasWrap is the live binding initShellRefs() populates from #canvas-wrap; the host dispatches
+    // The synthetic wheel on it so the editor's zoom/pan handler fires.
+    const wrap = document.createElement("div");
+    wrap.id = "canvas-wrap";
+    document.body.append(wrap);
+    initShellRefs();
+    expect(canvasWrap).toBe(wrap);
+
+    const seen: WheelEvent[] = [];
+    const onWheel = (event: Event) => seen.push(event as WheelEvent);
+    canvasWrap.addEventListener("wheel", onWheel);
+    channels[0]!.deliver({
+      ctrlKey: true,
+      deltaX: 4,
+      deltaY: 7,
+      kind: "forwardWheel",
+      metaKey: false,
+      shiftKey: false,
+      x: 100,
+      y: 50,
+    });
+    canvasWrap.removeEventListener("wheel", onWheel);
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.type).toBe("wheel");
+    expect(seen[0]!.deltaX).toBe(4);
+    expect(seen[0]!.deltaY).toBe(7);
+  });
+
+  test("mounting neutralizes a sibling .canvas-panel-click catcher (pointer-events:none)", async () => {
+    // The legacy hit-test catcher is a positioned sibling of the canvas (under the canvas's parent).
+    // On mount the host must set its pointer-events to none so it no longer eats clicks/wheel before
+    // The iframe — which now owns hit-testing and native scrolling — can see them.
+    const parent = document.createElement("div");
+    const catcher = document.createElement("div");
+    catcher.className = "canvas-panel-click";
+    const canvasEl = document.createElement("div");
+    parent.append(catcher, canvasEl);
+    document.body.append(parent);
+
+    await mountIframeCanvas(1, {} as never, canvasEl);
+    expect(catcher.style.pointerEvents).toBe("none");
   });
 });
 

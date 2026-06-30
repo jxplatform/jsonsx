@@ -177,11 +177,30 @@ describe("wheel handler", () => {
     expect(setPan).toHaveBeenCalledWith(-30, 0);
   });
 
-  test("edit mode lets native scrolling happen", () => {
+  test("edit mode without a content-edit-canvas lets native scrolling happen", () => {
     canvasMode = "edit";
     const e = wheel(wrapEl(), { deltaY: 20 });
     expect(e.defaultPrevented).toBe(false);
     expect(setPan).not.toHaveBeenCalled();
+  });
+
+  test("edit mode scrolls the content-edit-canvas and prevents default", () => {
+    canvasMode = "edit";
+    const sc = document.createElement("div");
+    sc.className = "content-edit-canvas";
+    sc.scrollTop = 0;
+    sc.scrollLeft = 0;
+    wrapEl().append(sc);
+    const e = wheel(wrapEl(), { deltaX: 0, deltaY: 50 });
+    expect(sc.scrollTop).toBe(50);
+    expect(e.defaultPrevented).toBe(true);
+    expect(setPan).not.toHaveBeenCalled();
+    sc.remove();
+  });
+
+  test("edit mode with no content-edit-canvas does not throw", () => {
+    canvasMode = "edit";
+    expect(() => wheel(wrapEl(), { deltaY: 50 })).not.toThrow();
   });
 
   test("manage mode lets the browse table scroll", () => {

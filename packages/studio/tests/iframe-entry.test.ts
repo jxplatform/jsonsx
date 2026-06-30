@@ -488,3 +488,80 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
     });
   });
 });
+
+describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", () => {
+  const freshH1 = () => ({ children: [{ children: ["Hi"], tagName: "h1" }], tagName: "div" });
+
+  // Append the container so its ownerDocument is the live document the wheel listener binds to and the
+  // Stubbed scrollHeight is read from.
+  async function bootRendered(gen: number) {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(gen, freshH1(), freshH1()));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return { acks, container, pair };
+  }
+
+  test("posts the measured content height after a successful render", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    // Stub the layout-free happy-dom scrollHeight so the post-render measure has a concrete value.
+    Object.defineProperty(container, "scrollHeight", { configurable: true, value: 1234 });
+
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(1, freshH1(), freshH1()));
+    pair.flush(); // Deliver the render command.
+    await flush(); // Let the async render settle (postContentHeight runs right after renderComplete).
+    pair.flush(); // Deliver the acks back to the parent.
+
+    expect(acks).toContainEqual({ height: 1234, kind: "contentHeight" });
+  });
+
+  test("forwards a wheel event (deltas) to the parent and prevents the default", async () => {
+    const { acks, container, pair } = await bootRendered(1);
+    acks.length = 0;
+
+    const evt = new WheelEvent("wheel", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 40,
+      clientY: 200,
+      ctrlKey: true,
+      deltaX: 3,
+      deltaY: 7,
+      metaKey: false,
+      shiftKey: true,
+    });
+    container.ownerDocument.dispatchEvent(evt);
+    pair.flush(); // Deliver the forwardWheel post back to the parent.
+
+    // Happy-dom's WheelEvent extends UIEvent (not MouseEvent), so clientX/Y + modifiers are undefined;
+    // The deterministically-assertable forwarded fields are the deltas. preventDefault is honored.
+    const wheel = acks.find((m) => m.kind === "forwardWheel");
+    expect(wheel).toMatchObject({ deltaX: 3, deltaY: 7, kind: "forwardWheel" });
+    expect(evt.defaultPrevented).toBe(true);
+  });
+
+  test("teardown removes the wheel listener: a later wheel dispatch posts nothing", async () => {
+    const { acks, container, pair } = await bootRendered(1);
+    teardown!();
+    teardown = undefined;
+    acks.length = 0;
+
+    container.ownerDocument.dispatchEvent(
+      new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaX: 9, deltaY: 9 }),
+    );
+    pair.flush();
+
+    expect(acks.some((m) => m.kind === "forwardWheel")).toBe(false);
+  });
+});

@@ -182,6 +182,19 @@ export type IframeToParent =
   | { kind: "patchError"; gen: number; message: string }
   // A global-shortcut keystroke captured inside the iframe, for the parent to re-dispatch.
   | { kind: "forwardKey"; event: SerializedKey }
+  // A wheel event over the canvas iframe, for the parent's zoom/pan handler. The iframe is sized to
+  // Its content (never scrolls itself) and a cross-origin OOPIF doesn't bubble wheel to the parent, so
+  // It forwards the deltas + modifiers + its own cursor (iframe-viewport coords) for the host to map.
+  | {
+      kind: "forwardWheel";
+      deltaX: number;
+      deltaY: number;
+      x: number;
+      y: number;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    }
   // Inline editing started in the iframe (the parent shows the format toolbar from here).
   | { kind: "editStart"; path: (string | number)[] }
   // Committed inline-edit content (rich `children` else `textContent`) for the parent to persist.

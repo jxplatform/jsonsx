@@ -15,6 +15,7 @@ import {
   buildScope,
   defineElement,
   renderNode,
+  setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   setRootMedia,
   setSkipServerFunctions,
@@ -186,6 +187,9 @@ export async function renderResolvedDocument(opts: {
   // Them from the iframe height, letting the host size the iframe to its content without `100vh`
   // Sections feeding back into an ever-growing height. Set every render (the iframe always wants it).
   setCanvasViewportTranspose(true);
+  // De-link `<a href>` in design/edit so clicks select the anchor instead of navigating the iframe;
+  // Preview keeps real links live (mirrors the server-function gate above).
+  setCanvasDelinkAnchors(opts.mode !== "preview");
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks

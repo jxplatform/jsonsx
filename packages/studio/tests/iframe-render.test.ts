@@ -1,5 +1,6 @@
 import "./with-dom.js";
 import { afterEach, describe, expect, test } from "bun:test";
+import { setCanvasDelinkAnchors, setCanvasViewportTranspose } from "@jxsuite/runtime";
 import {
   applySiteStyle,
   injectHead,
@@ -72,6 +73,68 @@ describe("renderResolvedDocument", () => {
     });
     expect(container.querySelector("section")).toBeNull();
     expect(container.querySelector("article")?.textContent).toBe("two");
+  });
+});
+
+describe("canvas transpose + anchor de-link flags", () => {
+  // CRITICAL: `setCanvasViewportTranspose` / `setCanvasDelinkAnchors` are GLOBAL module-level runtime
+  // Flags. Reset BOTH to false after every test so they cannot leak into other studio tests.
+  afterEach(() => {
+    setCanvasViewportTranspose(false);
+    setCanvasDelinkAnchors(false);
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+  });
+
+  test("applySiteStyle transposes viewport units to container units", () => {
+    setCanvasViewportTranspose(true);
+    applySiteStyle({ "--hero-h": "50vw", minHeight: "100vh" });
+    // Plain property goes on <body>, with vh → cqh.
+    expect(document.body.style.minHeight).toContain("cqh");
+    expect(document.body.style.minHeight).toBe("100cqh");
+    // `--`-prefixed var goes on documentElement (:root), with vw → cqw.
+    expect(document.documentElement.style.getPropertyValue("--hero-h")).toBe("50cqw");
+  });
+
+  test("applySiteStyle leaves viewport units untouched when the flag is off", () => {
+    // Flag defaults to false here (reset in afterEach); no transpose should happen.
+    applySiteStyle({ minHeight: "100vh" });
+    expect(document.body.style.minHeight).toBe("100vh");
+  });
+
+  test("renderResolvedDocument de-links <a href> in edit mode but keeps it live in preview", async () => {
+    const anchorDoc = {
+      children: [{ attributes: { href: "/x" }, children: ["go"], tagName: "a" }],
+      tagName: "div",
+    };
+
+    const editContainer = document.createElement("div");
+    const editHandle = await renderResolvedDocument({
+      container: editContainer,
+      doc: anchorDoc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "edit",
+    });
+    const editAnchor = editContainer.querySelector("a") as HTMLElement;
+    // Design/edit: the target is stamped on `data-jx-href`, leaving the anchor inert (no real href).
+    expect(editAnchor.getAttribute("href")).toBeNull();
+    expect(editAnchor.dataset.jxHref).toBe("/x");
+    editHandle.dispose();
+
+    const previewContainer = document.createElement("div");
+    const previewHandle = await renderResolvedDocument({
+      container: previewContainer,
+      doc: anchorDoc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "preview",
+    });
+    const previewAnchor = previewContainer.querySelector("a") as HTMLElement;
+    // Preview keeps a real, live link (no de-linking).
+    expect(previewAnchor.getAttribute("href")).toBe("/x");
+    expect(previewAnchor.dataset.jxHref).toBeUndefined();
+    previewHandle.dispose();
   });
 });
 
