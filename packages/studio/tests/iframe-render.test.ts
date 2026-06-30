@@ -4,6 +4,7 @@ import { setCanvasDelinkAnchors, setCanvasViewportTranspose } from "@jxsuite/run
 import {
   applySiteStyle,
   injectHead,
+  installCanvasImageRetry,
   makeStamper,
   registerElements,
   renderResolvedDocument,
@@ -234,5 +235,188 @@ describe("registerElements", () => {
 
     // Missing/non-array $elements is a no-op.
     expect(await registerElements({} as never, "http://localhost:3000/")).toBeUndefined();
+  });
+});
+
+describe("installCanvasImageRetry", () => {
+  // Happy-dom never loads images, so the broken-image `error` event is driven manually. The retry
+  // Schedules the re-fire via setTimeout(150 * attempt); swap setTimeout so the backoff fires
+  // Synchronously and we can assert the re-fire happened (or didn't) without real waiting.
+  function withCapturedTimers<T>(fn: (runPending: () => void) => T): T {
+    const origSet = globalThis.setTimeout;
+    const origClear = globalThis.clearTimeout;
+    const pending: (() => unknown)[] = [];
+    (globalThis as unknown as { setTimeout: unknown }).setTimeout = ((cb: () => unknown) => {
+      pending.push(cb);
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+    (globalThis as unknown as { clearTimeout: unknown }).clearTimeout =
+      (() => {}) as typeof clearTimeout;
+    try {
+      return fn(() => {
+        for (const cb of pending.splice(0)) {
+          cb();
+        }
+      });
+    } finally {
+      globalThis.setTimeout = origSet;
+      globalThis.clearTimeout = origClear;
+    }
+  }
+
+  /** Fire a bubbling-irrelevant `error` Event at `img` so the capture-phase root listener sees it. */
+  function fireError(img: HTMLImageElement): void {
+    img.dispatchEvent(new Event("error"));
+  }
+
+  test("re-fires a failed image's request after the backoff", () => {
+    withCapturedTimers((runPending) => {
+      const root = document.createElement("div");
+      const img = document.createElement("img");
+      img.src = "http://x/y.jpg";
+      root.append(img);
+      const stop = installCanvasImageRetry(root);
+
+      // Track that src is cleared then re-set to the original (the re-fire).
+      const sets: string[] = [];
+      let current = img.src;
+      Object.defineProperty(img, "src", {
+        configurable: true,
+        get: () => current,
+        set: (v: string) => {
+          current = v;
+          sets.push(v);
+        },
+      });
+
+      fireError(img);
+      // Re-fire is deferred until the backoff timer runs.
+      expect(sets).toEqual([]);
+      runPending();
+      // Cleared to "" then re-assigned the original URL.
+      expect(sets).toEqual(["", "http://x/y.jpg"]);
+
+      stop();
+    });
+  });
+
+  test("stops retrying after maxAttempts", () => {
+    withCapturedTimers((runPending) => {
+      const root = document.createElement("div");
+      const img = document.createElement("img");
+      img.src = "http://x/y.jpg";
+      root.append(img);
+      const stop = installCanvasImageRetry(root, 2);
+
+      let refires = 0;
+      let current = img.src;
+      Object.defineProperty(img, "src", {
+        configurable: true,
+        get: () => current,
+        set: (v: string) => {
+          current = v;
+          // Count each completed re-fire (the re-assignment back to a non-empty URL).
+          if (v !== "") {
+            refires += 1;
+          }
+        },
+      });
+
+      // Two attempts allowed: error → flush, error → flush each re-fire once.
+      fireError(img);
+      runPending();
+      fireError(img);
+      runPending();
+      expect(refires).toBe(2);
+
+      // Third error exceeds maxAttempts: nothing is scheduled, so a flush re-fires nothing.
+      fireError(img);
+      runPending();
+      expect(refires).toBe(2);
+
+      stop();
+    });
+  });
+
+  test("ignores a data:-src image", () => {
+    withCapturedTimers((runPending) => {
+      const root = document.createElement("div");
+      const img = document.createElement("img");
+      img.src = "data:image/png;base64,AAAA";
+      root.append(img);
+      const stop = installCanvasImageRetry(root);
+
+      let setCount = 0;
+      let current = img.src;
+      Object.defineProperty(img, "src", {
+        configurable: true,
+        get: () => current,
+        set: (v: string) => {
+          current = v;
+          setCount += 1;
+        },
+      });
+
+      fireError(img);
+      runPending();
+      // No retry was scheduled, so src was never touched.
+      expect(setCount).toBe(0);
+
+      stop();
+    });
+  });
+
+  test("ignores an error from a non-image target", () => {
+    withCapturedTimers((runPending) => {
+      const root = document.createElement("div");
+      // A non-<img> subresource (e.g. <script>/<link>) also fires a non-bubbling `error` in capture.
+      const script = document.createElement("script");
+      root.append(script);
+      const stop = installCanvasImageRetry(root);
+
+      let scheduled = false;
+      const origSetTimeout = globalThis.setTimeout;
+      (globalThis as unknown as { setTimeout: unknown }).setTimeout = ((cb: () => unknown) => {
+        scheduled = true;
+        return origSetTimeout(cb as () => void, 0);
+      }) as typeof setTimeout;
+      try {
+        script.dispatchEvent(new Event("error"));
+        runPending();
+      } finally {
+        globalThis.setTimeout = origSetTimeout;
+      }
+      // The non-image guard returned early — no retry timer was scheduled.
+      expect(scheduled).toBe(false);
+
+      stop();
+    });
+  });
+
+  test("teardown removes the listener so later errors no longer retry", () => {
+    withCapturedTimers((runPending) => {
+      const root = document.createElement("div");
+      const img = document.createElement("img");
+      img.src = "http://x/y.jpg";
+      root.append(img);
+      const stop = installCanvasImageRetry(root);
+      stop();
+
+      let setCount = 0;
+      let current = img.src;
+      Object.defineProperty(img, "src", {
+        configurable: true,
+        get: () => current,
+        set: (v: string) => {
+          current = v;
+          setCount += 1;
+        },
+      });
+
+      fireError(img);
+      runPending();
+      // Listener was removed, so no re-fire was scheduled.
+      expect(setCount).toBe(0);
+    });
   });
 });

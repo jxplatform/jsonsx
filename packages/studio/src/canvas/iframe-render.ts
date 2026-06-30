@@ -169,6 +169,44 @@ export function makeStamper(ctx: PathMapCtx) {
 }
 
 /**
+ * Recover canvas images that fail their first load. Registered components create their <img> in
+ * connectedCallback AFTER async registration, so on a cold first render those requests can fire
+ * before the loopback server is warm and 404 — which the browser then caches as a
+ * permanently-broken <img>. This re-fires a failed request a few times with backoff (exactly what
+ * the manual canvas re-render does), recovering the image without a full re-render. Bounded
+ * per-image so a genuinely missing file settles broken. Intentional data: placeholders never error,
+ * so they're untouched. Returns a teardown that removes the listener. <img> error events don't
+ * bubble, so listen in CAPTURE.
+ */
+export function installCanvasImageRetry(root: HTMLElement, maxAttempts = 3): () => void {
+  const attempts = new WeakMap<HTMLImageElement, number>();
+  const onError = (event: Event): void => {
+    const img = event.target;
+    if (!(img instanceof HTMLImageElement)) {
+      return;
+    }
+    // A data: URL never errors (and an empty src isn't a real request) — nothing to retry.
+    if (!img.src || img.src.startsWith("data:")) {
+      return;
+    }
+    const attempt = (attempts.get(img) ?? 0) + 1;
+    if (attempt > maxAttempts) {
+      // Bounded: a genuinely missing file settles broken instead of retrying forever.
+      return;
+    }
+    attempts.set(img, attempt);
+    setTimeout(() => {
+      // Re-fire the request by clearing then re-assigning the same src (mirrors the manual re-render).
+      const s = img.src;
+      img.src = "";
+      img.src = s;
+    }, 150 * attempt);
+  };
+  root.addEventListener("error", onError, true);
+  return () => root.removeEventListener("error", onError, true);
+}
+
+/**
  * Render a resolved document into `container`, replacing its current children. `mode` controls
  * whether server functions run (live in `preview`; skipped in `design`/`edit`). Returns a handle
  * whose `dispose()` stops the reactive scope.

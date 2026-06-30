@@ -6,7 +6,7 @@
  */
 
 import { postMessageChannel } from "./iframe-channel";
-import { renderResolvedDocument } from "./iframe-render";
+import { installCanvasImageRetry, renderResolvedDocument } from "./iframe-render";
 import { measureHits, startInteraction } from "./iframe-interaction";
 import {
   AUTO_SCROLL_STEP,
@@ -184,6 +184,10 @@ export function startCanvasIframe(opts: {
       shadowDoc ? previewAt(cursor, src, shadowDoc, container.ownerDocument) : null,
     stopAutoScroll,
   });
+  // Auto-recover canvas images that 404 on a cold first render (component <img>s created in
+  // ConnectedCallback fire late, before the loopback server is warm). Re-fires the failed request a
+  // Few times — what the manual data-sidebar "Refresh" does, but without a full re-render.
+  const stopImageRetry = installCanvasImageRetry(container);
 
   // ─── Content-height auto-sizing ─────────────────────────────────────────────
   // Measure the content height and post it so the host sizes the iframe to fit — the canvas then never
@@ -354,6 +358,7 @@ export function startCanvasIframe(opts: {
     stopKeyForwarding();
     stopInlineEdit();
     stopGrabDetector();
+    stopImageRetry();
     stopAutoScroll();
     heightObserver?.disconnect();
     container.ownerDocument.removeEventListener("wheel", onWheel);
