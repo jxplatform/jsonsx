@@ -160,8 +160,12 @@ export function startCanvasIframe(opts: {
   }
 
   // Report pointer hit/hover (resolved to data-jx-path) to the parent, which owns selection +
-  // Overlays — the cross-origin bridge means the parent never reads our DOM directly.
-  const stopInteraction = startInteraction(channel, container.ownerDocument);
+  // Overlays — the cross-origin bridge means the parent never reads our DOM directly. The shadow-doc
+  // Accessor feeds the insertion "+" zone computation hung off the same pointermove (the parent
+  // Draws the clickable "+" and runs the slash-menu → mutateInsertNode flow on click).
+  const stopInteraction = startInteraction(channel, container.ownerDocument, {
+    getShadowDoc: () => shadowDoc,
+  });
   // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);

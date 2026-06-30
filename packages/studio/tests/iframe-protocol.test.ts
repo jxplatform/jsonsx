@@ -3,6 +3,8 @@ import { CANVAS_MODES, isCanvasMode } from "../src/canvas/iframe-protocol";
 import type {
   ApplyFormatIntent,
   IframeToParent,
+  InsertZone,
+  InsertZonesMsg,
   ParentToIframe,
   SelectionSnapshot,
 } from "../src/canvas/iframe-protocol";
@@ -56,6 +58,33 @@ describe("4b-2 format-toolbar messages", () => {
     expect(collapsed.collapsed).toBe(true);
     expect(collapsed.rect).toBeNull();
     expect(collapsed.link).toEqual({ active: true, href: "https://example.com" });
+  });
+
+  test("insertZones carries the InsertZone shape and is a member of the iframe→parent union", () => {
+    const zone: InsertZone = {
+      edge: "top",
+      index: 1,
+      insertParentPath: ["children", 0],
+      rect: { height: 0, width: 120, x: 10, y: 40 },
+    };
+    const msg: InsertZonesMsg = { kind: "insertZones", zones: [zone] };
+    const asUnion: IframeToParent = msg;
+    expect(asUnion.kind).toBe("insertZones");
+    expect(msg.zones?.[0]).toEqual(zone);
+
+    // A null zone set (cursor mid-element / off-canvas) clears the parent "+".
+    const cleared: InsertZonesMsg = { kind: "insertZones", zones: null };
+    expect(cleared.zones).toBeNull();
+
+    // A center zone (empty container) inserts as the container's first child.
+    const center: InsertZone = {
+      edge: "center",
+      index: 0,
+      insertParentPath: ["children", 2],
+      rect: { height: 80, width: 200, x: 0, y: 0 },
+    };
+    expect(center.edge).toBe("center");
+    expect(center.index).toBe(0);
   });
 
   test("applyFormat carries the three intent variants", () => {

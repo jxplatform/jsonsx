@@ -83,6 +83,7 @@ const {
   postPatchToHosts,
   setIframeOriginateHandler,
   setIframePatchEscalation,
+  setInsertZoneClickHandler,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
 
@@ -1090,6 +1091,103 @@ describe("cross-frame drag session (Phase 4c)", () => {
     clearDropIndicator(host);
     expect(indicator(canvasEl).style.display).toBe("none");
     endDragSession(seq);
+  });
+});
+
+// ─── Cross-origin insertion "+" affordance ──────────────────────────────────────
+
+describe("iframe canvas insertion '+' affordance", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab({
+      children: [{ tagName: "p", textContent: "a" }],
+      tagName: "div",
+    });
+    // Reset the injected handler so a leak from one test never fires in another.
+    setInsertZoneClickHandler(() => {});
+  });
+
+  /** The host's overlay insertion "+" button. */
+  const plus = (canvasEl: HTMLElement) =>
+    canvasEl.querySelector(".insertion-helper") as HTMLButtonElement;
+
+  const topZone = {
+    edge: "top" as const,
+    index: 1,
+    insertParentPath: ["children", 0] as (string | number)[],
+    rect: { height: 0, width: 300, x: 10, y: 200 },
+  };
+
+  test("an insertZones post draws the '+' at scale=1, centered on the anchor box", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    const btn = plus(canvasEl);
+    expect(btn.style.display).toBe("grid");
+    expect(btn.classList.contains("visible")).toBe(true);
+    expect(btn.dataset.edge).toBe("top");
+    // CanvasRectToParent at scale=1 is straight-through (D-2); center = x + width/2 = 10 + 150 = 160.
+    expect(btn.style.left).toBe("160px");
+    expect(btn.style.top).toBe("200px");
+  });
+
+  test("a null/empty zones post keeps the '+' (grace timer) rather than hiding immediately", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    expect(plus(canvasEl).style.display).toBe("grid");
+    // The cursor crossed mid-element on its way to the button — the "+" must NOT vanish at once.
+    channels[0]!.deliver({ kind: "insertZones", zones: null });
+    expect(plus(canvasEl).style.display).toBe("grid");
+  });
+
+  test("clicking the '+' runs the injected handler with the button + captured zone", async () => {
+    const canvasEl = await mountReady();
+    const seen: { btn: HTMLElement; zone: unknown }[] = [];
+    setInsertZoneClickHandler((btn, zone) => seen.push({ btn, zone }));
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+
+    plus(canvasEl).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.btn).toBe(plus(canvasEl));
+    expect(seen[0]!.zone).toEqual(topZone);
+  });
+
+  test("clicking the '+' with no captured zone is a no-op (does not call the handler)", async () => {
+    const canvasEl = await mountReady();
+    let calls = 0;
+    setInsertZoneClickHandler(() => {
+      calls += 1;
+    });
+    // No insertZones delivered → insertZone is null → click bails before the handler.
+    plus(canvasEl).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(calls).toBe(0);
+  });
+
+  test("renderComplete clears the '+' (its anchored rect/path is now stale)", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    expect(plus(canvasEl).style.display).toBe("grid");
+    channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
+    expect(plus(canvasEl).style.display).toBe("none");
+  });
+
+  test("patchComplete also clears the '+'", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
+    expect(plus(canvasEl).style.display).toBe("none");
+  });
+
+  test("a fresh insertZones post after a clear re-shows the '+' (cancels any pending hide)", async () => {
+    const canvasEl = await mountReady();
+    channels[0]!.deliver({ kind: "insertZones", zones: [topZone] });
+    channels[0]!.deliver({ kind: "insertZones", zones: null }); // Arms the grace timer.
+    // A new zone immediately re-shows and cancels the pending hide.
+    channels[0]!.deliver({
+      kind: "insertZones",
+      zones: [{ ...topZone, edge: "bottom", index: 2 }],
+    });
+    const btn = plus(canvasEl);
+    expect(btn.style.display).toBe("grid");
+    expect(btn.dataset.edge).toBe("bottom");
   });
 });
 

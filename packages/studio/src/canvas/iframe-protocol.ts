@@ -146,6 +146,24 @@ export interface NodeHit {
   rect: SerializableRect;
 }
 
+// ─── Cross-frame insertion affordance ("+") ─────────────────────────────────────
+
+/**
+ * One candidate insertion point the iframe computed from its own pointer hit-test (the cross-origin
+ * cousin of the legacy insertion-helper). `edge` is the geometric side of the hovered node the "+"
+ * anchors to; the parent positions a clickable "+" from `rect` (a small anchor box in
+ * iframe-viewport coords, mapped via {@link canvasRectToParent} at scale=1 like the drop indicator).
+ * On click the parent runs the unchanged parent-realm slash-menu → mutateInsertNode flow with
+ * `insertParentPath` + `index`. A `center` zone is an empty container (insert as its first child);
+ * top/bottom/left/right insert a sibling before (`index`) or after the hovered node.
+ */
+export interface InsertZone {
+  edge: "top" | "bottom" | "left" | "right" | "center";
+  insertParentPath: (string | number)[];
+  index: number;
+  rect: SerializableRect;
+}
+
 /**
  * A keyboard event flattened for the bridge. The iframe forwards the global-shortcut subset (so
  * undo/redo/save/delete/… still fire when focus is inside the canvas iframe); the parent rebuilds a
@@ -173,6 +191,11 @@ export type IframeToParent =
   | { kind: "contentHeight"; height: number }
   | { kind: "hit"; hit: NodeHit }
   | { kind: "hover"; hit: NodeHit | null }
+  // Candidate insertion "+" zones for the hovered node, recomputed on pointermove (cross-origin
+  // Cousin of the legacy insertion-helper). `null` clears the "+" (cursor mid-element / left the
+  // Canvas). The parent draws a clickable "+" from each zone's rect and, on click, runs the
+  // Parent-realm slash-menu → mutateInsertNode flow with the zone's insertParentPath + index.
+  | { kind: "insertZones"; zones: InsertZone[] | null }
   // Response to `measure`: the rects of whichever requested paths resolved to a node (missing paths
   // Are simply omitted). `reqId` echoes the request so the parent can drop stale responses.
   | { kind: "geometry"; reqId: number; hits: NodeHit[] }
@@ -280,3 +303,6 @@ export type DragStartMsg = Extract<ParentToIframe, { kind: "dragStart" }>;
 
 /** The iframe→parent display-only drop-preview message (Phase 4c). */
 export type DragOverMsg = Extract<IframeToParent, { kind: "dragOver" }>;
+
+/** The iframe→parent insertion-affordance ("+") message. */
+export type InsertZonesMsg = Extract<IframeToParent, { kind: "insertZones" }>;

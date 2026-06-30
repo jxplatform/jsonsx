@@ -29,6 +29,7 @@ import type {
   CanvasMode,
   DragSrcKind,
   IframeToParent,
+  InsertZone,
   NodeHit,
   ParentToIframe,
   SelectionSnapshot,
@@ -72,6 +73,18 @@ interface HostState {
    * `gen` matches, so a drop computed against a superseded render is never applied (Phase 4c).
    */
   lastRenderedGen: number;
+  /**
+   * The insertion "+" zone the overlay button currently anchors to (the iframe posts it on hover);
+   * captured here so the button's click handler runs the slash-menu → mutateInsertNode flow against
+   * the same parentPath/index. Null when no "+" is shown.
+   */
+  insertZone: InsertZone | null;
+  /**
+   * Grace timer (SALVAGED HIDE_DELAY) so a `null` zone post (cursor crossed mid-element on its way
+   * to the button) doesn't yank the "+" before the author reaches it; cancelled on re-show / button
+   * mouseenter. Null when not pending.
+   */
+  insertHideTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -209,6 +222,22 @@ export function setIframeOriginateHandler(
   fn: (host: HostState, path: (string | number)[], dragSeq: number) => void,
 ): void {
   iframeOriginateHandler = fn;
+}
+
+/** Delay (ms) before hiding the insertion "+" so the cursor can reach it (SALVAGED HIDE_DELAY). */
+const INSERT_HIDE_DELAY = 300;
+
+/**
+ * The parent-realm insertion handler: open the slash menu anchored at the "+" `btn` and, on select,
+ * run `transactDoc → mutateInsertNode` for the captured `zone`. Injected from studio.ts (which owns
+ * the slash-menu / transact / defaultDef wiring) so this host module — and its tests — stay free of
+ * the lit/Spectrum slash-menu and the mutation pipeline, mirroring {@link iframeOriginateHandler}.
+ */
+let insertZoneClickHandler: ((btn: HTMLElement, zone: InsertZone) => void) | null = null;
+
+/** Register the slash-menu → mutateInsertNode handler the insertion "+" runs on click. */
+export function setInsertZoneClickHandler(fn: (btn: HTMLElement, zone: InsertZone) => void): void {
+  insertZoneClickHandler = fn;
 }
 
 /**
@@ -376,6 +405,8 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     channel,
     editing: false,
     iframe,
+    insertHideTimer: null,
+    insertZone: null,
     lastRenderedGen: -1,
     lastSelectionRect: null,
     lastSnapshotSeq: 0,
@@ -386,11 +417,64 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     selReqId: 0,
     snapshot: null,
   };
+  // The insertion "+" lives on the overlay (the one pointer-events:auto element there). Clicking it
+  // Opens the slash menu → mutateInsertNode for the captured zone; mouseenter/leave drive the same
+  // Grace timer the zone posts use, so moving the cursor onto the button never drops it.
+  overlay.insertButton.addEventListener("click", (e) => onInsertButtonClick(state, e));
+  overlay.insertButton.addEventListener("mouseenter", () => cancelInsertHide(state));
+  overlay.insertButton.addEventListener("mouseleave", () => scheduleInsertHide(state));
   channel.onMessage((msg) => handleMessage(state, msg));
   hosts.set(canvasEl, state);
   liveHosts.add(state);
   ensureSelectionWatch();
   return state;
+}
+
+// ─── Insertion "+" affordance (cross-origin) ────────────────────────────────────
+
+/** Show the "+" for `zone`, capturing it on the host for the click handler; cancels any hide. */
+function showInsertZone(state: HostState, zone: InsertZone): void {
+  cancelInsertHide(state);
+  state.insertZone = zone;
+  state.overlay.setInsertZone(canvasRectToParent(zone.rect), zone.edge);
+}
+
+/** Hide the "+" immediately and forget the captured zone. */
+function hideInsertZoneNow(state: HostState): void {
+  cancelInsertHide(state);
+  state.insertZone = null;
+  state.overlay.setInsertZone(null);
+}
+
+/** Arm the grace timer to hide the "+" (SALVAGED HIDE_DELAY), unless one is already pending. */
+function scheduleInsertHide(state: HostState): void {
+  cancelInsertHide(state);
+  state.insertHideTimer = setTimeout(() => {
+    state.insertHideTimer = null;
+    hideInsertZoneNow(state);
+  }, INSERT_HIDE_DELAY);
+}
+
+/** Cancel a pending grace-timer hide of the "+". */
+function cancelInsertHide(state: HostState): void {
+  if (state.insertHideTimer !== null) {
+    clearTimeout(state.insertHideTimer);
+    state.insertHideTimer = null;
+  }
+}
+
+/**
+ * Click the "+": defer to the injected slash-menu → mutateInsertNode handler with the captured
+ * zone.
+ */
+function onInsertButtonClick(state: HostState, e: MouseEvent): void {
+  e.stopPropagation();
+  e.preventDefault();
+  const zone = state.insertZone;
+  if (!zone) {
+    return;
+  }
+  insertZoneClickHandler?.(state.overlay.insertButton, zone);
 }
 
 /** Handle a message the iframe posted back: ready handshake, pointer hit/hover, measured geometry. */
@@ -425,6 +509,18 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       drawHover(state, msg.hit);
       return;
     }
+    case "insertZones": {
+      // The iframe recomputed the insertion "+" zones for the hovered node. Draw the "+" from the
+      // First zone's rect (scale=1, D-2 — the overlay is inside the scaled panzoom-wrap); a null/empty
+      // Set arms the grace timer rather than hiding immediately, so the cursor can reach the button.
+      const zone = msg.zones?.[0] ?? null;
+      if (zone) {
+        showInsertZone(state, zone);
+      } else {
+        scheduleInsertHide(state);
+      }
+      return;
+    }
     case "geometry": {
       if (msg.reqId === state.selReqId) {
         const [hit] = msg.hits;
@@ -442,6 +538,8 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The DOM now reflects so cross-frame drag replies can be stale-gated against it (Phase 4c).
       state.lastRenderedGen = msg.gen;
       requestSelection(state, state.selectionPath);
+      // The "+" anchored to a now-stale rect/path — drop it; the next hover recomputes fresh.
+      hideInsertZoneNow(state);
       return;
     }
     case "contentHeight": {

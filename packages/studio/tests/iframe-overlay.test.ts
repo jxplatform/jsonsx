@@ -83,6 +83,17 @@ describe("createOverlayLayer", () => {
     expect(hover.style.display).toBe("none");
   });
 
+  test("the insertion '+' is the one pointer-events:auto element, hidden until placed", () => {
+    const layer = createOverlayLayer(document);
+    // The overlay root suppresses pointer events; the "+" re-enables them so it can be clicked.
+    expect(layer.root.style.pointerEvents).toBe("none");
+    expect(layer.insertButton.tagName).toBe("BUTTON");
+    expect(layer.insertButton.className).toContain("insertion-helper");
+    expect(layer.insertButton.textContent).toBe("+");
+    expect(layer.insertButton.style.pointerEvents).toBe("auto");
+    expect(layer.insertButton.style.display).toBe("none");
+  });
+
   test("setSelection positions the box, and null hides it", () => {
     const layer = createOverlayLayer(document);
     const sel = layer.root.querySelector(".overlay-selection") as HTMLElement;
@@ -158,5 +169,39 @@ describe("setDropIndicator (Phase 4c)", () => {
     layer.setDropIndicator({ height: 40, left: 10, top: 20, width: 120 }, "inside");
     layer.setDropIndicator(null);
     expect(box.style.display).toBe("none");
+  });
+});
+
+describe("setInsertZone (insertion '+')", () => {
+  test("centers the '+' on the anchor box, becomes visible, and tags data-edge", () => {
+    const layer = createOverlayLayer(document);
+    const btn = layer.insertButton;
+    // A top-edge anchor box: zero-height, full width. The "+" centers on its midpoint.
+    layer.setInsertZone({ height: 0, left: 10, top: 200, width: 300 }, "top");
+    expect(btn.style.display).toBe("grid");
+    expect(btn.classList.contains("visible")).toBe(true);
+    expect(btn.dataset.edge).toBe("top");
+    // Center = left + width/2 = 10 + 150 = 160; top + height/2 = 200 + 0 = 200; translated -50%.
+    expect(btn.style.left).toBe("160px");
+    expect(btn.style.top).toBe("200px");
+    expect(btn.style.translate).toBe("-50% -50%");
+  });
+
+  test("a center zone (empty container) anchors at the box's center", () => {
+    const layer = createOverlayLayer(document);
+    const btn = layer.insertButton;
+    layer.setInsertZone({ height: 80, left: 0, top: 0, width: 200 }, "center");
+    expect(btn.dataset.edge).toBe("center");
+    expect(btn.style.left).toBe("100px");
+    expect(btn.style.top).toBe("40px");
+  });
+
+  test("null hides the '+' and drops the visible class", () => {
+    const layer = createOverlayLayer(document);
+    const btn = layer.insertButton;
+    layer.setInsertZone({ height: 0, left: 10, top: 20, width: 120 }, "bottom");
+    layer.setInsertZone(null);
+    expect(btn.style.display).toBe("none");
+    expect(btn.classList.contains("visible")).toBe(false);
   });
 });

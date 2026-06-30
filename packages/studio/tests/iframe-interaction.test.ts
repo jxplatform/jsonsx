@@ -4,6 +4,7 @@ import { stubRect } from "./harness";
 import { measureHits, nearestHit, startInteraction } from "../src/canvas/iframe-interaction";
 import type { IframeChannel } from "../src/canvas/iframe-channel";
 import type { IframeToParent, ParentToIframe } from "../src/canvas/iframe-protocol";
+import type { JxMutableNode } from "@jxsuite/schema/types";
 
 // A channel stub that only needs `post` (startInteraction never reads incoming messages).
 function fakeChannel() {
@@ -125,5 +126,85 @@ describe("startInteraction", () => {
     stop = undefined;
     inner.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(posts).toHaveLength(0);
+  });
+});
+
+describe("startInteraction — insertion '+' zones (deps)", () => {
+  let stop: (() => void) | undefined;
+  afterEach(() => {
+    stop?.();
+    stop = undefined;
+  });
+
+  const SHADOW = { children: [], tagName: "div" } as unknown as JxMutableNode;
+
+  /** A stamped sibling whose DOM parent is a block container (column layout → top/bottom edges). */
+  function stampedSibling(path: string, rect: Partial<DOMRect>) {
+    const outer = document.createElement("div");
+    outer.dataset.jxPath = path;
+    stubRect(outer, rect);
+    const parent = document.createElement("section"); // Block layout by default.
+    parent.append(outer);
+    document.body.append(parent);
+    return outer;
+  }
+
+  test("posts insertZones near an edge, deduped, and null past the edge", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    stop = startInteraction(channel, document, { getShadowDoc: () => SHADOW });
+
+    // Cursor 5px below the top edge (y=205) → a top-edge zone (insert before, index 1).
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    const zonePosts = posts.filter((p) => p.kind === "insertZones");
+    expect(zonePosts.at(-1)).toMatchObject({
+      kind: "insertZones",
+      zones: [{ edge: "top", index: 1, insertParentPath: [] }],
+    });
+
+    // A second move still near the top edge resolves to the SAME zone key → no new post.
+    const before = posts.filter((p) => p.kind === "insertZones").length;
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 206 }));
+    expect(posts.filter((p) => p.kind === "insertZones").length).toBe(before);
+
+    // Moving to mid-element posts a null zone set (clears the parent "+").
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 250 }));
+    expect(posts.findLast((p) => p.kind === "insertZones")).toEqual({
+      kind: "insertZones",
+      zones: null,
+    });
+  });
+
+  test("pointerleave posts a single null insertZones (and not again when already cleared)", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    stop = startInteraction(channel, document, { getShadowDoc: () => SHADOW });
+
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    document.body.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    const nulls = posts.filter((p) => p.kind === "insertZones" && p.zones === null);
+    expect(nulls).toHaveLength(1);
+
+    // A second leave while already cleared posts nothing new.
+    document.body.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    expect(posts.filter((p) => p.kind === "insertZones" && p.zones === null)).toHaveLength(1);
+  });
+
+  test("no deps → never posts insertZones (hover/hit only)", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    stop = startInteraction(channel, document);
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    document.body.dispatchEvent(new MouseEvent("pointerleave", { bubbles: true }));
+    expect(posts.some((p) => p.kind === "insertZones")).toBe(false);
+  });
+
+  test("a null shadow doc (pre-first-render) suppresses zones even near an edge", () => {
+    const { channel, posts } = fakeChannel();
+    const el = stampedSibling('["children",1]', { height: 100, width: 300, x: 0, y: 200 });
+    stop = startInteraction(channel, document, { getShadowDoc: () => null });
+    el.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 50, clientY: 205 }));
+    // ZonesKey resolves to "none" (null zones) → posted once as null, never a real zone.
+    expect(posts.some((p) => p.kind === "insertZones" && p.zones !== null)).toBe(false);
   });
 });

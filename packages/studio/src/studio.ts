@@ -38,7 +38,12 @@ import {
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
-import { setIframePatchEscalation, setToolbarRefresh } from "./canvas/iframe-host";
+import {
+  setIframePatchEscalation,
+  setInsertZoneClickHandler,
+  setToolbarRefresh,
+} from "./canvas/iframe-host";
+import { runInsertZoneAction } from "./editor/insert-zone-action";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
   mountStatusbar,
@@ -360,6 +365,8 @@ initBlockActionBar({
 });
 // The iframe's re-emitted selection snapshot drives the parent format toolbar refresh (4b-2).
 setToolbarRefresh(renderBlockActionBar);
+// The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
+setInsertZoneClickHandler(runInsertZoneAction);
 
 initCanvasHelpers({
   getCanvasMode,

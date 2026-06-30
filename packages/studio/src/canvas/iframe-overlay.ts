@@ -72,11 +72,25 @@ export interface OverlayLayer {
    * Pass null to hide.
    */
   setDropIndicator: (placement: OverlayPlacement | null, edge?: DropEdge) => void;
+  /**
+   * Position the clickable insertion "+" at `placement` (overlay-local coords, mapped via
+   * {@link canvasRectToParent} at scale=1 like the drop indicator, D-2), centered on the anchor box
+   * and tagged with `edge` (for the `[data-edge]` styling). Pass null to hide it. This is the ONE
+   * element on the otherwise `pointer-events:none` overlay that captures pointer events, so the
+   * author can actually click it; the caller wires its click/mouseenter/mouseleave via
+   * {@link insertButton}.
+   */
+  setInsertZone: (placement: OverlayPlacement | null, edge?: InsertButtonEdge) => void;
+  /** The clickable "+" button, so the caller can attach click + hover (grace-timer) listeners. */
+  readonly insertButton: HTMLButtonElement;
   /** The layer root element (caller appends it over the iframe). */
   readonly root: HTMLElement;
   /** Remove the layer from the DOM. */
   dispose: () => void;
 }
+
+/** The geometric side the insertion "+" anchors to (mirrors {@link InsertZone}'s `edge`). */
+export type InsertButtonEdge = "top" | "bottom" | "left" | "right" | "center";
 
 function place(box: HTMLElement, placement: OverlayPlacement | null): void {
   if (!placement) {
@@ -110,15 +124,52 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   dropBox.className = "canvas-drop-indicator";
   dropBox.style.display = "none";
 
-  root.append(hoverBox, selectionBox, dropBox);
+  // The clickable insertion "+" — reuses the legacy `.insertion-helper` circle styling. It is the
+  // ONE element on the `pointer-events:none` overlay that re-enables pointer events, so the author
+  // Can click it (the legacy CSS-anchor positioning rules are inert here — no `position-anchor` is
+  // Set — so it is positioned explicitly via left/top by placeInsertButton).
+  const insertButton = doc.createElement("button");
+  insertButton.className = "insertion-helper";
+  insertButton.textContent = "+";
+  insertButton.style.pointerEvents = "auto";
+  insertButton.style.display = "none";
+
+  root.append(hoverBox, selectionBox, dropBox, insertButton);
 
   return {
     dispose: () => root.remove(),
+    insertButton,
     root,
     setDropIndicator: (placement, edge = "inside") => placeDropIndicator(dropBox, placement, edge),
     setHover: (placement) => place(hoverBox, placement),
+    setInsertZone: (placement, edge = "center") => placeInsertButton(insertButton, placement, edge),
     setSelection: (placement) => place(selectionBox, placement),
   };
+}
+
+/**
+ * Position the insertion "+" centered on the anchor `placement` (a zero-thickness edge box from the
+ * iframe), or hide it when null. Sets `data-edge` for the `[data-edge]` styling and toggles the
+ * `visible` class the legacy CSS uses (display + opacity). Explicit left/top centering replaces the
+ * legacy CSS-anchor positioning, which can't reach across the iframe boundary.
+ */
+function placeInsertButton(
+  btn: HTMLButtonElement,
+  placement: OverlayPlacement | null,
+  edge: InsertButtonEdge,
+): void {
+  if (!placement) {
+    btn.style.display = "none";
+    btn.classList.remove("visible");
+    return;
+  }
+  btn.dataset.edge = edge;
+  btn.classList.add("visible");
+  // Center the 20×20 circle on the anchor box's midpoint (the edge for a zero-thickness box).
+  btn.style.display = "grid";
+  btn.style.left = `${placement.left + placement.width / 2}px`;
+  btn.style.top = `${placement.top + placement.height / 2}px`;
+  btn.style.translate = "-50% -50%";
 }
 
 /**
