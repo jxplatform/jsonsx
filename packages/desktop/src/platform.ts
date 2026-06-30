@@ -70,35 +70,6 @@ export function createDesktopPlatform() {
       }
     }
 
-    // Phase 7: the views:// readFile shim stays ONLY on the views:// path. On loopback the canvas
-    // Doc + assets are served natively over http, so this shim must not shadow them. loopbackOrigin()
-    // Is null with the gate off (canvasUrl unset) → the shim stays installed, byte-identical to today.
-    if (url.startsWith("views://") && !loopbackOrigin()) {
-      const path = url.replace(/^views:\/\/[^/]+\//, "");
-      try {
-        const content = await rpc.request.readFile({ path });
-        const ext = path.split(".").pop() || "";
-        const mime = ext === "json" ? "application/json" : "text/plain";
-        return new Response(content as string, {
-          headers: { "content-type": mime },
-          status: 200,
-        });
-      } catch {
-        try {
-          const content = await rpc.request.readFile({
-            path: `public/${path}`,
-          });
-          const ext = path.split(".").pop() || "";
-          const mime = ext === "json" ? "application/json" : "text/plain";
-          return new Response(content as string, {
-            headers: { "content-type": mime },
-            status: 200,
-          });
-        } catch {
-          return new Response("Not Found", { status: 404 });
-        }
-      }
-    }
     return originalFetch(input, init);
   };
 
@@ -106,11 +77,11 @@ export function createDesktopPlatform() {
   // Catches <img src>, <video src>, <source src>, <video poster> in any part of
   // The DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
   //
-  // Phase 7: the observer is ALWAYS installed; only its REWRITE TARGET switches by the loopback gate.
-  // The view-side gate signal is platform.canvasUrl: undefined on the views:// path (gate off /
-  // GetCanvasUrl null) → rewrite to a data-URL exactly as today; an absolute loopback origin when the
-  // Per-window server is up → rewrite to an absolute loopback URL (fetch-free, no readFileAsDataUrl).
-  // With the gate off, canvasUrl is never set, so this is byte-identical to before.
+  // The shell document lives on views://; a relative PANEL asset src there does not resolve to a
+  // Servable URL, so the observer rewrites it to ${loopbackOrigin()}/<path> — an absolute URL on the
+  // Per-window loopback server (a cross-origin <img> load, which needs NO CORS). loopbackOrigin() is
+  // The canvas origin from platform.canvasUrl (always set once activate() resolves); if it is not yet
+  // Resolved at boot, the observer no-ops that one mutation rather than rewriting it.
   function loopbackOrigin(): string | null {
     const { canvasUrl } = platform;
     if (!canvasUrl) {
@@ -124,12 +95,7 @@ export function createDesktopPlatform() {
     }
   }
 
-  const resolving = new WeakSet<Element>();
-
   function resolveElementAssets(el: Element) {
-    if (resolving.has(el)) {
-      return;
-    }
     const tag = el.tagName;
     if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") {
       return;
@@ -144,25 +110,15 @@ export function createDesktopPlatform() {
         !val.startsWith("http") &&
         !val.startsWith("views://")
       ) {
-        const path = val.replace(/^\.?\//, "");
         const origin = loopbackOrigin();
-        if (origin) {
-          // Loopback: point the panel <img> straight at the loopback server (a cross-origin image
-          // Load, allowed without CORS). No fetch, no readFileAsDataUrl round-trip.
-          el.setAttribute(attr, `${origin}/${path}`);
+        if (!origin) {
+          // The canvas origin isn't resolved yet (pre-activate) — leave this mutation untouched.
           continue;
         }
-        resolving.add(el);
-        el.removeAttribute(attr);
-        rpc.request
-          .readFileAsDataUrl({ path })
-          .then((dataUrl: string) => {
-            if (dataUrl) {
-              el.setAttribute(attr, dataUrl);
-            }
-          })
-          .catch(() => {})
-          .finally(() => resolving.delete(el));
+        // Point the panel <img> straight at the loopback server (a cross-origin image load,
+        // Allowed without CORS).
+        const path = val.replace(/^\.?\//, "");
+        el.setAttribute(attr, `${origin}/${path}`);
       }
     }
   }
@@ -184,21 +140,14 @@ export function createDesktopPlatform() {
     if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) {
       return;
     }
-    const path = val.replace(/^\.?\//, "");
     const origin = loopbackOrigin();
-    if (origin) {
-      // Loopback: rewrite the background-image url() to the loopback origin (cross-origin image load).
-      htmlEl.style.backgroundImage = `url(${origin}/${path})`;
+    if (!origin) {
+      // The canvas origin isn't resolved yet (pre-activate) — leave this mutation untouched.
       return;
     }
-    rpc.request
-      .readFileAsDataUrl({ path })
-      .then((dataUrl: string) => {
-        if (dataUrl) {
-          htmlEl.style.backgroundImage = `url(${dataUrl})`;
-        }
-      })
-      .catch(() => {});
+    // Rewrite the background-image url() to the loopback origin (a cross-origin image load).
+    const path = val.replace(/^\.?\//, "");
+    htmlEl.style.backgroundImage = `url(${origin}/${path})`;
   }
 
   function resolveAllAssets(el: Element) {
@@ -245,21 +194,20 @@ export function createDesktopPlatform() {
     projectRoot: "",
 
     /**
-     * Phase 7: the cross-origin loopback canvas URL for this window, fetched in {@link activate}
-     * (awaited at studio boot, before the first canvas mount). Stays undefined on the views:// path
-     * (gate off / getCanvasUrl returns null) → iframe-host falls back to DEFAULT_CANVAS_URL, so the
-     * shipped behavior is byte-identical until the gate flips.
+     * The cross-origin loopback canvas URL for this window, fetched in {@link activate} (awaited at
+     * studio boot, before the first canvas mount). The iframe-host resolves the iframe `src`
+     * against it, and the asset observer rewrites relative panel asset srcs to this origin.
      */
     canvasUrl: undefined as string | undefined,
 
     async activate() {
-      // Request this window's canvas URL over RPC (kills the preload/executeJavascript race). Null
-      // On the views:// path; an absolute loopback URL when the per-window server is up.
+      // Request this window's loopback canvas URL over RPC (kills the preload/executeJavascript
+      // Race), so it's set before the first canvas mount and the asset observer's first rewrite.
       try {
         const { canvasUrl } = await rpc.request.getCanvasUrl();
         platform.canvasUrl = canvasUrl ?? undefined;
-      } catch {
-        // RPC unavailable (e.g. older host): keep the views:// fallback.
+      } catch (error) {
+        console.warn("getCanvasUrl RPC failed; canvas falls back to the default URL:", error);
       }
     },
 

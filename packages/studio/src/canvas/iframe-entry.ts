@@ -180,6 +180,26 @@ export function startCanvasIframe(opts: {
     stopAutoScroll,
   });
 
+  // ─── Content-height auto-sizing ─────────────────────────────────────────────
+  // Measure the content height and post it so the host sizes the iframe to fit — the canvas then never
+  // Scrolls internally (the parent overlay can't follow an internal scroll, and every node stays inside
+  // The iframe box so it's hit-testable). The runtime transposes viewport units to container units, so
+  // This converges instead of feeding back; `MAX` is a backstop if some unit slips through. `container`
+  // Is `#jx-canvas-root`, which overflows the fixed-size query container freely, so its scrollHeight is
+  // The true content height.
+  const MAX_CANVAS_HEIGHT = 30_000;
+  let lastPostedHeight = -1;
+  function postContentHeight(): void {
+    const measured = Math.min(container.scrollHeight, MAX_CANVAS_HEIGHT);
+    if (measured > 0 && Math.abs(measured - lastPostedHeight) >= 1) {
+      lastPostedHeight = measured;
+      channel.post({ height: measured, kind: "contentHeight" });
+    }
+  }
+  const ResizeObs = win?.ResizeObserver;
+  const heightObserver = ResizeObs ? new ResizeObs(() => postContentHeight()) : null;
+  heightObserver?.observe(container);
+
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
       channel.post({
@@ -290,6 +310,8 @@ export function startCanvasIframe(opts: {
           renderCtx = handle.ctx;
           renderedGen = gen;
           channel.post({ gen, kind: "renderComplete" });
+          // Size the iframe to the freshly-rendered content (the ResizeObserver tracks later reflows).
+          postContentHeight();
         }
       } catch (error) {
         channel.post({
@@ -309,6 +331,7 @@ export function startCanvasIframe(opts: {
     stopInlineEdit();
     stopGrabDetector();
     stopAutoScroll();
+    heightObserver?.disconnect();
     handle?.dispose();
   };
 }
@@ -328,10 +351,11 @@ interface BootWindow {
  */
 export function bootCanvasIframe(win: BootWindow): () => void {
   const params = new URLSearchParams(win.location.search);
-  // ParentOrigin authenticates the parent peer. The host (iframe-host.ts) always passes it, so a
-  // Missing value means the parent origin could not round-trip (e.g. a custom scheme that CEF does
-  // Not surface as a postMessage origin). Fall back to "*" — token-gated, NOT a silent omission —
-  // And log it loudly so the looser origin check is visible (Phase 7 §2.6).
+  // ParentOrigin authenticates the parent peer. The host (iframe-host.ts) passes it ONLY for an
+  // Http(s) parent (dev / chromium — same-origin, the origin round-trips). It OMITS it for a
+  // Non-http(s) parent (electrobun views://), whose custom scheme may not surface as a postMessage
+  // Origin: a missing value here means fall back to "*" — token-gated, NOT a silent omission — and
+  // Log it loudly so the looser origin check is visible.
   const explicitParentOrigin = params.get("parentOrigin");
   const parentOrigin = explicitParentOrigin || "*";
   if (!explicitParentOrigin) {

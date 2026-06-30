@@ -10,13 +10,26 @@
         margin: 0;
         height: 100%;
       }
+      /* Fixed-size query container. The runtime transposes the document's viewport units (vh/vw/…) to
+         container units (cqh/cqw/…) in the studio canvas (see runtime `transposeCanvasUnits`), so they
+         resolve against THIS predictable design-viewport box instead of the iframe element. That
+         decouples them from the iframe's height, so the host can size the iframe to its content height
+         (no internal scroll → the parent overlay stays glued) without a `100vh` section feeding back
+         into an ever-growing height. `#jx-canvas-root` overflows this box freely (no paint/overflow
+         containment) and is what the host measures. */
+      #jx-canvas-viewport {
+        container-type: size;
+        container-name: jx-canvas;
+        width: 100%;
+        height: var(--jx-design-viewport-height, 800px);
+      }
       #jx-canvas-root {
         min-height: 100%;
       }
     </style>
   </head>
   <body>
-    <div id="jx-canvas-root"></div>
+    <div id="jx-canvas-viewport"><div id="jx-canvas-root"></div></div>
     <!-- Dev: cache-bust so each iframe mount loads the freshest canvas bundle. -->
     <script type="module">
       import(`./dist/iframe-entry.js?t=${Date.now()}`);

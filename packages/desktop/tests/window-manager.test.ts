@@ -59,7 +59,6 @@ function makeSession(initialRoot: string | null) {
     setFileEventSink: mock((_sink: unknown) => {}),
     dispose: mock(() => {}),
     handleReadFile: mock(async (_p: { path: string }) => '{"name":"Proj"}'),
-    handleReadFileAsDataUrl: mock(async () => "data:"),
     handleWriteFile: mock(async () => {}),
     handleDeleteFile: mock(async () => {}),
     handleRenameFile: mock(async () => {}),
@@ -145,15 +144,10 @@ void mock.module("../src/updater", () => ({
   getStatus: mock(() => "status"),
 }));
 
-// ─── Mock the loopback canvas gate + project-server factory (Phase 7) ─────────
+// ─── Mock the studio-asset dir + project-server factory ──────────────────────
 
-let loopbackOn = false;
-const _resetLoopback = () => {
-  loopbackOn = false;
-};
 void mock.module("../src/canvas-runtime", () => ({
   studioDir: () => "/fake/studio",
-  useLoopbackCanvas: () => loopbackOn,
 }));
 
 interface FakeServer {
@@ -206,7 +200,6 @@ beforeEach(() => {
   createdWindows.length = 0;
   createdServers.length = 0;
   createProjectServer.mockClear();
-  _resetLoopback();
 });
 
 afterEach(() => {
@@ -289,7 +282,6 @@ describe("per-window RPC", () => {
     const pkg = pkgInstances.at(-1)!;
 
     // File / project handlers (each forwards to the window's session).
-    await reqs.readFileAsDataUrl({ path: "a.png" } as never);
     await reqs.deleteFile({ path: "a.json" } as never);
     await reqs.renameFile({ from: "a", to: "b" } as never);
     await reqs.createDirectory({ path: "d" } as never);
@@ -418,19 +410,11 @@ describe("disposeWindow", () => {
   });
 });
 
-// ─── Phase 7: per-window loopback server (gated) ─────────────────────────────
+// ─── Per-window loopback canvas server (always stood up) ─────────────────────
 
-describe("loopback canvas server (Phase 7)", () => {
-  test("gate OFF (default): no server stood up, getCanvasUrl is null", () => {
-    openProjectWindow("/proj/gateoff");
-    expect(createProjectServer).not.toHaveBeenCalled();
-    expect(createdServers).toHaveLength(0);
-    expect(lastRequests().getCanvasUrl()).toEqual({ canvasUrl: null });
-  });
-
-  test("gate ON: stands up one per-window server and getCanvasUrl returns its canvas URL", () => {
-    loopbackOn = true;
-    openProjectWindow("/proj/gateon");
+describe("loopback canvas server", () => {
+  test("stands up one per-window server and getCanvasUrl returns its canvas URL", () => {
+    openProjectWindow("/proj/canvas");
     expect(createProjectServer).toHaveBeenCalledTimes(1);
     expect(createdServers).toHaveLength(1);
     const server = createdServers[0]!;
@@ -438,8 +422,7 @@ describe("loopback canvas server (Phase 7)", () => {
     expect(server.canvasUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/__studio__\/canvas\.html$/);
   });
 
-  test("gate ON: the server's session tracks THIS window's projectRoot, no ?win= needed", () => {
-    loopbackOn = true;
+  test("the server's session tracks THIS window's projectRoot, no ?win= needed", () => {
     openProjectWindow("/proj/winA");
     openProjectWindow("/proj/winB");
     expect(createdServers).toHaveLength(2);
@@ -450,8 +433,7 @@ describe("loopback canvas server (Phase 7)", () => {
     expect(a!.url).not.toBe(b!.url);
   });
 
-  test("gate ON: the WS handler subset exposes only canvas-facing reads (no writes/git)", async () => {
-    loopbackOn = true;
+  test("the WS handler subset exposes only canvas-facing reads (no writes/git)", async () => {
     openProjectWindow("/proj/handlers");
     const session = sessions.at(-1)!;
     const handlers = createdServers[0]!.resolveSession()!.handlers as Record<
@@ -462,7 +444,6 @@ describe("loopback canvas server (Phase 7)", () => {
       "jxResolve",
       "jxServerFunction",
       "readFile",
-      "readFileAsDataUrl",
       "resolveSiteContext",
     ]);
     await handlers.jxResolve!({ body: "{}" });
@@ -474,8 +455,7 @@ describe("loopback canvas server (Phase 7)", () => {
     expect(handlers.gitStatus).toBeUndefined();
   });
 
-  test("gate ON: disposeWindow stops THIS window's server", () => {
-    loopbackOn = true;
+  test("disposeWindow stops THIS window's server", () => {
     openProjectWindow("/proj/teardown");
     const server = createdServers[0]!;
     createdWindows.at(-1)!._closeHandler!();

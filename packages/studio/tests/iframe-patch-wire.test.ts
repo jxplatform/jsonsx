@@ -6,8 +6,7 @@
  * bridge itself is mocked so we can capture exactly what `applyPatchBatch` hands off.
  */
 import "./with-dom.js";
-import { afterAll, describe, expect, mock, test } from "bun:test";
-import { setCanvasHostOverride } from "../src/canvas/canvas-host";
+import { describe, expect, mock, test } from "bun:test";
 import type { TransactionRecord } from "../src/tabs/patch-ops";
 import type { Tab } from "../src/tabs/tab";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
@@ -23,9 +22,6 @@ void mock.module("../src/canvas/iframe-host", () => ({
 }));
 
 const { applyPatchBatch } = await import("../src/canvas/canvas-patcher");
-
-setCanvasHostOverride("iframe");
-afterAll(() => setCanvasHostOverride(null));
 
 describe("parent → iframe patch wire format", () => {
   test("posts value-carrying forward ops — the values cross, not just paths", () => {

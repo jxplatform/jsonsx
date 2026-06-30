@@ -15,8 +15,10 @@ import {
   buildScope,
   defineElement,
   renderNode,
+  setCanvasViewportTranspose,
   setRootMedia,
   setSkipServerFunctions,
+  transposeCanvasUnits,
 } from "@jxsuite/runtime";
 import { effectScope } from "../reactivity";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
@@ -101,9 +103,9 @@ export function applySiteStyle(siteStyle: Record<string, unknown> | null | undef
       continue;
     }
     if (key.startsWith("--")) {
-      rootStyle.setProperty(key, String(value));
+      rootStyle.setProperty(key, transposeCanvasUnits(String(value)));
     } else {
-      bodyStyle[key] = String(value);
+      bodyStyle[key] = transposeCanvasUnits(String(value));
     }
   }
 }
@@ -179,6 +181,11 @@ export async function renderResolvedDocument(opts: {
   siteStyle?: Record<string, unknown> | null;
 }): Promise<RenderHandle> {
   setSkipServerFunctions(opts.mode !== "preview");
+  // Transpose viewport units (vh/vw/…) → container units (cqh/cqw/…) so they resolve against the
+  // Canvas's fixed-size query container (canvas.html) instead of the iframe element. That decouples
+  // Them from the iframe height, letting the host size the iframe to its content without `100vh`
+  // Sections feeding back into an ever-growing height. Set every render (the iframe always wants it).
+  setCanvasViewportTranspose(true);
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks

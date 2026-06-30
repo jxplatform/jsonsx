@@ -146,6 +146,44 @@ export function setSkipContentResolution(_v: boolean) {
 }
 
 /**
+ * Studio-canvas viewport-unit transpose. The canvas iframe is sized to its document's height, so
+ * any viewport unit (`vh`/`vw`/`vmin`/`vmax`/`svh`/…) — which resolves against the iframe ELEMENT —
+ * would feed back into an ever-growing height. When this is on, the runtime transposes them to
+ * CONTAINER units (`cqh`/`cqw`/…) that resolve against the canvas's fixed-size query container (see
+ * `canvas.html`): a predictable, feedback-free stand-in for the viewport. Off (the default) leaves
+ * CSS untouched for real production rendering.
+ */
+let _canvasViewportTranspose = false;
+export function setCanvasViewportTranspose(on: boolean) {
+  _canvasViewportTranspose = on;
+}
+
+const VIEWPORT_UNIT_RE = /(-?\d*\.?\d+)(?:s|l|d)?v(h|w|min|max|i|b)\b/gi;
+const VIEWPORT_UNIT_MAP: Record<string, string> = {
+  b: "cqb",
+  h: "cqh",
+  i: "cqi",
+  max: "cqmax",
+  min: "cqmin",
+  w: "cqw",
+};
+
+/**
+ * Transpose CSS viewport units → container-query units in a value string, but only when the
+ * studio-canvas flag is set (otherwise the value is returned untouched). `100vh` → `100cqh`,
+ * `50svw` → `50cqw`, `10vmin` → `10cqmin`, etc.
+ */
+export function transposeCanvasUnits(value: string): string {
+  if (!_canvasViewportTranspose || !value.includes("v")) {
+    return value;
+  }
+  return value.replace(
+    VIEWPORT_UNIT_RE,
+    (_m, num: string, dim: string) => `${num}${VIEWPORT_UNIT_MAP[dim.toLowerCase()] ?? `cq${dim}`}`,
+  );
+}
+
+/**
  * Build the reactive scope (state) from the document using the five-shape detection algorithm.
  *
  * @param {JxDocument} doc
@@ -711,19 +749,22 @@ export function applyStyle(
     if (prop.startsWith("--")) {
       if (isTemplateString(val)) {
         effect(() => {
-          el.style.setProperty(prop, evaluateTemplate(val, state));
+          el.style.setProperty(prop, transposeCanvasUnits(evaluateTemplate(val, state)));
         });
       } else {
-        el.style.setProperty(prop, scalar);
+        el.style.setProperty(prop, transposeCanvasUnits(scalar));
       }
     } else if (isTemplateString(val)) {
       effect(() => {
-        (el.style as unknown as Record<string, string>)[prop] = evaluateTemplate(val, state);
+        (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(
+          evaluateTemplate(val, state),
+        );
       });
     } else if (mediaOverriddenProps.has(prop)) {
+      // Goes through toCSSText (which transposes) — don't double-transpose here.
       baseDecls[prop] = scalar;
     } else {
-      (el.style as unknown as Record<string, string>)[prop] = scalar;
+      (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(scalar);
     }
   }
 
@@ -1852,7 +1893,7 @@ export function camelToKebab(s: string) {
 export function toCSSText(rules: Record<string, unknown> | object) {
   return Object.entries(rules)
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
-    .map(([p, v]) => `${camelToKebab(p)}: ${v}`)
+    .map(([p, v]) => `${camelToKebab(p)}: ${transposeCanvasUnits(String(v))}`)
     .join("; ");
 }
 

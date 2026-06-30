@@ -16,7 +16,6 @@ import {
   initCanvasPatcher,
 } from "../src/canvas/canvas-patcher";
 import { canvasPerf, resetCanvasPerf } from "../src/canvas/canvas-perf";
-import { setCanvasHostOverride } from "../src/canvas/canvas-host";
 import { toRaw } from "../src/reactivity";
 
 import type { CanvasPanel } from "../src/types";
@@ -241,13 +240,6 @@ describe("consumed-document handshake", () => {
 // ─── Iframe canvas host (Phase 3a): narrower classify gate + post-over-bridge apply ─────
 
 describe("iframe canvas host gating", () => {
-  beforeEach(() => {
-    setCanvasHostOverride("iframe");
-  });
-  afterEach(() => {
-    setCanvasHostOverride(null);
-  });
-
   test("classification is host-agnostic: the iframe admits the full surgical op set", () => {
     // After Phase 3b the iframe applies every op the legacy patcher does (in-place, structural
     // Relocation, and subtree re-renders), so classify no longer rejects anything extra in iframe

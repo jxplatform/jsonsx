@@ -486,37 +486,6 @@ export function createProjectSession(initialRoot: string | null) {
     return readFile(abs, "utf8");
   }
 
-  async function readFileAsDataUrl(params: { path: string }): Promise<string> {
-    const root = requireRoot();
-    let abs = resolve(root, params.path);
-    assertUnderRoot(abs, root);
-
-    if (!existsSync(abs)) {
-      const publicAbs = resolve(root, "public", params.path);
-      assertUnderRoot(publicAbs, root);
-      if (!existsSync(publicAbs)) {
-        throw new Error(`File not found: ${params.path}`);
-      }
-      abs = publicAbs;
-    }
-
-    const buffer = await readFile(abs);
-    const base64 = Buffer.from(buffer).toString("base64");
-    const ext = params.path.split(".").pop()?.toLowerCase() || "";
-    const mimeMap: Record<string, string> = {
-      avif: "image/avif",
-      gif: "image/gif",
-      ico: "image/x-icon",
-      jpeg: "image/jpeg",
-      jpg: "image/jpeg",
-      png: "image/png",
-      svg: "image/svg+xml",
-      webp: "image/webp",
-    };
-    const mime = mimeMap[ext] || "application/octet-stream";
-    return `data:${mime};base64,${base64}`;
-  }
-
   async function writeFileHandler(params: { path: string; content: string }): Promise<void> {
     const root = requireRoot();
     const abs = resolve(root, params.path);
@@ -804,7 +773,6 @@ export function createProjectSession(initialRoot: string | null) {
     openProject,
     listDirectory,
     handleReadFile: readFileHandler,
-    handleReadFileAsDataUrl: readFileAsDataUrl,
     handleWriteFile: writeFileHandler,
     handleDeleteFile: deleteFile,
     handleRenameFile: renameFile,

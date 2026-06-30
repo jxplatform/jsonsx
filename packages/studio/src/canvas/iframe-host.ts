@@ -45,6 +45,12 @@ type ParentRect = OverlayPlacement;
 interface HostState {
   iframe: HTMLIFrameElement;
   channel: IframeChannel<ParentToIframe, IframeToParent>;
+  /**
+   * The resolved canvasUrl this iframe was built with — so a host built early with the default URL
+   * is rebuilt once the platform's loopback canvasUrl becomes available (electrobun resolves it
+   * async).
+   */
+  canvasUrl: string;
   ready: boolean;
   pending: ParentToIframe | null;
   overlay: OverlayLayer;
@@ -294,29 +300,46 @@ function requestSelection(host: HostState, sel: (string | number)[] | null): voi
 const DEFAULT_CANVAS_URL = "/packages/studio/canvas.html";
 
 function ensureHost(canvasEl: HTMLElement): HostState {
+  // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
+  // Dev server leaves it unset, and some tests mount without a platform registered.
+  const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
   const existing = hosts.get(canvasEl);
   if (existing) {
-    return existing;
+    if (existing.canvasUrl === canvasUrl) {
+      return existing;
+    }
+    // The platform's loopback canvasUrl arrived after this host was built with the default URL
+    // (electrobun resolves it async over RPC) — tear the early iframe down and rebuild against the
+    // Right cross-origin origin.
+    existing.channel.dispose();
+    liveHosts.delete(existing);
+    hosts.delete(canvasEl);
   }
   // ParentOrigin is the parent's real origin, passed into the iframe URL so the cross-origin iframe
   // Can target a postMessage back at it.
   const parentOrigin = location.origin;
   const token = crypto.randomUUID();
-  // Read the platform's canvasUrl when one is registered; otherwise fall back to the default. The
-  // Dev server and electrobun leave it unset, and some tests mount without a platform registered.
-  const canvasUrl = (hasPlatform() ? getPlatform().canvasUrl : undefined) ?? DEFAULT_CANVAS_URL;
-  // IframeOrigin is the iframe's own origin. For a RELATIVE canvasUrl (dev / chromium / electrobun
-  // Gate-off) it resolves to location.origin — IDENTICAL behavior. For an absolute loopback
-  // CanvasUrl it is the loopback origin, so the channel accepts/targets the right cross-origin peer.
+  // IframeOrigin is the iframe's own origin. For a RELATIVE canvasUrl (dev / chromium) it resolves to
+  // The parent's location.origin (same-origin). For an absolute loopback canvasUrl (electrobun) it is
+  // The loopback origin, so the channel accepts/targets the right cross-origin peer.
   const iframeOrigin = new URL(canvasUrl, location.href).origin;
   const iframe = document.createElement("iframe");
   iframe.className = "jx-canvas-iframe";
   iframe.style.cssText =
     "width:100%;min-height:480px;height:100%;border:0;display:block;background:#fff";
-  // Preserve any query already on canvasUrl (e.g. electrobun's ?win=7) and append parentOrigin+token.
+  // Preserve any query already on canvasUrl (e.g. electrobun's ?win=7) and append the token (always)
+  // Plus parentOrigin (conditionally — see below).
   const srcUrl = new URL(canvasUrl, location.href);
-  srcUrl.searchParams.set("parentOrigin", parentOrigin);
   srcUrl.searchParams.set("token", token);
+  // Pass parentOrigin into the iframe src ONLY when the PARENT is served over http(s) (dev / chromium
+  // — same-origin, so the origin round-trips and the iframe can keep its acceptOrigin STRICT). For a
+  // Non-http(s) parent (electrobun views://) OMIT it: a custom scheme may not surface as a postMessage
+  // Origin (event.origin), so the iframe falls back to acceptOrigin '*' + the shared token (it logs
+  // The warn) rather than silently stalling. The PARENT side here stays STRICT — acceptOrigin /
+  // TargetOrigin are the real (loopback) iframeOrigin below, a gateable origin.
+  if (location.protocol === "http:" || location.protocol === "https:") {
+    srcUrl.searchParams.set("parentOrigin", parentOrigin);
+  }
   // Keep a relative canvasUrl relative in the src attribute (emit only path+query, not the resolved
   // Absolute URL) so the same-origin path stays byte-identical.
   iframe.src = iframeOrigin === parentOrigin ? `${srcUrl.pathname}${srcUrl.search}` : srcUrl.href;
@@ -326,6 +349,15 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   }
   const overlay = createOverlayLayer(document);
   canvasEl.replaceChildren(iframe, overlay.root);
+  // Neutralize the legacy hit-test catcher. `.canvas-panel-click` is an absolutely-positioned sibling
+  // (z-index:9, inset:0) with the default `pointer-events:auto`, so it sits OVER this canvas and would
+  // Eat every click/wheel before the iframe — which now owns hit-testing AND native scrolling — can
+  // See them. Stylebook still relies on it, but its panels render a div canvas and never mount an iframe
+  // Host, so scoping the neutralization to this mount leaves stylebook untouched.
+  const catcher = canvasEl.parentElement?.querySelector<HTMLElement>(".canvas-panel-click");
+  if (catcher) {
+    catcher.style.pointerEvents = "none";
+  }
 
   const channel = postMessageChannel<ParentToIframe, IframeToParent>({
     acceptOrigin: iframeOrigin,
@@ -340,6 +372,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   });
 
   const state: HostState = {
+    canvasUrl,
     channel,
     editing: false,
     iframe,
@@ -409,6 +442,13 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The DOM now reflects so cross-frame drag replies can be stale-gated against it (Phase 4c).
       state.lastRenderedGen = msg.gen;
       requestSelection(state, state.selectionPath);
+      return;
+    }
+    case "contentHeight": {
+      // Size the iframe element to its document so the canvas never scrolls internally — the parent
+      // Canvas pans/scrolls instead, every node stays inside the iframe box (hit-testable), and the
+      // Overlay (drawn in canvas space) tracks it. `min-height` in cssText floors short documents.
+      state.iframe.style.height = `${msg.height}px`;
       return;
     }
     case "dragOver": {

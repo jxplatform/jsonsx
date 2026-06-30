@@ -1,13 +1,12 @@
 /**
- * Phase 7 (view-side gate-on): the desktop platform's data-URL MutationObserver + views://
- * fetch-shim switch REWRITE TARGET when platform.canvasUrl is an absolute loopback origin. A
- * relative panel asset is rewritten to an absolute loopback URL (fetch-free, a cross-origin image
- * load), and the views:// read-shim steps aside so the canvas doc + assets are served natively over
- * http.
+ * The desktop platform's asset MutationObserver rewrites a relative panel asset src to an absolute
+ * loopback URL (fetch-free, a cross-origin image load) when platform.canvasUrl is a loopback
+ * origin. A views:// URL is NOT intercepted (loopback-only: there is no views:// read-shim) — it
+ * passes through to the native fetch. A non-http canvasUrl yields no loopback origin, so the
+ * observer no-ops that mutation rather than rewriting it.
  *
  * This file owns a SINGLE platform (one observer, one window.fetch wrap) so there is no
- * cross-observer interference — platform.test.ts already covers the gate-off (data-URL) path with
- * its own fixture.
+ * cross-observer interference.
  */
 
 import { describe, expect, mock, test } from "bun:test";
@@ -82,8 +81,6 @@ describe("loopback rewrite target (gate-on)", () => {
   test("rewrites a relative img src to an absolute loopback URL (no data: fetch)", async () => {
     await flush();
     expect(lbImg.getAttribute("src")).toBe(`${LOOPBACK}/assets/hero.png`);
-    // No readFileAsDataUrl round-trip on the loopback path.
-    expect(callsFor("readFileAsDataUrl")).toHaveLength(0);
   });
 
   test("rewrites a background-image url() to the loopback origin", async () => {
@@ -93,24 +90,25 @@ describe("loopback rewrite target (gate-on)", () => {
     expect(lbBg.style.backgroundImage.startsWith("url(")).toBe(true);
   });
 
-  test("the views:// fetch-shim steps aside on loopback (passes through to native fetch)", async () => {
+  test("a views:// URL is NOT intercepted — it passes through to the native fetch", async () => {
+    // Loopback-only: there is no views:// read-shim, so a views:// URL falls through to the original
+    // Fetch (no readFile RPC).
     const res = await (window.fetch as typeof fetch)("views://studio/index.html");
     expect(res.status).toBe(299);
     expect(await res.text()).toBe("passthrough-body");
-    // No readFile shim call on the loopback path.
     expect(callsFor("readFile")).toHaveLength(0);
   });
 
-  test("a non-http canvasUrl yields no loopback origin → the views:// read-shim stays active", async () => {
+  test("a non-http canvasUrl yields no loopback origin → the observer no-ops the rewrite", async () => {
     // Defensive: a relative/custom-scheme canvasUrl must NOT be treated as a loopback origin, so the
-    // Views:// read-shim stays installed (loopbackOrigin() returns null on a non-http protocol).
+    // Observer leaves a relative panel src untouched rather than rewriting it (loopbackOrigin() is
+    // Null on a non-http protocol).
     platform.canvasUrl = "views://studio/packages/studio/canvas.html";
-    impls.set("readFile", () => "<html>shim</html>");
-    const res = await (window.fetch as typeof fetch)("views://studio/index.html");
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe("<html>shim</html>");
-    expect(callsFor("readFile").length).toBeGreaterThan(0);
-    impls.delete("readFile");
+    const nonHttpImg = document.createElement("img");
+    nonHttpImg.setAttribute("src", "./assets/late.png");
+    document.body.append(nonHttpImg);
+    await flush();
+    expect(nonHttpImg.getAttribute("src")).toBe("./assets/late.png");
     platform.canvasUrl = `${LOOPBACK}/__studio__/canvas.html`;
   });
 });

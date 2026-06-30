@@ -14,7 +14,7 @@ import { createPackageOps } from "./packages";
 import { createProjectServer } from "@jxsuite/server/project-server";
 import { createProjectSession } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
-import { studioDir, useLoopbackCanvas } from "./canvas-runtime";
+import { studioDir } from "./canvas-runtime";
 import type { ProjectServerHandle } from "@jxsuite/server/project-server";
 import type { ProjectSession } from "./project-session";
 import type { SiteConfig, StudioRPC } from "./rpc-schema";
@@ -25,10 +25,9 @@ interface WindowEntry {
   session: ProjectSession;
   projectRoot: string | null;
   /**
-   * This window's own loopback createProjectServer (Phase 7), stood up only when
-   * {@link useLoopbackCanvas} is on. Its single session is THIS window's session, so an asset GET is
-   * unambiguous (no ?win= needed) and a token from window A cannot drive window B. Torn down in
-   * {@link disposeWindow}.
+   * This window's own loopback createProjectServer (the cross-origin canvas path). Its single
+   * session is THIS window's session, so an asset GET is unambiguous (no ?win= needed) and a token
+   * from window A cannot drive window B. Torn down in {@link disposeWindow}.
    */
   server?: ProjectServerHandle;
   maximize: {
@@ -166,22 +165,20 @@ export function openProjectWindow(projectRoot: string | null): BrowserWindow {
   });
 
   windows.set(entry.win.id, entry);
-  // Phase 7 (gated OFF by default): stand up THIS window's own loopback project server. Its single
+  // Stand up THIS window's own loopback project server (the cross-origin canvas path). Its single
   // Session tracks this window's session.projectRoot, so an asset GET is unambiguous and no
-  // Cross-window token reuse is possible. With useLoopbackCanvas() false, nothing runs.
-  if (useLoopbackCanvas()) {
-    const handlers = buildWsHandlers(entry);
-    const windowSession = {
-      get projectRoot(): string | null {
-        return entry.session.projectRoot;
-      },
-      handlers,
-    };
-    entry.server = createProjectServer({
-      resolveSession: () => windowSession,
-      studioDir: studioDir(),
-    });
-  }
+  // Cross-window token reuse is possible. The studio shell reads its canvasUrl via getCanvasUrl().
+  const handlers = buildWsHandlers(entry);
+  const windowSession = {
+    get projectRoot(): string | null {
+      return entry.session.projectRoot;
+    },
+    handlers,
+  };
+  entry.server = createProjectServer({
+    resolveSession: () => windowSession,
+    studioDir: studioDir(),
+  });
   entry.win.on("close", () => disposeWindow(entry.win.id));
   return entry.win;
 }
@@ -199,7 +196,6 @@ function buildWsHandlers(
     jxResolve: (params) => session.jxResolve(params as { body: string }),
     jxServerFunction: (params) => session.jxServerFunction(params as { body: string }),
     readFile: (params) => session.handleReadFile(params as { path: string }),
-    readFileAsDataUrl: (params) => session.handleReadFileAsDataUrl(params as { path: string }),
     resolveSiteContext: (params) =>
       session.handleResolveSiteContext(params as { filePath: string }),
   };
@@ -261,7 +257,6 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
           return result;
         },
         readFile: (params) => session.handleReadFile(params),
-        readFileAsDataUrl: (params) => session.handleReadFileAsDataUrl(params),
         renameFile: (params) => session.handleRenameFile(params),
         resolveSiteContext: (params) => session.handleResolveSiteContext(params),
         uploadFile: (params) => session.handleUploadFile(params),
@@ -329,7 +324,7 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
           openProjectWindow(params.root);
         },
         getProjectRoot: () => ({ root: session.projectRoot }),
-        // Phase 7: hand the studio shell this window's cross-origin canvas URL (null = views:// path).
+        // Hand the studio shell this window's cross-origin loopback canvas URL.
         getCanvasUrl: () => ({ canvasUrl: entry.server?.canvasUrl ?? null }),
         listOpenWindows: () => listOpenWindows(),
         setWindowProject: async (params) => {

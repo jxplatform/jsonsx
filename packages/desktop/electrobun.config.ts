@@ -57,20 +57,21 @@ export default {
 
     // PreBuild copies compiled studio + runtime assets into assets/ before these run.
     // Source paths are relative to packages/desktop/.
+    //
+    // The studio SHELL loads over views:// (views://studio/index.html + its bundles). The canvas
+    // Iframe loads CROSS-ORIGIN from the per-window loopback project server — but that server serves
+    // Its studio assets out of studioDir(), which resolves to this staged views/studio dir (it probes
+    // For canvas.html there). So canvas.html + dist/iframe-entry.js must ALSO be staged here; the
+    // Loopback server reads them off disk and serves them over http (they are never fetched via the
+    // Views:// scheme). Without these two entries the packaged canvas iframe 404s at boot.
     copy: {
+      "assets/studio/canvas.html": "views/studio/canvas.html",
+      "assets/studio/dist/iframe-entry.js": "views/studio/dist/iframe-entry.js",
+      "assets/studio/dist/iframe-entry.js.map": "views/studio/dist/iframe-entry.js.map",
       "assets/studio/dist/init.js": "views/studio/dist/init.js",
       "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
       "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
       "assets/studio/index.html": "views/studio/index.html",
-      // Phase 7: ship the iframe canvas under views:// so the DEFAULT_CANVAS_URL fallback
-      // (/packages/studio/canvas.html → views/studio/packages/studio/canvas.html) resolves on the
-      // Gate-off path AND under MSIX. canvas.html imports ./dist/iframe-entry.js relative to ITSELF,
-      // So the bundle lands beside it at views/studio/packages/studio/dist/ (the spec's
-      // "views/studio/dist/" target predates the nested canvas.html location).
-      "assets/studio/canvas.html": "views/studio/packages/studio/canvas.html",
-      "assets/studio/dist/iframe-entry.js": "views/studio/packages/studio/dist/iframe-entry.js",
-      "assets/studio/dist/iframe-entry.js.map":
-        "views/studio/packages/studio/dist/iframe-entry.js.map",
     },
   },
 

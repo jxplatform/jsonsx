@@ -165,6 +165,12 @@ export type IframeToParent =
   | { kind: "ready" }
   | { kind: "renderComplete"; gen: number }
   | { kind: "renderError"; gen: number; message: string }
+  // The iframe's measured content height in CSS px. The host sizes the iframe ELEMENT to this so the
+  // Canvas never scrolls internally — the parent canvas pans/scrolls instead, every node stays inside
+  // The iframe box (hit-testable), and the parent-drawn overlay tracks it (it can't follow an internal
+  // Scroll). Viewport units are transposed to container units (runtime `transposeCanvasUnits`) so a
+  // `100vh` section can't feed back into an ever-growing height. Posted after each render and on reflow.
+  | { kind: "contentHeight"; height: number }
   | { kind: "hit"; hit: NodeHit }
   | { kind: "hover"; hit: NodeHit | null }
   // Response to `measure`: the rects of whichever requested paths resolved to a node (missing paths

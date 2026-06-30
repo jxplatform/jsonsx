@@ -26,7 +26,6 @@ export const { formatAction } = _default;
 export const { openProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;
-export const { handleReadFileAsDataUrl } = _default;
 export const { handleWriteFile } = _default;
 export const { handleDeleteFile } = _default;
 export const { handleRenameFile } = _default;

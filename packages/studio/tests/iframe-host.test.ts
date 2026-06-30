@@ -101,9 +101,11 @@ describe("mountIframeCanvas", () => {
 
     const iframe = canvasEl.querySelector("iframe");
     expect(iframe).toBeTruthy();
-    expect(iframe!.getAttribute("src")).toMatch(
-      /\/packages\/studio\/canvas\.html\?parentOrigin=.+&token=.+/,
-    );
+    const src0 = iframe!.getAttribute("src")!;
+    expect(src0.startsWith("/packages/studio/canvas.html?")).toBe(true);
+    const q0 = new URL(src0, location.href).searchParams;
+    expect(q0.get("parentOrigin")).toBe(location.origin);
+    expect(q0.get("token")).toBeTruthy();
     expect(channels).toHaveLength(1);
     // Not ready yet → the render is queued, not posted.
     expect(channels[0]!.posts).toHaveLength(0);
@@ -125,9 +127,11 @@ describe("mountIframeCanvas", () => {
       document.body.append(canvasEl);
       await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
       const iframe = canvasEl.querySelector("iframe")!;
-      expect(iframe.getAttribute("src")).toMatch(
-        /\/__studio__\/canvas\.html\?parentOrigin=.+&token=.+/,
-      );
+      const src1 = iframe.getAttribute("src")!;
+      expect(src1.startsWith("/__studio__/canvas.html?")).toBe(true);
+      const q1 = new URL(src1, location.href).searchParams;
+      expect(q1.get("parentOrigin")).toBe(location.origin);
+      expect(q1.get("token")).toBeTruthy();
     } finally {
       g.__jxPlatform = saved;
     }
@@ -172,6 +176,50 @@ describe("mountIframeCanvas", () => {
       expect(channels[0]!.opts.acceptOrigin).toBe("http://127.0.0.1:54321");
       expect(channels[0]!.opts.targetOrigin).toBe("http://127.0.0.1:54321");
     } finally {
+      g.__jxPlatform = saved;
+    }
+  });
+
+  test("an http(s) parent passes parentOrigin (strict, same-origin) — the channel stays gateable", async () => {
+    // The default happy-dom parent is http://localhost:3000 → parentOrigin round-trips and is passed.
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+    const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+    const u = new URL(src, location.href);
+    expect(u.searchParams.get("parentOrigin")).toBe(location.origin);
+  });
+
+  test("a NON-http(s) parent (views://) OMITS parentOrigin so the iframe falls to '*'+token", async () => {
+    // Simulate the electrobun shell: the parent doc is on a custom scheme (views://) whose origin may
+    // Not surface as a postMessage event.origin. The host must OMIT parentOrigin so the iframe falls
+    // Back to acceptOrigin '*' + the shared token rather than silently stalling. The parent side here
+    // Stays STRICT — it accepts/targets the real loopback iframeOrigin (asserted below).
+    const g = globalThis as unknown as { __jxPlatform?: { canvasUrl?: string } | undefined };
+    const saved = g.__jxPlatform;
+    g.__jxPlatform = { canvasUrl: "http://127.0.0.1:54321/__studio__/canvas.html" } as never;
+    const realLocation = globalThis.location;
+    // Override location with a views:// (non-http) parent for this test only.
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: { href: "views://studio/index.html", origin: "views://studio", protocol: "views:" },
+    });
+    try {
+      const canvasEl = document.createElement("div");
+      await mountIframeCanvas(1, { tagName: "div" } as never, canvasEl);
+      const src = canvasEl.querySelector("iframe")!.getAttribute("src")!;
+      const u = new URL(src);
+      // ParentOrigin is OMITTED (the iframe-entry side then falls back to '*'); token still present.
+      expect(u.searchParams.has("parentOrigin")).toBe(false);
+      expect(u.searchParams.get("token")).toBeTruthy();
+      // The PARENT channel stays STRICT: it accepts/targets the real loopback origin, not views://.
+      expect(channels[0]!.opts.acceptOrigin).toBe("http://127.0.0.1:54321");
+      expect(channels[0]!.opts.targetOrigin).toBe("http://127.0.0.1:54321");
+    } finally {
+      Object.defineProperty(globalThis, "location", {
+        configurable: true,
+        value: realLocation,
+      });
       g.__jxPlatform = saved;
     }
   });
