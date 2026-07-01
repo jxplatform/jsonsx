@@ -202,7 +202,10 @@ describe("studio assets (/__studio__/)", () => {
     const res = await fetch(`${base}/__studio__/index.html`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("studio-shell");
-    expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+    // MUST be same-origin (NOT no-referrer): the tokened URL still never leaks cross-origin, but
+    // Under no-referrer Chromium sends `Origin: null` on the canvas iframe's same-origin POSTs,
+    // Which fails the loopback-Origin gate and self-403s /__jx_resolve__ from our own document.
+    expect(res.headers.get("Referrer-Policy")).toBe("same-origin");
   });
 
   test("serves canvas.html and the iframe bundle", async () => {

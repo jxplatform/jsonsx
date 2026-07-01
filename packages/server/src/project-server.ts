@@ -279,9 +279,13 @@ export function createProjectServer(options: CreateProjectServerOptions): Projec
         const assetPath = resolve(studioDir, `.${sep}${assetRel}`);
         const res = await serveContained(assetPath, studioDir);
         if (res) {
-          // Strip ?token from the shell after boot + never leak it via Referer.
+          // Never leak the tokened URL cross-origin via Referer, while keeping same-origin requests
+          // Normal. MUST be `same-origin`, not `no-referrer`: under `no-referrer` Chromium serializes
+          // The Origin header of the canvas iframe's own same-origin POSTs as `null` (Fetch spec
+          // Origin-serialization respects referrer policy), which fails originIsLoopbackOrAbsent and
+          // Self-403s /__jx_resolve__ + /__jx_server__ from the very document this server serves.
           const headers = new Headers(res.headers);
-          headers.set("Referrer-Policy", "no-referrer");
+          headers.set("Referrer-Policy", "same-origin");
           return new Response(res.body, { headers, status: res.status });
         }
         return new Response("Not found", { status: 404 });
