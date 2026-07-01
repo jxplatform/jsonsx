@@ -634,3 +634,28 @@ describe("setResolveToken / resolveProxyPath", () => {
     expect(posts[0]!.url).toBe("/__jx_resolve__");
   });
 });
+
+// ─── observeScope (same-instance reactive observer) ───────────────────────────
+
+describe("observeScope", () => {
+  test("runs immediately, re-runs when a tracked runtime ref/reactive changes, and the disposer stops it", async () => {
+    const { observeScope } = await import("../src/runtime");
+    const state = reactive({ items: null as unknown }) as Record<string, unknown>;
+    const seen: unknown[] = [];
+    const stop = observeScope(() => {
+      seen.push(state.items);
+    });
+    // First run is synchronous.
+    expect(seen).toEqual([null]);
+
+    // A change to the tracked reactive re-runs the observer (same reactivity instance).
+    state.items = [1, 2];
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toEqual([1, 2]);
+
+    // After the disposer, further changes no longer re-run it.
+    stop();
+    state.items = "later";
+    expect(seen).toHaveLength(2);
+  });
+});

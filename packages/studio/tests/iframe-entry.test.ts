@@ -87,6 +87,61 @@ describe("startCanvasIframe", () => {
     expect(scopeMsg.scope.title).toBe("Home");
   });
 
+  test("re-posts dataScope when an async data source settles AFTER the render", async () => {
+    // A bare-specifier $src resolves via the dev proxy: the runtime returns ref(null) immediately
+    // And fills it when the /__jx_resolve__ fetch lands — i.e. AFTER renderComplete. The entry's
+    // Reactive effect must then re-post an updated snapshot (else the explorer shows null forever).
+    const realFetch = globalThis.fetch;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/__jx_resolve__")) {
+        return gate.then(() => Response.json([{ title: "Kubota U35" }]));
+      }
+      return realFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+      const fromIframe: IframeToParent[] = [];
+      pair.parent.onMessage((m) => fromIframe.push(m));
+      const container = document.createElement("div");
+      teardown = startCanvasIframe({ channel: pair.iframe, container });
+      pair.flush();
+
+      const doc = {
+        children: [{ children: ["Hi"], tagName: "h1" }],
+        state: { products: { $prototype: "Catalog", $src: "some-pkg/Catalog.class.json" } },
+        tagName: "div",
+      };
+      pair.parent.post(renderMsg(1, doc));
+      pair.flush();
+      await flush();
+      pair.flush();
+
+      const scopes = () =>
+        fromIframe.filter((m) => m.kind === "dataScope") as {
+          gen: number;
+          scope: Record<string, unknown>;
+        }[];
+      // First snapshot: the dev-proxy fetch hasn't landed, so the ref serializes to null.
+      expect(scopes()).toHaveLength(1);
+      expect(scopes()[0]!.scope.products).toBeNull();
+
+      // The resolve lands → the ref fills → the tracked effect re-posts an updated snapshot.
+      release();
+      await flush();
+      pair.flush();
+      expect(scopes()).toHaveLength(2);
+      expect(scopes()[1]!.gen).toBe(1);
+      expect(scopes()[1]!.scope.products).toEqual([{ title: "Kubota U35" }]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   test("ignores a render with a stale (lower) generation", async () => {
     const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
     const acks: IframeToParent[] = [];

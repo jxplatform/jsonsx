@@ -160,6 +160,24 @@ export function setSkipContentResolution(_v: boolean) {
 }
 
 /**
+ * Observe runtime-created reactive values: runs `fn` immediately inside a reactive effect and
+ * re-runs it whenever a tracked value changes; returns a disposer. Dep tracking in @vue/reactivity
+ * is per module INSTANCE, so an effect created from another copy of the package (e.g. the studio's
+ * own pin) can never track a ref/reactive created here — consumers that want to observe
+ * runtime-resolved scope values (the Studio canvas iframe's dataScope re-post) must use this.
+ *
+ * @param {() => void} fn - Read the reactive values to observe inside this callback.
+ * @returns {() => void} Disposer — stops the effect and its scope.
+ */
+export function observeScope(fn: () => void): () => void {
+  const scope = effectScope(true);
+  scope.run(() => {
+    effect(fn);
+  });
+  return () => scope.stop();
+}
+
+/**
  * Studio-canvas viewport-unit transpose. The canvas iframe is sized to its document's height, so
  * any viewport unit (`vh`/`vw`/`vmin`/`vmax`/`svh`/…) — which resolves against the iframe ELEMENT —
  * would feed back into an ever-growing height. When this is on, the runtime transposes them to

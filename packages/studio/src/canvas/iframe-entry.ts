@@ -21,7 +21,10 @@ import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { serializeDataScope } from "./serialize-scope";
-import { setResolveToken } from "@jxsuite/runtime";
+// ObserveScope MUST come from the runtime: the $defs refs are created by the runtime's copy of
+// @vue/reactivity, and dep tracking is per module instance — an effect from the studio's own copy
+// Would never re-run when a dev-proxy data source settles.
+import { observeScope, setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
 import type { DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
 import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
@@ -56,6 +59,9 @@ export function startCanvasIframe(opts: {
 }): () => void {
   const { channel, container } = opts;
   let handle: RenderHandle | null = null;
+  // Disposer for the live render's dataScope re-post effect (see the render handler); stopped
+  // Alongside the handle so a superseded render's refs can't keep posting.
+  let stopDataScopeWatch: (() => void) | null = null;
   let latestGen = -1;
   // The raw page doc the current DOM was rendered from — the patch source-of-truth. `renderedGen`
   // Tracks which generation it (and the DOM) reflect, so patches for an in-flight/superseded render
@@ -318,6 +324,8 @@ export function startCanvasIframe(opts: {
       try {
         // Drop the previous render's reactive scopes (root + any surgically-rendered subtrees).
         disposeAllSubtrees();
+        stopDataScopeWatch?.();
+        stopDataScopeWatch = null;
         handle?.dispose();
         handle = await renderResolvedDocument({
           container,
@@ -340,17 +348,19 @@ export function startCanvasIframe(opts: {
           renderedGen = gen;
           channel.post({ gen, kind: "renderComplete" });
           // Thread a serializable snapshot of the resolved $defs to the parent so the data-explorer
-          // Panel shows live data (the iframe, not the parent, now resolves the scope). Isolated in
-          // Its own try/catch: a serialization failure must never break the render ack above.
-          try {
-            channel.post({
-              gen,
-              kind: "dataScope",
-              scope: serializeDataScope(handle.ctx.defs as Record<string, unknown>),
-            });
-          } catch {
-            // A pathological scope can't be serialized — skip; the render itself already succeeded.
-          }
+          // Panel shows live data (the iframe, not the parent, now resolves the scope). Inside a
+          // Reactive effect: dev-proxy data sources ($prototype/$src) return a ref that fills AFTER
+          // BuildScope returns, and serializeDataScope reads defs[key], so the effect tracks those
+          // Refs and RE-POSTS an updated snapshot when the data settles (the host gen-gates stale
+          // Ones). Isolated in try/catch: a serialization failure never breaks the render ack above.
+          const defs = handle.ctx.defs as Record<string, unknown>;
+          stopDataScopeWatch = observeScope(() => {
+            try {
+              channel.post({ gen, kind: "dataScope", scope: serializeDataScope(defs) });
+            } catch {
+              // A pathological scope can't be serialized — skip; the render itself succeeded.
+            }
+          });
           // Size the iframe to the freshly-rendered content (the ResizeObserver tracks later reflows).
           postContentHeight();
         }
@@ -375,6 +385,7 @@ export function startCanvasIframe(opts: {
     stopAutoScroll();
     heightObserver?.disconnect();
     container.ownerDocument.removeEventListener("wheel", onWheel);
+    stopDataScopeWatch?.();
     handle?.dispose();
   };
 }
