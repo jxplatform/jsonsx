@@ -21,6 +21,7 @@ import { componentRegistry } from "../files/components";
 import { rectOf } from "../utils/geometry";
 
 import { renderPopover, showDialog } from "../ui/layers";
+import { loopbackAssetSrc } from "../canvas/canvas-origin";
 import { renderComponentPreview } from "../panels/stylebook-panel";
 import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
 import { parseSourceForPath } from "../files/file-ops";
@@ -695,6 +696,11 @@ async function loadPreview(el: Element, file: { path: string; category: string }
     return;
   }
 
+  // Component/doc previews instantiate a real runtime custom element that sets img.src verbatim to
+  // A relative path — not a direct-parent lit literal, so it cannot be pre-rewritten via
+  // LoopbackAssetSrc at this template layer. The desktop MutationObserver (plus activate()'s initial
+  // Sweep) still recovers these; the brief stray views:// request is a known cosmetic residual we
+  // Intentionally do NOT over-engineer with a per-component rewrite.
   let preview: HTMLElement | undefined = _previewCache.get(file.path);
   if (!preview) {
     try {
@@ -757,7 +763,7 @@ function renderCard(
       >
         ${isImg
           ? html`<img
-              src="/${file.path}"
+              src=${loopbackAssetSrc(`/${file.path}`)}
               style="max-width:100%;max-height:100%;object-fit:contain"
             />`
           : needsPreview
@@ -917,7 +923,7 @@ export async function renderBrowse(
                 >
                   <sp-table-cell class="browse-name-cell"
                     >${isImage(f.ext)
-                      ? html`<img class="browse-thumb" src="/${f.path}" />`
+                      ? html`<img class="browse-thumb" src=${loopbackAssetSrc(`/${f.path}`)} />`
                       : nothing}${f.name}</sp-table-cell
                   >
                   <sp-table-cell>${f.category}</sp-table-cell>

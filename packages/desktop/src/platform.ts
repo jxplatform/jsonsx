@@ -209,6 +209,19 @@ export function createDesktopPlatform() {
       } catch (error) {
         console.warn("getCanvasUrl RPC failed; canvas falls back to the default URL:", error);
       }
+      // Synchronous initial sweep AFTER canvasUrl resolves: imgs mounted before activate() awaited
+      // Carry relative srcs (a stray views:// request). Rewrite them to the loopback origin now
+      // Instead of waiting for the next mutation, then drain any records the observer already
+      // Batched pre-activate so they aren't reprocessed. Wrapped so a sweep failure can't break
+      // Activate.
+      try {
+        if (loopbackOrigin()) {
+          resolveAllAssets(document.documentElement);
+          observer.takeRecords();
+        }
+      } catch (error) {
+        console.warn("initial asset sweep failed:", error);
+      }
     },
 
     async openProject() {

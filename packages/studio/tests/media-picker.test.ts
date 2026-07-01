@@ -65,8 +65,9 @@ const defaultTree: Record<string, Entry[]> = {
   "public/img": [{ name: "photo.JPG", path: "public/img/photo.JPG", type: "file" }],
 };
 
-function installTree(tree: Record<string, Entry[]>) {
+function installTree(tree: Record<string, Entry[]>, canvasUrl?: string) {
   installMockPlatform({
+    ...(canvasUrl != null && { canvasUrl }),
     listDirectory: async (dir: string) => {
       const entries = tree[dir];
       if (!entries) {
@@ -122,8 +123,20 @@ describe("media cache collection", () => {
     const container = await renderLoaded("");
     pointer(container.querySelector("sp-action-button")!, "click");
     const items = [...popoverHost().querySelectorAll("sp-menu-item")];
+    // No cross-origin loopback registered => the icon src falls back to the relative path.
     expect(items[0]?.querySelector("img")?.getAttribute("src")).toBe("/logo.png");
     expect(items[1]?.querySelector("img")).toBeNull();
+  });
+
+  test("popover icon src is loopback-absolute when a cross-origin canvasUrl is registered", async () => {
+    invalidateMediaCache();
+    installTree(defaultTree, "http://127.0.0.1:54321/__studio__/canvas.html");
+    const container = await renderLoaded("");
+    pointer(container.querySelector("sp-action-button")!, "click");
+    const items = [...popoverHost().querySelectorAll("sp-menu-item")];
+    expect(items[0]?.querySelector("img")?.getAttribute("src")).toBe(
+      "http://127.0.0.1:54321/logo.png",
+    );
   });
 
   test("invalidateMediaCache forces reload; unreadable root yields empty cache and no browse button", async () => {
@@ -140,6 +153,7 @@ describe("media cache collection", () => {
 describe("renderMediaPicker field", () => {
   test("shows a thumbnail for image values only", async () => {
     const withImage = await renderLoaded("/logo.png");
+    // No cross-origin loopback registered => the thumb src falls back to the relative path.
     expect(withImage.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe("/logo.png");
 
     const withVideo = await renderLoaded("/clip.mp4");
@@ -147,6 +161,15 @@ describe("renderMediaPicker field", () => {
 
     const empty = await renderLoaded("");
     expect(empty.querySelector(".media-picker-thumb")).toBeNull();
+  });
+
+  test("thumb src is loopback-absolute when a cross-origin canvasUrl is registered", async () => {
+    invalidateMediaCache();
+    installTree(defaultTree, "http://127.0.0.1:54321/__studio__/canvas.html");
+    const withImage = await renderLoaded("/logo.png");
+    expect(withImage.querySelector(".media-picker-thumb")?.getAttribute("src")).toBe(
+      "http://127.0.0.1:54321/logo.png",
+    );
   });
 
   test("typing into the textfield commits the value", async () => {

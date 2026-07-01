@@ -600,6 +600,64 @@ describe("asset resolution via MutationObserver", () => {
   });
 });
 
+// ─── activate() initial sweep ────────────────────────────────────────────────
+// Imgs mounted before activate() resolves carry relative srcs; activate() runs a
+// Synchronous sweep AFTER canvasUrl is set (then drains the observer's queue) so
+// They are rewritten promptly rather than waiting for the next mutation.
+
+describe("activate() initial asset sweep", () => {
+  // Restore the module-scope loopback for any later assertions that depend on it.
+  afterEach(() => {
+    platform.canvasUrl = `${LOOPBACK}/__studio__/canvas.html`;
+    impls.delete("getCanvasUrl");
+  });
+
+  test("rewrites a pre-mounted relative img to the loopback origin during activate()", async () => {
+    // Clear the origin BEFORE mounting so the observer (if it fires on append) no-ops the img —
+    // Proving the rewrite below is the work of activate()'s synchronous sweep, not the observer.
+    platform.canvasUrl = undefined;
+    const preImg = document.createElement("img");
+    preImg.setAttribute("src", "/images/pre.png");
+    document.body.append(preImg);
+
+    impls.set("getCanvasUrl", () => ({ canvasUrl: `${LOOPBACK}/__studio__/canvas.html` }));
+    await platform.activate();
+    // No further flush(): the sweep ran synchronously inside activate() after canvasUrl resolved.
+    expect(preImg.getAttribute("src")).toBe(`${LOOPBACK}/images/pre.png`);
+    preImg.remove();
+  });
+
+  test("does not throw and leaves relative imgs untouched when canvasUrl is null", async () => {
+    platform.canvasUrl = undefined;
+    const preImg = document.createElement("img");
+    preImg.setAttribute("src", "/images/none.png");
+    document.body.append(preImg);
+
+    impls.set("getCanvasUrl", () => ({ canvasUrl: null }));
+    const result = await platform.activate();
+    expect(result).toBeUndefined();
+    // LoopbackOrigin() is null => the sweep is skipped and the relative src stays put.
+    expect(preImg.getAttribute("src")).toBe("/images/none.png");
+    preImg.remove();
+  });
+
+  test("a sweep failure is caught and does not break activate()", async () => {
+    platform.canvasUrl = undefined;
+    impls.set("getCanvasUrl", () => ({ canvasUrl: `${LOOPBACK}/__studio__/canvas.html` }));
+    // Force resolveAllAssets to throw by making the tree walk blow up; the catch must swallow it.
+    const original = document.documentElement.querySelectorAll.bind(document.documentElement);
+    document.documentElement.querySelectorAll = (() => {
+      throw new Error("sweep boom");
+    }) as typeof document.documentElement.querySelectorAll;
+    try {
+      const result = await platform.activate();
+      expect(result).toBeUndefined();
+    } finally {
+      document.documentElement.querySelectorAll = original;
+    }
+  });
+});
+
 describe("getAppInfo", () => {
   test("reports 'Up to date' when no update is pending", async () => {
     impls.set("updaterGetLocalInfo", () => ({ channel: "stable", hash: "abc", version: "1.2.3" }));

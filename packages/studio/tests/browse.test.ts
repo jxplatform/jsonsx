@@ -309,9 +309,18 @@ describe("scanning and grid view", () => {
   test("image cards render an <img>, plain media cards a document icon", async () => {
     const container = await mountWithDefaults();
     const img = cardByLabel(container, "logo.png").querySelector("img");
+    // No cross-origin loopback registered => loopbackAssetSrc falls back to the relative path.
     expect(img?.getAttribute("src")).toBe("/public/logo.png");
     expect(cardByLabel(container, "doc.pdf").querySelector("sp-icon-document")).not.toBeNull();
     expect(cardByLabel(container, "readme.txt").querySelector("sp-icon-document")).not.toBeNull();
+  });
+
+  test("image card src is loopback-absolute when a cross-origin canvasUrl is registered", async () => {
+    setup({ overrides: { canvasUrl: "http://127.0.0.1:54321/__studio__/canvas.html" } });
+    invalidateBrowseCache();
+    const container = await mountWithDefaults();
+    const img = cardByLabel(container, "logo.png").querySelector("img");
+    expect(img?.getAttribute("src")).toBe("http://127.0.0.1:54321/public/logo.png");
   });
 
   test("document previews render live content into preview slots", async () => {
@@ -420,12 +429,25 @@ describe("table view", () => {
     const container = await mountWithDefaults();
     await setView(container, "Table view");
     const imgRow = rowByPath(container, "public/logo.png");
+    // No cross-origin loopback registered => the thumb src falls back to the relative path.
     expect(imgRow.querySelector("img.browse-thumb")?.getAttribute("src")).toBe("/public/logo.png");
     pointer(imgRow, "click");
     expect(opened).toEqual([]);
 
     pointer(rowByPath(container, "layouts/main.json"), "click");
     expect(opened).toEqual(["layouts/main.json"]);
+    await setView(container, "Grid view");
+  });
+
+  test("table thumb src is loopback-absolute when a cross-origin canvasUrl is registered", async () => {
+    setup({ overrides: { canvasUrl: "http://127.0.0.1:54321/__studio__/canvas.html" } });
+    invalidateBrowseCache();
+    const container = await mountWithDefaults();
+    await setView(container, "Table view");
+    const imgRow = rowByPath(container, "public/logo.png");
+    expect(imgRow.querySelector("img.browse-thumb")?.getAttribute("src")).toBe(
+      "http://127.0.0.1:54321/public/logo.png",
+    );
     await setView(container, "Grid view");
   });
 
