@@ -235,6 +235,14 @@ export async function renderResolvedDocument(opts: {
   // Directly and never the runtime's `Jx()` entry, which is the only other place _rootMedia is set).
   // Set it every render (even to `{}`) so a stale map from a previous document cannot leak.
   setRootMedia((opts.doc as { $media?: Record<string, string> }).$media ?? {});
+  // Register components BEFORE renderNode. The runtime only applies a custom element's `$props` when
+  // That element is ALREADY defined (renderNode gates renderCustomElementWithProps on a truthy
+  // `customElements.get(tagName)`); if we register after render, every component paints with its
+  // Props dropped — it upgrades in place to the empty default state (<img src="">) — which was the
+  // Empty-render regression. `registerElements` wraps each element in a per-element 5s Promise.race
+  // Timeout and swallows failures internally, so awaiting it can't block the render indefinitely on
+  // A slow/hanging component (the document still renders; an unresolved tag just stays inert).
+  await registerElements(opts.doc, opts.docBase);
   const scope: EffectScope = effectScope(true);
   const $defs = await buildScope(opts.doc, {}, opts.docBase);
   const onNodeCreated = makeStamper(opts.mapperCtx);
@@ -242,9 +250,6 @@ export async function renderResolvedDocument(opts: {
     renderNode(opts.doc, $defs, { _path: [], onNodeCreated }),
   ) as HTMLElement;
   opts.container.replaceChildren(el);
-  // Register components AFTER the first paint so a slow/recursive/hanging component graph never
-  // Blocks the render — custom elements auto-upgrade in place once defined.
-  void registerElements(opts.doc, opts.docBase);
   return {
     ctx: { defs: $defs, docBase: opts.docBase, mapperCtx: opts.mapperCtx, mode: opts.mode },
     dispose: () => scope.stop(),

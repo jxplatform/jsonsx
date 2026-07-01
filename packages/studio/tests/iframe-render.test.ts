@@ -77,6 +77,90 @@ describe("renderResolvedDocument", () => {
   });
 });
 
+describe("component registration ordering (props applied)", () => {
+  // The runtime only applies a custom element's `$props` when the element is ALREADY defined
+  // (renderNode gates renderCustomElementWithProps on a truthy customElements.get). So the doc's
+  // `$elements` MUST be registered BEFORE renderNode. With the old fire-and-forget ordering the
+  // Component upgraded in place to its empty default and the prop was dropped. These tests prove the
+  // Fix by observing that the prop reached the DOM.
+  let uid = 0;
+  const uniqueTag = () => `eer-order-${(uid += 1)}`;
+
+  test("a $props-fed custom element renders WITH its prop applied (registered before renderNode)", async () => {
+    const tag = uniqueTag();
+    // Component whose child <img> src is driven purely by a state value fed via $props. The default
+    // Is "" — the exact empty-render regression symptom — so a real src proves the prop was applied.
+    const doc = {
+      $elements: [
+        {
+          children: [{ attributes: { class: "thumb", src: "${state.imgSrc}" }, tagName: "img" }],
+          state: { imgSrc: "" },
+          tagName: tag,
+        },
+      ],
+      children: [{ $props: { imgSrc: "/images/real.jpg" }, tagName: tag }],
+      tagName: "div",
+    };
+
+    const container = document.createElement("div");
+    // Attach the container so the custom element's async connectedCallback fires on replaceChildren.
+    document.body.append(container);
+    const handle = await renderResolvedDocument({
+      container,
+      doc: doc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    // The async connectedCallback renders the component's light DOM on a later microtask/timer.
+    await new Promise((r) => {
+      setTimeout(r, 150);
+    });
+
+    const host = container.querySelector(tag) as HTMLElement;
+    expect(host).not.toBeNull();
+    const img = host.querySelector("img.thumb") as HTMLImageElement;
+    expect(img).not.toBeNull();
+    // The prop reached the component's state and drove the child src — NOT the empty "" default.
+    expect(img.getAttribute("src")).toBe("/images/real.jpg");
+
+    handle.dispose();
+    container.remove();
+  });
+
+  test("registerElements resolves before renderNode produces the element", async () => {
+    const tag = uniqueTag();
+    // A component that has no template but records whether its tag was defined at render time. We
+    // Prove ordering directly: renderResolvedDocument must have registered the tag by the time it
+    // Returns (which only happens if registration is awaited before renderNode), so the custom
+    // Element is defined and its host node — not an inert unknown element — is in the container.
+    const doc = {
+      $elements: [{ children: [{ tagName: "span" }], state: {}, tagName: tag }],
+      children: [{ tagName: tag }],
+      tagName: "div",
+    };
+    // Not yet defined before the render call.
+    expect(customElements.get(tag)).toBeUndefined();
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const handle = await renderResolvedDocument({
+      container,
+      doc: doc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+
+    // Awaiting the render means registration already completed — the tag is now defined.
+    expect(customElements.get(tag)).toBeDefined();
+    expect(container.querySelector(tag)).not.toBeNull();
+
+    handle.dispose();
+    container.remove();
+  });
+});
+
 describe("canvas transpose + anchor de-link flags", () => {
   // CRITICAL: `setCanvasViewportTranspose` / `setCanvasDelinkAnchors` are GLOBAL module-level runtime
   // Flags. Reset BOTH to false after every test so they cannot leak into other studio tests.
