@@ -79,7 +79,10 @@ export interface Tab {
     ui: TabUi;
     canvas: {
       status: string;
-      scope: { stop: () => void; [k: string]: unknown } | null;
+      // A serializable snapshot of the iframe's resolved `$defs` (data-source values), posted over
+      // The bridge as a `dataScope` message and read by the data-explorer panel. Plain data now —
+      // The old live `EffectScope` (with `.stop()`) moved into the iframe realm with buildScope.
+      scope: Record<string, unknown> | null;
       error: string | null;
       pendingInlineEdit: InlineEditDef | null;
     };

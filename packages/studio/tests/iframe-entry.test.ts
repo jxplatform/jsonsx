@@ -55,6 +55,38 @@ describe("startCanvasIframe", () => {
     expect(fromIframe).toContainEqual({ gen: 1, kind: "renderComplete" });
   });
 
+  test("posts a serialized dataScope right AFTER renderComplete (resolved $defs cross to the parent)", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const fromIframe: IframeToParent[] = [];
+    pair.parent.onMessage((m) => fromIframe.push(m));
+    const container = document.createElement("div");
+
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.flush();
+
+    // A doc with `state` → buildScope resolves it, and the entry threads the snapshot to the parent.
+    const doc = {
+      children: [{ children: ["Hi"], tagName: "h1" }],
+      state: { title: "Home" },
+      tagName: "div",
+    };
+    pair.parent.post(renderMsg(1, doc));
+    pair.flush();
+    await flush();
+    pair.flush();
+
+    const kinds = fromIframe.map((m) => m.kind);
+    const doneIdx = kinds.indexOf("renderComplete");
+    const scopeIdx = kinds.indexOf("dataScope");
+    // Ordering: dataScope follows renderComplete (fills S.canvas.scope right after the render ack).
+    expect(doneIdx).toBeGreaterThanOrEqual(0);
+    expect(scopeIdx).toBeGreaterThan(doneIdx);
+    const scopeMsg = fromIframe[scopeIdx] as { gen: number; scope: Record<string, unknown> };
+    expect(scopeMsg.gen).toBe(1);
+    // The resolved state value crossed as plain, structured-clone-safe data.
+    expect(scopeMsg.scope.title).toBe("Home");
+  });
+
   test("ignores a render with a stale (lower) generation", async () => {
     const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
     const acks: IframeToParent[] = [];

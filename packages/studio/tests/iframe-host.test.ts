@@ -2,7 +2,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
-import { canvasPanels, canvasWrap, initShellRefs } from "../src/store";
+import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
 import type { CanvasPanel } from "../src/types";
@@ -420,6 +420,60 @@ describe("iframe canvas interaction", () => {
 
     channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
     expect(channels[0]!.posts.some((p) => p.kind === "measure")).toBe(true);
+  });
+});
+
+// ─── Data-scope bridge: iframe → parent S.canvas.scope for the data-explorer ─────
+
+describe("iframe canvas dataScope bridge", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("a non-stale dataScope adopts scope into S.canvas and re-renders the left panel", async () => {
+    let leftRenders = 0;
+    registerRenderer("leftPanel", () => {
+      leftRenders += 1;
+    });
+    await mountReady();
+    // Record the DOM's gen (mirrors the real renderComplete → lastRenderedGen path).
+    channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
+    leftRenders = 0;
+
+    channels[0]!.deliver({
+      gen: 1,
+      kind: "dataScope",
+      scope: { posts: [{ title: "a" }], title: "Home" },
+    });
+
+    // The iframe's resolved scope now lives in the parent canvas state (data-explorer reads it).
+    expect(activeTab.value!.session.canvas.scope).toEqual({
+      posts: [{ title: "a" }],
+      title: "Home",
+    });
+    // The left panel (which hosts the data-explorer) re-rendered to reflect the new scope.
+    expect(leftRenders).toBe(1);
+  });
+
+  test("a STALE-gen dataScope is ignored (scope unchanged, no re-render)", async () => {
+    let leftRenders = 0;
+    registerRenderer("leftPanel", () => {
+      leftRenders += 1;
+    });
+    await mountReady();
+    channels[0]!.deliver({ gen: 4, kind: "renderComplete" });
+    activeTab.value!.session.canvas.scope = null;
+    leftRenders = 0;
+
+    // Gen 3 != lastRenderedGen (4) → a snapshot from a superseded render must not clobber scope.
+    channels[0]!.deliver({
+      gen: 3,
+      kind: "dataScope",
+      scope: { title: "STALE" },
+    });
+
+    expect(activeTab.value!.session.canvas.scope).toBeNull();
+    expect(leftRenders).toBe(0);
   });
 });
 

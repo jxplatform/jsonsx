@@ -20,6 +20,7 @@ import { startIframeInlineEdit } from "./iframe-inline-edit";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
+import { serializeDataScope } from "./serialize-scope";
 import { setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
 import type { DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
@@ -338,6 +339,18 @@ export function startCanvasIframe(opts: {
           renderCtx = handle.ctx;
           renderedGen = gen;
           channel.post({ gen, kind: "renderComplete" });
+          // Thread a serializable snapshot of the resolved $defs to the parent so the data-explorer
+          // Panel shows live data (the iframe, not the parent, now resolves the scope). Isolated in
+          // Its own try/catch: a serialization failure must never break the render ack above.
+          try {
+            channel.post({
+              gen,
+              kind: "dataScope",
+              scope: serializeDataScope(handle.ctx.defs as Record<string, unknown>),
+            });
+          } catch {
+            // A pathological scope can't be serialized — skip; the render itself already succeeded.
+          }
           // Size the iframe to the freshly-rendered content (the ResizeObserver tracks later reflows).
           postContentHeight();
         }

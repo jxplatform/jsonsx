@@ -189,6 +189,12 @@ export type IframeToParent =
   // Scroll). Viewport units are transposed to container units (runtime `transposeCanvasUnits`) so a
   // `100vh` section can't feed back into an ever-growing height. Posted after each render and on reflow.
   | { kind: "contentHeight"; height: number }
+  // A serializable snapshot of the iframe's resolved `$defs` (buildScope's output — content
+  // Collections / `$prototype` data sources eagerly resolved). The parent adopts it into
+  // `S.canvas.scope` so the data-explorer panel shows live data instead of "pending" (the iframe,
+  // Not the parent, now resolves the scope). `gen` lets the parent drop a snapshot from a superseded
+  // Render. Posted right after `renderComplete`; values are JSON-safe deep clones (see serialize-scope).
+  | { kind: "dataScope"; gen: number; scope: Record<string, unknown> }
   | { kind: "hit"; hit: NodeHit }
   | { kind: "hover"; hit: NodeHit | null }
   // Candidate insertion "+" zones for the hovered node, recomputed on pointermove (cross-origin

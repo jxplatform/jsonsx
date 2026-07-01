@@ -21,7 +21,7 @@ import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
-import { canvasWrap, pathsEqual } from "../store";
+import { canvasWrap, pathsEqual, renderOnly, updateCanvas } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
@@ -540,6 +540,19 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       requestSelection(state, state.selectionPath);
       // The "+" anchored to a now-stale rect/path — drop it; the next hover recomputes fresh.
       hideInsertZoneNow(state);
+      return;
+    }
+    case "dataScope": {
+      // The iframe posted its resolved $defs snapshot right after renderComplete. Adopt it into the
+      // Parent's canvas state so the data-explorer panel shows live data (buildScope moved into the
+      // Iframe realm; the parent hard-codes scope:null at ready). Gate on the last-rendered gen so a
+      // Snapshot from a superseded render can't clobber the current one, then re-render the left
+      // Panel (which hosts the data-explorer) to reflect the new scope.
+      if (msg.gen !== state.lastRenderedGen) {
+        return;
+      }
+      updateCanvas({ scope: msg.scope });
+      renderOnly("leftPanel");
       return;
     }
     case "contentHeight": {
