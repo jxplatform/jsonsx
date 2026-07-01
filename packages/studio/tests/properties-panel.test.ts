@@ -13,6 +13,7 @@ import {
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   invalidateLayoutPickerCache,
+  invalidatePageRouteCache,
   renderPropertiesPanelTemplate,
 } from "../src/panels/properties-panel";
 import { componentRegistry } from "../src/files/components";
@@ -74,6 +75,7 @@ beforeEach(() => {
   view.addBreakpointPreview = "";
   componentRegistry.length = 0;
   invalidateLayoutPickerCache();
+  invalidatePageRouteCache();
   resetStudioState();
   installMockPlatform();
 });
@@ -717,7 +719,9 @@ describe("html attribute sections", () => {
   });
 
   test("text attribute commits via its widget and clears via the set-dot", async () => {
-    openDoc({ children: [{ attributes: { href: "/x" }, tagName: "a" }], tagName: "div" }, [
+    // <link> carries href in html-meta but is NOT an anchor, so it keeps the raw text widget
+    // (the Link-target composite is scoped to a/area only).
+    openDoc({ children: [{ attributes: { href: "/x" }, tagName: "link" }], tagName: "div" }, [
       "children",
       0,
     ]);
@@ -759,6 +763,202 @@ describe("html attribute sections", () => {
     c = await renderPanel();
     pointer(c.querySelector('[title="Clear required"]')!, "click");
     expect((docNow().children as JxMutableNode[])[0]!.attributes?.required).toBeUndefined();
+  });
+});
+
+// ─── Link-target control (anchor href / target) ───────────────────────────────
+
+function pageRoutesSetup(files: Record<string, string> = {}) {
+  resetStudioState({ isSiteProject: true, projectConfig: null });
+  installMockPlatform({
+    listDirectory: (async (dir: string) => {
+      if (dir === "pages") {
+        return [
+          { name: "index.json", path: "pages/index.json", type: "file" },
+          { name: "about.json", path: "pages/about.json", type: "file" },
+          { name: "notes.txt", path: "pages/notes.txt", type: "file" },
+          { name: "blog", path: "pages/blog", type: "directory" },
+        ];
+      }
+      if (dir === "pages/blog") {
+        return [
+          { name: "index.json", path: "pages/blog/index.json", type: "file" },
+          { name: "[slug].json", path: "pages/blog/[slug].json", type: "file" },
+        ];
+      }
+      return [];
+    }) as never,
+    ...files,
+  });
+}
+
+function anchorDoc(attrs: Record<string, unknown>) {
+  return { children: [{ attributes: attrs, tagName: "a" }], tagName: "div" };
+}
+
+function linkField(root: Element): HTMLElement | null {
+  return root.querySelector('[data-prop="href"] .link-target-field');
+}
+
+describe("link-target control", () => {
+  test("selected <a> renders the composite kind selector + value input", async () => {
+    openDoc(anchorDoc({ href: "/about/" }), ["children", 0]);
+    const c = await renderPanel();
+    const field = linkField(c)!;
+    expect(field).not.toBeNull();
+    const kind = field.querySelector("sp-picker.link-target-kind") as HTMLInputElement;
+    expect(kind.getAttribute("value")).toBe("internal");
+    const kindOpts = [...kind.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    expect(kindOpts).toEqual(["internal", "external", "anchor", "mailto", "tel"]);
+    // Internal kind → route picker (not a textfield)
+    expect(field.querySelector("sp-picker.link-target-value")).not.toBeNull();
+  });
+
+  test("changing kind to Email recomposes the href with the mailto scheme", async () => {
+    openDoc(anchorDoc({ href: "a@b.com" }), ["children", 0]);
+    const c = await renderPanel();
+    const kind = linkField(c)!.querySelector("sp-picker.link-target-kind") as HTMLInputElement;
+    kind.value = "mailto";
+    kind.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("mailto:a@b.com");
+  });
+
+  test("entering an external URL composes and commits the href", async () => {
+    openDoc(anchorDoc({ href: "https://old.com" }), ["children", 0]);
+    const c = await renderPanel();
+    const field = linkField(c)!;
+    const input = field.querySelector("sp-textfield.link-target-value") as HTMLInputElement;
+    expect(
+      (field.querySelector("sp-picker.link-target-kind") as HTMLInputElement).getAttribute("value"),
+    ).toBe("external");
+    input.value = "https://new.com";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(460);
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("https://new.com");
+  });
+
+  test("an anchor input target composes a #fragment href", async () => {
+    openDoc(anchorDoc({ href: "#top" }), ["children", 0]);
+    const c = await renderPanel();
+    const field = linkField(c)!;
+    const input = field.querySelector("sp-textfield.link-target-value") as HTMLInputElement;
+    expect(input.value).toBe("top");
+    input.value = "footer";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await sleep(460);
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("#footer");
+  });
+
+  test("clearing the value via the set-dot removes the href attribute", async () => {
+    openDoc(anchorDoc({ href: "https://x.com" }), ["children", 0]);
+    const c = await renderPanel();
+    pointer(c.querySelector('[data-prop="href"] [title="Clear href"]')!, "click");
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.href).toBeUndefined();
+  });
+
+  test("Internal picker lists routes derived from the pages/ tree", async () => {
+    pageRoutesSetup();
+    const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
+      documentPath: "pages/index.json",
+    });
+    tab.session.selection = ["children", 0] as never;
+
+    // First pass kicks off the async recursive walk; the route options aren't present yet.
+    await renderPanel();
+    await flush();
+
+    const c = await renderPanel();
+    const picker = linkField(c)!.querySelector("sp-picker.link-target-value")!;
+    const routes = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    expect(routes).toContain("/");
+    expect(routes).toContain("/about/");
+    expect(routes).toContain("/blog/");
+    expect(routes).toContain("/blog/:slug");
+    // .txt files are not routes
+    expect(routes).not.toContain("/notes/");
+  });
+
+  test("choosing a route from the Internal picker commits it as the href", async () => {
+    pageRoutesSetup();
+    const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
+      documentPath: "pages/index.json",
+    });
+    tab.session.selection = ["children", 0] as never;
+    await renderPanel();
+    await flush();
+
+    const c = await renderPanel();
+    const picker = linkField(c)!.querySelector("sp-picker.link-target-value") as HTMLInputElement;
+    picker.value = "/blog/";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.href).toBe("/blog/");
+  });
+
+  test("a bound href ($ref) falls back to the raw widget, not the Link-target control", async () => {
+    openDoc(anchorDoc({ href: { $ref: "#/state/url" } }), ["children", 0]);
+    const c = await renderPanel();
+    expect(linkField(c)).toBeNull();
+    // The raw widget path renders inside the href row
+    expect(c.querySelector('[data-prop="href"]')).not.toBeNull();
+  });
+
+  test("a template-string href (${…}) falls back to the raw widget", async () => {
+    openDoc(anchorDoc({ href: "${item.url}" }), ["children", 0]);
+    const c = await renderPanel();
+    expect(linkField(c)).toBeNull();
+    expect(c.querySelector('[data-prop="href"] sp-textfield')).not.toBeNull();
+  });
+
+  test("the target attribute renders a real enum sp-picker with all four keywords", async () => {
+    openDoc(anchorDoc({ href: "/x", target: "_blank" }), ["children", 0]);
+    const c = await renderPanel();
+    const picker = section(c, "Link")!.querySelector(
+      '[data-prop="target"] sp-picker.link-target-window',
+    ) as HTMLInputElement;
+    expect(picker).not.toBeNull();
+    expect(picker.getAttribute("value")).toBe("_blank");
+    const opts = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    expect(opts).toEqual(["_self", "_blank", "_parent", "_top"]);
+  });
+
+  test("target picker change commits; empty selection clears the attribute", async () => {
+    openDoc(anchorDoc({ href: "/x", target: "_blank" }), ["children", 0]);
+    let c = await renderPanel();
+    let picker = section(c, "Link")!.querySelector(
+      '[data-prop="target"] sp-picker.link-target-window',
+    ) as HTMLInputElement;
+    picker.value = "_self";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docNow().children as JxMutableNode[])[0]!.attributes!.target).toBe("_self");
+
+    c = await renderPanel();
+    picker = section(c, "Link")!.querySelector(
+      '[data-prop="target"] sp-picker.link-target-window',
+    ) as HTMLInputElement;
+    picker.value = "";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    expect((docNow().children as JxMutableNode[])[0]!.attributes?.target).toBeUndefined();
+  });
+
+  test("layout listing failure degrades the route picker to an empty list", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: null });
+    installMockPlatform({
+      listDirectory: (async () => {
+        throw new Error("nope");
+      }) as never,
+    });
+    const tab = resetWorkspaceWithTab(anchorDoc({ href: "/about/" }) as JxMutableNode, {
+      documentPath: "pages/index.json",
+    });
+    tab.session.selection = ["children", 0] as never;
+    await renderPanel();
+    await flush();
+
+    const c = await renderPanel();
+    const picker = linkField(c)!.querySelector("sp-picker.link-target-value")!;
+    // Only the "known value" option for the current href survives; no enumerated routes.
+    const routes = [...picker.querySelectorAll("sp-menu-item")].map((m) => m.getAttribute("value"));
+    expect(routes).toEqual(["/about/"]);
   });
 });
 

@@ -29,6 +29,8 @@ import {
   inferInputType,
   parseCemType,
 } from "../utils/studio-utils";
+import { classifyHref, composeHref } from "../utils/link-target";
+import type { LinkKind } from "../utils/link-target";
 import { collectCssParts, isCustomElementDoc } from "./signals-panel";
 import { mediaDisplayName } from "./shared";
 import { getCssInitialMap } from "./style-utils";
@@ -800,6 +802,202 @@ function isPageDocument(documentPath: string | undefined | null) {
   return documentPath.startsWith("pages/") || documentPath.startsWith("./pages/");
 }
 
+// ─── Page-route enumeration (for the Link-target Internal picker) ─────────────
+
+/** @type {string[] | null} — cached list of internal routes derived from the pages/ tree. */
+let pageRouteEntries: string[] | null = null;
+
+/**
+ * Derive a site route from a page file path relative to `pages/`, following the file-based routing
+ * convention: `index.json` → the directory route, `[slug].json` → `:slug`, all others drop their
+ * extension. Directory routes get a trailing slash (`/about/`); the root is `/`.
+ *
+ * @param {string} relPath — path relative to `pages/`, forward-slashed (e.g. "blog/[slug].json").
+ * @returns {string}
+ */
+function routeForPagePath(relPath: string): string {
+  const withoutExt = relPath.replace(/\.[^./]+$/, "");
+  const segments = withoutExt
+    .split("/")
+    .map((seg) => (seg.startsWith("[") ? `:${seg.slice(1, -1)}` : seg));
+  const isIndex = segments.at(-1) === "index";
+  if (isIndex) {
+    segments.pop();
+  }
+  const body = segments.join("/");
+  if (!body) {
+    return "/";
+  }
+  // Dynamic routes keep no trailing slash; static routes are directory-style (trailing slash).
+  return isIndex || body.includes(":") ? `/${body}${isIndex ? "/" : ""}` : `/${body}/`;
+}
+
+/** Recursively walk the pages/ tree and populate {@link pageRouteEntries} with derived routes. */
+async function loadPageRouteEntries() {
+  const platform = getPlatform();
+  const routes: string[] = [];
+  const docExts = new Set([".json", ".md", ".html"]);
+  async function walk(dir: string, rel: string) {
+    let listing: DirEntry[];
+    try {
+      listing = await platform.listDirectory(dir);
+    } catch {
+      return;
+    }
+    for (const entry of listing) {
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.type === "directory") {
+        await walk(entry.path ?? `${dir}/${entry.name}`, childRel);
+      } else if (docExts.has(entry.name.slice(entry.name.lastIndexOf(".")))) {
+        routes.push(routeForPagePath(childRel));
+      }
+    }
+  }
+  await walk("pages", "");
+  pageRouteEntries = [...new Set(routes)].toSorted((a, b) => a.localeCompare(b));
+  renderOnly("rightPanel");
+}
+
+export function invalidatePageRouteCache() {
+  pageRouteEntries = null;
+}
+
+/**
+ * Composite Link-target control for an anchor's `href` — a kind selector (Internal / External /
+ * Anchor / Email / Phone) plus the matching input, backed by classifyHref/composeHref so edits
+ * round-trip. Internal targets render an sp-picker of page routes enumerated from the pages/ tree.
+ *
+ * @param {JxMutableNode} node
+ * @param {JxPath} path
+ */
+function renderLinkTargetField(node: JxMutableNode, path: JxPath) {
+  const raw = typeof node.attributes?.href === "string" ? node.attributes.href : "";
+  const { kind, value } = classifyHref(raw);
+
+  const commit = (nextKind: LinkKind, nextValue: string) => {
+    const composed = composeHref(nextKind, nextValue);
+    transactDoc(activeTab.value!, (t) =>
+      mutateUpdateAttribute(t, path, "href", composed || undefined),
+    );
+  };
+
+  const kindOptions: { value: LinkKind; label: string }[] = [
+    { label: "Internal Page", value: "internal" },
+    { label: "External URL", value: "external" },
+    { label: "Anchor", value: "anchor" },
+    { label: "Email", value: "mailto" },
+    { label: "Phone", value: "tel" },
+  ];
+
+  const kindSelector = html`
+    <sp-picker
+      class="link-target-kind"
+      size="s"
+      value=${kind}
+      @change=${(e: Event) => {
+        const nextKind = (e.target as HTMLInputElement).value as LinkKind;
+        // Switching kind reinterprets the current value under the new kind.
+        commit(nextKind, value);
+      }}
+    >
+      ${kindOptions.map((o) => html`<sp-menu-item value=${o.value}>${o.label}</sp-menu-item>`)}
+    </sp-picker>
+  `;
+
+  let valueInput;
+  if (kind === "internal") {
+    if (pageRouteEntries === null) {
+      void loadPageRouteEntries();
+    }
+    const routes = pageRouteEntries ?? [];
+    const knownValue = value !== "" && !routes.includes(value);
+    valueInput = html`
+      <sp-picker
+        class="link-target-value"
+        size="s"
+        value=${value}
+        @change=${(e: Event) => commit("internal", (e.target as HTMLInputElement).value)}
+      >
+        ${knownValue ? html`<sp-menu-item value=${value}>${value}</sp-menu-item>` : nothing}
+        ${routes.map((r) => html`<sp-menu-item value=${r}>${r}</sp-menu-item>`)}
+      </sp-picker>
+    `;
+  } else {
+    const placeholder =
+      kind === "mailto"
+        ? "name@example.com"
+        : kind === "tel"
+          ? "+15551234567"
+          : kind === "anchor"
+            ? "section-id"
+            : "https://example.com";
+    valueInput = html`
+      <sp-textfield
+        class="link-target-value"
+        size="s"
+        placeholder=${placeholder}
+        .value=${live(value)}
+        @input=${debouncedStyleCommit("link:href", 400, (e: Event) =>
+          commit(kind, (e.target as HTMLInputElement).value),
+        )}
+      ></sp-textfield>
+    `;
+  }
+
+  return renderFieldRow({
+    hasValue: raw !== "",
+    label: "Link",
+    onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "href")),
+    prop: "href",
+    widget: html`<div class="link-target-field">${kindSelector}${valueInput}</div>`,
+  });
+}
+
+/**
+ * Real enum picker (sp-picker) for the anchor `target` attribute, replacing the generic
+ * jx-value-selector so the four browsing-context keywords are offered as a dropdown.
+ *
+ * @param {JxMutableNode} node
+ * @param {JxPath} path
+ * @param {HtmlMetaEntry} entry
+ */
+function renderTargetField(node: JxMutableNode, path: JxPath, entry: HtmlMetaEntry) {
+  const options = Array.isArray(entry.enum) ? (entry.enum as string[]) : [];
+  const current = typeof node.attributes?.target === "string" ? node.attributes.target : "";
+  return renderFieldRow({
+    hasValue: current !== "",
+    label: attrLabel(entry, "target"),
+    onClear: () => transactDoc(activeTab.value, (t) => mutateUpdateAttribute(t, path, "target")),
+    prop: "target",
+    widget: html`
+      <sp-picker
+        class="link-target-window"
+        size="s"
+        value=${current}
+        @change=${(e: Event) =>
+          transactDoc(activeTab.value!, (t) =>
+            mutateUpdateAttribute(
+              t,
+              path,
+              "target",
+              (e.target as HTMLInputElement).value || undefined,
+            ),
+          )}
+      >
+        ${options.map((o) => html`<sp-menu-item value=${o}>${o}</sp-menu-item>`)}
+      </sp-picker>
+    `,
+  });
+}
+
+/**
+ * True when an attribute value is a binding (a `$ref` object or a template string containing
+ * `${…}`), so the Link-target special-case must fall back to the raw widget to keep it editable.
+ */
+function isBoundAttrValue(value: unknown): boolean {
+  return isRef(value) || (typeof value === "string" && value.includes("${"));
+}
+
 function renderPageSection(node: JxMutableNode) {
   const tab = activeTab.value;
   if (!isPageDocument(tab!.documentPath)) {
@@ -967,6 +1165,18 @@ export function renderPropertiesPanelTemplate(ctx: {
   function renderAttrRow(attr: string, entry: HtmlMetaEntry, value: unknown) {
     const type = inferInputType(entry);
     const hasVal = value !== undefined && value !== "";
+
+    // Enhanced Link handling: only for anchors (a/area) with a plain (non-binding) value. Bindings
+    // ($ref objects or ${…} template strings) fall through to the raw widget to stay editable.
+    const isAnchor = tagName === "a" || tagName === "area";
+    if (isAnchor && !isBoundAttrValue(value)) {
+      if (attr === "href") {
+        return renderLinkTargetField(node, path);
+      }
+      if (attr === "target") {
+        return renderTargetField(node, path, entry);
+      }
+    }
 
     if (entry.type === "boolean") {
       return renderFieldRow({
