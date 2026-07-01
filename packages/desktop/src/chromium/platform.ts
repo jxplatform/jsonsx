@@ -22,6 +22,13 @@ export function createDesktopPlatform(): StudioPlatform {
   // (?token=…); read it here before the shell strips it from the address bar after boot.
   const token = new URLSearchParams(location.search).get("token") ?? "";
   const ws = new WebSocket(`ws://${location.host}/?token=${encodeURIComponent(token)}`);
+  // The canvas iframe runs the in-iframe runtime, which authenticates its dev-proxy loopback
+  // Resolve/server fetches with this same per-process rpcToken (?rpcToken=…). Thread it onto the
+  // Canvas URL when present so createProjectServer does not 403 those fetches; keep the bare path
+  // Otherwise so a token-less/dev context stays byte-identical. Mirrors electrobun's getCanvasUrl.
+  const canvasUrl = token
+    ? `/__studio__/canvas.html?rpcToken=${encodeURIComponent(token)}`
+    : "/__studio__/canvas.html";
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
@@ -65,7 +72,9 @@ export function createDesktopPlatform(): StudioPlatform {
 
     // The chromium project server serves the canvas iframe doc under /__studio__/. Only chromium
     // Sets this; electrobun and the dev server leave it unset and keep their default canvas path.
-    canvasUrl: "/__studio__/canvas.html",
+    // The ?rpcToken (computed above) authenticates the in-iframe runtime's loopback resolve/server
+    // Fetches, mirroring electrobun's getCanvasUrl RPC.
+    canvasUrl,
 
     async activate() {
       // No-op: the chromium platform needs no activation step
