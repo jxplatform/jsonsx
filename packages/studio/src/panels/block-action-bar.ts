@@ -16,7 +16,9 @@ import { mutateMoveNode, mutateUpdateProperty, transactDoc } from "../tabs/trans
 import { view } from "../view";
 import { getInlineActions } from "../editor/inline-edit";
 import type { InlineAction } from "../editor/inline-edit";
-import { buildMergeTags } from "../editor/merge-tags";
+import { buildMergeTags, buildRepeaterTagsFromFields } from "../editor/merge-tags";
+import { findEnclosingRepeater, resolveRepeaterItemFields } from "../editor/repeater-scope";
+import { projectState } from "../state";
 import { componentRegistry } from "../files/components";
 import { convertToComponent } from "../editor/convert-to-component";
 import { getEditBarAnchorRect, getEditSnapshot, postApplyFormat } from "../canvas/iframe-host";
@@ -246,10 +248,25 @@ function onMergeTagClick(e: MouseEvent) {
   const anchorEl = e.currentTarget as HTMLElement;
   const tab = activeTab.value;
   const state = (tab?.doc.document.state ?? {}) as Record<string, unknown>;
-  // The live resolved scope lives inside the iframe realm and is not threaded out yet, so the parent
-  // Offers only top-level `state.*` tokens (buildMergeTags tolerates the null scopes). Follow-up:
-  // Thread $map repeater scope iframe-side to restore item/index merge tags.
-  const commands = buildMergeTags(state, null, null).map((t) => ({
+  // The live resolved scope lives inside the iframe realm and is not threaded out, so the parent
+  // Offers only top-level `state.*` tokens (buildMergeTags tolerates the null scopes).
+  const tags = buildMergeTags(state, null, null);
+
+  // When the caret sits inside a repeater, offer its local scope (item/index + item fields). There is
+  // No live `$map` in edit mode — the perimeter renders one glyph template — so fields resolve
+  // Parent-side from schema, keyed off the selected element's doc path (which carries a `map` segment).
+  const selPath = getEditSnapshot().snapshot?.path ?? tab?.session.selection;
+  const arrayNode = tab && selPath ? findEnclosingRepeater(tab.doc.document, selPath) : null;
+  if (arrayNode) {
+    const tokens = resolveRepeaterItemFields(
+      arrayNode,
+      tab!.doc.document.state as Record<string, unknown>,
+      projectState?.projectConfig,
+    );
+    tags.push(...buildRepeaterTagsFromFields(tokens));
+  }
+
+  const commands = tags.map((t) => ({
     description: t.hint,
     label: t.label,
     tag: t.token,

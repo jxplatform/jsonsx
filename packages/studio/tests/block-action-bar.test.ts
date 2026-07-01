@@ -7,7 +7,7 @@
  * a mocked `postApplyFormat`. The parent never reads the iframe DOM. `../src/canvas/iframe-host` is
  * mocked so the three bridge functions are controllable per test.
  */
-import { flush, resetWorkspaceWithTab } from "./harness";
+import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { getConvertTargets } from "../src/editor/convert-targets";
 import { dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
@@ -537,6 +537,45 @@ describe("block action bar", () => {
     await flush();
     expect(isSlashMenuOpen()).toBe(false);
     expect(host.posted).toEqual([{ command: "insertData", token: "state.title" }]);
+  });
+
+  test("merge-tag menu offers repeater item.data.<field> tokens when editing inside a repeater", () => {
+    // Doc: div > ul > Array(items:#/state/$docs) whose map template is <li>${item.data.title}</li>.
+    const arrayNode = {
+      $prototype: "Array",
+      items: { $ref: "#/state/$docs" },
+      map: { children: ["${item.data.title}"], tagName: "li" },
+    };
+    setup(
+      {
+        children: [{ children: [arrayNode], tagName: "ul" }],
+        state: { $docs: { $prototype: "ContentCollection", contentType: "docs" } },
+        tagName: "div",
+      },
+      // Selection resolves to a real node (the <li> map template) so the bar renders.
+      ["children", 0, "children", 0, "map"],
+    );
+    // The content type's frontmatter schema drives the item fields.
+    resetStudioState({
+      projectConfig: {
+        contentTypes: {
+          docs: { schema: { properties: { title: { type: "string" } } } },
+        },
+      },
+    });
+    // The snapshot path (caret) sits inside the repeater map — carries the `map` segment.
+    startEditingState({ path: ["children", 0, "children", 0, "map", "children", 0] });
+
+    barButton("Insert data").click();
+    expect(isSlashMenuOpen()).toBe(true);
+    const labels = [...document.querySelectorAll("sp-menu-item")].map((el) =>
+      el.textContent!.trim(),
+    );
+    expect(labels).toContain("item");
+    expect(labels).toContain("index");
+    expect(labels).toContain("item.data.title");
+
+    resetStudioState(); // Reset projectConfig so it does not leak into later tests.
   });
 
   // ─── Link popover ──────────────────────────────────────────────────────────
