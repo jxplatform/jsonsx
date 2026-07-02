@@ -33,8 +33,19 @@ export default {
       ],
     },
 
+    // "disable-site-isolation-trials" (all CEF platforms): keep the loopback canvas iframe in the
+    // Studio shell's renderer process. As a cross-site OOPIF (views://studio shell +
+    // Http://127.0.0.1 canvas), CEF Alloy's windowed drag-and-drop DELIVERS native dragover/drop to
+    // The iframe but never propagates its accepted drop-effect to the native cursor feedback — a
+    // Drag over the canvas shows the "not allowed" cursor the whole way even though the drop lands.
+    // In-process, event routing matches the (verified-good) same-origin dev-server/chromium cases.
+    // Process isolation is defense-in-depth only for this local trusted-author tool (electrobun
+    // Already runs CEF with disable-web-security by default); JS same-origin checks are unaffected.
     mac: {
       bundleCEF: true,
+      chromiumFlags: {
+        "disable-site-isolation-trials": true,
+      },
       codesign: true,
       defaultRenderer: "cef",
       notarize: false,
@@ -43,6 +54,7 @@ export default {
       bundleCEF: true,
       chromiumFlags: {
         "disable-gpu": false,
+        "disable-site-isolation-trials": true,
         "enable-features": "UseOzonePlatform",
         "ozone-platform-hint": "auto",
       },
@@ -51,6 +63,9 @@ export default {
     },
     win: {
       bundleCEF: true,
+      chromiumFlags: {
+        "disable-site-isolation-trials": true,
+      },
       defaultRenderer: "cef",
       icon: "icon.ico",
     },
