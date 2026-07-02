@@ -4,6 +4,7 @@
 .env
 .npmrc
 *.local
+codecov-debug.mjs
 coverage/
 dist/
 junit.xml
