@@ -41,13 +41,56 @@ jobs:
       - name: Build with metafile
         run: bun run build:metafile
         working-directory: packages/${{ matrix.package }}
-      - name: Upload bundle stats to Codecov
-        run: >-
-          bunx metafile-codecov
-          -f metafile.json
-          -n ${{ matrix.package }}
-          --output-dir dist
-          --bundler-name bun
-          --bundler-version "$(bun --version)"
-          --upload
+      # TEMPORARY DEBUG: replaces `bunx metafile-codecov --upload` with an
+      # inline reimplementation of the tool's upload path that PRINTS Codecov's
+      # POST response (status/headers/body) and the exact service params it
+      # sends. The upstream CLI discards that response, so the reason main-branch
+      # bundle reports come back empty is invisible in normal logs. Revert this
+      # step to the `bunx metafile-codecov ... --upload` one-liner once diagnosed.
+      - name: Upload bundle stats to Codecov (instrumented debug)
         working-directory: packages/${{ matrix.package }}
+        env:
+          BUNDLE_NAME: ${{ matrix.package }}
+        run: |
+          cat > codecov-debug.mjs <<'JS'
+          import { readFileSync } from "node:fs";
+          import { transformMetafile, getServiceParams, fetchOidcToken } from "metafile-codecov-bundle";
+          const NAME = process.env.BUNDLE_NAME;
+          const banner = (s) => console.error(`\n===== [bundle-debug:${NAME}] ${s} =====`);
+          const meta = JSON.parse(readFileSync("metafile.json", "utf8"));
+          const payload = transformMetafile(meta, {
+            bundleName: NAME,
+            outputDir: "dist",
+            bundler: { name: "bun", version: Bun.version },
+          });
+          const totalBytes = payload.assets.reduce((n, a) => n + a.size, 0);
+          banner(`payload: bundleName=${payload.bundleName} assets=${payload.assets.length} chunks=${payload.chunks.length} totalBytes=${totalBytes}`);
+          const params = getServiceParams();
+          banner("SERVICE PARAMS sent to Codecov (branch/commit/pr are the key fields)");
+          console.error("GITHUB_EVENT_NAME =", process.env.GITHUB_EVENT_NAME);
+          console.error(JSON.stringify(params, null, 2));
+          const oidc = await fetchOidcToken();
+          banner(`OIDC token acquired (length ${oidc.length})`);
+          const res = await fetch("https://api.codecov.io/upload/bundle_analysis/v1", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `token ${oidc}` },
+            body: JSON.stringify(params),
+          });
+          const body = await res.text();
+          banner(`CODECOV POST -> ${res.status} ${res.statusText}`);
+          console.error("response headers:", JSON.stringify(Object.fromEntries(res.headers), null, 2));
+          console.error("response body:", body);
+          let putUrl;
+          try { putUrl = JSON.parse(body).url; } catch {}
+          if (!putUrl) { banner("NO presigned url in response body -- stopping before PUT"); process.exit(1); }
+          const put = await fetch(putUrl, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const putBody = await put.text();
+          banner(`STORAGE PUT -> ${put.status} ${put.statusText}`);
+          if (putBody) console.error("PUT body (first 500 chars):", putBody.slice(0, 500));
+          banner("done");
+          JS
+          bun codecov-debug.mjs
