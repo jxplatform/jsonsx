@@ -370,6 +370,93 @@ describe("startGrabDetector (flow 3 — iframe-driven)", () => {
     target.remove();
   });
 
+  test("suppresses native dragstart while a candidate is armed or the drag is live", () => {
+    // A REAL mouse press-drag over a draggable <img>/selection starts a native HTML5 drag, which
+    // Pointercancels the stream and kills the grab before it originates — the detector must
+    // PreventDefault dragstart from the moment a candidate is armed.
+    const { channel, deps } = setup(null);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    // No candidate armed → native drags stay native.
+    const before = new Event("dragstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(before);
+    expect(before.defaultPrevented).toBe(false);
+
+    // Candidate armed (pointerdown, below threshold) → dragstart suppressed.
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    const armedEv = new Event("dragstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(armedEv);
+    expect(armedEv.defaultPrevented).toBe(true);
+
+    // Drag live (past threshold) → still suppressed.
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    const liveEv = new Event("dragstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(liveEv);
+    expect(liveEv.defaultPrevented).toBe(true);
+
+    stop();
+    target.remove();
+  });
+
+  test("suppresses selectstart only while the drag is live (plain clicks keep native selection)", () => {
+    const { channel, deps } = setup(null);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    // Armed but below threshold → selection still allowed (a plain click must not lose it).
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    const whileArmed = new Event("selectstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(whileArmed);
+    expect(whileArmed.defaultPrevented).toBe(false);
+
+    // Live drag → selection suppressed for the rest of the gesture.
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    const whileLive = new Event("selectstart", { bubbles: true, cancelable: true });
+    target.dispatchEvent(whileLive);
+    expect(whileLive.defaultPrevented).toBe(true);
+
+    stop();
+    target.remove();
+  });
+
+  test("clears the text selection the pre-threshold moves started when the drag originates", () => {
+    const { channel, deps } = setup(null);
+    const target = el(["children", 1], { height: 50, top: 0 });
+    target.textContent = "grab me";
+    document.body.append(target);
+    const stop = startGrabDetector(channel as never, document, deps as never);
+
+    // Simulate the selection a real press-drag builds up before the grab threshold.
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    const sel = document.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    expect(sel.rangeCount).toBe(1);
+
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    document.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 20, clientY: 30 }),
+    );
+    expect(document.getSelection()!.rangeCount).toBe(0);
+
+    stop();
+    target.remove();
+  });
+
   test("a later move (after originating) drives another dragOver from its own cursor", () => {
     const { channel, deps, posts } = setup(null);
     const target = el(["children", 1], { height: 50, top: 0 });

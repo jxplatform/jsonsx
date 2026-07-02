@@ -385,6 +385,26 @@ export function startGrabDetector(
     candidate = { origin: { x: e.clientX, y: e.clientY }, path };
   };
 
+  // A REAL mouse press-drag over an <img> (draggable by default) or a text selection starts a
+  // NATIVE HTML5 drag, which fires pointercancel and hijacks the pointer stream — the grab dies
+  // Before it originates (synthetic/CDP input never triggers this, which is why only real-mouse
+  // Drags broke). While a grab candidate is armed or a drag is live, native drags are never wanted;
+  // Outside that (no path target, inline editing) native behavior is preserved.
+  const onDragStart = (e: Event) => {
+    if (candidate || dragActive) {
+      e.preventDefault();
+    }
+  };
+
+  // Suppress text selection only while the drag is LIVE (plain clicks and inline editing keep
+  // Native selection); the origination path below also clears any selection the pre-threshold
+  // Moves already started.
+  const onSelectStart = (e: Event) => {
+    if (dragActive) {
+      e.preventDefault();
+    }
+  };
+
   /** Compute + post the dragOver preview for the live cursor, and (re)arm auto-scroll. */
   const drive = (cursor: { x: number; y: number }) => {
     if (!src) {
@@ -412,6 +432,9 @@ export function startGrabDetector(
       candidate = null;
       src = { path: [...path], type: "tree-node" };
       beginIframeDrag(() => channel.post({ dragSeq: localSeq, kind: "dragEnd" }));
+      // Drop any text selection the pre-threshold moves started (real-mouse drags select as they
+      // Go); onSelectStart keeps new selections suppressed for the rest of the gesture.
+      doc.getSelection?.()?.removeAllRanges();
       channel.post({ dragSeq: localSeq, kind: "dragOriginate", path: [...path] });
       // Fall through and drive the first move immediately (the originating move is also a move).
     }
@@ -440,10 +463,14 @@ export function startGrabDetector(
   doc.addEventListener("pointerdown", onPointerDown, true);
   doc.addEventListener("pointermove", onPointerMove, true);
   doc.addEventListener("pointerup", onPointerUp, true);
+  doc.addEventListener("dragstart", onDragStart, true);
+  doc.addEventListener("selectstart", onSelectStart, true);
 
   return () => {
     doc.removeEventListener("pointerdown", onPointerDown, true);
     doc.removeEventListener("pointermove", onPointerMove, true);
     doc.removeEventListener("pointerup", onPointerUp, true);
+    doc.removeEventListener("dragstart", onDragStart, true);
+    doc.removeEventListener("selectstart", onSelectStart, true);
   };
 }
