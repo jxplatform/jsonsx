@@ -146,7 +146,17 @@ export function beginDragSession(
 ): number {
   currentDragSeq += 1;
   retainedSrcData.set(currentDragSeq, srcData);
-  host.channel.post({ dragSeq: currentDragSeq, gen: host.lastRenderedGen, kind: "dragStart", src });
+  // The src crosses postMessage: plain-copy the path so a reactive-proxy array (e.g. a live
+  // Selection fed through a drag source) can't DataCloneError the structured clone. Test fake
+  // Channels pass messages by reference and never exercise the clone, so guard at the boundary.
+  const wireSrc: DragSrcKind =
+    src.type === "tree-node" ? { path: [...src.path], type: "tree-node" } : { type: src.type };
+  host.channel.post({
+    dragSeq: currentDragSeq,
+    gen: host.lastRenderedGen,
+    kind: "dragStart",
+    src: wireSrc,
+  });
   return currentDragSeq;
 }
 

@@ -537,7 +537,11 @@ export function renderBlockActionBar() {
                 view.selDragCleanup = draggable({
                   element: handleEl as HTMLElement,
                   getInitialData: () => ({
-                    path: activeTab.value?.session.selection,
+                    // Snapshot the selection: the live array is a Vue reactive proxy, which
+                    // Structured clone rejects when the src crosses postMessage (DataCloneError
+                    // Killed the whole handle drag), and a live reference would also mutate the
+                    // Retained srcData if the selection changed mid-drag.
+                    path: [...(activeTab.value?.session.selection ?? [])],
                     type: "tree-node",
                   }),
                   onGenerateDragPreview: ({

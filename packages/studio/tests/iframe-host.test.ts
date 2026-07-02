@@ -2,6 +2,7 @@ import "./with-dom.js";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
 import { activeTab } from "../src/workspace/workspace";
+import { reactive } from "../src/reactivity";
 import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
 import { clearDragGhost, setDragGhost } from "../src/panels/drag-ghost";
 import type { WireDocOp } from "../src/canvas/iframe-protocol";
@@ -834,6 +835,28 @@ describe("cross-frame drag session (Phase 4c)", () => {
       kind: "dragStart",
       src: { type: "block" },
     });
+    endDragSession(seq);
+  });
+
+  test("posts a structured-cloneable dragStart even when src.path is a reactive proxy", async () => {
+    // The ⠿ handle fed the LIVE selection (a Vue reactive proxy array) into the drag source; the
+    // Real postMessage structured-clones the message and threw DataCloneError, killing the whole
+    // Handle drag before the iframe ever saw a dragStart. Test channels pass by reference, so
+    // Assert cloneability explicitly at the wire.
+    const { host } = await readyHostAt(4);
+    channels[0]!.posts.length = 0;
+    const proxyPath = reactive(["children", 2]) as unknown as (string | number)[];
+    const seq = beginDragSession(
+      host,
+      { path: proxyPath, type: "tree-node" },
+      { path: proxyPath, type: "tree-node" },
+    );
+    const msg = channels[0]!.posts.find((p) => (p as { kind?: string }).kind === "dragStart") as {
+      src: { path: (string | number)[] };
+    };
+    // The wire src survives the same clone the real channel performs, and carries the plain path.
+    expect(() => structuredClone(msg)).not.toThrow();
+    expect(msg.src.path).toEqual(["children", 2]);
     endDragSession(seq);
   });
 
