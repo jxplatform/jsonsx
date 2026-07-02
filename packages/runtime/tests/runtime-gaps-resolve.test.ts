@@ -659,3 +659,34 @@ describe("observeScope", () => {
     expect(seen).toHaveLength(2);
   });
 });
+
+// ─── runScoped (same-instance render scope ownership) ─────────────────────────
+
+describe("runScoped", () => {
+  test("owns renderNode's binding effects: live until stop(), dead after", async () => {
+    const { renderNode: rn, runScoped } = await import("../src/runtime");
+    const state = reactive({ msg: "one" }) as Record<string, unknown>;
+    const { result: el, stop } = runScoped(
+      () => rn({ children: ["${state.msg}"], tagName: "p" }, state) as HTMLElement,
+    );
+    expect(el.textContent).toBe("one");
+
+    // The template effect attached to the runScoped scope and tracks the reactive state.
+    state.msg = "two";
+    expect(el.textContent).toBe("two");
+
+    // After stop() the effect is gone — further state changes leave the DOM untouched.
+    stop();
+    state.msg = "three";
+    expect(el.textContent).toBe("two");
+  });
+
+  test("a throwing fn stops its partial scope and rethrows", async () => {
+    const { runScoped } = await import("../src/runtime");
+    expect(() =>
+      runScoped(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+  });
+});

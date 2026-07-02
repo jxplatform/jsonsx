@@ -178,6 +178,29 @@ export function observeScope(fn: () => void): () => void {
 }
 
 /**
+ * Run `fn` inside a detached reactive scope of THIS module's reactivity instance, returning its
+ * result plus a disposer that stops every effect `fn` created. Callers that render via
+ * {@link renderNode} and later tear the render down (the Studio canvas full render and its surgical
+ * subtree re-renders) MUST use this instead of their own effectScope: scope collection is per
+ * vue-reactivity module instance, so a scope from another copy of the package collects NOTHING and
+ * its stop() silently leaks every binding effect of the superseded render.
+ *
+ * @param {() => T} fn - Work that may create reactive effects (typically a renderNode call).
+ * @returns {{ result: T; stop: () => void }} The callback result and the scope disposer.
+ */
+export function runScoped<T>(fn: () => T): { result: T; stop: () => void } {
+  const scope = effectScope(true);
+  try {
+    const result = scope.run(fn) as T;
+    return { result, stop: () => scope.stop() };
+  } catch (error) {
+    // A throwing fn would otherwise leak the effects it created before failing.
+    scope.stop();
+    throw error;
+  }
+}
+
+/**
  * Studio-canvas viewport-unit transpose. The canvas iframe is sized to its document's height, so
  * any viewport unit (`vh`/`vw`/`vmin`/`vmax`/`svh`/…) — which resolves against the iframe ELEMENT —
  * would feed back into an ever-growing height. When this is on, the runtime transposes them to

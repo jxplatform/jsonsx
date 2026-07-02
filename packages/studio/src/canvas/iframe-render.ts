@@ -15,16 +15,15 @@ import {
   buildScope,
   defineElement,
   renderNode,
+  runScoped,
   setCanvasDelinkAnchors,
   setCanvasViewportTranspose,
   setRootMedia,
   setSkipServerFunctions,
   transposeCanvasUnits,
 } from "@jxsuite/runtime";
-import { effectScope } from "../reactivity";
 import { classifyRenderNode, serializeJxPath } from "./path-mapping";
 import type { CanvasMode } from "./iframe-protocol";
-import type { EffectScope } from "../reactivity";
 import type { JxDocument } from "@jxsuite/schema/types";
 import type { PathMapCtx } from "./path-mapping";
 
@@ -243,15 +242,17 @@ export async function renderResolvedDocument(opts: {
   // Timeout and swallows failures internally, so awaiting it can't block the render indefinitely on
   // A slow/hanging component (the document still renders; an unresolved tag just stays inert).
   await registerElements(opts.doc, opts.docBase);
-  const scope: EffectScope = effectScope(true);
   const $defs = await buildScope(opts.doc, {}, opts.docBase);
   const onNodeCreated = makeStamper(opts.mapperCtx);
-  const el = scope.run(() =>
-    renderNode(opts.doc, $defs, { _path: [], onNodeCreated }),
-  ) as HTMLElement;
+  // The scope MUST be the runtime's (runScoped): renderNode creates its binding effects with the
+  // Runtime's copy of @vue/reactivity, and scope collection is per module instance — a studio
+  // EffectScope here collects nothing and dispose() would leak every effect of this render.
+  const { result: el, stop } = runScoped(
+    () => renderNode(opts.doc, $defs, { _path: [], onNodeCreated }) as HTMLElement,
+  );
   opts.container.replaceChildren(el);
   return {
     ctx: { defs: $defs, docBase: opts.docBase, mapperCtx: opts.mapperCtx, mode: opts.mode },
-    dispose: () => scope.stop(),
+    dispose: stop,
   };
 }

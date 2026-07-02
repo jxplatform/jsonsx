@@ -75,6 +75,38 @@ describe("renderResolvedDocument", () => {
     expect(container.querySelector("section")).toBeNull();
     expect(container.querySelector("article")?.textContent).toBe("two");
   });
+
+  test("dispose() actually stops the render's reactive effects", async () => {
+    // The runtime's renderNode creates its effects with the RUNTIME's copy of @vue/reactivity, and
+    // Scope collection is per module instance — a studio-instance effectScope wrap around renderNode
+    // Collects NOTHING, so dispose() would silently leak every binding effect of the superseded
+    // Render (they keep re-running against detached DOM and pin it in memory).
+    const container = document.createElement("div");
+    const doc = {
+      children: [{ children: ["${state.msg}"], tagName: "p" }],
+      state: { msg: "one" },
+      tagName: "div",
+    };
+    const handle = await renderResolvedDocument({
+      container,
+      doc: doc as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: ctx,
+      mode: "preview",
+    });
+    const p = container.querySelector("p") as HTMLElement;
+    expect(p.textContent).toBe("one");
+
+    // Sanity: the binding is live before dispose (the effect tracks the reactive $defs).
+    const defs = handle.ctx.defs as Record<string, unknown>;
+    defs.msg = "two";
+    expect(p.textContent).toBe("two");
+
+    // After dispose the effect must be dead: further state changes leave the DOM untouched.
+    handle.dispose();
+    defs.msg = "three";
+    expect(p.textContent).toBe("two");
+  });
 });
 
 describe("component registration ordering (props applied)", () => {

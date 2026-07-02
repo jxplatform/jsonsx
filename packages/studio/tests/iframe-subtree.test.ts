@@ -99,4 +99,30 @@ describe("disposeSubtree / disposeAllSubtrees", () => {
     renderSubtreeIframe(docOf({ tagName: "span" }), ["children", 0], ctx);
     expect(() => disposeAllSubtrees()).not.toThrow();
   });
+
+  test("disposal actually stops a live binding effect (runtime-instance scope ownership)", async () => {
+    // The subtree's effects are created by the runtime's copy of @vue/reactivity; a studio-instance
+    // EffectScope would collect nothing and disposal would silently leak them (they'd keep firing
+    // Against detached DOM and pin it in memory). A bare string node skips prepareForEditMode, so a
+    // Template child keeps its live binding even under the design-mode ctx.
+    const liveCtx: IframeRenderCtx = {
+      ...ctx,
+      defs: await buildScope(
+        { state: { msg: "one" } } as unknown as JxDocument,
+        {},
+        "http://localhost/",
+      ),
+    };
+    const node = renderSubtreeIframe(docOf("${state.msg}"), ["children", 0], liveCtx);
+    expect(node.textContent).toBe("one");
+
+    // Live before disposal: the effect tracks the reactive defs.
+    (liveCtx.defs as Record<string, unknown>).msg = "two";
+    expect(node.textContent).toBe("two");
+
+    // Dead after: further changes leave the detached text node untouched.
+    disposeAllSubtrees();
+    (liveCtx.defs as Record<string, unknown>).msg = "three";
+    expect(node.textContent).toBe("two");
+  });
 });

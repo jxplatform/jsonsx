@@ -11,21 +11,24 @@
  * WeakMap, this stamps `data-jx-path` and tracks per-subtree effect scopes locally.
  */
 
-import { elementStyleTags, renderNode } from "@jxsuite/runtime";
-import { effectScope } from "../reactivity";
+import { elementStyleTags, renderNode, runScoped } from "@jxsuite/runtime";
 import { getNodeAtPath } from "../state";
 import { makeStamper } from "./iframe-render";
 import { prepareForEditMode } from "../utils/edit-display";
 import { stripEventHandlers } from "../utils/strip-events";
-import type { EffectScope } from "../reactivity";
 import type { IframeRenderCtx } from "./iframe-render";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
-/** The effect scope each surgically-rendered subtree root owns (for disposal on remove/replace). */
-const elScope = new WeakMap<HTMLElement, EffectScope>();
-/** Every live subtree scope, so a full re-render can stop them all (they're detached roots). */
-const liveScopes = new Set<EffectScope>();
+/**
+ * The scope disposer each surgically-rendered subtree root owns (for disposal on remove/replace).
+ * Disposers come from the RUNTIME's runScoped — renderNode's effects belong to the runtime's copy
+ * of vue-reactivity, so a studio-instance effectScope here would collect nothing and leak every
+ * binding effect of a superseded subtree (they keep firing against detached DOM).
+ */
+const elScope = new WeakMap<HTMLElement, () => void>();
+/** Every live subtree disposer, so a full re-render can stop them all (they're detached roots). */
+const liveScopes = new Set<() => void>();
 
 /**
  * Render the shadow-doc node at `docPath` into a detached DOM subtree, stamped with `data-jx-path`
@@ -41,18 +44,17 @@ export function renderSubtreeIframe(
     throw new Error(`iframe-patch-node-not-found:${docPath.join("/")}`);
   }
   const def = typeof node === "string" ? node : prepareForEditMode(stripEventHandlers(node));
-  const scope = effectScope(true);
-  const rendered = scope.run(() =>
+  const { result: rendered, stop } = runScoped(() =>
     renderNode(def, ctx.defs, {
       _path: docPathToRenderPath(docPath, ctx),
       onNodeCreated: makeStamper(ctx.mapperCtx),
     }),
-  )!;
-  // Track the scope for bulk dispose on full re-render; element scopes are also keyed by their root
-  // Element so a targeted remove/replace can stop just that subtree (a bare text node owns none).
-  liveScopes.add(scope);
+  );
+  // Track the disposer for bulk dispose on full re-render; element disposers are also keyed by their
+  // Root element so a targeted remove/replace can stop just that subtree (a bare text node owns none).
+  liveScopes.add(stop);
   if (rendered instanceof HTMLElement) {
-    elScope.set(rendered, scope);
+    elScope.set(rendered, stop);
   }
   return rendered;
 }
@@ -72,10 +74,10 @@ export function disposeSubtree(el: Element): void {
       tag.remove();
       elementStyleTags.delete(t);
     }
-    const scope = elScope.get(t);
-    if (scope) {
-      scope.stop();
-      liveScopes.delete(scope);
+    const stop = elScope.get(t);
+    if (stop) {
+      stop();
+      liveScopes.delete(stop);
       elScope.delete(t);
     }
   }
@@ -83,8 +85,8 @@ export function disposeSubtree(el: Element): void {
 
 /** Stop every live subtree scope — called before a full re-render replaces the whole document. */
 export function disposeAllSubtrees(): void {
-  for (const scope of liveScopes) {
-    scope.stop();
+  for (const stop of liveScopes) {
+    stop();
   }
   liveScopes.clear();
 }
