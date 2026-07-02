@@ -272,6 +272,12 @@ export type IframeToParent =
   // Own pointermove over the iframe. `dragSeq` is the iframe's pre-allocated session hint; the parent
   // Bumps its own authoritative seq in beginDragSession.
   | { kind: "dragOriginate"; path: (string | number)[]; dragSeq: number }
+  // A NATIVE drag stream entered this iframe with NO session bound here. Chromium delivers
+  // Dragover/drop to the frame UNDER THE CURSOR, so a parent-originated drag (palette/layers)
+  // Crosses onto the canvas without the parent ever seeing a cursor inside the iframe rect — it
+  // Never binds a host. On this message the bridge binds/migrates its live pragmatic session to
+  // This host (posting dragStart); the iframe's native handlers then drive dragOver/dropResult.
+  | { kind: "nativeDragEnter" }
   // The iframe cancelled a flow-3 (iframe-originated) drag locally (Escape during a body-grab): the
   // Parent tears down its ghost/indicator. Single-sourced through the iframe for that case so cancel
   // Never double-fires (the parent-source flows cancel via pragmatic instead).

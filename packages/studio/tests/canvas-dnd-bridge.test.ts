@@ -26,6 +26,11 @@ let hostAt: AnyRec | null = fakeHost;
 let dragSeq = 5;
 // The flow-3 handler the bridge installs via setIframeOriginateHandler (captured for direct drive).
 let originateHandler: ((host: AnyRec, path: AnyRec, seq: number) => void) | null = null;
+// The native-drag-enter handler the bridge installs via setNativeDragEnterHandler.
+let nativeEnterHandler: ((host: AnyRec) => void) | null = null;
+// The session sawIframeDragOver reports as iframe-driven (-1 = none; set to a seq to simulate the
+// Native over/drop stream having been routed to the iframe).
+let iframeDroveSeq = -1;
 
 void mock.module("../src/canvas/iframe-host", () => ({
   adoptDragSession: (host: AnyRec, src: AnyRec, srcData: AnyRec, seq: number) => {
@@ -50,8 +55,12 @@ void mock.module("../src/canvas/iframe-host", () => ({
     return hostAt;
   },
   postDragMessage: (host: AnyRec, msg: AnyRec) => calls.push({ fn: "post", host, msg }),
+  sawIframeDragOver: (seq: number) => seq === iframeDroveSeq,
   setIframeOriginateHandler: (fn: (host: AnyRec, path: AnyRec, seq: number) => void) => {
     originateHandler = fn;
+  },
+  setNativeDragEnterHandler: (fn: (host: AnyRec) => void) => {
+    nativeEnterHandler = fn;
   },
 }));
 
@@ -76,6 +85,8 @@ beforeEach(() => {
   hostAt = fakeHost;
   dragSeq = 5;
   originateHandler = null;
+  nativeEnterHandler = null;
+  iframeDroveSeq = -1;
   registerCanvasDndBridge();
 });
 
@@ -277,6 +288,104 @@ describe("registerCanvasDndBridge — coordinator", () => {
     });
     expect(calls.find((c) => c.fn === "ghostClear")).toBeTruthy();
     expect(calls.find((c) => c.fn === "clearIndicator")).toBeTruthy();
+  });
+});
+
+describe("nativeDragEnter — native stream entered an unclaimed iframe", () => {
+  test("binds the pending drag when the parent never bound a host (palette → canvas jump)", () => {
+    // The drag starts off every canvas: no session, but the source is retained as pending.
+    hostAt = null;
+    m().onDragStart({ location: loc(5, 5), source: { data: { type: "block" } } });
+    expect(calls.find((c) => c.fn === "begin")).toBeUndefined();
+    calls.length = 0;
+    // The cursor crossed onto the iframe unseen; the iframe announces it.
+    nativeEnterHandler!(fakeHost);
+    const begin = calls.find((c) => c.fn === "begin");
+    expect(begin!.host).toBe(fakeHost);
+    expect(begin!.src).toEqual({ type: "block" });
+  });
+
+  test("migrates a session bound to another panel (dragEnd old + dragStart new)", () => {
+    const hostA = { id: "A" } as unknown as AnyRec;
+    const hostB = { id: "B" } as unknown as AnyRec;
+    hostAt = hostA;
+    m().onDragStart({ location: loc(150, 60), source: { data: { type: "block" } } });
+    calls.length = 0;
+    nativeEnterHandler!(hostB);
+    const ended = calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd");
+    expect(ended!.host).toBe(hostA);
+    const begun = calls.find((c) => c.fn === "begin");
+    expect(begun!.host).toBe(hostB);
+  });
+
+  test("is a no-op when already bound to that host (dragStart already posted)", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    nativeEnterHandler!(fakeHost);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("is a no-op with no parent drag in flight (e.g. an OS file drag)", () => {
+    nativeEnterHandler!(fakeHost);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("is a no-op after the drag ended (pending cleared in onDrop)", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    m().onDrop({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    nativeEnterHandler!(fakeHost);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("iframe-driven drop (native routing) — onDrop defers to the in-flight dropResult", () => {
+  test("skips cancel/drop even on a snap-back location and keeps the retained srcData", () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    // The begin bumped the mock seq to 6; mark the iframe as having driven that session.
+    iframeDroveSeq = 6;
+    calls.length = 0;
+    // Pragmatic saw no dragover over the iframe, so current snapped back to initial (a false
+    // Cancel) — the bridge must trust the iframe's in-flight dropResult instead.
+    m().onDrop({
+      location: {
+        current: { input: { clientX: 9, clientY: 9 } },
+        initial: { input: { clientX: 9, clientY: 9 } },
+      },
+      source: { data: { type: "block" } },
+    });
+    expect(calls.find((c) => c.fn === "post")).toBeUndefined();
+    expect(calls.find((c) => c.fn === "end")).toBeUndefined();
+    expect(calls.find((c) => c.fn === "ghostClear")).toBeUndefined();
+  });
+
+  test("falls back to a full teardown when no dropResult ever arrives (Escape over the iframe)", async () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    iframeDroveSeq = 6;
+    calls.length = 0;
+    m().onDrop({ location: loc(300, 250), source: { data: { type: "block" } } });
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 300);
+    });
+    const ended = calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd");
+    expect(ended!.host).toBe(fakeHost);
+    expect(calls.find((c) => c.fn === "end")).toBeTruthy();
+    expect(calls.find((c) => c.fn === "ghostClear")).toBeTruthy();
+    expect(calls.find((c) => c.fn === "clearIndicator")).toBeTruthy();
+  });
+
+  test("the fallback no-ops when a NEW session started before the window elapsed", async () => {
+    m().onDragStart({ location: loc(300, 250), source: { data: { type: "block" } } });
+    iframeDroveSeq = 6;
+    m().onDrop({ location: loc(300, 250), source: { data: { type: "block" } } });
+    calls.length = 0;
+    // A new drag began (the mock's currentDragSession now reports a different seq).
+    dragSeq = 99;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 300);
+    });
+    expect(calls.find((c) => c.fn === "post" && c.msg.kind === "dragEnd")).toBeUndefined();
+    expect(calls.find((c) => c.fn === "end")).toBeUndefined();
   });
 });
 

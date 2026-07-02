@@ -461,6 +461,90 @@ describe("startCanvasIframe — cross-frame drag (Phase 4c)", () => {
     expect((acks.find((m) => m.kind === "dragOver") as { preview: unknown }).preview).toBeNull();
   });
 
+  // ─── Native drag routing: Chromium delivers dragover/drop to the frame under the cursor, so a
+  // Parent-originated drag over the canvas arrives here as NATIVE events, not dragMove messages.
+  test("a NATIVE dragover with a live session preventDefaults and posts a cursor-carrying dragOver", async () => {
+    const { acks, pair } = await bootRendered(7);
+    pair.parent.post({ dragSeq: 6, gen: 7, kind: "dragStart", src: { type: "block" } });
+    pair.flush();
+    acks.length = 0;
+    const ev = new MouseEvent("dragover", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 5,
+      clientY: 5,
+    });
+    document.dispatchEvent(ev);
+    pair.flush();
+    // Accepted (no "not allowed" cursor) + the preview posted from OUR viewport coords, cursor
+    // Included so the parent can keep its ghost tracking (it sees no dragover of its own).
+    expect(ev.defaultPrevented).toBe(true);
+    expect(acks.find((m) => m.kind === "dragOver")).toEqual({
+      cursor: { x: 5, y: 5 },
+      dragSeq: 6,
+      gen: 7,
+      kind: "dragOver",
+      preview: null,
+    });
+  });
+
+  test("a NATIVE drop posts the authoritative dropResult and ends the session", async () => {
+    const { acks, pair } = await bootRendered(7);
+    pair.parent.post({ dragSeq: 6, gen: 7, kind: "dragStart", src: { type: "block" } });
+    pair.flush();
+    acks.length = 0;
+    const drop = new MouseEvent("drop", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 5,
+      clientY: 5,
+    });
+    document.dispatchEvent(drop);
+    pair.flush();
+    expect(drop.defaultPrevented).toBe(true);
+    expect(acks.find((m) => m.kind === "dropResult")).toEqual({
+      dragSeq: 6,
+      gen: 7,
+      instruction: null,
+      kind: "dropResult",
+      targetPath: null,
+    });
+    // The session ended with the drop: a later native dragover is unclaimed (not accepted).
+    acks.length = 0;
+    const after = new MouseEvent("dragover", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 5,
+      clientY: 5,
+    });
+    document.dispatchEvent(after);
+    pair.flush();
+    expect(after.defaultPrevented).toBe(false);
+    expect(acks.find((m) => m.kind === "dragOver")).toBeUndefined();
+  });
+
+  test("a NATIVE dragover with NO session posts nativeDragEnter once per throttle window", async () => {
+    const { acks, pair } = await bootRendered(7);
+    acks.length = 0;
+    const fire = () => {
+      const ev = new MouseEvent("dragover", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 5,
+        clientY: 5,
+      });
+      document.dispatchEvent(ev);
+      return ev;
+    };
+    const first = fire();
+    fire();
+    pair.flush();
+    // Unclaimed stream: never accepted (an OS file drag must keep the browser's default), and the
+    // Crossing announced exactly once within the throttle window (dragover re-fires ~350ms).
+    expect(first.defaultPrevented).toBe(false);
+    expect(acks.filter((m) => m.kind === "nativeDragEnter")).toHaveLength(1);
+  });
+
   test("a dragMove landing in the top edge band arms auto-scroll without throwing", async () => {
     // Auto-scroll's rAF/scrollBy body is CDP-only (happy-dom has no layout/scroll); here we only
     // Prove arming the loop from a band cursor is safe and still posts the dragOver preview.

@@ -35,7 +35,9 @@ import {
   hostDragGeometry,
   liveDragHostAt,
   postDragMessage,
+  sawIframeDragOver,
   setIframeOriginateHandler,
+  setNativeDragEnterHandler,
 } from "../canvas/iframe-host";
 import { parentCursorToIframe } from "../canvas/iframe-overlay";
 import { clearDragGhost, moveDragGhost, setDragGhost } from "./drag-ghost";
@@ -286,10 +288,35 @@ export function isCancelDrop(location: MonitorDragArgs["location"]): boolean {
 export function registerCanvasDndBridge(): () => void {
   // The active parent-source (pragmatic) session, or null between drags / before it binds a host.
   let session: CoordSession | null = null;
+  // The in-flight pragmatic source (set in onDragStart, cleared in onDrop) so a nativeDragEnter can
+  // Bind a session for a drag whose cursor entered an iframe before the parent ever bound a host.
+  let pending: { src: DragSrcKind; srcData: Record<string, unknown> } | null = null;
 
   // Install the flow-3 handler so the iframe-host's `dragOriginate` case enters this coordinator.
   // The iframe drives the gesture; the parent only adopts the seq + shows the ghost (no listeners).
   setIframeOriginateHandler((host, path, seq) => startIframeOriginatedDrag(host, path, seq));
+
+  // Bind/migrate the live pragmatic session when its NATIVE stream enters an unclaimed iframe:
+  // Chromium delivers dragover to the frame under the cursor, so a drag from the palette/layers
+  // Crosses onto the canvas without this monitor ever seeing a cursor inside the iframe rect — the
+  // Iframe announces the crossing instead (the `nativeDragEnter` message).
+  setNativeDragEnterHandler((host) => {
+    if (!pending || session?.host === host) {
+      // No parent drag in flight (e.g. an OS file drag), or already bound here — nothing to do.
+      return;
+    }
+    if (session) {
+      // Migrate: the session was bound elsewhere (or unbound after leaving a canvas).
+      if (session.host) {
+        postDragMessage(session.host, { dragSeq: session.seq, kind: "dragEnd" });
+      }
+      session.host = host;
+      session.seq = beginDragSession(host, session.src, session.srcData);
+      return;
+    }
+    // First canvas contact for this drag — the ghost is already up (set in onDragStart).
+    session = startSession(host, pending.src, pending.srcData);
+  });
 
   return monitorForElements({
     onDrag({ source, location }: MonitorDragArgs) {
@@ -315,6 +342,8 @@ export function registerCanvasDndBridge(): () => void {
       if (!src) {
         return;
       }
+      // Retain the source for the drag's lifetime so a nativeDragEnter can bind late (see above).
+      pending = { src, srcData: source.data };
       const cursor = cursorOf(location);
       const host = liveDragHostAt(cursor);
       // Bind the session to the host under the cursor (if any). The ghost shows immediately and
@@ -327,10 +356,33 @@ export function registerCanvasDndBridge(): () => void {
       if (!src) {
         return;
       }
+      pending = null;
       const cursor = location.current.input ? cursorOf(location) : { x: 0, y: 0 };
       if (!session) {
         // Never bound a host (dropped off every canvas) — just hide the ghost; nothing to apply.
         clearDragGhost();
+        return;
+      }
+      // While the cursor is over the canvas, the native over/drop stream goes to the IFRAME — this
+      // Monitor sees nothing, so pragmatic's location is stale: its cancel heuristic false-positives
+      // (current never advanced past initial) and its coords are frame-local. When the iframe
+      // Recently drove the session, its native-drop dropResult is the authoritative outcome and is
+      // In flight: keep the retained srcData for it and only schedule the no-reply fallback teardown
+      // (which also covers an Escape-cancel over the iframe — no dropResult ever arrives).
+      if (sawIframeDragOver(session.seq)) {
+        const { host, seq } = session;
+        session = null;
+        setTimeout(() => {
+          if (currentDragSession() !== seq) {
+            return;
+          }
+          if (host) {
+            postDragMessage(host, { dragSeq: seq, kind: "dragEnd" });
+            clearDropIndicator(host);
+          }
+          endDragSession(seq);
+          clearDragGhost();
+        }, DROP_RESULT_TIMEOUT);
         return;
       }
       // A cancel (Escape/abort) snaps back to the initial cursor — tear down without applying.

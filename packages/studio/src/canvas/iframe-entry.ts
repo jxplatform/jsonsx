@@ -76,6 +76,9 @@ export function startCanvasIframe(opts: {
   // Began against; dragMove/drop tag every reply with both so the parent can stale-gate them.
   let dragSrc: DragSrcKind | null = null;
   let dragGen = -1;
+  // The parent-session id (from dragStart), so NATIVE drag events routed into this frame can post
+  // DragOver/dropResult tagged for the parent's seq gate.
+  let sessionSeq = -1;
 
   // ─── Auto-scroll (commit 6) — a SELF-SUSTAINING rAF loop. When a dragMove lands in an edge band,
   // The loop each frame scrolls the viewport AND re-hit-tests the CACHED cursor (elementFromPoint is
@@ -235,6 +238,69 @@ export function startCanvasIframe(opts: {
   };
   container.ownerDocument.addEventListener("wheel", onWheel, { passive: false });
 
+  // ─── Native drag routing (flows 1/2/4 over the canvas) ─────────────────────
+  // Chromium delivers native dragover/drop to the frame UNDER THE CURSOR, so once a
+  // Parent-originated drag (palette / layers / ⠿ handle) crosses onto the canvas the parent stops
+  // Seeing dragover — it can't forward dragMove, and cross-origin nothing preventDefaults here,
+  // Giving the "not allowed" cursor and a dead drop. So handle the native stream directly: while a
+  // Parent session is live (dragSrc set), accept the drag, post dragOver previews from OUR
+  // ClientX/y (already iframe-local — no rect conversion), and on drop post the authoritative
+  // DropResult. The cursor rides on dragOver so the parent can keep its ghost tracking (it has no
+  // Pointer stream of its own while the drag is over this frame).
+  //
+  // A native stream arriving with NO session yet (dragSrc null) is a parent drag that crossed onto
+  // The canvas before the parent could bind a host (it never sees a cursor inside the iframe rect) —
+  // Post nativeDragEnter so the bridge binds the session here. Throttled: dragover fires
+  // Continuously (~350ms even stationary), and an unclaimable stream (e.g. an OS file drag) would
+  // Otherwise spam the channel forever.
+  const NATIVE_ENTER_REPOST_MS = 300;
+  let lastNativeEnterPost = 0;
+  const onNativeDragOver = (e: DragEvent) => {
+    if (!dragSrc) {
+      const now = Date.now();
+      if (now - lastNativeEnterPost >= NATIVE_ENTER_REPOST_MS) {
+        lastNativeEnterPost = now;
+        channel.post({ kind: "nativeDragEnter" });
+      }
+      return;
+    }
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+    const cursor = { x: e.clientX, y: e.clientY };
+    const preview = shadowDoc
+      ? previewAt(cursor, dragSrc, shadowDoc, container.ownerDocument)
+      : null;
+    channel.post({ cursor, dragSeq: sessionSeq, gen: dragGen, kind: "dragOver", preview });
+    updateAutoScroll(cursor, sessionSeq);
+  };
+  const onNativeDrop = (e: DragEvent) => {
+    if (!dragSrc) {
+      return;
+    }
+    e.preventDefault();
+    const cursor = { x: e.clientX, y: e.clientY };
+    const preview = shadowDoc
+      ? previewAt(cursor, dragSrc, shadowDoc, container.ownerDocument)
+      : null;
+    channel.post({
+      dragSeq: sessionSeq,
+      gen: dragGen,
+      instruction: preview?.instruction ?? null,
+      kind: "dropResult",
+      targetPath: preview?.targetPath ?? null,
+    });
+    dragSrc = null;
+    dragGen = -1;
+    sessionSeq = -1;
+    stopAutoScroll();
+    clearIframeDrag();
+  };
+  container.ownerDocument.addEventListener("dragenter", onNativeDragOver, true);
+  container.ownerDocument.addEventListener("dragover", onNativeDragOver, true);
+  container.ownerDocument.addEventListener("drop", onNativeDrop, true);
+
   const off = channel.onMessage((msg) => {
     if (msg.kind === "measure") {
       channel.post({
@@ -272,6 +338,7 @@ export function startCanvasIframe(opts: {
       // Tagged with this gen so the parent drops any that arrive after a re-render superseded it.
       dragSrc = msg.src;
       dragGen = msg.gen;
+      sessionSeq = msg.dragSeq;
       return;
     }
     if (msg.kind === "dragEnd" || msg.kind === "dragCancel") {
@@ -279,6 +346,7 @@ export function startCanvasIframe(opts: {
       // Or drop is a no-op, and clear any flow-3 (iframe-originated) drag state + auto-scroll.
       dragSrc = null;
       dragGen = -1;
+      sessionSeq = -1;
       stopAutoScroll();
       clearIframeDrag();
       return;
@@ -310,6 +378,7 @@ export function startCanvasIframe(opts: {
       });
       dragSrc = null;
       dragGen = -1;
+      sessionSeq = -1;
       stopAutoScroll();
       clearIframeDrag();
       return;
@@ -385,6 +454,9 @@ export function startCanvasIframe(opts: {
     stopAutoScroll();
     heightObserver?.disconnect();
     container.ownerDocument.removeEventListener("wheel", onWheel);
+    container.ownerDocument.removeEventListener("dragenter", onNativeDragOver, true);
+    container.ownerDocument.removeEventListener("dragover", onNativeDragOver, true);
+    container.ownerDocument.removeEventListener("drop", onNativeDrop, true);
     stopDataScopeWatch?.();
     handle?.dispose();
   };

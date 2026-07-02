@@ -82,8 +82,10 @@ const {
   postApplyFormat,
   postDragMessage,
   postPatchToHosts,
+  sawIframeDragOver,
   setIframeOriginateHandler,
   setIframePatchEscalation,
+  setNativeDragEnterHandler,
   setInsertZoneClickHandler,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
@@ -1149,6 +1151,34 @@ describe("cross-frame drag session (Phase 4c)", () => {
     expect(ghost.style.top).toBe("120px");
     clearDragGhost();
     endDragSession(seq);
+  });
+
+  test("sawIframeDragOver: only a cursor-carrying dragOver marks the session iframe-driven", async () => {
+    const { host } = await readyHostAt(4);
+    const seq = beginDragSession(host, { type: "block" }, { fragment: {}, type: "block" });
+    // A cursor-less dragOver is a reply to a parent-forwarded dragMove — not iframe-driven.
+    channels[0]!.deliver({ dragSeq: seq, gen: 4, kind: "dragOver", preview: null });
+    expect(sawIframeDragOver(seq)).toBe(false);
+    // A cursor-carrying one means the iframe drives the stream from its own native events.
+    channels[0]!.deliver({
+      cursor: { x: 5, y: 5 },
+      dragSeq: seq,
+      gen: 4,
+      kind: "dragOver",
+      preview: null,
+    });
+    expect(sawIframeDragOver(seq)).toBe(true);
+    expect(sawIframeDragOver(seq + 1)).toBe(false);
+    endDragSession(seq);
+  });
+
+  test("nativeDragEnter routes to the installed coordinator handler with the host", async () => {
+    const { host } = await readyHostAt(4);
+    const seen: unknown[] = [];
+    setNativeDragEnterHandler((h) => seen.push(h));
+    channels[0]!.deliver({ kind: "nativeDragEnter" });
+    expect(seen).toEqual([host as never]);
+    setNativeDragEnterHandler(() => {});
   });
 
   test("clearDropIndicator hides the host's indicator", async () => {

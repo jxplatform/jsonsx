@@ -110,6 +110,32 @@ let currentDragSeq = 0;
 /** Parent-retained source data keyed by `dragSeq` (the block fragment never crosses the boundary). */
 const retainedSrcData = new Map<number, Record<string, unknown>>();
 
+/**
+ * The last session whose cursor-carrying `dragOver` arrived FROM an iframe, and when. While a
+ * parent-originated drag is over the canvas, the native dragover/drop stream is delivered to the
+ * IFRAME (not the parent), so the iframe drives the session's dragOvers and its native drop posts
+ * the dropResult. The coordinator checks {@link sawIframeDragOver} in its `onDrop` to know the
+ * parent's own drop location is frame-local garbage and the in-flight dropResult is authoritative.
+ */
+let lastIframeDragOverSeq = -1;
+let lastIframeDragOverAt = 0;
+
+/**
+ * How recently (ms) an iframe-driven dragOver still marks the iframe as owning the stream. Native
+ * dragover re-fires ~350ms even with a stationary cursor, so an iframe the cursor is still over
+ * stays fresh; once the cursor moves back to parent chrome (e.g. drops on the block-action-bar,
+ * which overlays the iframe) the iframe stream stops and the parent's drop coords are trusted
+ * again.
+ */
+const IFRAME_DRAGOVER_FRESH_MS = 600;
+
+/** Whether the iframe recently drove a `dragOver` for session `seq` (see above). */
+export function sawIframeDragOver(seq: number): boolean {
+  return (
+    lastIframeDragOverSeq === seq && Date.now() - lastIframeDragOverAt <= IFRAME_DRAGOVER_FRESH_MS
+  );
+}
+
 /** The host backing a given canvas element (or null), for the coordinator's host resolution. */
 export function hostForCanvas(canvasEl: HTMLElement): HostState | null {
   return hosts.get(canvasEl) ?? null;
@@ -232,6 +258,18 @@ export function setIframeOriginateHandler(
   fn: (host: HostState, path: (string | number)[], dragSeq: number) => void,
 ): void {
   iframeOriginateHandler = fn;
+}
+
+/**
+ * The coordinator's handler for a NATIVE drag stream entering an iframe with no session bound there
+ * (the `nativeDragEnter` message) — the bridge binds/migrates its live pragmatic session to that
+ * host. Installed by the bridge to avoid a host→bridge import cycle.
+ */
+let nativeDragEnterHandler: ((host: HostState) => void) | null = null;
+
+/** Register the coordinator's native-drag-enter handler (see {@link nativeDragEnterHandler}). */
+export function setNativeDragEnterHandler(fn: (host: HostState) => void): void {
+  nativeDragEnterHandler = fn;
 }
 
 /** Delay (ms) before hiding the insertion "+" so the cursor can reach it (SALVAGED HIDE_DELAY). */
@@ -576,7 +614,17 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Display-only drop indicator (Phase 4c). Drop stale replies: a different drag session
       // (dragSeq) or a superseded render (gen). The indicator draw side uses scale=1 (D-2) — the
       // Overlay is inside the scaled panzoom-wrap, so the browser already applies the zoom.
-      if (msg.dragSeq !== currentDragSeq || msg.gen !== state.lastRenderedGen) {
+      if (msg.dragSeq !== currentDragSeq) {
+        return;
+      }
+      // A cursor-carrying dragOver means the IFRAME is driving the over-stream from its own events
+      // (native routing or flow 3) — not merely replying to a parent-forwarded dragMove. Record it
+      // BEFORE the gen gate: it's a fact about event routing, not render freshness.
+      if (msg.cursor) {
+        lastIframeDragOverSeq = msg.dragSeq;
+        lastIframeDragOverAt = Date.now();
+      }
+      if (msg.gen !== state.lastRenderedGen) {
         return;
       }
       if (msg.preview) {
@@ -602,6 +650,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // Which ADOPTS the iframe's seq (so its dragOver/dropResult pass the gate) and shows the ghost
       // — it attaches NO parent-document listeners (the iframe owns the pointer it started).
       iframeOriginateHandler?.(state, msg.path, msg.dragSeq);
+      return;
+    }
+    case "nativeDragEnter": {
+      // A parent-originated NATIVE drag crossed onto this iframe before any session bound it (the
+      // Parent never sees a cursor inside the iframe rect) — let the bridge bind/migrate here.
+      nativeDragEnterHandler?.(state);
       return;
     }
     case "dragEnd": {
