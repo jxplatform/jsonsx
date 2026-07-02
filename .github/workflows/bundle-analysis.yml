@@ -66,7 +66,13 @@ jobs:
           const totalBytes = payload.assets.reduce((n, a) => n + a.size, 0);
           banner(`payload: bundleName=${payload.bundleName} assets=${payload.assets.length} chunks=${payload.chunks.length} totalBytes=${totalBytes}`);
           const params = getServiceParams();
-          banner("SERVICE PARAMS sent to Codecov (branch/commit/pr are the key fields)");
+          // EXPERIMENT: the upstream CLI omits `git_service`, which Codecov's own
+          // bundler plugin always sends for tokenless uploads. Push (pr="") uploads
+          // land but produce EMPTY default-branch reports; PR uploads populate fine.
+          // Hypothesis: without git_service, Codecov can't attach a pushed commit's
+          // bundle to the branch head. Add it and see if main finally populates.
+          params.git_service = "github";
+          banner("SERVICE PARAMS sent to Codecov (now incl. git_service)");
           console.error("GITHUB_EVENT_NAME =", process.env.GITHUB_EVENT_NAME);
           console.error(JSON.stringify(params, null, 2));
           const oidc = await fetchOidcToken();
