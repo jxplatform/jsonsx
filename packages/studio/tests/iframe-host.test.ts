@@ -70,6 +70,7 @@ const {
   adoptDragSession,
   beginDragSession,
   clearDropIndicator,
+  commitActiveEditSession,
   currentDragSession,
   endDragSession,
   getActiveEditHost,
@@ -83,6 +84,8 @@ const {
   postDragMessage,
   postPatchToHosts,
   sawIframeDragOver,
+  setCanvasContextMenuHandler,
+  setCanvasSlashHandler,
   setIframeOriginateHandler,
   setIframePatchEscalation,
   setNativeDragEnterHandler,
@@ -308,8 +311,12 @@ type Msg = Record<string, unknown>;
 async function mountReady(): Promise<HTMLElement> {
   const canvasEl = document.createElement("div");
   document.body.append(canvasEl);
-  await mountIframeCanvas(1, {} as never, canvasEl);
+  // Mount for the active tab (when one exists) and ack the render so the host adopts the tab
+  // Identity — doc-mutating bridge messages (editCommit/editSplit/editInsert/dropResult) route by
+  // The host's tabId, never by activeTab at message time.
+  await mountIframeCanvas(1, {} as never, canvasEl, null, activeTab.value?.id ?? null);
   channels[0]!.deliver({ kind: "ready" });
+  channels[0]!.deliver({ gen: 1, kind: "renderComplete" });
   return canvasEl;
 }
 
@@ -495,7 +502,7 @@ describe("iframe canvas patch bridge", () => {
     await mountReady();
     channels[0]!.posts.length = 0;
 
-    const count = postPatchToHosts(OPS, 7);
+    const count = postPatchToHosts(OPS, 7, activeTab.value?.id ?? null);
     expect(count).toBe(1);
     expect(channels[0]!.posts).toContainEqual({ forwardOps: OPS, gen: 7, kind: "patch" });
   });
@@ -505,14 +512,14 @@ describe("iframe canvas patch bridge", () => {
     document.body.append(canvasEl);
     await mountIframeCanvas(1, {} as never, canvasEl);
     // No `ready` delivered → the host can't apply a patch yet.
-    expect(postPatchToHosts(OPS, 1)).toBe(0);
+    expect(postPatchToHosts(OPS, 1, activeTab.value?.id ?? null)).toBe(0);
     expect(channels[0]!.posts.some((p) => p.kind === "patch")).toBe(false);
   });
 
   test("postPatchToHosts drops a host whose iframe has been disconnected", async () => {
     const canvasEl = await mountReady();
     canvasEl.remove(); // Detach the canvas → the iframe is no longer connected.
-    expect(postPatchToHosts(OPS, 1)).toBe(0);
+    expect(postPatchToHosts(OPS, 1, activeTab.value?.id ?? null)).toBe(0);
   });
 
   test("patchComplete re-measures the current selection", async () => {
@@ -582,7 +589,7 @@ describe("iframe canvas inline-edit bridge", () => {
     expect(docChildren()[0]!.textContent).toBe("Edited");
   });
 
-  test("editSplit applies and asks the iframe to re-enter on the new paragraph", async () => {
+  test("editSplit applies and re-enters on the new paragraph once the DOM acks", async () => {
     await mountReady();
     channels[0]!.posts.length = 0;
     channels[0]!.deliver({
@@ -593,10 +600,48 @@ describe("iframe canvas inline-edit bridge", () => {
     });
     expect(docChildren()).toHaveLength(2);
     expect(docChildren()[1]).toMatchObject({ tagName: "p", textContent: "lo" });
+    // Re-entry is DEFERRED until the iframe acks the DOM that contains the new paragraph — an
+    // Immediate enterEdit would race an escalated async full render.
+    expect(channels[0]!.posts.some((p) => p.kind === "enterEdit")).toBe(false);
+    channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
     expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
   });
 
-  test("editInsert applies and re-enters on the resulting path", async () => {
+  test("editSplit re-entry flushes on an ESCALATED renderComplete at a bumped gen", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({
+      after: { textContent: "lo" },
+      before: { textContent: "Hi" },
+      kind: "editSplit",
+      path: ["children", 0],
+    });
+    // A patchError must NOT flush (the escalation's render is still coming)…
+    channels[0]!.deliver({ gen: 1, kind: "patchError", message: "x" });
+    expect(channels[0]!.posts.some((p) => p.kind === "enterEdit")).toBe(false);
+    // …the escalated full render (bumped gen) does.
+    channels[0]!.deliver({ gen: 2, kind: "renderComplete" });
+    expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+
+  test("editSplit re-entry is suppressed when the host's tab is no longer active", async () => {
+    const { openTab } = await import("../src/workspace/workspace");
+    await mountReady();
+    channels[0]!.deliver({
+      after: { textContent: "lo" },
+      before: { textContent: "Hi" },
+      kind: "editSplit",
+      path: ["children", 0],
+    });
+    // The split landed in the originating tab, but the user has since switched tabs — re-entering
+    // Would target a different document's DOM.
+    openTab({ document: { tagName: "div" }, id: "other-tab" });
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
+    expect(channels[0]!.posts.some((p) => p.kind === "enterEdit")).toBe(false);
+  });
+
+  test("editInsert applies and re-enters on the resulting path once the DOM acks", async () => {
     await mountReady();
     channels[0]!.posts.length = 0;
     channels[0]!.deliver({
@@ -606,7 +651,84 @@ describe("iframe canvas inline-edit bridge", () => {
       path: ["children", 0],
     });
     expect(docChildren()[1]!.tagName).toBe("h2");
+    channels[0]!.deliver({ gen: 1, kind: "patchComplete" });
     expect(channels[0]!.posts).toContainEqual({ kind: "enterEdit", path: ["children", 1] });
+  });
+
+  test("a preview-mode mount clears a pending re-entry", async () => {
+    await mountReady();
+    const canvasEl = document.body.querySelector("div")!;
+    channels[0]!.deliver({
+      after: { textContent: "lo" },
+      before: { textContent: "Hi" },
+      kind: "editSplit",
+      path: ["children", 0],
+    });
+    (resolved.mapperCtx as { canvasMode: string }).canvasMode = "preview";
+    await mountIframeCanvas(2, {} as never, canvasEl, null, activeTab.value?.id ?? null);
+    channels[0]!.posts.length = 0;
+    channels[0]!.deliver({ gen: 2, kind: "renderComplete" });
+    expect(channels[0]!.posts.some((p) => p.kind === "enterEdit")).toBe(false);
+  });
+
+  test("editCommit routes to the ORIGINATING tab when it races a tab switch (the bleed)", async () => {
+    const { openTab, workspace } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    await mountReady();
+    // The user switches to tab B; the host is re-mounted for B but the iframe has NOT acked yet —
+    // Its DOM (and any live edit session) still belongs to tab A.
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B text" }], tagName: "div" },
+      id: "tab-b",
+    });
+    const canvasEl = document.body.querySelector("div")!;
+    await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
+    // The in-flight commit from tab A's session drains BEFORE renderComplete(2) on the FIFO.
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "A text edited",
+    });
+    // Tab A got the edit; tab B is untouched.
+    expect((tabA.doc.document.children as { textContent?: string }[])[0]!.textContent).toBe(
+      "A text edited",
+    );
+    expect((tabB.doc.document.children as { textContent?: string }[])[0]!.textContent).toBe(
+      "B text",
+    );
+    // After the ack flips the identity, commits route to tab B.
+    channels[0]!.deliver({ gen: 2, kind: "renderComplete" });
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "B text edited",
+    });
+    expect((tabB.doc.document.children as { textContent?: string }[])[0]!.textContent).toBe(
+      "B text edited",
+    );
+    expect(workspace.activeTabId).toBe("tab-b");
+  });
+
+  test("editCommit is dropped when the originating tab has been closed", async () => {
+    const { closeAllTabs, openTab } = await import("../src/workspace/workspace");
+    await mountReady();
+    closeAllTabs();
+    const fresh = openTab({
+      document: { children: [{ tagName: "p", textContent: "fresh" }], tagName: "div" },
+      id: "fresh-tab",
+    });
+    // The host still carries the CLOSED tab's identity — the late commit must go nowhere.
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "ghost",
+    });
+    expect((fresh.doc.document.children as { textContent?: string }[])[0]!.textContent).toBe(
+      "fresh",
+    );
   });
 });
 
@@ -1369,3 +1491,259 @@ describe("iframe canvas host viewport plumbing", () => {
 
 /** Opaque host handle for the drag-session API tests (its internals aren't asserted directly). */
 type AnyHost = Parameters<typeof beginDragSession>[0];
+
+// ─── Zoom-aware anchor math (D-2 empirical scale on the fixed-position toolbar) ──
+
+describe("getEditBarAnchorRect zoom scaling", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("scales the snapshot rect by the empirical zoom before adding the iframe offset", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    // Empirical scale: rect.width / clientWidth = 600 / 300 → 2 (design mode zoomed to 200%).
+    stubRect(iframe, { height: 480, left: 100, top: 50, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    channels[0]!.deliver({
+      activeTags: [],
+      collapsed: false,
+      kind: "selectionChanged",
+      link: { active: false, href: null },
+      localScope: null,
+      path: ["children", 0],
+      rect: { height: 12, width: 30, x: 7, y: 8 },
+      seq: 1,
+    });
+
+    expect(getEditBarAnchorRect()).toEqual({ height: 24, left: 114, top: 66, width: 60 });
+    channels[0]!.deliver({ kind: "editEnd" });
+  });
+
+  test("scales the lastSelectionRect fallback the same way (plain selection, no session)", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 100, top: 50, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+    canvasPanels.push({ canvas: canvasEl, mediaName: "base" } as unknown as CanvasPanel);
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 14, width: 40, x: 5, y: 9 } },
+      kind: "hit",
+    });
+
+    expect(getEditBarAnchorRect()).toEqual({ height: 28, left: 110, top: 68, width: 80 });
+    canvasPanels.length = 0;
+  });
+});
+
+// ─── Hit-driven panel activation (the bar anchors to the panel you clicked) ─────
+
+describe("hit → activeMedia", () => {
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("a hit in a breakpoint panel makes it the active panel; base maps to null", async () => {
+    const canvasA = await mountReady();
+    const canvasB = document.createElement("div");
+    document.body.append(canvasB);
+    await mountIframeCanvas(1, {} as never, canvasB, null, activeTab.value!.id);
+    channels[1]!.deliver({ kind: "ready" });
+    canvasPanels.push(
+      { canvas: canvasA, mediaName: "base" } as unknown as CanvasPanel,
+      { canvas: canvasB, mediaName: "sm" } as unknown as CanvasPanel,
+    );
+
+    channels[1]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(activeTab.value!.session.ui.activeMedia).toBe("sm");
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(activeTab.value!.session.ui.activeMedia).toBeNull();
+    canvasPanels.length = 0;
+  });
+
+  test("a git-diff panel hit never poisons the style-panel media context", async () => {
+    const canvasEl = await mountReady();
+    activeTab.value!.session.ui.activeMedia = "sm";
+    canvasPanels.push({
+      canvas: canvasEl,
+      mediaName: "git-diff-current",
+    } as unknown as CanvasPanel);
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(activeTab.value!.session.ui.activeMedia).toBe("sm");
+    canvasPanels.length = 0;
+  });
+});
+
+// ─── Tab identity bookkeeping details ───────────────────────────────────────────
+
+describe("host tab-identity bookkeeping", () => {
+  const firstChildText = (t: { doc: { document: { children?: unknown } } }) =>
+    (t.doc.document.children as { textContent?: string }[])[0]!.textContent;
+
+  beforeEach(() => {
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" });
+  });
+
+  test("patchComplete does NOT flip the host's tab identity", async () => {
+    const { openTab } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    const canvasEl = await mountReady();
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B" }], tagName: "div" },
+      id: "tab-b2",
+    });
+    await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
+    // A patch ack for the new gen must not adopt the pending identity…
+    channels[0]!.deliver({ gen: 2, kind: "patchComplete" });
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "still A",
+    });
+    expect(firstChildText(tabA)).toBe("still A");
+    expect(firstChildText(tabB)).toBe("B");
+  });
+
+  test("renderError prunes the pending identity — a later matching ack cannot adopt it", async () => {
+    const { openTab } = await import("../src/workspace/workspace");
+    const tabA = activeTab.value!;
+    const canvasEl = await mountReady();
+    const tabB = openTab({
+      document: { children: [{ tagName: "p", textContent: "B" }], tagName: "div" },
+      id: "tab-b3",
+    });
+    await mountIframeCanvas(2, {} as never, canvasEl, null, tabB.id);
+    channels[0]!.deliver({ gen: 2, kind: "renderError", message: "boom" });
+    channels[0]!.deliver({ gen: 2, kind: "renderComplete" });
+    channels[0]!.deliver({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "routed to A",
+    });
+    expect(firstChildText(tabA)).toBe("routed to A");
+    expect(firstChildText(tabB)).toBe("B");
+  });
+
+  test("postPatchToHosts skips hosts rendering another tab's document", async () => {
+    await mountReady();
+    channels[0]!.posts.length = 0;
+    const ops: WireDocOp[] = [
+      { key: "textContent", op: "set-key", path: ["children", 0], value: "x" },
+    ];
+    expect(postPatchToHosts(ops, 1, "some-other-tab")).toBe(0);
+    expect(channels[0]!.posts.some((p) => p.kind === "patch")).toBe(false);
+    // …while the owning tab's patches go through.
+    expect(postPatchToHosts(ops, 1, activeTab.value!.id)).toBe(1);
+  });
+
+  test("commitActiveEditSession posts endEdit to the active edit host only while editing", async () => {
+    await mountReady();
+    commitActiveEditSession();
+    expect(channels[0]!.posts.some((p) => p.kind === "endEdit")).toBe(false);
+
+    channels[0]!.deliver({ kind: "editStart", path: ["children", 0] });
+    commitActiveEditSession();
+    expect(channels[0]!.posts.some((p) => p.kind === "endEdit")).toBe(true);
+    channels[0]!.deliver({ kind: "editEnd" });
+  });
+});
+
+// ─── Slash-menu + context-menu bridge cases (host-side coordinate conversion) ────
+
+describe("slash/context bridge messages", () => {
+  interface SlashShown {
+    rect: { left: number; top: number; bottom: number; width: number; height: number };
+    filter: string;
+    onSelect: (cmd: { label: string; tag: string; description: string }) => void;
+    onDismiss: () => void;
+  }
+
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+  });
+
+  test("slashShow converts the rect by the empirical scale + offset; select/dismiss round-trip", async () => {
+    const shown: SlashShown[] = [];
+    const navs: string[] = [];
+    let dismissed = 0;
+    setCanvasSlashHandler({
+      dismiss: () => {
+        dismissed += 1;
+      },
+      nav: (key) => navs.push(key),
+      show: (req) => shown.push(req as SlashShown),
+    });
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 100, top: 50, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+
+    channels[0]!.deliver({
+      filter: "he",
+      kind: "slashShow",
+      rect: { height: 12, width: 30, x: 10, y: 20 },
+    });
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toMatchObject({
+      filter: "he",
+      rect: { bottom: 114, height: 24, left: 120, top: 90, width: 60 },
+    });
+
+    channels[0]!.posts.length = 0;
+    shown[0]!.onSelect({ description: "d", label: "Paragraph", tag: "p" });
+    expect(channels[0]!.posts).toContainEqual({
+      cmd: { description: "d", label: "Paragraph", tag: "p" },
+      kind: "slashSelect",
+    });
+    shown[0]!.onDismiss();
+    expect(channels[0]!.posts).toContainEqual({ kind: "slashDismissed" });
+
+    channels[0]!.deliver({ key: "ArrowDown", kind: "slashNav" });
+    expect(navs).toEqual(["ArrowDown"]);
+    channels[0]!.deliver({ kind: "slashDismiss" });
+    expect(dismissed).toBe(1);
+  });
+
+  test("contextMenu converts coords, passes the path (or null), and a hit dismisses", async () => {
+    const shows: { path: (string | number)[] | null; clientX: number; clientY: number }[] = [];
+    let dismissed = 0;
+    setCanvasContextMenuHandler({
+      dismiss: () => {
+        dismissed += 1;
+      },
+      show: (args) => shows.push(args),
+    });
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    stubRect(iframe, { height: 480, left: 100, top: 50, width: 600 });
+    Object.defineProperty(iframe, "clientWidth", { configurable: true, value: 300 });
+
+    channels[0]!.deliver({ kind: "contextMenu", path: ["children", 1], x: 5, y: 7 });
+    expect(shows[0]).toEqual({ clientX: 110, clientY: 64, path: ["children", 1] });
+
+    channels[0]!.deliver({ kind: "contextMenu", path: null, x: 1, y: 1 });
+    expect(shows[1]!.path).toBeNull();
+
+    channels[0]!.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(dismissed).toBe(1);
+  });
+});

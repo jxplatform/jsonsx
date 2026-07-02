@@ -10,7 +10,14 @@ import { ref } from "lit-html/directives/ref.js";
 import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 
-import { childIndex, childList, getNodeAtPath, nodeLabel, parentElementPath } from "../store";
+import {
+  canvasWrap,
+  childIndex,
+  childList,
+  getNodeAtPath,
+  nodeLabel,
+  parentElementPath,
+} from "../store";
 import { activeTab } from "../workspace/workspace";
 import { mutateMoveNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { view } from "../view";
@@ -61,12 +68,112 @@ export function initBlockActionBar(ctx: {
   _ctx = ctx;
   if (!_formatShortcutBound) {
     document.addEventListener("keydown", handleParentFormatShortcut);
+    // `scroll` doesn't bubble but IS deliverable capture-phase at the document — one app-lifetime
+    // Listener covers .content-edit-canvas (edit mode), window scrolls, and any future scroll
+    // Container, keeping the position:fixed bar tracking its (scrolling) anchor.
+    document.addEventListener("scroll", onCanvasScroll, { capture: true, passive: true });
     _formatShortcutBound = true;
   }
 }
 
-/** Register the parent-document format-shortcut handler exactly once. */
+/** Register the parent-document format-shortcut + scroll handlers exactly once. */
 let _formatShortcutBound = false;
+
+/** One reposition per frame, no matter how many scroll events land in it. */
+let _scrollRafPending = false;
+
+/**
+ * Reposition the bar on a canvas-area scroll — rAF-throttled and via the style fast path ({@link
+ * repositionBlockActionBar}), NOT a full lit re-render (which would tear down and re-create the
+ * drag-handle's pragmatic-dnd registration every frame). Exported for tests.
+ *
+ * @param {Event} e
+ */
+export function onCanvasScroll(e: Event): void {
+  if (!_ctx || _linkPopoverOpen) {
+    return;
+  }
+  if (!activeTab.value?.session.selection) {
+    return;
+  }
+  const mode = _ctx.getCanvasMode();
+  if (mode !== "design" && mode !== "edit") {
+    return;
+  }
+  // Only canvas-area scrolls (or the window itself) move the anchor; left/right panel scrolling
+  // Never does.
+  const isCanvasScroll =
+    e.target === document ||
+    (canvasWrap != null && e.target instanceof Node && canvasWrap.contains(e.target));
+  if (!isCanvasScroll || _scrollRafPending) {
+    return;
+  }
+  _scrollRafPending = true;
+  requestAnimationFrame(() => {
+    _scrollRafPending = false;
+    repositionBlockActionBar();
+  });
+}
+
+/**
+ * Style-only fast path: move the existing bar to the anchor's current position (fresh
+ * {@link getEditBarAnchorRect} — the iframe's GBCR moves with the scroll). Hides via `visibility`
+ * when the anchor left the canvas area so the lit tree (and the drag handle's dnd registration)
+ * survives; a bar hidden by the full render path (`nothing`) is resurrected with a full render.
+ */
+function repositionBlockActionBar(): void {
+  const bar = view.blockActionBarEl?.firstElementChild as HTMLElement | null;
+  if (!bar) {
+    renderBlockActionBar();
+    return;
+  }
+  const anchor = getEditBarAnchorRect();
+  const pos = anchor ? barPosition(anchor) : null;
+  if (!pos) {
+    bar.style.visibility = "hidden";
+    return;
+  }
+  bar.style.visibility = "";
+  bar.style.left = `${pos.left}px`;
+  bar.style.top = `${pos.top}px`;
+  clampBarToWindow(bar);
+}
+
+/**
+ * The bar's position for `anchor` (flipping below the element near the top edge), or null when the
+ * anchor's vertical extent has left the canvas area — the popover layer has no clipping, so a
+ * clamped bar would float detached over the app toolbar / panel headers.
+ *
+ * @param {{ left: number; top: number; height: number }} anchor
+ */
+function barPosition(anchor: {
+  left: number;
+  top: number;
+  height: number;
+}): { left: number; top: number } | null {
+  if (canvasWrap) {
+    const wrap = rectOf(canvasWrap);
+    if (anchor.top + anchor.height < wrap.top || anchor.top > wrap.bottom) {
+      return null;
+    }
+  }
+  return {
+    left: anchor.left,
+    top: anchor.top < 80 ? anchor.top + anchor.height + 4 : anchor.top - 38,
+  };
+}
+
+/**
+ * Pull the bar back inside the window's right edge.
+ *
+ * @param {HTMLElement} bar
+ */
+function clampBarToWindow(bar: HTMLElement): void {
+  const barRect = rectOf(bar);
+  if (barRect.right > window.innerWidth) {
+    bar.style.left = `${Math.max(0, window.innerWidth - barRect.width)}px`;
+  }
+}
 
 /**
  * Route Ctrl/Cmd+B/I/`/K to the iframe while an inline-edit session is live but focus is on the
@@ -306,6 +413,26 @@ export function isLinkPopoverOpen(): boolean {
 }
 
 /**
+ * Whether `target` sits inside the edit-session chrome — the block action bar, its link popover, or
+ * the slash menu. The parent's pointerdown commit-guard must NOT end the inline-edit session for
+ * clicks on these (they operate ON the session); any other parent-chrome press commits it. This
+ * module owns those popover roots, hence the helper lives here.
+ *
+ * @param {EventTarget | null} target
+ */
+export function isEditChromeTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Node)) {
+    return false;
+  }
+  const roots = [
+    view.blockActionBarEl,
+    getLayerSlot("popover", "link-popover"),
+    getLayerSlot("popover", "slash-menu"),
+  ];
+  return roots.some((root) => root != null && root.contains(target));
+}
+
+/**
  * Show the link URL popover. The iframe owns the Selection, so the existing-link state comes from
  * the latest selection snapshot; Apply/Remove post `applyFormat` link intents the iframe applies.
  *
@@ -470,11 +597,11 @@ export function renderBlockActionBar() {
   // Position from the iframe-host's viewport-space anchor (the bar is position:fixed). The parent
   // Never reads the iframe DOM, so geometry crosses the bridge as the selection snapshot's rect.
   const anchor = getEditBarAnchorRect();
-  if (!anchor) {
+  const pos = anchor ? barPosition(anchor) : null;
+  if (!pos) {
     litRender(nothing, view.blockActionBarEl);
     return;
   }
-  const topPos = anchor.top < 80 ? anchor.top + anchor.height + 4 : anchor.top - 38;
 
   const tag = (node.tagName ?? "div").toLowerCase();
 
@@ -509,7 +636,7 @@ export function renderBlockActionBar() {
     html`
       <div
         class="block-action-bar"
-        style=${styleMap({ left: `${anchor.left}px`, top: `${topPos}px` })}
+        style=${styleMap({ left: `${pos.left}px`, top: `${pos.top}px` })}
         @mousedown=${onBarMousedown}
       >
         ${selection.length >= 2 ? renderParentSelector() : nothing}
@@ -634,10 +761,6 @@ export function renderBlockActionBar() {
     if (!bar) {
       return;
     }
-    // Clamp to window
-    const barRect = rectOf(bar);
-    if (barRect.right > window.innerWidth) {
-      bar.style.left = `${Math.max(0, window.innerWidth - barRect.width)}px`;
-    }
+    clampBarToWindow(bar);
   });
 }

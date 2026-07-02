@@ -1,6 +1,6 @@
 import "./with-dom.js";
 import { beforeEach, describe, expect, test } from "bun:test";
-import { closeTab, openTab, workspace } from "../src/workspace/workspace";
+import { activeTab, closeTab, openTab, workspace } from "../src/workspace/workspace";
 import { applyDropInstruction } from "../src/panels/dnd";
 import { jsonClone } from "../src/utils/studio-utils";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -46,10 +46,12 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("reorder-above moves node before target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "reorder-above" }, { path: ["children", 2], type: "tree-node" }, [
-      "children",
-      0,
-    ]);
+    applyDropInstruction(
+      activeTab.value,
+      { type: "reorder-above" },
+      { path: ["children", 2], type: "tree-node" },
+      ["children", 0],
+    );
     const children = tab.doc.document.children as JxMutableNode[];
     expect(children.map((c) => c.textContent ?? c.tagName)).toEqual(["second", "section", "first"]);
     assertNoHoles(tab.doc.document);
@@ -57,10 +59,12 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("reorder-below moves node after target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "reorder-below" }, { path: ["children", 0], type: "tree-node" }, [
-      "children",
-      2,
-    ]);
+    applyDropInstruction(
+      activeTab.value,
+      { type: "reorder-below" },
+      { path: ["children", 0], type: "tree-node" },
+      ["children", 2],
+    );
     const children = tab.doc.document.children as JxMutableNode[];
     expect(children.map((c) => c.textContent ?? c.tagName)).toEqual(["first", "second", "section"]);
     assertNoHoles(tab.doc.document);
@@ -68,10 +72,12 @@ describe("applyDropInstruction — tree-node moves", () => {
 
   test("make-child appends node into target's children", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "make-child" }, { path: ["children", 1], type: "tree-node" }, [
-      "children",
-      0,
-    ]);
+    applyDropInstruction(
+      activeTab.value,
+      { type: "make-child" },
+      { path: ["children", 1], type: "tree-node" },
+      ["children", 0],
+    );
     const [section] = (tab.doc.document as any).children;
     expect(section.children).toHaveLength(2);
     expect(section.children[1].textContent).toBe("first");
@@ -87,10 +93,15 @@ describe("applyDropInstruction — tree-node moves", () => {
     // Even if called repeatedly with the same (now stale) arguments.
     const tab = openDoc(makeDoc());
     const src = { path: ["children", 2], type: "tree-node" };
-    applyDropInstruction({ type: "make-child" }, src, ["children", 0]);
+    applyDropInstruction(activeTab.value, { type: "make-child" }, src, ["children", 0]);
     // Simulate the outer stacked targets firing with the same stale source path
-    applyDropInstruction({ type: "make-child" }, src, ["children", 0, "children", 0]);
-    applyDropInstruction({ type: "reorder-above" }, src, ["children", 0]);
+    applyDropInstruction(activeTab.value, { type: "make-child" }, src, [
+      "children",
+      0,
+      "children",
+      0,
+    ]);
+    applyDropInstruction(activeTab.value, { type: "reorder-above" }, src, ["children", 0]);
 
     assertNoHoles(tab.doc.document);
     // First application moved "second" into the section; stale repeats were no-ops
@@ -104,9 +115,12 @@ describe("applyDropInstruction — tree-node moves", () => {
     const tab = openDoc(makeDoc());
     const before = jsonClone(tab.doc.document);
     // TargetPath ["children"] has no parent element and a non-numeric index
-    applyDropInstruction({ type: "reorder-above" }, { path: ["children", 1], type: "tree-node" }, [
-      "children",
-    ]);
+    applyDropInstruction(
+      activeTab.value,
+      { type: "reorder-above" },
+      { path: ["children", 1], type: "tree-node" },
+      ["children"],
+    );
     expect(jsonClone(tab.doc.document)).toEqual(before);
   });
 });
@@ -121,6 +135,7 @@ describe("applyDropInstruction — block inserts", () => {
   test("reorder-above inserts fragment before target", () => {
     const tab = openDoc(makeDoc());
     applyDropInstruction(
+      activeTab.value,
       { type: "reorder-above" },
       { fragment: { tagName: "hr" }, type: "block" },
       ["children", 1],
@@ -133,10 +148,12 @@ describe("applyDropInstruction — block inserts", () => {
 
   test("make-child appends fragment into target", () => {
     const tab = openDoc(makeDoc());
-    applyDropInstruction({ type: "make-child" }, { fragment: { tagName: "img" }, type: "block" }, [
-      "children",
-      0,
-    ]);
+    applyDropInstruction(
+      activeTab.value,
+      { type: "make-child" },
+      { fragment: { tagName: "img" }, type: "block" },
+      ["children", 0],
+    );
     const [section] = (tab.doc.document as any).children;
     expect(section.children).toHaveLength(2);
     expect(section.children[1].tagName).toBe("img");
@@ -147,10 +164,37 @@ describe("applyDropInstruction — block inserts", () => {
     const tab = openDoc(makeDoc());
     const before = jsonClone(tab.doc.document);
     applyDropInstruction(
+      activeTab.value,
       { type: "reorder-below" },
       { fragment: { tagName: "hr" }, type: "block" },
       ["children"],
     );
     expect(jsonClone(tab.doc.document)).toEqual(before);
+  });
+});
+
+describe("applyDropInstruction — tab routing", () => {
+  test("a null tab is a no-op (the originating tab is gone)", () => {
+    const tab = openDoc(makeDoc());
+    const before = JSON.stringify(tab.doc.document);
+    applyDropInstruction(
+      null,
+      { type: "reorder-above" },
+      {
+        path: ["children", 2],
+        type: "tree-node",
+      },
+      ["children", 0],
+    );
+    applyDropInstruction(
+      null,
+      { type: "make-child" },
+      {
+        fragment: { tagName: "img" },
+        type: "block",
+      },
+      ["children", 0],
+    );
+    expect(JSON.stringify(tab.doc.document)).toBe(before);
   });
 });

@@ -17,10 +17,15 @@ import {
   startGrabDetector,
 } from "./iframe-drop";
 import { startIframeInlineEdit } from "./iframe-inline-edit";
+import { startIframeSlashBridge } from "./iframe-slash";
 import { startKeyForwarding } from "./iframe-keys";
 import { applyIframePatch } from "./iframe-patch";
 import { disposeAllSubtrees } from "./iframe-subtree";
 import { serializeDataScope } from "./serialize-scope";
+import { getActivePath, isEditing, stopEditing } from "../editor/inline-edit";
+import { isAncestor } from "../state";
+import type { JxDocOp } from "../tabs/patch-ops";
+import type { JxPath } from "../state";
 // ObserveScope MUST come from the runtime: the $defs refs are created by the runtime's copy of
 // @vue/reactivity, and dep tracking is per module instance — an effect from the studio's own copy
 // Would never re-run when a dev-proxy data source settles.
@@ -46,6 +51,43 @@ function previewAt(
     return null;
   }
   return computeDropInstruction(targetEl, cursor.y, shadowDoc, src);
+}
+
+/** Set-key keys the patcher applies IN PLACE (never a subtree re-render) — safe under a live edit. */
+const IN_PLACE_KEYS = new Set(["style", "textContent"]);
+
+/**
+ * Whether applying `forwardOps` would re-render/detach the element of the live edit session: any op
+ * that is NOT an in-place set-key (style/text/event) whose affected node is an ancestor-or-self of
+ * the active edit path. Structural ops affect the PARENT's children (any sibling churn under an
+ * ancestor can reflow/replace the edited element's position), so their parent path is compared.
+ */
+export function patchDisturbsActiveEdit(forwardOps: JxDocOp[]): boolean {
+  const activePath = getActivePath();
+  if (!activePath) {
+    return false;
+  }
+  for (const op of forwardOps) {
+    let affected: JxPath;
+    if (op.op === "set-key") {
+      if (IN_PLACE_KEYS.has(op.key) || op.key.startsWith("on")) {
+        continue;
+      }
+      affected = op.path;
+    } else if (op.op === "move-child") {
+      affected = op.fromParentPath;
+      if (isAncestor(affected, activePath) || isAncestor(op.toParentPath, activePath)) {
+        return true;
+      }
+      continue;
+    } else {
+      affected = op.parentPath;
+    }
+    if (isAncestor(affected, activePath)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -181,6 +223,8 @@ export function startCanvasIframe(opts: {
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
   const stopInlineEdit = startIframeInlineEdit(channel, container);
+  // Bridge the engine's slash menu to the parent's Spectrum menu (show/nav/select over the channel).
+  const stopSlashBridge = startIframeSlashBridge(channel, container.ownerDocument);
   // Flow 3 (grab-anywhere): detect an element-body drag and DRIVE it locally. A drag that begins in
   // The iframe gets its held-button moves in the IFRAME document (not the parent), so the iframe
   // Computes the preview/drop from its own cursor and posts dragOver/dropResult directly; the parent
@@ -321,6 +365,12 @@ export function startCanvasIframe(opts: {
         channel.post({ gen, kind: "patchError", message: "patch-ahead-of-render" });
         return;
       }
+      // A structural/subtree op that re-renders the active editable (or an ancestor) would detach
+      // The session's element mid-edit — commit and end the session first (in-place style/text
+      // Patches elsewhere leave it alone).
+      if (isEditing() && patchDisturbsActiveEdit(msg.forwardOps)) {
+        stopEditing();
+      }
       try {
         applyIframePatch(shadowDoc, msg.forwardOps, container, renderCtx);
         channel.post({ gen, kind: "patchComplete" });
@@ -386,6 +436,13 @@ export function startCanvasIframe(opts: {
     if (msg.kind !== "render" || msg.gen < latestGen) {
       return;
     }
+    // A render replaces the DOM under a live edit session — COMMIT it first (never discard). The
+    // Resulting editCommit/editEnd post synchronously here, so on the FIFO channel they precede
+    // This render's renderComplete and the parent routes them by the host's not-yet-flipped tab
+    // Identity — a commit racing a tab switch still lands in the document it belonged to.
+    if (isEditing()) {
+      stopEditing();
+    }
     latestGen = msg.gen;
     const { gen, mapperCtx } = msg;
     const rawDoc = msg.shadowDoc as JxMutableNode;
@@ -449,6 +506,7 @@ export function startCanvasIframe(opts: {
     stopInteraction();
     stopKeyForwarding();
     stopInlineEdit();
+    stopSlashBridge();
     stopGrabDetector();
     stopImageRetry();
     stopAutoScroll();

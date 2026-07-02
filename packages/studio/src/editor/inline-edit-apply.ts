@@ -8,12 +8,13 @@
  */
 
 import { childIndex, getNodeAtPath, parentElementPath } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { isTabActive } from "../workspace/workspace";
 import { mutateInsertNode, mutateUpdateProperty, transactDoc } from "../tabs/transact";
 import { defaultDef } from "../panels/shared";
 
 import type { JxContentResult, SlashCommand } from "./inline-edit";
 import type { JxPath } from "../state";
+import type { Tab } from "../tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /**
@@ -41,20 +42,26 @@ export function isEmptyContent(commitData?: JxContentResult): boolean {
 }
 
 /**
- * Commit edited content to the node at `path` (children when rich, else textContent). No-op if
- * unchanged.
+ * Commit edited content to the node at `path` of `tab`'s document (children when rich, else
+ * textContent). No-op if unchanged or the originating tab is gone. `tab` is the tab the edit
+ * session belonged to (resolved host-side from the posting iframe) — NEVER the active tab at
+ * message time, which may have changed while the commit was in flight.
  */
 export function applyInlineCommit(
+  tab: Tab | null,
   path: JxPath,
   children: (JxMutableNode | string)[] | null,
   textContent: string | null,
 ): void {
-  const node = getNodeAtPath(activeTab.value!.doc.document, path);
+  if (!tab) {
+    return;
+  }
+  const node = getNodeAtPath(tab.doc.document, path);
   if (children) {
     if (node && JSON.stringify(node.children) === JSON.stringify(children)) {
       return;
     }
-    transactDoc(activeTab.value, (t) => {
+    transactDoc(tab, (t) => {
       mutateUpdateProperty(t, path, "textContent");
       mutateUpdateProperty(t, path, "children", children);
     });
@@ -62,7 +69,7 @@ export function applyInlineCommit(
     if (node && node.textContent === textContent && !node.children) {
       return;
     }
-    transactDoc(activeTab.value, (t) => {
+    transactDoc(tab, (t) => {
       mutateUpdateProperty(t, path, "children");
       mutateUpdateProperty(t, path, "textContent", textContent);
     });
@@ -70,16 +77,22 @@ export function applyInlineCommit(
 }
 
 /**
- * Apply a paragraph split: keep `before` in the node, insert a new `<p>` with `after`. Returns its
- * path.
+ * Apply a paragraph split to `tab`'s document: keep `before` in the node, insert a new `<p>` with
+ * `after`. Returns its path (unchanged when `tab` is gone — the caller may still use it for
+ * bookkeeping, but nothing is mutated).
  */
 export function applyInlineSplit(
+  tab: Tab | null,
   path: JxPath,
   before: JxContentResult,
   after: JxContentResult,
 ): JxPath {
   const parentPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
+  const newPath = [...parentPath, "children", idx + 1];
+  if (!tab) {
+    return newPath;
+  }
   const newNode: JxMutableNode = { tagName: "p" };
   if (after.textContent != null) {
     newNode.textContent = after.textContent;
@@ -88,9 +101,8 @@ export function applyInlineSplit(
   } else {
     newNode.textContent = "";
   }
-  const newPath = [...parentPath, "children", idx + 1];
 
-  transactDoc(activeTab.value, (t) => {
+  transactDoc(tab, (t) => {
     if (before.textContent != null) {
       mutateUpdateProperty(t, path, "children");
       mutateUpdateProperty(t, path, "textContent", before.textContent);
@@ -99,23 +111,31 @@ export function applyInlineSplit(
       mutateUpdateProperty(t, path, "children", before.children);
     }
     mutateInsertNode(t, parentPath, idx + 1, newNode);
-    t.session.selection = newPath;
+    // A background tab's selection stays exactly as the user left it — only the visible tab's
+    // Selection follows the split.
+    if (isTabActive(tab)) {
+      t.session.selection = newPath;
+    }
   });
   return newPath;
 }
 
 /**
- * Apply a slash-insert at `path`: swap the (empty) node's tag in place, or commit pending content
- * and insert a new element after it. Returns the path to edit next (the swapped node or the new
- * one).
+ * Apply a slash-insert at `path` of `tab`'s document: swap the (empty) node's tag in place, or
+ * commit pending content and insert a new element after it. Returns the path to edit next (the
+ * swapped node or the new one); nothing is mutated when `tab` is gone.
  */
 export function applyInlineInsert(
+  tab: Tab | null,
   path: JxPath,
   cmd: SlashCommand,
   commitData: JxContentResult | undefined,
 ): JxPath {
   if (isEmptyContent(commitData)) {
-    transactDoc(activeTab.value, (t) => {
+    if (!tab) {
+      return path;
+    }
+    transactDoc(tab, (t) => {
       mutateUpdateProperty(t, path, "tagName", cmd.tag);
       mutateUpdateProperty(t, path, "children");
       const def = defaultDef(cmd.tag);
@@ -124,17 +144,22 @@ export function applyInlineInsert(
       } else {
         mutateUpdateProperty(t, path, "textContent");
       }
-      t.session.selection = path;
+      if (isTabActive(tab)) {
+        t.session.selection = path;
+      }
     });
     return path;
   }
 
-  const elementDef = defaultDef(cmd.tag);
   const parentPath = parentElementPath(path) as JxPath;
   const idx = childIndex(path) as number;
   const newPath = [...parentPath, "children", idx + 1];
+  if (!tab) {
+    return newPath;
+  }
+  const elementDef = defaultDef(cmd.tag);
 
-  transactDoc(activeTab.value, (t) => {
+  transactDoc(tab, (t) => {
     if (commitData?.children) {
       mutateUpdateProperty(t, path, "textContent");
       mutateUpdateProperty(t, path, "children", commitData.children);
@@ -143,7 +168,9 @@ export function applyInlineInsert(
       mutateUpdateProperty(t, path, "textContent", commitData.textContent);
     }
     mutateInsertNode(t, parentPath, idx + 1, structuredClone(elementDef));
-    t.session.selection = newPath;
+    if (isTabActive(tab)) {
+      t.session.selection = newPath;
+    }
   });
   return newPath;
 }

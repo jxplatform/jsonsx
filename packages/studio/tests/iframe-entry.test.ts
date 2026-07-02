@@ -736,3 +736,177 @@ describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", 
     expect(acks.some((m) => m.kind === "forwardWheel")).toBe(false);
   });
 });
+
+// ─── Render/patch vs live edit session (tab-identity lifecycle guards) ─────────
+
+describe("render/patch vs live edit session", () => {
+  const P_DOC = () => ({
+    children: [{ children: ["Hi"], tagName: "p" }],
+    tagName: "div",
+  });
+
+  async function bootEditable() {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(renderMsg(1, P_DOC(), P_DOC()));
+    pair.flush();
+    await flush();
+    pair.flush();
+    const { startEditing } = await import("../src/editor/inline-edit");
+    const el = container.querySelector("p") as HTMLElement;
+    const calls: string[] = [];
+    startEditing(el, ["children", 0], {
+      onCommit: (path, children, textContent) => {
+        calls.push("commit");
+        pair.iframe.post({ children, kind: "editCommit", path, textContent });
+      },
+      onEnd: () => {
+        calls.push("end");
+        pair.iframe.post({ kind: "editEnd" });
+      },
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    return { acks, calls, container, el, pair };
+  }
+
+  test("a render arriving mid-session COMMITS it, and the commit precedes renderComplete", async () => {
+    const { acks, container, el, pair } = await bootEditable();
+    el.textContent = "typed";
+    acks.length = 0;
+
+    pair.parent.post(renderMsg(2, P_DOC(), P_DOC()));
+    pair.flush();
+    await flush();
+    pair.flush();
+
+    const { isEditing } = await import("../src/editor/inline-edit");
+    expect(isEditing()).toBe(false);
+    const kinds = acks.map((m) => m.kind);
+    const commitIdx = kinds.indexOf("editCommit");
+    const doneIdx = kinds.indexOf("renderComplete");
+    // FIFO: the commit posts BEFORE the ack that flips the host's tab identity.
+    expect(commitIdx).toBeGreaterThanOrEqual(0);
+    expect(doneIdx).toBeGreaterThan(commitIdx);
+    expect(acks[commitIdx]).toMatchObject({ path: ["children", 0], textContent: "typed" });
+    expect(container.querySelector("p")).toBeTruthy();
+  });
+
+  test("a STALE-gen render does not end the session", async () => {
+    const { acks, pair } = await bootEditable();
+    acks.length = 0;
+
+    pair.parent.post(renderMsg(0, P_DOC(), P_DOC()));
+    pair.flush();
+    await flush();
+    pair.flush();
+
+    const { isEditing, stopEditing } = await import("../src/editor/inline-edit");
+    expect(isEditing()).toBe(true);
+    expect(acks.some((m) => m.kind === "editCommit")).toBe(false);
+    stopEditing();
+  });
+
+  test("a patch that re-renders the edited subtree ends the session first; text/style elsewhere do not", async () => {
+    const { acks, pair } = await bootEditable();
+    acks.length = 0;
+
+    // In-place text patch on ANOTHER node — the session survives.
+    pair.parent.post({
+      forwardOps: [{ key: "textContent", op: "set-key", path: ["children", 1], value: "x" }],
+      gen: 1,
+      kind: "patch",
+    });
+    pair.flush();
+    const { isEditing } = await import("../src/editor/inline-edit");
+    expect(isEditing()).toBe(true);
+
+    // A children re-render on the edited node itself — commit-and-end BEFORE the patch applies.
+    pair.parent.post({
+      forwardOps: [{ key: "children", op: "set-key", path: ["children", 0], value: ["swapped"] }],
+      gen: 1,
+      kind: "patch",
+    });
+    pair.flush();
+    expect(isEditing()).toBe(false);
+    pair.flush(); // Deliver the commit the guard posted during the patch handling.
+    expect(acks.some((m) => m.kind === "editCommit")).toBe(true);
+  });
+});
+
+describe("patchDisturbsActiveEdit", () => {
+  test("classifies ops against the live edit path", async () => {
+    const { patchDisturbsActiveEdit } = await import("../src/canvas/iframe-entry");
+    const { startEditing, stopEditing } = await import("../src/editor/inline-edit");
+
+    // No session → nothing disturbs.
+    expect(
+      patchDisturbsActiveEdit([{ key: "children", op: "set-key", path: ["children", 0] }]),
+    ).toBe(false);
+
+    const el = document.createElement("p");
+    document.body.append(el);
+    startEditing(el, ["children", 0, "children", 1], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    try {
+      // In-place set-keys (style/text/event) never disturb, wherever they land.
+      expect(
+        patchDisturbsActiveEdit([
+          { key: "style", op: "set-key", path: ["children", 0, "children", 1] },
+          { key: "textContent", op: "set-key", path: ["children", 0, "children", 1] },
+          { key: "onclick", op: "set-key", path: ["children", 0, "children", 1] },
+        ]),
+      ).toBe(false);
+      // A subtree-re-rendering set-key on an ancestor-or-self disturbs…
+      expect(
+        patchDisturbsActiveEdit([{ key: "children", op: "set-key", path: ["children", 0] }]),
+      ).toBe(true);
+      // …but on an unrelated branch does not.
+      expect(
+        patchDisturbsActiveEdit([{ key: "children", op: "set-key", path: ["children", 2] }]),
+      ).toBe(false);
+      // Structural ops compare their PARENT path (sibling churn can reflow the edited element).
+      expect(
+        patchDisturbsActiveEdit([
+          { index: 0, node: {}, op: "insert-child", parentPath: ["children", 0] },
+        ]),
+      ).toBe(true);
+      expect(
+        patchDisturbsActiveEdit([{ index: 0, op: "remove-child", parentPath: ["children", 2] }]),
+      ).toBe(false);
+      // Move: either endpoint's parent counts.
+      expect(
+        patchDisturbsActiveEdit([
+          {
+            fromIndex: 0,
+            fromParentPath: ["children", 2],
+            op: "move-child",
+            toIndex: 0,
+            toParentPath: ["children", 0],
+          },
+        ]),
+      ).toBe(true);
+      expect(
+        patchDisturbsActiveEdit([
+          {
+            fromIndex: 0,
+            fromParentPath: ["children", 2],
+            op: "move-child",
+            toIndex: 1,
+            toParentPath: ["children", 3],
+          },
+        ]),
+      ).toBe(false);
+    } finally {
+      stopEditing();
+    }
+  });
+});

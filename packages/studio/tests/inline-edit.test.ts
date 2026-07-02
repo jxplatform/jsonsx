@@ -431,3 +431,31 @@ describe("normalizeChildren", () => {
     expect(result.children.length).toBe(1);
   });
 });
+
+describe("session accessors", () => {
+  test("getActivePath mirrors the live session; isSlashActive proxies the DI'd controller", async () => {
+    const { getActivePath, isSlashActive } = await import("../src/editor/inline-edit");
+
+    expect(getActivePath()).toBeNull();
+    expect(isSlashActive()).toBe(false);
+
+    const el = document.createElement("p");
+    document.body.append(el);
+    startEditing(el, ["children", 3], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    expect(getActivePath()).toEqual(["children", 3]);
+
+    let open = true;
+    setSlashController({ dismiss: () => {}, isOpen: () => open, show: () => {} });
+    expect(isSlashActive()).toBe(true);
+    open = false;
+    expect(isSlashActive()).toBe(false);
+
+    stopEditing();
+    expect(getActivePath()).toBeNull();
+  });
+});

@@ -69,6 +69,19 @@ export type ParentToIframe =
   | { kind: "patch"; forwardOps: WireDocOp[]; gen: number }
   // Enter inline editing on the node at `path` (used to re-enter after a split/insert re-renders).
   | { kind: "enterEdit"; path: (string | number)[] }
+  // Commit and end the inline-edit session if one is live (a no-op otherwise). Posted by the parent
+  // When focus/intent leaves the edit surface in the PARENT realm (tab switch, layers-panel click,
+  // Chrome pointerdown outside the edit toolbars) — the iframe can't observe those itself. Carries
+  // No identity: each host talks to exactly one iframe, so the parent routes the resulting
+  // EditCommit by the posting host's tab.
+  | { kind: "endEdit" }
+  // The parent slash menu resolved a selection — the iframe engine deletes the "/filter" text and
+  // Runs its insert flow (which posts editInsert back).
+  | { kind: "slashSelect"; cmd: SlashCommand }
+  // The parent dismissed the slash menu (outside click / Escape / no matches). The iframe bridge
+  // Flips closed but KEEPS its stored onSelect — the parent's select() dismisses the menu BEFORE it
+  // Fires onSelect, so a slashSelect may legitimately arrive after this.
+  | { kind: "slashDismissed" }
   // Apply a format/link/insert intent to the iframe's cached selection range (4b-2 format toolbar).
   // The parent toolbar lives in the parent realm but never touches the iframe Selection — it posts
   // The author's intent and the iframe applies it where the edited DOM (and its Selection) live.
@@ -265,6 +278,23 @@ export type IframeToParent =
     }
   // The inline-edit session ended.
   | { kind: "editEnd" }
+  // ─── Slash-menu bridge ──────────────────────────────────────────────────────
+  // The engine (in the iframe) detected "/" in a live edit session; the parent shows the real
+  // Lit/Spectrum menu. Re-posted with a new `filter` as the author keeps typing (the engine's
+  // UpdateSlashMenu drives it). `rect` is the edited element's bbox in IFRAME-VIEWPORT coords.
+  | { kind: "slashShow"; rect: SerializableRect; filter: string }
+  // A menu-navigation key pressed in the iframe while the parent menu is open. The iframe
+  // Intercepts these four keys capture-phase (restoring the "menu captures Enter" contract) and the
+  // Host drives the parent menu's key handler directly — no synthetic keydown redispatch.
+  | { kind: "slashNav"; key: "ArrowUp" | "ArrowDown" | "Enter" | "Escape" }
+  // Iframe-side dismissal (backspace past the "/", session end, a click inside the iframe — the
+  // Parent's outside-click listener can't see iframe clicks).
+  | { kind: "slashDismiss" }
+  // ─── Context menu ───────────────────────────────────────────────────────────
+  // Right-click in the canvas. `path` is the nearest data-jx-path node (null on empty space — the
+  // Browser menu is still suppressed, legacy parity); x/y are IFRAME-VIEWPORT coords for the host
+  // To convert via its empirical geometry.
+  | { kind: "contextMenu"; path: (string | number)[] | null; x: number; y: number }
   // ─── Cross-frame DnD (Phase 4c spike) ──────────────────────────────────────
   // Flow 3 (grab-anywhere): the iframe detected a drag begin on an element body (pointerdown past a
   // Movement threshold on a `[data-jx-path]`, NOT during an inline-edit). The parent starts a

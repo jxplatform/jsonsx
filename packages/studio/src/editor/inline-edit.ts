@@ -366,6 +366,25 @@ export function getActiveElement() {
   return activeEl;
 }
 
+/**
+ * Get the document path of the currently editing element (null when no session is live).
+ *
+ * @returns {JxPath | null}
+ */
+export function getActivePath() {
+  return activePath;
+}
+
+/**
+ * Whether the DI'd slash menu reports itself open — session-lifecycle guards must not commit-and-
+ * end on a pointerdown that is really a slash-menu interaction.
+ *
+ * @returns {boolean}
+ */
+export function isSlashActive() {
+  return slash.isOpen();
+}
+
 // ─── Event handlers ────────────────────────────────────────────────────────
 
 /** @param {KeyboardEvent} e */

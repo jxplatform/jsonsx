@@ -8,6 +8,7 @@ import { render as litRender, nothing } from "lit-html";
 import { canvasPanels } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
+import { updateActivePanelHeaders } from "../canvas/canvas-utils";
 import type { EffectScope } from "@vue/reactivity";
 
 interface OverlaysCtx {
@@ -36,10 +37,12 @@ export function mount(ctx: OverlaysCtx) {
       if (!tab) {
         return;
       }
-      // Track selection, hover, and mode
+      // Track selection, hover, mode, and the active panel (a hit in another breakpoint panel — or
+      // A header click — re-anchors the block action bar even when the selection path is unchanged).
       void tab.session.selection;
       void tab.session.hover;
       void tab.doc.mode;
+      void tab.session.ui.activeMedia;
       render();
     });
   });
@@ -78,6 +81,10 @@ function _flush() {
     litRender(nothing, p.overlay);
     p.overlayClk.style.pointerEvents = "none";
   }
+
+  // Header highlighting follows hit-driven activation immediately (it otherwise only refreshes on
+  // Full canvas renders).
+  updateActivePanelHeaders();
 
   _ctx.renderBlockActionBar();
 }

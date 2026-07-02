@@ -208,3 +208,68 @@ describe("startInteraction — insertion '+' zones (deps)", () => {
     expect(posts.some((p) => p.kind === "insertZones" && p.zones !== null)).toBe(false);
   });
 });
+
+// ─── Context menu forwarding (right-click → parent Jx menu) ─────────────────────
+
+describe("contextmenu forwarding", () => {
+  test("right-click on a stamped element preventDefaults and posts contextMenu with the path", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 10, y: 5 });
+    const stop = startInteraction(channel, document);
+
+    const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    inner.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    const msg = posts.find((p) => p.kind === "contextMenu");
+    expect(msg).toMatchObject({ kind: "contextMenu", path: ["children", 0] });
+    stop();
+  });
+
+  test("right-click on empty space still suppresses the browser menu (path null)", () => {
+    const { channel, posts } = fakeChannel();
+    const lonely = document.createElement("div");
+    document.body.append(lonely);
+    const stop = startInteraction(channel, document);
+
+    const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    lonely.dispatchEvent(e);
+
+    expect(e.defaultPrevented).toBe(true);
+    expect(posts.find((p) => p.kind === "contextMenu")).toMatchObject({ path: null });
+    stop();
+  });
+
+  test("right-click INSIDE the active editable keeps the native menu (no post)", async () => {
+    const { channel, posts } = fakeChannel();
+    const { outer } = stampedTree('["children",0]', { height: 20, width: 100, x: 10, y: 5 });
+    const stop = startInteraction(channel, document);
+
+    const { startEditing, stopEditing } = await import("../src/editor/inline-edit");
+    startEditing(outer, ["children", 0], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    try {
+      const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+      outer.dispatchEvent(e);
+      expect(e.defaultPrevented).toBe(false);
+      expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
+    } finally {
+      stopEditing();
+    }
+    stop();
+  });
+
+  test("teardown removes the contextmenu listener", () => {
+    const { channel, posts } = fakeChannel();
+    const { inner } = stampedTree('["children",0]', { height: 20, width: 100, x: 10, y: 5 });
+    const stop = startInteraction(channel, document);
+    stop();
+
+    inner.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    expect(posts.some((p) => p.kind === "contextMenu")).toBe(false);
+  });
+});

@@ -134,6 +134,7 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   initBlockActionBar: (ctx: unknown) => {
     blockBarCtx = ctx;
   },
+  isEditChromeTarget: mock(() => false),
   renderBlockActionBar: mock(() => {}),
 }));
 
@@ -818,5 +819,15 @@ describe("autosave", () => {
     await captured!();
     expect(write).not.toHaveBeenCalled();
     expect(tab.doc.dirty).toBe(true);
+  });
+});
+
+describe("parent-chrome commit guard", () => {
+  test("a chrome pointerdown with no live edit session is a harmless no-op", () => {
+    // The capture-phase guard registered at init runs on every parent pointerdown; without an
+    // Active edit host (getEditSnapshot().editing false) it must short-circuit silently.
+    expect(() =>
+      document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
+    ).not.toThrow();
   });
 });

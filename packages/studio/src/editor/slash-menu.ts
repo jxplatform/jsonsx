@@ -41,16 +41,26 @@ const SLASH_COMMANDS = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let callbacks: {
+/** Callbacks a caller passes to {@link showSlashMenu}/{@link showSlashMenuAtRect}. */
+export interface SlashMenuCallbacks {
   onSelect: (cmd: SlashCommand) => void;
+  /** Fired whenever the menu closes (outside click, Escape, no matches, and just before select). */
+  onDismiss?: () => void;
   showFilter?: boolean;
   commands?: SlashCommand[];
-} | null = null;
+}
+
+/** The anchor geometry the menu positions from (a DOMRect satisfies this). */
+export interface SlashMenuAnchorRect {
+  left: number;
+  bottom: number;
+}
+
+let callbacks: SlashMenuCallbacks | null = null;
 let activeIdx = 0;
 let filteredItems: SlashCommand[] = [];
 let open = false;
-let _anchorEl: HTMLElement | null = null;
-let _anchorRect: DOMRect | null = null;
+let _anchorRect: SlashMenuAnchorRect | null = null;
 let _filterEl: HTMLInputElement | null = null;
 let _popoverEl: HTMLElement | null = null;
 
@@ -71,24 +81,33 @@ export function isSlashMenuOpen() {
  *
  * @param {HTMLElement} anchorEl — the element being edited (for positioning)
  * @param {string} filter — current typed filter text (after the "/")
- * @param {{
- *   onSelect: (cmd: SlashCommand) => void;
- *   showFilter?: boolean;
- *   commands?: SlashCommand[];
- * }} cbs
+ * @param {SlashMenuCallbacks} cbs
  */
-export function showSlashMenu(
-  anchorEl: HTMLElement,
+export function showSlashMenu(anchorEl: HTMLElement, filter: string, cbs: SlashMenuCallbacks) {
+  showAt(rectOf(anchorEl), filter, cbs);
+}
+
+/**
+ * Show (or update) the slash menu anchored below a PARENT-VIEWPORT rect — for callers with no
+ * anchor element in this realm (the canvas iframe posts the edited element's rect across the bridge
+ * and the host converts it).
+ *
+ * @param {SlashMenuAnchorRect} rect
+ * @param {string} filter
+ * @param {SlashMenuCallbacks} cbs
+ */
+export function showSlashMenuAtRect(
+  rect: SlashMenuAnchorRect,
   filter: string,
-  cbs: {
-    onSelect: (cmd: SlashCommand) => void;
-    showFilter?: boolean;
-    commands?: SlashCommand[];
-  },
+  cbs: SlashMenuCallbacks,
 ) {
+  showAt(rect, filter, cbs);
+}
+
+/** Shared body of the two show entry points. */
+function showAt(rect: SlashMenuAnchorRect, filter: string, cbs: SlashMenuCallbacks) {
   callbacks = cbs;
-  _anchorEl = anchorEl;
-  _anchorRect = rectOf(anchorEl);
+  _anchorRect = rect;
 
   const source = cbs.commands || SLASH_COMMANDS;
   filteredItems = filter
@@ -104,7 +123,7 @@ export function showSlashMenu(
 
   activeIdx = 0;
 
-  render(anchorEl, cbs.showFilter || false);
+  render(cbs.showFilter || false);
 
   if (!open) {
     open = true;
@@ -127,9 +146,9 @@ export function dismissSlashMenu() {
   if (!open) {
     return;
   }
+  const cbs = callbacks;
   open = false;
   callbacks = null;
-  _anchorEl = null;
   _anchorRect = null;
   _filterEl = null;
   _popoverEl = null;
@@ -137,16 +156,19 @@ export function dismissSlashMenu() {
   document.removeEventListener("keydown", onKeydown, true);
   document.removeEventListener("mousedown", onOutsideClick, true);
   litRender(nothing, getHost());
+  // After teardown so a re-entrant show from the callback sees a closed menu. select() relies on
+  // This ordering too: dismiss (→ onDismiss) fires BEFORE onSelect.
+  cbs?.onDismiss?.();
 }
 
 // ─── Internal ─────────────────────────────────────────────────────────────────
 
-/**
- * @param {HTMLElement} anchorEl
- * @param {boolean} showFilter
- */
-function render(anchorEl: HTMLElement, showFilter: boolean) {
-  const rect = _anchorRect || rectOf(anchorEl);
+/** @param {boolean} showFilter */
+function render(showFilter: boolean) {
+  const rect = _anchorRect;
+  if (!rect) {
+    return;
+  }
 
   litRender(
     html`
@@ -225,9 +247,7 @@ function onFilterInput(e: Event) {
     : source;
 
   activeIdx = 0;
-  if (_anchorEl) {
-    render(_anchorEl, true);
-  }
+  render(true);
 
   // Re-focus input after re-render
   requestAnimationFrame(() => {
@@ -239,17 +259,21 @@ function onFilterInput(e: Event) {
   });
 }
 
-/** @param {KeyboardEvent} e */
-function onKeydown(e: KeyboardEvent) {
+/**
+ * Drive the open menu with a navigation key. The canvas-iframe bridge calls this DIRECTLY (the key
+ * was pressed in the iframe realm — a synthetic keydown redispatch on this document would lose the
+ * capture-first + stopPropagation semantics the menu relies on to shield other handlers).
+ *
+ * @param {string} key — "ArrowDown" | "ArrowUp" | "Enter" | "Escape"
+ */
+export function handleSlashMenuKey(key: string): void {
   if (!open) {
     return;
   }
 
   const items = getHost().querySelectorAll("sp-menu-item:not([disabled])") as NodeListOf<Element>;
 
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    e.stopPropagation();
+  if (key === "ArrowDown") {
     if (items.length === 0) {
       return;
     }
@@ -257,9 +281,7 @@ function onKeydown(e: KeyboardEvent) {
     activeIdx = (activeIdx + 1) % items.length;
     items[activeIdx]?.setAttribute("focused", "");
     items[activeIdx]?.scrollIntoView({ block: "nearest" });
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    e.stopPropagation();
+  } else if (key === "ArrowUp") {
     if (items.length === 0) {
       return;
     }
@@ -267,16 +289,24 @@ function onKeydown(e: KeyboardEvent) {
     activeIdx = (activeIdx - 1 + items.length) % items.length;
     items[activeIdx]?.setAttribute("focused", "");
     items[activeIdx]?.scrollIntoView({ block: "nearest" });
-  } else if (e.key === "Enter") {
-    e.preventDefault();
-    e.stopPropagation();
+  } else if (key === "Enter") {
     const cmd = filteredItems[activeIdx];
     if (cmd) {
       select(cmd);
     }
-  } else if (e.key === "Escape") {
+  } else if (key === "Escape") {
+    dismissSlashMenu();
+  }
+}
+
+/** @param {KeyboardEvent} e */
+function onKeydown(e: KeyboardEvent) {
+  if (!open) {
+    return;
+  }
+  if (["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) {
     e.preventDefault();
     e.stopPropagation();
-    dismissSlashMenu();
+    handleSlashMenuKey(e.key);
   }
 }

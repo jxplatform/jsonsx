@@ -9,6 +9,7 @@
 import { parseJxPath, serializeJxPath } from "./path-mapping";
 import { rectOf } from "../utils/geometry";
 import { computeInsertZones, insertZonesKey } from "./iframe-insert";
+import { getActiveElement, isEditing } from "../editor/inline-edit";
 import type { IframeChannel } from "./iframe-channel";
 import type { IframeToParent, NodeHit, ParentToIframe } from "./iframe-protocol";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -137,13 +138,34 @@ export function startInteraction(
     }
   };
 
+  const onContextMenu = (e: Event) => {
+    const me = e as MouseEvent;
+    // Inside the ACTIVE editable keep the NATIVE menu (spellcheck / paste) — the session owns it.
+    const active = isEditing() ? getActiveElement() : null;
+    if (active && e.target instanceof Node && active.contains(e.target)) {
+      return;
+    }
+    // Suppress the browser menu everywhere else (legacy parity — the deleted panel-events handler
+    // PreventDefaulted even with no element hit) and let the parent show the Jx element menu.
+    e.preventDefault();
+    const hit = nearestHit(e.target);
+    channel.post({
+      kind: "contextMenu",
+      path: hit ? hit.path : null,
+      x: me.clientX,
+      y: me.clientY,
+    });
+  };
+
   doc.addEventListener("click", onClick, true);
   doc.addEventListener("pointermove", onMove, true);
   doc.addEventListener("pointerleave", onLeave, true);
+  doc.addEventListener("contextmenu", onContextMenu, true);
 
   return () => {
     doc.removeEventListener("click", onClick, true);
     doc.removeEventListener("pointermove", onMove, true);
     doc.removeEventListener("pointerleave", onLeave, true);
+    doc.removeEventListener("contextmenu", onContextMenu, true);
   };
 }

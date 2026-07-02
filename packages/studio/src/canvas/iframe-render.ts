@@ -91,6 +91,86 @@ export async function registerElements(doc: JxDocument, docBase: string): Promis
   );
 }
 
+/** Id of the injected design/edit-mode canvas stylesheet (placeholder affordances). */
+export const EDIT_PLACEHOLDER_STYLE_ID = "jx-canvas-edit-css";
+
+/**
+ * The design/edit-mode canvas CSS, ported from the parent editor stylesheet (index.html) with
+ * iframe-safe fallbacks — the parent theme variables (--fg-dim/--radius/--accent) don't exist in
+ * the iframe document. The placeholder CLASSES are stamped by prepareForEditMode (parent-side
+ * resolution + surgical subtree renders), so preview mode never matches these rules — but the sheet
+ * is still removed there (belt and braces). The `[contenteditable="true"]:empty` hint is new: it
+ * marks the caret's empty paragraph (e.g. right after an Enter split) and advertises the slash
+ * menu.
+ */
+export const EDIT_PLACEHOLDER_CSS = `
+.empty-media-placeholder {
+  display: inline-block;
+  min-width: 120px;
+  min-height: 80px;
+  border: 1px dashed color-mix(in srgb, #808080 30%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, #808080 5%, transparent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' fill='none'%3E%3Crect x='4' y='8' width='32' height='24' rx='2' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Ccircle cx='13' cy='16' r='3' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5'/%3E%3Cpath d='M8 28l8-8 5 5 4-4 7 7' stroke='%23808080' stroke-opacity='.4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 40px no-repeat;
+  color: transparent;
+  font-size: 0;
+  overflow: hidden;
+}
+.empty-text-placeholder:not([contenteditable])::after {
+  content: "Click here to add text...";
+  color: color-mix(in srgb, #808080 40%, transparent);
+  font-style: italic;
+  font-size: 13px;
+  pointer-events: none;
+}
+.empty-container-placeholder {
+  border: 1px dashed color-mix(in srgb, #808080 25%, transparent);
+  border-radius: 4px;
+  min-height: 32px;
+  position: relative;
+}
+.empty-container-placeholder::after {
+  content: "Drag elements here...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: color-mix(in srgb, #808080 40%, transparent);
+  font-style: italic;
+  font-size: 11px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  pointer-events: none;
+  white-space: nowrap;
+}
+[contenteditable="true"]:empty::after {
+  content: "Type / for commands";
+  color: color-mix(in srgb, #808080 40%, transparent);
+  font-style: italic;
+  font-size: 13px;
+  pointer-events: none;
+}
+`;
+
+/**
+ * Keep the design/edit canvas stylesheet in sync with the render mode: present (idempotently) for
+ * design/edit, removed for preview.
+ */
+export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
+  const existing = doc.head.querySelector(`#${EDIT_PLACEHOLDER_STYLE_ID}`);
+  if (mode === "preview") {
+    existing?.remove();
+    return;
+  }
+  if (existing) {
+    return;
+  }
+  const style = doc.createElement("style");
+  style.id = EDIT_PLACEHOLDER_STYLE_ID;
+  style.textContent = EDIT_PLACEHOLDER_CSS;
+  doc.head.append(style);
+}
+
 /** Apply the project's site style: custom properties on :root, plain properties on <body>. */
 export function applySiteStyle(siteStyle: Record<string, unknown> | null | undefined): void {
   if (!siteStyle || typeof siteStyle !== "object") {
@@ -229,6 +309,7 @@ export async function renderResolvedDocument(opts: {
   setCanvasDelinkAnchors(opts.mode !== "preview");
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
+  syncEditModeCss(opts.container.ownerDocument, opts.mode);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
   // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope
   // Directly and never the runtime's `Jx()` entry, which is the only other place _rootMedia is set).

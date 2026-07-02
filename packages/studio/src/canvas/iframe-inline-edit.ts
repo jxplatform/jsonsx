@@ -23,6 +23,7 @@ import {
   getActiveElement,
   isEditableBlock,
   isEditing,
+  isSlashActive,
   resumeBlurClose,
   startEditing,
   stopEditing,
@@ -289,15 +290,40 @@ export function startIframeInlineEdit(
   // Capture-phase blur: cache the range before focus moves out (the bubbling blur fires too late).
   const onBlurCapture = () => cacheRange();
 
+  /**
+   * Commit-on-click-away: a pointerdown INSIDE the iframe but OUTSIDE the active editable ends the
+   * session (committing via the engine's stopEditing → onCommit). Blur-close stays suspended for
+   * the whole session (a parent-toolbar click across the bridge must not kill it), so without this
+   * an in-canvas click-away would never commit — text edits would never reach the document.
+   */
+  const onPointerDownCapture = (e: Event) => {
+    if (!isEditing() || isSlashActive()) {
+      return;
+    }
+    const el = getActiveElement();
+    if (el && e.target instanceof Node && !el.contains(e.target)) {
+      stopEditing();
+    }
+  };
+
   doc.addEventListener("dblclick", onDblClick, true);
   doc.addEventListener("selectionchange", onSelectionChange);
   doc.addEventListener("mouseup", onMouseUp, true);
   doc.addEventListener("keyup", onKeyUp, true);
   doc.addEventListener("blur", onBlurCapture, true);
+  doc.addEventListener("pointerdown", onPointerDownCapture, true);
 
   const off = channel.onMessage((msg) => {
     if (msg.kind === "applyFormat") {
       applyFormatIntent(msg.intent);
+      return;
+    }
+    if (msg.kind === "endEdit") {
+      // The parent detected intent leaving the edit surface in ITS realm (tab switch, chrome click
+      // Outside the edit toolbars) — commit and end, a no-op when no session is live.
+      if (isEditing()) {
+        stopEditing();
+      }
       return;
     }
     if (msg.kind !== "enterEdit") {
@@ -315,6 +341,7 @@ export function startIframeInlineEdit(
     doc.removeEventListener("mouseup", onMouseUp, true);
     doc.removeEventListener("keyup", onKeyUp, true);
     doc.removeEventListener("blur", onBlurCapture, true);
+    doc.removeEventListener("pointerdown", onPointerDownCapture, true);
     off();
     clearHighlight();
     lastNonEmptyRange = null;

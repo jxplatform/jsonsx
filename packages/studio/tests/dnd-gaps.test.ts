@@ -59,6 +59,7 @@ void mock.module("../src/panels/stylebook-panel", () => ({
 const { initShellRefs, registerRenderer } = await import("../src/store");
 const { view } = await import("../src/view");
 const { componentRegistry } = await import("../src/files/components");
+const { activeTab } = await import("../src/workspace/workspace");
 const dnd = await import("../src/panels/dnd");
 
 // Shell refs: dnd reads store.leftPanel which initShellRefs populates from #left-panel.
@@ -513,6 +514,7 @@ describe("applyDropInstruction — uncovered branches", () => {
   test("block reorder-below inserts after the target", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "reorder-below" },
       { fragment: { tagName: "hr" }, type: "block" },
       ["children", 1],
@@ -524,14 +526,18 @@ describe("applyDropInstruction — uncovered branches", () => {
   test("unknown instruction types are no-ops for both source kinds", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     const before = JSON.stringify(tab.doc.document);
-    dnd.applyDropInstruction({ type: "mystery" }, { path: ["children", 1], type: "tree-node" }, [
-      "children",
-      2,
-    ]);
-    dnd.applyDropInstruction({ type: "mystery" }, { fragment: { tagName: "hr" }, type: "block" }, [
-      "children",
-      2,
-    ]);
+    dnd.applyDropInstruction(
+      activeTab.value,
+      { type: "mystery" },
+      { path: ["children", 1], type: "tree-node" },
+      ["children", 2],
+    );
+    dnd.applyDropInstruction(
+      activeTab.value,
+      { type: "mystery" },
+      { fragment: { tagName: "hr" }, type: "block" },
+      ["children", 2],
+    );
     expect(JSON.stringify(tab.doc.document)).toBe(before);
   });
 
@@ -544,9 +550,9 @@ describe("applyDropInstruction — uncovered branches", () => {
       tagName: "x-button",
     } as never);
     const src = { fragment: { tagName: "x-button" }, type: "block" };
-    dnd.applyDropInstruction({ type: "make-child" }, src, ["children", 0]);
+    dnd.applyDropInstruction(activeTab.value, { type: "make-child" }, src, ["children", 0]);
     expect(tab.doc.document.$elements).toEqual(["@acme/ui/button.js"]);
-    dnd.applyDropInstruction({ type: "make-child" }, src, ["children", 0]);
+    dnd.applyDropInstruction(activeTab.value, { type: "make-child" }, src, ["children", 0]);
     expect(tab.doc.document.$elements).toEqual(["@acme/ui/button.js"]);
   });
 
@@ -554,6 +560,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     componentRegistry.push({ package: "@acme/ui", source: "npm", tagName: "x-chip" } as never);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "reorder-above" },
       { fragment: { tagName: "x-chip" }, type: "block" },
       ["children", 1],
@@ -565,6 +572,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     componentRegistry.push({ source: "npm", tagName: "x-naked" } as never);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "x-naked" }, type: "block" },
       ["children", 0],
@@ -576,6 +584,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     const tab = resetWorkspaceWithTab(makeDoc(), { documentPath: "pages/index.json" });
     componentRegistry.push({ path: "components/card.json", tagName: "my-card" } as never);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "my-card" }, type: "block" },
       ["children", 0],
@@ -589,6 +598,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     let tab = resetWorkspaceWithTab(doc);
     componentRegistry.push({ path: "components/card.json", tagName: "my-card" } as never);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "my-card" }, type: "block" },
       ["children", 0],
@@ -599,6 +609,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     doc2.$elements = [{ $ref: "../shared/card.json" }];
     tab = resetWorkspaceWithTab(doc2);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "my-card" }, type: "block" },
       ["children", 0],
@@ -610,6 +621,7 @@ describe("applyDropInstruction — uncovered branches", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     componentRegistry.push({ tagName: "my-pathless" } as never);
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "my-pathless" }, type: "block" },
       ["children", 0],
@@ -620,11 +632,13 @@ describe("applyDropInstruction — uncovered branches", () => {
   test("plain tags and unknown custom elements skip auto-import", () => {
     const tab = resetWorkspaceWithTab(makeDoc());
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "div" }, type: "block" },
       ["children", 0],
     );
     dnd.applyDropInstruction(
+      activeTab.value,
       { type: "make-child" },
       { fragment: { tagName: "not-registered" }, type: "block" },
       ["children", 0],

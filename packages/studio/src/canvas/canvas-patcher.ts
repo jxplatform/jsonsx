@@ -14,7 +14,7 @@
  */
 
 import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { isTabActive } from "../workspace/workspace";
 import { view } from "../view";
 import { toRaw } from "../reactivity";
 import { postPatchToHosts } from "./iframe-host";
@@ -79,12 +79,6 @@ export function escalateToFullRender(reason: string) {
 }
 
 // ─── Classification ──────────────────────────────────────────────────────────
-
-/** Identity check that survives reactive proxy wrapping (activeTab.value is a proxy). */
-function isActiveTab(tab: Tab) {
-  const active = activeTab.value;
-  return active !== null && toRaw(active as object) === toRaw(tab as unknown as object);
-}
 
 /**
  * $switch cases render as a substituted first-case placeholder in edit mode, so their element paths
@@ -235,7 +229,7 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
     return { patchable: false, reason };
   };
 
-  if (!isActiveTab(tab)) {
+  if (!isTabActive(tab)) {
     return reject("inactive-tab");
   }
   const canvasMode = _ctx ? _ctx.getCanvasMode() : "";
@@ -250,10 +244,25 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
   if (!canvasPanels.every((p) => p.ready)) {
     return reject("panels-not-ready");
   }
+  // A `set-text` on a node whose CHILDREN are replaced in the same batch is subsumed by that
+  // Subtree re-render (the iframe folds every forward op into the shadow doc first, then the
+  // Trailing children re-render draws the node from the final state — see iframe-patch.ts). This is
+  // The rich-text inline-commit shape (clear text + set children), which opVerdict alone would
+  // Reject as "text-with-children" because classification runs POST-mutation — the node already has
+  // Its new children by the time we look.
+  const subtreeReplacedPaths = new Set<string>();
+  for (const op of ops) {
+    if ((op.op === "set-prop" && op.key === "children") || op.op === "replace") {
+      subtreeReplacedPaths.add(JSON.stringify(op.path));
+    }
+  }
   // Inline editing now lives inside the iframe canvas, which the parent patcher can't observe; the
   // Iframe escalates to a full render itself if a posted patch can't apply mid-edit. So there is no
   // Parent-side inline-edit guard here anymore.
   for (const op of ops) {
+    if (op.op === "set-text" && subtreeReplacedPaths.has(JSON.stringify(op.path))) {
+      continue;
+    }
     const reason = opVerdict(tab, op);
     if (reason) {
       return reject(reason);
@@ -276,13 +285,14 @@ export function classifyOps(tab: Tab, ops: JxPatchOp[]): { patchable: boolean; r
  * @param {JxPatchOp[]} ops
  * @param {TransactionRecord} [record] Value-carrying ops, used by the iframe host.
  */
-export function applyPatchBatch(_tab: Tab, _ops: JxPatchOp[], record?: TransactionRecord) {
+export function applyPatchBatch(tab: Tab, _ops: JxPatchOp[], record?: TransactionRecord) {
   // The canvas renders inside the iframe — the parent has no DOM to mutate. Post the value-carrying
-  // Forward ops over the bridge for the iframe to apply against its shadow doc. Throwing when no host
-  // Received it escalates to a full render (the suppressed render then runs), so an edit is never
-  // Dropped.
+  // Forward ops over the bridge for the iframe to apply against its shadow doc — only to hosts
+  // Rendering THIS tab's document (a background tab's iframe must never fold a foreign edit into
+  // Its shadow doc). Throwing when no host received it escalates to a full render (the suppressed
+  // Render then runs), so an edit is never dropped.
   const forwardOps = (record?.docOps ?? []).map((pair) => pair.forward);
-  if (postPatchToHosts(forwardOps, view.renderGeneration) === 0) {
+  if (postPatchToHosts(forwardOps, view.renderGeneration, tab.id) === 0) {
     throw new Error("no-ready-iframe-host");
   }
 }

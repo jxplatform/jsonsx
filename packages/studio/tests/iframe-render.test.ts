@@ -3,11 +3,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { setCanvasDelinkAnchors, setCanvasViewportTranspose } from "@jxsuite/runtime";
 import {
   applySiteStyle,
+  EDIT_PLACEHOLDER_STYLE_ID,
   injectHead,
   installCanvasImageRetry,
   makeStamper,
   registerElements,
   renderResolvedDocument,
+  syncEditModeCss,
 } from "../src/canvas/iframe-render";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
 
@@ -534,5 +536,30 @@ describe("installCanvasImageRetry", () => {
       // Listener was removed, so no re-fire was scheduled.
       expect(setCount).toBe(0);
     });
+  });
+});
+
+// ─── Design/edit-mode canvas CSS (placeholder affordances) ──────────────────────
+
+describe("syncEditModeCss", () => {
+  const sheet = () => document.head.querySelector(`#${EDIT_PLACEHOLDER_STYLE_ID}`);
+
+  test("injects the placeholder stylesheet for design/edit, idempotently", () => {
+    syncEditModeCss(document, "design");
+    expect(sheet()).toBeTruthy();
+    expect(sheet()!.textContent).toContain("Click here to add text...");
+    expect(sheet()!.textContent).toContain("Type / for commands");
+    syncEditModeCss(document, "edit");
+    expect(document.head.querySelectorAll(`#${EDIT_PLACEHOLDER_STYLE_ID}`)).toHaveLength(1);
+  });
+
+  test("a preview render removes it", () => {
+    syncEditModeCss(document, "design");
+    expect(sheet()).toBeTruthy();
+    syncEditModeCss(document, "preview");
+    expect(sheet()).toBeNull();
+    // Removing when absent is a no-op.
+    syncEditModeCss(document, "preview");
+    expect(sheet()).toBeNull();
   });
 });

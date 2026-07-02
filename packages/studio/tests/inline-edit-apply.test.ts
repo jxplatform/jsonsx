@@ -41,20 +41,20 @@ describe("isEmptyContent", () => {
 
 describe("applyInlineCommit", () => {
   test("commits plain textContent (clearing children)", () => {
-    applyInlineCommit(["children", 0], null, "Updated");
+    applyInlineCommit(tab, ["children", 0], null, "Updated");
     expect(kids()[0]!.textContent).toBe("Updated");
     expect(kids()[0]!.children).toBeUndefined();
   });
 
   test("commits rich children (clearing textContent)", () => {
     const rich = ["a ", { tagName: "strong", textContent: "b" }];
-    applyInlineCommit(["children", 0], rich, null);
+    applyInlineCommit(tab, ["children", 0], rich, null);
     expect(kids()[0]!.children).toEqual(rich);
     expect(kids()[0]!.textContent).toBeUndefined();
   });
 
   test("is a no-op when the text is unchanged", () => {
-    applyInlineCommit(["children", 0], null, "Hello");
+    applyInlineCommit(tab, ["children", 0], null, "Hello");
     expect(kids()[0]!.textContent).toBe("Hello");
   });
 });
@@ -62,6 +62,7 @@ describe("applyInlineCommit", () => {
 describe("applyInlineSplit", () => {
   test("keeps the before-content, inserts a new <p> with the after-content, returns its path", () => {
     const newPath = applyInlineSplit(
+      tab,
       ["children", 0],
       { textContent: "Hel" },
       { textContent: "lo" },
@@ -77,16 +78,73 @@ describe("applyInlineInsert", () => {
   const h2: SlashCommand = { tag: "h2" } as unknown as SlashCommand;
 
   test("swaps the tag in place when the node is empty (returns the same path)", () => {
-    applyInlineCommit(["children", 0], null, ""); // Make it empty first.
-    const path = applyInlineInsert(["children", 0], h2, { textContent: "" });
+    applyInlineCommit(tab, ["children", 0], null, ""); // Make it empty first.
+    const path = applyInlineInsert(tab, ["children", 0], h2, { textContent: "" });
     expect(path).toEqual(["children", 0]);
     expect(kids()[0]!.tagName).toBe("h2");
   });
 
   test("inserts a new element after when the node has content (returns the new path)", () => {
-    const path = applyInlineInsert(["children", 0], h2, { textContent: "Hello" });
+    const path = applyInlineInsert(tab, ["children", 0], h2, { textContent: "Hello" });
     expect(path).toEqual(["children", 1]);
     expect(kids()[0]!.textContent).toBe("Hello");
     expect(kids()[1]!.tagName).toBe("h2");
+  });
+});
+
+// ─── Tab routing (the cross-document-bleed fix) ─────────────────────────────────
+
+describe("explicit-tab routing", () => {
+  test("a null tab is a no-op for all three appliers (paths still computed)", () => {
+    applyInlineCommit(null, ["children", 0], null, "ghost");
+    expect(kids()[0]!.textContent).toBe("Hello");
+
+    const splitPath = applyInlineSplit(
+      null,
+      ["children", 0],
+      { textContent: "He" },
+      {
+        textContent: "llo",
+      },
+    );
+    expect(splitPath).toEqual(["children", 1]);
+    expect(kids()).toHaveLength(1);
+
+    const insertPath = applyInlineInsert(
+      null,
+      ["children", 0],
+      { tag: "h2" } as unknown as SlashCommand,
+      { textContent: "Hello" },
+    );
+    expect(insertPath).toEqual(["children", 1]);
+    expect(kids()).toHaveLength(1);
+    // The empty-content branch also no-ops on a null tab.
+    expect(
+      applyInlineInsert(null, ["children", 0], { tag: "h2" } as unknown as SlashCommand, {
+        textContent: "",
+      }),
+    ).toEqual(["children", 0]);
+    expect(kids()[0]!.tagName).toBe("p");
+  });
+
+  test("a commit against an INACTIVE tab mutates that tab without touching its selection", async () => {
+    const { openTab, workspace } = await import("../src/workspace/workspace");
+    const original = tab;
+    original.session.selection = ["children", 0];
+    openTab({ document: { tagName: "div" }, id: "front-tab" });
+    expect(workspace.activeTabId).toBe("front-tab");
+
+    // The background tab still receives its late split — but its selection stays as the user
+    // Left it (only the visible tab's selection follows edits).
+    const newPath = applyInlineSplit(
+      original,
+      ["children", 0],
+      { textContent: "He" },
+      { textContent: "llo" },
+    );
+    const originalKids = original.doc.document.children as Record<string, unknown>[];
+    expect(newPath).toEqual(["children", 1]);
+    expect(originalKids).toHaveLength(2);
+    expect(original.session.selection).toEqual(["children", 0]);
   });
 });

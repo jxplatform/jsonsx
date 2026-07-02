@@ -26,7 +26,7 @@ import {
 import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
 import { parseMediaEntries } from "../utils/canvas-media";
 import { getEffectiveMedia } from "../site-context";
-import { mountIframeCanvas } from "./iframe-host";
+import { commitActiveEditSession, mountIframeCanvas } from "./iframe-host";
 import { canvasPerf } from "./canvas-perf";
 import { refreshStylebookStyles, renderStylebookMode } from "../panels/stylebook-panel";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
@@ -253,6 +253,12 @@ export function renderCanvas() {
 
   // Detect whether this is a mode transition or a content-only re-render
   view.prevCanvasMode = canvasMode;
+
+  // Best-effort commit of a live inline-edit session BEFORE lit rebuilds the panel DOM. Covers
+  // Keyboard-driven tab switches / mode changes where no parent pointerdown preceded the render —
+  // The endEdit posts ahead of the new render on the FIFO channel, so the resulting editCommit
+  // Still routes to the tab the session belonged to (the host's tabId flips only on renderComplete).
+  commitActiveEditSession();
 
   // DnD handlers are registered on inner canvas elements that get replaced on every
   // Content render, so always clean them up.
@@ -685,7 +691,15 @@ function renderCanvasIntoPanel(
   canvasPerf.panelRenders += 1;
   panel.ready = false;
 
-  void mountIframeCanvas(gen, docToRender, canvas, panel._width)
+  // Overrides (git-diff docs) mount with a null tab identity: their iframes must never route doc
+  // Mutations anywhere. The real doc carries its tab id so edit/drop messages route to THAT tab.
+  void mountIframeCanvas(
+    gen,
+    docToRender,
+    canvas,
+    panel._width,
+    docOverride ? null : (tab?.id ?? null),
+  )
     .then(() => {
       if (gen === view.renderGeneration) {
         // Mark the panel patchable once the real document is mounted (not a diff/preview override)

@@ -16,13 +16,13 @@ import {
   applyInlineSplit,
 } from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
-import { getActivePanel } from "./canvas-helpers";
+import { getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
 import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
 import { effect, effectScope } from "../reactivity";
-import { canvasWrap, pathsEqual, renderOnly, updateCanvas } from "../store";
-import { activeTab } from "../workspace/workspace";
+import { canvasPanels, canvasWrap, pathsEqual, renderOnly, updateCanvas, updateUi } from "../store";
+import { activeTab, workspace } from "../workspace/workspace";
 import { getPlatform, hasPlatform } from "../platform";
 import type {
   ApplyFormatIntent,
@@ -38,6 +38,8 @@ import type {
 } from "./iframe-protocol";
 import type { IframeChannel } from "./iframe-channel";
 import type { OverlayLayer, OverlayPlacement } from "./iframe-overlay";
+import type { SlashCommand } from "../editor/inline-edit";
+import type { Tab } from "../tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
 /** A rect in PARENT coordinates (overlay-local from {@link canvasRectToParent}, same field shape). */
@@ -85,6 +87,24 @@ interface HostState {
    * mouseenter. Null when not pending.
    */
   insertHideTimer: ReturnType<typeof setTimeout> | null;
+  /**
+   * Id of the tab whose document this host's iframe DOM currently reflects. Adopted from
+   * {@link HostState.pendingTabIds} ONLY when the render acks (`renderComplete`), so on the FIFO
+   * channel any edit-session commit the iframe posts ahead of that ack still routes to the tab the
+   * session belonged to. Doc-mutating bridge messages (editCommit/editSplit/editInsert/dropResult)
+   * resolve their target tab from THIS — never from `activeTab` at message time, which may have
+   * changed while the message was in flight (the cross-document bleed).
+   */
+  tabId: string | null;
+  /** Tab id keyed by render gen for posted-but-unacked renders; adopted on `renderComplete`. */
+  pendingTabIds: Map<number, string | null>;
+  /**
+   * A split/insert re-entry deferred until this host's DOM contains the new element: a surgical
+   * patch acks (`patchComplete`) at the SAME gen the host already reflects, an escalated full
+   * render acks (`renderComplete`) at a bumped one — both satisfy `gen >= minGen`. An immediate
+   * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
+   */
+  pendingEnterEdit: { path: (string | number)[]; minGen: number } | null;
 }
 
 /**
@@ -288,6 +308,48 @@ export function setInsertZoneClickHandler(fn: (btn: HTMLElement, zone: InsertZon
   insertZoneClickHandler = fn;
 }
 
+/** A canvas-originated slash-menu request, converted to PARENT-VIEWPORT coords by the host. */
+export interface CanvasSlashRequest {
+  rect: { left: number; top: number; bottom: number; width: number; height: number };
+  filter: string;
+  onSelect: (cmd: SlashCommand) => void;
+  onDismiss: () => void;
+}
+
+/**
+ * The parent-realm slash-menu surface the canvas iframe drives (show at a rect, navigate by key,
+ * dismiss). Injected from studio.ts (which owns the lit/Spectrum menu) so this host module — and
+ * its tests — stay free of it, mirroring {@link insertZoneClickHandler}.
+ */
+export interface CanvasSlashHandler {
+  show: (req: CanvasSlashRequest) => void;
+  nav: (key: string) => void;
+  dismiss: () => void;
+}
+
+let canvasSlashHandler: CanvasSlashHandler | null = null;
+
+/** Register the parent-realm slash-menu surface the canvas iframe drives. */
+export function setCanvasSlashHandler(handler: CanvasSlashHandler): void {
+  canvasSlashHandler = handler;
+}
+
+/**
+ * The parent-realm context-menu surface for canvas right-clicks (show at parent-viewport coords,
+ * dismiss on a canvas left-click). Injected from studio.ts, same DI pattern as the slash handler.
+ */
+export interface CanvasContextMenuHandler {
+  show: (args: { path: (string | number)[] | null; clientX: number; clientY: number }) => void;
+  dismiss: () => void;
+}
+
+let canvasContextMenuHandler: CanvasContextMenuHandler | null = null;
+
+/** Register the parent-realm context-menu surface the canvas iframe drives. */
+export function setCanvasContextMenuHandler(handler: CanvasContextMenuHandler): void {
+  canvasContextMenuHandler = handler;
+}
+
 /**
  * The single host whose iframe currently owns the inline-edit session. Only one editable can be
  * active across all panels, so the parent format toolbar reads/writes through this (fixes the
@@ -314,23 +376,34 @@ export function setIframePatchEscalation(fn: () => void): void {
 }
 
 /**
- * Post a surgical patch (value-carrying forward ops) to every ready live iframe host. Returns how
- * many hosts received it; the caller escalates to a full render when that's zero (no host could
- * apply the edit in place, so the suppressed full render must run after all).
+ * Post a surgical patch (value-carrying forward ops) to every ready live iframe host rendering
+ * `tabId`'s document — a still-connected host showing another tab's doc must never fold a foreign
+ * edit into its shadow doc. Returns how many hosts received it; the caller escalates to a full
+ * render when that's zero (no host could apply the edit in place, so the suppressed full render
+ * must run after all).
  */
-export function postPatchToHosts(forwardOps: WireDocOp[], gen: number): number {
+export function postPatchToHosts(
+  forwardOps: WireDocOp[],
+  gen: number,
+  tabId: string | null,
+): number {
   let posted = 0;
   for (const host of liveHosts) {
     if (!host.iframe.isConnected) {
       liveHosts.delete(host);
       continue;
     }
-    if (host.ready) {
+    if (host.ready && host.tabId === tabId) {
       host.channel.post({ forwardOps, gen, kind: "patch" });
       posted += 1;
     }
   }
   return posted;
+}
+
+/** The tab whose document `state`'s iframe currently renders (null when unknown or closed). */
+function hostTab(state: HostState): Tab | null {
+  return state.tabId ? (workspace.tabs.get(state.tabId) ?? null) : null;
 }
 
 /** Lazily start one reactive watcher that re-measures the selection in every live iframe host. */
@@ -460,10 +533,13 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     lastSnapshotSeq: 0,
     overlay,
     pending: null,
+    pendingEnterEdit: null,
+    pendingTabIds: new Map(),
     ready: false,
     selectionPath: null,
     selReqId: 0,
     snapshot: null,
+    tabId: null,
   };
   // The insertion "+" lives on the overlay (the one pointer-events:auto element there). Clicking it
   // Opens the slash menu → mutateInsertNode for the captured zone; mouseenter/leave drive the same
@@ -539,6 +615,20 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "hit": {
+      // The clicked panel becomes the ACTIVE panel (same as clicking its header): getActivePanel(),
+      // Header highlighting, and the style panel's breakpoint context all follow the click — and the
+      // Block action bar anchors to the panel the selection was actually made in, not panel 0.
+      for (const p of canvasPanels) {
+        if (hosts.get(p.canvas as HTMLElement) === state) {
+          if (!p.mediaName?.startsWith("git-diff")) {
+            updateUi("activeMedia", panelMediaToActiveMedia(p.mediaName));
+          }
+          break;
+        }
+      }
+      // A canvas left-click closes an open context menu — its parent-realm outside-click listener
+      // Can't see clicks inside the cross-origin iframe.
+      canvasContextMenuHandler?.dismiss();
       // A click in the canvas selects the node; the selection watcher redraws the box via `measure`.
       state.selectionPath = msg.hit.path;
       const tab = activeTab.value;
@@ -580,14 +670,29 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       }
       return;
     }
-    case "renderComplete":
+    case "renderComplete": {
+      // Adopt the tab identity this render was mounted with. host.tabId flips ONLY here — after any
+      // Edit-session commit the iframe posted ahead of this ack on the FIFO channel — so a commit
+      // Racing a tab switch still routes to the tab its session belonged to.
+      if (state.pendingTabIds.has(msg.gen)) {
+        state.tabId = state.pendingTabIds.get(msg.gen) ?? null;
+      }
+      for (const gen of state.pendingTabIds.keys()) {
+        if (gen <= msg.gen) {
+          state.pendingTabIds.delete(gen);
+        }
+      }
+      onDomUpdated(state, msg.gen);
+      return;
+    }
     case "patchComplete": {
-      // The DOM (and so all geometry) just changed — re-measure the selection box. Record the gen
-      // The DOM now reflects so cross-frame drag replies can be stale-gated against it (Phase 4c).
-      state.lastRenderedGen = msg.gen;
-      requestSelection(state, state.selectionPath);
-      // The "+" anchored to a now-stale rect/path — drop it; the next hover recomputes fresh.
-      hideInsertZoneNow(state);
+      // A patch never re-targets the host (tabId untouched) — only the DOM/geometry changed.
+      onDomUpdated(state, msg.gen);
+      return;
+    }
+    case "renderError": {
+      // The render never landed — its pending identity must not be adopted by a later ack.
+      state.pendingTabIds.delete(msg.gen);
       return;
     }
     case "dataScope": {
@@ -675,7 +780,7 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       if (msg.instruction && msg.targetPath) {
         const srcData = retainedSrcData.get(msg.dragSeq);
         if (srcData) {
-          applyDropInstruction({ type: msg.instruction }, srcData, msg.targetPath);
+          applyDropInstruction(hostTab(state), { type: msg.instruction }, srcData, msg.targetPath);
         }
       }
       retainedSrcData.delete(msg.dragSeq);
@@ -725,17 +830,58 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "editCommit": {
-      applyInlineCommit(msg.path, msg.children, msg.textContent);
+      // Route to the tab this host's iframe renders — NOT activeTab, which may have changed while
+      // The message was in flight (the cross-document bleed).
+      applyInlineCommit(hostTab(state), msg.path, msg.children, msg.textContent);
       return;
     }
     case "editSplit": {
-      // The split's transactDoc patch was already posted to this host; re-enter on the new paragraph
-      // (delivered after the patch, so the element exists by the time the iframe handles it).
-      reenterEdit(state, applyInlineSplit(msg.path, msg.before, msg.after));
+      // The mutation lands now (surgical patch or escalated render); re-entry on the new paragraph
+      // Is deferred until this host acks the DOM that contains it (see deferEnterEdit).
+      deferEnterEdit(state, applyInlineSplit(hostTab(state), msg.path, msg.before, msg.after));
       return;
     }
     case "editInsert": {
-      reenterEdit(state, applyInlineInsert(msg.path, msg.cmd, msg.commitData));
+      deferEnterEdit(state, applyInlineInsert(hostTab(state), msg.path, msg.cmd, msg.commitData));
+      return;
+    }
+    case "slashShow": {
+      // The iframe engine wants the slash menu at its edited element's rect (iframe-viewport) —
+      // Convert to parent-viewport by the empirical zoom + iframe offset and show the real menu.
+      // The select/dismiss callbacks post back over THIS host's channel, closing the loop.
+      const { rect: ifr, scale } = hostDragGeometry(state);
+      const left = msg.rect.x * scale + ifr.left;
+      const top = msg.rect.y * scale + ifr.top;
+      canvasSlashHandler?.show({
+        filter: msg.filter,
+        onDismiss: () => state.channel.post({ kind: "slashDismissed" }),
+        onSelect: (cmd) => state.channel.post({ cmd: { ...cmd }, kind: "slashSelect" }),
+        rect: {
+          bottom: top + msg.rect.height * scale,
+          height: msg.rect.height * scale,
+          left,
+          top,
+          width: msg.rect.width * scale,
+        },
+      });
+      return;
+    }
+    case "slashNav": {
+      canvasSlashHandler?.nav(msg.key);
+      return;
+    }
+    case "slashDismiss": {
+      canvasSlashHandler?.dismiss();
+      return;
+    }
+    case "contextMenu": {
+      // A canvas right-click — convert to parent-viewport coords and show the Jx element menu.
+      const { rect: ifr, scale } = hostDragGeometry(state);
+      canvasContextMenuHandler?.show({
+        clientX: msg.x * scale + ifr.left,
+        clientY: msg.y * scale + ifr.top,
+        path: msg.path ? [...msg.path] : null,
+      });
       return;
     }
     case "editEnd": {
@@ -756,6 +902,38 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       break;
     }
   }
+}
+
+/**
+ * Shared renderComplete/patchComplete bookkeeping: the DOM (and so all geometry) just changed —
+ * re-measure the selection box, record the gen the DOM now reflects (cross-frame drag replies are
+ * stale-gated against it, Phase 4c), drop the "+" (anchored to a now-stale rect), and flush a
+ * deferred split/insert re-entry once the DOM containing the new element is live.
+ */
+function onDomUpdated(state: HostState, gen: number): void {
+  state.lastRenderedGen = gen;
+  requestSelection(state, state.selectionPath);
+  hideInsertZoneNow(state);
+  if (state.pendingEnterEdit && gen >= state.pendingEnterEdit.minGen) {
+    const { path } = state.pendingEnterEdit;
+    state.pendingEnterEdit = null;
+    // Re-enter only when this host still shows the ACTIVE tab — a background tab's iframe renders a
+    // Different doc, so re-entering there would grab the wrong element (the commit itself already
+    // Landed in the right tab via hostTab routing).
+    if (state.tabId !== null && state.tabId === workspace.activeTabId) {
+      reenterEdit(state, path);
+    }
+  }
+}
+
+/**
+ * Defer re-entering inline editing on `path` until this host's DOM reflects the split/insert (see
+ * {@link onDomUpdated}). `minGen` is the gen the host currently reflects: the surgical patch acks at
+ * that same gen; an escalated full render acks at a bumped one — both satisfy `gen >= minGen`,
+ * while a stale ack cannot. Latest-wins on overwrite.
+ */
+function deferEnterEdit(state: HostState, path: (string | number)[]): void {
+  state.pendingEnterEdit = { minGen: state.lastRenderedGen, path: [...path] };
 }
 
 /** Ask the host's iframe to (re-)enter inline editing on `path` (a plain copy crosses the bridge). */
@@ -826,14 +1004,21 @@ function drawHover(state: HostState, hit: NodeHit | null): void {
  * (edit-mode / git-diff / full-width panels) falls back to `100%`. The iframe stays FIXED-HEIGHT —
  * content scrolls inside it like a real device viewport; narrowing the width does not auto-grow
  * it.
+ *
+ * `tabId` is the identity of the tab whose document this render shows (null for override docs like
+ * git-diff, whose iframes must never route doc mutations anywhere). It is recorded against `gen`
+ * and adopted into `host.tabId` only when the iframe acks the render — see
+ * {@link HostState.tabId}.
  */
 export async function mountIframeCanvas(
   gen: number,
   doc: JxMutableNode,
   canvasEl: HTMLElement,
   widthPx?: number | null,
+  tabId: string | null = null,
 ): Promise<void> {
   const state = ensureHost(canvasEl);
+  state.pendingTabIds.set(gen, tabId);
   state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
   // Always resolve and post the latest render. The iframe drops stale generations itself (via its
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
@@ -858,6 +1043,10 @@ export async function mountIframeCanvas(
     shadowDoc: cloneableShadow,
     siteStyle: resolved.siteStyle,
   };
+  // A mode switch to preview mid-split must not start an edit session in the preview render.
+  if (message.mode === "preview") {
+    state.pendingEnterEdit = null;
+  }
   if (state.ready) {
     state.channel.post(message);
   } else {
@@ -889,6 +1078,20 @@ export function postApplyFormat(intent: ApplyFormatIntent): void {
   host.channel.post({ intent, kind: "applyFormat" });
 }
 
+/**
+ * Ask the active edit host's iframe to commit-and-end its inline-edit session (no-op when none).
+ * The parent calls this when intent leaves the edit surface in the PARENT realm — a tab switch, a
+ * chrome click outside the edit toolbars — which the iframe cannot observe itself. The resulting
+ * `editCommit` routes by the host's tabId, so a commit racing a tab switch still lands in the
+ * document its session belonged to.
+ */
+export function commitActiveEditSession(): void {
+  const host = activeEditHost;
+  if (host?.editing && host.ready) {
+    host.channel.post({ kind: "endEdit" });
+  }
+}
+
 /** The live host backing the active panel's canvas (for non-edit selection-bar positioning). */
 function hostForActivePanel(): HostState | null {
   const panel = getActivePanel();
@@ -896,10 +1099,12 @@ function hostForActivePanel(): HostState | null {
 }
 
 /**
- * The format toolbar's anchor rect, in PARENT-VIEWPORT space (the bar is `position:fixed`). The
- * snapshot's rect is in IFRAME-VIEWPORT coords; convert by the same zoom `scale`
- * {@link canvasRectToParent} uses (always 1 in edit mode) and add the iframe's own viewport offset.
- * Falls back to the last selection rect mapped to viewport, else null.
+ * The format toolbar's anchor rect, in PARENT-VIEWPORT space (the bar is `position:fixed`). Both
+ * source rects — the edit session's caret snapshot and the `lastSelectionRect` fallback — are in
+ * UNSCALED iframe-viewport px (D-2: the overlay draws them inside the scaled panzoom-wrap, so the
+ * browser applies the zoom there); the fixed bar gets no such free ride, so scale by the live
+ * empirical zoom ({@link hostDragGeometry}) and add the iframe's on-screen offset, whose GBCR
+ * already bakes in pan + zoom + ancestor scroll. Edit mode has no transform → scale is 1.
  */
 export function getEditBarAnchorRect(): ParentRect | null {
   // The format toolbar follows the live caret/selection snapshot of the active edit session; the
@@ -911,8 +1116,7 @@ export function getEditBarAnchorRect(): ParentRect | null {
   if (!host) {
     return null;
   }
-  const ifr = rectOf(host.iframe);
-  const scale = 1;
+  const { rect: ifr, scale } = hostDragGeometry(host);
   const snapRect = host === editHost ? host.snapshot?.rect : null;
   if (snapRect) {
     return {
@@ -923,12 +1127,12 @@ export function getEditBarAnchorRect(): ParentRect | null {
     };
   }
   if (host.lastSelectionRect) {
-    // The fallback rect is overlay-local (same top-left as the iframe) → add the iframe offset.
+    // The fallback rect is overlay-local (same top-left + coordinate space as the iframe viewport).
     return {
-      height: host.lastSelectionRect.height,
-      left: host.lastSelectionRect.left + ifr.left,
-      top: host.lastSelectionRect.top + ifr.top,
-      width: host.lastSelectionRect.width,
+      height: host.lastSelectionRect.height * scale,
+      left: host.lastSelectionRect.left * scale + ifr.left,
+      top: host.lastSelectionRect.top * scale + ifr.top,
+      width: host.lastSelectionRect.width * scale,
     };
   }
   return null;

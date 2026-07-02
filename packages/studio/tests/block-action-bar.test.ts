@@ -54,6 +54,8 @@ const {
   dismissLinkPopover,
   handleParentFormatShortcut,
   initBlockActionBar,
+  isEditChromeTarget,
+  onCanvasScroll,
   renderBlockActionBar,
 } = await import("../src/panels/block-action-bar");
 
@@ -737,5 +739,97 @@ describe("block action bar", () => {
       delete (document as unknown as Record<string, unknown>).activeElement;
       iframe.remove();
     });
+  });
+});
+
+// ─── Scroll tracking: rAF-throttled fast-path reposition + hide-out-of-view ─────
+
+describe("scroll tracking", () => {
+  const raf = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+
+  /** Dispatch a scroll whose target is the document (a window/document-level scroll). */
+  const scrollDoc = () => {
+    const e = new Event("scroll");
+    Object.defineProperty(e, "target", { configurable: true, value: document });
+    onCanvasScroll(e);
+  };
+
+  beforeEach(async () => {
+    canvasMode = "edit";
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    await flush();
+  });
+
+  test("a document-target scroll repositions the existing bar from a fresh anchor", async () => {
+    expect(bar()).toBeTruthy();
+    const before = bar()!.style.top;
+    host.anchor = { height: 20, left: 44, top: 400, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.top).not.toBe(before);
+    expect(bar()!.style.left).toBe("44px");
+    expect(bar()!.style.top).toBe(`${400 - 38}px`);
+  });
+
+  test("repositioning is rAF-throttled: many scroll events, one anchor application", async () => {
+    host.anchor = { height: 20, left: 71, top: 300, width: 100 };
+    scrollDoc();
+    host.anchor = { height: 20, left: 99, top: 500, width: 100 };
+    scrollDoc();
+    scrollDoc();
+    await raf();
+    // The single frame read the LATEST anchor (one reposition, not three).
+    expect(bar()!.style.left).toBe("99px");
+  });
+
+  test("a vanished anchor hides the bar via visibility; a returning one restores it", async () => {
+    host.anchor = null;
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.visibility).toBe("hidden");
+
+    host.anchor = { height: 20, left: 30, top: 250, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.visibility).toBe("");
+    expect(bar()!.style.top).toBe(`${250 - 38}px`);
+  });
+
+  test("scrolls are ignored in preview mode / without a selection / from unrelated targets", async () => {
+    const before = bar()!.style.top;
+
+    canvasMode = "preview";
+    host.anchor = { height: 20, left: 1, top: 999, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.top).toBe(before);
+
+    canvasMode = "edit";
+    const unrelated = document.createElement("div");
+    document.body.append(unrelated);
+    const e = new Event("scroll");
+    Object.defineProperty(e, "target", { configurable: true, value: unrelated });
+    onCanvasScroll(e);
+    await raf();
+    expect(bar()!.style.top).toBe(before);
+  });
+});
+
+// ─── Edit-chrome hit test (the parent pointerdown commit-guard's exclusion set) ──
+
+describe("isEditChromeTarget", () => {
+  test("recognizes the bar and its popovers; rejects outside targets and non-nodes", async () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    await flush();
+    expect(isEditChromeTarget(bar())).toBe(true);
+    const outside = document.createElement("div");
+    document.body.append(outside);
+    expect(isEditChromeTarget(outside)).toBe(false);
+    expect(isEditChromeTarget(null)).toBe(false);
   });
 });

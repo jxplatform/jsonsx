@@ -146,6 +146,72 @@ describe("startIframeInlineEdit", () => {
   });
 });
 
+// ─── Session lifecycle: commit-on-click-away + the parent endEdit message ───────
+
+describe("session lifecycle", () => {
+  test("a pointerdown OUTSIDE the active editable commits and ends the session", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const other = document.createElement("div");
+    container.append(other);
+    const stop = startIframeInlineEdit(channel, container);
+
+    dblclick(el);
+    el.textContent = "Edited";
+    posts.length = 0;
+    other.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+
+    expect(isEditing()).toBe(false);
+    expect(posts).toContainEqual({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "Edited",
+    });
+    expect(posts).toContainEqual({ kind: "editEnd" });
+    stop();
+  });
+
+  test("a pointerdown INSIDE the active editable keeps the session alive", () => {
+    const { channel, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = startIframeInlineEdit(channel, container);
+
+    dblclick(el);
+    posts.length = 0;
+    el.firstChild!.parentElement!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+
+    expect(isEditing()).toBe(true);
+    expect(posts.some((p) => p.kind === "editCommit" || p.kind === "editEnd")).toBe(false);
+    stop();
+  });
+
+  test("an endEdit message commits and ends a live session (no-op without one)", () => {
+    const { channel, deliver, posts } = fakeChannel();
+    const { container, el } = editableContainer();
+    const stop = startIframeInlineEdit(channel, container);
+
+    // No session yet — nothing happens.
+    deliver({ kind: "endEdit" });
+    expect(posts).toEqual([]);
+
+    dblclick(el);
+    el.textContent = "Committed by parent";
+    posts.length = 0;
+    deliver({ kind: "endEdit" });
+
+    expect(isEditing()).toBe(false);
+    expect(posts).toContainEqual({
+      children: null,
+      kind: "editCommit",
+      path: ["children", 0],
+      textContent: "Committed by parent",
+    });
+    expect(posts).toContainEqual({ kind: "editEnd" });
+    stop();
+  });
+});
+
 // ─── Selection snapshot + applyFormat bridge (Phase 4b-2) ────────────────────
 //
 // Realm isolation is STRUCTURAL, not unit-proven: the session engine + inline-link are bundled into

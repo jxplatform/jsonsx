@@ -285,3 +285,30 @@ describe("iframe canvas host gating", () => {
     expect(pEl.textContent).toBe(before);
   });
 });
+
+// ─── Rich-commit subsumption (set-text swallowed by a same-path children replace) ───
+
+describe("rich-commit batch subsumption", () => {
+  test("set-text + set-prop(children) on the SAME node classifies patchable", () => {
+    // Simulate the post-mutation state a rich inline commit leaves behind: the node now HAS
+    // Children (classification runs after the mutation), which a lone set-text would reject.
+    const node = (tab.doc.document.children as Record<string, unknown>[])[0]!;
+    node.children = ["a ", { tagName: "strong", textContent: "b" }];
+    delete node.textContent;
+
+    const verdict = classifyOps(tab, [
+      { op: "set-text", path: ["children", 0] },
+      { key: "children", op: "set-prop", path: ["children", 0] },
+    ]);
+    expect(verdict.patchable).toBe(true);
+
+    // The subsumption is path-exact: the same batch with the children op on ANOTHER node still
+    // Rejects the set-text.
+    expect(
+      classifyOps(tab, [
+        { op: "set-text", path: ["children", 0] },
+        { key: "children", op: "set-prop", path: ["children", 1] },
+      ]).reason,
+    ).toBe("text-with-children");
+  });
+});

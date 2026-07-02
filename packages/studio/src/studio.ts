@@ -39,11 +39,17 @@ import {
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
 import {
+  commitActiveEditSession,
+  getEditSnapshot,
+  setCanvasContextMenuHandler,
+  setCanvasSlashHandler,
   setIframePatchEscalation,
   setInsertZoneClickHandler,
   setToolbarRefresh,
 } from "./canvas/iframe-host";
 import { runInsertZoneAction } from "./editor/insert-zone-action";
+import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
+import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
   mountStatusbar,
@@ -104,7 +110,11 @@ import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from ".
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
 import { registerFunctionCompletions } from "./panels/editors";
-import { initBlockActionBar, renderBlockActionBar } from "./panels/block-action-bar";
+import {
+  initBlockActionBar,
+  isEditChromeTarget,
+  renderBlockActionBar,
+} from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
 import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
 import { initQuickSearch } from "./panels/quick-search";
@@ -367,6 +377,24 @@ initBlockActionBar({
 setToolbarRefresh(renderBlockActionBar);
 // The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
 setInsertZoneClickHandler(runInsertZoneAction);
+// The in-iframe "/" trigger drives the parent-realm Spectrum slash menu across the bridge.
+setCanvasSlashHandler(canvasSlashHandler);
+// Canvas right-clicks show the parent-realm Jx element context menu across the bridge.
+setCanvasContextMenuHandler(makeCanvasContextMenuHandler({ navigateToComponent }));
+// Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
+// Toolbar / link popover / slash menu) ends the live inline-edit session — the iframe can't observe
+// Parent-realm pointer events (layers panel, tab strip, right panel…). Pointerdowns over the canvas
+// Land inside the cross-origin iframe and never reach this listener, so it can't double-fire with
+// The iframe's own click-away commit.
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (getEditSnapshot().editing && !isEditChromeTarget(e.target)) {
+      commitActiveEditSession();
+    }
+  },
+  true,
+);
 
 initCanvasHelpers({
   getCanvasMode,

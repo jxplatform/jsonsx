@@ -199,7 +199,12 @@ describe("targetPath parity through REAL applyDropInstruction", () => {
     expect(out.targetPath).toEqual(["children", 2]);
 
     const fragment: JxMutableNode = { tagName: "hr" };
-    applyDropInstruction({ type: out.instruction }, { fragment, type: "block" }, out.targetPath);
+    applyDropInstruction(
+      activeTab.value,
+      { type: out.instruction },
+      { fragment, type: "block" },
+      out.targetPath,
+    );
 
     // Reorder-below idx 2 → inserted at index 3 (end). Doc had 3 children.
     const liveDoc = activeTab.value!.doc.document as JxMutableNode;
@@ -218,7 +223,12 @@ describe("targetPath parity through REAL applyDropInstruction", () => {
     expect(out.targetPath).toEqual(["children", 0]);
 
     const fragment: JxMutableNode = { tagName: "span" };
-    applyDropInstruction({ type: out.instruction }, { fragment, type: "block" }, out.targetPath);
+    applyDropInstruction(
+      activeTab.value,
+      { type: out.instruction },
+      { fragment, type: "block" },
+      out.targetPath,
+    );
 
     const liveDoc = activeTab.value!.doc.document as JxMutableNode;
     const section = getNodeAtPath(liveDoc, ["children", 0]) as JxMutableNode;

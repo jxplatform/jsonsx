@@ -114,6 +114,16 @@ describe("overlays — lifecycle", () => {
     expect(renderBlockActionBar).toHaveBeenCalled();
   });
 
+  test("reactive effect re-runs the delegate when the ACTIVE PANEL (activeMedia) changes", async () => {
+    makePanel();
+    await mountAndFlush();
+    renderBlockActionBar.mockClear();
+    // A hit in another breakpoint panel re-anchors the bar even with an unchanged selection path.
+    activeTab.value!.session.ui.activeMedia = "sm";
+    await flush();
+    expect(renderBlockActionBar).toHaveBeenCalled();
+  });
+
   test("render after unmount is a no-op (the block-action-bar delegate is not invoked)", async () => {
     makePanel();
     await mountAndFlush();

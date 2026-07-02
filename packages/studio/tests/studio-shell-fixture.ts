@@ -144,6 +144,7 @@ export async function bootStudio(opts: {
     initBlockActionBar: (ctx: unknown) => {
       captured.blockBarCtx = ctx;
     },
+    isEditChromeTarget: mock(() => false),
     renderBlockActionBar: mock(() => {}),
   }));
 
