@@ -24,6 +24,10 @@ mkdirSync(STUDIO_ASSETS, { recursive: true });
 writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
 writeFileSync(join(FIXTURES, "public", "pub.css"), "body { margin: 0 }");
 writeFileSync(join(STUDIO_ASSETS, "index.html"), "<html>studio-shell</html>");
+// The iframe canvas assets the launcher must serve (staged by scripts/stage-studio-assets.ts).
+mkdirSync(join(STUDIO_ASSETS, "dist"), { recursive: true });
+writeFileSync(join(STUDIO_ASSETS, "canvas.html"), '<html><div id="jx-canvas-root"></div></html>');
+writeFileSync(join(STUDIO_ASSETS, "dist", "iframe-entry.js"), "// canvas entry stub");
 
 // A self-contained .class.json so the /__jx_resolve__ HTTP route returns a known value.
 writeFileSync(
@@ -434,11 +438,23 @@ describe("chromium launcher RPC dispatch", () => {
 // ─── HTTP static serving ────────────────────────────────────────────────────
 
 describe("chromium launcher HTTP server", () => {
-  test("serves studio assets under /__studio__/ with Referrer-Policy no-referrer", async () => {
+  test("serves studio assets under /__studio__/ with Referrer-Policy same-origin", async () => {
+    // Same-origin (not no-referrer): the studio shell's asset fetches must carry a referrer so the
+    // Server-side referrer checks pass — see @jxsuite/server commit bdbb33a6.
     const res = await fetch(`${baseUrl}/__studio__/index.html`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("studio-shell");
-    expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+    expect(res.headers.get("Referrer-Policy")).toBe("same-origin");
+  });
+
+  test("serves the iframe canvas doc + bundle under /__studio__/", async () => {
+    // The canvas iframe boots from /__studio__/canvas.html (see chromium/platform.ts canvasUrl);
+    // A missing file here is the packaged-app "Not found" iframe regression.
+    const doc = await fetch(`${baseUrl}/__studio__/canvas.html`);
+    expect(doc.status).toBe(200);
+    expect(await doc.text()).toContain("jx-canvas-root");
+    const entry = await fetch(`${baseUrl}/__studio__/dist/iframe-entry.js`);
+    expect(entry.status).toBe(200);
   });
 
   test("studio-asset over-encoded traversal out of studioDir is 404", async () => {

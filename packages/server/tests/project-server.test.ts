@@ -295,7 +295,7 @@ describe("token / Origin / Host auth", () => {
   });
 
   test("WS upgrade without token is 403 (closes)", async () => {
-    await expect(openWs("?win=one")).rejects.toThrow();
+    expect(openWs("?win=one")).rejects.toThrow();
   });
 
   test("WS upgrade with token connects and dispatches", async () => {
