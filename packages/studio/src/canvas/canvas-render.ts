@@ -23,12 +23,16 @@ import {
   resetZoomIndicator,
   updateActivePanelHeaders,
 } from "./canvas-utils";
-import { effectiveZoom, overlayBoxDescriptor } from "./canvas-helpers";
 import { parseMediaEntries } from "../utils/canvas-media";
-import { getEffectiveMedia } from "../site-context";
-import { commitActiveEditSession, mountIframeCanvas } from "./iframe-host";
+import { getEffectiveMedia, getEffectiveStyle } from "../site-context";
+import {
+  commitActiveEditSession,
+  mountIframeCanvas,
+  postStyleUpdateToStylebookHosts,
+} from "./iframe-host";
 import { canvasPerf } from "./canvas-perf";
-import { refreshStylebookStyles, renderStylebookMode } from "../panels/stylebook-panel";
+import { renderStylebookMode } from "../panels/stylebook-panel";
+import { transposeStylebookStyle } from "../panels/stylebook-doc";
 import { dismissBlockActionBar, dismissLinkPopover } from "../panels/block-action-bar";
 import { dismissContextMenu } from "../editor/context-menu";
 import { dismissSlashMenu } from "../editor/slash-menu";
@@ -239,15 +243,20 @@ export function renderCanvas() {
     return;
   }
 
-  // Stylebook fast-path: re-apply styles without rebuilding DOM
+  // Stylebook fast-path: a style edit re-applies IN PLACE via the bridge (the iframe re-runs the
+  // Runtime's style applier on the specimen root — real @media, no re-render, no iframe reload).
+  // Filter/Customized changes fall through to the full rebuild (they change which specimens exist),
+  // As does a zero-host post (no stylebook iframe live yet).
   if (canvasMode === "stylebook" && !modeChanged) {
     const curFilter = tab.session.ui.stylebookFilter || "";
     const curCustomized = Boolean(tab.session.ui.stylebookCustomizedOnly);
     const filterChanged =
       curFilter !== _prevStylebookFilter || curCustomized !== _prevStylebookCustomizedOnly;
     if (!filterChanged) {
-      refreshStylebookStyles();
-      return;
+      const style = transposeStylebookStyle(getEffectiveStyle(tab.doc.document?.style));
+      if (postStyleUpdateToStylebookHosts(style as Record<string, unknown>) > 0) {
+        return;
+      }
     }
   }
 
@@ -325,9 +334,7 @@ export function renderCanvas() {
     renderStylebookMode({
       applyTransform,
       canvasPanelTemplate,
-      effectiveZoom,
       observeCenterUntilStable,
-      overlayBoxDescriptor,
       renderZoomIndicator,
       updateActivePanelHeaders,
     });

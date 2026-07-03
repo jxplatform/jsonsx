@@ -910,3 +910,121 @@ describe("patchDisturbsActiveEdit", () => {
     }
   });
 });
+
+// ─── Stylebook mode: live styleUpdate + interaction gates ───────────────────────
+
+describe("startCanvasIframe — stylebook mode", () => {
+  function stylebookMsg(gen: number, doc: unknown): ParentToIframe {
+    return {
+      doc,
+      docBase: "http://localhost:3000/",
+      gen,
+      kind: "render",
+      mapperCtx: { ...WIRE_CTX, canvasMode: "stylebook" },
+      mode: "stylebook",
+      shadowDoc: doc,
+      siteStyle: null,
+    };
+  }
+
+  const sbDoc = (color: string) => ({
+    attributes: { class: "sb-root" },
+    children: [{ children: ["Hi"], tagName: "p" }],
+    style: { "& .element-card-preview p": { color } },
+    tagName: "div",
+  });
+
+  async function bootStylebook(gen: number) {
+    // Scoped style tags land in document.head and outlive the per-test body reset.
+    for (const tag of document.head.querySelectorAll("style[data-jx-owner]")) {
+      tag.remove();
+    }
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    pair.parent.post(stylebookMsg(gen, sbDoc("red")));
+    pair.flush();
+    await flush();
+    pair.flush();
+    return { acks, container, pair };
+  }
+
+  const headCss = () =>
+    [...document.head.querySelectorAll("style[data-jx-owner]")]
+      .map((s) => s.textContent)
+      .join("\n");
+
+  test("styleUpdate at the rendered gen reapplies the root style WITHOUT a re-render", async () => {
+    const { container, pair } = await bootStylebook(3);
+    expect(headCss()).toContain("color: red");
+    const rootBefore = container.firstElementChild;
+
+    pair.parent.post({
+      gen: 3,
+      kind: "styleUpdate",
+      style: { "& .element-card-preview p": { color: "blue" } },
+    });
+    pair.flush();
+
+    expect(headCss()).toContain("color: blue");
+    expect(headCss()).not.toContain("color: red");
+    // Same DOM root — the whole point: no iframe re-render, no CLS.
+    expect(container.firstElementChild).toBe(rootBefore);
+  });
+
+  test("a stale-gen styleUpdate is dropped", async () => {
+    const { pair } = await bootStylebook(4);
+    pair.parent.post({
+      gen: 3,
+      kind: "styleUpdate",
+      style: { "& .element-card-preview p": { color: "blue" } },
+    });
+    pair.flush();
+    expect(headCss()).toContain("color: red");
+    expect(headCss()).not.toContain("color: blue");
+  });
+
+  test("dblclick does NOT start an inline-edit session on a specimen", async () => {
+    const { container, pair } = await bootStylebook(5);
+    const p = container.querySelector("p") as HTMLElement;
+    p.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    pair.flush();
+    await flush();
+    const { isEditing } = await import("../src/editor/inline-edit");
+    expect(isEditing()).toBe(false);
+    expect(p.getAttribute("contenteditable")).toBeNull();
+  });
+
+  test("pointer movement posts hover hits but never insertZones; pointerdown never arms a grab", async () => {
+    const { acks, container, pair } = await bootStylebook(6);
+    const p = container.querySelector("p") as HTMLElement;
+    acks.length = 0;
+
+    p.dispatchEvent(new MouseEvent("pointermove", { bubbles: true, clientX: 5, clientY: 5 }));
+    pair.flush();
+    expect(acks.some((m) => m.kind === "hover")).toBe(true);
+    expect(acks.some((m) => m.kind === "insertZones")).toBe(false);
+
+    p.dispatchEvent(
+      new MouseEvent("pointerdown", { bubbles: true, button: 0, clientX: 10, clientY: 10 }),
+    );
+    container.ownerDocument.dispatchEvent(
+      new MouseEvent("pointermove", { bubbles: true, clientX: 60, clientY: 10 }),
+    );
+    pair.flush();
+    expect(acks.some((m) => m.kind === "dragOriginate")).toBe(false);
+  });
+
+  test("clicks still post hits (the parent decodes them to stylebook tags)", async () => {
+    const { acks, container, pair } = await bootStylebook(7);
+    const p = container.querySelector("p") as HTMLElement;
+    acks.length = 0;
+    p.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pair.flush();
+    const hit = acks.find((m) => m.kind === "hit") as { hit: { path: unknown } } | undefined;
+    expect(hit?.hit.path).toEqual(["children", 0]);
+  });
+});

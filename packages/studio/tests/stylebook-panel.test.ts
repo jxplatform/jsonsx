@@ -1,271 +1,197 @@
-import "./with-dom.js";
-import { beforeEach, describe, expect, test } from "bun:test";
-import {
-  buildStylebookElement,
-  renderComponentPreview,
-  renderStylebookElementsIntoCanvas,
-} from "../src/panels/stylebook-panel";
-import { setProjectState } from "../src/store";
-import type { ProjectState } from "../src/types";
+/**
+ * Stylebook panel (src/panels/stylebook-panel.ts) — the iframe-era orchestrator: builds one
+ * specimen doc, one panel per breakpoint, and mounts each through the (mocked) iframe host.
+ * Selection is session-state only; overlay drawing/measurement lives in the host.
+ */
+import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { html } from "lit-html";
+import type { JxMutableNode } from "@jxsuite/schema/types";
+import type { CanvasPanel } from "../src/types";
+
+// ─── iframe-host mock (captures stylebook mounts + pans) ────────────────────────
+
+interface MountCall {
+  gen: number;
+  generated: {
+    doc: JxMutableNode;
+    pathToTag: ReadonlyMap<string, string>;
+    tagToCardPath: ReadonlyMap<string, (string | number)[]>;
+  };
+  canvasEl: HTMLElement;
+  widthPx: number | null;
+}
+const mounts: MountCall[] = [];
+const pans: string[] = [];
+
+void mock.module("../src/canvas/iframe-host", () => ({
+  mountStylebookCanvas: (
+    gen: number,
+    generated: MountCall["generated"],
+    canvasEl: HTMLElement,
+    widthPx: number | null,
+  ) => {
+    mounts.push({ canvasEl, gen, generated, widthPx });
+  },
+  panToStylebookTag: (tag: string) => {
+    pans.push(tag);
+  },
+}));
+
+const { renderStylebookMode, selectStylebookTag } = await import("../src/panels/stylebook-panel");
+const { canvasPanels, initShellRefs } = await import("../src/store");
+const { componentRegistry } = await import("../src/files/components");
+const { view } = await import("../src/view");
+const { closeAllTabs } = await import("../src/workspace/workspace");
+
+// ─── Shell + panel scaffolding ────────────────────────────────────────────────
+
+function setupShell() {
+  document.body.innerHTML = "";
+  for (const id of [
+    "canvas-wrap",
+    "activity-bar",
+    "left-panel",
+    "right-panel",
+    "toolbar",
+    "statusbar",
+  ]) {
+    const el = document.createElement("div");
+    el.id = id;
+    document.body.append(el);
+  }
+  initShellRefs();
+}
+
+const panelTemplateCalls: unknown[][] = [];
+const ctx = {
+  applyTransform: mock(() => {}),
+  canvasPanelTemplate: (
+    mediaName: string | null,
+    label: string | null,
+    fullWidth: boolean,
+    width?: number | null,
+  ) => {
+    panelTemplateCalls.push([mediaName, label, fullWidth, width]);
+    const element = document.createElement("div");
+    const canvas = document.createElement("div");
+    element.append(canvas);
+    const panel = {
+      _width: width ?? null,
+      canvas,
+      element,
+      mediaName,
+    } as unknown as CanvasPanel;
+    return { panel, tpl: html`${element}` };
+  },
+  observeCenterUntilStable: mock(() => {}),
+  renderZoomIndicator: mock(() => {}),
+  updateActivePanelHeaders: mock(() => {}),
+} as Parameters<typeof renderStylebookMode>[0];
+
+const ctxMocks = ctx as unknown as Record<string, ReturnType<typeof mock>>;
+
+function makeTab(doc: Record<string, unknown> = {}) {
+  return resetWorkspaceWithTab({ children: [], tagName: "div", ...doc } as JxMutableNode);
+}
 
 beforeEach(() => {
-  setProjectState({
-    expanded: new Set(),
-    projectConfig: null,
-  } as unknown as ProjectState);
+  setupShell();
+  resetStudioState();
+  canvasPanels.length = 0;
+  componentRegistry.length = 0;
+  panelTemplateCalls.length = 0;
+  mounts.length = 0;
+  pans.length = 0;
+  view.renderGeneration = 7;
+  for (const key of [
+    "applyTransform",
+    "observeCenterUntilStable",
+    "renderZoomIndicator",
+    "updateActivePanelHeaders",
+  ]) {
+    ctxMocks[key]!.mockClear();
+  }
 });
 
-// ─── buildStylebookElement ────────────────────────────────────────────────────
+afterEach(() => {
+  closeAllTabs();
+  document.body.innerHTML = "";
+});
 
-describe("buildStylebookElement", () => {
-  test("creates element with correct tag", () => {
-    const el = buildStylebookElement({ tag: "h1", text: "Hello" }, {}, null);
-    expect(el.tagName).toBe("H1");
-    expect(el.textContent).toBe("Hello");
+// ─── renderStylebookMode ──────────────────────────────────────────────────────
+
+describe("renderStylebookMode", () => {
+  test("no $media → one full-width panel mounting the generated doc", () => {
+    makeTab();
+    renderStylebookMode(ctx);
+    expect(panelTemplateCalls).toEqual([[null, null, true, undefined]]);
+    expect(canvasPanels).toHaveLength(1);
+    expect(mounts).toHaveLength(1);
+    expect(mounts[0]!.gen).toBe(7);
+    expect(mounts[0]!.widthPx).toBeNull();
+    expect(mounts[0]!.canvasEl).toBe(canvasPanels[0]!.canvas as HTMLElement);
+    // The generated specimen doc reached the mount intact (sb-root + path maps).
+    expect((mounts[0]!.generated.doc.attributes as Record<string, string>).class).toBe("sb-root");
+    expect(mounts[0]!.generated.tagToCardPath.has("h1")).toBe(true);
+    expect(ctxMocks.applyTransform).toHaveBeenCalled();
+    expect(ctxMocks.renderZoomIndicator).toHaveBeenCalled();
   });
 
-  test("applies style from rootStyle matching selector", () => {
-    const rootStyle = { h1: { color: "red", fontSize: "2rem" } };
-    const el = buildStylebookElement({ tag: "h1", text: "Test" }, rootStyle, null);
-    expect(el.style.color).toBe("red");
-    expect(el.style.fontSize).toBe("2rem");
+  test("$media breakpoints → base + one panel per breakpoint, SAME generated doc for all", () => {
+    makeTab({ $media: { "--": "320px", md: "(min-width: 768px)" } });
+    renderStylebookMode(ctx);
+    expect(canvasPanels.map((p) => p.mediaName)).toEqual(["base", "md"]);
+    expect(mounts).toHaveLength(2);
+    expect(mounts[0]!.generated).toBe(mounts[1]!.generated);
+    expect(mounts[1]!.widthPx).toBe(768);
+    expect(ctxMocks.updateActivePanelHeaders).toHaveBeenCalled();
   });
 
-  test("applies CSS variable references as style values", () => {
-    const rootStyle = { h1: { color: "var(--color-primary)" } };
-    const el = buildStylebookElement({ tag: "h1", text: "Test" }, rootStyle, null);
-    expect(el.style.color).toBe("var(--color-primary)");
-  });
+  test("the chrome bar filter narrows the generated doc; Customized toggles the session flag", async () => {
+    const tab = makeTab();
+    tab.session.ui.stylebookFilter = "h1";
+    renderStylebookMode(ctx);
+    expect(mounts[0]!.generated.tagToCardPath.has("h1")).toBe(true);
+    expect(mounts[0]!.generated.tagToCardPath.has("ul")).toBe(false);
 
-  test("applies media-specific overrides when breakpoint is active", () => {
-    const rootStyle = {
-      h1: {
-        "@md": { fontSize: "2rem" },
-        "@sm": { fontSize: "1.5rem" },
-        fontSize: "3rem",
-      },
-    };
-    const active = new Set(["md"]);
-    const el = buildStylebookElement({ tag: "h1", text: "Test" }, rootStyle, active);
-    expect(el.style.fontSize).toBe("2rem");
-  });
+    const toggle = document.querySelector(".sb-chrome button") as HTMLButtonElement;
+    toggle.click();
+    await flush();
+    expect(tab.session.ui.stylebookCustomizedOnly).toBe(true);
 
-  test("does not apply media overrides for inactive breakpoints", () => {
-    const rootStyle = {
-      h1: {
-        "@lg": { fontSize: "2.5rem" },
-        fontSize: "3rem",
-      },
-    };
-    const active = new Set(["md"]);
-    const el = buildStylebookElement({ tag: "h1", text: "Test" }, rootStyle, active);
-    expect(el.style.fontSize).toBe("3rem");
-  });
-
-  test("applies attributes from entry", () => {
-    const el = buildStylebookElement(
-      { attributes: { href: "#", target: "_blank" }, tag: "a", text: "Link" },
-      {},
-      null,
-    );
-    expect(el.getAttribute("href")).toBe("#");
-    expect(el.getAttribute("target")).toBe("_blank");
-  });
-
-  test("builds nested children recursively", () => {
-    const entry = {
-      children: [
-        { tag: "li", text: "Item 1" },
-        { tag: "li", text: "Item 2" },
-      ],
-      tag: "ul",
-    };
-    const rootStyle = { li: { color: "blue" } };
-    const el = buildStylebookElement(entry, rootStyle, null);
-    expect(el.children.length).toBe(2);
-    expect(el.children[0]!.textContent).toBe("Item 1");
-    expect((el.children[0] as HTMLElement).style.color).toBe("blue");
+    const input = document.querySelector(".sb-chrome input") as HTMLInputElement;
+    input.value = "table";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(tab.session.ui.stylebookFilter).toBe("table");
   });
 });
 
-// ─── buildStylebookElement — compound selectors ─────────────────────────────────
+// ─── selectStylebookTag ───────────────────────────────────────────────────────
 
-describe("buildStylebookElement compound selectors", () => {
-  test("applies compound selector style when parentTag differs from entry.tag", () => {
-    const rootStyle = {
-      blockquote: { p: { fontStyle: "italic" } },
-      p: { color: "black" },
-    };
-    const el = buildStylebookElement({ tag: "p", text: "Quote" }, rootStyle, null, "blockquote");
-    expect(el.style.fontStyle).toBe("italic");
+describe("selectStylebookTag", () => {
+  test("writes the stylebook selection session state (selection stays a path-empty [])", () => {
+    const tab = makeTab();
+    selectStylebookTag("table th", "md");
+    expect(tab.session.ui.stylebookSelection).toBe("table th");
+    expect(tab.session.ui.activeSelector).toBe("table th");
+    expect(tab.session.ui.rightTab).toBe("style");
+    expect(tab.session.ui.activeMedia).toBe("md");
+    expect(tab.session.selection).toEqual([]);
   });
 
-  test("falls back to leaf selector when compound not in rootStyle", () => {
-    const rootStyle = { p: { color: "green" } };
-    const el = buildStylebookElement({ tag: "p", text: "Test" }, rootStyle, null, "blockquote");
-    expect(el.style.color).toBe("green");
+  test("omitting media leaves the current breakpoint context untouched", () => {
+    const tab = makeTab();
+    tab.session.ui.activeMedia = "md";
+    selectStylebookTag("p");
+    expect(tab.session.ui.activeMedia).toBe("md");
   });
 
-  test("uses leaf selector when parentTag equals entry.tag", () => {
-    const rootStyle = { li: { margin: "4px" } };
-    const el = buildStylebookElement({ tag: "li", text: "Item" }, rootStyle, null, "li");
-    expect(el.style.margin).toBe("4px");
-  });
-
-  test("recursive children receive parent entry.tag as parentTag", () => {
-    const rootStyle = {
-      li: { listStyleType: "none" },
-      ul: { li: { listStyleType: "disc" } },
-    };
-    const entry = {
-      children: [{ tag: "li", text: "Item" }],
-      tag: "ul",
-    };
-    const el = buildStylebookElement(entry, rootStyle, null);
-    expect((el.children[0] as HTMLElement).style.listStyleType).toBe("disc");
-  });
-
-  test("differentiates ul li from ol li", () => {
-    const rootStyle = {
-      ol: { li: { color: "red" } },
-      ul: { li: { color: "blue" } },
-    };
-    const ul = buildStylebookElement(
-      { children: [{ tag: "li", text: "UL item" }], tag: "ul" },
-      rootStyle,
-      null,
-    );
-    const ol = buildStylebookElement(
-      { children: [{ tag: "li", text: "OL item" }], tag: "ol" },
-      rootStyle,
-      null,
-    );
-    expect((ul.children[0] as HTMLElement).style.color).toBe("blue");
-    expect((ol.children[0] as HTMLElement).style.color).toBe("red");
-  });
-
-  test("compound selector with media breakpoint overrides", () => {
-    const rootStyle = {
-      blockquote: {
-        p: {
-          "@sm": { fontSize: "1rem" },
-          fontSize: "1.2rem",
-        },
-      },
-    };
-    const active = new Set(["sm"]);
-    const el = buildStylebookElement({ tag: "p", text: "Q" }, rootStyle, active, "blockquote");
-    expect(el.style.fontSize).toBe("1rem");
-  });
-});
-
-// ─── renderStylebookElementsIntoCanvas — CSS variable propagation ─────────────
-
-describe("renderStylebookElementsIntoCanvas CSS variables", () => {
-  test("sets CSS custom properties on the canvas element", () => {
-    const canvasEl = document.createElement("div");
-    const rootStyle = {
-      "--color-primary": "#6c0505",
-      "--font-body": "Inter, sans-serif",
-      "--spacing-lg": "2rem",
-      h1: { color: "var(--color-primary)" },
-    };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle, "", false, null);
-    expect(canvasEl.style.getPropertyValue("--color-primary")).toBe("#6c0505");
-    expect(canvasEl.style.getPropertyValue("--font-body")).toBe("Inter, sans-serif");
-    expect(canvasEl.style.getPropertyValue("--spacing-lg")).toBe("2rem");
-  });
-
-  test("does not set non-variable properties on canvas element", () => {
-    const canvasEl = document.createElement("div");
-    const rootStyle = {
-      "--color-accent": "blue",
-      h1: { color: "red" },
-    };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle, "", false, null);
-    expect(canvasEl.style.getPropertyValue("--color-accent")).toBe("blue");
-    expect(canvasEl.style.color).toBe("");
-  });
-
-  test("re-render replaces stale content with fresh elements", () => {
-    const canvasEl = document.createElement("div");
-    const rootStyle1 = { h1: { color: "red" } };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle1, "", false, null);
-
-    const h1Before = canvasEl.querySelector("h1");
-    expect(h1Before).not.toBeNull();
-    expect(h1Before?.style.color).toBe("red");
-
-    const rootStyle2 = { h1: { color: "blue" } };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle2, "", false, null);
-
-    const h1After = canvasEl.querySelector("h1");
-    expect(h1After).not.toBeNull();
-    expect(h1After?.style.color).toBe("blue");
-  });
-
-  test("updates CSS variables on re-render", () => {
-    const canvasEl = document.createElement("div");
-    const rootStyle1 = { "--color-primary": "#000" };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle1, "", false, null);
-    expect(canvasEl.style.getPropertyValue("--color-primary")).toBe("#000");
-
-    const rootStyle2 = { "--color-primary": "#fff" };
-    renderStylebookElementsIntoCanvas(canvasEl, rootStyle2, "", false, null);
-    expect(canvasEl.style.getPropertyValue("--color-primary")).toBe("#fff");
-  });
-});
-
-// ─── renderComponentPreview ──────────────────────────────────────────────────
-
-describe("renderComponentPreview", () => {
-  test("npm component not registered → returns fallback div", async () => {
-    const el = await renderComponentPreview(
-      /** @type {any} */ { source: "npm", tagName: "sl-button" },
-    );
-    expect(el.tagName).toBe("DIV");
-    expect(el.textContent).toBe("<sl-button>");
-  });
-
-  test("npm component not registered → does not throw", async () => {
-    // oxlint-disable-next-line typescript/await-thenable -- Bun's expect().resolves.toBeDefined() returns a real Promise at runtime but is typed `void`; the await must be kept to wait for resolution.
-    await expect(
-      renderComponentPreview(/** @type {any} */ { source: "npm", tagName: "sl-nonexistent" }),
-    ).resolves.toBeDefined();
-  });
-
-  test("markdown component → returns fallback div without fetch", async () => {
-    const el = await renderComponentPreview({
-      path: "components/todo-app.md",
-      source: "local",
-      tagName: "todo-app",
-    });
-    expect(el.tagName).toBe("DIV");
-    expect(el.textContent).toBe("<todo-app>");
-  });
-
-  test("markdown component with .MD extension → returns fallback", async () => {
-    const el = await renderComponentPreview({
-      path: "components/my-comp.MD",
-      source: "local",
-      tagName: "my-comp",
-    });
-    expect(el.tagName).toBe("DIV");
-    expect(el.textContent).toBe("<my-comp>");
-  });
-
-  test("local component with invalid path → returns fallback (no unhandled error)", async () => {
-    setProjectState({
-      expanded: new Set(),
-      projectConfig: null,
-      projectRoot: "test-project",
-    } as any);
-    const el = await renderComponentPreview({
-      path: "components/nonexistent.json",
-      source: "local",
-      tagName: "missing-comp",
-    });
-    expect(el.tagName).toBe("DIV");
-    expect(el.textContent).toBe("<missing-comp>");
+  test("panCanvas routes to the host's pan-to-card (measured over the bridge)", () => {
+    makeTab();
+    selectStylebookTag("h1", null, { panCanvas: true });
+    expect(pans).toEqual(["h1"]);
+    selectStylebookTag("p");
+    expect(pans).toEqual(["h1"]); // No pan without the flag.
   });
 });

@@ -743,9 +743,6 @@
       .canvas-panel-canvas {
         isolation: isolate;
       }
-      .canvas-panel-canvas.sb-canvas {
-        padding: 16px;
-      }
       .canvas-panel-canvas * {
         cursor: default;
       }
@@ -773,18 +770,6 @@
         color: var(--spectrum-gray-500, #888);
         font-family: var(--font-mono);
         pointer-events: none;
-      }
-      .canvas-panel-overlay {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        z-index: 10;
-      }
-      .canvas-panel-click {
-        position: absolute;
-        inset: 0;
-        z-index: 9;
-        cursor: default;
       }
       /* Single-canvas fallback (no $media) */
       .canvas-panel.full-width {

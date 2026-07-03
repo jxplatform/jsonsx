@@ -9,7 +9,9 @@ import {
   makeStamper,
   registerElements,
   renderResolvedDocument,
+  STYLEBOOK_STYLE_ID,
   syncEditModeCss,
+  syncStylebookCss,
 } from "../src/canvas/iframe-render";
 import type { PathMapCtx } from "../src/canvas/path-mapping";
 
@@ -561,5 +563,56 @@ describe("syncEditModeCss", () => {
     // Removing when absent is a no-op.
     syncEditModeCss(document, "preview");
     expect(sheet()).toBeNull();
+  });
+
+  test("a stylebook render removes it (specimens must not show placeholder affordances)", () => {
+    syncEditModeCss(document, "edit");
+    expect(sheet()).toBeTruthy();
+    syncEditModeCss(document, "stylebook");
+    expect(sheet()).toBeNull();
+  });
+});
+
+// ─── Stylebook chrome CSS ────────────────────────────────────────────────────────
+
+describe("syncStylebookCss", () => {
+  const sheet = () => document.head.querySelector(`#${STYLEBOOK_STYLE_ID}`);
+
+  afterEach(() => {
+    syncStylebookCss(document, "preview");
+  });
+
+  test("injects card/section chrome for stylebook mode, idempotently", () => {
+    syncStylebookCss(document, "stylebook");
+    expect(sheet()).toBeTruthy();
+    expect(sheet()!.textContent).toContain(".element-card");
+    expect(sheet()!.textContent).toContain(".sb-section");
+    // The parent grid disabled preview hits; the iframe must NOT — clicks select specimens.
+    expect(sheet()!.textContent).not.toContain("pointer-events: none");
+    syncStylebookCss(document, "stylebook");
+    expect(document.head.querySelectorAll(`#${STYLEBOOK_STYLE_ID}`)).toHaveLength(1);
+  });
+
+  test("any other mode removes it", () => {
+    syncStylebookCss(document, "stylebook");
+    expect(sheet()).toBeTruthy();
+    syncStylebookCss(document, "design");
+    expect(sheet()).toBeNull();
+    syncStylebookCss(document, "design");
+    expect(sheet()).toBeNull();
+  });
+
+  test("renderResolvedDocument wires it by mode", async () => {
+    const container = document.createElement("div");
+    const handle = await renderResolvedDocument({
+      container,
+      doc: { children: ["x"], tagName: "div" } as never,
+      docBase: "http://localhost:3000/page.json",
+      mapperCtx: { ...ctx, canvasMode: "stylebook" },
+      mode: "stylebook",
+    });
+    expect(sheet()).toBeTruthy();
+    expect(document.head.querySelector(`#${EDIT_PLACEHOLDER_STYLE_ID}`)).toBeNull();
+    handle.dispose();
   });
 });

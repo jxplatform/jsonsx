@@ -154,11 +154,12 @@ export const EDIT_PLACEHOLDER_CSS = `
 
 /**
  * Keep the design/edit canvas stylesheet in sync with the render mode: present (idempotently) for
- * design/edit, removed for preview.
+ * design/edit, removed otherwise (preview must look live; stylebook specimens must not show "Click
+ * here to add text..." placeholders).
  */
 export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
   const existing = doc.head.querySelector(`#${EDIT_PLACEHOLDER_STYLE_ID}`);
-  if (mode === "preview") {
+  if (mode !== "design" && mode !== "edit") {
     existing?.remove();
     return;
   }
@@ -168,6 +169,115 @@ export function syncEditModeCss(doc: Document, mode: CanvasMode): void {
   const style = doc.createElement("style");
   style.id = EDIT_PLACEHOLDER_STYLE_ID;
   style.textContent = EDIT_PLACEHOLDER_CSS;
+  doc.head.append(style);
+}
+
+/** Id of the injected stylebook-mode chrome stylesheet (section/card scaffolding). */
+export const STYLEBOOK_STYLE_ID = "jx-canvas-stylebook-css";
+
+/**
+ * Card/section chrome for the stylebook specimen document, ported from the parent editor stylesheet
+ * with self-contained fallback values (the parent theme vars don't exist in the iframe).
+ * Deliberately OMITS the parent's `.element-card-preview { pointer-events: none }` — the iframe
+ * owns hit-testing and needs real hits on the specimens.
+ */
+export const STYLEBOOK_CSS = `
+.sb-root {
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.sb-section {
+  margin-bottom: 24px;
+}
+.sb-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, #808080 70%, transparent);
+  padding: 8px 0 4px;
+  border-bottom: 1px solid color-mix(in srgb, #808080 25%, transparent);
+  margin-bottom: 8px;
+}
+.sb-body {
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.element-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, #808080 30%, transparent);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.element-card-preview {
+  background: #fff;
+  padding: 6px 8px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.element-card-preview > * {
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+.element-card-preview > hr {
+  width: 100%;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, #808080 40%, transparent);
+}
+.element-card-preview > input,
+.element-card-preview > textarea,
+.element-card-preview > select,
+.element-card-preview > button,
+.element-card-preview > progress,
+.element-card-preview > meter {
+  font-size: 10px;
+}
+.element-card-label {
+  padding: 2px 6px;
+  font-size: 10px;
+  color: color-mix(in srgb, #808080 70%, transparent);
+  background: color-mix(in srgb, #808080 8%, transparent);
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sb-fallback {
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, #808080 40%, transparent);
+  border-radius: 4px;
+  color: color-mix(in srgb, #808080 70%, transparent);
+}
+.sb-empty {
+  padding: 48px;
+  text-align: center;
+  color: color-mix(in srgb, #808080 70%, transparent);
+  font-size: 13px;
+}
+`;
+
+/**
+ * Keep the stylebook chrome stylesheet in sync with the render mode: present (idempotently) for
+ * stylebook, removed otherwise.
+ */
+export function syncStylebookCss(doc: Document, mode: CanvasMode): void {
+  const existing = doc.head.querySelector(`#${STYLEBOOK_STYLE_ID}`);
+  if (mode !== "stylebook") {
+    existing?.remove();
+    return;
+  }
+  if (existing) {
+    return;
+  }
+  const style = doc.createElement("style");
+  style.id = STYLEBOOK_STYLE_ID;
+  style.textContent = STYLEBOOK_CSS;
   doc.head.append(style);
 }
 
@@ -310,6 +420,7 @@ export async function renderResolvedDocument(opts: {
   applySiteStyle(opts.siteStyle);
   injectHead(opts.doc);
   syncEditModeCss(opts.container.ownerDocument, opts.mode);
+  syncStylebookCss(opts.container.ownerDocument, opts.mode);
   // Seed the runtime's root $media before buildScope so a COMPONENT with its own `@--name` blocks
   // But no own `$media` resolves the breakpoint to its real query (the iframe path calls buildScope
   // Directly and never the runtime's `Jx()` entry, which is the only other place _rootMedia is set).

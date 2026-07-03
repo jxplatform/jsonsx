@@ -16,7 +16,9 @@ import {
   applyInlineSplit,
 } from "../editor/inline-edit-apply";
 import { canvasRectToParent, createOverlayLayer } from "./iframe-overlay";
+import { serializeJxPath } from "./path-mapping";
 import { getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
+import { panToParentRect } from "./canvas-utils";
 import { clearDragGhost, moveDragGhost } from "../panels/drag-ghost";
 import { applyDropInstruction } from "../panels/dnd";
 import { rectOf } from "../utils/geometry";
@@ -105,6 +107,19 @@ interface HostState {
    * `enterEdit` would race the escalated ASYNC render and silently fail to find the element.
    */
   pendingEnterEdit: { path: (string | number)[]; minGen: number } | null;
+  /**
+   * Stylebook capability (set by {@link mountStylebookCanvas}, cleared by page mounts). The specimen
+   * doc's paths decode to TAGS, not tab-document paths: hits route to the injected stylebook
+   * handler instead of `session.selection`, the selection watcher measures the selected tag's card,
+   * and the document-editing affordances (insert "+", context menu, grab-drags) are ignored for
+   * this host.
+   */
+  stylebook: {
+    pathToTag: ReadonlyMap<string, string>;
+    tagToCardPath: ReadonlyMap<string, (string | number)[]>;
+  } | null;
+  /** Measure-request id of an in-flight pan-to-card (stylebook); -1 when none. */
+  panReqId: number;
 }
 
 /**
@@ -351,6 +366,43 @@ export function setCanvasContextMenuHandler(handler: CanvasContextMenuHandler): 
 }
 
 /**
+ * The parent-realm stylebook selection handler: a hit in a stylebook host decodes to a TAG (or null
+ * for chrome/empty space) plus the clicked panel's media, and routes here — never to
+ * `session.selection`. Injected from studio.ts (which owns selectStylebookTag), same DI pattern as
+ * the slash/context handlers.
+ */
+let stylebookHitHandler: ((tag: string | null, media: string | null) => void) | null = null;
+
+/** Register the stylebook tag-selection handler stylebook hosts route hits to. */
+export function setStylebookHitHandler(
+  fn: (tag: string | null, media: string | null) => void,
+): void {
+  stylebookHitHandler = fn;
+}
+
+/**
+ * Decode a stylebook hit path to its tag/compound: exact `pathToTag` lookup, then trim trailing
+ * path segments pairwise ("children", i) so a hit on an unmapped descendant resolves to its nearest
+ * mapped ancestor. Null = chrome/empty space (deselect).
+ */
+function resolveStylebookTag(
+  pathToTag: ReadonlyMap<string, string>,
+  path: (string | number)[],
+): string | null {
+  let p = [...path];
+  for (;;) {
+    const tag = pathToTag.get(serializeJxPath(p));
+    if (tag) {
+      return tag;
+    }
+    if (p.length < 2) {
+      return null;
+    }
+    p = p.slice(0, -2);
+  }
+}
+
+/**
  * The single host whose iframe currently owns the inline-edit session. Only one editable can be
  * active across all panels, so the parent format toolbar reads/writes through this (fixes the
  * multi-panel bug where two hosts' editing state could fight).
@@ -415,6 +467,9 @@ function ensureSelectionWatch(): void {
   scope.run(() => {
     effect(() => {
       const sel = activeTab.value?.session.selection ?? null;
+      // Track the stylebook selection too: stylebook hosts measure the selected TAG's card
+      // (session.selection is deliberately [] in stylebook mode).
+      void activeTab.value?.session.ui.stylebookSelection;
       for (const host of liveHosts) {
         requestSelection(host, sel);
       }
@@ -425,6 +480,10 @@ function ensureSelectionWatch(): void {
 
 /** Track the selection on a host and ask its iframe to measure it (or clear the box when null). */
 function requestSelection(host: HostState, sel: (string | number)[] | null): void {
+  if (host.stylebook) {
+    requestStylebookSelection(host);
+    return;
+  }
   host.selectionPath = sel;
   if (!host.iframe.isConnected) {
     liveHosts.delete(host);
@@ -441,6 +500,29 @@ function requestSelection(host: HostState, sel: (string | number)[] | null): voi
   // Post a plain copy: `session.selection` is a reactive proxy, and only serializable values may
   // Cross the postMessage boundary.
   host.channel.post({ kind: "measure", paths: [[...sel]], reqId: host.selReqId });
+}
+
+/**
+ * Stylebook variant of {@link requestSelection}: measure the SELECTED TAG's card (the specimen doc
+ * addresses selection by tag, not by tab-document path). Cleared when no tag is selected or the tag
+ * has no card in this host's generated doc.
+ */
+function requestStylebookSelection(host: HostState): void {
+  if (!host.iframe.isConnected) {
+    liveHosts.delete(host);
+    return;
+  }
+  const tag = activeTab.value?.session.ui.stylebookSelection ?? null;
+  const cardPath = tag ? host.stylebook?.tagToCardPath.get(tag) : undefined;
+  if (!tag || !cardPath) {
+    host.overlay.setSelection(null);
+    return;
+  }
+  if (!host.ready) {
+    return;
+  }
+  host.selReqId += 1;
+  host.channel.post({ kind: "measure", paths: [[...cardPath]], reqId: host.selReqId });
 }
 
 /**
@@ -499,16 +581,6 @@ function ensureHost(canvasEl: HTMLElement): HostState {
   }
   const overlay = createOverlayLayer(document);
   canvasEl.replaceChildren(iframe, overlay.root);
-  // Neutralize the legacy hit-test catcher. `.canvas-panel-click` is an absolutely-positioned sibling
-  // (z-index:9, inset:0) with the default `pointer-events:auto`, so it sits OVER this canvas and would
-  // Eat every click/wheel before the iframe — which now owns hit-testing AND native scrolling — can
-  // See them. Stylebook still relies on it, but its panels render a div canvas and never mount an iframe
-  // Host, so scoping the neutralization to this mount leaves stylebook untouched.
-  const catcher = canvasEl.parentElement?.querySelector<HTMLElement>(".canvas-panel-click");
-  if (catcher) {
-    catcher.style.pointerEvents = "none";
-  }
-
   const channel = postMessageChannel<ParentToIframe, IframeToParent>({
     acceptOrigin: iframeOrigin,
     source: window,
@@ -532,6 +604,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     lastSelectionRect: null,
     lastSnapshotSeq: 0,
     overlay,
+    panReqId: -1,
     pending: null,
     pendingEnterEdit: null,
     pendingTabIds: new Map(),
@@ -539,6 +612,7 @@ function ensureHost(canvasEl: HTMLElement): HostState {
     selectionPath: null,
     selReqId: 0,
     snapshot: null,
+    stylebook: null,
     tabId: null,
   };
   // The insertion "+" lives on the overlay (the one pointer-events:auto element there). Clicking it
@@ -618,10 +692,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // The clicked panel becomes the ACTIVE panel (same as clicking its header): getActivePanel(),
       // Header highlighting, and the style panel's breakpoint context all follow the click — and the
       // Block action bar anchors to the panel the selection was actually made in, not panel 0.
+      let panelMedia: string | null = null;
       for (const p of canvasPanels) {
         if (hosts.get(p.canvas as HTMLElement) === state) {
           if (!p.mediaName?.startsWith("git-diff")) {
-            updateUi("activeMedia", panelMediaToActiveMedia(p.mediaName));
+            panelMedia = panelMediaToActiveMedia(p.mediaName);
+            updateUi("activeMedia", panelMedia);
           }
           break;
         }
@@ -629,6 +705,21 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       // A canvas left-click closes an open context menu — its parent-realm outside-click listener
       // Can't see clicks inside the cross-origin iframe.
       canvasContextMenuHandler?.dismiss();
+      // Stylebook host: the path decodes to a TAG (or null = deselect) and routes to the injected
+      // Handler — specimen paths are NOT tab-document paths, so session.selection stays untouched.
+      if (state.stylebook) {
+        const tag = resolveStylebookTag(state.stylebook.pathToTag, msg.hit.path);
+        stylebookHitHandler?.(tag, panelMedia);
+        if (tag) {
+          // Draw immediately from the posted rect; the selection watcher re-measures the CARD.
+          const rect = canvasRectToParent(msg.hit.rect);
+          state.overlay.setSelection(rect, `<${tag}>`);
+          state.lastSelectionRect = rect;
+        } else {
+          state.overlay.setSelection(null);
+        }
+        return;
+      }
       // A click in the canvas selects the node; the selection watcher redraws the box via `measure`.
       state.selectionPath = msg.hit.path;
       const tab = activeTab.value;
@@ -644,10 +735,26 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "hover": {
+      if (state.stylebook) {
+        // Decode to a tag; suppress the box when hovering the selected tag (legacy parity).
+        const tag = msg.hit ? resolveStylebookTag(state.stylebook.pathToTag, msg.hit.path) : null;
+        const selected = activeTab.value?.session.ui.stylebookSelection ?? null;
+        if (msg.hit && tag && tag !== selected) {
+          state.overlay.setHover(canvasRectToParent(msg.hit.rect));
+        } else {
+          state.overlay.setHover(null);
+        }
+        return;
+      }
       drawHover(state, msg.hit);
       return;
     }
     case "insertZones": {
+      // Document-editing affordance — never for specimen catalogs (belt-and-braces with the
+      // Iframe-side mode gate).
+      if (state.stylebook) {
+        return;
+      }
       // The iframe recomputed the insertion "+" zones for the hovered node. Draw the "+" from the
       // First zone's rect (scale=1, D-2 — the overlay is inside the scaled panzoom-wrap); a null/empty
       // Set arms the grace timer rather than hiding immediately, so the cursor can reach the button.
@@ -660,10 +767,24 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "geometry": {
+      // Pan-to-card reply (stylebook): convert the card's iframe rect to parent-viewport space by
+      // The empirical zoom + iframe offset and center it.
+      if (msg.reqId === state.panReqId) {
+        state.panReqId = -1;
+        const [hit] = msg.hits;
+        if (hit) {
+          const { rect: ifr, scale } = hostDragGeometry(state);
+          panToParentRect({ height: hit.rect.height * scale, top: hit.rect.y * scale + ifr.top });
+        }
+        return;
+      }
       if (msg.reqId === state.selReqId) {
         const [hit] = msg.hits;
         const rect = hit ? canvasRectToParent(hit.rect) : null;
-        state.overlay.setSelection(rect);
+        const sbTag = state.stylebook
+          ? (activeTab.value?.session.ui.stylebookSelection ?? null)
+          : null;
+        state.overlay.setSelection(rect, sbTag ? `<${sbTag}>` : null);
         if (rect) {
           state.lastSelectionRect = rect;
         }
@@ -751,6 +872,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "dragOriginate": {
+      if (state.stylebook) {
+        return; // Specimens can't be reordered (belt-and-braces with the iframe-side gate).
+      }
       // Flow 3: the iframe began a body-grab drag and DRIVES it locally. Hand off to the coordinator,
       // Which ADOPTS the iframe's seq (so its dragOver/dropResult pass the gate) and shows the ghost
       // — it attaches NO parent-document listeners (the iframe owns the pointer it started).
@@ -758,6 +882,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "nativeDragEnter": {
+      if (state.stylebook) {
+        return; // A specimen catalog is never a drop target.
+      }
       // A parent-originated NATIVE drag crossed onto this iframe before any session bound it (the
       // Parent never sees a cursor inside the iframe rect) — let the bridge bind/migrate here.
       nativeDragEnterHandler?.(state);
@@ -875,6 +1002,9 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
       return;
     }
     case "contextMenu": {
+      if (state.stylebook) {
+        return; // The doc context menu's actions are meaningless for specimen paths.
+      }
       // A canvas right-click — convert to parent-viewport coords and show the Jx element menu.
       const { rect: ifr, scale } = hostDragGeometry(state);
       canvasContextMenuHandler?.show({
@@ -1019,6 +1149,8 @@ export async function mountIframeCanvas(
 ): Promise<void> {
   const state = ensureHost(canvasEl);
   state.pendingTabIds.set(gen, tabId);
+  // A page mount clears any stylebook capability from a previous mode's reuse of this host.
+  state.stylebook = null;
   state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
   // Always resolve and post the latest render. The iframe drops stale generations itself (via its
   // Own `latestGen`), so the parent must NOT gate on `view.renderGeneration`: during boot many
@@ -1052,6 +1184,104 @@ export async function mountIframeCanvas(
   } else {
     state.pending = message;
   }
+}
+
+/**
+ * Mount a STYLEBOOK canvas: post the pre-generated specimen document (no `resolveCanvasDocument` —
+ * the generator already merged the effective style/media and there is no layout/page mapping) and
+ * arm the host's stylebook capability (tag-addressed hits/selection). Mounted with a NULL tab
+ * identity: specimen paths are not tab-document paths, so any doc-mutating bridge message from this
+ * host must drop — the existing null-tabId routing does exactly that.
+ */
+export function mountStylebookCanvas(
+  gen: number,
+  generated: {
+    doc: JxMutableNode;
+    pathToTag: ReadonlyMap<string, string>;
+    tagToCardPath: ReadonlyMap<string, (string | number)[]>;
+  },
+  canvasEl: HTMLElement,
+  widthPx: number | null,
+): void {
+  const state = ensureHost(canvasEl);
+  state.pendingTabIds.set(gen, null);
+  state.stylebook = { pathToTag: generated.pathToTag, tagToCardPath: generated.tagToCardPath };
+  state.pendingEnterEdit = null;
+  state.iframe.style.width = widthPx ? `${widthPx}px` : "100%";
+  // Two independent plain clones: the iframe renders `doc` and folds styleUpdates into `shadowDoc`
+  // (and fake test channels pass messages by reference, so sharing one object would alias them).
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const cloneableDoc = JSON.parse(JSON.stringify(generated.doc)) as unknown;
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const cloneableShadow = JSON.parse(JSON.stringify(generated.doc)) as unknown;
+  const message: ParentToIframe = {
+    doc: cloneableDoc,
+    docBase: `${canvasBaseOrigin()}/`,
+    gen,
+    kind: "render",
+    mapperCtx: {
+      arrayPaths: [],
+      canvasMode: "stylebook",
+      layoutWrapped: false,
+      pageContentOffset: null,
+      pageContentPrefix: null,
+    },
+    mode: "stylebook",
+    shadowDoc: cloneableShadow,
+    // The generator already merged projectConfig.style into the doc's own style block — passing
+    // SiteStyle too would double-apply it.
+    siteStyle: null,
+  };
+  if (state.ready) {
+    state.channel.post(message);
+  } else {
+    state.pending = message;
+  }
+}
+
+/**
+ * Post a live style update to every ready stylebook host (gen-tagged per host so a stale update is
+ * dropped iframe-side; the superseding render carries the same style). Returns how many hosts
+ * received it — zero means no stylebook iframe is live yet and the caller should fall through to a
+ * full render. Each post is followed by a selection re-measure so the box tracks the reflow.
+ */
+export function postStyleUpdateToStylebookHosts(style: Record<string, unknown>): number {
+  let posted = 0;
+  // Style objects come off the reactive doc — only plain values may cross postMessage.
+  // oxlint-disable-next-line unicorn/prefer-structured-clone
+  const cloneable = JSON.parse(JSON.stringify(style)) as Record<string, unknown>;
+  for (const host of liveHosts) {
+    if (!host.iframe.isConnected) {
+      liveHosts.delete(host);
+      continue;
+    }
+    if (host.ready && host.stylebook) {
+      host.channel.post({ gen: host.lastRenderedGen, kind: "styleUpdate", style: cloneable });
+      posted += 1;
+      requestSelection(host, host.selectionPath);
+    }
+  }
+  return posted;
+}
+
+/**
+ * Pan the canvas so the selected tag's card is centered (layers-panel "locate" affordance). The
+ * card lives inside the iframe, so it is measured over the bridge and the reply pans by the
+ * converted parent-viewport rect (see the `geometry` handler's panReqId branch).
+ */
+export function panToStylebookTag(tag: string): void {
+  const panel = getActivePanel();
+  const host = panel ? (hosts.get(panel.canvas as HTMLElement) ?? null) : null;
+  if (!host?.stylebook || !host.ready) {
+    return;
+  }
+  const cardPath = host.stylebook.tagToCardPath.get(tag);
+  if (!cardPath) {
+    return;
+  }
+  host.selReqId += 1;
+  host.panReqId = host.selReqId;
+  host.channel.post({ kind: "measure", paths: [[...cardPath]], reqId: host.selReqId });
 }
 
 // ─── Format-toolbar bridge (Phase 4b-2) ─────────────────────────────────────────

@@ -30,7 +30,6 @@ interface CanvasPatcherCtx {
   getCanvasMode: () => string;
   scheduleCanvasRender: () => void;
   renderOverlays: () => void;
-  updateForcedPseudoPreview: () => void;
 }
 
 let _ctx: CanvasPatcherCtx | null = null;

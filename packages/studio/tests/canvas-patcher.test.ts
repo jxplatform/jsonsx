@@ -5,7 +5,7 @@
  */
 import "./with-dom.js";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { canvasPanels, elToPath } from "../src/store";
+import { canvasPanels } from "../src/store";
 import { closeAllTabs, openTab } from "../src/workspace/workspace";
 import { getPatchConsumer, setPatchConsumer } from "../src/tabs/patch-ops";
 import {
@@ -33,7 +33,6 @@ let emEl: HTMLElement;
 let canvasMode = "design";
 const ctxCalls = {
   overlays: 0,
-  pseudo: 0,
   scheduled: 0,
 };
 
@@ -49,7 +48,6 @@ beforeEach(() => {
   resetCanvasPerf();
   canvasMode = "design";
   ctxCalls.overlays = 0;
-  ctxCalls.pseudo = 0;
   ctxCalls.scheduled = 0;
 
   tabCount += 1;
@@ -80,11 +78,6 @@ beforeEach(() => {
   rootEl.append(pEl, spanEl, divEl);
   canvas.append(rootEl);
   document.body.append(canvas);
-  elToPath.set(rootEl, []);
-  elToPath.set(pEl, ["children", 0]);
-  elToPath.set(spanEl, ["children", 1]);
-  elToPath.set(divEl, ["children", 2]);
-  elToPath.set(emEl, ["children", 2, "children", 0]);
 
   panel = {
     canvas,
@@ -100,9 +93,6 @@ beforeEach(() => {
     },
     scheduleCanvasRender: () => {
       ctxCalls.scheduled += 1;
-    },
-    updateForcedPseudoPreview: () => {
-      ctxCalls.pseudo += 1;
     },
   });
 });

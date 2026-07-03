@@ -40,7 +40,6 @@ interface ViewState {
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
   _completionRegistered: boolean;
-  stylebookElToTag: WeakMap<Element, string>;
   showAddBreakpointForm: boolean;
   addBreakpointPreview: string;
   layoutSelection: unknown;
@@ -93,7 +92,6 @@ export const view: ViewState = {
   _completionRegistered: false,
 
   // Canvas / stylebook
-  stylebookElToTag: new WeakMap(),
 
   // Responsive breakpoints UI
   showAddBreakpointForm: false,

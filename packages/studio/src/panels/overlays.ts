@@ -1,11 +1,10 @@
 /// <reference lib="dom" />
 /**
- * Overlays panel — renders hover/selection overlay boxes on canvas panels. Delegates block action
- * bar rendering to studio.js via ctx callback.
+ * Overlays panel — the iframe canvas owns hit-testing and draws its own hover/selection boxes (from
+ * posted rects, inside each host's overlay layer), so this panel only keeps panel-header
+ * highlighting in sync and delegates the block-action-bar render on tracked session changes.
  */
 
-import { render as litRender, nothing } from "lit-html";
-import { canvasPanels } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
 import { updateActivePanelHeaders } from "../canvas/canvas-utils";
@@ -72,14 +71,6 @@ function _flush() {
   const tab = activeTab.value;
   if (!tab) {
     return;
-  }
-
-  // The iframe owns hit-testing and draws its own selection/hover overlays (from posted rects).
-  // Clear any parent-side overlay layer and disable the legacy click-catcher so pointer events
-  // Reach the iframe.
-  for (const p of canvasPanels) {
-    litRender(nothing, p.overlay);
-    p.overlayClk.style.pointerEvents = "none";
   }
 
   // Header highlighting follows hit-driven activation immediately (it otherwise only refreshes on

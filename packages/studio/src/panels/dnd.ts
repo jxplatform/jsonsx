@@ -33,7 +33,7 @@ import {
   componentRegistry,
   computeRelativePath,
 } from "../files/components";
-import { renderComponentPreview } from "./stylebook-panel";
+import { renderComponentPreview } from "./component-preview";
 import { defaultDef, unsafeTags } from "./shared";
 import { elementAtPoint } from "../utils/geometry";
 import type { JxPath } from "../state";

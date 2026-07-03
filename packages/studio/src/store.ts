@@ -51,14 +51,6 @@ export function initShellRefs() {
 
 // ─── Shared containers (mutated in place by owner modules) ───────────────────
 
-export const elToPath = new WeakMap<Element, JxPath>();
-
-/**
- * Canvas element → the runtime scope its children render with. Captured during live renders so the
- * canvas patcher can re-render a subtree in isolation with the same prototype-chained scope.
- */
-export const elToScope = new WeakMap<Element, Record<string, unknown>>();
-
 export const canvasPanels: CanvasPanel[] = [];
 
 // ─── Shared constants ────────────────────────────────────────────────────────

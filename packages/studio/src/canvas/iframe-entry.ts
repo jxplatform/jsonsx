@@ -29,10 +29,10 @@ import type { JxPath } from "../state";
 // ObserveScope MUST come from the runtime: the $defs refs are created by the runtime's copy of
 // @vue/reactivity, and dep tracking is per module instance — an effect from the studio's own copy
 // Would never re-run when a dev-proxy data source settles.
-import { observeScope, setResolveToken } from "@jxsuite/runtime";
+import { observeScope, reapplyStyle, setResolveToken } from "@jxsuite/runtime";
 import type { IframeChannel } from "./iframe-channel";
-import type { DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
-import type { JxDocument, JxMutableNode } from "@jxsuite/schema/types";
+import type { CanvasMode, DragSrcKind, IframeToParent, ParentToIframe } from "./iframe-protocol";
+import type { JxDocument, JxMutableNode, JxStyle } from "@jxsuite/schema/types";
 import type { IframeRenderCtx, RenderHandle } from "./iframe-render";
 
 /**
@@ -110,6 +110,9 @@ export function startCanvasIframe(opts: {
   // Are handled correctly rather than applied against the wrong tree.
   let shadowDoc: JxMutableNode | null = null;
   let renderedGen = -1;
+  // The mode of the LIVE render — gates the interactive surfaces (inline editing, insert zones,
+  // Grab-drags) that only design/edit modes own. Adopted alongside shadowDoc.
+  let currentMode: CanvasMode = "design";
   // The current render's retained context (scope/mapping), used to render subtrees for structural
   // Patches. Set together with `shadowDoc`, so it's non-null whenever a patch is applied.
   let renderCtx: IframeRenderCtx | null = null;
@@ -216,13 +219,16 @@ export function startCanvasIframe(opts: {
   // Accessor feeds the insertion "+" zone computation hung off the same pointermove (the parent
   // Draws the clickable "+" and runs the slash-menu → mutateInsertNode flow on click).
   const stopInteraction = startInteraction(channel, container.ownerDocument, {
+    getMode: () => currentMode,
     getShadowDoc: () => shadowDoc,
   });
   // Forward global-shortcut keystrokes to the parent — its shortcut handler is bound to the editor
   // Document, so without this they'd be swallowed whenever focus is inside the canvas iframe.
   const stopKeyForwarding = startKeyForwarding(channel, container.ownerDocument);
   // Run inline editing (contenteditable) here, posting committed/split/insert results to the parent.
-  const stopInlineEdit = startIframeInlineEdit(channel, container);
+  const stopInlineEdit = startIframeInlineEdit(channel, container, {
+    getMode: () => currentMode,
+  });
   // Bridge the engine's slash menu to the parent's Spectrum menu (show/nav/select over the channel).
   const stopSlashBridge = startIframeSlashBridge(channel, container.ownerDocument);
   // Flow 3 (grab-anywhere): detect an element-body drag and DRIVE it locally. A drag that begins in
@@ -234,6 +240,7 @@ export function startCanvasIframe(opts: {
     armAutoScroll: (cursor, dragSeq, src) =>
       updateAutoScroll(cursor, dragSeq, { gen: renderedGen, src }),
     gen: () => renderedGen,
+    getMode: () => currentMode,
     previewAt: (cursor, src) =>
       shadowDoc ? previewAt(cursor, src, shadowDoc, container.ownerDocument) : null,
     stopAutoScroll,
@@ -383,6 +390,24 @@ export function startCanvasIframe(opts: {
       }
       return;
     }
+    if (msg.kind === "styleUpdate") {
+      // Stylebook live style edit: swap the ROOT's style and re-run the runtime's style applier —
+      // One reapply regenerates the whole scoped-CSS cascade (real @media included) without a
+      // Re-render. A stale gen is dropped; the superseding render carries the same style.
+      if (msg.gen !== renderedGen || !shadowDoc) {
+        return;
+      }
+      (shadowDoc as { style?: JxStyle }).style = msg.style as JxStyle;
+      const rootEl = container.firstElementChild;
+      if (rootEl instanceof HTMLElement) {
+        reapplyStyle(
+          rootEl,
+          msg.style as JxStyle,
+          (shadowDoc as { $media?: Record<string, string> }).$media ?? {},
+        );
+      }
+      return;
+    }
     if (msg.kind === "dragStart") {
       // Begin a drag session: retain the source kind + the gen it targets. dragMove/drop replies are
       // Tagged with this gen so the parent drops any that arrive after a re-render superseded it.
@@ -472,6 +497,7 @@ export function startCanvasIframe(opts: {
           shadowDoc = rawDoc;
           renderCtx = handle.ctx;
           renderedGen = gen;
+          currentMode = msg.mode;
           channel.post({ gen, kind: "renderComplete" });
           // Thread a serializable snapshot of the resolved $defs to the parent so the data-explorer
           // Panel shows live data (the iframe, not the parent, now resolves the scope). Inside a

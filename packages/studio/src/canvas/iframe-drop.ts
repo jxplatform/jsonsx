@@ -334,6 +334,11 @@ export interface GrabDetectorDeps {
   /** The generation the iframe's DOM currently reflects, so replies can be stale-gated parent-side. */
   gen: () => number;
   /**
+   * The live render's canvas mode. Grab-anywhere drags are a document-editing affordance —
+   * suppressed for stylebook renders (specimens can't be reordered). Absent = permissive.
+   */
+  getMode?: () => string;
+  /**
    * Arm the self-sustaining auto-scroll loop for a flow-3 cursor. `src` lets the loop recompute the
    * preview during an edge-hold (the parent never posts a dragStart for flow 3, so the entry's own
    * `dragSrc` is null); the loop also re-posts dragOver WITH the cursor so the ghost keeps
@@ -376,6 +381,9 @@ export function startGrabDetector(
   const onPointerDown = (e: PointerEvent) => {
     // Only a primary-button drag originates; ignore right/middle and multi-touch gestures.
     if (e.button !== 0) {
+      return;
+    }
+    if (deps?.getMode?.() === "stylebook") {
       return;
     }
     const path = grabCandidatePath(e.target);

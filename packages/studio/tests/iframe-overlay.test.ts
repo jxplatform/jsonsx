@@ -109,6 +109,27 @@ describe("createOverlayLayer", () => {
     expect(sel.style.display).toBe("none");
   });
 
+  test("setSelection label renders inside the box (stylebook tag chip) and clears when omitted", () => {
+    const layer = createOverlayLayer(document);
+    const sel = layer.root.querySelector(".overlay-selection") as HTMLElement;
+
+    layer.setSelection({ height: 20, left: 10, top: 5, width: 100 }, "<p>");
+    const label = sel.querySelector(".overlay-label") as HTMLElement;
+    expect(label).toBeTruthy();
+    expect(label.textContent).toBe("<p>");
+    expect(label.style.display).toBe("block");
+
+    // A plain (label-less) selection hides the chip but keeps the box.
+    layer.setSelection({ height: 20, left: 10, top: 5, width: 100 });
+    expect(sel.style.display).toBe("block");
+    expect(label.style.display).toBe("none");
+
+    // One label element, reused across selections.
+    layer.setSelection({ height: 1, left: 1, top: 1, width: 1 }, "<ul li>");
+    expect(label.textContent).toBe("<ul li>");
+    expect(sel.querySelectorAll(".overlay-label")).toHaveLength(1);
+  });
+
   test("setHover positions the hover box independently", () => {
     const layer = createOverlayLayer(document);
     const hover = layer.root.querySelector(".overlay-hover") as HTMLElement;

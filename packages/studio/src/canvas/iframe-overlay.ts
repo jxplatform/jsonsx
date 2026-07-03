@@ -59,8 +59,12 @@ export type DropEdge = "top" | "bottom" | "inside";
 
 /** A floating overlay layer over the iframe that draws a selection box and a hover box. */
 export interface OverlayLayer {
-  /** Position the selection box (or hide it when `placement` is null). */
-  setSelection: (placement: OverlayPlacement | null) => void;
+  /**
+   * Position the selection box (or hide it when `placement` is null). `label` shows a small badge
+   * on the box (stylebook draws the selected tag, e.g. "<p>", via the legacy `.overlay-label` CSS);
+   * omitted/null hides it.
+   */
+  setSelection: (placement: OverlayPlacement | null, label?: string | null) => void;
   /** Position the hover box (or hide it when `placement` is null). */
   setHover: (placement: OverlayPlacement | null) => void;
   /**
@@ -115,6 +119,11 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
   selectionBox.className = "overlay-box overlay-selection";
   selectionBox.style.display = "none";
 
+  const selectionLabel = doc.createElement("div");
+  selectionLabel.className = "overlay-label";
+  selectionLabel.style.display = "none";
+  selectionBox.append(selectionLabel);
+
   const hoverBox = doc.createElement("div");
   hoverBox.className = "overlay-box overlay-hover";
   hoverBox.style.display = "none";
@@ -143,7 +152,15 @@ export function createOverlayLayer(doc: Document = document): OverlayLayer {
     setDropIndicator: (placement, edge = "inside") => placeDropIndicator(dropBox, placement, edge),
     setHover: (placement) => place(hoverBox, placement),
     setInsertZone: (placement, edge = "center") => placeInsertButton(insertButton, placement, edge),
-    setSelection: (placement) => place(selectionBox, placement),
+    setSelection: (placement, label = null) => {
+      place(selectionBox, placement);
+      if (placement && label) {
+        selectionLabel.textContent = label;
+        selectionLabel.style.display = "block";
+      } else {
+        selectionLabel.style.display = "none";
+      }
+    },
   };
 }
 

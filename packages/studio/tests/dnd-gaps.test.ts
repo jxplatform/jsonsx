@@ -47,7 +47,7 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop-hitbox/tree-item", () => ({
 }));
 
 let previewRenders = 0;
-void mock.module("../src/panels/stylebook-panel", () => ({
+void mock.module("../src/panels/component-preview", () => ({
   renderComponentPreview: async (comp: AnyRec) => {
     previewRenders += 1;
     const el = document.createElement(comp.tagName);

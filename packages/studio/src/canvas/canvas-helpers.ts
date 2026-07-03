@@ -5,32 +5,11 @@
  * multiple canvas-related modules: element lookup, zoom, panel resolution, inline bubbling.
  */
 
-import { canvasPanels, elToPath, getNodeAtPath, parentElementPath, pathsEqual } from "../store";
-import { rectOf } from "../utils/geometry";
+import { canvasPanels, getNodeAtPath, parentElementPath } from "../store";
 import { activeTab } from "../workspace/workspace";
 import { isInlineInContext } from "../editor/inline-edit";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
-import type { CanvasPanel } from "../types";
-
-let _ctx: { getCanvasMode: () => string; getZoom: () => number } | null = null;
-
-/**
- * Initialize the canvas helpers module.
- *
- * @param {{ getCanvasMode: () => string; getZoom: () => number }} ctx
- */
-export function initCanvasHelpers(ctx: { getCanvasMode: () => string; getZoom: () => number }) {
-  _ctx = ctx;
-}
-
-/** Effective zoom scale — always 1 in edit (content) mode, actual zoom otherwise. */
-export function effectiveZoom() {
-  const ctx = _ctx!;
-  return ctx.getCanvasMode() === "edit"
-    ? 1
-    : (ctx.getZoom?.() ?? activeTab.value?.session.ui.zoom ?? 1);
-}
 
 /**
  * Convert a canvas panel's mediaName to an activeMedia value. Panels without a breakpoint (content
@@ -138,39 +117,5 @@ export function findCanvasElement(path: JxPath, canvasEl: HTMLElement) {
     i += 2;
   }
 
-  if (el) {
-    const elPath = elToPath.get(el);
-    if (elPath && pathsEqual(elPath, path)) {
-      return el;
-    }
-  }
-
-  for (const candidate of canvasEl.querySelectorAll("*")) {
-    const p = elToPath.get(candidate);
-    if (p && pathsEqual(p, path)) {
-      return candidate as HTMLElement;
-    }
-  }
-  return null;
-}
-
-/**
- * Build an overlay box descriptor (no DOM creation).
- *
- * @param {Element} el
- * @param {string} type
- * @param {import("../types").CanvasPanel} panel
- */
-export function overlayBoxDescriptor(el: Element, type: string, panel: CanvasPanel) {
-  const viewport = panel.viewport as HTMLElement;
-  const vpRect = rectOf(viewport);
-  const elRect = rectOf(el);
-  const scale = effectiveZoom();
-  return {
-    cls: `overlay-box overlay-${type}`,
-    height: `${elRect.height / scale}px`,
-    left: `${(elRect.left - vpRect.left + viewport.scrollLeft) / scale}px`,
-    top: `${(elRect.top - vpRect.top + viewport.scrollTop) / scale}px`,
-    width: `${elRect.width / scale}px`,
-  };
+  return el ?? null;
 }

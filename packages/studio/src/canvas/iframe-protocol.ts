@@ -22,9 +22,12 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
  */
 export type WireDocOp = JxDocOp;
 
-export const CANVAS_MODES = ["preview", "design", "edit"] as const;
+export const CANVAS_MODES = ["preview", "design", "edit", "stylebook"] as const;
 
-/** How the iframe renders the document: live `preview`, or instrumented `design`/`edit`. */
+/**
+ * How the iframe renders the document: live `preview`, instrumented `design`/`edit`, or the
+ * `stylebook` specimen catalog (hit/hover/measure only — no inline editing, DnD, or insert zones).
+ */
 export type CanvasMode = (typeof CANVAS_MODES)[number];
 
 export function isCanvasMode(value: unknown): value is CanvasMode {
@@ -67,6 +70,12 @@ export type ParentToIframe =
   // Apply a surgical edit: fold each value-carrying forward op into the shadow doc and patch the DOM
   // In place. `gen` matches the last render so the iframe drops patches superseded by a re-render.
   | { kind: "patch"; forwardOps: WireDocOp[]; gen: number }
+  // Replace the rendered ROOT's style block in place (stylebook live style editing): the iframe
+  // Folds it into the shadow doc and re-runs the runtime's reapplyStyle on the root element, which
+  // Regenerates the whole scoped-CSS cascade (real @media included) without a re-render. `style` is
+  // Already transposed parent-side (transposeStylebookStyle); `gen` must equal the iframe's
+  // RenderedGen — a stale update is dropped (the superseding render carries the same style).
+  | { kind: "styleUpdate"; style: Record<string, unknown>; gen: number }
   // Enter inline editing on the node at `path` (used to re-enter after a split/insert re-renders).
   | { kind: "enterEdit"; path: (string | number)[] }
   // Commit and end the inline-edit session if one is live (a no-op otherwise). Posted by the parent

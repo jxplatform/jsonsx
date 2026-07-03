@@ -22,7 +22,7 @@ import { rectOf } from "../utils/geometry";
 
 import { renderPopover, showDialog } from "../ui/layers";
 import { loopbackAssetSrc } from "../canvas/canvas-origin";
-import { renderComponentPreview } from "../panels/stylebook-panel";
+import { renderComponentPreview } from "../panels/component-preview";
 import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
 import { parseSourceForPath } from "../files/file-ops";
 import {

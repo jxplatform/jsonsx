@@ -19,6 +19,7 @@ import {
   requireProjectState,
   setProjectState,
   toolbarEl,
+  updateSession,
   updateUi,
 } from "./store";
 
@@ -30,7 +31,6 @@ import { view } from "./view";
 
 import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
-import { initCanvasHelpers } from "./canvas/canvas-helpers";
 import {
   initCanvasRender,
   renderCanvas,
@@ -45,6 +45,7 @@ import {
   setCanvasSlashHandler,
   setIframePatchEscalation,
   setInsertZoneClickHandler,
+  setStylebookHitHandler,
   setToolbarRefresh,
 } from "./canvas/iframe-host";
 import { runInsertZoneAction } from "./editor/insert-zone-action";
@@ -110,7 +111,7 @@ import * as rightPanelMod from "./panels/right-panel";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
 import * as tabBar from "./panels/tab-bar";
-import { renderStylebookOverlays } from "./panels/stylebook-panel";
+import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
 import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
@@ -121,7 +122,6 @@ import {
   renderBlockActionBar,
 } from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
-import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
 import { initQuickSearch } from "./panels/quick-search";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
@@ -386,6 +386,14 @@ setInsertZoneClickHandler(runInsertZoneAction);
 setCanvasSlashHandler(canvasSlashHandler);
 // Canvas right-clicks show the parent-realm Jx element context menu across the bridge.
 setCanvasContextMenuHandler(makeCanvasContextMenuHandler({ navigateToComponent }));
+// Stylebook hits decode to a TAG in the host and route here (null = clicked chrome/empty space).
+setStylebookHitHandler((tag, media) => {
+  if (tag) {
+    selectStylebookTag(tag, media);
+  } else {
+    updateSession({ ui: { activeSelector: null, stylebookSelection: null } });
+  }
+});
 // Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
 // Toolbar / link popover / slash menu) ends the live inline-edit session — the iframe can't observe
 // Parent-realm pointer events (layers panel, tab strip, right panel…). Pointerdowns over the canvas
@@ -401,14 +409,9 @@ document.addEventListener(
   true,
 );
 
-initCanvasHelpers({
-  getCanvasMode,
-  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-});
 initCanvasUtils({
   getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-  renderStylebookOverlays,
   setZoomDirect: (zoom) => {
     if (activeTab.value) {
       activeTab.value.session.ui.zoom = zoom;
@@ -422,7 +425,6 @@ initCanvasPatcher({
   getCanvasMode,
   renderOverlays,
   scheduleCanvasRender,
-  updateForcedPseudoPreview,
 });
 // When the iframe canvas can't apply a posted patch surgically, fall back to a full render.
 setIframePatchEscalation(scheduleCanvasRender);
@@ -487,7 +489,6 @@ rightPanelMod.mount({
   getCanvasMode,
   navigateToComponent,
   renderCanvas: () => renderCanvas(),
-  updateForcedPseudoPreview,
 });
 
 leftPanelMod.mount({

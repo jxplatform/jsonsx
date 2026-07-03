@@ -259,11 +259,8 @@ export interface CanvasPanel {
   mediaName: string;
   element: HTMLElement;
   canvas: HTMLElement;
-  overlay: HTMLElement;
-  overlayClk: HTMLElement;
   viewport: HTMLElement;
   scrollContainer: HTMLElement;
-  dropLine: HTMLElement;
   _width: number | null;
   /** True when the panel's DOM reflects the current document via a successful live render. */
   ready: boolean;

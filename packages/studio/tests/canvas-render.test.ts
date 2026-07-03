@@ -10,7 +10,6 @@ import { closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
 import { initCanvasUtils } from "../src/canvas/canvas-utils";
-import { initCanvasHelpers } from "../src/canvas/canvas-helpers";
 import { MARKDOWN_FORMAT } from "./format-fixture";
 import type { CanvasPanel } from "../src/types";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -26,6 +25,8 @@ type IframeMount = (
   canvas: HTMLElement,
   widthPx?: number | null,
 ) => Promise<void>;
+// The stylebook fast path posts style updates to live stylebook hosts; tests control the count.
+let styleUpdateImpl: (style: Record<string, unknown>) => number = () => 0;
 let iframeImpl: IframeMount = async (_gen, doc, canvas) => {
   canvas.innerHTML = "";
   const root = document.createElement("div");
@@ -45,9 +46,7 @@ const renderWelcome = mock((host: HTMLElement) => {
 const renderFunctionEditor = mock(() => {});
 const statusMessage = mock((_msg: string, _duration?: number) => {});
 const overlaysRender = mock(() => {});
-const updateForcedPseudoPreview = mock(() => {});
 const renderStylebookMode = mock((_helpers: unknown) => {});
-const refreshStylebookStyles = mock(() => {});
 const parseSourceForPathMock = mock(async (_path: string, _source: string) => ({
   document: { children: [{ tagName: "p", textContent: "parsed-md" }], tagName: "article" },
   format: MARKDOWN_FORMAT,
@@ -129,6 +128,7 @@ void mock.module("../src/canvas/canvas-live-render.js", () => ({
 
 void mock.module("../src/canvas/iframe-host.js", () => ({
   commitActiveEditSession: () => {},
+  postStyleUpdateToStylebookHosts: (style: Record<string, unknown>) => styleUpdateImpl(style),
   getEditBarAnchorRect: () => null,
   getEditSnapshot: () => ({ editing: false, snapshot: null }),
   mountIframeCanvas: (
@@ -165,12 +165,7 @@ void mock.module("../src/panels/overlays.js", () => ({
   unmount: () => {},
 }));
 
-void mock.module("../src/panels/pseudo-preview.js", () => ({
-  updateForcedPseudoPreview,
-}));
-
 void mock.module("../src/panels/stylebook-panel.js", () => ({
-  refreshStylebookStyles,
   renderStylebookMode,
 }));
 
@@ -274,6 +269,7 @@ beforeEach(() => {
   canvasModeFn = () => canvasMode;
   zoom = 1;
   ctx.gitDiffState = null;
+  styleUpdateImpl = () => 0;
   iframeImpl = async (_gen, doc, canvas) => {
     canvas.innerHTML = "";
     const root = document.createElement("div");
@@ -291,9 +287,7 @@ beforeEach(() => {
     renderFunctionEditor,
     statusMessage,
     overlaysRender,
-    updateForcedPseudoPreview,
     renderStylebookMode,
-    refreshStylebookStyles,
     parseSourceForPathMock,
     serializeDocumentMock,
     ctx.setCanvasMode,
@@ -311,11 +305,9 @@ beforeEach(() => {
   view.canvasDndCleanups = [];
   view.canvasEventCleanups = [];
   view.renderGeneration = 0;
-  initCanvasHelpers({ getCanvasMode: () => canvasModeFn(), getZoom: () => zoom });
   initCanvasUtils({
     getCanvasMode: () => canvasModeFn(),
     getZoom: () => zoom,
-    renderStylebookOverlays: () => {},
     setZoomDirect: (z: number) => {
       zoom = z;
     },
@@ -961,9 +953,7 @@ describe("stylebook mode", () => {
     for (const key of [
       "applyTransform",
       "canvasPanelTemplate",
-      "effectiveZoom",
       "observeCenterUntilStable",
-      "overlayBoxDescriptor",
       "renderZoomIndicator",
       "updateActivePanelHeaders",
     ]) {
@@ -971,23 +961,42 @@ describe("stylebook mode", () => {
     }
   });
 
-  test("re-render with unchanged filters takes the style-refresh fast path", () => {
+  test("re-render with unchanged filters posts a styleUpdate to live stylebook hosts", () => {
     resetWorkspaceWithTab();
     canvasMode = "stylebook";
+    const updates: Record<string, unknown>[] = [];
+    styleUpdateImpl = (style) => {
+      updates.push(style);
+      return 1; // A live stylebook host received it → no full rebuild.
+    };
     renderCanvas();
     renderCanvas();
-    expect(refreshStylebookStyles).toHaveBeenCalledTimes(1);
+    expect(updates).toHaveLength(1);
     expect(renderStylebookMode).toHaveBeenCalledTimes(1);
+  });
+
+  test("falls through to a full stylebook render when no host is live yet", () => {
+    resetWorkspaceWithTab();
+    canvasMode = "stylebook";
+    styleUpdateImpl = () => 0; // No stylebook iframe mounted → fast path can't apply.
+    renderCanvas();
+    renderCanvas();
+    expect(renderStylebookMode).toHaveBeenCalledTimes(2);
   });
 
   test("filter changes force a full stylebook re-render", () => {
     const tab = resetWorkspaceWithTab();
     canvasMode = "stylebook";
+    const updates: Record<string, unknown>[] = [];
+    styleUpdateImpl = (style) => {
+      updates.push(style);
+      return 1;
+    };
     renderCanvas();
     tab.session.ui.stylebookFilter = "head";
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(2);
-    expect(refreshStylebookStyles).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
   });
 
   test("customized-only toggle also forces a full re-render", () => {

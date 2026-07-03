@@ -95,8 +95,16 @@ function toSerializableRect(rect: DOMRect): SerializableRect {
 export function startIframeInlineEdit(
   channel: IframeChannel<IframeToParent, ParentToIframe>,
   container: HTMLElement,
+  opts?: { getMode?: () => string },
 ): () => void {
   const doc = container.ownerDocument;
+
+  // Inline editing exists only in design/edit renders — a stylebook (or preview) render must not
+  // Start a contenteditable session on its nodes. An absent getMode is permissive (tests).
+  const editingAllowed = () => {
+    const mode = opts?.getMode?.();
+    return mode === undefined || mode === "design" || mode === "edit";
+  };
 
   // The most recent non-empty range inside the active editable. Cached AGGRESSIVELY (not just on
   // Selectionchange) because focus can collapse the live selection before the post-blur event runs.
@@ -279,6 +287,9 @@ export function startIframeInlineEdit(
   };
 
   const onDblClick = (e: Event) => {
+    if (!editingAllowed()) {
+      return;
+    }
     const hit = findEditableTarget(e.target);
     if (hit) {
       enterEditAt(hit.el, hit.path);
@@ -327,6 +338,9 @@ export function startIframeInlineEdit(
       return;
     }
     if (msg.kind !== "enterEdit") {
+      return;
+    }
+    if (!editingAllowed()) {
       return;
     }
     const el = elementForPath(container, msg.path);

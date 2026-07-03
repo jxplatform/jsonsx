@@ -62,8 +62,12 @@ const DEFAULT_RESOLVED = {
   siteStyle: null,
 };
 let resolved: Record<string, unknown> = structuredClone(DEFAULT_RESOLVED);
+let resolveCalls = 0;
 void mock.module("../src/canvas/canvas-live-render", () => ({
-  resolveCanvasDocument: () => Promise.resolve(resolved),
+  resolveCanvasDocument: () => {
+    resolveCalls += 1;
+    return Promise.resolve(resolved);
+  },
 }));
 
 const {
@@ -80,9 +84,12 @@ const {
   hostForCanvas,
   liveDragHostAt,
   mountIframeCanvas,
+  mountStylebookCanvas,
+  panToStylebookTag,
   postApplyFormat,
   postDragMessage,
   postPatchToHosts,
+  postStyleUpdateToStylebookHosts,
   sawIframeDragOver,
   setCanvasContextMenuHandler,
   setCanvasSlashHandler,
@@ -90,6 +97,7 @@ const {
   setIframePatchEscalation,
   setNativeDragEnterHandler,
   setInsertZoneClickHandler,
+  setStylebookHitHandler,
   setToolbarRefresh,
 } = await import("../src/canvas/iframe-host");
 
@@ -97,6 +105,7 @@ beforeEach(() => {
   channels.length = 0;
   document.body.innerHTML = "";
   resolved = structuredClone(DEFAULT_RESOLVED);
+  resolveCalls = 0;
 });
 
 describe("mountIframeCanvas", () => {
@@ -1472,21 +1481,6 @@ describe("iframe canvas host viewport plumbing", () => {
     expect(seen[0]!.deltaX).toBe(4);
     expect(seen[0]!.deltaY).toBe(7);
   });
-
-  test("mounting neutralizes a sibling .canvas-panel-click catcher (pointer-events:none)", async () => {
-    // The legacy hit-test catcher is a positioned sibling of the canvas (under the canvas's parent).
-    // On mount the host must set its pointer-events to none so it no longer eats clicks/wheel before
-    // The iframe — which now owns hit-testing and native scrolling — can see them.
-    const parent = document.createElement("div");
-    const catcher = document.createElement("div");
-    catcher.className = "canvas-panel-click";
-    const canvasEl = document.createElement("div");
-    parent.append(catcher, canvasEl);
-    document.body.append(parent);
-
-    await mountIframeCanvas(1, {} as never, canvasEl);
-    expect(catcher.style.pointerEvents).toBe("none");
-  });
 });
 
 /** Opaque host handle for the drag-session API tests (its internals aren't asserted directly). */
@@ -1745,5 +1739,253 @@ describe("slash/context bridge messages", () => {
       kind: "hit",
     });
     expect(dismissed).toBe(1);
+  });
+});
+
+// ─── Stylebook host capability: tag-addressed hits, live styleUpdate, pan ────────
+
+const { serializeJxPath } = await import("../src/canvas/path-mapping");
+
+describe("stylebook host capability", () => {
+  // Card → preview → specimen root (p) → nested child (b), mirroring buildStylebookDoc's shape.
+  const CARD_PATH = ["children", 0, "children", 1, "children", 0];
+  const SPECIMEN_PATH = [...CARD_PATH, "children", 0, "children", 0];
+  const NESTED_PATH = [...SPECIMEN_PATH, "children", 0];
+
+  function makeGenerated() {
+    return {
+      doc: { attributes: { class: "sb-root" }, children: [], tagName: "div" } as never,
+      pathToTag: new Map([
+        [serializeJxPath(CARD_PATH), "p"],
+        [serializeJxPath([...CARD_PATH, "children", 0]), "p"],
+        [serializeJxPath(SPECIMEN_PATH), "p"],
+        [serializeJxPath(NESTED_PATH), "p b"],
+      ]),
+      tagToCardPath: new Map<string, (string | number)[]>([["p", CARD_PATH]]),
+    };
+  }
+
+  async function mountStylebookReady(widthPx: number | null = 480) {
+    const canvasEl = document.createElement("div");
+    document.body.append(canvasEl);
+    mountStylebookCanvas(9, makeGenerated(), canvasEl, widthPx);
+    const channel = channels.at(-1)!;
+    channel.deliver({ kind: "ready" });
+    channel.deliver({ gen: 9, kind: "renderComplete" });
+    await flush();
+    return { canvasEl, channel };
+  }
+
+  beforeEach(() => {
+    resetWorkspaceWithTab();
+    canvasPanels.length = 0;
+    setStylebookHitHandler(() => {});
+  });
+
+  test("mountStylebookCanvas posts the pre-generated doc as a stylebook render — no resolveCanvasDocument, no siteStyle, fixed width", async () => {
+    const { canvasEl, channel } = await mountStylebookReady(768);
+    expect(resolveCalls).toBe(0);
+    const render = channel.posts.find((p) => p.kind === "render")!;
+    expect(render).toMatchObject({ gen: 9, kind: "render", mode: "stylebook", siteStyle: null });
+    expect((render.mapperCtx as { canvasMode: string }).canvasMode).toBe("stylebook");
+    // Doc and shadowDoc are independent plain clones (fake channels pass by reference).
+    expect(render.doc).toEqual(render.shadowDoc as never);
+    expect(render.doc).not.toBe(render.shadowDoc);
+    const iframe = canvasEl.querySelector("iframe") as HTMLIFrameElement;
+    expect(iframe.style.width).toBe("768px");
+  });
+
+  test("a null width mounts full-width (the no-$media single panel)", async () => {
+    const { canvasEl } = await mountStylebookReady(null);
+    const iframe = canvasEl.querySelector("iframe") as HTMLIFrameElement;
+    expect(iframe.style.width).toBe("100%");
+  });
+
+  test("a specimen hit decodes to its tag (nearest mapped ancestor), routes to the handler with the panel's media, draws a labelled box, and never writes session.selection", async () => {
+    const hits: [string | null, string | null][] = [];
+    setStylebookHitHandler((tag, media) => hits.push([tag, media]));
+    const { canvasEl, channel } = await mountStylebookReady();
+    canvasPanels.push({ canvas: canvasEl, mediaName: "sm" } as unknown as CanvasPanel);
+
+    // A hit on an UNMAPPED descendant of the nested <b> trims pairwise up to "p b".
+    channel.deliver({
+      hit: {
+        path: [...NESTED_PATH, "children", 2],
+        rect: { height: 20, width: 100, x: 10, y: 5 },
+      },
+      kind: "hit",
+    });
+    expect(hits).toEqual([["p b", "sm"]]);
+    expect(activeTab.value?.session.selection).toBeNull();
+    const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
+    expect(sel.style.display).toBe("block");
+    expect((sel.querySelector(".overlay-label") as HTMLElement).textContent).toBe("<p b>");
+
+    // Chrome (unmapped all the way up) → null tag, box cleared.
+    channel.deliver({
+      hit: { path: ["children", 0], rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    expect(hits).toEqual([
+      ["p b", "sm"],
+      [null, "sm"],
+    ]);
+    expect(sel.style.display).toBe("none");
+  });
+
+  test("hover decodes to a tag and suppresses the box over the SELECTED tag", async () => {
+    const { canvasEl, channel } = await mountStylebookReady();
+    activeTab.value!.session.ui.stylebookSelection = "p";
+    await flush();
+    const hover = canvasEl.querySelector(".overlay-hover") as HTMLElement;
+
+    channel.deliver({
+      hit: { path: SPECIMEN_PATH, rect: { height: 8, width: 40, x: 2, y: 3 } },
+      kind: "hover",
+    });
+    expect(hover.style.display).toBe("none");
+
+    channel.deliver({
+      hit: { path: NESTED_PATH, rect: { height: 8, width: 40, x: 2, y: 3 } },
+      kind: "hover",
+    });
+    expect(hover.style.display).toBe("block");
+
+    channel.deliver({ hit: null, kind: "hover" });
+    expect(hover.style.display).toBe("none");
+  });
+
+  test("insertZones, contextMenu, and dragOriginate are inert on stylebook hosts", async () => {
+    const shows: unknown[] = [];
+    setCanvasContextMenuHandler({ dismiss: () => {}, show: (a) => shows.push(a) });
+    const originates: unknown[] = [];
+    setIframeOriginateHandler((...a) => {
+      originates.push(a);
+    });
+    const { canvasEl, channel } = await mountStylebookReady();
+
+    channel.deliver({
+      kind: "insertZones",
+      zones: [
+        {
+          index: 0,
+          parentPath: [],
+          position: "before",
+          rect: { height: 10, width: 10, x: 0, y: 0 },
+          refPath: ["children", 0],
+        },
+      ],
+    });
+    const plus = canvasEl.querySelector(".insertion-helper") as HTMLElement;
+    expect(plus.style.display).toBe("none");
+
+    channel.deliver({ kind: "contextMenu", path: SPECIMEN_PATH, x: 5, y: 7 });
+    expect(shows).toHaveLength(0);
+
+    channel.deliver({
+      cursor: { x: 1, y: 2 },
+      dragSeq: 1,
+      kind: "dragOriginate",
+      path: SPECIMEN_PATH,
+      rect: { height: 10, width: 10, x: 0, y: 0 },
+    });
+    expect(originates).toHaveLength(0);
+    setCanvasContextMenuHandler({ dismiss: () => {}, show: () => {} });
+  });
+
+  test("the selection watcher measures the selected tag's CARD; the geometry reply draws the labelled box", async () => {
+    const { canvasEl, channel } = await mountStylebookReady();
+    channel.posts.length = 0;
+
+    activeTab.value!.session.ui.stylebookSelection = "p";
+    await flush();
+    const measure = channel.posts.find((p) => p.kind === "measure") as Msg;
+    expect(measure).toMatchObject({ kind: "measure", paths: [CARD_PATH] });
+
+    channel.deliver({
+      hits: [{ path: CARD_PATH, rect: { height: 40, width: 200, x: 12, y: 30 } }],
+      kind: "geometry",
+      reqId: measure.reqId as number,
+    });
+    const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
+    expect(sel.style.display).toBe("block");
+    expect(sel.style.left).toBe("12px");
+    expect((sel.querySelector(".overlay-label") as HTMLElement).textContent).toBe("<p>");
+
+    // A tag with no card in this host's doc clears the box without a round-trip.
+    channel.posts.length = 0;
+    activeTab.value!.session.ui.stylebookSelection = "table";
+    await flush();
+    expect(channel.posts.some((p) => p.kind === "measure")).toBe(false);
+    expect(sel.style.display).toBe("none");
+  });
+
+  test("postStyleUpdateToStylebookHosts gen-tags per stylebook host and skips page hosts", async () => {
+    // A regular page host first (channels[0]) …
+    await mountReady();
+    // … then a live stylebook host (channels[1]).
+    const { channel } = await mountStylebookReady();
+    channels[0]!.posts.length = 0;
+    channel.posts.length = 0;
+
+    const posted = postStyleUpdateToStylebookHosts({
+      "& .element-card-preview p": { color: "blue" },
+    });
+    expect(posted).toBe(1);
+    const update = channel.posts.find((p) => p.kind === "styleUpdate")!;
+    // Tagged with the host's last RENDERED gen (9), so a stale update is dropped iframe-side.
+    expect(update).toMatchObject({ gen: 9, kind: "styleUpdate" });
+    expect(channels[0]!.posts.some((p) => p.kind === "styleUpdate")).toBe(false);
+  });
+
+  test("postStyleUpdateToStylebookHosts returns 0 with no live stylebook host (caller falls back to a full render)", async () => {
+    await mountReady();
+    expect(postStyleUpdateToStylebookHosts({})).toBe(0);
+  });
+
+  test("panToStylebookTag measures the card via a dedicated reqId whose geometry reply pans instead of drawing the selection", async () => {
+    const wrap = document.createElement("div");
+    wrap.id = "canvas-wrap";
+    document.body.append(wrap);
+    initShellRefs();
+
+    const { canvasEl, channel } = await mountStylebookReady();
+    canvasPanels.push({ canvas: canvasEl, mediaName: null } as unknown as CanvasPanel);
+    channel.posts.length = 0;
+
+    panToStylebookTag("p");
+    const measure = channel.posts.find((p) => p.kind === "measure") as Msg;
+    expect(measure).toMatchObject({ kind: "measure", paths: [CARD_PATH] });
+
+    const sel = canvasEl.querySelector(".overlay-selection") as HTMLElement;
+    channel.deliver({
+      hits: [{ path: CARD_PATH, rect: { height: 40, width: 200, x: 12, y: 500 } }],
+      kind: "geometry",
+      reqId: measure.reqId as number,
+    });
+    // The pan branch consumed the reply — the selection box was not (re)drawn from it.
+    expect(sel.style.display).toBe("none");
+
+    // An unknown tag posts nothing.
+    channel.posts.length = 0;
+    panToStylebookTag("nope");
+    expect(channel.posts).toHaveLength(0);
+  });
+
+  test("a later page mount on the same canvas clears the stylebook capability", async () => {
+    const hits: unknown[] = [];
+    setStylebookHitHandler((tag) => hits.push(tag));
+    const { canvasEl, channel } = await mountStylebookReady();
+
+    await mountIframeCanvas(10, {} as never, canvasEl, null, activeTab.value!.id);
+    channel.deliver({ gen: 10, kind: "renderComplete" });
+
+    channel.deliver({
+      hit: { path: SPECIMEN_PATH, rect: { height: 1, width: 1, x: 0, y: 0 } },
+      kind: "hit",
+    });
+    // Routed as a normal document hit: session.selection written, no stylebook decode.
+    expect(hits).toHaveLength(0);
+    expect(activeTab.value?.session.selection).toEqual(SPECIMEN_PATH);
   });
 });

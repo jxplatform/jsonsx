@@ -73,6 +73,11 @@ export interface InteractionDeps {
    * use.
    */
   getShadowDoc: () => JxMutableNode | null;
+  /**
+   * The live render's canvas mode. Insertion "+" zones are a document-editing affordance —
+   * suppressed for stylebook renders (specimens aren't insert targets). Absent = permissive.
+   */
+  getMode?: () => string;
 }
 
 /**
@@ -111,7 +116,7 @@ export function startInteraction(
 
   /** Resolve + post the insertion "+" zones for an iframe-viewport cursor, deduped by key. */
   const reportInsertZones = (target: EventTarget | null, cursor: { x: number; y: number }) => {
-    if (!deps) {
+    if (!deps || deps.getMode?.() === "stylebook") {
       return;
     }
     const shadowDoc = deps.getShadowDoc();
