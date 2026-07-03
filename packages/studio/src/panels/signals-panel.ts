@@ -8,7 +8,10 @@
 import { html, nothing } from "lit-html";
 import { classMap } from "lit-html/directives/class-map.js";
 import { ifDefined } from "lit-html/directives/if-defined.js";
+import { live } from "lit-html/directives/live.js";
 import { styleMap } from "lit-html/directives/style-map.js";
+import { isRef } from "@jxsuite/schema/guards";
+import { dynamicRouteParams } from "../page-params";
 import { projectState } from "../state";
 import type { JsonValue } from "../types";
 import { activeTab } from "../workspace/workspace";
@@ -110,6 +113,14 @@ let expandedSignal: string | null = null;
 
 /** Track which functions have the advanced param editor open. */
 const advancedParamOpen = new Set();
+
+/** Schema fields whose binding picker is in free-form Custom mode (cleared on commit). */
+const bindingCustomOpen = new Set<string>();
+
+/** Reset binding-control ephemeral UI state (test hook). */
+export function resetBindingUiState() {
+  bindingCustomOpen.clear();
+}
 
 /** Default templates for creating new signal definitions. */
 const DEF_TEMPLATES = {
@@ -1294,6 +1305,18 @@ function renderInlineField(
   onChange: (val: unknown) => void,
   parentDef?: Record<string, unknown>,
 ) {
+  if (isRef(value)) {
+    return html`<sp-textfield
+      size="s"
+      label=${key}
+      placeholder=${key}
+      .value=${live(value.$ref)}
+      @change=${(e: Event) => {
+        const v = (e.target as HTMLInputElement).value.trim();
+        onChange(v ? { $ref: v } : undefined);
+      }}
+    ></sp-textfield>`;
+  }
   const enumValues = resolveSchemaEnum(schema.enum, parentDef);
 
   if (enumValues) {
@@ -1344,6 +1367,63 @@ function renderInlineField(
   ></sp-textfield>`;
 }
 
+/**
+ * Render a binding picker for a `{ $ref }` config value — route params derived from the document
+ * path plus a free-form custom ref, with a switch back to a static value.
+ */
+function renderBindingControl(opts: {
+  refVal: string;
+  params: string[];
+  fieldKey: string;
+  commit: (next: { $ref: string } | undefined) => void;
+  rerender: (() => void) | undefined;
+}) {
+  const paramRefs = opts.params.map((p) => `#/$params/${p}`);
+  const isCustom =
+    bindingCustomOpen.has(opts.fieldKey) ||
+    (opts.refVal !== "" && !paramRefs.includes(opts.refVal));
+  return html`
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <sp-picker
+        size="s"
+        .value=${live(isCustom ? "__custom__" : opts.refVal || "__static__")}
+        @change=${(e: Event) => {
+          const v = (e.target as HTMLInputElement).value;
+          if (v === "__custom__") {
+            bindingCustomOpen.add(opts.fieldKey);
+            opts.rerender?.();
+            return;
+          }
+          bindingCustomOpen.delete(opts.fieldKey);
+          opts.commit(v === "__static__" ? undefined : { $ref: v });
+          opts.rerender?.();
+        }}
+      >
+        <sp-menu-item value="__static__">Static value</sp-menu-item>
+        ${paramRefs.length > 0 ? html`<sp-menu-divider></sp-menu-divider>` : nothing}
+        ${paramRefs.map((r) => html`<sp-menu-item value=${r}>${r.slice(2)}</sp-menu-item>`)}
+        <sp-menu-divider></sp-menu-divider>
+        <sp-menu-item value="__custom__">Custom…</sp-menu-item>
+      </sp-picker>
+      ${isCustom
+        ? html`<sp-textfield
+            size="s"
+            placeholder="#/$params/…"
+            .value=${live(opts.refVal)}
+            @change=${(e: Event) => {
+              const v = (e.target as HTMLInputElement).value.trim();
+              if (!v) {
+                bindingCustomOpen.delete(opts.fieldKey);
+              }
+              opts.commit(v ? { $ref: v } : undefined);
+              opts.rerender?.();
+            }}
+          ></sp-textfield>`
+        : nothing}
+    </div>
+  `;
+}
+
 /** Render a debounced multiline JSON text field for array/object schema properties. */
 function renderJsonTextField(
   currentValue: unknown,
@@ -1382,7 +1462,7 @@ export function renderSchemaFieldsTemplate(
   schema: JsonSchema | null | undefined,
   def: SignalDef,
   name: string,
-  _S: SignalsPanelState,
+  S: SignalsPanelState,
   ctx: SignalsPanelCtx | null = null,
 ) {
   if (!schema?.properties) {
@@ -1390,6 +1470,7 @@ export function renderSchemaFieldsTemplate(
   }
 
   const required = new Set(schema.required);
+  const params = dynamicRouteParams(S.documentPath);
 
   const propertyFields = Object.entries(schema.properties)
     .filter(([prop]) => !STUDIO_RESERVED_KEYS.has(prop))
@@ -1399,7 +1480,21 @@ export function renderSchemaFieldsTemplate(
 
       let control;
       const enumValues = resolveSchemaEnum(ps.enum, def);
-      if (enumValues) {
+      if (
+        isRef(currentValue) &&
+        ps.format !== "json-schema" &&
+        ps.type !== "object" &&
+        ps.type !== "array"
+      ) {
+        control = renderBindingControl({
+          refVal: currentValue.$ref,
+          params,
+          fieldKey: `${name}.${prop}`,
+          commit: (next) =>
+            transactDoc(activeTab.value, (t) => mutateUpdateDef(t, name, { [prop]: next })),
+          rerender: ctx ? () => ctx.renderLeftPanel() : undefined,
+        });
+      } else if (enumValues) {
         control = html`
           <sp-picker
             size="s"
@@ -1463,12 +1558,12 @@ export function renderSchemaFieldsTemplate(
         const hasValue =
           currentValue && typeof currentValue === "object" && Object.keys(currentValue).length > 0;
         const cv = currentValue as Record<string, unknown>;
-        const isRef = hasValue && cv.$ref;
+        const isSchemaRef = hasValue && cv.$ref;
         /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce: ReturnType<typeof setTimeout> | undefined;
         control = html`
           <div class="schema-param-editor">
-            ${hasValue && !isRef && cv.properties
+            ${hasValue && !isSchemaRef && cv.properties
               ? html`
                   <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">
                     ${Object.entries(cv.properties as Record<string, Record<string, unknown>>).map(
@@ -1580,24 +1675,43 @@ export function renderSchemaFieldsTemplate(
         /** @type {ReturnType<typeof setTimeout> | undefined} */
         let debounce: ReturnType<typeof setTimeout> | undefined;
         const ph = ps.default !== undefined ? String(ps.default) : (ps.examples?.[0] ?? "");
-        control = html`<sp-textfield
-          size="s"
-          .value=${currentValue ?? ""}
-          placeholder=${ph || nothing}
-          title=${ps.description || nothing}
-          @input=${(e: Event) => {
-            clearTimeout(debounce);
-            debounce = setTimeout(
-              () =>
-                transactDoc(activeTab.value, (t) =>
-                  mutateUpdateDef(t, name, {
-                    [prop]: (e.target as HTMLInputElement).value || undefined,
-                  }),
-                ),
-              400,
-            );
-          }}
-        ></sp-textfield>`;
+        control = html`<div style="display:flex;gap:4px;align-items:center">
+          <sp-textfield
+            size="s"
+            style="flex:1"
+            .value=${currentValue ?? ""}
+            placeholder=${ph || nothing}
+            title=${ps.description || nothing}
+            @input=${(e: Event) => {
+              clearTimeout(debounce);
+              debounce = setTimeout(
+                () =>
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, {
+                      [prop]: (e.target as HTMLInputElement).value || undefined,
+                    }),
+                  ),
+                400,
+              );
+            }}
+          ></sp-textfield>
+          ${params.length > 0
+            ? html`<sp-action-button
+                quiet
+                size="s"
+                title="Bind to route param"
+                @click=${() => {
+                  transactDoc(activeTab.value, (t) =>
+                    mutateUpdateDef(t, name, {
+                      [prop]: { $ref: `#/$params/${params[0]}` },
+                    }),
+                  );
+                  ctx?.renderLeftPanel();
+                }}
+                ><sp-icon-link slot="icon"></sp-icon-link
+              ></sp-action-button>`
+            : nothing}
+        </div>`;
       }
 
       return renderFieldRow({

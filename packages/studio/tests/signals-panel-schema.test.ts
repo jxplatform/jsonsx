@@ -16,6 +16,7 @@ import { activeTab } from "../src/workspace/workspace";
 import {
   renderExternalPrototypeEditorTemplate,
   renderSchemaFieldsTemplate,
+  resetBindingUiState,
 } from "../src/panels/signals-panel";
 import { pluginSchemaCache } from "../src/services/code-services";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -48,6 +49,7 @@ function mountSchema(
   schema: Record<string, unknown> | null,
   def: Record<string, unknown>,
   ctx: { renderLeftPanel: () => void } | null = null,
+  documentPath?: string,
 ): HTMLElement {
   resetWorkspaceWithTab({
     children: [],
@@ -59,7 +61,10 @@ function mountSchema(
   if (!tab) {
     throw new Error("no active tab");
   }
-  const S = { document: tab.doc.document } as never;
+  const S = {
+    document: tab.doc.document,
+    ...(documentPath != null && { documentPath }),
+  } as never;
   render(
     html`${renderSchemaFieldsTemplate(
       schema as never,
@@ -89,6 +94,7 @@ beforeEach(() => {
   resetStudioState();
   installMockPlatform();
   pluginSchemaCache.clear();
+  resetBindingUiState();
 });
 
 // ─── renderSchemaFieldsTemplate basics ───────────────────────────────────────
@@ -502,6 +508,148 @@ describe("array-of-objects fields", () => {
       el.getAttribute("value"),
     );
     expect(values).toEqual(["__none__", "slug", "title"]);
+  });
+});
+
+// ─── Param binding fields ─────────────────────────────────────────────────────
+
+describe("param binding fields", () => {
+  const stringSchema = { properties: { id: { type: "string" } } };
+  const skuDoc = "pages/products/[sku].json";
+
+  test("$ref value renders a binding picker instead of [object Object]", () => {
+    const container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, null, skuDoc);
+    const picker = fieldEl<ValueEl>(container, "id", "sp-picker");
+    expect(picker.value).toBe("#/$params/sku");
+    const values = [...container.querySelectorAll('[data-prop="id"] sp-menu-item')].map((el) =>
+      el.getAttribute("value"),
+    );
+    expect(values).toEqual(["__static__", "#/$params/sku", "__custom__"]);
+    expect(container.textContent).toContain("$params/sku");
+    expect(container.textContent).not.toContain("[object Object]");
+    // Known param selected → no freeform textfield
+    expect(container.querySelector('[data-prop="id"] sp-textfield')).toBeNull();
+  });
+
+  test("picking another param commits the new $ref", () => {
+    const container = mountSchema(
+      stringSchema,
+      { id: { $ref: "#/$params/a" } },
+      null,
+      "pages/[a]/[b].json",
+    );
+    commitValue(fieldEl(container, "id", "sp-picker"), "#/$params/b");
+    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/b" } as never);
+  });
+
+  test("Static value clears the binding", () => {
+    const container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, null, skuDoc);
+    commitValue(fieldEl(container, "id", "sp-picker"), "__static__");
+    expect((pluginDef() as { id?: unknown }).id).toBeUndefined();
+  });
+
+  test("ref outside the param list opens custom mode with an editable textfield", () => {
+    const container = mountSchema(
+      stringSchema,
+      { id: { $ref: "#/$params/sku" } },
+      null,
+      "pages/index.json",
+    );
+    expect(fieldEl<ValueEl>(container, "id", "sp-picker").value).toBe("__custom__");
+    const tf = fieldEl<ValueEl>(container, "id", "sp-textfield");
+    expect(tf.value).toBe("#/$params/sku");
+    commitValue(tf, "#/other/path");
+    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/other/path" } as never);
+  });
+
+  test("custom textfield committed blank deletes the key", () => {
+    const container = mountSchema(stringSchema, { id: { $ref: "#/custom/ref" } }, null, skuDoc);
+    commitValue(fieldEl(container, "id", "sp-textfield"), "  ");
+    expect((pluginDef() as { id?: unknown }).id).toBeUndefined();
+  });
+
+  test("selecting Custom… re-renders into freeform mode without committing", () => {
+    let renders = 0;
+    const ctx = {
+      renderLeftPanel: () => {
+        renders += 1;
+      },
+    };
+    let container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, ctx, skuDoc);
+    commitValue(fieldEl(container, "id", "sp-picker"), "__custom__");
+    expect(renders).toBe(1);
+    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/sku" } as never);
+    // Custom mode persists across re-mounts via ephemeral UI state
+    container = mountSchema(stringSchema, { id: { $ref: "#/$params/sku" } }, ctx, skuDoc);
+    expect(fieldEl<ValueEl>(container, "id", "sp-picker").value).toBe("__custom__");
+    expect(fieldEl<ValueEl>(container, "id", "sp-textfield").value).toBe("#/$params/sku");
+  });
+
+  test("bind button converts a plain string field into a param binding", () => {
+    let renders = 0;
+    const ctx = {
+      renderLeftPanel: () => {
+        renders += 1;
+      },
+    };
+    const container = mountSchema(stringSchema, { id: "abc" }, ctx, skuDoc);
+    expect(fieldEl<ValueEl>(container, "id", "sp-textfield").value).toBe("abc");
+    const btn = fieldEl(container, "id", "sp-action-button");
+    pointer(btn, "click");
+    expect((pluginDef() as { id: unknown }).id).toEqual({ $ref: "#/$params/sku" } as never);
+    expect(renders).toBe(1);
+  });
+
+  test("no bind button on documents without route params", () => {
+    const container = mountSchema(stringSchema, { id: "abc" }, null, "pages/index.json");
+    expect(container.querySelector('[data-prop="id"] sp-action-button')).toBeNull();
+    const bare = mountSchema(stringSchema, { id: "abc" });
+    expect(bare.querySelector('[data-prop="id"] sp-action-button')).toBeNull();
+  });
+
+  test("enum prop with a $ref value renders the binding picker, not the enum", () => {
+    const container = mountSchema(
+      { properties: { layout: { enum: ["grid", "list"] } } },
+      { layout: { $ref: "#/$params/sku" } },
+      null,
+      skuDoc,
+    );
+    const values = [...container.querySelectorAll('[data-prop="layout"] sp-menu-item')].map((el) =>
+      el.getAttribute("value"),
+    );
+    expect(values).toEqual(["__static__", "#/$params/sku", "__custom__"]);
+  });
+
+  test("json-schema format props keep their editor even with a $ref value", () => {
+    const container = mountSchema(
+      { properties: { shape: { format: "json-schema", type: "object" } } },
+      { shape: { $ref: "#/defs/thing" } },
+      null,
+      skuDoc,
+    );
+    expect(container.querySelector('[data-prop="shape"] .schema-param-editor')).not.toBeNull();
+    expect(container.querySelector('[data-prop="shape"] sp-picker')).toBeNull();
+  });
+
+  test("array-of-objects cell with a $ref shows the ref string and preserves the shape", () => {
+    const schema = {
+      properties: {
+        columns: {
+          items: { properties: { source: { type: "string" } }, type: "object" },
+          type: "array",
+        },
+      },
+    };
+    const container = mountSchema(schema, {
+      columns: [{ source: { $ref: "#/$params/sku" } }],
+    });
+    const tf = container.querySelector(".array-object-row sp-textfield") as ValueEl;
+    expect(tf.value).toBe("#/$params/sku");
+    expect(container.textContent).not.toContain("[object Object]");
+    commitValue(tf, "#/$params/other");
+    expect((pluginDef() as { columns: { source: unknown }[] }).columns[0]!.source).toEqual({
+      $ref: "#/$params/other",
+    } as never);
   });
 });
 
