@@ -148,3 +148,42 @@ describe("explicit-tab routing", () => {
     expect(original.session.selection).toEqual(["children", 0]);
   });
 });
+
+// ─── Minimal op recording (no spurious counterpart clears) ──────────────────────
+
+describe("commit op recording", () => {
+  test("a plain-text commit on a childless node records ONLY set-text; rich adds no text clear when absent", async () => {
+    const { setPatchConsumer } = await import("../src/tabs/patch-ops");
+    const batches: string[][] = [];
+    setPatchConsumer({
+      apply: () => {},
+      classify: (_t, ops) => {
+        batches.push(ops.map((o) => o.op + ("key" in o ? `:${o.key}` : "")));
+        return { patchable: false, reason: "spy" };
+      },
+      escalate: () => {},
+      markConsumed: () => {},
+    });
+    try {
+      // Plain text on a node with no children → a spurious `set-prop:children` would demote the
+      // Cheap in-place text patch to a subtree re-render.
+      applyInlineCommit(tab, ["children", 0], null, "Updated");
+      expect(batches.at(-1)).toEqual(["set-text"]);
+      // Rich commit on a node whose textContent was already cleared → no spurious set-text.
+      applyInlineCommit(
+        tab,
+        ["children", 0],
+        ["a ", { tagName: "strong", textContent: "b" }],
+        null,
+      );
+      expect(batches.at(-1)).toEqual(["set-text", "set-prop:children"]); // Text present → cleared.
+      applyInlineCommit(tab, ["children", 0], ["c ", { tagName: "em", textContent: "d" }], null);
+      expect(batches.at(-1)).toEqual(["set-prop:children"]); // Already rich → children only.
+      // Plain commit on the now-rich node clears children (real op, kept).
+      applyInlineCommit(tab, ["children", 0], null, "flat");
+      expect(batches.at(-1)).toEqual(["set-prop:children", "set-text"]);
+    } finally {
+      setPatchConsumer(null);
+    }
+  });
+});

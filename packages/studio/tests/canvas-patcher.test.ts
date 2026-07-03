@@ -312,3 +312,76 @@ describe("rich-commit batch subsumption", () => {
     ).toBe("text-with-children");
   });
 });
+
+// ─── Custom-element ancestors: by-path replaces patch, index splices escalate ────
+
+describe("custom-element ancestor classification", () => {
+  /** Add an eer-intro-style component child wrapping a rich paragraph (markdown class-directive). */
+  function addComponentSubtree() {
+    (doc().children as JxMutableNode[]).push({
+      children: [{ children: ["call ", { tagName: "strong", textContent: "now" }], tagName: "p" }],
+      tagName: "eer-intro",
+    });
+  }
+
+  test("a rich text commit INSIDE a component is patchable (embedded-iframe CLS regression)", () => {
+    addComponentSubtree();
+    // The rich-commit shape: clear text + set children on the paragraph inside <eer-intro>. The
+    // Iframe swaps the paragraph by its stamped data-jx-path — slot redistribution is irrelevant —
+    // So this must NOT escalate (a full render reloads embedded iframes on the page).
+    const verdict = classifyOps(tab, [
+      { op: "set-text", path: ["children", 3, "children", 0] },
+      { key: "children", op: "set-prop", path: ["children", 3, "children", 0] },
+    ]);
+    expect(verdict.patchable).toBe(true);
+    // A lone prop change on the nested node patches too.
+    expect(
+      classifyOps(tab, [{ key: "title", op: "set-prop", path: ["children", 3, "children", 0] }])
+        .patchable,
+    ).toBe(true);
+  });
+
+  test("index-splicing structural ops inside a component still escalate", () => {
+    addComponentSubtree();
+    // Splices locate the Nth DOM child of the parent — slot redistribution CAN break that, so the
+    // Ancestor rule stays for insert/remove/move.
+    expect(classifyOps(tab, [{ index: 1, op: "insert", parentPath: ["children", 3] }]).reason).toBe(
+      "structure-in-custom-element",
+    );
+    expect(classifyOps(tab, [{ op: "remove", path: ["children", 3, "children", 0] }]).reason).toBe(
+      "structure-in-custom-element",
+    );
+    expect(
+      classifyOps(tab, [
+        {
+          fromPath: ["children", 3, "children", 0],
+          op: "move",
+          toIndex: 0,
+          toParentPath: ["children", 2],
+        },
+      ]).reason,
+    ).toBe("structure-in-custom-element");
+  });
+
+  test("a replace under an innerHTML parent or inside a repeater template still escalates", () => {
+    (doc().children as JxMutableNode[]).push({
+      children: [{ tagName: "b", textContent: "x" }],
+      innerHTML: "<b>x</b>",
+      tagName: "div",
+    });
+    expect(
+      classifyOps(tab, [{ key: "children", op: "set-prop", path: ["children", 3, "children", 0] }])
+        .reason,
+    ).toBe("structure-with-innerhtml");
+    (doc().children as JxMutableNode[]).push({
+      $prototype: "Array",
+      map: { children: [{ tagName: "span" }], tagName: "li" },
+      tagName: "ul",
+    } as never);
+    expect(
+      classifyOps(tab, [
+        { key: "children", op: "set-prop", path: ["children", 4, "map", "children", 0] },
+      ]).reason,
+    ).toBe("structure-on-map-path");
+  });
+});

@@ -130,7 +130,17 @@ function containerVerdict(tab: Tab, parentPath: JxPath, requireArray = true): st
   return null;
 }
 
-/** Verdict for ops applied as a subtree replace at `path`. */
+/**
+ * Verdict for ops applied as a subtree replace at `path`. Unlike the structural splices
+ * (insert/remove/move), a replace locates its target DIRECTLY by its stamped `data-jx-path`
+ * (iframe-patch `requireElement`) and swaps it in place — doc↔DOM child-index correspondence is
+ * never consulted, so a custom-element ancestor (slot redistribution) cannot break it and is NOT a
+ * reason to escalate. That matters for real content: markdown class-directive pages put every
+ * editable block inside a component, and rejecting those forced a full render (reloading embedded
+ * iframes) on every text commit. Should the element be un-queryable after all (e.g. a component
+ * rendered its children into shadow DOM), the iframe throws element-not-found and the parent
+ * escalates — the same outcome as rejecting here, without the false positives.
+ */
 function replaceVerdict(tab: Tab, path: JxPath): string | null {
   if (path.length === 0) {
     return "replace-root";
@@ -142,9 +152,18 @@ function replaceVerdict(tab: Tab, path: JxPath): string | null {
   if (!parentPath) {
     return "replace-no-parent";
   }
-  const container = containerVerdict(tab, parentPath, false);
-  if (container) {
-    return container;
+  // A subtree re-render inside a repeater template can't be re-rendered 1:1 in the edit-mode
+  // Perimeter (mirrors containerVerdict's map rule).
+  if (parentPath.includes("map")) {
+    return "structure-on-map-path";
+  }
+  const parent = getNodeAtPath(tab.doc.document, parentPath);
+  if (!parent) {
+    return "node-not-found";
+  }
+  // An innerHTML parent renders opaque children — the target has no stamped element to swap.
+  if (parent.innerHTML) {
+    return "structure-with-innerhtml";
   }
   return getNodeAtPath(tab.doc.document, path) === undefined ? "node-not-found" : null;
 }

@@ -57,12 +57,17 @@ export function applyInlineCommit(
     return;
   }
   const node = getNodeAtPath(tab.doc.document, path);
+  // Only clear the counterpart key when it actually exists: deleting an absent key is a semantic
+  // No-op, but the recorded op isn't — a spurious `set-prop children` turns a cheap in-place text
+  // Patch into a subtree re-render (and, pre-relaxation, forced a full render inside components).
   if (children) {
     if (node && JSON.stringify(node.children) === JSON.stringify(children)) {
       return;
     }
     transactDoc(tab, (t) => {
-      mutateUpdateProperty(t, path, "textContent");
+      if (node?.textContent != null) {
+        mutateUpdateProperty(t, path, "textContent");
+      }
       mutateUpdateProperty(t, path, "children", children);
     });
   } else if (textContent != null) {
@@ -70,7 +75,9 @@ export function applyInlineCommit(
       return;
     }
     transactDoc(tab, (t) => {
-      mutateUpdateProperty(t, path, "children");
+      if (node?.children) {
+        mutateUpdateProperty(t, path, "children");
+      }
       mutateUpdateProperty(t, path, "textContent", textContent);
     });
   }
