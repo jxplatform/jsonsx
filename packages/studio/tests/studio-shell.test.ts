@@ -600,6 +600,36 @@ describe("openRecentProject", () => {
     expect(statusMessages).toContain("Opened project: Recent Project");
   });
 
+  test("switching projects refreshes the format registry (stale-cache regression)", async () => {
+    const { formatForPath, loadFormats, setFormats } = await import("../src/format/format-host");
+    // A fresh desktop launch caches a registry with no Markdown (no project open / previous root)…
+    setFormats([]);
+    expect(formatForPath("pages/contact.md")).toBeUndefined();
+    // …and the newly-opened project's backend registry claims .md.
+    (platform as any).listFormats = async () => [
+      {
+        capabilities: { parse: { identifier: "parse", timing: ["client"] } },
+        documentKinds: ["page"],
+        exportTarget: false,
+        extensions: [".md"],
+        mediaType: "text/markdown",
+        name: "Markdown",
+        remote: false,
+        studio: null,
+      },
+    ];
+    try {
+      await toolbarCtx.openRecentProject("/recent/site");
+      await loadFormats();
+      // Without the refreshFormats() in openRecentProject the stale empty cache answers and
+      // Opening any .md fails with "No format class imported".
+      expect(formatForPath("pages/contact.md")?.name).toBe("Markdown");
+    } finally {
+      delete (platform as any).listFormats;
+      setFormats([]);
+    }
+  });
+
   test("reports a missing project.json as an error", async () => {
     const saved = state.files.get("project.json")!;
     state.files.delete("project.json");

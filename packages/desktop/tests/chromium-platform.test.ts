@@ -224,12 +224,13 @@ describe("chromium desktop platform", () => {
     await expect(platform.saveRecentProjects!(list)).resolves.toBeUndefined();
   });
 
-  test("probeRootProject returns fallback when readFile fails", async () => {
+  test("probeRootProject returns null when readFile fails (no project → welcome screen)", async () => {
+    // The launcher's root defaults to the launch cwd; a missing project.json means "no project".
+    // A phantom non-site result here would set projectState and suppress the welcome screen for
+    // The whole session (the chromium never-shows-welcome regression).
     forcedErrors.set("readFile", "File not found");
     const result = await platform.probeRootProject();
-    expect(result!.info.isSiteProject).toBe(false);
-    expect(result!.info.projectConfig).toBeNull();
-    expect(result!.meta.name).toBe("project");
+    expect(result).toBeNull();
   });
 
   test("resolveSiteContext returns site path", async () => {

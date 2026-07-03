@@ -58,7 +58,12 @@ import {
   statusMessage,
 } from "./panels/statusbar";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
-import { documentExtensions, formatForPath, loadFormats } from "./format/format-host";
+import {
+  documentExtensions,
+  formatForPath,
+  loadFormats,
+  refreshFormats,
+} from "./format/format-host";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
@@ -750,6 +755,11 @@ async function openRecentProject(root: string) {
     }
 
     platform.projectRoot = root;
+    // The format registry is cached per project — the previous root's registry (often empty on a
+    // Fresh desktop launch) must not answer for this project, or non-JSON documents fail with
+    // "No format class imported" until a reload. Mirrors openProject in files.ts.
+    refreshFormats();
+    void loadFormats();
     const content = await platform.readFile("project.json");
     const config = JSON.parse(content) as ProjectConfig;
 

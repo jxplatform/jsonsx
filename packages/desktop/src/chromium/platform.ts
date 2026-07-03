@@ -102,14 +102,11 @@ export function createDesktopPlatform(): StudioPlatform {
           meta: { name: config.name || "project", root: root || "." },
         };
       } catch {
-        return {
-          info: {
-            directories: [] as string[],
-            isSiteProject: false as const,
-            projectConfig: null,
-          },
-          meta: { name: "project", root: "." },
-        };
+        // The launcher's root defaults to the launch cwd, which usually holds no project.json.
+        // Report "no project" (null) so the studio shows the welcome screen — returning a phantom
+        // Non-site project instead sets projectState and suppresses the welcome screen for the
+        // Whole session (mirrors the electrobun platform's probeRootProject contract).
+        return null;
       }
     },
 
