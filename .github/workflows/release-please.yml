@@ -15,8 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.rp.outputs.releases_created }}
-      # Path-prefixed output for the root component ("." -> ".--tag_name").
-      tag_name: ${{ steps.rp.outputs['.--tag_name'] }}
+      # The root component (".") emits UNPREFIXED outputs, so it's `tag_name`,
+      # not `.--tag_name` (path prefixing only applies to non-root components).
+      tag_name: ${{ steps.rp.outputs.tag_name }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v5
