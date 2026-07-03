@@ -305,7 +305,6 @@ function minimalToolbarTemplate(ctx: ToolbarCtx) {
 const modes = [
   { iconTag: "sp-icon-edit", key: "edit", label: "Edit" },
   { iconTag: "sp-icon-artboard", key: "design", label: "Design" },
-  { iconTag: "sp-icon-preview", key: "preview", label: "Preview" },
   { iconTag: "sp-icon-code", key: "source", label: "Code" },
   { iconTag: "sp-icon-brush", key: "stylebook", label: "Stylebook" },
 ];
@@ -333,7 +332,9 @@ function toolbarTemplate() {
     selection: tab.session.selection,
     ui: tab.session.ui,
   };
-  const canvasMode = ctx.getCanvasMode();
+  // Base mode, not the effective mode: the switcher keeps Edit/Design highlighted while the
+  // Tab-bar preview toggle is on (preview is no longer a switchable mode).
+  const { canvasMode } = tab.session.ui;
 
   const modeSwitcherTpl = html`
     <sp-action-group selects="single" size="s" compact>

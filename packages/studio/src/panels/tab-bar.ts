@@ -1,20 +1,23 @@
 /// <reference lib="dom" />
 /**
- * Tab bar — a per-tab contextual action bar rendered between the tab strip and the edit content.
- * Standardizes Back/breadcrumb navigation, media feature toggles, and mode actions (Code-mode
- * Export) into a single bar shared identically by every edit mode.
+ * Tab bar — a persistent per-tab settings bar rendered between the tab strip and the edit content.
+ * Standardizes Back/breadcrumb navigation, the view settings cluster (preview toggle, layout
+ * visibility, dynamic route-param pickers — shown in the edit/design base modes), media feature
+ * toggles, and mode actions (Code-mode Export) into a single bar shared by every edit mode.
  *
  * Follows the same module shape as tab-strip.ts: mount(host, ctx) → effectScope/effect → render().
- * The bar collapses (renders `nothing`, so `#tab-bar:empty` hides the row) when there is nothing
- * contextual to show.
+ * The bar renders `nothing` (so `#tab-bar:empty` hides the row) only when no tab is active.
  */
 
 import { html, render as litRender, nothing } from "lit-html";
-import { updateUi } from "../store";
+import { projectState, updateUi } from "../store";
 import { effect, effectScope } from "../reactivity";
 import { activeTab } from "../workspace/workspace";
-import { getEffectiveMedia } from "../site-context";
+import { getEffectiveLayoutPath, getEffectiveMedia } from "../site-context";
+import { dynamicRouteParams, loadParamValues, pagePathsDef } from "../page-params";
 import { mediaDisplayName } from "./shared";
+import type { ParamValues } from "../page-params";
+import type { Tab } from "../tabs/tab";
 import type { DocumentStackEntry, FunctionEditDef } from "../types";
 import type { EffectScope } from "@vue/reactivity";
 import type { TemplateResult } from "lit-html";
@@ -59,12 +62,16 @@ export function mount(host: HTMLElement, ctx: TabBarCtx) {
       if (tab) {
         // Read reactive properties to establish tracking — mirrors the toolbar's subset
         void tab.doc.document;
+        void tab.doc.document?.$layout;
         void tab.doc.mode;
         void tab.documentPath;
         void tab.session.documentStack.length;
         void tab.session.ui.canvasMode;
         void tab.session.ui.editingFunction;
         void tab.session.ui.featureToggles;
+        void tab.session.ui.preview;
+        void tab.session.ui.previewParams;
+        void tab.session.ui.showLayout;
       }
       render();
     });
@@ -143,6 +150,55 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
     `;
   }
 
+  // ── Right region: view settings cluster (edit/design base modes only) ──
+  // Gates on the BASE mode (not the effective mode): the cluster stays visible while the preview
+  // Toggle is on so it can be toggled back off.
+  const baseMode = S.ui.canvasMode;
+  const isPage = Boolean(
+    S.documentPath &&
+    projectState?.isSiteProject &&
+    (S.documentPath.startsWith("pages/") || S.documentPath.startsWith("./pages/")),
+  );
+  let settingsTpl: TemplateResult | typeof nothing = nothing;
+  if (!editing && (baseMode === "edit" || baseMode === "design")) {
+    const canPreview = tab.capabilities.modes.includes("preview");
+    const hasLayout = isPage && Boolean(getEffectiveLayoutPath(S.document?.$layout));
+    const pickersTpl = isPage ? paramPickersTpl(tab) : nothing;
+    const previewTpl = canPreview
+      ? html`
+          <sp-action-button
+            toggles
+            size="s"
+            title="Preview resolved values"
+            ?selected=${Boolean(S.ui.preview)}
+            @click=${() => updateUi("preview", !S.ui.preview)}
+          >
+            <sp-icon-preview slot="icon"></sp-icon-preview>
+            Preview
+          </sp-action-button>
+        `
+      : nothing;
+    const layoutTpl = hasLayout
+      ? html`
+          <sp-action-button
+            toggles
+            size="s"
+            title="Show layout elements"
+            ?selected=${S.ui.showLayout !== false}
+            @click=${() => updateUi("showLayout", S.ui.showLayout === false)}
+          >
+            Layout
+          </sp-action-button>
+        `
+      : nothing;
+    if (pickersTpl !== nothing || previewTpl !== nothing || layoutTpl !== nothing) {
+      settingsTpl = html`
+        ${pickersTpl}
+        <sp-action-group compact size="s">${layoutTpl} ${previewTpl}</sp-action-group>
+      `;
+    }
+  }
+
   // ── Right region: media feature toggles ──
   const { featureQueries } = ctx.parseMediaEntries(getEffectiveMedia(S.document?.$media));
   const togglesTpl =
@@ -183,16 +239,106 @@ function tabBarTemplate(ctx: TabBarCtx): TemplateResult | typeof nothing {
         `
       : nothing;
 
-  // Collapse the bar entirely when there is nothing contextual to show.
-  if (navTpl === nothing && togglesTpl === nothing && exportTpl === nothing) {
-    return nothing;
-  }
-
   return html`
     <div class="tab-bar">
       ${navTpl}
       <div class="tb-spacer"></div>
-      ${togglesTpl} ${exportTpl}
+      ${settingsTpl} ${togglesTpl} ${exportTpl}
     </div>
+  `;
+}
+
+// ── Dynamic route-param pickers ──────────────────────────────────────────────
+// Candidate values load asynchronously (ContentCollection resolution / data-file read); the module
+// Caches the last result per (documentPath, $paths) and re-renders when it lands — the same lazy
+// Fill pattern as head-panel's loadLayoutEntries. When values arrive, any param without a chosen
+// Value auto-selects the first candidate (matching the compiler, whose first expanded route is the
+// First path entry).
+
+let _paramValues: ParamValues | null = null;
+
+let _paramValuesKey: string | null = null;
+
+/**
+ * @param {Tab} tab
+ * @returns {ParamValues | null} — null while loading (or when the doc declares no params)
+ */
+function paramValuesFor(tab: Tab): ParamValues | null {
+  const pathsDef = pagePathsDef({
+    document: tab.doc.document,
+    frontmatter: tab.doc.content.frontmatter,
+  });
+  if (!pathsDef && dynamicRouteParams(tab.documentPath).length === 0) {
+    return null;
+  }
+  const key = `${tab.documentPath ?? ""}::${JSON.stringify(pathsDef)}`;
+  if (_paramValuesKey === key) {
+    return _paramValues;
+  }
+  _paramValuesKey = key;
+  _paramValues = null;
+  void loadParamValues(tab.documentPath, pathsDef).then((values) => {
+    if (_paramValuesKey !== key || activeTab.value !== tab) {
+      return;
+    }
+    _paramValues = values;
+    autoSelectParams(tab, values);
+    render();
+  });
+  return _paramValues;
+}
+
+/**
+ * @param {Tab} tab
+ * @param {ParamValues} values
+ */
+function autoSelectParams(tab: Tab, values: ParamValues) {
+  const current = tab.session.ui.previewParams ?? {};
+  const additions: Record<string, string> = {};
+  for (const [name, list] of Object.entries(values)) {
+    if (!current[name] && list.length > 0) {
+      additions[name] = list[0]!;
+    }
+  }
+  if (Object.keys(additions).length > 0) {
+    updateUi("previewParams", { ...current, ...additions });
+  }
+}
+
+/**
+ * @param {Tab} tab
+ * @returns {TemplateResult | typeof nothing}
+ */
+function paramPickersTpl(tab: Tab): TemplateResult | typeof nothing {
+  const values = paramValuesFor(tab);
+  const names = new Set(dynamicRouteParams(tab.documentPath));
+  for (const name of Object.keys(values ?? {})) {
+    names.add(name);
+  }
+  if (names.size === 0) {
+    return nothing;
+  }
+  const { previewParams } = tab.session.ui;
+  return html`
+    ${[...names].map(
+      (name) => html`
+        <sp-picker
+          size="s"
+          quiet
+          class="tab-bar-param"
+          label=${name}
+          title=${`Preview value for [${name}]`}
+          value=${previewParams?.[name] ?? ""}
+          @change=${(e: Event) => {
+            const { value } = e.target as HTMLInputElement;
+            updateUi("previewParams", { ...tab.session.ui.previewParams, [name]: value });
+          }}
+        >
+          ${(values?.[name] ?? []).map(
+            (v: string) => html`<sp-menu-item value=${v}>${v}</sp-menu-item>`,
+          )}
+        </sp-picker>
+      `,
+    )}
   `;
 }

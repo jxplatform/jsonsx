@@ -6,7 +6,7 @@
 import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { canvasPanels, canvasWrap, initShellRefs, setProjectState } from "../src/store";
-import { closeAllTabs } from "../src/workspace/workspace";
+import { activeTab, closeAllTabs } from "../src/workspace/workspace";
 import { view } from "../src/view";
 import { setFormats } from "../src/format/format-host";
 import { initCanvasUtils } from "../src/canvas/canvas-utils";
@@ -183,12 +183,33 @@ let canvasMode = "design";
 let canvasModeFn = () => canvasMode;
 let zoom = 1;
 
+/**
+ * The render dispatch reads the BASE mode from the active tab (tab.session.ui.canvasMode), while
+ * ctx.getCanvasMode supplies the effective mode to helpers. Keep both in sync here.
+ */
+function setMode(m: string) {
+  canvasMode = m;
+  const tab = activeTab.value;
+  if (tab) {
+    tab.session.ui.canvasMode = m;
+  }
+}
+
+/** Open a tab and sync its base mode with the test's current canvasMode. */
+function openSyncedTab(
+  ...args: Parameters<typeof resetWorkspaceWithTab>
+): ReturnType<typeof resetWorkspaceWithTab> {
+  const tab = resetWorkspaceWithTab(...args);
+  tab.session.ui.canvasMode = canvasMode;
+  return tab;
+}
+
 const ctx = {
   getCanvasMode: () => canvasModeFn(),
   gitDiffState: null as Record<string, unknown> | null,
   openFileFromTree: mock(() => {}),
   setCanvasMode: mock((m: string) => {
-    canvasMode = m;
+    setMode(m);
   }),
   setGitDiffState: mock(() => {}),
 };
@@ -265,7 +286,7 @@ beforeEach(() => {
   resetStudioState();
   closeAllTabs();
   setFormats([]);
-  canvasMode = "design";
+  setMode("design");
   canvasModeFn = () => canvasMode;
   zoom = 1;
   ctx.gitDiffState = null;
@@ -343,8 +364,8 @@ describe("tab close/reopen lifecycle", () => {
   const litPart = () => (canvasWrap as unknown as Record<string, unknown>)["_$litPart$"];
 
   test("reopening after closing all tabs re-renders without a dangling Lit part", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "edit";
+    openSyncedTab();
+    setMode("edit");
     renderCanvas();
     await flush();
     expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
@@ -360,8 +381,8 @@ describe("tab close/reopen lifecycle", () => {
     expect(view.prevCanvasMode).toBeNull();
 
     // Reopening must render cleanly rather than crashing the canvas into an unusable state.
-    resetWorkspaceWithTab();
-    canvasMode = "edit";
+    openSyncedTab();
+    setMode("edit");
     expect(() => renderCanvas()).not.toThrow();
     await flush();
     expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
@@ -369,16 +390,16 @@ describe("tab close/reopen lifecycle", () => {
 
   test("edit-mode column hugs a component definition (is-component) but fills for a page", async () => {
     // A page root (plain div) → the column fills the viewport (document-like editing surface).
-    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
-    canvasMode = "edit";
+    openSyncedTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    setMode("edit");
     renderCanvas();
     await flush();
     const pageColumn = canvasWrap.querySelector(".content-edit-column")!;
     expect(pageColumn.classList.contains("is-component")).toBe(false);
 
     // A component-definition root (custom-element tag) → the column hugs its content.
-    resetWorkspaceWithTab({ children: [{ tagName: "h2", textContent: "Hi" }], tagName: "eer-cta" });
-    canvasMode = "edit";
+    openSyncedTab({ children: [{ tagName: "h2", textContent: "Hi" }], tagName: "eer-cta" });
+    setMode("edit");
     renderCanvas();
     await flush();
     const compColumn = canvasWrap.querySelector(".content-edit-column")!;
@@ -386,8 +407,8 @@ describe("tab close/reopen lifecycle", () => {
   });
 
   test("closing all tabs while in source mode disposes the monaco editor", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "source";
+    openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
@@ -401,8 +422,8 @@ describe("tab close/reopen lifecycle", () => {
     expect(view.monacoEditor).toBeNull();
 
     // Reopening source mode builds a fresh editor instead of writing into the dead, detached one.
-    resetWorkspaceWithTab();
-    canvasMode = "source";
+    openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     expect(createdEditors.length).toBe(2);
@@ -410,7 +431,7 @@ describe("tab close/reopen lifecycle", () => {
   });
 
   test("clearing to the no-tab state disposes observers, editors, scopes, and cleanups", () => {
-    resetWorkspaceWithTab();
+    openSyncedTab();
     const dndCleanup = mock(() => {});
     const eventCleanup = mock(() => {});
     const stop = mock(() => {});
@@ -444,7 +465,7 @@ describe("tab close/reopen lifecycle", () => {
 
 describe("function editor dispatch", () => {
   test("renders the function editor while editingFunction is set", () => {
-    const tab = resetWorkspaceWithTab();
+    const tab = openSyncedTab();
     tab.session.ui.editingFunction = { path: ["children", 0], prop: "onclick" } as never;
     renderCanvas();
     expect(renderFunctionEditor).toHaveBeenCalled();
@@ -452,7 +473,7 @@ describe("function editor dispatch", () => {
   });
 
   test("disposes a leftover function editor when switching away", () => {
-    resetWorkspaceWithTab();
+    openSyncedTab();
     const dispose = mock(() => {});
     view.functionEditor = { dispose } as never;
     renderCanvas();
@@ -465,8 +486,8 @@ describe("function editor dispatch", () => {
 
 describe("source mode", () => {
   test("creates a monaco editor with the document JSON", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     renderCanvas();
     expect(canvasWrap.querySelector(".source-wrap")).not.toBeNull();
     expect(canvasWrap.querySelector(".source-editor")).not.toBeNull();
@@ -478,8 +499,8 @@ describe("source mode", () => {
   });
 
   test("debounced edits sync valid JSON back into the document", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -494,8 +515,8 @@ describe("source mode", () => {
   });
 
   test("invalid JSON edits do not touch the document", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -510,8 +531,8 @@ describe("source mode", () => {
   });
 
   test("programmatic buffer updates are swallowed via _ignoreNextChange", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -528,8 +549,8 @@ describe("source mode", () => {
 
   test("javascript files use the document toString and only mark dirty", async () => {
     closeAllTabs();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/handlers.js" });
-    canvasMode = "source";
+    const tab = openSyncedTab(undefined, { documentPath: "/project/handlers.js" });
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -546,9 +567,9 @@ describe("source mode", () => {
   test("format documents serialize to source and parse edits back", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
     tab.doc.sourceFormat = "Markdown";
-    canvasMode = "source";
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -571,9 +592,9 @@ describe("source mode", () => {
   test("unparseable format source leaves the document untouched", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
     tab.doc.sourceFormat = "Markdown";
-    canvasMode = "source";
+    setMode("source");
     parseSourceForPathMock.mockImplementationOnce(async () => {
       throw new Error("bad source");
     });
@@ -590,8 +611,8 @@ describe("source mode", () => {
   });
 
   test("re-render in source mode updates the buffer without recreating the editor", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     expect(createdEditors.length).toBe(1);
@@ -607,8 +628,8 @@ describe("source mode", () => {
   });
 
   test("re-render does not clobber the buffer while the editor has focus", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
@@ -621,8 +642,8 @@ describe("source mode", () => {
   });
 
   test("stale buffer updates are dropped when the editor was replaced mid-flight", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
@@ -637,8 +658,8 @@ describe("source mode", () => {
   });
 
   test("change events fired after editor teardown are ignored", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -653,8 +674,8 @@ describe("source mode", () => {
   });
 
   test("debounced sync bails when the tab was closed in the meantime", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "source";
+    const tab = openSyncedTab();
+    setMode("source");
     await withFastTimers(async (runPending) => {
       renderCanvas();
       await flush();
@@ -671,9 +692,9 @@ describe("source mode", () => {
   test("serialization failure on a fresh render leaves the buffer empty", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
     tab.doc.sourceFormat = "Markdown";
-    canvasMode = "source";
+    setMode("source");
     serializeDocumentMock.mockImplementationOnce(async () => {
       throw new Error("format service unreachable");
     });
@@ -685,9 +706,9 @@ describe("source mode", () => {
   test("serialization failure on a re-render keeps the current buffer", async () => {
     setFormats([MARKDOWN_FORMAT]);
     closeAllTabs();
-    const tab = resetWorkspaceWithTab(undefined, { documentPath: "/project/post.md" });
+    const tab = openSyncedTab(undefined, { documentPath: "/project/post.md" });
     tab.doc.sourceFormat = "Markdown";
-    canvasMode = "source";
+    setMode("source");
     renderCanvas();
     await flush();
     expect(createdModels[0]!._value).toBe("# markdown source");
@@ -701,14 +722,14 @@ describe("source mode", () => {
   });
 
   test("switching modes disposes the monaco editor and its model", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "source";
+    openSyncedTab();
+    setMode("source");
     renderCanvas();
     await flush();
     const [editor] = createdEditors;
     const [model] = createdModels;
 
-    canvasMode = "design";
+    setMode("design");
     renderCanvas();
     expect(editor!.dispose).toHaveBeenCalled();
     expect(model!.dispose).toHaveBeenCalled();
@@ -720,8 +741,8 @@ describe("source mode", () => {
 
 describe("git-diff mode", () => {
   test("falls back to design mode when no diff state is set", () => {
-    resetWorkspaceWithTab();
-    canvasMode = "git-diff";
+    openSyncedTab();
+    setMode("git-diff");
     canvasModeFn = () => canvasMode;
     renderCanvas();
     expect(ctx.setCanvasMode).toHaveBeenCalledWith("design");
@@ -729,8 +750,8 @@ describe("git-diff mode", () => {
   });
 
   test("renders Original and Current panels side by side", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "git-diff";
+    openSyncedTab();
+    setMode("git-diff");
     ctx.gitDiffState = {
       currentContent: JSON.stringify({
         children: [{ tagName: "p", textContent: "new text" }],
@@ -759,8 +780,8 @@ describe("git-diff mode", () => {
   });
 
   test("unparseable JSON falls back to a parse-failure document", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "git-diff";
+    openSyncedTab();
+    setMode("git-diff");
     ctx.gitDiffState = {
       currentContent: "also not json",
       filePath: "/project/index.json",
@@ -773,8 +794,8 @@ describe("git-diff mode", () => {
 
   test("format files parse diff content through the format host", async () => {
     setFormats([MARKDOWN_FORMAT]);
-    resetWorkspaceWithTab();
-    canvasMode = "git-diff";
+    openSyncedTab();
+    setMode("git-diff");
     ctx.gitDiffState = {
       currentContent: "# new",
       filePath: "/project/post.md",
@@ -792,8 +813,8 @@ describe("git-diff mode", () => {
 
 describe("edit mode", () => {
   test("renders a centered column with the iframe-rendered content", async () => {
-    resetWorkspaceWithTab();
-    canvasMode = "edit";
+    openSyncedTab();
+    setMode("edit");
     renderCanvas();
     await flush();
 
@@ -812,12 +833,12 @@ describe("edit mode", () => {
   });
 
   test("uses the document base width for the content column", async () => {
-    resetWorkspaceWithTab({
+    openSyncedTab({
       $media: { "--": "600px" },
       children: [{ tagName: "p", textContent: "Hi" }],
       tagName: "div",
     } as never);
-    canvasMode = "edit";
+    setMode("edit");
     renderCanvas();
     await flush();
     const column = canvasWrap.querySelector(".content-edit-column") as HTMLElement;
@@ -829,8 +850,8 @@ describe("edit mode", () => {
 
 describe("iframe render pipeline", () => {
   test("a successful iframe mount marks the panel ready and reports status", async () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "edit";
+    const tab = openSyncedTab();
+    setMode("edit");
     renderCanvas();
     await flush();
 
@@ -842,13 +863,13 @@ describe("iframe render pipeline", () => {
   });
 
   test("a stale iframe mount bails without touching state", async () => {
-    const tab = resetWorkspaceWithTab();
+    const tab = openSyncedTab();
     let resolveMount: () => void = () => {};
     iframeImpl = () =>
       new Promise((resolve) => {
         resolveMount = resolve;
       });
-    canvasMode = "edit";
+    setMode("edit");
     renderCanvas();
     view.renderGeneration += 1; // A newer render started
     resolveMount();
@@ -859,13 +880,13 @@ describe("iframe render pipeline", () => {
   });
 
   test("a rejected iframe mount warns and leaves the panel un-ready", async () => {
-    resetWorkspaceWithTab();
+    openSyncedTab();
     iframeImpl = async () => {
       throw new Error("iframe exploded");
     };
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     try {
-      canvasMode = "edit";
+      setMode("edit");
       renderCanvas();
       await flush();
       expect(warn.mock.calls.some((c) => String(c[0]).includes("mountIframeCanvas failed"))).toBe(
@@ -882,7 +903,7 @@ describe("iframe render pipeline", () => {
 
 describe("design mode", () => {
   test("renders a single full-width panel without media", async () => {
-    resetWorkspaceWithTab();
+    openSyncedTab();
     renderCanvas();
     await flush();
     expect(view.panzoomWrap).not.toBeNull();
@@ -896,7 +917,7 @@ describe("design mode", () => {
   });
 
   test("renders a labeled base panel when a custom base width is set", async () => {
-    resetWorkspaceWithTab({
+    openSyncedTab({
       $media: { "--": "600px" },
       children: [{ tagName: "p", textContent: "Hello" }],
       tagName: "div",
@@ -912,7 +933,7 @@ describe("design mode", () => {
   });
 
   test("renders one panel per breakpoint plus base", async () => {
-    resetWorkspaceWithTab({
+    openSyncedTab({
       $media: { "--": "320px", md: "(min-width: 768px)" },
       children: [{ tagName: "p", textContent: "Hello" }],
       tagName: "div",
@@ -939,7 +960,7 @@ describe("design mode", () => {
   });
 
   test("mode transitions run cleanup callbacks and stop panel scopes", () => {
-    resetWorkspaceWithTab();
+    openSyncedTab();
     const dndCleanup = mock(() => {});
     const eventCleanup = mock(() => {});
     const stop = mock(() => {});
@@ -963,8 +984,8 @@ describe("design mode", () => {
 
 describe("stylebook mode", () => {
   test("first render delegates to renderStylebookMode with canvas helpers", () => {
-    resetWorkspaceWithTab();
-    canvasMode = "stylebook";
+    openSyncedTab();
+    setMode("stylebook");
     renderCanvas();
     expect(renderStylebookMode).toHaveBeenCalledTimes(1);
     const helpers = renderStylebookMode.mock.calls[0]![0] as Record<string, unknown>;
@@ -980,8 +1001,8 @@ describe("stylebook mode", () => {
   });
 
   test("re-render with unchanged filters posts a styleUpdate to live stylebook hosts", () => {
-    resetWorkspaceWithTab();
-    canvasMode = "stylebook";
+    openSyncedTab();
+    setMode("stylebook");
     const updates: Record<string, unknown>[] = [];
     styleUpdateImpl = (style) => {
       updates.push(style);
@@ -994,8 +1015,8 @@ describe("stylebook mode", () => {
   });
 
   test("falls through to a full stylebook render when no host is live yet", () => {
-    resetWorkspaceWithTab();
-    canvasMode = "stylebook";
+    openSyncedTab();
+    setMode("stylebook");
     styleUpdateImpl = () => 0; // No stylebook iframe mounted → fast path can't apply.
     renderCanvas();
     renderCanvas();
@@ -1003,8 +1024,8 @@ describe("stylebook mode", () => {
   });
 
   test("filter changes force a full stylebook re-render", () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "stylebook";
+    const tab = openSyncedTab();
+    setMode("stylebook");
     const updates: Record<string, unknown>[] = [];
     styleUpdateImpl = (style) => {
       updates.push(style);
@@ -1018,8 +1039,8 @@ describe("stylebook mode", () => {
   });
 
   test("customized-only toggle also forces a full re-render", () => {
-    const tab = resetWorkspaceWithTab();
-    canvasMode = "stylebook";
+    const tab = openSyncedTab();
+    setMode("stylebook");
     renderCanvas();
     tab.session.ui.stylebookCustomizedOnly = true;
     renderCanvas();
@@ -1040,10 +1061,9 @@ describe("scheduleCanvasRender", () => {
   });
 
   test("catches renderCanvas errors inside the frame callback", async () => {
-    resetWorkspaceWithTab();
-    canvasModeFn = () => {
-      throw new Error("mode lookup failed");
-    };
+    const tab = openSyncedTab();
+    // Poison the tab UI so the dispatch's base-mode read throws inside the frame callback.
+    (tab.session as unknown as { ui: unknown }).ui = null;
     const error = spyOn(console, "error").mockImplementation(() => {});
     try {
       scheduleCanvasRender();

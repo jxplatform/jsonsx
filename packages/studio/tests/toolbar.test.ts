@@ -112,9 +112,11 @@ describe("minimal toolbar (no open tab)", () => {
     expect(btn(root, "Save").hasAttribute("disabled")).toBe(true);
     expect(btn(root, "Undo").hasAttribute("disabled")).toBe(true);
     expect(btn(root, "Redo").hasAttribute("disabled")).toBe(true);
-    for (const label of ["Edit", "Design", "Preview", "Code", "Stylebook"]) {
+    for (const label of ["Edit", "Design", "Code", "Stylebook"]) {
       expect(btn(root, label).hasAttribute("disabled")).toBe(true);
     }
+    // Preview is a tab-bar toggle now, not a switchable mode.
+    expect(root.textContent).not.toContain("Preview");
     expect(btn(root, "Design").hasAttribute("selected")).toBe(true);
     expect(btn(root, "Edit").hasAttribute("selected")).toBe(false);
   });
@@ -346,6 +348,18 @@ describe("full toolbar (active tab)", () => {
     expect(tab.session.ui.editingFunction).toBeNull();
   });
 
+  test("switcher has no Preview button and keeps the base mode highlighted while previewing", async () => {
+    const tab = openTestTab();
+    toolbar.mount(root, makeCtx());
+    tab.session.ui.canvasMode = "design";
+    tab.session.ui.preview = true;
+    await flush();
+
+    expect(root.textContent).not.toContain("Preview");
+    expect(btn(root, "Design").hasAttribute("selected")).toBe(true);
+    expect(btn(root, "Edit").hasAttribute("selected")).toBe(false);
+  });
+
   test("clicking the current mode is a no-op", async () => {
     openTestTab();
     const ctx = makeCtx({ getCanvasMode: mock(() => "edit") });
@@ -538,18 +552,17 @@ describe("lifecycle", () => {
   });
 
   test("template errors are caught and logged, not thrown", async () => {
-    openTestTab();
+    const tab = openTestTab();
+    // Poison the tab capabilities (read only inside the template, not the mount effect) so the
+    // AllowedModes read throws during render.
+    (tab as unknown as { capabilities: unknown }).capabilities = null;
     const errors: unknown[][] = [];
     const originalError = console.error;
     console.error = (...args: unknown[]) => {
       errors.push(args);
     };
     try {
-      const ctx = makeCtx({
-        getCanvasMode: mock(() => {
-          throw new Error("boom");
-        }),
-      });
+      const ctx = makeCtx();
       expect(() => {
         toolbar.mount(root, ctx);
       }).not.toThrow();

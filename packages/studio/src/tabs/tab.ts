@@ -16,6 +16,12 @@ import type { JxDocOp } from "./patch-ops";
 export interface TabUi {
   rightTab: string;
   canvasMode: string;
+  /** Preview toggle — composes with an edit/design canvasMode; the effective mode becomes "preview". */
+  preview: boolean;
+  /** Show elements inherited from the page's layout (pages with an effective layout only). */
+  showLayout: boolean;
+  /** Chosen literal values for dynamic route params (e.g. { sku: "mini-trencher" }). */
+  previewParams: Record<string, string>;
   zoom: number;
   activeMedia: string | null;
   activeSelector: string | null;
@@ -95,9 +101,10 @@ export interface Tab {
 
 /**
  * @param {string} canvasMode — initial canvas mode (the tab's first allowed mode)
+ * @param {boolean} preview — initial preview-toggle state
  * @returns {TabUi}
  */
-function createDefaultUi(canvasMode: string) {
+function createDefaultUi(canvasMode: string, preview = false) {
   return {
     activeMedia: null,
     activeSelector: null,
@@ -112,8 +119,11 @@ function createDefaultUi(canvasMode: string) {
     gitStatus: null,
     inspectorSections: {},
     pendingInlineEdit: null,
+    preview,
+    previewParams: {},
     rightTab: "properties",
     settingsTab: "stylebook",
+    showLayout: true,
     styleFilter: "",
     styleFilterActive: false,
     styleSections: {},
@@ -168,7 +178,10 @@ export function createTab({
   const resolvedModes = capabilities?.modes ?? inferModes(documentPath, sourceFormat);
   // A tab opens in its first allowed mode — never one the toolbar would disable.
   // Formats author mode order so the default comes first (edit, stylebook, etc.).
-  const initialCanvasMode = resolvedModes[0] ?? "edit";
+  // "preview" is a per-tab toggle rather than a base mode: a preview-first format opens
+  // In its first non-preview mode with the toggle already on.
+  const initialCanvasMode = resolvedModes.find((m) => m !== "preview") ?? "edit";
+  const initialPreview = resolvedModes[0] === "preview";
 
   const tab = scope.run(() => ({
     capabilities: { modes: resolvedModes },
@@ -199,7 +212,7 @@ export function createTab({
       documentStack: [],
       hover: null,
       selection: null,
-      ui: createDefaultUi(initialCanvasMode),
+      ui: createDefaultUi(initialCanvasMode, initialPreview),
     }),
   })) as unknown as Tab;
 
@@ -207,6 +220,9 @@ export function createTab({
 }
 
 /**
+ * Allowed modes for a document. "preview" in a format's mode list means the preview toggle is
+ * Available for the tab (it is not a base canvas mode the toolbar switches to).
+ *
  * @param {string | null | undefined} documentPath
  * @param {string | null} sourceFormat
  * @returns {string[]}

@@ -588,6 +588,21 @@ export function createDevServerPlatform() {
       return schema;
     },
 
+    // ─── Class resolution (dev-proxy) ─────────────────────────────────────
+
+    /** @param {Record<string, unknown>} body */
+    async resolveClass(body: Record<string, unknown>) {
+      const res = await fetch("/__jx_resolve__", {
+        body: JSON.stringify(body),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Class resolution failed: ${res.status}`);
+      }
+      return await readJson<unknown>(res);
+    },
+
     // ─── Git operations ──────────────────────────────────────────────────
 
     async gitStatus() {

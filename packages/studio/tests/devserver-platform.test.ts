@@ -790,6 +790,39 @@ describe("fetchPluginSchema", () => {
   });
 });
 
+// ─── Class resolution (dev-proxy) ────────────────────────────────────────────
+
+describe("resolveClass", () => {
+  test("POSTs the config to /__jx_resolve__ and returns the parsed result", async () => {
+    route(
+      "/__jx_resolve__",
+      (c) => {
+        expect(c.body).toEqual({
+          $prototype: "ContentCollection",
+          $src: "@jxsuite/parser/ContentCollection.class.json",
+          contentType: "product",
+        });
+        return json([{ data: { sku: "a" }, id: "A" }]);
+      },
+      "POST",
+    );
+    const p = createDevServerPlatform();
+    expect(
+      await p.resolveClass!({
+        $prototype: "ContentCollection",
+        $src: "@jxsuite/parser/ContentCollection.class.json",
+        contentType: "product",
+      }),
+    ).toEqual([{ data: { sku: "a" }, id: "A" }]);
+  });
+
+  test("throws on a non-OK response", async () => {
+    route("/__jx_resolve__", () => textRes("boom", 500), "POST");
+    const p = createDevServerPlatform();
+    expect(p.resolveClass!({ $src: "x" })).rejects.toThrow("Class resolution failed: 500");
+  });
+});
+
 // ─── Git operations ──────────────────────────────────────────────────────────
 
 describe("git read operations", () => {

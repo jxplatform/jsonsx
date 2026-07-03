@@ -262,6 +262,24 @@ export function createDesktopPlatform(): StudioPlatform {
       return request("listFormats", {}) as Promise<Record<string, unknown>[]>;
     },
 
+    /**
+     * Class resolution over HTTP: the project server gates `/__jx_resolve__` on the RPC token (a
+     * token-less fetch 403s), so pass the token captured from the shell URL.
+     *
+     * @param {Record<string, unknown>} body
+     */
+    async resolveClass(body: Record<string, unknown>) {
+      const res = await fetch(`/__jx_resolve__?token=${encodeURIComponent(token)}`, {
+        body: JSON.stringify(body),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      if (!res.ok) {
+        throw new Error(`Class resolution failed: ${res.status}`);
+      }
+      return (await res.json()) as unknown;
+    },
+
     /** @param {Record<string, unknown>} payload */
     async formatAction(payload: Record<string, unknown>) {
       return request("formatAction", payload);

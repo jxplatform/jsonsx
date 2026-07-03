@@ -227,6 +227,29 @@ describe("fetch interception", () => {
     expect(json.error).toContain("boom");
     impls.delete("jxServerFunction");
   });
+});
+
+// ─── Class resolution (resolveClass PAL method) ─────────────────────────────
+
+describe("resolveClass", () => {
+  test("calls rpc.request.jxResolve directly and parses the JSON body", async () => {
+    impls.set("jxResolve", () => ({
+      body: JSON.stringify([{ data: { sku: "a" }, id: "A" }]),
+      status: 200,
+    }));
+    const result = await platform.resolveClass!({ $src: "x", contentType: "product" });
+    expect(result).toEqual([{ data: { sku: "a" }, id: "A" }]);
+    expect(lastCall("jxResolve")!.args[0]).toEqual({
+      body: '{"$src":"x","contentType":"product"}',
+    });
+    impls.delete("jxResolve");
+  });
+
+  test("throws on an error status", async () => {
+    impls.set("jxResolve", () => ({ body: "nope", status: 500 }));
+    expect(platform.resolveClass!({ $src: "x" })).rejects.toThrow("Class resolution failed: 500");
+    impls.delete("jxResolve");
+  });
 
   test("does NOT intercept views:// URLs — they pass through to the original fetch", async () => {
     // Loopback-only: the canvas doc + assets are served natively over http by the per-window loopback

@@ -136,8 +136,14 @@ void _swc;
 // These mutable variables are local to studio.js for now. As sections are extracted
 // Into their own modules, they will migrate to ctx in store.js.
 
+// Effective canvas mode: the per-tab preview toggle composes with an edit/design base mode and
+// Presents as "preview" to every downstream gate (doc resolution, iframe flags, interaction
+// Surfaces). Consumers needing the base mode (toolbar switcher selection, canvas host layout)
+// Read tab.session.ui.canvasMode directly.
 function getCanvasMode() {
-  return activeTab.value?.session.ui.canvasMode ?? "design";
+  const ui = activeTab.value?.session.ui;
+  const base = ui?.canvasMode ?? "design";
+  return ui?.preview && (base === "edit" || base === "design") ? "preview" : base;
 }
 
 /** @param {string} mode */
@@ -477,7 +483,10 @@ effect(() => {
     void tab.session.ui.canvasMode;
     void tab.session.ui.editingFunction;
     void tab.session.ui.featureToggles;
+    void tab.session.ui.preview;
+    void tab.session.ui.previewParams;
     void tab.session.ui.settingsTab;
+    void tab.session.ui.showLayout;
     void tab.session.ui.stylebookTab;
     void tab.session.ui.stylebookFilter;
     void tab.session.ui.stylebookCustomizedOnly;

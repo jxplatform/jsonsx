@@ -197,6 +197,13 @@ export interface StudioPlatform {
   /** Invoke a format capability (parse/serialize) — { format, action, source?, doc?, options? }. */
   formatAction?: (payload: Record<string, unknown>) => Promise<unknown>;
   fetchPluginSchema: (src: string, prototype?: string, base?: string) => Promise<unknown>;
+  /**
+   * Resolve a class-prototype config through the backend's `/__jx_resolve__` pipeline (with the
+   * project's content types loaded) and return the parsed result. Used by the tab-bar's dynamic
+   * route-param picker to enumerate ContentCollection entries. Optional: platforms without a
+   * resolve backend omit it and the picker falls back to a plain fetch.
+   */
+  resolveClass?: (body: Record<string, unknown>) => Promise<unknown>;
   gitStatus: () => Promise<GitStatusResult>;
   gitBranches: () => Promise<GitBranchesResult>;
   gitLog: (limit?: number) => Promise<GitLogEntry[]>;

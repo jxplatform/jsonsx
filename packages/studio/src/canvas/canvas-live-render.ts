@@ -21,6 +21,11 @@ import {
 import { canvasBaseOrigin } from "./canvas-origin";
 import { componentRegistry, computeRelativePath } from "../files/components";
 import { prepareForEditMode } from "../utils/edit-display";
+import {
+  paramBoundStateKeys,
+  resolveParamBoundState,
+  substitutePreviewParams,
+} from "../page-params";
 
 import type { JxElement, JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
@@ -135,7 +140,9 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
   let pageContentPrefix: (string | number)[] | null = null;
   let pageContentOffset = 0;
 
-  if (isPage) {
+  // Layout wrapping obeys the tab-bar's "show layout elements" toggle (default on); with it off,
+  // The page renders alone — the unwrapped path is identical to a non-layout page.
+  if (isPage && tab?.session.ui.showLayout !== false) {
     const layoutPath = getEffectiveLayoutPath(doc.$layout);
     if (layoutPath) {
       const layoutDoc = (await resolveLayoutDoc(layoutPath)) as JxMutableNode | null;
@@ -150,6 +157,28 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
         pageContentPrefix = pageContent?.prefix ?? null;
         pageContentOffset = pageContent?.offset ?? 0;
       }
+    }
+  }
+
+  const root = projectState?.projectRoot || "";
+  const docPrefix = root ? `${root}/` : "";
+  const docBase = S.documentPath
+    ? `${canvasBaseOrigin()}/${docPrefix}${S.documentPath}`
+    : undefined;
+
+  // Substitute chosen dynamic route params ({$ref: "#/$params/x"} → literal), inject state.$page,
+  // And bake the substituted class-prototype state entries via the backend resolver — in every
+  // Mode, so ContentEntry state is real data for preview templates AND the design/edit data
+  // Explorer. Pure rebuild: renderDoc shares node references with the tab's source document
+  // (posted as shadowDoc), whose $refs must survive for editing/serialization.
+  if (isPage && tab) {
+    const { previewParams } = tab.session.ui;
+    if (previewParams && Object.keys(previewParams).length > 0) {
+      const boundKeys = paramBoundStateKeys(
+        (doc as { state?: Record<string, unknown> }).state ?? null,
+      );
+      renderDoc = substitutePreviewParams(renderDoc, previewParams, S.documentPath);
+      await resolveParamBoundState(renderDoc, boundKeys, docBase);
     }
   }
 
@@ -189,12 +218,6 @@ export async function resolveCanvasDocument(doc: JxMutableNode): Promise<{
       }
     })(doc, []);
   }
-
-  const root = projectState?.projectRoot || "";
-  const docPrefix = root ? `${root}/` : "";
-  const docBase = S.documentPath
-    ? `${canvasBaseOrigin()}/${docPrefix}${S.documentPath}`
-    : undefined;
 
   // Component auto-discovery (content mode or layout) — mirrors the legacy render path.
   const effectiveElements = getEffectiveElements(renderDoc.$elements as (JxElement | string)[]);

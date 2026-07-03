@@ -5,7 +5,13 @@
  * nothing when there is no context to show. These cases were relocated here from the toolbar,
  * editors, and canvas-render suites when the bar was unified.
  */
-import { flush, installMockPlatform, pointer, resetWorkspaceWithTab } from "./harness";
+import {
+  flush,
+  installMockPlatform,
+  pointer,
+  resetStudioState,
+  resetWorkspaceWithTab,
+} from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Tab } from "../src/tabs/tab";
 
@@ -61,6 +67,7 @@ let root: HTMLElement;
 
 beforeEach(() => {
   closeAllTabs();
+  resetStudioState();
   installMockPlatform();
   root = document.createElement("div");
   document.body.append(root);
@@ -71,20 +78,135 @@ afterEach(() => {
   root.remove();
 });
 
-// ─── Collapse ─────────────────────────────────────────────────────────────────
+// ─── Persistence ──────────────────────────────────────────────────────────────
 
-describe("collapse", () => {
-  test("renders nothing when there is no contextual content", async () => {
+describe("persistence", () => {
+  test("renders the settings bar (with the Preview toggle) for any active editor tab", async () => {
     openTestTab();
     tabBar.mount(root, makeCtx());
     await flush();
-    expect(root.querySelector(".tab-bar")).toBeNull();
+    expect(root.querySelector(".tab-bar")).not.toBeNull();
+    expect(hasBtn(root, "Preview")).toBe(true);
   });
 
   test("renders nothing when there is no active tab", async () => {
     tabBar.mount(root, makeCtx());
     await flush();
     expect(root.querySelector(".tab-bar")).toBeNull();
+  });
+});
+
+// ─── View settings cluster ───────────────────────────────────────────────────
+
+describe("view settings", () => {
+  test("Preview toggle flips tab.session.ui.preview and reflects selection", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    const preview = btn(root, "Preview");
+    expect(preview.hasAttribute("selected")).toBe(false);
+    pointer(preview, "click");
+    await flush();
+    expect(tab.session.ui.preview).toBe(true);
+    expect(btn(root, "Preview").hasAttribute("selected")).toBe(true);
+
+    pointer(btn(root, "Preview"), "click");
+    await flush();
+    expect(tab.session.ui.preview).toBe(false);
+  });
+
+  test("settings cluster is hidden outside the edit/design base modes", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    tab.session.ui.canvasMode = "source";
+    await flush();
+    expect(hasBtn(root, "Preview")).toBe(false);
+  });
+
+  test("settings cluster is hidden while the function editor is open", async () => {
+    const tab = openTestTab();
+    tabBar.mount(root, makeCtx());
+    tab.session.ui.editingFunction = { defName: "greet", type: "def" };
+    await flush();
+    expect(hasBtn(root, "Preview")).toBe(false);
+  });
+
+  test("Preview toggle is hidden when the tab's modes do not include preview", async () => {
+    const tab = openTestTab();
+    tab.capabilities.modes = ["edit", "source"];
+    tabBar.mount(root, makeCtx());
+    await flush();
+    expect(hasBtn(root, "Preview")).toBe(false);
+  });
+
+  test("Layout toggle shows only for a site page with an effective layout and flips showLayout", async () => {
+    resetStudioState({ isSiteProject: true });
+    const tab = resetWorkspaceWithTab(
+      { $layout: "./layouts/base.json", children: [], tagName: "div" } as any,
+      { documentPath: "pages/about.json", id: "layout-tab" },
+    );
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    const layout = btn(root, "Layout");
+    expect(layout.hasAttribute("selected")).toBe(true);
+    pointer(layout, "click");
+    await flush();
+    expect(tab.session.ui.showLayout).toBe(false);
+    expect(btn(root, "Layout").hasAttribute("selected")).toBe(false);
+
+    pointer(btn(root, "Layout"), "click");
+    await flush();
+    expect(tab.session.ui.showLayout).toBe(true);
+  });
+
+  test("no Layout toggle for a non-page document or a page without a layout", async () => {
+    resetStudioState({ isSiteProject: true });
+    resetWorkspaceWithTab({ children: [], tagName: "div" }, { documentPath: "pages/plain.json" });
+    tabBar.mount(root, makeCtx());
+    await flush();
+    expect(hasBtn(root, "Layout")).toBe(false);
+  });
+});
+
+// ─── Dynamic route-param pickers ──────────────────────────────────────────────
+
+describe("param pickers", () => {
+  test("renders a picker per param, auto-selects the first value, and applies changes", async () => {
+    resetStudioState({ isSiteProject: true });
+    const tab = resetWorkspaceWithTab(
+      {
+        $paths: { param: "sku", values: ["alpha", "beta"] },
+        children: [],
+        tagName: "div",
+      } as any,
+      { documentPath: "pages/products/[sku].json", id: "param-tab" },
+    );
+    tabBar.mount(root, makeCtx());
+    await flush();
+
+    const picker = root.querySelector("sp-picker.tab-bar-param") as HTMLElement & {
+      value: string;
+    };
+    expect(picker).not.toBeNull();
+    const options = [...root.querySelectorAll("sp-menu-item")].map((o) => o.textContent?.trim());
+    expect(options).toEqual(["alpha", "beta"]);
+    // First candidate auto-selected once values load.
+    expect(tab.session.ui.previewParams).toEqual({ sku: "alpha" });
+
+    picker.value = "beta";
+    picker.dispatchEvent(new Event("change", { bubbles: true }));
+    await flush();
+    expect(tab.session.ui.previewParams).toEqual({ sku: "beta" });
+  });
+
+  test("no pickers for a page without params or a non-page document", async () => {
+    resetStudioState({ isSiteProject: true });
+    resetWorkspaceWithTab({ children: [], tagName: "div" }, { documentPath: "pages/simple.json" });
+    tabBar.mount(root, makeCtx());
+    await flush();
+    expect(root.querySelector("sp-picker.tab-bar-param")).toBeNull();
   });
 });
 
@@ -239,12 +361,12 @@ describe("media feature toggles", () => {
     expect(tab.session.ui.featureToggles["--dark-mode"]).toBe(false);
   });
 
-  test("no toggle group when the document has no feature queries", async () => {
-    const tab = openTestTab();
+  test("no media toggle group when the document has no feature queries", async () => {
+    openTestTab();
     tabBar.mount(root, makeCtx());
-    // Give the bar a reason to render so the absence of toggles is meaningful.
-    tab.session.documentStack.push({ documentPath: "/project/parent.json" } as any);
     await flush();
-    expect(root.querySelector("sp-action-button[toggles]")).toBeNull();
+    // Only the settings-cluster Preview toggle remains — no media feature toggles.
+    const toggles = [...root.querySelectorAll("sp-action-button[toggles]")];
+    expect(toggles.map((b) => b.textContent?.trim())).toEqual(["Preview"]);
   });
 });

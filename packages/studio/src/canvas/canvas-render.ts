@@ -192,7 +192,11 @@ export function renderCanvas() {
     mode: tab.doc.mode,
     ui: tab.session.ui,
   };
-  const canvasMode = ctx.getCanvasMode();
+  // Base mode drives the host surface (panel structure, panzoom vs centered column). The preview
+  // Toggle changes only what the iframe renders — resolveCanvasDocument reads the effective mode
+  // Via its own getCanvasMode. Flipping the toggle therefore re-renders panels in place (no
+  // ModeChanged teardown, no pan reset).
+  const { canvasMode } = S.ui;
 
   // Advance render generation so stale async renders from the previous cycle bail out
   view.renderGeneration += 1;
@@ -317,7 +321,7 @@ export function renderCanvas() {
     canvasWrap.style.overflow = "";
     canvasWrap.style.overflow = "";
 
-    // Clear zoom indicator (only re-rendered by design/preview/stylebook)
+    // Clear zoom indicator (only re-rendered by design/stylebook)
     resetZoomIndicator();
 
     // Dismiss open popovers/toolbars that are no longer relevant
@@ -532,7 +536,7 @@ export function renderCanvas() {
       canvasWrap.style.padding = "0";
       canvasWrap.style.overflow = "hidden";
 
-      // Remove zoom indicator left over from design/preview mode
+      // Remove zoom indicator left over from design mode
       resetZoomIndicator();
     }
 
@@ -559,7 +563,7 @@ export function renderCanvas() {
     return;
   }
 
-  // Normal canvas mode (design / preview) — set up panzoom surface
+  // Design mode (also hosts preview-toggle renders) — set up panzoom surface
   if (modeChanged) {
     canvasWrap.style.padding = "0";
     canvasWrap.style.overflow = "hidden";

@@ -191,6 +191,37 @@ describe("chromium desktop platform", () => {
     await expect(platform.activate()).resolves.toBeUndefined();
   });
 
+  // ─── Class resolution ──────────────────────────────────────────────────
+
+  test("resolveClass POSTs to /__jx_resolve__ with the shell token", async () => {
+    // The project server 403s a token-less /__jx_resolve__; the platform must thread the token.
+    const originalFetch = globalThis.fetch;
+    const seen: { url: string; init?: RequestInit }[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push({ init, url: String(input) });
+      return Response.json([{ data: { sku: "a" }, id: "A" }]);
+    }) as typeof fetch;
+    try {
+      const result = await platform.resolveClass!({ $src: "x" });
+      expect(result).toEqual([{ data: { sku: "a" }, id: "A" }]);
+      expect(seen[0]!.url).toBe("/__jx_resolve__?token=CHROMIUM_TOK");
+      expect(seen[0]!.init?.method).toBe("POST");
+      expect(seen[0]!.init?.body).toBe('{"$src":"x"}');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("resolveClass throws on a non-OK response", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("no", { status: 403 })) as typeof fetch;
+    try {
+      expect(platform.resolveClass!({ $src: "x" })).rejects.toThrow("Class resolution failed: 403");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   // ─── Project operations ────────────────────────────────────────────────
 
   test("openProject returns config and handle", async () => {

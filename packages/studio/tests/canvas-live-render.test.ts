@@ -116,6 +116,85 @@ describe("resolveCanvasDocument", () => {
     expect(result.mapperCtx.pageContentPrefix).not.toBeNull();
   });
 
+  test("skips layout wrapping when the tab's showLayout toggle is off", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/base.json": JSON.stringify(LAYOUT) });
+    const tab = resetWorkspaceWithTab(
+      {
+        $layout: "./layouts/base.json",
+        children: [{ tagName: "p", textContent: "Page content" }],
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/home.json" },
+    ) as Tab;
+    tab.session.ui.showLayout = false;
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+    expect(result.mapperCtx.layoutWrapped).toBe(false);
+    expect(result.mapperCtx.pageContentPrefix).toBeNull();
+    const children = result.renderDoc.children as JxMutableNode[];
+    expect(children.some((c) => c.tagName === "header")).toBe(false);
+  });
+
+  test("effective preview mode keeps the raw doc (no edit-display tokens)", async () => {
+    canvasMode = "preview";
+    const result = await resolve({
+      children: [{ tagName: "p", textContent: "${state.x}" }],
+      tagName: "div",
+    } as unknown as JxMutableNode);
+    expect(result.mapperCtx.canvasMode).toBe("preview");
+    const p = (result.renderDoc.children as JxMutableNode[])[0]!;
+    // Preview passes the raw template through; design/edit would rewrite it to a display token.
+    expect(p.textContent).toBe("${state.x}");
+    expect(result.mapperCtx.arrayPaths).toEqual([]);
+  });
+
+  test("substitutes chosen preview params into renderDoc, leaving the source doc intact", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    const tab = resetWorkspaceWithTab(
+      {
+        children: [],
+        state: {
+          product: { $prototype: "ContentEntry", id: { $ref: "#/$params/sku" } },
+        },
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/products/[sku].json" },
+    ) as Tab;
+    tab.session.ui.previewParams = { sku: "mini-trencher" };
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+
+    const state = result.renderDoc.state as Record<string, Record<string, unknown>>;
+    expect(state.product!.id).toBe("mini-trencher");
+    expect(state.$page).toEqual({
+      params: { sku: "mini-trencher" },
+      title: "",
+      url: "/products/:sku",
+    });
+    // The tab's source document keeps its $ref (it is what gets edited and saved).
+    const srcState = (tab.doc.document as { state: Record<string, Record<string, unknown>> }).state;
+    expect(srcState.product!.id).toEqual({ $ref: "#/$params/sku" });
+  });
+
+  test("substitution composes with layout wrapping", async () => {
+    resetStudioState({ isSiteProject: true, projectConfig: {} });
+    installMockPlatform({}, { "layouts/base.json": JSON.stringify(LAYOUT) });
+    const tab = resetWorkspaceWithTab(
+      {
+        $layout: "./layouts/base.json",
+        children: [{ tagName: "p", textContent: "Body" }],
+        state: { entry: { id: { $ref: "#/$params/slug" } } },
+        tagName: "div",
+      } as unknown as JxMutableNode,
+      { documentPath: "pages/docs/[slug].json" },
+    ) as Tab;
+    tab.session.ui.previewParams = { slug: "intro" };
+    const result = await resolveCanvasDocument(tab.doc.document as JxMutableNode);
+
+    expect(result.mapperCtx.layoutWrapped).toBe(true);
+    const state = result.renderDoc.state as Record<string, Record<string, unknown>>;
+    expect(state.entry!.id).toBe("intro");
+  });
+
   test("auto-discovers project components in content mode and adds them to $elements", async () => {
     installMockPlatform({
       discoverComponents: async () => [

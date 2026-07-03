@@ -427,6 +427,22 @@ export function createDesktopPlatform() {
       return rpc.request.listFormats();
     },
 
+    /**
+     * Class resolution via the shared dev-proxy pipeline (the same handler the canvas runtime
+     * reaches through the fetch patch above), called directly over RPC.
+     *
+     * @param {Record<string, unknown>} body
+     */
+    async resolveClass(body: Record<string, unknown>) {
+      const { status, body: resBody } = await rpc.request.jxResolve({
+        body: JSON.stringify(body),
+      });
+      if (status >= 400) {
+        throw new Error(`Class resolution failed: ${status}`);
+      }
+      return JSON.parse(resBody) as unknown;
+    },
+
     /** @param {Record<string, unknown>} payload */
     async formatAction(payload: Record<string, unknown>) {
       return rpc.request.formatAction(
