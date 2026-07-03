@@ -9,9 +9,24 @@ import {
   isInlineElement,
   isInlineInContext,
   normalizeChildren,
+  resumeBlurClose,
+  setSlashController,
   startEditing,
   stopEditing,
+  suspendBlurClose,
 } from "../src/editor/inline-edit";
+import { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } from "../src/editor/slash-menu";
+
+// Inline-edit no longer hard-imports the slash menu (so it can live in the slim iframe bundle);
+// Wire the real one for the tests that exercise slash commands.
+setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
+
+/** Wait `ms` real milliseconds (for the 150ms blur-close timer). */
+function waitMs(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 // ─── Pure function tests ─────────────────────────────────────────────────────
 
@@ -215,11 +230,71 @@ describe("Editing lifecycle", () => {
       onSplit: () => {},
     });
 
-    expect(endCount).toBe(1); // First editing's onEnd was called
+    // Re-enter must NOT fire the previous session's onEnd (it would reset the parent toolbar).
+    expect(endCount).toBe(0);
     expect(getActiveElement()).toBe(el2);
     expect(el.contentEditable).toBe("false");
 
     el2.remove();
+  });
+});
+
+// ─── 4b-2: blur-close suspension ─────────────────────────────────────────────
+
+describe("suspendBlurClose / resumeBlurClose", () => {
+  let el: HTMLElement;
+
+  beforeEach(() => {
+    el = document.createElement("p");
+    el.textContent = "edit me";
+    document.body.append(el);
+  });
+
+  afterEach(() => {
+    if (isEditing()) {
+      stopEditing();
+    }
+    resumeBlurClose();
+    el.remove();
+  });
+
+  test("a REAL blur event does not stop the session while blur-close is suspended", async () => {
+    startEditing(el, ["children", 0], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    suspendBlurClose();
+
+    // Dispatch a real blur and move focus off the editable, then let the 150ms timer elapse.
+    el.blur();
+    el.dispatchEvent(new FocusEvent("blur"));
+    document.body.focus();
+    await waitMs(200);
+
+    expect(isEditing()).toBe(true);
+    expect(getActiveElement()).toBe(el);
+  });
+
+  test("after resumeBlurClose a real blur (focus elsewhere) stops the session", async () => {
+    startEditing(el, ["children", 0], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    suspendBlurClose();
+    resumeBlurClose();
+
+    const other = document.createElement("input");
+    document.body.append(other);
+    other.focus(); // ActiveElement is no longer the editable
+    el.dispatchEvent(new FocusEvent("blur"));
+    await waitMs(200);
+
+    expect(isEditing()).toBe(false);
+    other.remove();
   });
 });
 
@@ -354,5 +429,33 @@ describe("normalizeChildren", () => {
     }) as any;
     expect(result.children).toBeDefined();
     expect(result.children.length).toBe(1);
+  });
+});
+
+describe("session accessors", () => {
+  test("getActivePath mirrors the live session; isSlashActive proxies the DI'd controller", async () => {
+    const { getActivePath, isSlashActive } = await import("../src/editor/inline-edit");
+
+    expect(getActivePath()).toBeNull();
+    expect(isSlashActive()).toBe(false);
+
+    const el = document.createElement("p");
+    document.body.append(el);
+    startEditing(el, ["children", 3], {
+      onCommit: () => {},
+      onEnd: () => {},
+      onInsert: () => {},
+      onSplit: () => {},
+    });
+    expect(getActivePath()).toEqual(["children", 3]);
+
+    let open = true;
+    setSlashController({ dismiss: () => {}, isOpen: () => open, show: () => {} });
+    expect(isSlashActive()).toBe(true);
+    open = false;
+    expect(isSlashActive()).toBe(false);
+
+    stopEditing();
+    expect(getActivePath()).toBeNull();
   });
 });

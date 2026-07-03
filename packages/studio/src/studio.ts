@@ -19,6 +19,7 @@ import {
   requireProjectState,
   setProjectState,
   toolbarEl,
+  updateSession,
   updateUi,
 } from "./store";
 
@@ -28,20 +29,28 @@ import { effect } from "./reactivity";
 
 import { view } from "./view";
 
-import { isEditableBlock, isEditing } from "./editor/inline-edit";
-import { enterComponentInlineEdit, initComponentInlineEdit } from "./editor/component-inline-edit";
-import { enterInlineEdit } from "./editor/content-inline-edit";
+import { isEditing } from "./editor/inline-edit";
 import { applyTransform, initCanvasUtils, positionZoomIndicator } from "./canvas/canvas-utils";
-import { findCanvasElement, getActivePanel, initCanvasHelpers } from "./canvas/canvas-helpers";
 import {
-  applyCanvasMediaOverrides,
   initCanvasRender,
   renderCanvas,
   renderOverlays,
   scheduleCanvasRender,
 } from "./canvas/canvas-render";
 import { consumePatchedDocument, initCanvasPatcher } from "./canvas/canvas-patcher";
-import { registerSubtreeDnD } from "./panels/canvas-dnd";
+import {
+  commitActiveEditSession,
+  getEditSnapshot,
+  setCanvasContextMenuHandler,
+  setCanvasSlashHandler,
+  setIframePatchEscalation,
+  setInsertZoneClickHandler,
+  setStylebookHitHandler,
+  setToolbarRefresh,
+} from "./canvas/iframe-host";
+import { runInsertZoneAction } from "./editor/insert-zone-action";
+import { canvasSlashHandler } from "./editor/canvas-slash-bridge";
+import { makeCanvasContextMenuHandler } from "./editor/canvas-context-menu";
 import { initCanvasLiveRender } from "./canvas/canvas-live-render";
 import {
   mountStatusbar,
@@ -50,7 +59,12 @@ import {
   statusMessage,
 } from "./panels/statusbar";
 import { exportFile, parseSourceForPath, saveFile, serializeDocument } from "./files/file-ops";
-import { documentExtensions, formatForPath, loadFormats } from "./format/format-host";
+import {
+  documentExtensions,
+  formatForPath,
+  loadFormats,
+  refreshFormats,
+} from "./format/format-host";
 import {
   loadProject as _loadProject,
   openProject as _openProject,
@@ -97,14 +111,17 @@ import * as rightPanelMod from "./panels/right-panel";
 import * as leftPanelMod from "./panels/left-panel";
 import * as tabStrip from "./panels/tab-strip";
 import * as tabBar from "./panels/tab-bar";
-import { renderStylebookOverlays } from "./panels/stylebook-panel";
+import { selectStylebookTag } from "./panels/stylebook-panel";
 import { registerLayersDnD, registerComponentsDnD, registerElementsDnD } from "./panels/dnd";
+import { registerCanvasDndBridge } from "./panels/canvas-dnd-bridge";
 import { defaultDef } from "./panels/shared";
 import { registerFunctionCompletions } from "./panels/editors";
-import { renderBlockActionBar, initBlockActionBar } from "./panels/block-action-bar";
+import {
+  initBlockActionBar,
+  isEditChromeTarget,
+  renderBlockActionBar,
+} from "./panels/block-action-bar";
 import { initCssData } from "./panels/style-utils";
-import { updateForcedPseudoPreview } from "./panels/pseudo-preview";
-import { initPanelEvents } from "./panels/panel-events";
 import { initQuickSearch } from "./panels/quick-search";
 import { addRecentProject, hydrateRecentProjects, removeRecentProject } from "./recent-projects";
 import { initWelcome } from "./panels/welcome-screen";
@@ -361,39 +378,58 @@ initBlockActionBar({
   getCanvasMode,
   navigateToComponent,
 });
-
-initComponentInlineEdit({ findCanvasElement });
-initCanvasHelpers({
-  getCanvasMode,
-  getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
+// The iframe's re-emitted selection snapshot drives the parent format toolbar refresh (4b-2).
+setToolbarRefresh(renderBlockActionBar);
+// The cross-origin insertion "+" click runs the parent-realm slash-menu → mutateInsertNode flow.
+setInsertZoneClickHandler(runInsertZoneAction);
+// The in-iframe "/" trigger drives the parent-realm Spectrum slash menu across the bridge.
+setCanvasSlashHandler(canvasSlashHandler);
+// Canvas right-clicks show the parent-realm Jx element context menu across the bridge.
+setCanvasContextMenuHandler(makeCanvasContextMenuHandler({ navigateToComponent }));
+// Stylebook hits decode to a TAG in the host and route here (null = clicked chrome/empty space).
+setStylebookHitHandler((tag, media) => {
+  if (tag) {
+    selectStylebookTag(tag, media);
+  } else {
+    updateSession({ ui: { activeSelector: null, stylebookSelection: null } });
+  }
 });
+// Commit-on-parent-click: a pointerdown in PARENT chrome outside the edit-session chrome (format
+// Toolbar / link popover / slash menu) ends the live inline-edit session — the iframe can't observe
+// Parent-realm pointer events (layers panel, tab strip, right panel…). Pointerdowns over the canvas
+// Land inside the cross-origin iframe and never reach this listener, so it can't double-fire with
+// The iframe's own click-away commit.
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (getEditSnapshot().editing && !isEditChromeTarget(e.target)) {
+      commitActiveEditSession();
+    }
+  },
+  true,
+);
+
 initCanvasUtils({
   getCanvasMode,
   getZoom: () => activeTab.value?.session.ui.zoom ?? 1,
-  renderStylebookOverlays,
   setZoomDirect: (zoom) => {
     if (activeTab.value) {
       activeTab.value.session.ui.zoom = zoom;
     }
   },
 });
-initPanelEvents({
-  enterInlineEdit,
-  getCanvasMode,
-  navigateToComponent,
-});
 initCanvasLiveRender({
   getCanvasMode,
 });
 initCanvasPatcher({
-  applyCanvasMediaOverrides,
-  enterComponentInlineEdit,
   getCanvasMode,
-  registerSubtreeDnD,
   renderOverlays,
   scheduleCanvasRender,
-  updateForcedPseudoPreview,
 });
+// When the iframe canvas can't apply a posted patch surgically, fall back to a full render.
+setIframePatchEscalation(scheduleCanvasRender);
+// One global coordinator monitor drives cross-frame palette→canvas drops (Phase 4c).
+registerCanvasDndBridge();
 initCanvasRender({
   getCanvasMode,
   get gitDiffState() {
@@ -453,7 +489,6 @@ rightPanelMod.mount({
   getCanvasMode,
   navigateToComponent,
   renderCanvas: () => renderCanvas(),
-  updateForcedPseudoPreview,
 });
 
 leftPanelMod.mount({
@@ -519,6 +554,19 @@ function ensureFsSync() {
 
 const _urlParams = new URLSearchParams(location.search);
 const _projectParam = _urlParams.get("project") || _urlParams.get("open");
+
+if (!_projectParam) {
+  // Electrobun (and other non-?project= hosts) load their project over RPC, so the ?project= branch
+  // Below — which is the only place that calls platform.activate() — is skipped. Kick off activate()
+  // Here UNCONDITIONALLY so this window's loopback canvasUrl is fetched on boot (the canvas iframe
+  // Needs it); a render() once it resolves lets ensureHost swap an early default iframe for the
+  // Loopback one (see iframe-host ensureHost's canvasUrl-changed rebuild).
+  const _bootPlatform = getPlatform();
+  // oxlint-disable-next-line unicorn/prefer-top-level-await -- fire-and-forget: must not block the initial render
+  void _bootPlatform.activate?.()?.then(() => {
+    render();
+  });
+}
 
 if (_projectParam) {
   // ?project= mode: skip normal loadProject, set up site context from the path
@@ -708,6 +756,11 @@ async function openRecentProject(root: string) {
     }
 
     platform.projectRoot = root;
+    // The format registry is cached per project — the previous root's registry (often empty on a
+    // Fresh desktop launch) must not answer for this project, or non-JSON documents fail with
+    // "No format class imported" until a reload. Mirrors openProject in files.ts.
+    refreshFormats();
+    void loadFormats();
     const content = await platform.readFile("project.json");
     const config = JSON.parse(content) as ProjectConfig;
 
@@ -779,18 +832,6 @@ function openFileFromTree(path: string) {
 initShortcuts(() => ({
   applyTransform,
   canvasMode: getCanvasMode(),
-  componentInlineEdit: view.componentInlineEdit,
-  enterEditOnPath(path) {
-    requestAnimationFrame(() => {
-      const activePanel = getActivePanel();
-      if (activePanel) {
-        const el = findCanvasElement(path, activePanel.canvas);
-        if (el && isEditableBlock(el)) {
-          enterInlineEdit(el, path);
-        }
-      }
-    });
-  },
   openProject,
   panX: view.panX,
   panY: view.panY,

@@ -1,15 +1,13 @@
 import { $ } from "bun";
-import { join, resolve } from "node:path";
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { stageStudioAssets } from "./stage-studio-assets";
 
 const desktopDir = resolve(import.meta.dir, "..");
-const studioDir = resolve(desktopDir, "../studio");
-const assetsDir = join(desktopDir, "assets");
 
 // ── 1. Build studio ────────────────────────────────────────────────────────
 
 console.log("[prebuild-rpc] Building @jxsuite/studio…");
-await $`bun run build`.cwd(studioDir);
+await $`bun run build`.cwd(resolve(desktopDir, "../studio"));
 
 // ── 2. Build chromium init script ────────────────────────────────────────
 
@@ -18,25 +16,9 @@ await $`bun build ./src/chromium/init.ts --outdir ./assets/studio/dist --target 
   desktopDir,
 );
 
-// ── 3. Copy + patch assets ─────────────────────────────────────────────────
+// ── 3. Copy + patch assets (shared with the electrobun pre-build) ──────────
 
 console.log("[prebuild-rpc] Staging studio assets…");
-await mkdir(join(assetsDir, "studio", "dist"), { recursive: true });
-
-await copyFile(
-  join(studioDir, "dist", "studio.css"),
-  join(assetsDir, "studio", "dist", "studio.css"),
-);
-await copyFile(
-  join(studioDir, "dist", "studio.js"),
-  join(assetsDir, "studio", "dist", "studio.js"),
-);
-
-const html = await readFile(join(studioDir, "index.html"), "utf8");
-const patched = html.replace(
-  '<script type="module" src="./dist/studio.js"></script>',
-  '<script type="module" src="./dist/init.js"></script>\n  <script type="module" src="./dist/studio.js"></script>',
-);
-await writeFile(join(assetsDir, "studio", "index.html"), patched, "utf8");
+await stageStudioAssets(desktopDir);
 
 console.log("[prebuild-rpc] Done.");

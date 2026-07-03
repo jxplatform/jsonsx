@@ -15,9 +15,13 @@ void mock.module("../src/editor/inline-format.js", () => ({
   toggleInlineFormat,
 }));
 
-const { getActiveElement, isEditing, startEditing, stopEditing } =
+const { getActiveElement, isEditing, setSlashController, startEditing, stopEditing } =
   await import("../src/editor/inline-edit");
-const { dismissSlashMenu, isSlashMenuOpen } = await import("../src/editor/slash-menu");
+const { dismissSlashMenu, isSlashMenuOpen, showSlashMenu } =
+  await import("../src/editor/slash-menu");
+// Inline-edit no longer hard-imports the slash menu (kept out of the slim iframe bundle) — wire the
+// Real one here so the slash-command lifecycle tests drive it.
+setSlashController({ dismiss: dismissSlashMenu, isOpen: isSlashMenuOpen, show: showSlashMenu });
 
 // ─── Environment ──────────────────────────────────────────────────────────────
 

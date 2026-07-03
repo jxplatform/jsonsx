@@ -12,6 +12,8 @@ import { ref } from "lit-html/directives/ref.js";
 import { getPlatform } from "../platform";
 import { debouncedStyleCommit, renderOnly } from "../store";
 import { getLayerSlot } from "./layers";
+import { rectOf } from "../utils/geometry";
+import { loopbackAssetSrc } from "../canvas/canvas-origin";
 
 // ─── Media file cache ────────────────────────────────────────────────────────
 
@@ -142,7 +144,7 @@ function onPopoverOutsideClick(e: MouseEvent) {
 
 function renderMediaPickerPopover() {
   const host = getLayerSlot("popover", "media-picker");
-  const rect = _popoverAnchorEl?.getBoundingClientRect();
+  const rect = _popoverAnchorEl ? rectOf(_popoverAnchorEl) : undefined;
   if (!rect) {
     return;
   }
@@ -210,7 +212,7 @@ function renderMediaPickerPopover() {
                     ${m.isImage
                       ? html`<img
                           slot="icon"
-                          src=${m.path}
+                          src=${loopbackAssetSrc(m.path)}
                           alt=""
                           style="width:24px;height:24px;object-fit:cover;border-radius:var(--spectrum-corner-radius-75, 2px)"
                         />`
@@ -232,7 +234,7 @@ function renderMediaPickerPopover() {
   // Fine-tune position after render using actual measured dimensions
   requestAnimationFrame(() => {
     if (_popoverEl) {
-      const popoverRect = _popoverEl.getBoundingClientRect();
+      const popoverRect = rectOf(_popoverEl);
       let adjLeft = popoverRect.left;
       let adjTop = popoverRect.top;
       let needsAdjust = false;
@@ -304,7 +306,7 @@ export function renderMediaPicker(prop: string, value: string, onCommit: (val: s
   return html`
     <div class="media-picker">
       ${isImage && currentValue
-        ? html`<img class="media-picker-thumb" src=${currentValue} alt="" />`
+        ? html`<img class="media-picker-thumb" src=${loopbackAssetSrc(currentValue)} alt="" />`
         : nothing}
       <sp-textfield
         size="s"

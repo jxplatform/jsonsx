@@ -41,6 +41,7 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { StudioState } from "../state.js";
 import type { Tab } from "../tabs/tab.js";
 import type { RenameResult } from "../types";
+import { rectOf } from "../utils/geometry";
 
 // ─── File icon map ────────────────────────────────────────────────────────────
 
@@ -738,7 +739,7 @@ function showFileContextMenu(
         }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
-          const menuRect = popover.getBoundingClientRect();
+          const menuRect = rectOf(popover);
           if (x + menuRect.width > window.innerWidth) {
             x = window.innerWidth - menuRect.width - 4;
           }

@@ -24,6 +24,30 @@ mkdirSync(STUDIO_ASSETS, { recursive: true });
 writeFileSync(join(FIXTURES, "hello.txt"), "Hello Index");
 writeFileSync(join(FIXTURES, "public", "pub.css"), "body { margin: 0 }");
 writeFileSync(join(STUDIO_ASSETS, "index.html"), "<html>studio-shell</html>");
+// The iframe canvas assets the launcher must serve (staged by scripts/stage-studio-assets.ts).
+mkdirSync(join(STUDIO_ASSETS, "dist"), { recursive: true });
+writeFileSync(join(STUDIO_ASSETS, "canvas.html"), '<html><div id="jx-canvas-root"></div></html>');
+writeFileSync(join(STUDIO_ASSETS, "dist", "iframe-entry.js"), "// canvas entry stub");
+
+// A self-contained .class.json so the /__jx_resolve__ HTTP route returns a known value.
+writeFileSync(
+  join(FIXTURES, "Sum.class.json"),
+  JSON.stringify({
+    $defs: {
+      constructor: { $prototype: "Function", role: "constructor" },
+      fields: {
+        a: { access: "public", default: 0, identifier: "a", role: "field", scope: "instance" },
+        b: { access: "public", default: 0, identifier: "b", role: "field", scope: "instance" },
+      },
+      methods: {
+        resolve: { body: "return this.a + this.b;", identifier: "resolve", role: "method" },
+      },
+    },
+    $prototype: "Class",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    title: "Sum",
+  }),
+);
 
 // ─── Mocked collaborator modules ────────────────────────────────────────────
 
@@ -42,6 +66,12 @@ const handlerMocks = {
   handleResolveSiteContext: mock(() => Promise.resolve({ sitePath: "." })),
   handleUploadFile: mock(() => Promise.resolve()),
   handleWriteFile: mock(() => Promise.resolve()),
+  jxResolve: mock((p: { body: string }) =>
+    Promise.resolve({ body: JSON.stringify({ resolved: p.body }), status: 200 }),
+  ),
+  jxServerFunction: mock((p: { body: string }) =>
+    Promise.resolve({ body: JSON.stringify({ server: p.body }), status: 200 }),
+  ),
   listDirectory: mock(() => Promise.resolve([{ name: "hello.txt", type: "file" }])),
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
@@ -83,10 +113,6 @@ const packageMocks = {
 
 const openFileDialogMock = mock(() => Promise.resolve("/picked/project.json"));
 
-const handleAiApiMock = mock((_req: Request, url: URL) =>
-  Promise.resolve(url.pathname === "/__studio/ai/auth-status" ? Response.json({ ok: true }) : null),
-);
-
 const readRecentsMock = mock(() =>
   Promise.resolve([{ name: "Recent", root: "/abs/recent", timestamp: 1 }]),
 );
@@ -96,7 +122,6 @@ void mock.module("../src/handlers", () => handlerMocks);
 void mock.module("../src/git", () => gitMocks);
 void mock.module("../src/packages", () => packageMocks);
 void mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
-void mock.module("@jxsuite/server/ai-api", () => ({ handleAiApi: handleAiApiMock }));
 void mock.module("../src/recent-store", () => ({
   readRecents: readRecentsMock,
   writeRecents: writeRecentsMock,
@@ -177,7 +202,13 @@ const sigtermHandlers = process
   .listeners("SIGTERM")
   .filter((listener) => !sigtermBefore.has(listener));
 
-const baseUrl = `http://localhost:${server!.port}`;
+// The factory binds 127.0.0.1; localhost is a loopback alias the test client can also use.
+const baseUrl = `http://127.0.0.1:${server!.port}`;
+
+// Extract the rpc token the launcher threaded into the --app URL (?token=…). The privileged routes
+// And the WS upgrade are gated on it.
+const appArg = spawnCalls[0]!.args[0]!;
+const rpcToken = new URL(appArg.replace(/^--app=/, "")).searchParams.get("token")!;
 
 afterAll(() => {
   process.exit = realExit;
@@ -217,7 +248,7 @@ function rpc(method: string, params?: Record<string, unknown>): Promise<unknown>
 
 beforeAll(async () => {
   ws = await new Promise<WebSocket>((resolve, reject) => {
-    const socket = new WebSocket(`ws://localhost:${server!.port}`);
+    const socket = new WebSocket(`ws://127.0.0.1:${server!.port}/?token=${rpcToken}`);
     socket.addEventListener("open", () => resolve(socket));
     socket.addEventListener("error", reject);
   });
@@ -235,16 +266,18 @@ describe("chromium launcher startup", () => {
     expect(handlerMocks.setFileDialog).toHaveBeenCalledWith(openFileDialogMock);
   });
 
-  test("logs the server URL and project root", () => {
+  test("logs the loopback server URL and project root", () => {
     expect(logs.some((line) => line.includes(`Studio server at ${baseUrl}`))).toBe(true);
+    expect(logs.some((line) => line.includes("Studio server at http://127.0.0.1:"))).toBe(true);
     expect(logs.some((line) => line.includes(`Project root: ${FIXTURES}`))).toBe(true);
   });
 
-  test("spawns the resolved chromium binary in app mode", () => {
+  test("spawns the resolved chromium binary in app mode under /__studio__/ with the token", () => {
     expect(spawnCalls).toHaveLength(1);
     const [{ args, bin }] = spawnCalls;
     expect(bin.endsWith("/sh")).toBe(true);
-    expect(args[0]).toBe(`--app=${baseUrl}/studio/index.html`);
+    expect(args[0]).toBe(`--app=${baseUrl}/__studio__/index.html?token=${rpcToken}`);
+    expect(args[0]).toContain("127.0.0.1");
     expect(args).toContain("--no-first-run");
     // The profile dir is built with path.resolve, so the separator is OS-native (\ on Windows).
     expect(args.some((a) => a.includes(join(".jx", "chromium-profile")))).toBe(true);
@@ -300,6 +333,19 @@ describe("chromium launcher RPC dispatch", () => {
 
   test("getProjectRoot wraps the handler value in { root }", async () => {
     expect(await rpc("getProjectRoot")).toEqual({ root: projectRootValue });
+  });
+
+  test("jxResolve / jxServerFunction WS methods dispatch to the handlers", async () => {
+    expect(await rpc("jxResolve", { body: '{"a":1}' })).toEqual({
+      body: JSON.stringify({ resolved: '{"a":1}' }),
+      status: 200,
+    });
+    expect(handlerMocks.jxResolve).toHaveBeenCalledWith({ body: '{"a":1}' });
+    expect(await rpc("jxServerFunction", { body: '{"x":2}' })).toEqual({
+      body: JSON.stringify({ server: '{"x":2}' }),
+      status: 200,
+    });
+    expect(handlerMocks.jxServerFunction).toHaveBeenCalledWith({ body: '{"x":2}' });
   });
 
   test("setWindowProject rebinds the root in place and reports no dedup", async () => {
@@ -392,25 +438,49 @@ describe("chromium launcher RPC dispatch", () => {
 // ─── HTTP static serving ────────────────────────────────────────────────────
 
 describe("chromium launcher HTTP server", () => {
-  test("serves studio assets under /studio/", async () => {
-    const res = await fetch(`${baseUrl}/studio/index.html`);
+  test("serves studio assets under /__studio__/ with Referrer-Policy same-origin", async () => {
+    // Same-origin (not no-referrer): the studio shell's asset fetches must carry a referrer so the
+    // Server-side referrer checks pass — see @jxsuite/server commit bdbb33a6.
+    const res = await fetch(`${baseUrl}/__studio__/index.html`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("studio-shell");
+    expect(res.headers.get("Referrer-Policy")).toBe("same-origin");
   });
 
-  test("delegates /studio/ai/ routes to handleAiApi, rewriting to /__studio/ai/", async () => {
-    const res = await fetch(`${baseUrl}/studio/ai/auth-status`);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true });
-    expect(handleAiApiMock).toHaveBeenCalled();
-    expect((handleAiApiMock.mock.calls.at(-1)![1] as URL).pathname).toBe(
-      "/__studio/ai/auth-status",
-    );
+  test("serves the iframe canvas doc + bundle under /__studio__/", async () => {
+    // The canvas iframe boots from /__studio__/canvas.html (see chromium/platform.ts canvasUrl);
+    // A missing file here is the packaged-app "Not found" iframe regression.
+    const doc = await fetch(`${baseUrl}/__studio__/canvas.html`);
+    expect(doc.status).toBe(200);
+    expect(await doc.text()).toContain("jx-canvas-root");
+    const entry = await fetch(`${baseUrl}/__studio__/dist/iframe-entry.js`);
+    expect(entry.status).toBe(200);
   });
 
-  test("falls through to 404 when handleAiApi returns null", async () => {
-    const res = await fetch(`${baseUrl}/studio/ai/not-a-route`);
+  test("studio-asset over-encoded traversal out of studioDir is 404", async () => {
+    // A single fetch/URL parse collapses real "../"; an over-encoded %252e survives one decode as
+    // %2e and is rejected by the server's over-encoding guard.
+    const res = await fetch(`${baseUrl}/__studio__/%252e%252e/hello.txt`);
     expect(res.status).toBe(404);
+  });
+
+  test("POST /__jx_resolve__ with the token dispatches to handleResolve", async () => {
+    const res = await fetch(`${baseUrl}/__jx_resolve__?token=${rpcToken}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ $prototype: "Sum", $src: "./Sum.class.json", a: 2, b: 3 }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toBe(5);
+  });
+
+  test("POST /__jx_resolve__ without the token is 403", async () => {
+    const res = await fetch(`${baseUrl}/__jx_resolve__`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ $src: "./Sum.class.json" }),
+    });
+    expect(res.status).toBe(403);
   });
 
   test("serves absolute paths under the project root", async () => {
@@ -430,16 +500,22 @@ describe("chromium launcher HTTP server", () => {
     expect(await res.text()).toBe("Hello Index");
   });
 
-  test("collapses leading double slashes", async () => {
-    const res = await fetch(`${baseUrl}//hello.txt`);
-    expect(res.status).toBe(200);
-    expect(await res.text()).toBe("Hello Index");
-  });
-
   test("serves files from the public/ subdirectory", async () => {
     const res = await fetch(`${baseUrl}/pub.css`);
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("margin: 0");
+  });
+
+  test("over-encoded ../ traversal of a project file is 404", async () => {
+    const res = await fetch(`${baseUrl}/%252e%252e/hello.txt`);
+    expect(res.status).toBe(404);
+  });
+
+  test("an absolute path outside the project root is 404", async () => {
+    // The tests directory sits outside FIXTURES (the project root). An absolute request for a file
+    // That really exists there must not be served — containment is by root, not by existence.
+    const res = await fetch(`${baseUrl}${toUrlPath(import.meta.dir)}/chromium-index.test.ts`);
+    expect(res.status).toBe(404);
   });
 
   test("returns 404 for missing files", async () => {

@@ -16,7 +16,10 @@ await createDevServer({
       outdir: "./packages/runtime/dist",
     },
     {
-      entrypoints: ["./packages/studio/src/studio.js"],
+      entrypoints: [
+        "./packages/studio/src/studio.js",
+        "./packages/studio/src/canvas/iframe-entry.js",
+      ],
       label: "studio",
       match: /studio/,
       outdir: "./packages/studio/dist",

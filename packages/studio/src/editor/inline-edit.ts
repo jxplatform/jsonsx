@@ -12,11 +12,37 @@ import { normalizeInlineContent, toggleInlineFormat } from "./inline-format";
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
-import {
-  showSlashMenu as sharedShowSlashMenu,
-  dismissSlashMenu as sharedDismissSlashMenu,
-  isSlashMenuOpen,
-} from "./slash-menu";
+/**
+ * The slash-menu surface inline editing drives. Injected (rather than imported) so this module
+ * stays free of the menu's heavy `lit-html` / `ui/layers` dependencies — the editor realm wires the
+ * real menu, the canvas iframe supplies its own (or a no-op) without bloating the slim iframe
+ * bundle.
+ */
+export interface SlashController {
+  show: (
+    anchorEl: HTMLElement,
+    filter: string,
+    cbs: { onSelect: (cmd: SlashCommand) => void; showFilter?: boolean; commands?: SlashCommand[] },
+  ) => void;
+  dismiss: () => void;
+  isOpen: () => boolean;
+}
+
+const noopSlash: SlashController = {
+  dismiss: () => {
+    // No slash controller wired in this realm.
+  },
+  isOpen: () => false,
+  show: () => {
+    // No slash controller wired in this realm.
+  },
+};
+let slash: SlashController = noopSlash;
+
+/** Inject the slash-menu controller inline editing should drive (call once at realm init). */
+export function setSlashController(controller: SlashController): void {
+  slash = controller;
+}
 
 export interface InlineAction {
   tag: string;
@@ -160,6 +186,24 @@ let insertFn:
 let endFn: (() => void) | null = null; // Function() called when editing stops
 
 /**
+ * When a parent toolbar (or its link popover) may take focus during a live session, the iframe sets
+ * this so {@link handleBlur} does NOT schedule a `stopEditing()` (the BLOCKER focus-loss race fix —
+ * a parent-toolbar click blurs the iframe editable, which must NOT tear the session down). Only an
+ * explicit commit (Escape/Enter/click-away-in-iframe) ends the session while suspended.
+ */
+let _blurCloseSuspended = false;
+
+/** Suspend blur-driven `stopEditing` (call while the parent toolbar/popover may steal focus). */
+export function suspendBlurClose() {
+  _blurCloseSuspended = true;
+}
+
+/** Resume blur-driven `stopEditing` (call on real editEnd/teardown). */
+export function resumeBlurClose() {
+  _blurCloseSuspended = false;
+}
+
+/**
  * Check if an element is a text-bearing editable block.
  *
  * @param {HTMLElement} el
@@ -228,7 +272,9 @@ export function startEditing(
   },
 ) {
   if (activeEl) {
-    stopEditing();
+    // Re-enter (e.g. after a split/insert re-render): tear the old session down WITHOUT firing the
+    // User-visible `onEnd` — a re-enter must not reset the parent toolbar via a stray `editEnd`.
+    stopEditing(true);
   }
 
   activeEl = el;
@@ -262,14 +308,19 @@ export function startEditing(
   el.addEventListener("paste", handlePaste);
 }
 
-/** Stop editing and commit changes. */
-export function stopEditing() {
+/**
+ * Stop editing and commit changes. Pass `silent` to skip the `onEnd` callback (used by the re-enter
+ * path so a stop→start sequence doesn't post a user-visible `editEnd`).
+ *
+ * @param {boolean} [silent]
+ */
+export function stopEditing(silent = false) {
   if (!activeEl) {
     return;
   }
 
   commitChanges();
-  sharedDismissSlashMenu();
+  slash.dismiss();
 
   activeEl.contentEditable = "false";
   activeEl.style.pointerEvents = "";
@@ -288,7 +339,9 @@ export function stopEditing() {
   splitFn = null;
   insertFn = null;
 
-  if (endFn) {
+  if (silent) {
+    endFn = null;
+  } else if (endFn) {
     const fn = endFn;
     endFn = null;
     fn();
@@ -313,6 +366,25 @@ export function getActiveElement() {
   return activeEl;
 }
 
+/**
+ * Get the document path of the currently editing element (null when no session is live).
+ *
+ * @returns {JxPath | null}
+ */
+export function getActivePath() {
+  return activePath;
+}
+
+/**
+ * Whether the DI'd slash menu reports itself open — session-lifecycle guards must not commit-and-
+ * end on a pointerdown that is really a slash-menu interaction.
+ *
+ * @returns {boolean}
+ */
+export function isSlashActive() {
+  return slash.isOpen();
+}
+
 // ─── Event handlers ────────────────────────────────────────────────────────
 
 /** @param {KeyboardEvent} e */
@@ -325,7 +397,7 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   if (e.key === "Enter" && !e.shiftKey) {
-    if (isSlashMenuOpen()) {
+    if (slash.isOpen()) {
       return;
     } // Shared slash menu captures Enter
     e.preventDefault();
@@ -374,17 +446,14 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   // Dismiss slash menu on non-matching keys
-  if (
-    isSlashMenuOpen() &&
-    !["ArrowUp", "ArrowDown", "Enter", "Backspace", "Delete"].includes(e.key)
-  ) {
+  if (slash.isOpen() && !["ArrowUp", "ArrowDown", "Enter", "Backspace", "Delete"].includes(e.key)) {
     // Let the input handler deal with filtering
   }
 }
 
 function handleInput() {
   // Check if slash menu should update or dismiss
-  if (isSlashMenuOpen()) {
+  if (slash.isOpen()) {
     updateSlashMenu();
   }
 }
@@ -392,12 +461,21 @@ function handleInput() {
 /** @param {FocusEvent} _e */
 function handleBlur(_e: FocusEvent) {
   // Don't close if focus moved to slash menu
-  if (isSlashMenuOpen()) {
+  if (slash.isOpen()) {
+    return;
+  }
+
+  // The parent format toolbar/link popover may have taken focus across the bridge — blur must NOT
+  // Tear the session down (Phase 4b-2 focus-loss BLOCKER). Only an explicit commit ends it.
+  if (_blurCloseSuspended) {
     return;
   }
 
   // Delay to allow click events to fire
   setTimeout(() => {
+    if (_blurCloseSuspended) {
+      return;
+    }
     if (activeEl && document.activeElement !== activeEl) {
       stopEditing();
     }
@@ -669,7 +747,7 @@ function openSlashMenu() {
   const range = sel.getRangeAt(0);
   _slashFilterStart = getTextBeforeCursor(range).length;
 
-  sharedShowSlashMenu(activeEl, "", { onSelect: handleSlashSelect });
+  slash.show(activeEl, "", { onSelect: handleSlashSelect });
 }
 
 function updateSlashMenu() {
@@ -679,7 +757,7 @@ function updateSlashMenu() {
 
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) {
-    sharedDismissSlashMenu();
+    slash.dismiss();
     return;
   }
 
@@ -688,12 +766,12 @@ function updateSlashMenu() {
   const slashIdx = fullText.lastIndexOf("/");
 
   if (slashIdx === -1 || fullText.length < _slashFilterStart - 1) {
-    sharedDismissSlashMenu();
+    slash.dismiss();
     return;
   }
 
   const filter = fullText.slice(slashIdx + 1).toLowerCase();
-  sharedShowSlashMenu(activeEl, filter, { onSelect: handleSlashSelect });
+  slash.show(activeEl, filter, { onSelect: handleSlashSelect });
 }
 
 /** @param {SlashCommand} cmd */

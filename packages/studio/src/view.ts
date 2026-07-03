@@ -28,15 +28,6 @@ interface ViewState {
         _editingTarget?: string | null;
       })
     | null;
-  componentInlineEdit: {
-    el: HTMLElement;
-    path: (string | number)[];
-    originalText: string;
-    mediaName: string | null;
-    _outsideHandler?: ((e: MouseEvent) => void) | null;
-    [k: string]: unknown;
-  } | null;
-  inlineEditCleanup: (() => void) | null;
   blockActionBarEl: HTMLElement | null;
   selDragCleanup: (() => void) | null;
   dndCleanups: (() => void)[];
@@ -46,16 +37,9 @@ interface ViewState {
   forcedAttrEl: HTMLElement | null;
   elementsCollapsed: Set<string>;
   elementsFilter: string;
-  lastDragInput: {
-    clientX: number;
-    clientY: number;
-    [k: string]: unknown;
-  } | null;
   _currentDropTargetRow: HTMLElement | null;
   layerDragSourceHeight: number;
-  savedRange: Range | null;
   _completionRegistered: boolean;
-  stylebookElToTag: WeakMap<Element, string>;
   showAddBreakpointForm: boolean;
   addBreakpointPreview: string;
   layoutSelection: unknown;
@@ -81,10 +65,6 @@ export const view: ViewState = {
   monacoEditor: null,
   functionEditor: null,
 
-  // Inline editing
-  componentInlineEdit: null,
-  inlineEditCleanup: null,
-
   // Floating UI containers
   blockActionBarEl: null,
 
@@ -105,16 +85,13 @@ export const view: ViewState = {
   elementsFilter: "",
 
   // Drag interaction
-  lastDragInput: null,
   _currentDropTargetRow: null,
   layerDragSourceHeight: 0,
 
   // Editor state
-  savedRange: null,
   _completionRegistered: false,
 
   // Canvas / stylebook
-  stylebookElToTag: new WeakMap(),
 
   // Responsive breakpoints UI
   showAddBreakpointForm: false,

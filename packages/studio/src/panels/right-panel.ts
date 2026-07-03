@@ -31,7 +31,6 @@ interface RightPanelCtx {
   navigateToComponent: (path: string) => void;
   getCanvasMode: () => string;
   renderCanvas: () => void;
-  updateForcedPseudoPreview: () => void;
 }
 
 let _ctx: RightPanelCtx | null = null;
@@ -223,5 +222,4 @@ function _doRender() {
     console.error("right-panel render error:", error);
   }
   requestAnimationFrame(() => mountQuikChat());
-  _ctx.updateForcedPseudoPreview();
 }

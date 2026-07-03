@@ -16,13 +16,13 @@ import { activeTab } from "../workspace/workspace";
 import { view } from "../view";
 import { getLayerSlot } from "../ui/layers";
 import { findCanvasElement, getActivePanel, panelMediaToActiveMedia } from "./canvas-helpers";
+import { rectOf } from "../utils/geometry";
 import type { TemplateResult } from "lit-html";
 
 let _ctx: {
   getCanvasMode: () => string;
   getZoom: () => number;
   setZoomDirect: (zoom: number) => void;
-  renderStylebookOverlays: () => void;
 };
 
 let _zoomIndicatorEl: HTMLElement | null = null;
@@ -34,14 +34,12 @@ let _zoomIndicatorEl: HTMLElement | null = null;
  *   getCanvasMode: () => string;
  *   getZoom: () => number;
  *   setZoomDirect: (zoom: number) => void;
- *   renderStylebookOverlays: () => void;
  * }} ctx
  */
 export function initCanvasUtils(ctx: {
   getCanvasMode: () => string;
   getZoom: () => number;
   setZoomDirect: (zoom: number) => void;
-  renderStylebookOverlays: () => void;
 }) {
   _ctx = ctx;
 }
@@ -64,14 +62,9 @@ export function canvasPanelTemplate(
   // Which lit runs synchronously during render — before any consumer reads them.
   const panel = {
     _width: width || null,
-    activeBreakpoints: null,
     canvas: null,
-    dropLine: null,
     element: null,
-    liveCtx: null,
     mediaName: mediaName || "",
-    overlay: null,
-    overlayClk: null,
     ready: false,
     renderScope: null,
     scrollContainer: null,
@@ -114,32 +107,6 @@ export function canvasPanelTemplate(
           ${ref((el) => {
             if (el) {
               panel.canvas = el as HTMLElement;
-            }
-          })}
-        ></div>
-        <div
-          class="canvas-panel-overlay"
-          ${ref((el) => {
-            if (el) {
-              panel.overlay = el as HTMLElement;
-            }
-          })}
-        >
-          <div
-            class="canvas-drop-indicator"
-            style="display:none"
-            ${ref((el) => {
-              if (el) {
-                panel.dropLine = el as HTMLElement;
-              }
-            })}
-          ></div>
-        </div>
-        <div
-          class="canvas-panel-click"
-          ${ref((el) => {
-            if (el) {
-              panel.overlayClk = el as HTMLElement;
             }
           })}
         ></div>
@@ -196,10 +163,9 @@ export function applyTransform() {
   const zoom = _ctx.getZoom();
   view.panzoomWrap.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${zoom})`;
   renderZoomIndicator();
+  // Overlays live INSIDE the scaled panzoom-wrap (iframe hosts draw there), so no per-mode redraw
+  // Is needed here — the flush only re-anchors the fixed block-action-bar.
   renderOnly("overlays");
-  if (_ctx.getCanvasMode() === "stylebook") {
-    _ctx.renderStylebookOverlays();
-  }
 }
 
 /** Calculate zoom + pan to fit all panels within the viewport. */
@@ -218,7 +184,7 @@ export function fitToScreen() {
   totalPanelWidth += gap * Math.max(0, canvasPanels.length - 1) + padding;
 
   const zoom = _ctx.getZoom();
-  const wrapRect = view.panzoomWrap.getBoundingClientRect();
+  const wrapRect = rectOf(view.panzoomWrap);
   const unscaledHeight = wrapRect.height / zoom;
   const maxPanelHeight = unscaledHeight + padding;
 
@@ -258,8 +224,8 @@ export function resetZoomIndicator() {
  * @param {{ scrollContainer?: HTMLElement | null }} [panel]
  */
 function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | null }) {
-  const wrapRect = canvasWrap.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
+  const wrapRect = rectOf(canvasWrap);
+  const elRect = rectOf(el);
   const elCenterY = elRect.top + elRect.height / 2 - wrapRect.top;
   const vpCenterY = wrapRect.height / 2;
   const offsetY = vpCenterY - elCenterY;
@@ -270,21 +236,37 @@ function _panToEl(el: HTMLElement, panel?: { scrollContainer?: HTMLElement | nul
       top: panel.scrollContainer.scrollTop - offsetY,
     });
   } else {
-    const startY = view.panY;
-    const targetY = startY + offsetY;
-    const start = performance.now();
-    const duration = 250;
-    const step = (now: number) => {
-      const t = Math.min((now - start) / duration, 1);
-      const ease = t * (2 - t);
-      view.panY = startY + (targetY - startY) * ease;
-      applyTransform();
-      if (t < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-    requestAnimationFrame(step);
+    animatePanBy(offsetY);
   }
+}
+
+/**
+ * Pan the panzoom canvas vertically so a PARENT-VIEWPORT rect is centered — for callers whose
+ * target lives inside an iframe (no parent DOM element to measure; the host converts the measured
+ * iframe rect and passes it here).
+ */
+export function panToParentRect(rect: { top: number; height: number }) {
+  const wrapRect = rectOf(canvasWrap);
+  const elCenterY = rect.top + rect.height / 2 - wrapRect.top;
+  animatePanBy(wrapRect.height / 2 - elCenterY);
+}
+
+/** Animate `view.panY` by `offsetY` with the shared 250ms ease-out. */
+function animatePanBy(offsetY: number) {
+  const startY = view.panY;
+  const targetY = startY + offsetY;
+  const start = performance.now();
+  const duration = 250;
+  const step = (now: number) => {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = t * (2 - t);
+    view.panY = startY + (targetY - startY) * ease;
+    applyTransform();
+    if (t < 1) {
+      requestAnimationFrame(step);
+    }
+  };
+  requestAnimationFrame(step);
 }
 
 /**
@@ -302,16 +284,6 @@ export function panToElement(path: (string | number)[]) {
     return;
   }
   _panToEl(el, panel);
-}
-
-/**
- * Pan the canvas vertically to center a specific DOM element (e.g. stylebook elements).
- *
- * @param {HTMLElement} el
- */
-export function panToCanvasEl(el: HTMLElement) {
-  const panel = getActivePanel();
-  _panToEl(el, panel ?? undefined);
 }
 
 /**
@@ -368,7 +340,7 @@ export function positionZoomIndicator() {
   if (!_zoomIndicatorEl) {
     return;
   }
-  const rect = canvasWrap.getBoundingClientRect();
+  const rect = rectOf(canvasWrap);
   _zoomIndicatorEl.style.left = `${rect.left + rect.width / 2}px`;
   _zoomIndicatorEl.style.top = `${rect.bottom - 32}px`;
   _zoomIndicatorEl.style.transform = "translateX(-50%)";

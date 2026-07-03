@@ -1,6 +1,6 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
-import { describe, test, expect, mock, spyOn } from "bun:test";
-import { buildScope, resolvePrototype } from "../src/runtime";
+import { afterEach, describe, test, expect, mock, spyOn } from "bun:test";
+import { buildScope, resolvePrototype, setResolveToken } from "../src/runtime";
 import { reactive } from "@vue/reactivity";
 import type { JxDocument } from "@jxsuite/schema/types";
 
@@ -533,5 +533,160 @@ describe("resolveServerFunction", () => {
     expect(state.remoteReactive).toBe(null);
     expect(err).toHaveBeenCalled();
     err.mockRestore();
+  });
+});
+
+// ─── setResolveToken / resolveProxyPath (dev-proxy auth token) ────────────────
+//
+// `_resolveToken` is MODULE-GLOBAL state. The afterEach below resets it after
+// Every test, so a leaked token cannot bleed into the bare-path suites above.
+
+describe("setResolveToken / resolveProxyPath", () => {
+  afterEach(() => {
+    setResolveToken(null);
+  });
+
+  /** A bare-specifier $src that always falls through to resolveViaDevProxy. */
+  function bareSpecifierDoc(key: string) {
+    return {
+      state: { v: { $prototype: "Search", $src: `@fake/pkg/${key}.class.json`, q: "x" } },
+    } as unknown as JxDocument;
+  }
+
+  test("calling the setter directly returns undefined (covers the exported setter)", () => {
+    expect(setResolveToken("anything")).toBeUndefined();
+    expect(setResolveToken(null)).toBeUndefined();
+    expect(setResolveToken("")).toBeUndefined();
+  });
+
+  test("default (no token): dev-proxy resolve posts to the BARE /__jx_resolve__", async () => {
+    const posts = installFetch({ proxyValue: () => "ok" });
+    const state = await buildScope(bareSpecifierDoc("default"), {}, BASE);
+    await wait(5);
+    expect(state.v).toBe("ok");
+    expect(posts.length).toBe(1);
+    // No token configured → no "?token=" query appended.
+    expect(posts[0]!.url).toBe("/__jx_resolve__");
+    expect(posts[0]!.url).not.toContain("?token=");
+  });
+
+  test('setResolveToken("abc123"): dev-proxy resolve posts to /__jx_resolve__?token=abc123', async () => {
+    setResolveToken("abc123");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    const state = await buildScope(bareSpecifierDoc("tokened"), {}, BASE);
+    await wait(5);
+    expect(state.v).toBe("ok");
+    expect(posts[0]!.url).toBe("/__jx_resolve__?token=abc123");
+  });
+
+  test("token value is encodeURIComponent-escaped in the query", async () => {
+    // Characters that MUST be percent-encoded: space, &, =, /, +, #.
+    setResolveToken("a b&c=d/e+f#g");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    await buildScope(bareSpecifierDoc("encoded"), {}, BASE);
+    await wait(5);
+    expect(posts[0]!.url).toBe(`/__jx_resolve__?token=${encodeURIComponent("a b&c=d/e+f#g")}`);
+    // Sanity: the raw, un-escaped token must NOT appear verbatim.
+    expect(posts[0]!.url).not.toContain("a b&c=d/e+f#g");
+  });
+
+  test("server-function proxy (/__jx_server__) is token-gated too", async () => {
+    setResolveToken("srv-tok");
+    const posts = installFetch({ proxyValue: () => "served" });
+    const doc = {
+      state: {
+        remote: {
+          $export: "anyFn",
+          $src: "./__gaps_token_missing_server__.js",
+          arguments: { a: "x" },
+          timing: "server",
+        },
+      },
+    } as unknown as JxDocument;
+    const state = await buildScope(doc, {}, "file:///nonexistent/tok/");
+    await wait(5);
+    expect(state.remote).toBe("served");
+    expect(posts[0]!.url).toBe("/__jx_server__?token=srv-tok");
+  });
+
+  test("is idempotent/resettable: setting back to null restores the bare path", async () => {
+    setResolveToken("temp");
+    const first = installFetch({ proxyValue: () => "with-token" });
+    await buildScope(bareSpecifierDoc("reset-a"), {}, BASE);
+    await wait(5);
+    expect(first[0]!.url).toBe("/__jx_resolve__?token=temp");
+
+    // Reset to null mid-test → next resolve must drop the query entirely.
+    setResolveToken(null);
+    const second = installFetch({ proxyValue: () => "no-token" });
+    await buildScope(bareSpecifierDoc("reset-b"), {}, BASE);
+    await wait(5);
+    expect(second[0]!.url).toBe("/__jx_resolve__");
+    expect(second[0]!.url).not.toContain("?token=");
+  });
+
+  test('empty-string token is treated as unset (setResolveToken("") → bare path)', async () => {
+    // The setter normalizes falsy input to null (`token || null`).
+    setResolveToken("");
+    const posts = installFetch({ proxyValue: () => "ok" });
+    await buildScope(bareSpecifierDoc("empty"), {}, BASE);
+    await wait(5);
+    expect(posts[0]!.url).toBe("/__jx_resolve__");
+  });
+});
+
+// ─── observeScope (same-instance reactive observer) ───────────────────────────
+
+describe("observeScope", () => {
+  test("runs immediately, re-runs when a tracked runtime ref/reactive changes, and the disposer stops it", async () => {
+    const { observeScope } = await import("../src/runtime");
+    const state = reactive({ items: null as unknown }) as Record<string, unknown>;
+    const seen: unknown[] = [];
+    const stop = observeScope(() => {
+      seen.push(state.items);
+    });
+    // First run is synchronous.
+    expect(seen).toEqual([null]);
+
+    // A change to the tracked reactive re-runs the observer (same reactivity instance).
+    state.items = [1, 2];
+    expect(seen).toHaveLength(2);
+    expect(seen[1]).toEqual([1, 2]);
+
+    // After the disposer, further changes no longer re-run it.
+    stop();
+    state.items = "later";
+    expect(seen).toHaveLength(2);
+  });
+});
+
+// ─── runScoped (same-instance render scope ownership) ─────────────────────────
+
+describe("runScoped", () => {
+  test("owns renderNode's binding effects: live until stop(), dead after", async () => {
+    const { renderNode: rn, runScoped } = await import("../src/runtime");
+    const state = reactive({ msg: "one" }) as Record<string, unknown>;
+    const { result: el, stop } = runScoped(
+      () => rn({ children: ["${state.msg}"], tagName: "p" }, state) as HTMLElement,
+    );
+    expect(el.textContent).toBe("one");
+
+    // The template effect attached to the runScoped scope and tracks the reactive state.
+    state.msg = "two";
+    expect(el.textContent).toBe("two");
+
+    // After stop() the effect is gone — further state changes leave the DOM untouched.
+    stop();
+    state.msg = "three";
+    expect(el.textContent).toBe("two");
+  });
+
+  test("a throwing fn stops its partial scope and rethrows", async () => {
+    const { runScoped } = await import("../src/runtime");
+    expect(() =>
+      runScoped(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
   });
 });

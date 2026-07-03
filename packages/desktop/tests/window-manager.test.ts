@@ -59,7 +59,6 @@ function makeSession(initialRoot: string | null) {
     setFileEventSink: mock((_sink: unknown) => {}),
     dispose: mock(() => {}),
     handleReadFile: mock(async (_p: { path: string }) => '{"name":"Proj"}'),
-    handleReadFileAsDataUrl: mock(async () => "data:"),
     handleWriteFile: mock(async () => {}),
     handleDeleteFile: mock(async () => {}),
     handleRenameFile: mock(async () => {}),
@@ -145,6 +144,37 @@ void mock.module("../src/updater", () => ({
   getStatus: mock(() => "status"),
 }));
 
+// ─── Mock the studio-asset dir + project-server factory ──────────────────────
+
+void mock.module("../src/canvas-runtime", () => ({
+  studioDir: () => "/fake/studio",
+}));
+
+interface FakeServer {
+  resolveSession: () => { projectRoot: string | null; handlers: Record<string, unknown> } | null;
+  url: string;
+  canvasUrl: string;
+  rpcToken: string;
+  stop: ReturnType<typeof mock>;
+}
+const createdServers: FakeServer[] = [];
+let nextPort = 50_000;
+const createProjectServer = mock((opts: { resolveSession: () => never; studioDir: string }) => {
+  const port = nextPort;
+  nextPort += 1;
+  const url = `http://127.0.0.1:${port}`;
+  const handle: FakeServer = {
+    canvasUrl: `${url}/__studio__/canvas.html`,
+    resolveSession: opts.resolveSession,
+    rpcToken: `tok-${port}`,
+    stop: mock(() => {}),
+    url,
+  };
+  createdServers.push(handle);
+  return handle;
+});
+void mock.module("@jxsuite/server/project-server", () => ({ createProjectServer }));
+
 // ─── Import module under test ────────────────────────────────────────────────
 
 const {
@@ -170,6 +200,8 @@ beforeEach(() => {
   gitInstances.length = 0;
   pkgInstances.length = 0;
   createdWindows.length = 0;
+  createdServers.length = 0;
+  createProjectServer.mockClear();
 });
 
 afterEach(() => {
@@ -192,6 +224,8 @@ describe("openProjectWindow", () => {
     expect(w.opts.title).toBe(`a ${DASH} Jx Studio`);
     expect(w.opts.titleBarStyle).toBe("hidden");
     expect(w.opts.frame).toEqual({ height: 900, width: 1400, x: 0, y: 0 });
+    // Block-all first, then allow the two known origins last (last-match-wins).
+    expect(w.opts.navigationRules).toBe("^*,views://*,http://127.0.0.1:*");
     expect(w.opts.rpc).toBe(rpcObjects.at(-1) as never);
     expect(createProjectSession).toHaveBeenLastCalledWith("/proj/a" as never);
   });
@@ -250,7 +284,6 @@ describe("per-window RPC", () => {
     const pkg = pkgInstances.at(-1)!;
 
     // File / project handlers (each forwards to the window's session).
-    await reqs.readFileAsDataUrl({ path: "a.png" } as never);
     await reqs.deleteFile({ path: "a.json" } as never);
     await reqs.renameFile({ from: "a", to: "b" } as never);
     await reqs.createDirectory({ path: "d" } as never);
@@ -376,6 +409,90 @@ describe("disposeWindow", () => {
     win._closeHandler!();
     expect(session.setProjectRoot).toHaveBeenCalledWith(null);
     expect(listOpenWindows().map((w) => w.projectRoot)).not.toContain("/proj/dispose");
+  });
+});
+
+// ─── Per-window loopback canvas server (always stood up) ─────────────────────
+
+describe("loopback canvas server", () => {
+  test("stands up one per-window server and getCanvasUrl returns its canvas URL", () => {
+    openProjectWindow("/proj/canvas");
+    expect(createProjectServer).toHaveBeenCalledTimes(1);
+    expect(createdServers).toHaveLength(1);
+    const server = createdServers[0]!;
+    // GetCanvasUrl returns the server canvasUrl with the per-window rpcToken appended as a query
+    // Param, so the in-iframe runtime can authenticate its loopback dev-proxy fetches.
+    const got = (lastRequests().getCanvasUrl() as { canvasUrl: string }).canvasUrl;
+    const gotUrl = new URL(got);
+    const expectedUrl = new URL(server.canvasUrl);
+    expect(`${gotUrl.origin}${gotUrl.pathname}`).toBe(
+      `${expectedUrl.origin}${expectedUrl.pathname}`,
+    );
+    expect(gotUrl.searchParams.get("rpcToken")).toBe(server.rpcToken);
+    expect(server.canvasUrl).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/__studio__\/canvas\.html$/);
+  });
+
+  test("getCanvasUrl appends the server rpcToken to the canvas URL", () => {
+    openProjectWindow("/proj/token");
+    // Pin a known canvasUrl + rpcToken on this window's server so the assertion is exact.
+    const server = createdServers[0]!;
+    server.canvasUrl = "http://127.0.0.1:5555/__studio__/canvas.html";
+    server.rpcToken = "TOK123";
+
+    const { canvasUrl } = lastRequests().getCanvasUrl() as { canvasUrl: string };
+    const parsed = new URL(canvasUrl);
+    expect(parsed.pathname).toBe("/__studio__/canvas.html");
+    expect(parsed.host).toBe("127.0.0.1:5555");
+    expect(parsed.searchParams.get("rpcToken")).toBe("TOK123");
+  });
+
+  test("getCanvasUrl returns { canvasUrl: null } when there is no server", () => {
+    // This window's loopback server fails to stand up, so entry.server stays undefined and the
+    // Handler must take the null branch instead of constructing a URL from `undefined`.
+    createProjectServer.mockImplementationOnce(() => undefined as never);
+    openProjectWindow("/proj/noserver");
+    expect(createdServers).toHaveLength(0);
+    expect(lastRequests().getCanvasUrl()).toEqual({ canvasUrl: null });
+  });
+
+  test("the server's session tracks THIS window's projectRoot, no ?win= needed", () => {
+    openProjectWindow("/proj/winA");
+    openProjectWindow("/proj/winB");
+    expect(createdServers).toHaveLength(2);
+    const [a, b] = createdServers;
+    expect(a!.resolveSession()!.projectRoot).toBe("/proj/winA");
+    expect(b!.resolveSession()!.projectRoot).toBe("/proj/winB");
+    // Distinct ports → no cross-window token reuse.
+    expect(a!.url).not.toBe(b!.url);
+  });
+
+  test("the WS handler subset exposes only canvas-facing reads (no writes/git)", async () => {
+    openProjectWindow("/proj/handlers");
+    const session = sessions.at(-1)!;
+    const handlers = createdServers[0]!.resolveSession()!.handlers as Record<
+      string,
+      (p: unknown) => Promise<unknown>
+    >;
+    expect(Object.keys(handlers).toSorted()).toEqual([
+      "jxResolve",
+      "jxServerFunction",
+      "readFile",
+      "resolveSiteContext",
+    ]);
+    await handlers.jxResolve!({ body: "{}" });
+    expect(session.jxResolve).toHaveBeenCalledWith({ body: "{}" });
+    await handlers.readFile!({ path: "p" });
+    expect(session.handleReadFile).toHaveBeenCalledWith({ path: "p" });
+    // No write/git surface leaks onto the loopback server.
+    expect(handlers.writeFile).toBeUndefined();
+    expect(handlers.gitStatus).toBeUndefined();
+  });
+
+  test("disposeWindow stops THIS window's server", () => {
+    openProjectWindow("/proj/teardown");
+    const server = createdServers[0]!;
+    createdWindows.at(-1)!._closeHandler!();
+    expect(server.stop).toHaveBeenCalledTimes(1);
   });
 });
 

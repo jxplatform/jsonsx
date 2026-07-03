@@ -1,6 +1,6 @@
 import "./with-dom.js";
 import { describe, expect, test } from "bun:test";
-import { buildMergeTags } from "../src/editor/merge-tags";
+import { buildMergeTags, buildRepeaterTagsFromFields } from "../src/editor/merge-tags";
 import type { MergeTag } from "../src/editor/merge-tags";
 
 /** Fake a Vue ref so unwrapSignal resolves it. */
@@ -121,5 +121,43 @@ describe("buildMergeTags", () => {
   test("tolerates null state, and a null scope with defined state", () => {
     expect(buildMergeTags(null, null)).toEqual([]);
     expect(tokens(buildMergeTags({ a: 1 }, null))).toEqual(["state.a"]);
+  });
+});
+
+describe("buildRepeaterTagsFromFields", () => {
+  test("emits item / index / item.* with category repeater and label===token", () => {
+    const tags = buildRepeaterTagsFromFields(["item", "index", "item.data.title", "item.id"]);
+    expect(tokens(tags)).toEqual(["item", "index", "item.data.title", "item.id"]);
+    for (const t of tags) {
+      expect(t.category).toBe("repeater");
+      expect(t.label).toBe(t.token);
+      expect(t.hint).toBe(""); // No live value in edit mode.
+    }
+  });
+
+  test("guarantees item + index first even when the input omits them", () => {
+    const tags = buildRepeaterTagsFromFields(["item.name"]);
+    expect(tokens(tags)).toEqual(["item", "index", "item.name"]);
+  });
+
+  test("empty-ish input yields just item + index", () => {
+    expect(tokens(buildRepeaterTagsFromFields([]))).toEqual(["item", "index"]);
+  });
+
+  test("dedupes tokens while preserving first-seen order", () => {
+    const tags = buildRepeaterTagsFromFields([
+      "item",
+      "index",
+      "item.a",
+      "item.a",
+      "index",
+      "item.b",
+    ]);
+    expect(tokens(tags)).toEqual(["item", "index", "item.a", "item.b"]);
+  });
+
+  test("skips empty-string tokens", () => {
+    const tags = buildRepeaterTagsFromFields(["", "item.x", ""]);
+    expect(tokens(tags)).toEqual(["item", "index", "item.x"]);
   });
 });

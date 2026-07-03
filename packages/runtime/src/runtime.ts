@@ -140,9 +140,123 @@ export function setSkipServerFunctions(v: boolean) {
   _serverFnConfig.skip = v;
 }
 
+// ─── Dev-proxy auth token (Studio cross-origin canvas) ────────────────────────
+// The Studio canvas iframe is served from a token-gated loopback origin (createProjectServer): its
+// POST /__jx_resolve__ + /__jx_server__ routes 403 without ?token=<rpcToken>. The iframe boot reads
+// The token from its URL and calls setResolveToken so these dev-proxy fetches authenticate. Unset by
+// Default, leaving production + same-origin dev untouched (bare path, no query appended).
+let _resolveToken: string | null = null;
+export function setResolveToken(token: string | null) {
+  _resolveToken = token || null;
+}
+/** Append the dev-proxy auth token to a privileged resolve path when one is configured. */
+function resolveProxyPath(path: string): string {
+  return _resolveToken ? `${path}?token=${encodeURIComponent(_resolveToken)}` : path;
+}
+
 /** @deprecated No longer needed — ContentCollection/ContentEntry resolve via generic class path */
 export function setSkipContentResolution(_v: boolean) {
   // No-op retained for API compatibility
+}
+
+/**
+ * Observe runtime-created reactive values: runs `fn` immediately inside a reactive effect and
+ * re-runs it whenever a tracked value changes; returns a disposer. Dep tracking in @vue/reactivity
+ * is per module INSTANCE, so an effect created from another copy of the package (e.g. the studio's
+ * own pin) can never track a ref/reactive created here — consumers that want to observe
+ * runtime-resolved scope values (the Studio canvas iframe's dataScope re-post) must use this.
+ *
+ * @param {() => void} fn - Read the reactive values to observe inside this callback.
+ * @returns {() => void} Disposer — stops the effect and its scope.
+ */
+export function observeScope(fn: () => void): () => void {
+  const scope = effectScope(true);
+  scope.run(() => {
+    effect(fn);
+  });
+  return () => scope.stop();
+}
+
+/**
+ * Run `fn` inside a detached reactive scope of THIS module's reactivity instance, returning its
+ * result plus a disposer that stops every effect `fn` created. Callers that render via
+ * {@link renderNode} and later tear the render down (the Studio canvas full render and its surgical
+ * subtree re-renders) MUST use this instead of their own effectScope: scope collection is per
+ * vue-reactivity module instance, so a scope from another copy of the package collects NOTHING and
+ * its stop() silently leaks every binding effect of the superseded render.
+ *
+ * @param {() => T} fn - Work that may create reactive effects (typically a renderNode call).
+ * @returns {{ result: T; stop: () => void }} The callback result and the scope disposer.
+ */
+export function runScoped<T>(fn: () => T): { result: T; stop: () => void } {
+  const scope = effectScope(true);
+  try {
+    const result = scope.run(fn) as T;
+    return { result, stop: () => scope.stop() };
+  } catch (error) {
+    // A throwing fn would otherwise leak the effects it created before failing.
+    scope.stop();
+    throw error;
+  }
+}
+
+/**
+ * Studio-canvas viewport-unit transpose. The canvas iframe is sized to its document's height, so
+ * any viewport unit (`vh`/`vw`/`vmin`/`vmax`/`svh`/…) — which resolves against the iframe ELEMENT —
+ * would feed back into an ever-growing height. When this is on, the runtime transposes them to
+ * CONTAINER units (`cqh`/`cqw`/…) that resolve against the canvas's fixed-size query container (see
+ * `canvas.html`): a predictable, feedback-free stand-in for the viewport. Off (the default) leaves
+ * CSS untouched for real production rendering.
+ */
+let _canvasViewportTranspose = false;
+export function setCanvasViewportTranspose(on: boolean) {
+  _canvasViewportTranspose = on;
+}
+
+const VIEWPORT_UNIT_RE = /(-?\d*\.?\d+)(?:s|l|d)?v(h|w|min|max|i|b)\b/gi;
+const VIEWPORT_UNIT_MAP: Record<string, string> = {
+  b: "cqb",
+  h: "cqh",
+  i: "cqi",
+  max: "cqmax",
+  min: "cqmin",
+  w: "cqw",
+};
+
+/**
+ * Transpose CSS viewport units → container-query units in a value string, but only when the
+ * studio-canvas flag is set (otherwise the value is returned untouched). `100vh` → `100cqh`,
+ * `50svw` → `50cqw`, `10vmin` → `10cqmin`, etc.
+ */
+export function transposeCanvasUnits(value: string): string {
+  if (!_canvasViewportTranspose || !value.includes("v")) {
+    return value;
+  }
+  return value.replace(
+    VIEWPORT_UNIT_RE,
+    (_m, num: string, dim: string) => `${num}${VIEWPORT_UNIT_MAP[dim.toLowerCase()] ?? `cq${dim}`}`,
+  );
+}
+
+/**
+ * Studio-canvas anchor de-linking. In the editor canvas a rendered `<a href>` would navigate the
+ * iframe when clicked, fighting element selection. When this is on, the runtime stamps the value on
+ * `data-jx-href` instead of `href` so the anchor is inert (selectable, not a live link) while the
+ * original target stays recoverable for richer link handling later. Off (the default) leaves
+ * production rendering untouched; the studio sets it for design/edit (not preview — see
+ * iframe-render).
+ */
+let _canvasDelinkAnchors = false;
+export function setCanvasDelinkAnchors(on: boolean) {
+  _canvasDelinkAnchors = on;
+}
+
+/** The attribute name to stamp `key` on `el` under — `href` → `data-jx-href` on de-linked anchors. */
+function canvasAttrName(el: HTMLElement, key: string): string {
+  if (_canvasDelinkAnchors && key === "href" && (el.tagName === "A" || el.tagName === "AREA")) {
+    return "data-jx-href";
+  }
+  return key;
 }
 
 /**
@@ -711,19 +825,22 @@ export function applyStyle(
     if (prop.startsWith("--")) {
       if (isTemplateString(val)) {
         effect(() => {
-          el.style.setProperty(prop, evaluateTemplate(val, state));
+          el.style.setProperty(prop, transposeCanvasUnits(evaluateTemplate(val, state)));
         });
       } else {
-        el.style.setProperty(prop, scalar);
+        el.style.setProperty(prop, transposeCanvasUnits(scalar));
       }
     } else if (isTemplateString(val)) {
       effect(() => {
-        (el.style as unknown as Record<string, string>)[prop] = evaluateTemplate(val, state);
+        (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(
+          evaluateTemplate(val, state),
+        );
       });
     } else if (mediaOverriddenProps.has(prop)) {
+      // Goes through toCSSText (which transposes) — don't double-transpose here.
       baseDecls[prop] = scalar;
     } else {
-      (el.style as unknown as Record<string, string>)[prop] = scalar;
+      (el.style as unknown as Record<string, string>)[prop] = transposeCanvasUnits(scalar);
     }
   }
 
@@ -859,12 +976,13 @@ export function reapplyStyle(
  */
 function applyAttributes(el: HTMLElement, attrs: Record<string, JxAttributeValue>, state: JxScope) {
   for (const [k, v] of Object.entries(attrs)) {
+    const attr = canvasAttrName(el, k);
     if (isRefObj(v)) {
-      effect(() => el.setAttribute(k, String(resolveRef(v.$ref, state) ?? "")));
+      effect(() => el.setAttribute(attr, String(resolveRef(v.$ref, state) ?? "")));
     } else if (isTemplateString(v)) {
-      effect(() => el.setAttribute(k, String(evaluateTemplate(v, state))));
+      effect(() => el.setAttribute(attr, String(evaluateTemplate(v, state))));
     } else {
-      el.setAttribute(k, String(v));
+      el.setAttribute(attr, String(v));
     }
   }
 }
@@ -1549,7 +1667,7 @@ async function resolveViaDevProxy(def: JxPrototypeDef, state: JxScope, key: stri
 
   /** @param {JxScope} resolvedConfig */
   const doResolve = (resolvedConfig: JxScope) =>
-    fetch("/__jx_resolve__", {
+    fetch(resolveProxyPath("/__jx_resolve__"), {
       body: JSON.stringify({
         $base: base,
         $export: def.$export,
@@ -1700,7 +1818,7 @@ async function resolveServerFunctionViaProxy(
 
   /** @param {JxScope} args */
   const doResolve = (args: JxScope) =>
-    fetch("/__jx_server__", {
+    fetch(resolveProxyPath("/__jx_server__"), {
       body: JSON.stringify({
         $base: base,
         $export: def.$export,
@@ -1852,14 +1970,29 @@ export function camelToKebab(s: string) {
 export function toCSSText(rules: Record<string, unknown> | object) {
   return Object.entries(rules)
     .filter(([k, v]) => !isNestedSelector(k) && (v === null || typeof v !== "object"))
-    .map(([p, v]) => `${camelToKebab(p)}: ${v}`)
+    .map(([p, v]) => `${camelToKebab(p)}: ${transposeCanvasUnits(String(v))}`)
     .join("; ");
 }
 
 // ─── Custom Element Registration ──────────────────────────────────────────────
 
-let _rootMedia = {};
+let _rootMedia: Record<string, string> = {};
 const _elementDefs = new Map();
+
+/**
+ * Seed the module-level root `$media` map used as the fallback for components that declare their
+ * own `@--name` style blocks but carry no own `$media` (buildScope ~279-280). `Jx()` sets this from
+ * the document during a full top-level render, but the Studio iframe canvas calls `buildScope`/
+ * `renderNode` directly (never `Jx()`), so without seeding it a component's `@--md` would resolve
+ * to the invalid `@media md`. Callers on the direct path MUST set it (with the merged `$media`)
+ * before `buildScope`, and re-set it every render so a stale map from a previous document cannot
+ * leak.
+ *
+ * @param {Record<string, string>} map
+ */
+export function setRootMedia(map: Record<string, string>): void {
+  _rootMedia = map ?? {};
+}
 
 /**
  * Resolve and register $elements entries (depth-first).
@@ -2000,6 +2133,13 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
     }
 
     async connectedCallback() {
+      // An element carrying `data-jx-definition-root` IS the definition being rendered by an
+      // External renderer (the studio canvas editing this component's own document) — its subtree
+      // Is authored DOM, not an instantiation site. Self-initializing here would wipe that tree
+      // And re-render it with default state (the "component editor shows a live instance" bug).
+      if (this.dataset.jxDefinitionRoot !== undefined) {
+        return;
+      }
       if (this._jxInitialized) {
         return;
       }

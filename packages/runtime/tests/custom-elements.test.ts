@@ -6,6 +6,8 @@ import {
   renderNode as _renderNode,
   buildScope,
   RESERVED_KEYS,
+  applyStyle,
+  setRootMedia,
 } from "../src/runtime";
 
 try {
@@ -164,5 +166,94 @@ describe("Custom Elements", () => {
     expect((el as any).myLabel).toBe("updated");
 
     el.remove();
+  });
+
+  test("data-jx-definition-root suppresses self-initialization (studio edits the definition)", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      children: [{ tagName: "span", textContent: "${state.heading}" }],
+      state: { heading: "Default Heading" },
+      tagName: tag,
+    });
+
+    // An external renderer (the studio canvas) built the definition's tree itself and marked the
+    // Root; connectedCallback must NOT wipe it and re-render a live instance with default state.
+    const el = document.createElement(tag);
+    el.dataset.jxDefinitionRoot = "";
+    const authored = document.createElement("h2");
+    authored.dataset.jxPath = '["children",0]';
+    authored.textContent = "Authored Tree";
+    el.append(authored);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect(el.children).toHaveLength(1);
+    expect(el.firstElementChild).toBe(authored);
+    expect(el.textContent).toBe("Authored Tree");
+
+    // A SIBLING instance without the marker still self-initializes normally.
+    const instance = document.createElement(tag);
+    document.body.append(instance);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+    expect(instance.textContent).toBe("Default Heading");
+
+    el.remove();
+    instance.remove();
+  });
+});
+
+// ─── Phase 5: component @media via the buildScope-direct (iframe) path ────────────
+
+describe("component @media (setRootMedia seeds the iframe path)", () => {
+  test("equal-specificity cascade: base prop → stylesheet rule (not inline) + a real @media rule", () => {
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
+    const el = document.createElement("div");
+    // A base prop that is ALSO overridden under @--md routes to a stylesheet baseDecls rule (NOT
+    // Inline), so the @media rule can win at equal specificity — the whole Phase-5 premise.
+    applyStyle(el, { "@--md": { color: "blue" }, color: "red" }, { "--md": "(min-width: 768px)" });
+    expect(el.style.color).toBe(""); // No inline color.
+    const jxUid = el.dataset.jx;
+    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
+      .textContent;
+    expect(css).toContain(`[data-jx="${jxUid}"] { color: red }`);
+    expect(css).toContain(`@media (min-width: 768px) { [data-jx="${jxUid}"] { color: blue } }`);
+  });
+
+  test("a component with its own @--md and no own $media resolves the real query after setRootMedia", async () => {
+    for (const s of document.head.querySelectorAll("style")) {
+      s.remove();
+    }
+    const tag = uniqueTag();
+    // The component carries an @--md block but NO own $media — it must inherit the root map.
+    await defineElement({
+      state: {},
+      style: { "@--md": { color: "blue" }, color: "red" },
+      tagName: tag,
+    });
+
+    // The iframe path calls buildScope directly (never Jx()); seed the root media first.
+    setRootMedia({ "--md": "(min-width: 768px)" });
+
+    const el = document.createElement(tag);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    const jxUid = el.dataset.jx;
+    const css = (document.head.querySelector(`style[data-jx-owner="${jxUid}"]`) as HTMLStyleElement)
+      .textContent;
+    // The named breakpoint resolved to its real query — NOT the invalid `@media --md`.
+    expect(css).toContain("@media (min-width: 768px)");
+    expect(css).not.toContain("@media --md");
+
+    el.remove();
+    setRootMedia({}); // Reset so the map can't leak into other tests.
   });
 });

@@ -11,7 +11,6 @@ import { flush, installMockPlatform, resetStudioState } from "./harness";
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { activeTab, closeAllTabs, openTab, workspace } from "../src/workspace/workspace";
 import { view } from "../src/view";
-import { canvasPanels } from "../src/store";
 import { resetZoom } from "../src/canvas/canvas-utils";
 import type { Tab } from "../src/tabs/tab";
 
@@ -135,11 +134,11 @@ void mock.module("../src/panels/block-action-bar.ts", () => ({
   initBlockActionBar: (ctx: unknown) => {
     blockBarCtx = ctx;
   },
+  isEditChromeTarget: mock(() => false),
   renderBlockActionBar: mock(() => {}),
 }));
 
 void mock.module("../src/canvas/canvas-render.ts", () => ({
-  applyCanvasMediaOverrides: mock(() => {}),
   initCanvasRender: (ctx: unknown) => {
     canvasRenderCtx = ctx;
   },
@@ -601,6 +600,36 @@ describe("openRecentProject", () => {
     expect(statusMessages).toContain("Opened project: Recent Project");
   });
 
+  test("switching projects refreshes the format registry (stale-cache regression)", async () => {
+    const { formatForPath, loadFormats, setFormats } = await import("../src/format/format-host");
+    // A fresh desktop launch caches a registry with no Markdown (no project open / previous root)…
+    setFormats([]);
+    expect(formatForPath("pages/contact.md")).toBeUndefined();
+    // …and the newly-opened project's backend registry claims .md.
+    (platform as any).listFormats = async () => [
+      {
+        capabilities: { parse: { identifier: "parse", timing: ["client"] } },
+        documentKinds: ["page"],
+        exportTarget: false,
+        extensions: [".md"],
+        mediaType: "text/markdown",
+        name: "Markdown",
+        remote: false,
+        studio: null,
+      },
+    ];
+    try {
+      await toolbarCtx.openRecentProject("/recent/site");
+      await loadFormats();
+      // Without the refreshFormats() in openRecentProject the stale empty cache answers and
+      // Opening any .md fails with "No format class imported".
+      expect(formatForPath("pages/contact.md")?.name).toBe("Markdown");
+    } finally {
+      delete (platform as any).listFormats;
+      setFormats([]);
+    }
+  });
+
   test("reports a missing project.json as an error", async () => {
     const saved = state.files.get("project.json")!;
     state.files.delete("project.json");
@@ -711,45 +740,6 @@ describe("shortcuts context", () => {
     expect(view.panY).toBe(34);
     expect(view.needsCenter).toBe(false);
   });
-
-  test("enterEditOnPath defers via rAF and tolerates a missing canvas panel", async () => {
-    openShellTab();
-    const origRaf = globalThis.requestAnimationFrame;
-    let ran = false;
-    (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
-      ran = true;
-      cb(0);
-      return 0;
-    };
-    try {
-      const ctx = shortcutsGet!();
-      expect(() => ctx.enterEditOnPath(["children", 0])).not.toThrow();
-    } finally {
-      globalThis.requestAnimationFrame = origRaf;
-    }
-    expect(ran).toBe(true);
-  });
-
-  test("enterEditOnPath resolves the element through the active canvas panel", () => {
-    openShellTab();
-    const canvas = document.createElement("div");
-    canvas.innerHTML = "<div><jx-widget>nope</jx-widget></div>";
-    canvasPanels.push({ canvas, mediaName: "base" } as any);
-    const origRaf = globalThis.requestAnimationFrame;
-    (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
-      cb(0);
-      return 0;
-    };
-    try {
-      const ctx = shortcutsGet!();
-      // Path resolves to <jx-widget>, which is not an editable block — no edit session starts.
-      expect(() => ctx.enterEditOnPath(["children", 0])).not.toThrow();
-      expect(view.componentInlineEdit).toBeNull();
-    } finally {
-      globalThis.requestAnimationFrame = origRaf;
-      canvasPanels.length = 0;
-    }
-  });
 });
 
 describe("zoom wiring", () => {
@@ -859,5 +849,15 @@ describe("autosave", () => {
     await captured!();
     expect(write).not.toHaveBeenCalled();
     expect(tab.doc.dirty).toBe(true);
+  });
+});
+
+describe("parent-chrome commit guard", () => {
+  test("a chrome pointerdown with no live edit session is a harmless no-op", () => {
+    // The capture-phase guard registered at init runs on every parent pointerdown; without an
+    // Active edit host (getEditSnapshot().editing false) it must short-circuit silently.
+    expect(() =>
+      document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })),
+    ).not.toThrow();
   });
 });

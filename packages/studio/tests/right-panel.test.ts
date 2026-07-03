@@ -20,7 +20,6 @@ function makeCtx() {
     getCanvasMode: mock(() => "design"),
     navigateToComponent: mock(() => {}),
     renderCanvas: mock(() => {}),
-    updateForcedPseudoPreview: mock(() => {}),
   };
 }
 
@@ -73,7 +72,6 @@ describe("right panel", () => {
       expect(visible.length).toBe(1);
     }
     expect(ctx.getCanvasMode).toHaveBeenCalled();
-    expect(ctx.updateForcedPseudoPreview).toHaveBeenCalled();
   });
 
   test("sp-tabs change handler switches the active tab", async () => {

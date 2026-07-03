@@ -20,6 +20,7 @@ import { isEditing, stopEditing } from "./inline-edit";
 import { copyNode, cutNode, pasteNode } from "./context-menu";
 import { openQuickSearch } from "../panels/quick-search";
 import { showConfirmDialog } from "../ui/layers";
+import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
 
@@ -33,10 +34,8 @@ import type { JxPath } from "../state";
  *   setPan: (x: number, y: number) => void;
  *   applyTransform: () => void;
  *   positionZoomIndicator: () => void;
- *   componentInlineEdit: object | null;
  *   saveFile: () => void;
  *   openProject: () => void;
- *   enterEditOnPath: (path: JxPath) => void;
  * }} getContext
  */
 export function initShortcuts(
@@ -47,10 +46,8 @@ export function initShortcuts(
     setPan: (x: number, y: number) => void;
     applyTransform: () => void;
     positionZoomIndicator: () => void;
-    componentInlineEdit: Record<string, unknown> | null;
     saveFile: () => void;
     openProject: () => void;
-    enterEditOnPath: (path: JxPath) => void;
   },
 ) {
   // Wheel handler: Ctrl+Scroll = zoom (cursor-centered), plain scroll = pan
@@ -58,8 +55,16 @@ export function initShortcuts(
     "wheel",
     (e: WheelEvent) => {
       const { canvasMode, panX, panY, setPan, applyTransform } = getContext();
-      // Edit (content) mode: let the scroll container handle scrolling natively
+      // Edit (content) mode: scroll the edit-mode container ourselves. The canvas iframe is sized to
+      // Its content (no internal scroll) and a cross-origin OOPIF doesn't bubble wheel to the parent,
+      // So the wheel reaches us forwarded (or over the canvas chrome) but never triggers native scroll.
       if (canvasMode === "edit") {
+        const sc = canvasWrap.querySelector<HTMLElement>(".content-edit-canvas");
+        if (sc) {
+          e.preventDefault();
+          sc.scrollTop += e.deltaY;
+          sc.scrollLeft += e.deltaX;
+        }
         return;
       }
       // Manage mode: browse table handles its own scrolling
@@ -69,7 +74,7 @@ export function initShortcuts(
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom towards cursor
-        const rect = canvasWrap.getBoundingClientRect();
+        const rect = rectOf(canvasWrap);
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
         const oldZoom = activeTab.value?.session.ui.zoom ?? 1;
@@ -124,15 +129,7 @@ export function initShortcuts(
   window.addEventListener("resize", () => getContext().positionZoomIndicator());
 
   document.addEventListener("keydown", (e) => {
-    const {
-      canvasMode,
-      setPan,
-      applyTransform,
-      componentInlineEdit,
-      saveFile,
-      openProject,
-      enterEditOnPath,
-    } = getContext();
+    const { canvasMode, setPan, applyTransform, saveFile, openProject } = getContext();
     const tab = activeTab.value;
     const mod = e.ctrlKey || e.metaKey;
 
@@ -163,18 +160,6 @@ export function initShortcuts(
       }
       return;
     }
-    if (componentInlineEdit) {
-      if (mod && e.key === "s") {
-        e.preventDefault();
-        stopEditing();
-        saveFile();
-      }
-      if (mod && e.key === "w") {
-        e.preventDefault();
-      }
-      return;
-    }
-
     if (mod) {
       switch (e.key) {
         case "w": {
@@ -305,7 +290,8 @@ export function initShortcuts(
             mutateInsertNode(t, pp, idx + 1, { tagName: "p", textContent: "" });
             t.session.selection = newPath;
           });
-          enterEditOnPath(newPath);
+          // The iframe canvas re-enters inline edit for the freshly-selected node via its own
+          // Posted enterEdit flow, so no parent-side enterEditOnPath is needed here.
         }
         break;
       }

@@ -1,15 +1,12 @@
-import { resetStudioState, resetWorkspaceWithTab, stubRect } from "./harness";
+import { resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { beforeEach, describe, expect, test } from "bun:test";
 import {
   bubbleInlinePath,
-  effectiveZoom,
   findCanvasElement,
   getActivePanel,
-  initCanvasHelpers,
-  overlayBoxDescriptor,
   panelMediaToActiveMedia,
 } from "../src/canvas/canvas-helpers";
-import { canvasPanels, elToPath } from "../src/store";
+import { canvasPanels } from "../src/store";
 import { closeAllTabs } from "../src/workspace/workspace";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 
@@ -17,33 +14,6 @@ beforeEach(() => {
   resetStudioState();
   canvasPanels.length = 0;
   closeAllTabs();
-});
-
-// ─── effectiveZoom ────────────────────────────────────────────────────────────
-
-describe("effectiveZoom", () => {
-  test("returns 1 in edit (content) mode regardless of zoom", () => {
-    initCanvasHelpers({ getCanvasMode: () => "edit", getZoom: () => 3 });
-    expect(effectiveZoom()).toBe(1);
-  });
-
-  test("returns ctx zoom in design mode", () => {
-    initCanvasHelpers({ getCanvasMode: () => "design", getZoom: () => 2.5 });
-    expect(effectiveZoom()).toBe(2.5);
-  });
-
-  test("falls back to active tab zoom when ctx has no getZoom", () => {
-    const tab = resetWorkspaceWithTab();
-    tab.session.ui.zoom = 1.75;
-    initCanvasHelpers({ getCanvasMode: () => "design" } as never);
-    expect(effectiveZoom()).toBe(1.75);
-  });
-
-  test("falls back to 1 when no tab and no getZoom", () => {
-    closeAllTabs();
-    initCanvasHelpers({ getCanvasMode: () => "preview" } as never);
-    expect(effectiveZoom()).toBe(1);
-  });
 });
 
 // ─── panelMediaToActiveMedia ──────────────────────────────────────────────────
@@ -210,9 +180,8 @@ describe("findCanvasElement", () => {
     expect(findCanvasElement([], canvas)).toBe(root);
   });
 
-  test("walks children indices and verifies via elToPath", () => {
+  test("walks children indices in the rendered DOM", () => {
     const { canvas, p1 } = buildCanvas();
-    elToPath.set(p1, ["children", 1]);
     expect(findCanvasElement(["children", 1], canvas)).toBe(p1);
   });
 
@@ -223,13 +192,11 @@ describe("findCanvasElement", () => {
 
   test("supports cases segments", () => {
     const { canvas, p0 } = buildCanvas();
-    elToPath.set(p0, ["cases", 0]);
     expect(findCanvasElement(["cases", 0], canvas)).toBe(p0);
   });
 
   test("undefined index falls to first child", () => {
     const { canvas, p0 } = buildCanvas();
-    elToPath.set(p0, ["children"]);
     expect(findCanvasElement(["children"], canvas)).toBe(p0);
   });
 
@@ -241,7 +208,6 @@ describe("findCanvasElement", () => {
     wrapper.append(item);
     root.append(wrapper);
     canvas.append(root);
-    elToPath.set(item, ["children", "map"]);
     expect(findCanvasElement(["children", "map"], canvas)).toBe(item);
   });
 
@@ -254,64 +220,12 @@ describe("findCanvasElement", () => {
     perimeter.append(item);
     root.append(p0, perimeter);
     canvas.append(root);
-    elToPath.set(perimeter, ["children", 1]);
-    elToPath.set(item, ["children", 1, "map"]);
     expect(findCanvasElement(["children", 1], canvas)).toBe(perimeter);
     expect(findCanvasElement(["children", 1, "map"], canvas)).toBe(item);
   });
 
-  test("falls back to a full scan when the direct walk dead-ends", () => {
-    const { canvas, p1 } = buildCanvas();
-    // Walk to children[5] fails, but p1 is registered under that path
-    elToPath.set(p1, ["children", 5]);
-    expect(findCanvasElement(["children", 5], canvas)).toBe(p1);
-  });
-
-  test("falls back to a full scan when the walked element path mismatches", () => {
-    const { canvas, p0, p1 } = buildCanvas();
-    elToPath.set(p0, ["children", 99]);
-    elToPath.set(p1, ["children", 0]);
-    expect(findCanvasElement(["children", 0], canvas)).toBe(p1);
-  });
-
-  test("returns null when no element matches", () => {
+  test("returns null when the walk dead-ends past the rendered children", () => {
     const { canvas } = buildCanvas();
-    expect(findCanvasElement(["children", 0], canvas)).toBeNull();
-  });
-});
-
-// ─── overlayBoxDescriptor ─────────────────────────────────────────────────────
-
-describe("overlayBoxDescriptor", () => {
-  function setup() {
-    const viewport = document.createElement("div");
-    viewport.scrollLeft = 10;
-    viewport.scrollTop = 20;
-    stubRect(viewport, { height: 600, left: 100, top: 50, width: 800 });
-    const el = document.createElement("p");
-    stubRect(el, { height: 60, left: 150, top: 80, width: 200 });
-    return { el, panel: { viewport } as never, viewport };
-  }
-
-  test("computes scaled box at zoom 2", () => {
-    initCanvasHelpers({ getCanvasMode: () => "design", getZoom: () => 2 });
-    const { el, panel } = setup();
-    const box = overlayBoxDescriptor(el, "hover", panel);
-    expect(box.cls).toBe("overlay-box overlay-hover");
-    expect(box.left).toBe("30px"); // (150-100+10)/2
-    expect(box.top).toBe("25px"); // (80-50+20)/2
-    expect(box.width).toBe("100px");
-    expect(box.height).toBe("30px");
-  });
-
-  test("edit mode uses scale 1", () => {
-    initCanvasHelpers({ getCanvasMode: () => "edit", getZoom: () => 2 });
-    const { el, panel } = setup();
-    const box = overlayBoxDescriptor(el, "selection", panel);
-    expect(box.cls).toBe("overlay-box overlay-selection");
-    expect(box.left).toBe("60px");
-    expect(box.top).toBe("50px");
-    expect(box.width).toBe("200px");
-    expect(box.height).toBe("60px");
+    expect(findCanvasElement(["children", 5], canvas)).toBeNull();
   });
 });

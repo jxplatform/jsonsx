@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
@@ -77,33 +77,15 @@ const passthroughFetch = mock(async () => new Response("passthrough-body", { sta
 (window as unknown as Record<string, unknown>).fetch = passthroughFetch;
 
 const platform = createDesktopPlatform();
+// The asset observer rewrites relative panel srcs to the loopback origin; set it BEFORE the
+// Synchronous mutation batch below so the observer sees the canvas origin as active.
+const LOOPBACK = "http://127.0.0.1:51999";
+platform.canvasUrl = `${LOOPBACK}/__studio__/canvas.html`;
 
 // ─── Asset-resolution fixture (single synchronous mutation batch) ───────────
 // The happy-dom MutationObserver delivers exactly one batch per observer, so
 // All DOM mutations that should be observed must happen synchronously right
 // After createDesktopPlatform() starts observing.
-
-const assetResponses: Record<string, () => string> = {
-  "assets/pic.png": () => "data:image/png;base64,SU1H",
-  "bg/tile.png": () => "data:image/png;base64,Qkc=",
-  "deep/backdrop.png": () => "data:image/png;base64,REVFUEJH",
-  "deep/inner.png": () => "data:image/png;base64,TkVTVA==",
-  "empty/none.png": () => "",
-  "fail/err.png": () => {
-    throw new Error("io error");
-  },
-  "late/style.png": () => "data:image/png;base64,U1RZ",
-  "media/poster.jpg": () => "data:image/jpeg;base64,UE9TVEVS",
-};
-
-impls.set("readFileAsDataUrl", (params) => {
-  const { path } = params as { path: string };
-  const responder = assetResponses[path];
-  if (!responder) {
-    throw new Error(`unexpected asset path: ${path}`);
-  }
-  return responder();
-});
 
 const imgRelative = document.createElement("img");
 imgRelative.setAttribute("src", "./assets/pic.png");
@@ -128,10 +110,6 @@ const bgDiv = document.createElement("div");
 bgDiv.setAttribute("style", "background-image: url('./bg/tile.png')");
 const bgHttpDiv = document.createElement("div");
 bgHttpDiv.setAttribute("style", "background-image: url('http://example.com/bg.png')");
-const emptyImg = document.createElement("img");
-emptyImg.setAttribute("src", "empty/none.png");
-const failImg = document.createElement("img");
-failImg.setAttribute("src", "fail/err.png");
 const styleLateDiv = document.createElement("div");
 const bgNoneDiv = document.createElement("div");
 bgNoneDiv.setAttribute("style", "background-image: none");
@@ -150,8 +128,6 @@ document.body.append(
   styleWrap,
   bgDiv,
   bgHttpDiv,
-  emptyImg,
-  failImg,
   styleLateDiv,
   "plain text node",
 );
@@ -252,40 +228,13 @@ describe("fetch interception", () => {
     impls.delete("jxServerFunction");
   });
 
-  test("serves views:// URLs via readFile with json mime", async () => {
-    impls.set("readFile", () => '{"hello":"world"}');
+  test("does NOT intercept views:// URLs — they pass through to the original fetch", async () => {
+    // Loopback-only: the canvas doc + assets are served natively over http by the per-window loopback
+    // Server, so there is no views:// read-shim. A views:// URL falls through to the original fetch.
     const res = await window.fetch("views://studio/data/foo.json");
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("application/json");
-    expect(await res.text()).toBe('{"hello":"world"}');
-    expect(lastCall("readFile")!.args[0]).toEqual({ path: "data/foo.json" });
-    impls.delete("readFile");
-  });
-
-  test("falls back to public/ prefix when direct read fails", async () => {
-    impls.set("readFile", (params) => {
-      const { path } = params as { path: string };
-      if (path.startsWith("public/")) {
-        return "public file body";
-      }
-      throw new Error("not found");
-    });
-    const res = await window.fetch("views://studio/notes.txt");
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("text/plain");
-    expect(await res.text()).toBe("public file body");
-    expect(lastCall("readFile")!.args[0]).toEqual({ path: "public/notes.txt" });
-    impls.delete("readFile");
-  });
-
-  test("returns 404 when both reads fail", async () => {
-    impls.set("readFile", () => {
-      throw new Error("nope");
-    });
-    const res = await window.fetch("views://studio/missing.bin");
-    expect(res.status).toBe(404);
-    expect(await res.text()).toBe("Not Found");
-    impls.delete("readFile");
+    expect(res.status).toBe(299);
+    expect(await res.text()).toBe("passthrough-body");
+    expect(callsFor("readFile")).toHaveLength(0);
   });
 
   test("passes other URLs to the original fetch", async () => {
@@ -299,10 +248,39 @@ describe("fetch interception", () => {
 // ─── Platform method delegation ─────────────────────────────────────────────
 
 describe("platform methods", () => {
+  // The asset-observer fixture (module scope) set platform.canvasUrl to LOOPBACK; restore it after
+  // Tests that mutate it so the later asset-resolution describe's observer still sees the origin.
+  afterEach(() => {
+    platform.canvasUrl = `${LOOPBACK}/__studio__/canvas.html`;
+  });
+
   test("identity and activate", async () => {
     expect(platform.id).toBe("desktop");
     expect(platform.projectRoot).toBe("");
     await platform.activate();
+  });
+
+  test("activate stores the loopback canvasUrl returned by getCanvasUrl", async () => {
+    impls.set("getCanvasUrl", () => ({
+      canvasUrl: "http://127.0.0.1:51234/__studio__/canvas.html",
+    }));
+    await platform.activate();
+    expect(platform.canvasUrl).toBe("http://127.0.0.1:51234/__studio__/canvas.html");
+    // A null canvasUrl clears it back to undefined.
+    impls.set("getCanvasUrl", () => ({ canvasUrl: null }));
+    await platform.activate();
+    expect(platform.canvasUrl).toBeUndefined();
+    impls.delete("getCanvasUrl");
+  });
+
+  test("activate leaves canvasUrl unset when the getCanvasUrl RPC throws", async () => {
+    impls.set("getCanvasUrl", () => {
+      throw new Error("rpc down");
+    });
+    platform.canvasUrl = undefined;
+    await platform.activate();
+    expect(platform.canvasUrl).toBeUndefined();
+    impls.delete("getCanvasUrl");
   });
 
   test("openProject delegates with no arguments", async () => {
@@ -499,22 +477,6 @@ describe("platform methods", () => {
     });
   }
 
-  test("resolveAssetUrl returns the data url on success", async () => {
-    impls.set("readFileAsDataUrl", () => "data:image/png;base64,QUJD");
-    const url = await platform.resolveAssetUrl("img.png");
-    expect(url).toBe("data:image/png;base64,QUJD");
-    impls.delete("readFileAsDataUrl");
-  });
-
-  test("resolveAssetUrl returns null on failure", async () => {
-    impls.set("readFileAsDataUrl", () => {
-      throw new Error("nope");
-    });
-    const url = await platform.resolveAssetUrl("img.png");
-    expect(url).toBeNull();
-    impls.delete("readFileAsDataUrl");
-  });
-
   test("discoverComponents includes dir only when provided", async () => {
     await platform.discoverComponents("components");
     expect(lastCall("discoverComponents")!.args[0]).toEqual({ dir: "components" });
@@ -593,14 +555,9 @@ describe("platform methods", () => {
 // Assert on the settled DOM state.
 
 describe("asset resolution via MutationObserver", () => {
-  test("rewrites relative img src to data url", async () => {
+  test("rewrites a relative img src to the loopback origin (no data: fetch)", async () => {
     await flush();
-    expect(imgRelative.getAttribute("src")).toBe("data:image/png;base64,SU1H");
-    expect(
-      callsFor("readFileAsDataUrl").some(
-        (c) => (c.args[0] as { path: string }).path === "assets/pic.png",
-      ),
-    ).toBe(true);
+    expect(imgRelative.getAttribute("src")).toBe(`${LOOPBACK}/assets/pic.png`);
   });
 
   test("leaves absolute, data and views urls untouched", async () => {
@@ -608,36 +565,26 @@ describe("asset resolution via MutationObserver", () => {
     expect(imgHttp.getAttribute("src")).toBe("http://example.com/pic2.png");
     expect(imgData.getAttribute("src")).toBe("data:image/png;base64,AA==");
     expect(imgViews.getAttribute("src")).toBe("views://studio/pic.png");
-    const requestedPaths = callsFor("readFileAsDataUrl").map(
-      (c) => (c.args[0] as { path: string }).path,
-    );
-    expect(requestedPaths.some((p) => p.includes("example.com"))).toBe(false);
-    expect(requestedPaths.some((p) => p.includes("pic2"))).toBe(false);
   });
 
   test("resolves video poster attribute", async () => {
     await flush();
-    expect(video.getAttribute("poster")).toBe("data:image/jpeg;base64,UE9TVEVS");
+    expect(video.getAttribute("poster")).toBe(`${LOOPBACK}/media/poster.jpg`);
   });
 
   test("resolves nested children of an added subtree", async () => {
     await flush();
-    expect(innerImg.getAttribute("src")).toBe("data:image/png;base64,TkVTVA==");
+    expect(innerImg.getAttribute("src")).toBe(`${LOOPBACK}/deep/inner.png`);
   });
 
   test("resolves background images on styled children of an added subtree", async () => {
     await flush();
-    expect(styleChild.style.backgroundImage).toContain("data:image/png;base64,REVFUEJH");
+    expect(styleChild.style.backgroundImage).toContain(`${LOOPBACK}/deep/backdrop.png`);
   });
 
-  test("rewrites style background-image url", async () => {
+  test("rewrites style background-image url to the loopback origin", async () => {
     await flush();
-    expect(bgDiv.style.backgroundImage).toContain("data:image/png;base64,Qkc=");
-    expect(
-      callsFor("readFileAsDataUrl").some(
-        (c) => (c.args[0] as { path: string }).path === "bg/tile.png",
-      ),
-    ).toBe(true);
+    expect(bgDiv.style.backgroundImage).toContain(`${LOOPBACK}/bg/tile.png`);
   });
 
   test("ignores http, none and absent background images", async () => {
@@ -645,25 +592,69 @@ describe("asset resolution via MutationObserver", () => {
     expect(bgHttpDiv.style.backgroundImage).toContain("example.com/bg.png");
     expect(bgNoneDiv.style.backgroundImage).toBe("none");
     expect(plainStyleDiv.style.color).toBe("red");
-    const requestedPaths = callsFor("readFileAsDataUrl").map(
-      (c) => (c.args[0] as { path: string }).path,
-    );
-    expect(requestedPaths.some((p) => p.includes("bg.png"))).toBe(false);
   });
 
   test("reacts to style attribute mutations", async () => {
     await flush();
-    expect(styleLateDiv.style.backgroundImage).toContain("data:image/png;base64,U1RZ");
+    expect(styleLateDiv.style.backgroundImage).toContain(`${LOOPBACK}/late/style.png`);
+  });
+});
+
+// ─── activate() initial sweep ────────────────────────────────────────────────
+// Imgs mounted before activate() resolves carry relative srcs; activate() runs a
+// Synchronous sweep AFTER canvasUrl is set (then drains the observer's queue) so
+// They are rewritten promptly rather than waiting for the next mutation.
+
+describe("activate() initial asset sweep", () => {
+  // Restore the module-scope loopback for any later assertions that depend on it.
+  afterEach(() => {
+    platform.canvasUrl = `${LOOPBACK}/__studio__/canvas.html`;
+    impls.delete("getCanvasUrl");
   });
 
-  test("leaves attribute removed when data url resolution returns empty", async () => {
-    await flush();
-    expect(emptyImg.getAttribute("src")).toBeNull();
+  test("rewrites a pre-mounted relative img to the loopback origin during activate()", async () => {
+    // Clear the origin BEFORE mounting so the observer (if it fires on append) no-ops the img —
+    // Proving the rewrite below is the work of activate()'s synchronous sweep, not the observer.
+    platform.canvasUrl = undefined;
+    const preImg = document.createElement("img");
+    preImg.setAttribute("src", "/images/pre.png");
+    document.body.append(preImg);
+
+    impls.set("getCanvasUrl", () => ({ canvasUrl: `${LOOPBACK}/__studio__/canvas.html` }));
+    await platform.activate();
+    // No further flush(): the sweep ran synchronously inside activate() after canvasUrl resolved.
+    expect(preImg.getAttribute("src")).toBe(`${LOOPBACK}/images/pre.png`);
+    preImg.remove();
   });
 
-  test("swallows data url resolution failures", async () => {
-    await flush();
-    expect(failImg.getAttribute("src")).toBeNull();
+  test("does not throw and leaves relative imgs untouched when canvasUrl is null", async () => {
+    platform.canvasUrl = undefined;
+    const preImg = document.createElement("img");
+    preImg.setAttribute("src", "/images/none.png");
+    document.body.append(preImg);
+
+    impls.set("getCanvasUrl", () => ({ canvasUrl: null }));
+    const result = await platform.activate();
+    expect(result).toBeUndefined();
+    // LoopbackOrigin() is null => the sweep is skipped and the relative src stays put.
+    expect(preImg.getAttribute("src")).toBe("/images/none.png");
+    preImg.remove();
+  });
+
+  test("a sweep failure is caught and does not break activate()", async () => {
+    platform.canvasUrl = undefined;
+    impls.set("getCanvasUrl", () => ({ canvasUrl: `${LOOPBACK}/__studio__/canvas.html` }));
+    // Force resolveAllAssets to throw by making the tree walk blow up; the catch must swallow it.
+    const original = document.documentElement.querySelectorAll.bind(document.documentElement);
+    document.documentElement.querySelectorAll = (() => {
+      throw new Error("sweep boom");
+    }) as typeof document.documentElement.querySelectorAll;
+    try {
+      const result = await platform.activate();
+      expect(result).toBeUndefined();
+    } finally {
+      document.documentElement.querySelectorAll = original;
+    }
   });
 });
 

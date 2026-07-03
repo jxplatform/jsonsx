@@ -288,7 +288,7 @@ describe("jxResolve", () => {
       expect(result).toEqual({ body: '{"resolved":true}', status: 200 });
       const [req, root, third] = mockHandleResolve.mock.calls[0]!;
       expect(root).toBe(FIXTURES);
-      expect(third).toBeNull();
+      expect(third).toBe(FIXTURES);
       expect(req.method).toBe("POST");
       expect(new URL(req.url).pathname).toBe("/__jx_resolve__");
       expect(await req.text()).toBe('{"$prototype":"ContentCollection"}');

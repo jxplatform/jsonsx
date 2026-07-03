@@ -17,7 +17,6 @@ const {
   setFileDialog,
   listDirectory,
   handleReadFile,
-  handleReadFileAsDataUrl,
   handleWriteFile,
   handleDeleteFile,
   handleRenameFile,
@@ -73,6 +72,31 @@ describe("guards", () => {
       cleanup();
     }
   });
+
+  test.skipIf(process.platform === "win32")(
+    "write-path realpath check blocks a symlinked dir that escapes the root",
+    async () => {
+      setup();
+      const { mkdirSync: mkdir, symlinkSync, rmSync: rmTree } = await import("node:fs");
+      const outside = join(import.meta.dir, "_fixtures_handlers_outside");
+      rmTree(outside, { force: true, recursive: true });
+      mkdir(outside, { recursive: true });
+      try {
+        // A symlink INSIDE the project that points to a directory OUTSIDE it. The lexical guard
+        // Alone ("evil/x.txt" has no "..") would pass; the realpath re-check must catch it.
+        symlinkSync(outside, join(FIXTURES, "evil"));
+        await expect(handleWriteFile({ content: "x", path: "evil/x.txt" })).rejects.toThrow(
+          "Path outside project root",
+        );
+        await expect(handleDeleteFile({ path: "evil/x.txt" })).rejects.toThrow(
+          "Path outside project root",
+        );
+      } finally {
+        rmTree(outside, { force: true, recursive: true });
+        cleanup();
+      }
+    },
+  );
 });
 
 // ─── listDirectory ──────────────────────────────────────────────────────────
@@ -870,91 +894,6 @@ describe("handleResolveSiteContext", () => {
         filePath: "orphan/file.json",
       });
       expect(result.sitePath).toBeNull();
-    } finally {
-      cleanup();
-    }
-  });
-});
-
-// ─── handleReadFileAsDataUrl ──────────────────────────────────────────────
-
-describe("handleReadFileAsDataUrl", () => {
-  test("returns data URL for PNG file", async () => {
-    setup();
-    try {
-      const pngData = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
-      writeFileSync(join(FIXTURES, "image.png"), pngData);
-      const result = await handleReadFileAsDataUrl({ path: "image.png" });
-      expect(result).toStartWith("data:image/png;base64,");
-      const base64 = result.replace("data:image/png;base64,", "");
-      expect(Buffer.from(base64, "base64")).toEqual(pngData);
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("detects JPEG mime type", async () => {
-    setup();
-    try {
-      writeFileSync(join(FIXTURES, "photo.jpg"), Buffer.from([0xff, 0xd8]));
-      const result = await handleReadFileAsDataUrl({ path: "photo.jpg" });
-      expect(result).toStartWith("data:image/jpeg;base64,");
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("detects SVG mime type", async () => {
-    setup();
-    try {
-      writeFileSync(join(FIXTURES, "icon.svg"), "<svg></svg>");
-      const result = await handleReadFileAsDataUrl({ path: "icon.svg" });
-      expect(result).toStartWith("data:image/svg+xml;base64,");
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("uses octet-stream for unknown extensions", async () => {
-    setup();
-    try {
-      writeFileSync(join(FIXTURES, "file.xyz"), "data");
-      const result = await handleReadFileAsDataUrl({ path: "file.xyz" });
-      expect(result).toStartWith("data:application/octet-stream;base64,");
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("falls back to public/ directory", async () => {
-    setup();
-    try {
-      mkdirSync(join(FIXTURES, "public"), { recursive: true });
-      writeFileSync(join(FIXTURES, "public", "logo.png"), Buffer.from([0x89, 0x50]));
-      const result = await handleReadFileAsDataUrl({ path: "logo.png" });
-      expect(result).toStartWith("data:image/png;base64,");
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("throws for non-existent file in both root and public/", async () => {
-    setup();
-    try {
-      await expect(handleReadFileAsDataUrl({ path: "missing.png" })).rejects.toThrow(
-        "File not found",
-      );
-    } finally {
-      cleanup();
-    }
-  });
-
-  test("rejects path traversal", async () => {
-    setup();
-    try {
-      await expect(handleReadFileAsDataUrl({ path: "../../etc/passwd" })).rejects.toThrow(
-        "Path outside project root",
-      );
     } finally {
       cleanup();
     }

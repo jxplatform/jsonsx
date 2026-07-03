@@ -126,6 +126,13 @@ export interface RenameResult {
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
+  /**
+   * URL of the canvas iframe document. Optional: when set (chromium serves it from the project
+   * server under the studio namespace), the iframe host uses it; otherwise the host falls back to
+   * the default dev-server path. Not keyed on `id` — chromium and electrobun both report `id:
+   * "desktop"`, but only chromium sets this.
+   */
+  canvasUrl?: string;
   activate: (root?: string) => Promise<void>;
   openProject: () => Promise<{
     config: ProjectConfig;
@@ -252,34 +259,16 @@ export interface CanvasPanel {
   mediaName: string;
   element: HTMLElement;
   canvas: HTMLElement;
-  overlay: HTMLElement;
-  overlayClk: HTMLElement;
   viewport: HTMLElement;
   scrollContainer: HTMLElement;
-  dropLine: HTMLElement;
   _width: number | null;
   /** True when the panel's DOM reflects the current document via a successful live render. */
   ready: boolean;
-  /** Breakpoints active for this panel's width (persisted for surgical patch re-application). */
-  activeBreakpoints: Set<string> | null;
-  /** Render context captured from the last successful live render (null until then). */
-  liveCtx: PanelLiveCtx | null;
   /**
    * Effect scope owning the reactive effects created while rendering this panel's content
    * (including child scopes from surgical subtree renders). Stopped when panels are rebuilt.
    */
   renderScope: { stop: () => void; run: <T>(fn: () => T) => T | undefined } | null;
-}
-
-/** Per-panel context persisted by a successful live render so patches can re-render subtrees. */
-export interface PanelLiveCtx {
-  scope: Record<string, unknown>;
-  canvasMode: string;
-  layoutWrapped: boolean;
-  pageContentPrefix: (string | number)[] | null;
-  pageContentOffset: number;
-  arrayPaths: Set<string>;
-  pathMapper: (created: Node, path: (string | number)[], def: unknown) => void;
 }
 
 export interface DocumentStackEntry {

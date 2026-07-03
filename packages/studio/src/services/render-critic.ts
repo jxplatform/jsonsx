@@ -13,9 +13,8 @@
  * @license MIT
  */
 
-import { buildScope, renderNode, setSkipServerFunctions } from "@jxsuite/runtime";
+import { buildScope, renderNode, runScoped, setSkipServerFunctions } from "@jxsuite/runtime";
 import type { JxDocument } from "@jxsuite/schema/types";
-import { effectScope } from "../reactivity";
 
 /**
  * Translate a render-time error into an actionable message the model can fix.
@@ -51,25 +50,26 @@ function translateRenderError(err: Error): string {
 export async function renderCheck(
   doc: JxDocument,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const scope = effectScope();
+  let stopRender: (() => void) | null = null;
   try {
     setSkipServerFunctions(true);
 
     const state = await buildScope(doc, {});
 
     const container = document.createElement("div");
-    scope.run(() => {
+    const { stop } = runScoped(() => {
       container.append(renderNode(doc, state));
     });
+    stopRender = stop;
 
     return { ok: true };
   } catch (error) {
     return { ok: false, error: translateRenderError(error as Error) };
   } finally {
-    // Dispose all effects created synchronously by renderNode. Effects from the async
-    // BuildScope (prototype/computed setup) escape the scope because Vue tracks the active
-    // Scope synchronously — they're GC-eligible once the throwaway state/container are
-    // Unreferenced. This bounded leak is acceptable for v1.
-    scope.stop();
+    // Dispose all effects created synchronously by renderNode via the RUNTIME's runScoped — scope
+    // Collection is per @vue/reactivity module instance, so a studio effectScope here would collect
+    // Nothing. Effects from the async buildScope (prototype/computed setup) still escape the scope;
+    // They're GC-eligible once the throwaway state/container are unreferenced. Bounded, acceptable.
+    stopRender?.();
   }
 }

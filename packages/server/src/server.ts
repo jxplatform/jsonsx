@@ -212,6 +212,14 @@ export async function createDevServer(options: {
   // Bundle cache for npm packages (bare specifier → bundled JS)
   const bundleCache = new Map<string, string>();
 
+  // Dev-server cache policy: always revalidate. Without any Cache-Control the browser HEURISTICALLY
+  // Caches responses (there are no validators either), so a plain reload can serve a stale
+  // Studio.js/canvas bundle — which shows up as half-updated UI after a rebuild (the iframe assets
+  // Are query-cache-busted per mount, the parent bundle is not).
+  const NO_CACHE = { "Cache-Control": "no-cache" };
+  const fileResponse = (file: ReturnType<typeof Bun.file>) =>
+    new Response(file, { headers: NO_CACHE });
+
   // Active studio project root (set via /__studio/activate, used for static file fallback)
   let activeProjectRoot: string | null = null;
 
@@ -289,7 +297,7 @@ export async function createDevServer(options: {
       if (activeProjectRoot && normSep(fsPath).startsWith(normSep(activeProjectRoot))) {
         const file = Bun.file(fsPath);
         if (await file.exists()) {
-          return new Response(file);
+          return fileResponse(file);
         }
       }
 
@@ -299,12 +307,12 @@ export async function createDevServer(options: {
         if (activeProjectRoot) {
           const projectFile = Bun.file(resolve(activeProjectRoot, `.${path}`));
           if (await projectFile.exists()) {
-            return new Response(projectFile);
+            return fileResponse(projectFile);
           }
           // Mirror production: public/ contents are served at root
           const publicFile = Bun.file(resolve(activeProjectRoot, "public", `.${path}`));
           if (await publicFile.exists()) {
-            return new Response(publicFile);
+            return fileResponse(publicFile);
           }
         }
 
@@ -331,6 +339,7 @@ export async function createDevServer(options: {
           if (bundled) {
             return new Response(bundled, {
               headers: {
+                ...NO_CACHE,
                 "Content-Type": "application/javascript; charset=utf-8",
               },
             });
@@ -346,11 +355,11 @@ export async function createDevServer(options: {
       if (handleSSE && path.endsWith(".html") && !path.startsWith("/packages/studio/")) {
         const html = await file.text();
         return new Response(injectSSE(html), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
+          headers: { ...NO_CACHE, "Content-Type": "text/html; charset=utf-8" },
         });
       }
 
-      return new Response(file);
+      return fileResponse(file);
     },
 
     port,

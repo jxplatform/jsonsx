@@ -216,6 +216,6 @@ describe("chromium platform: search, formats and packages", () => {
 
 describe("chromium platform: AI assistant endpoints", () => {
   test("aiChatUrl points at the chromium AI chat route", () => {
-    expect(platform.aiChatUrl()).toBe("/studio/ai/chat");
+    expect(platform.aiChatUrl()).toBe("/__studio__/ai/chat");
   });
 });

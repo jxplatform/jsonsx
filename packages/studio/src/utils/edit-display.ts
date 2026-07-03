@@ -10,6 +10,19 @@ import type { JxMutableNode } from "@jxsuite/schema/types";
 const mediaTags = new Set(["img", "video", "source", "iframe", "audio"]);
 const TRANSPARENT_PX =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+// A neutral, visible gray placeholder for image-like bindings in edit mode (e.g. a component `image`
+// Prop bound to ${...}). The component renders <img src={prop}> internally, so a transparent pixel
+// Would collapse to nothing — a gray SVG box reads as an intentional placeholder instead.
+const PLACEHOLDER_IMG =
+  "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='32'%20height='32'%3E%3Crect%20width='32'%20height='32'%20fill='%23d0d0d0'/%3E%3C/svg%3E";
+
+// Prop/attribute names that feed an <img>/background, so a ${...} binding would otherwise render a
+// Broken image in edit mode. Matched by exact name or common camelCase suffix (featuredImage, heroBg).
+const IMAGE_KEY_RE =
+  /(src|poster|image|bg|background|icon|logo|photo|avatar|thumbnail|cover|banner)$/i;
+function isImageUrlKey(key: string): boolean {
+  return IMAGE_KEY_RE.test(key);
+}
 
 const textTags = new Set([
   "p",
@@ -197,8 +210,15 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
       const propsOut: Record<string, unknown> = {};
       for (const [pk, pv] of Object.entries(v)) {
         if (typeof pv === "string" && pv.includes("${")) {
-          const isUrlAttr = pk === "src" || pk === "href" || pk === "poster" || pk === "action";
-          propsOut[pk] = isUrlAttr ? "" : templateToEditDisplay(pv);
+          // Image-like prop → neutral placeholder (the component renders it as an <img src>); link
+          // Targets → inert ""; everything else → the readable ❪ expr ❫ binding text.
+          if (isImageUrlKey(pk)) {
+            propsOut[pk] = PLACEHOLDER_IMG;
+          } else if (pk === "href" || pk === "action") {
+            propsOut[pk] = "";
+          } else {
+            propsOut[pk] = templateToEditDisplay(pv);
+          }
         } else if (pv && typeof pv === "object" && (pv as Record<string, unknown>).$ref) {
           const ref = (pv as Record<string, unknown>).$ref as string;
           const label = ref.startsWith("#/state/") ? ref.slice(8) : ref;

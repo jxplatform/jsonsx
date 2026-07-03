@@ -7,15 +7,15 @@ import {
   fitToScreen,
   initCanvasUtils,
   observeCenterUntilStable,
-  panToCanvasEl,
   panToElement,
+  panToParentRect,
   positionZoomIndicator,
   renderZoomIndicator,
   resetZoom,
   resetZoomIndicator,
   updateActivePanelHeaders,
 } from "../src/canvas/canvas-utils";
-import { canvasPanels, canvasWrap, elToPath, initShellRefs, registerRenderer } from "../src/store";
+import { canvasPanels, canvasWrap, initShellRefs, registerRenderer } from "../src/store";
 import { view } from "../src/view";
 import type { CanvasPanel } from "../src/types";
 
@@ -26,7 +26,6 @@ let canvasMode = "design";
 const setZoomDirect = mock((z: number) => {
   zoom = z;
 });
-const renderStylebookOverlays = mock(() => {});
 const overlaysRenderer = mock(() => {});
 registerRenderer("overlays", overlaysRenderer);
 
@@ -68,7 +67,6 @@ beforeEach(() => {
   zoom = 1;
   canvasMode = "design";
   setZoomDirect.mockClear();
-  renderStylebookOverlays.mockClear();
   overlaysRenderer.mockClear();
   canvasPanels.length = 0;
   view.panzoomWrap = null;
@@ -79,7 +77,6 @@ beforeEach(() => {
   initCanvasUtils({
     getCanvasMode: () => canvasMode,
     getZoom: () => zoom,
-    renderStylebookOverlays,
     setZoomDirect,
   });
 });
@@ -98,10 +95,6 @@ describe("canvasPanelTemplate", () => {
     expect(panel.element?.classList.contains("canvas-panel")).toBe(true);
     expect(panel.viewport?.classList.contains("canvas-panel-viewport")).toBe(true);
     expect(panel.canvas?.classList.contains("canvas-panel-canvas")).toBe(true);
-    expect(panel.overlay?.classList.contains("canvas-panel-overlay")).toBe(true);
-    expect(panel.overlayClk?.classList.contains("canvas-panel-click")).toBe(true);
-    expect(panel.dropLine?.classList.contains("canvas-drop-indicator")).toBe(true);
-    expect(panel.dropLine?.style.display).toBe("none");
     expect(panel.mediaName).toBe("md");
     expect(panel._width).toBe(768);
     expect(panel.ready).toBe(false);
@@ -198,14 +191,14 @@ describe("applyTransform", () => {
     applyTransform();
     expect(wrap.style.transform).toBe("translate(10px, 20px) scale(2)");
     expect(overlaysRenderer).toHaveBeenCalled();
-    expect(renderStylebookOverlays).not.toHaveBeenCalled();
   });
 
-  test("re-renders stylebook overlays in stylebook mode", () => {
+  test("stylebook mode needs no per-mode overlay redraw (iframe overlays live in the wrap)", () => {
     makePanzoomWrap();
     canvasMode = "stylebook";
+    overlaysRenderer.mockClear();
     applyTransform();
-    expect(renderStylebookOverlays).toHaveBeenCalled();
+    expect(overlaysRenderer).toHaveBeenCalled();
   });
 });
 
@@ -380,7 +373,7 @@ describe("observeCenterUntilStable", () => {
   });
 });
 
-// ─── panToElement / panToCanvasEl ─────────────────────────────────────────────
+// ─── panToElement / panToParentRect ───────────────────────────────────────────
 
 function makeRenderedPanel(opts: { scrollContainer?: HTMLElement | null } = {}) {
   const canvas = document.createElement("div");
@@ -388,7 +381,6 @@ function makeRenderedPanel(opts: { scrollContainer?: HTMLElement | null } = {}) 
   const target = document.createElement("p");
   root.append(target);
   canvas.append(root);
-  elToPath.set(target, ["children", 0]);
   const panel = {
     canvas,
     mediaName: "base",
@@ -456,12 +448,10 @@ describe("panToElement", () => {
   });
 });
 
-describe("panToCanvasEl", () => {
-  test("pans to an arbitrary element with no active panel", () => {
+describe("panToParentRect", () => {
+  test("pans by the parent-viewport rect (the stylebook pan-to-card entry point)", () => {
     makePanzoomWrap();
-    const el = document.createElement("div");
     stubRect(canvasWrap, { height: 600, top: 0 });
-    stubRect(el, { height: 0, top: 0 });
 
     globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => {
       cb(performance.now() + 1000);
@@ -469,7 +459,7 @@ describe("panToCanvasEl", () => {
     }) as typeof requestAnimationFrame;
 
     view.panY = 50;
-    panToCanvasEl(el);
+    panToParentRect({ height: 0, top: 0 });
     // OffsetY = 300 → target = 350
     expect(view.panY).toBeCloseTo(350);
   });

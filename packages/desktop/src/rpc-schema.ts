@@ -137,10 +137,6 @@ export interface StudioRPC {
         params: { path: string };
         response: string;
       };
-      readFileAsDataUrl: {
-        params: { path: string };
-        response: string;
-      };
       writeFile: {
         params: { path: string; content: string };
         response: void;
@@ -377,6 +373,11 @@ export interface StudioRPC {
       getProjectRoot: {
         params: void;
         response: { root: string | null };
+      };
+      // Phase 7: the cross-origin loopback canvas URL for this window, or null on the views:// path.
+      getCanvasUrl: {
+        params: void;
+        response: { canvasUrl: string | null };
       };
       listOpenWindows: {
         params: void;

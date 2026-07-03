@@ -1,4 +1,4 @@
-import { computed, reactive } from "../reactivity";
+import { computed, reactive, toRaw } from "../reactivity";
 import { createTab, disposeTab } from "../tabs/tab";
 import type { Tab } from "../tabs/tab";
 
@@ -55,6 +55,19 @@ export const workspace: Workspace = reactive({
 export const activeTab = computed(() =>
   workspace.activeTabId ? (workspace.tabs.get(workspace.activeTabId) ?? null) : null,
 ) as unknown as ComputedRef<Tab | null>;
+
+/**
+ * Whether `tab` is the active tab. Identity check survives reactive-proxy wrapping (activeTab.value
+ * is a proxy; callers may hold either the raw tab or a proxy of it).
+ *
+ * @param {Tab | null} tab
+ */
+export function isTabActive(tab: Tab | null): boolean {
+  const active = activeTab.value;
+  return (
+    tab !== null && active !== null && toRaw(active as object) === toRaw(tab as unknown as object)
+  );
+}
 
 /**
  * Open a new tab and make it active.

@@ -179,6 +179,18 @@ describe("createDevServer", () => {
       expect(await res.text()).toBe("hello root");
     });
 
+    test("static responses carry Cache-Control: no-cache (dev must never serve stale bundles)", async () => {
+      // Without this the browser heuristically caches (no validators either) — a plain reload can
+      // Then serve a stale studio.js while the query-cache-busted iframe assets update, leaving a
+      // Half-updated editor.
+      const staticRes = await fetch(`${base}/hello.txt`);
+      expect(staticRes.headers.get("cache-control")).toBe("no-cache");
+      const builtRes = await fetch(`${base}/dist/entry.js`);
+      expect(builtRes.headers.get("cache-control")).toBe("no-cache");
+      const htmlRes = await fetch(`${base}/page.html`);
+      expect(htmlRes.headers.get("cache-control")).toBe("no-cache");
+    });
+
     test("serves html without SSE injection when watch is off", async () => {
       const res = await fetch(`${base}/page.html`);
       expect(res.status).toBe(200);

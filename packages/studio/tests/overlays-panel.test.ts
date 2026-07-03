@@ -1,63 +1,36 @@
 /**
- * Overlays panel — hover/selection overlay boxes per canvas panel, pointer-event gating per canvas
- * mode, and block-action-bar delegation.
+ * Overlays panel — the iframe canvas owns hit-testing and draws its own hover/selection boxes
+ * inside each host's overlay layer, so this panel is a thin reactive delegate: it keeps
+ * panel-header highlighting in sync and re-renders the block-action-bar on tracked session changes
+ * (selection, hover, mode, activeMedia).
  */
-import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
+import { flush, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { mount, render, unmount } from "../src/panels/overlays";
-import { canvasPanels, elToPath } from "../src/store";
-import { initCanvasHelpers } from "../src/canvas/canvas-helpers";
-import { layoutElements } from "../src/canvas/canvas-live-render";
+import { canvasPanels } from "../src/store";
 import { activeTab, closeAllTabs } from "../src/workspace/workspace";
-import { view } from "../src/view";
 import type { CanvasPanel } from "../src/types";
 
 let canvasMode = "design";
-let zoom = 1;
 let isEditingFlag = false;
 let renderBlockActionBar: ReturnType<typeof mock>;
 
-interface FakePanel {
-  panel: CanvasPanel;
-  rootEl: HTMLElement;
-  childEl: HTMLElement;
-}
-
-function makePanel(mediaName = "base"): FakePanel {
+/** A minimal iframe-era panel: element + header for the active-highlight sync. */
+function makePanel(mediaName = "base"): CanvasPanel {
   const element = document.createElement("div");
+  const header = document.createElement("div");
+  header.className = "canvas-panel-header";
   const canvas = document.createElement("div");
-  const overlay = document.createElement("div");
-  const overlayClk = document.createElement("div");
-  const viewport = document.createElement("div");
-  const dropLine = document.createElement("div");
-  dropLine.className = "drop-line";
-
-  const rootEl = document.createElement("div");
-  const childEl = document.createElement("p");
-  rootEl.append(childEl);
-  canvas.append(rootEl);
-  viewport.append(canvas);
-  element.append(viewport, overlay, overlayClk);
+  element.append(header, canvas);
   document.body.append(element);
-
-  elToPath.set(rootEl, []);
-  elToPath.set(childEl, ["children", 0]);
-
-  stubRect(viewport, { height: 600, left: 100, top: 50, width: 800 });
-  stubRect(rootEl, { height: 500, left: 110, top: 60, width: 700 });
-  stubRect(childEl, { height: 40, left: 130, top: 90, width: 200 });
 
   const panel = {
     canvas,
-    dropLine,
     element,
     mediaName,
-    overlay,
-    overlayClk,
-    viewport,
   } as unknown as CanvasPanel;
   canvasPanels.push(panel);
-  return { childEl, panel, rootEl };
+  return panel;
 }
 
 async function mountAndFlush() {
@@ -72,12 +45,8 @@ async function mountAndFlush() {
 beforeEach(() => {
   document.body.innerHTML = "";
   canvasMode = "design";
-  zoom = 1;
   isEditingFlag = false;
-  view.componentInlineEdit = null;
-  view.selDragCleanup = null;
   renderBlockActionBar = mock(() => {});
-  initCanvasHelpers({ getCanvasMode: () => canvasMode, getZoom: () => zoom });
   resetWorkspaceWithTab({
     children: [{ tagName: "p", textContent: "Hello" }],
     tagName: "div",
@@ -91,178 +60,63 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("overlays — design mode boxes", () => {
-  test("renders a selection box on the active panel with scaled geometry", async () => {
-    const { panel } = makePanel();
+describe("overlays — header sync", () => {
+  test("the flush highlights the active panel's header", async () => {
+    const base = makePanel("base");
+    const md = makePanel("md");
+    activeTab.value!.session.ui.activeMedia = "md";
+    await mountAndFlush();
+    expect(md.element.querySelector(".canvas-panel-header")?.classList.contains("active")).toBe(
+      true,
+    );
+    expect(base.element.querySelector(".canvas-panel-header")?.classList.contains("active")).toBe(
+      false,
+    );
+  });
+
+  test("panels' DOM is otherwise untouched (the iframe draws its own overlays)", async () => {
+    const panel = makePanel();
+    const marker = document.createElement("div");
+    panel.canvas.append(marker);
     activeTab.value!.session.selection = ["children", 0];
     await mountAndFlush();
-
-    const box = panel.overlay.querySelector(".overlay-selection") as HTMLElement;
-    expect(box).not.toBeNull();
-    const style = box.getAttribute("style") ?? "";
-    expect(style).toContain("top:40px");
-    expect(style).toContain("left:30px");
-    expect(style).toContain("width:200px");
-    expect(style).toContain("height:40px");
-    expect(panel.overlay.querySelector(".drop-line")).not.toBeNull();
-    expect(renderBlockActionBar).toHaveBeenCalled();
-    expect(panel.overlayClk.style.pointerEvents).toBe("");
-  });
-
-  test("zoom scales overlay box geometry", async () => {
-    zoom = 2;
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
-    await mountAndFlush();
-    const style = panel.overlay.querySelector(".overlay-selection")!.getAttribute("style") ?? "";
-    expect(style).toContain("top:20px");
-    expect(style).toContain("left:15px");
-    expect(style).toContain("width:100px");
-    expect(style).toContain("height:20px");
-  });
-
-  test("hover distinct from selection renders a hover box", async () => {
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
-    activeTab.value!.session.hover = [];
-    await mountAndFlush();
-    const hover = panel.overlay.querySelector(".overlay-hover") as HTMLElement;
-    expect(hover).not.toBeNull();
-    expect(hover.getAttribute("style")).toContain("width:700px");
-    expect(panel.overlay.querySelector(".overlay-selection")).not.toBeNull();
-  });
-
-  test("hover equal to selection renders no hover box", async () => {
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
-    activeTab.value!.session.hover = ["children", 0];
-    await mountAndFlush();
-    expect(panel.overlay.querySelector(".overlay-hover")).toBeNull();
-  });
-
-  test("layout elements get the layout class and badge", async () => {
-    const { panel, childEl } = makePanel();
-    layoutElements.add(childEl);
-    activeTab.value!.session.selection = ["children", 0];
-    activeTab.value!.session.hover = ["children", 0];
-    await mountAndFlush();
-    const box = panel.overlay.querySelector(".overlay-selection") as HTMLElement;
-    expect(box.classList.contains("overlay-layout")).toBe(true);
-    expect(box.querySelector(".overlay-layout-badge")!.textContent).toBe("Layout");
-  });
-
-  test("editing mode hides the selection border and disables overlay clicks", async () => {
-    isEditingFlag = true;
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
-    await mountAndFlush();
-    expect(panel.overlayClk.style.pointerEvents).toBe("none");
-    const style = panel.overlay.querySelector(".overlay-selection")!.getAttribute("style") ?? "";
-    expect(style).toContain("border:none");
-  });
-
-  test("componentInlineEdit also disables overlay clicks", async () => {
-    view.componentInlineEdit = {} as never;
-    const { panel } = makePanel();
-    await mountAndFlush();
-    expect(panel.overlayClk.style.pointerEvents).toBe("none");
-  });
-
-  test("selection on a non-active panel renders no selection box there", async () => {
-    const first = makePanel("base");
-    const second = makePanel("--tablet");
-    activeTab.value!.session.selection = ["children", 0];
-    activeTab.value!.session.ui.activeMedia = "--tablet";
-    await mountAndFlush();
-    expect(first.panel.overlay.querySelector(".overlay-selection")).toBeNull();
-    expect(second.panel.overlay.querySelector(".overlay-selection")).not.toBeNull();
-  });
-
-  test("panels without a viewport are skipped", async () => {
-    const { panel } = makePanel();
-    (panel as unknown as { viewport: null }).viewport = null;
-    activeTab.value!.session.selection = ["children", 0];
-    await mountAndFlush();
-    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
-    expect(renderBlockActionBar).toHaveBeenCalled();
-  });
-
-  test("selection path that resolves to no canvas element renders no box", async () => {
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 99];
-    await mountAndFlush();
-    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
-  });
-
-  test("design render runs a pending selDragCleanup", async () => {
-    makePanel();
-    const cleanup = mock(() => {});
-    view.selDragCleanup = cleanup as unknown as () => void;
-    await mountAndFlush();
-    expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(view.selDragCleanup).toBeNull();
-  });
-});
-
-describe("overlays — mode gating", () => {
-  test("preview mode clears overlays, disables clicks, and runs selDragCleanup", async () => {
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
-    await mountAndFlush();
-    expect(panel.overlay.querySelector(".overlay-selection")).not.toBeNull();
-
-    canvasMode = "preview";
-    const cleanup = mock(() => {});
-    view.selDragCleanup = cleanup as unknown as () => void;
-    renderBlockActionBar.mockClear();
-    render();
-    await flush();
-    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
-    expect(panel.overlayClk.style.pointerEvents).toBe("none");
-    expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(view.selDragCleanup).toBeNull();
-    expect(renderBlockActionBar).not.toHaveBeenCalled();
-  });
-
-  test("stylebook mode enables clicks only on the elements tab", async () => {
-    canvasMode = "stylebook";
-    const { panel } = makePanel();
-    activeTab.value!.session.ui.stylebookTab = "elements";
-    await mountAndFlush();
-    expect(panel.overlayClk.style.pointerEvents).toBe("");
-
-    activeTab.value!.session.ui.stylebookTab = "tokens";
-    render();
-    await flush();
-    expect(panel.overlayClk.style.pointerEvents).toBe("none");
-    expect(renderBlockActionBar).not.toHaveBeenCalled();
+    expect(panel.canvas.contains(marker)).toBe(true);
   });
 });
 
 describe("overlays — lifecycle", () => {
-  test("reactive effect re-renders when selection changes", async () => {
-    const { panel } = makePanel();
+  test("reactive effect re-runs the block-action-bar delegate when selection changes", async () => {
+    makePanel();
     await mountAndFlush();
-    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
+    renderBlockActionBar.mockClear();
+    // A selection change re-runs the tracked effect, which schedules another flush.
     activeTab.value!.session.selection = ["children", 0];
     await flush();
-    expect(panel.overlay.querySelector(".overlay-selection")).not.toBeNull();
+    expect(renderBlockActionBar).toHaveBeenCalled();
   });
 
-  test("render after unmount is a no-op", async () => {
-    const { panel } = makePanel();
-    activeTab.value!.session.selection = ["children", 0];
+  test("reactive effect re-runs the delegate when the ACTIVE PANEL (activeMedia) changes", async () => {
+    makePanel();
+    await mountAndFlush();
+    renderBlockActionBar.mockClear();
+    // A hit in another breakpoint panel re-anchors the bar even with an unchanged selection path.
+    activeTab.value!.session.ui.activeMedia = "sm";
+    await flush();
+    expect(renderBlockActionBar).toHaveBeenCalled();
+  });
+
+  test("render after unmount is a no-op (the block-action-bar delegate is not invoked)", async () => {
+    makePanel();
     await mountAndFlush();
     unmount();
-    panel.overlay.innerHTML = "";
+    renderBlockActionBar.mockClear();
     render();
     await flush();
-    expect(panel.overlay.querySelector(".overlay-selection")).toBeNull();
+    expect(renderBlockActionBar).not.toHaveBeenCalled();
   });
 
   test("unmount between schedule and flush aborts the paint", async () => {
     makePanel();
-    activeTab.value!.session.selection = ["children", 0];
     await mountAndFlush();
     render();
     unmount();
@@ -282,7 +136,6 @@ describe("overlays — lifecycle", () => {
 
   test("multiple render calls coalesce into one flush", async () => {
     makePanel();
-    activeTab.value!.session.selection = ["children", 0];
     await mountAndFlush();
     renderBlockActionBar.mockClear();
     render();

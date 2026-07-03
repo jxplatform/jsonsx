@@ -70,44 +70,32 @@ export function createDesktopPlatform() {
       }
     }
 
-    if (url.startsWith("views://")) {
-      const path = url.replace(/^views:\/\/[^/]+\//, "");
-      try {
-        const content = await rpc.request.readFile({ path });
-        const ext = path.split(".").pop() || "";
-        const mime = ext === "json" ? "application/json" : "text/plain";
-        return new Response(content as string, {
-          headers: { "content-type": mime },
-          status: 200,
-        });
-      } catch {
-        try {
-          const content = await rpc.request.readFile({
-            path: `public/${path}`,
-          });
-          const ext = path.split(".").pop() || "";
-          const mime = ext === "json" ? "application/json" : "text/plain";
-          return new Response(content as string, {
-            headers: { "content-type": mime },
-            status: 200,
-          });
-        } catch {
-          return new Response("Not Found", { status: 404 });
-        }
-      }
-    }
     return originalFetch(input, init);
   };
 
   // ─── Global MutationObserver: resolve relative asset URLs everywhere ────────
   // Catches <img src>, <video src>, <source src>, <video poster> in any part of
   // The DOM (canvas, panels, dropdowns, etc.) so we don't need per-component fixes.
-  const resolving = new WeakSet<Element>();
+  //
+  // The shell document lives on views://; a relative PANEL asset src there does not resolve to a
+  // Servable URL, so the observer rewrites it to ${loopbackOrigin()}/<path> — an absolute URL on the
+  // Per-window loopback server (a cross-origin <img> load, which needs NO CORS). loopbackOrigin() is
+  // The canvas origin from platform.canvasUrl (always set once activate() resolves); if it is not yet
+  // Resolved at boot, the observer no-ops that one mutation rather than rewriting it.
+  function loopbackOrigin(): string | null {
+    const { canvasUrl } = platform;
+    if (!canvasUrl) {
+      return null;
+    }
+    try {
+      const { protocol, origin } = new URL(canvasUrl, location.href);
+      return protocol === "http:" || protocol === "https:" ? origin : null;
+    } catch {
+      return null;
+    }
+  }
 
   function resolveElementAssets(el: Element) {
-    if (resolving.has(el)) {
-      return;
-    }
     const tag = el.tagName;
     if (tag !== "IMG" && tag !== "VIDEO" && tag !== "SOURCE") {
       return;
@@ -122,18 +110,15 @@ export function createDesktopPlatform() {
         !val.startsWith("http") &&
         !val.startsWith("views://")
       ) {
-        resolving.add(el);
-        el.removeAttribute(attr);
+        const origin = loopbackOrigin();
+        if (!origin) {
+          // The canvas origin isn't resolved yet (pre-activate) — leave this mutation untouched.
+          continue;
+        }
+        // Point the panel <img> straight at the loopback server (a cross-origin image load,
+        // Allowed without CORS).
         const path = val.replace(/^\.?\//, "");
-        rpc.request
-          .readFileAsDataUrl({ path })
-          .then((dataUrl: string) => {
-            if (dataUrl) {
-              el.setAttribute(attr, dataUrl);
-            }
-          })
-          .catch(() => {})
-          .finally(() => resolving.delete(el));
+        el.setAttribute(attr, `${origin}/${path}`);
       }
     }
   }
@@ -155,15 +140,14 @@ export function createDesktopPlatform() {
     if (val.startsWith("data:") || val.startsWith("blob:") || val.startsWith("http")) {
       return;
     }
+    const origin = loopbackOrigin();
+    if (!origin) {
+      // The canvas origin isn't resolved yet (pre-activate) — leave this mutation untouched.
+      return;
+    }
+    // Rewrite the background-image url() to the loopback origin (a cross-origin image load).
     const path = val.replace(/^\.?\//, "");
-    rpc.request
-      .readFileAsDataUrl({ path })
-      .then((dataUrl: string) => {
-        if (dataUrl) {
-          htmlEl.style.backgroundImage = `url(${dataUrl})`;
-        }
-      })
-      .catch(() => {});
+    htmlEl.style.backgroundImage = `url(${origin}/${path})`;
   }
 
   function resolveAllAssets(el: Element) {
@@ -204,13 +188,40 @@ export function createDesktopPlatform() {
     subtree: true,
   });
 
-  return {
+  const platform = {
     id: "desktop" as const,
 
     projectRoot: "",
 
+    /**
+     * The cross-origin loopback canvas URL for this window, fetched in {@link activate} (awaited at
+     * studio boot, before the first canvas mount). The iframe-host resolves the iframe `src`
+     * against it, and the asset observer rewrites relative panel asset srcs to this origin.
+     */
+    canvasUrl: undefined as string | undefined,
+
     async activate() {
-      /* No-op */
+      // Request this window's loopback canvas URL over RPC (kills the preload/executeJavascript
+      // Race), so it's set before the first canvas mount and the asset observer's first rewrite.
+      try {
+        const { canvasUrl } = await rpc.request.getCanvasUrl();
+        platform.canvasUrl = canvasUrl ?? undefined;
+      } catch (error) {
+        console.warn("getCanvasUrl RPC failed; canvas falls back to the default URL:", error);
+      }
+      // Synchronous initial sweep AFTER canvasUrl resolves: imgs mounted before activate() awaited
+      // Carry relative srcs (a stray views:// request). Rewrite them to the loopback origin now
+      // Instead of waiting for the next mutation, then drain any records the observer already
+      // Batched pre-activate so they aren't reprocessed. Wrapped so a sweep failure can't break
+      // Activate.
+      try {
+        if (loopbackOrigin()) {
+          resolveAllAssets(document.documentElement);
+          observer.takeRecords();
+        }
+      } catch (error) {
+        console.warn("initial asset sweep failed:", error);
+      }
     },
 
     async openProject() {
@@ -293,14 +304,6 @@ export function createDesktopPlatform() {
 
     async readFile(path: string) {
       return rpc.request.readFile({ path });
-    },
-
-    async resolveAssetUrl(path: string): Promise<string | null> {
-      try {
-        return await rpc.request.readFileAsDataUrl({ path });
-      } catch {
-        return null;
-      }
     },
 
     async writeFile(path: string, content: string) {
@@ -517,6 +520,8 @@ export function createDesktopPlatform() {
       return rpc.request.aiChatUrl() as Promise<string>;
     },
   };
+
+  return platform;
 }
 
 function showUpdateToast(version: string, rpc: { request: { updaterApplyUpdate: () => unknown } }) {

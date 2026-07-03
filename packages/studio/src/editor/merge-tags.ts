@@ -74,8 +74,8 @@ function walk(value: unknown, prefix: string, category: string, depth: number, o
  *
  * @param state - The document's `state` definitions (`tab.doc.document.state`), used for names and
  *   classification (functions are skipped — they are not text-insertable values).
- * @param scope - The live resolved scope (`panel.liveCtx.scope`) for type/preview hints and the
- *   nested-property walk. May be null before the canvas has rendered.
+ * @param scope - The live resolved scope for type/preview hints and the nested-property walk. May
+ *   be null (the iframe canvas holds the render scope, so the parent passes null).
  * @param localScope - The editing element's recorded render scope (`elToScope.get(el)`). When it
  *   carries a `$map` (repeater) context, `item` / `item.*` / `index` tags are appended.
  */
@@ -116,5 +116,29 @@ export function buildMergeTags(
     }
   }
 
+  return out;
+}
+
+/**
+ * Build repeater-scope merge tags from a flat list of pre-resolved tokens (e.g. `item`, `index`,
+ * `item.data.title`). Unlike {@link buildMergeTags}'s live-scope branch, these carry no live value —
+ * in edit mode the iframe holds no `$map`, so fields are resolved parent-side from schema and the
+ * hint is empty. `item` and `index` are guaranteed first; the list is deduped preserving order.
+ *
+ * @param tokens - Insertion tokens (see `resolveRepeaterItemFields`); typically leads
+ *   `item`/`index`.
+ * @returns One {@link MergeTag} per unique token, `category: "repeater"`, `label === token`.
+ */
+export function buildRepeaterTagsFromFields(tokens: string[]): MergeTag[] {
+  const ordered = ["item", "index", ...tokens];
+  const seen = new Set<string>();
+  const out: MergeTag[] = [];
+  for (const token of ordered) {
+    if (!token || seen.has(token)) {
+      continue;
+    }
+    seen.add(token);
+    out.push({ category: "repeater", hint: "", label: token, token });
+  }
   return out;
 }

@@ -10,6 +10,7 @@ import {
   monitorForElements,
 } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
+import { disableNativeDragPreview } from "@atlaskit/pragmatic-drag-and-drop/element/disable-native-drag-preview";
 import {
   attachInstruction,
   extractInstruction,
@@ -32,15 +33,22 @@ import {
   componentRegistry,
   computeRelativePath,
 } from "../files/components";
-import { renderComponentPreview } from "./stylebook-panel";
+import { renderComponentPreview } from "./component-preview";
 import { defaultDef, unsafeTags } from "./shared";
+import { elementAtPoint } from "../utils/geometry";
 import type { JxPath } from "../state";
+import type { Tab } from "../tabs/tab";
 import type { JxMutableNode } from "@jxsuite/schema/types";
 import type { ComponentEntry } from "../files/components.js";
 
 interface DragCanDragArgs {
   element: HTMLElement;
   input: { clientX: number; clientY: number };
+}
+
+/** The `onGenerateDragPreview` argument subset we forward to {@link disableNativeDragPreview}. */
+interface DragPreviewArgs {
+  nativeSetDragImage: ((image: Element, x: number, y: number) => void) | null;
 }
 
 interface DragDropSourceArgs {
@@ -75,7 +83,7 @@ export function registerLayersDnD() {
       const cleanup = combine(
         draggable({
           canDrag({ element: _el, input }: DragCanDragArgs) {
-            const target = document.elementFromPoint(input.clientX, input.clientY) as HTMLElement;
+            const target = elementAtPoint(input.clientX, input.clientY) as HTMLElement;
             if (target?.closest(".layer-actions")) {
               return false;
             }
@@ -84,6 +92,11 @@ export function registerLayersDnD() {
           element: row,
           getInitialData() {
             return { path: rowPath, type: "tree-node" };
+          },
+          onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+            // Suppress the browser's native drag image — the cross-frame ghost (Phase 4c) is the
+            // Only drag affordance, so a duplicate native preview would double up.
+            disableNativeDragPreview({ nativeSetDragImage });
           },
           onDragStart() {
             row.classList.add("dragging");
@@ -162,7 +175,8 @@ export function registerLayersDnD() {
         const srcRow = srcData.type === "tree-node" && source.element;
         const wasExpanded = srcRow && Object.hasOwn(srcRow.dataset, "dndExpanded");
 
-        applyDropInstruction(instruction, srcData, targetPath);
+        // Parent-originated layer drops legitimately target the active tab.
+        applyDropInstruction(activeTab.value, instruction, srcData, targetPath);
 
         if (wasExpanded) {
           const tab = activeTab.value;
@@ -221,6 +235,9 @@ export function registerComponentsDnD() {
         getInitialData() {
           return { fragment: structuredClone(instanceDef), type: "block" };
         },
+        onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+          disableNativeDragPreview({ nativeSetDragImage });
+        },
       });
       view.dndCleanups.push(cleanup);
     }
@@ -247,6 +264,9 @@ export function registerElementsDnD() {
         element: row,
         getInitialData() {
           return { fragment: structuredClone(def), type: "block" };
+        },
+        onGenerateDragPreview({ nativeSetDragImage }: DragPreviewArgs) {
+          disableNativeDragPreview({ nativeSetDragImage });
         },
       });
       view.dndCleanups.push(cleanup);
@@ -337,18 +357,25 @@ export function clearLayerDropGap(container: HTMLElement) {
 }
 
 /**
- * Apply a DnD instruction to the state
+ * Apply a DnD instruction to `tab`'s document. `tab` is the tab whose canvas the drop resolved in
+ * (host-routed for iframe drops — never the active tab at message time, which may have changed
+ * while the dropResult was in flight); a null tab is a no-op.
  *
+ * @param {Tab | null} tab
  * @param {{ type: string }} instruction
  * @param {Record<string, unknown>} srcData
  * @param {JxPath} targetPath
  */
 export function applyDropInstruction(
+  tab: Tab | null,
   instruction: { type: string },
   srcData: Record<string, unknown>,
   targetPath: JxPath,
 ) {
-  const doc = activeTab.value?.doc.document as JxMutableNode;
+  if (!tab) {
+    return;
+  }
+  const doc = tab.doc.document as JxMutableNode;
   if (srcData.type === "tree-node") {
     const fromPath = srcData.path as JxPath;
     const targetParent = parentElementPath(targetPath) as JxPath;
@@ -361,19 +388,17 @@ export function applyDropInstruction(
 
     switch (instruction.type) {
       case "reorder-above": {
-        transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetParent, targetIdx));
+        transactDoc(tab, (t) => mutateMoveNode(t, fromPath, targetParent, targetIdx));
         break;
       }
       case "reorder-below": {
-        transactDoc(activeTab.value, (t) =>
-          mutateMoveNode(t, fromPath, targetParent, targetIdx + 1),
-        );
+        transactDoc(tab, (t) => mutateMoveNode(t, fromPath, targetParent, targetIdx + 1));
         break;
       }
       case "make-child": {
         const target = getNodeAtPath(doc, targetPath);
         const len = childList(target).length;
-        transactDoc(activeTab.value, (t) => mutateMoveNode(t, fromPath, targetPath, len));
+        transactDoc(tab, (t) => mutateMoveNode(t, fromPath, targetPath, len));
         break;
       }
       default: {
@@ -389,7 +414,7 @@ export function applyDropInstruction(
 
     switch (instruction.type) {
       case "reorder-above": {
-        transactDoc(activeTab.value, (t) =>
+        transactDoc(tab, (t) =>
           mutateInsertNode(
             t,
             targetParent,
@@ -400,7 +425,7 @@ export function applyDropInstruction(
         break;
       }
       case "reorder-below": {
-        transactDoc(activeTab.value, (t) =>
+        transactDoc(tab, (t) =>
           mutateInsertNode(
             t,
             targetParent,
@@ -413,7 +438,7 @@ export function applyDropInstruction(
       case "make-child": {
         const target = getNodeAtPath(doc, targetPath);
         const len = childList(target).length;
-        transactDoc(activeTab.value, (t) =>
+        transactDoc(tab, (t) =>
           mutateInsertNode(t, targetPath, len, structuredClone(srcData.fragment as JxMutableNode)),
         );
         break;
@@ -429,8 +454,7 @@ export function applyDropInstruction(
     if (tag && tag.includes("-")) {
       const comp = componentRegistry.find((c: ComponentEntry) => c.tagName === tag);
       if (comp) {
-        const tab = activeTab.value;
-        const elements = tab?.doc.document?.$elements || [];
+        const elements = tab.doc.document?.$elements || [];
         if (comp.source === "npm") {
           const specifier = comp.modulePath ? `${comp.package}/${comp.modulePath}` : comp.package;
           if (!specifier) {
@@ -440,7 +464,7 @@ export function applyDropInstruction(
             (e: JxMutableNode | string | { $ref: string }) => e === specifier || e === comp.package,
           );
           if (!alreadyImported) {
-            transact(activeTab.value, (d: JxMutableNode) => {
+            transact(tab, (d: JxMutableNode) => {
               if (!d.$elements) {
                 d.$elements = [];
               }
@@ -459,7 +483,7 @@ export function applyDropInstruction(
           });
           if (!alreadyImported && comp.path) {
             const relPath = computeRelativePath(tab?.documentPath ?? null, comp.path);
-            transact(activeTab.value, (d: JxMutableNode) => {
+            transact(tab, (d: JxMutableNode) => {
               if (!d.$elements) {
                 d.$elements = [];
               }

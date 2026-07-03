@@ -16,6 +16,7 @@
     ".": "./src/server.ts",
     "./ai-api": "./src/ai-api.ts",
     "./packages": "./src/packages.ts",
+    "./project-server": "./src/project-server.ts",
     "./refactor": "./src/refactor/index.ts",
     "./resolve": "./src/resolve.ts",
     "./types": "./src/types.ts"

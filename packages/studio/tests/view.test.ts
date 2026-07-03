@@ -101,6 +101,5 @@ describe("view defaults", () => {
     expect(view.leftTab).toBeString();
     expect(view.dndCleanups).toBeArray();
     expect(view.elementsCollapsed).toBeInstanceOf(Set);
-    expect(view.stylebookElToTag).toBeInstanceOf(WeakMap);
   });
 });

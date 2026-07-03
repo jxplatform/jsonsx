@@ -149,7 +149,11 @@ describe("chromium desktop platform", () => {
   beforeAll(() => {
     Object.defineProperty(globalThis, "location", {
       configurable: true,
-      value: { host: TEST_HOST, href: `http://${TEST_HOST}/` },
+      value: {
+        host: TEST_HOST,
+        href: `http://${TEST_HOST}/?token=CHROMIUM_TOK`,
+        search: "?token=CHROMIUM_TOK",
+      },
       writable: true,
     });
     platform = createDesktopPlatform();
@@ -161,6 +165,26 @@ describe("chromium desktop platform", () => {
 
   test("has correct id", () => {
     expect(platform.id).toBe("desktop");
+  });
+
+  test("canvasUrl carries the per-process rpcToken read from the shell URL", () => {
+    // The launcher passes the rpcToken as ?token= on the shell URL; the platform threads it onto
+    // The canvas iframe URL as ?rpcToken= so the in-iframe runtime's loopback fetches authenticate.
+    const url = new URL(platform.canvasUrl!, "http://x");
+    expect(url.pathname).toBe("/__studio__/canvas.html");
+    expect(url.searchParams.get("rpcToken")).toBe("CHROMIUM_TOK");
+  });
+
+  test("canvasUrl stays the bare path when no token is present (dev/token-less parity)", () => {
+    // Construct a platform under a token-less location; canvasUrl must be byte-identical to the
+    // Default so the dev server / token-less contexts are unaffected.
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: { host: TEST_HOST, href: `http://${TEST_HOST}/`, search: "" },
+      writable: true,
+    });
+    const tokenless = createDesktopPlatform();
+    expect(tokenless.canvasUrl).toBe("/__studio__/canvas.html");
   });
 
   test("activate is a no-op", async () => {
@@ -200,12 +224,13 @@ describe("chromium desktop platform", () => {
     await expect(platform.saveRecentProjects!(list)).resolves.toBeUndefined();
   });
 
-  test("probeRootProject returns fallback when readFile fails", async () => {
+  test("probeRootProject returns null when readFile fails (no project → welcome screen)", async () => {
+    // The launcher's root defaults to the launch cwd; a missing project.json means "no project".
+    // A phantom non-site result here would set projectState and suppress the welcome screen for
+    // The whole session (the chromium never-shows-welcome regression).
     forcedErrors.set("readFile", "File not found");
     const result = await platform.probeRootProject();
-    expect(result!.info.isSiteProject).toBe(false);
-    expect(result!.info.projectConfig).toBeNull();
-    expect(result!.meta.name).toBe("project");
+    expect(result).toBeNull();
   });
 
   test("resolveSiteContext returns site path", async () => {

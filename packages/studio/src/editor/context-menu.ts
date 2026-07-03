@@ -19,6 +19,7 @@ import { convertToComponent } from "./convert-to-component";
 import { convertToRepeater } from "./convert-to-repeater";
 import { componentRegistry } from "../files/components";
 import { renderPopover } from "../ui/layers";
+import { rectOf } from "../utils/geometry";
 
 import type { JxPath } from "../state";
 import type { JxMutableNode } from "@jxsuite/schema/types";
@@ -445,7 +446,7 @@ export function showContextMenu(
         }
         requestAnimationFrame(() => {
           const popover = el as HTMLElement;
-          const menuRect = popover.getBoundingClientRect();
+          const menuRect = rectOf(popover);
           if (x + menuRect.width > window.innerWidth) {
             x = window.innerWidth - menuRect.width - 4;
           }

@@ -1,24 +1,24 @@
 /**
  * Tests for src/panels/block-action-bar.ts — the floating action bar above the selected element.
  *
- * Renders against a real tab + in-memory canvas panel (canvasPanels/elToPath from the store), with
- * the pragmatic-drag-and-drop adapter mocked so drag-handle registration is observable. Covers bar
- * structure per selection kind, parent/move/convert actions, inline formatting, and the link
- * popover.
+ * The bar now drives its format state + position across the iframe bridge (Phase 4b-2): selection
+ * structure (badge/parent/move/convert/drag) comes from the doc + a mocked `getEditBarAnchorRect`,
+ * pressed-state from a mocked `getEditSnapshot`, and format/link/merge-tag clicks post intents via
+ * a mocked `postApplyFormat`. The parent never reads the iframe DOM. `../src/canvas/iframe-host` is
+ * mocked so the three bridge functions are controllable per test.
  */
-import { flush, resetWorkspaceWithTab, stubRect } from "./harness";
+import { flush, resetStudioState, resetWorkspaceWithTab } from "./harness";
 import { afterEach, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { getConvertTargets } from "../src/editor/convert-targets";
-import { startEditing, stopEditing } from "../src/editor/inline-edit";
 import { dismissSlashMenu, isSlashMenuOpen } from "../src/editor/slash-menu";
 import { componentRegistry } from "../src/files/components";
-import { canvasPanels, elToPath } from "../src/store";
 import { initLayers } from "../src/ui/layers";
 import { view } from "../src/view";
 import { activeTab } from "../src/workspace/workspace";
 
 import type { JxPath } from "../src/state";
 import type { JxMutableNode, JxStateDefinition } from "@jxsuite/schema/types";
+import type { ApplyFormatIntent, SelectionSnapshot } from "../src/canvas/iframe-protocol";
 
 // ─── DnD adapter mock (must precede the module-under-test import) ────────────
 
@@ -33,8 +33,31 @@ void mock.module("@atlaskit/pragmatic-drag-and-drop/element/adapter", () => ({
   },
 }));
 
-const { dismissBlockActionBar, dismissLinkPopover, initBlockActionBar, renderBlockActionBar } =
-  await import("../src/panels/block-action-bar");
+// ─── iframe-host bridge mock — controllable edit snapshot / anchor / applyFormat ─────
+
+interface HostMock {
+  editing: boolean;
+  snapshot: SelectionSnapshot | null;
+  anchor: { left: number; top: number; width: number; height: number } | null;
+  posted: ApplyFormatIntent[];
+}
+const host: HostMock = { anchor: null, editing: false, posted: [], snapshot: null };
+
+void mock.module("../src/canvas/iframe-host", () => ({
+  getEditBarAnchorRect: () => host.anchor,
+  getEditSnapshot: () => ({ editing: host.editing, snapshot: host.snapshot }),
+  postApplyFormat: (intent: ApplyFormatIntent) => host.posted.push(intent),
+}));
+
+const {
+  dismissBlockActionBar,
+  dismissLinkPopover,
+  handleParentFormatShortcut,
+  initBlockActionBar,
+  isEditChromeTarget,
+  onCanvasScroll,
+  renderBlockActionBar,
+} = await import("../src/panels/block-action-bar");
 
 // ─── Layer hosts ─────────────────────────────────────────────────────────────
 
@@ -49,40 +72,33 @@ initLayers();
 
 let canvasMode = "design";
 let navigated: string[] = [];
-let canvas: HTMLElement;
-let rootEl: HTMLElement;
 
-/** Build canvas DOM mirroring the doc, registering every element in elToPath. */
-function buildCanvas(docNode: JxMutableNode) {
-  canvas = document.createElement("div");
-  const build = (node: JxMutableNode, path: JxPath): HTMLElement => {
-    const el = document.createElement(node.tagName ?? "div");
-    elToPath.set(el, path);
-    if (typeof node.textContent === "string") {
-      el.textContent = node.textContent;
-    }
-    const kids = Array.isArray(node.children) ? node.children : [];
-    for (const [i, child] of kids.entries()) {
-      if (typeof child === "object" && child !== null) {
-        el.append(build(child as JxMutableNode, [...path, "children", i]));
-      }
-    }
-    return el;
+/** Make a selection snapshot with the given active tags / collapsed / link state. */
+function snapshotOf(overrides: Partial<SelectionSnapshot> = {}): SelectionSnapshot {
+  return {
+    activeTags: [],
+    collapsed: false,
+    kind: "selectionChanged",
+    link: { active: false, href: null },
+    localScope: null,
+    path: [],
+    rect: { height: 12, width: 30, x: 0, y: 0 },
+    seq: 1,
+    ...overrides,
   };
-  rootEl = build(docNode, []);
-  canvas.append(rootEl);
-  document.body.append(canvas);
-  canvasPanels.push({
-    canvas,
-    mediaName: "base",
-    viewport: document.createElement("div"),
-  } as never);
+}
+
+/** Place the toolbar anchor (parent-viewport space). Default keeps it well below the 80px headroom. */
+function setAnchor(
+  rect: Partial<{ left: number; top: number; width: number; height: number }> = {},
+) {
+  host.anchor = { height: 20, left: 30, top: 200, width: 100, ...rect };
 }
 
 function setup(docNode: JxMutableNode, selection: JxPath | null) {
   const tab = resetWorkspaceWithTab(docNode);
   tab.session.selection = selection as never;
-  buildCanvas(tab.doc.document);
+  setAnchor();
   return tab;
 }
 
@@ -104,6 +120,13 @@ function doc(): JxMutableNode {
 
 function linkPopoverHost(): HTMLElement | null {
   return document.querySelector("#layer-popover sp-popover.link-popover")?.parentElement ?? null;
+}
+
+/** Put the bar into the editing state with a snapshot (default: non-collapsed, no active tags). */
+function startEditingState(snapshot: Partial<SelectionSnapshot> = {}) {
+  host.editing = true;
+  host.snapshot = snapshotOf(snapshot);
+  renderBlockActionBar();
 }
 
 // ─── Pre-init behavior ───────────────────────────────────────────────────────
@@ -128,27 +151,25 @@ describe("block action bar", () => {
     navigated = [];
     dnd.draggables.length = 0;
     componentRegistry.length = 0;
-    canvasPanels.length = 0;
+    host.editing = false;
+    host.snapshot = null;
+    host.anchor = null;
+    host.posted.length = 0;
   });
 
   afterEach(() => {
-    stopEditing();
     dismissSlashMenu();
     dismissLinkPopover();
     dismissBlockActionBar();
-    window.getSelection()?.removeAllRanges();
-    view.savedRange = null;
     if (view.selDragCleanup) {
       view.selDragCleanup();
       view.selDragCleanup = null;
     }
-    canvas?.remove();
-    canvasPanels.length = 0;
   });
 
   // ─── Dismissal conditions ──────────────────────────────────────────────────
 
-  test("renders nothing outside design/edit modes, without selection, panel, or element", () => {
+  test("renders nothing outside design/edit modes, without selection, or without an anchor", () => {
     setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
 
     canvasMode = "preview";
@@ -161,22 +182,13 @@ describe("block action bar", () => {
     expect(bar()).toBeNull();
 
     activeTab.value!.session.selection = ["children", 0] as never;
-    canvasPanels.length = 0; // No active panel
+    host.anchor = null; // No anchor rect from the bridge → nothing to position from.
     renderBlockActionBar();
     expect(bar()).toBeNull();
   });
 
-  test("renders nothing when the selected element is missing from the canvas", () => {
-    setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 5]);
-    renderBlockActionBar();
-    expect(bar()).toBeNull();
-  });
-
-  test("renders nothing when the element exists but the doc node does not", () => {
+  test("renders nothing when the selected doc node does not exist", () => {
     setup({ children: [], tagName: "div" }, ["children", 0]);
-    const orphan = document.createElement("p");
-    elToPath.set(orphan, ["children", 0]);
-    rootEl.append(orphan);
     renderBlockActionBar();
     expect(bar()).toBeNull();
   });
@@ -213,16 +225,24 @@ describe("block action bar", () => {
     expect(barButton("Move down").hasAttribute("disabled")).toBe(false);
     expect(barButton("Convert to Component")).not.toBeNull();
     expect(barEl.querySelector("sp-action-group")).toBeNull(); // Not editing
-    expect(barEl.getAttribute("style")).toContain("top:4px"); // Zero rect → bottom + 4
   });
 
-  test("positions above the element when there is headroom", () => {
+  test("positions from the bridge anchor rect (viewport space), above when there is headroom", () => {
     setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
-    stubRect(rootEl.children[0]!, { height: 50, left: 30, top: 200, width: 100 });
+    setAnchor({ height: 50, left: 30, top: 200, width: 100 });
     renderBlockActionBar();
     const style = bar()!.getAttribute("style")!;
     expect(style).toContain("left:30px");
     expect(style).toContain("top:162px"); // 200 - 38
+  });
+
+  test("positions below the anchor when near the top of the viewport", () => {
+    setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
+    setAnchor({ height: 20, left: 12, top: 10, width: 100 });
+    renderBlockActionBar();
+    const style = bar()!.getAttribute("style")!;
+    expect(style).toContain("left:12px");
+    expect(style).toContain("top:34px"); // 10 + 20 + 4
   });
 
   test("root selection renders only the tag badge", () => {
@@ -243,15 +263,6 @@ describe("block action bar", () => {
     ]);
     renderBlockActionBar();
     expect(bar()!.querySelector(".bar-tag")!.textContent!.trim()).toBe("hero");
-  });
-
-  test("clamps the bar into the window after layout", async () => {
-    setup({ children: [{ tagName: "p", textContent: "A" }], tagName: "div" }, ["children", 0]);
-    renderBlockActionBar();
-    const barEl = bar()!;
-    stubRect(barEl, { height: 30, left: window.innerWidth - 100, top: 0, width: 300 });
-    await flush();
-    expect(barEl.style.left).toBe(`${window.innerWidth - 300}px`);
   });
 
   // ─── Bar mousedown focus guard ─────────────────────────────────────────────
@@ -383,6 +394,42 @@ describe("block action bar", () => {
     expect(navigated).toEqual(["components/card.json"]);
   });
 
+  // ─── Repeater ($prototype:"Array") pseudo-element badge ────────────────────
+
+  test("repeater (Array) node shows the nodeLabel badge and is not interactive", () => {
+    setup(
+      {
+        children: [
+          {
+            $prototype: "Array",
+            items: { $ref: "#/state/excavators" },
+            map: { tagName: "li", textContent: "${item}" },
+          } as never,
+        ],
+        tagName: "div",
+      },
+      ["children", 0],
+    );
+    renderBlockActionBar();
+
+    const badge = bar()!.querySelector(".bar-tag")!;
+    // NodeLabel(node) → "Repeater → <items-ref>" instead of falling through to "div".
+    expect(badge.textContent!.trim()).toBe("Repeater → #/state/excavators");
+    // Repeaters offer no tag-conversion targets, so the badge is inert (no slash menu on click).
+    expect(badge.classList.contains("bar-tag--interactive")).toBe(false);
+    expect(bar()!.querySelector(".bar-tag--interactive")).toBeNull();
+  });
+
+  test("a normal div node still shows its tag name and is interactive", () => {
+    // Contrast with the repeater: a plain element keeps the bare tag badge + convert targets.
+    setup({ children: [{ children: [], tagName: "div" }], tagName: "section" }, ["children", 0]);
+    renderBlockActionBar();
+
+    const badge = bar()!.querySelector(".bar-tag")!;
+    expect(badge.textContent!.trim()).toBe("div");
+    expect(badge.classList.contains("bar-tag--interactive")).toBe(true);
+  });
+
   // ─── Drag handle ───────────────────────────────────────────────────────────
 
   test("drag handle registers a draggable carrying the selection path", () => {
@@ -408,33 +455,14 @@ describe("block action bar", () => {
     expect(view.selDragCleanup).toBeInstanceOf(Function);
   });
 
-  // ─── Inline formatting ─────────────────────────────────────────────────────
+  // ─── Inline formatting (snapshot-driven) ───────────────────────────────────
 
-  function setupEditing() {
+  test("format buttons appear only while editing, with shortcuts in their titles", () => {
     setup({ children: [{ tagName: "p", textContent: "hello" }], tagName: "div" }, ["children", 0]);
-    const el = rootEl.children[0] as HTMLElement;
-    startEditing(el, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
     renderBlockActionBar();
-    return el;
-  }
+    expect(bar()!.querySelector("sp-action-group")).toBeNull(); // Not editing
 
-  function selectText(node: Node) {
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    const sel = window.getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(range);
-    return range;
-  }
-
-  test("format buttons appear while editing, with shortcuts in their titles", () => {
-    const el = setupEditing();
-    expect(el.getAttribute("contenteditable")).toBe("true");
+    startEditingState();
     const group = bar()!.querySelector("sp-action-group")!;
     const titles = [...group.querySelectorAll("sp-action-button")].map((b) =>
       b.getAttribute("title"),
@@ -444,62 +472,33 @@ describe("block action bar", () => {
     expect(titles.length).toBe(8); // P inline actions
   });
 
-  test("format buttons appear for a contenteditable element even without startEditing", () => {
+  test("pressed-state comes from the snapshot's activeTags", () => {
     setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
-    (rootEl.children[0] as HTMLElement).contentEditable = "true";
-    renderBlockActionBar();
-    expect(bar()!.querySelector("sp-action-group")).not.toBeNull();
-  });
-
-  test("active inline tags are reflected in the action group selection", () => {
-    setup(
-      {
-        children: [{ children: [{ tagName: "strong", textContent: "hi" }], tagName: "p" }],
-        tagName: "div",
-      },
-      ["children", 0],
-    );
-    const el = rootEl.children[0] as HTMLElement;
-    el.contentEditable = "true";
-    selectText(el.querySelector("strong")!.firstChild!);
-    renderBlockActionBar();
+    startEditingState({ activeTags: ["strong"] });
     const selected = bar()!.querySelector("sp-action-group")!.getAttribute("selected");
     expect(JSON.parse(selected!)).toEqual(["strong"]);
   });
 
-  test("mousedown + click on Bold wraps the saved selection in <strong>", async () => {
-    const el = setupEditing();
-    selectText(el.firstChild!);
-
-    const bold = barButton("Bold");
-    bold.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); // Captures range
-    expect(view.savedRange).not.toBeNull();
-    bold.click();
-    await flush();
-
-    expect(el.querySelector("strong")).not.toBeNull();
-    expect(el.querySelector("strong")!.textContent).toBe("hello");
+  test("a Bold click posts an applyFormat bold intent across the bridge", () => {
+    setup({ children: [{ tagName: "p", textContent: "hello" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
+    barButton("Bold").click();
+    expect(host.posted).toEqual([{ command: "bold" }]);
   });
 
-  test("format click without a saved range or outside contenteditable is a no-op", async () => {
-    const el = setupEditing();
+  test("a collapsed caret disables format buttons (link stays enabled)", () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState({ collapsed: true });
+    expect(barButton("Bold").hasAttribute("disabled")).toBe(true);
+    expect(barButton("Link").hasAttribute("disabled")).toBe(false);
+  });
 
-    view.savedRange = null;
-    barButton("Bold").click();
-    await flush();
-    expect(el.querySelector("strong")).toBeNull();
-
-    // Saved range outside any contenteditable root
-    const stray = document.createElement("span");
-    stray.textContent = "outside";
-    document.body.append(stray);
-    const range = document.createRange();
-    range.selectNodeContents(stray.firstChild!);
-    view.savedRange = range;
-    barButton("Bold").click();
-    await flush();
-    expect(el.querySelector("strong")).toBeNull();
-    stray.remove();
+  test("format button mousedown is prevented (focus guard)", () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
+    const e = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+    barButton("Bold").dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(true);
   });
 
   // ─── Merge tags ──────────────────────────────────────────────────────────
@@ -509,15 +508,7 @@ describe("block action bar", () => {
       "children",
       0,
     ]);
-    const el = rootEl.children[0] as HTMLElement;
-    startEditing(el, ["children", 0], {
-      onCommit: () => {},
-      onEnd: () => {},
-      onInsert: () => {},
-      onSplit: () => {},
-    });
-    renderBlockActionBar();
-    return el;
+    startEditingState();
   }
 
   test("Insert data button is absent when not editing", () => {
@@ -540,153 +531,305 @@ describe("block action bar", () => {
     expect(document.querySelectorAll("sp-menu-item").length).toBe(2);
   });
 
-  test("mousedown captures the selection; selecting a tag inserts a ${…} via execCommand", async () => {
-    const el = setupEditingWithState({ title: "Hello" });
-    selectText(el.firstChild!);
-
-    const btn = barButton("Insert data");
-    btn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    expect(view.savedRange).not.toBeNull();
-
-    const orig = document.execCommand;
-    const execCalls: unknown[][] = [];
-    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
-      execCalls.push(args);
-      return true;
-    };
-
-    btn.click();
+  test("selecting a merge tag posts an insertData intent", async () => {
+    setupEditingWithState({ title: "Hello" });
+    barButton("Insert data").click();
     expect(isSlashMenuOpen()).toBe(true);
     document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
     await flush();
-
     expect(isSlashMenuOpen()).toBe(false);
-    expect(execCalls).toEqual([["insertText", false, "${state.title}"]]);
-    (document as unknown as Record<string, unknown>).execCommand = orig;
+    expect(host.posted).toEqual([{ command: "insertData", token: "state.title" }]);
   });
 
-  test("inserting a merge tag with no saved range is a no-op", async () => {
-    setupEditingWithState({ title: "Hello" });
-    view.savedRange = null;
-
-    const orig = document.execCommand;
-    const execCalls: unknown[][] = [];
-    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
-      execCalls.push(args);
-      return true;
+  test("merge-tag menu offers repeater item.data.<field> tokens when editing inside a repeater", () => {
+    // Doc: div > ul > Array(items:#/state/$docs) whose map template is <li>${item.data.title}</li>.
+    const arrayNode = {
+      $prototype: "Array",
+      items: { $ref: "#/state/$docs" },
+      map: { children: ["${item.data.title}"], tagName: "li" },
     };
+    setup(
+      {
+        children: [{ children: [arrayNode], tagName: "ul" }],
+        state: { $docs: { $prototype: "ContentCollection", contentType: "docs" } },
+        tagName: "div",
+      },
+      // Selection resolves to a real node (the <li> map template) so the bar renders.
+      ["children", 0, "children", 0, "map"],
+    );
+    // The content type's frontmatter schema drives the item fields.
+    resetStudioState({
+      projectConfig: {
+        contentTypes: {
+          docs: { schema: { properties: { title: { type: "string" } } } },
+        },
+      },
+    });
+    // The snapshot path (caret) sits inside the repeater map — carries the `map` segment.
+    startEditingState({ path: ["children", 0, "children", 0, "map", "children", 0] });
 
     barButton("Insert data").click();
-    document.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
-    await flush();
-    expect(execCalls).toEqual([]);
-    (document as unknown as Record<string, unknown>).execCommand = orig;
+    expect(isSlashMenuOpen()).toBe(true);
+    const labels = [...document.querySelectorAll("sp-menu-item")].map((el) =>
+      el.textContent!.trim(),
+    );
+    expect(labels).toContain("item");
+    expect(labels).toContain("index");
+    expect(labels).toContain("item.data.title");
+
+    resetStudioState(); // Reset projectConfig so it does not leak into later tests.
   });
 
   // ─── Link popover ──────────────────────────────────────────────────────────
 
-  test("Link button opens the popover; Apply creates a link via execCommand", async () => {
-    const el = setupEditing();
-    selectText(el.firstChild!);
-    const execCalls: unknown[][] = [];
-    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
-      execCalls.push(args);
-      return true;
-    };
+  test("Link button opens the popover; Apply posts a link intent", async () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
 
     barButton("Link").click();
-    const host = linkPopoverHost()!;
-    expect(host.querySelector("sp-popover.link-popover")).not.toBeNull();
-    const field = host.querySelector("sp-textfield") as HTMLInputElement;
+    const popoverHost = linkPopoverHost()!;
+    expect(popoverHost.querySelector("sp-popover.link-popover")).not.toBeNull();
+    const field = popoverHost.querySelector("sp-textfield") as HTMLInputElement;
     expect(field.getAttribute("value")).toBe("");
-    const buttons = [...host.querySelectorAll("sp-action-button")];
+    const buttons = [...popoverHost.querySelectorAll("sp-action-button")];
     expect(buttons.map((b) => b.textContent!.trim())).toEqual(["Apply"]);
 
     field.value = "https://example.com";
     (buttons[0] as HTMLElement).click();
     await flush();
-    expect(execCalls).toEqual([["createLink", false, "https://example.com"]]);
+    expect(host.posted).toEqual([{ command: "link", href: "https://example.com" }]);
     expect(linkPopoverHost()).toBeNull();
-    delete (document as unknown as Record<string, unknown>).execCommand;
   });
 
-  test("inside an existing link the popover offers Update and Remove", async () => {
-    setup(
-      {
-        children: [
-          {
-            children: [{ attributes: { href: "https://old" }, tagName: "a", textContent: "go" }],
-            tagName: "p",
-          },
-        ],
-        tagName: "div",
-      },
-      ["children", 0],
-    );
-    const el = rootEl.children[0] as HTMLElement;
-    el.contentEditable = "true";
-    const anchor = el.querySelector("a")!;
-    anchor.setAttribute("href", "https://old");
-    renderBlockActionBar();
-    selectText(anchor.firstChild!);
+  test("inside an existing link the popover prefills and offers Update + Remove", async () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState({ link: { active: true, href: "https://old" } });
 
     barButton("Link").click();
-    let host = linkPopoverHost()!;
-    const field = host.querySelector("sp-textfield") as HTMLInputElement;
+    let popoverHost = linkPopoverHost()!;
+    const field = popoverHost.querySelector("sp-textfield") as HTMLInputElement;
     expect(field.getAttribute("value")).toBe("https://old");
-    const labels = [...host.querySelectorAll("sp-action-button")].map((b) => b.textContent!.trim());
+    const labels = [...popoverHost.querySelectorAll("sp-action-button")].map((b) =>
+      b.textContent!.trim(),
+    );
     expect(labels).toEqual(["Update", "Remove"]);
 
-    // Update rewrites the href without execCommand
+    // Update posts a link intent with the new href.
     field.value = "https://new";
-    (host.querySelectorAll("sp-action-button")[0] as HTMLElement).click();
+    (popoverHost.querySelectorAll("sp-action-button")[0] as HTMLElement).click();
     await flush();
-    expect(anchor.getAttribute("href")).toBe("https://new");
+    expect(host.posted).toEqual([{ command: "link", href: "https://new" }]);
     expect(linkPopoverHost()).toBeNull();
 
-    // Reopen and Remove unwraps the link
-    selectText(anchor.firstChild!);
+    // Reopen and Remove posts a null-href link intent.
+    host.posted.length = 0;
     barButton("Link").click();
-    host = linkPopoverHost()!;
-    (host.querySelectorAll("sp-action-button")[1] as HTMLElement).click();
+    popoverHost = linkPopoverHost()!;
+    (popoverHost.querySelectorAll("sp-action-button")[1] as HTMLElement).click();
     await flush();
-    expect(el.querySelector("a")).toBeNull();
-    expect(el.textContent).toContain("go");
+    expect(host.posted).toEqual([{ command: "link", href: null }]);
   });
 
   test("Enter applies and Escape dismisses from the URL field", async () => {
-    const el = setupEditing();
-    selectText(el.firstChild!);
-    const execCalls: unknown[][] = [];
-    (document as unknown as Record<string, unknown>).execCommand = (...args: unknown[]) => {
-      execCalls.push(args);
-      return true;
-    };
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
 
     barButton("Link").click();
     let field = linkPopoverHost()!.querySelector("sp-textfield") as HTMLInputElement;
     field.value = "https://kbd.example";
     field.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }));
     await flush();
-    expect(execCalls.length).toBe(1);
+    expect(host.posted).toEqual([{ command: "link", href: "https://kbd.example" }]);
     expect(linkPopoverHost()).toBeNull();
 
-    selectText(el.firstChild!);
+    host.posted.length = 0;
     barButton("Link").click();
     field = linkPopoverHost()!.querySelector("sp-textfield") as HTMLInputElement;
     field.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }));
     await flush();
     expect(linkPopoverHost()).toBeNull();
-    expect(execCalls.length).toBe(1); // Escape did not apply
-    delete (document as unknown as Record<string, unknown>).execCommand;
+    expect(host.posted).toEqual([]); // Escape did not apply
+  });
+
+  test("an open link popover is preserved across a snapshot-driven re-render", () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
+    barButton("Link").click();
+    expect(linkPopoverHost()).not.toBeNull();
+
+    // A snapshot-driven refresh must NOT re-mount (and so clobber) the open popover.
+    const fieldBefore = linkPopoverHost()!.querySelector("sp-textfield");
+    renderBlockActionBar();
+    expect(linkPopoverHost()).not.toBeNull();
+    expect(linkPopoverHost()!.querySelector("sp-textfield")).toBe(fieldBefore);
   });
 
   test("dismissLinkPopover clears the popover slot", () => {
-    const el = setupEditing();
-    selectText(el.firstChild!);
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    startEditingState();
     barButton("Link").click();
     expect(linkPopoverHost()).not.toBeNull();
     dismissLinkPopover();
     expect(linkPopoverHost()).toBeNull();
+  });
+
+  // ─── Parent-focus format shortcuts (Ctrl+B etc.) ───────────────────────────
+
+  describe("handleParentFormatShortcut", () => {
+    function ctrl(key: string) {
+      return new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ctrlKey: true, key });
+    }
+
+    test("editing + parent-focused: Ctrl+B posts an applyFormat bold intent", () => {
+      host.editing = true;
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+      const e = ctrl("b");
+      handleParentFormatShortcut(e);
+      expect(host.posted).toEqual([{ command: "bold" }]);
+      expect(e.defaultPrevented).toBe(true);
+      input.remove();
+    });
+
+    test("Ctrl+I and Ctrl+` post italic/code", () => {
+      host.editing = true;
+      handleParentFormatShortcut(ctrl("i"));
+      handleParentFormatShortcut(ctrl("`"));
+      expect(host.posted).toEqual([{ command: "italic" }, { command: "code" }]);
+    });
+
+    test("Ctrl+K opens the link popover (anchored to the bar's Link button)", () => {
+      setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+      startEditingState();
+      const input = document.createElement("input");
+      document.body.append(input);
+      input.focus();
+
+      handleParentFormatShortcut(ctrl("k"));
+      expect(linkPopoverHost()).not.toBeNull();
+      input.remove();
+    });
+
+    test("does nothing when not editing", () => {
+      host.editing = false;
+      handleParentFormatShortcut(ctrl("b"));
+      expect(host.posted).toEqual([]);
+    });
+
+    test("ignores chords without ctrl/meta or with alt held", () => {
+      host.editing = true;
+      handleParentFormatShortcut(
+        new KeyboardEvent("keydown", { altKey: true, ctrlKey: true, key: "b" }),
+      );
+      handleParentFormatShortcut(new KeyboardEvent("keydown", { key: "b" }));
+      expect(host.posted).toEqual([]);
+    });
+
+    test("does nothing when focus is inside the canvas iframe", () => {
+      host.editing = true;
+      const iframe = document.createElement("iframe");
+      iframe.className = "jx-canvas-iframe";
+      document.body.append(iframe);
+      iframe.focus();
+      // Force activeElement to the iframe (happy-dom focus on iframe).
+      Object.defineProperty(document, "activeElement", { configurable: true, value: iframe });
+      handleParentFormatShortcut(ctrl("b"));
+      expect(host.posted).toEqual([]);
+      delete (document as unknown as Record<string, unknown>).activeElement;
+      iframe.remove();
+    });
+  });
+});
+
+// ─── Scroll tracking: rAF-throttled fast-path reposition + hide-out-of-view ─────
+
+describe("scroll tracking", () => {
+  const raf = () =>
+    new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+
+  /** Dispatch a scroll whose target is the document (a window/document-level scroll). */
+  const scrollDoc = () => {
+    const e = new Event("scroll");
+    Object.defineProperty(e, "target", { configurable: true, value: document });
+    onCanvasScroll(e);
+  };
+
+  beforeEach(async () => {
+    canvasMode = "edit";
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    await flush();
+  });
+
+  test("a document-target scroll repositions the existing bar from a fresh anchor", async () => {
+    expect(bar()).toBeTruthy();
+    const before = bar()!.style.top;
+    host.anchor = { height: 20, left: 44, top: 400, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.top).not.toBe(before);
+    expect(bar()!.style.left).toBe("44px");
+    expect(bar()!.style.top).toBe(`${400 - 38}px`);
+  });
+
+  test("repositioning is rAF-throttled: many scroll events, one anchor application", async () => {
+    host.anchor = { height: 20, left: 71, top: 300, width: 100 };
+    scrollDoc();
+    host.anchor = { height: 20, left: 99, top: 500, width: 100 };
+    scrollDoc();
+    scrollDoc();
+    await raf();
+    // The single frame read the LATEST anchor (one reposition, not three).
+    expect(bar()!.style.left).toBe("99px");
+  });
+
+  test("a vanished anchor hides the bar via visibility; a returning one restores it", async () => {
+    host.anchor = null;
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.visibility).toBe("hidden");
+
+    host.anchor = { height: 20, left: 30, top: 250, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.visibility).toBe("");
+    expect(bar()!.style.top).toBe(`${250 - 38}px`);
+  });
+
+  test("scrolls are ignored in preview mode / without a selection / from unrelated targets", async () => {
+    const before = bar()!.style.top;
+
+    canvasMode = "preview";
+    host.anchor = { height: 20, left: 1, top: 999, width: 100 };
+    scrollDoc();
+    await raf();
+    expect(bar()!.style.top).toBe(before);
+
+    canvasMode = "edit";
+    const unrelated = document.createElement("div");
+    document.body.append(unrelated);
+    const e = new Event("scroll");
+    Object.defineProperty(e, "target", { configurable: true, value: unrelated });
+    onCanvasScroll(e);
+    await raf();
+    expect(bar()!.style.top).toBe(before);
+  });
+});
+
+// ─── Edit-chrome hit test (the parent pointerdown commit-guard's exclusion set) ──
+
+describe("isEditChromeTarget", () => {
+  test("recognizes the bar and its popovers; rejects outside targets and non-nodes", async () => {
+    setup({ children: [{ tagName: "p", textContent: "hi" }], tagName: "div" }, ["children", 0]);
+    renderBlockActionBar();
+    await flush();
+    expect(isEditChromeTarget(bar())).toBe(true);
+    const outside = document.createElement("div");
+    document.body.append(outside);
+    expect(isEditChromeTarget(outside)).toBe(false);
+    expect(isEditChromeTarget(null)).toBe(false);
   });
 });

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jx Canvas</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        /* The iframe is sized to its content and NEVER scrolls internally (the parent canvas pans
+           instead, and the parent overlay can't track an internal scroll). Clip here to enforce that:
+           when the content is shorter than the fixed 800px query viewport below, the viewport's empty
+           excess would otherwise become a scrollbar exposing the white iframe background. */
+        overflow: hidden;
+      }
+      /* Fixed-size query container. The runtime transposes the document's viewport units (vh/vw/…) to
+         container units (cqh/cqw/…) in the studio canvas (see runtime `transposeCanvasUnits`), so they
+         resolve against THIS predictable design-viewport box instead of the iframe element. That
+         decouples them from the iframe's height, so the host can size the iframe to its content height
+         (no internal scroll → the parent overlay stays glued) without a `100vh` section feeding back
+         into an ever-growing height. `#jx-canvas-root` overflows this box freely (no paint/overflow
+         containment) and is what the host measures. */
+      #jx-canvas-viewport {
+        container-type: size;
+        container-name: jx-canvas;
+        width: 100%;
+        height: var(--jx-design-viewport-height, 800px);
+      }
+      #jx-canvas-root {
+        min-height: 100%;
+      }
+      /* A page's root should fill the design viewport (short pages still look like real pages —
+         footer at the bottom, full-height heroes). A component DEFINITION is a fragment, not a page:
+         flooring it to the viewport leaves dead space below a short component. When the render stamps
+         the root as a definition (see makeStamper's `data-jx-definition-root`), drop the floor so the
+         host sizes the iframe to the component's own content. */
+      #jx-canvas-root:has(> [data-jx-definition-root]) {
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="jx-canvas-viewport"><div id="jx-canvas-root"></div></div>
+    <!-- Dev: cache-bust so each iframe mount loads the freshest canvas bundle. -->
+    <script type="module">
+      import(`./dist/iframe-entry.js?t=${Date.now()}`);
+    </script>
+  </body>
+</html>

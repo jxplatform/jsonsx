@@ -18,7 +18,17 @@ import type {
 } from "../rpc-schema";
 
 export function createDesktopPlatform(): StudioPlatform {
-  const ws = new WebSocket(`ws://${location.host}`);
+  // The project server gates the WS upgrade on the token. The launcher passes it in the shell URL
+  // (?token=…); read it here before the shell strips it from the address bar after boot.
+  const token = new URLSearchParams(location.search).get("token") ?? "";
+  const ws = new WebSocket(`ws://${location.host}/?token=${encodeURIComponent(token)}`);
+  // The canvas iframe runs the in-iframe runtime, which authenticates its dev-proxy loopback
+  // Resolve/server fetches with this same per-process rpcToken (?rpcToken=…). Thread it onto the
+  // Canvas URL when present so createProjectServer does not 403 those fetches; keep the bare path
+  // Otherwise so a token-less/dev context stays byte-identical. Mirrors electrobun's getCanvasUrl.
+  const canvasUrl = token
+    ? `/__studio__/canvas.html?rpcToken=${encodeURIComponent(token)}`
+    : "/__studio__/canvas.html";
   let nextId = 1;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
@@ -60,6 +70,12 @@ export function createDesktopPlatform(): StudioPlatform {
 
     projectRoot: "",
 
+    // The chromium project server serves the canvas iframe doc under /__studio__/. Only chromium
+    // Sets this; electrobun and the dev server leave it unset and keep their default canvas path.
+    // The ?rpcToken (computed above) authenticates the in-iframe runtime's loopback resolve/server
+    // Fetches, mirroring electrobun's getCanvasUrl RPC.
+    canvasUrl,
+
     async activate() {
       // No-op: the chromium platform needs no activation step
     },
@@ -86,14 +102,11 @@ export function createDesktopPlatform(): StudioPlatform {
           meta: { name: config.name || "project", root: root || "." },
         };
       } catch {
-        return {
-          info: {
-            directories: [] as string[],
-            isSiteProject: false as const,
-            projectConfig: null,
-          },
-          meta: { name: "project", root: "." },
-        };
+        // The launcher's root defaults to the launch cwd, which usually holds no project.json.
+        // Report "no project" (null) so the studio shows the welcome screen — returning a phantom
+        // Non-site project instead sets projectState and suppresses the welcome screen for the
+        // Whole session (mirrors the electrobun platform's probeRootProject contract).
+        return null;
       }
     },
 
@@ -297,7 +310,7 @@ export function createDesktopPlatform(): StudioPlatform {
 
     // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)
     aiChatUrl() {
-      return "/studio/ai/chat";
+      return "/__studio__/ai/chat";
     },
   };
 }

@@ -144,11 +144,11 @@ export async function bootStudio(opts: {
     initBlockActionBar: (ctx: unknown) => {
       captured.blockBarCtx = ctx;
     },
+    isEditChromeTarget: mock(() => false),
     renderBlockActionBar: mock(() => {}),
   }));
 
   void mock.module("../src/canvas/canvas-render.ts", () => ({
-    applyCanvasMediaOverrides: mock(() => {}),
     initCanvasRender: (ctx: unknown) => {
       captured.canvasRenderCtx = ctx;
     },

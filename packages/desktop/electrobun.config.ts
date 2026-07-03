@@ -33,8 +33,19 @@ export default {
       ],
     },
 
+    // "disable-site-isolation-trials" (all CEF platforms): keep the loopback canvas iframe in the
+    // Studio shell's renderer process. As a cross-site OOPIF (views://studio shell +
+    // Http://127.0.0.1 canvas), CEF Alloy's windowed drag-and-drop DELIVERS native dragover/drop to
+    // The iframe but never propagates its accepted drop-effect to the native cursor feedback — a
+    // Drag over the canvas shows the "not allowed" cursor the whole way even though the drop lands.
+    // In-process, event routing matches the (verified-good) same-origin dev-server/chromium cases.
+    // Process isolation is defense-in-depth only for this local trusted-author tool (electrobun
+    // Already runs CEF with disable-web-security by default); JS same-origin checks are unaffected.
     mac: {
       bundleCEF: true,
+      chromiumFlags: {
+        "disable-site-isolation-trials": true,
+      },
       codesign: true,
       defaultRenderer: "cef",
       notarize: false,
@@ -43,6 +54,7 @@ export default {
       bundleCEF: true,
       chromiumFlags: {
         "disable-gpu": false,
+        "disable-site-isolation-trials": true,
         "enable-features": "UseOzonePlatform",
         "ozone-platform-hint": "auto",
       },
@@ -51,13 +63,26 @@ export default {
     },
     win: {
       bundleCEF: true,
+      chromiumFlags: {
+        "disable-site-isolation-trials": true,
+      },
       defaultRenderer: "cef",
       icon: "icon.ico",
     },
 
     // PreBuild copies compiled studio + runtime assets into assets/ before these run.
     // Source paths are relative to packages/desktop/.
+    //
+    // The studio SHELL loads over views:// (views://studio/index.html + its bundles). The canvas
+    // Iframe loads CROSS-ORIGIN from the per-window loopback project server — but that server serves
+    // Its studio assets out of studioDir(), which resolves to this staged views/studio dir (it probes
+    // For canvas.html there). So canvas.html + dist/iframe-entry.js must ALSO be staged here; the
+    // Loopback server reads them off disk and serves them over http (they are never fetched via the
+    // Views:// scheme). Without these two entries the packaged canvas iframe 404s at boot.
     copy: {
+      "assets/studio/canvas.html": "views/studio/canvas.html",
+      "assets/studio/dist/iframe-entry.js": "views/studio/dist/iframe-entry.js",
+      "assets/studio/dist/iframe-entry.js.map": "views/studio/dist/iframe-entry.js.map",
       "assets/studio/dist/init.js": "views/studio/dist/init.js",
       "assets/studio/dist/studio.css": "views/studio/dist/studio.css",
       "assets/studio/dist/studio.js": "views/studio/dist/studio.js",
