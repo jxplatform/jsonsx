@@ -280,6 +280,67 @@ describe("makeStamper", () => {
     stamp(el, ["children", 2], { tagName: "div" });
     expect(el.dataset.jxPath).toBe('["children",2]');
   });
+
+  test("marks a component-definition ROOT with data-jx-definition-root; plain roots and nested custom tags stay unmarked", () => {
+    const stamp = makeStamper(ctx);
+    // The opened doc IS a component definition — its root must not self-instantiate.
+    const defRoot = document.createElement("eer-cta");
+    stamp(defRoot, [], { tagName: "eer-cta" });
+    expect(defRoot.dataset.jxDefinitionRoot).toBe("");
+    expect(defRoot.dataset.jxPath).toBe("[]");
+    // A page's plain root gets no marker.
+    const pageRoot = document.createElement("div");
+    stamp(pageRoot, [], { tagName: "div" });
+    expect(pageRoot.dataset.jxDefinitionRoot).toBeUndefined();
+    // A NESTED custom element is an instantiation site — it must stay live.
+    const nested = document.createElement("eer-step");
+    stamp(nested, ["children", 1], { tagName: "eer-step" });
+    expect(nested.dataset.jxDefinitionRoot).toBeUndefined();
+  });
+});
+
+describe("component-definition root vs a registered custom element (cross-tab realm reuse)", () => {
+  test("rendering a doc whose root tag is ALREADY registered keeps the stamped editable tree", async () => {
+    // A previously-rendered page registered the component in this realm (hosts persist across tab
+    // Switches). Without the definition-root guard, the upgrade's connectedCallback wipes the
+    // Editor-rendered children and re-renders a live instance with default state — the "component
+    // Editor shows an uneditable instance" bug.
+    const { defineElement } = await import("@jxsuite/runtime");
+    await defineElement({
+      children: [{ children: ["Default Heading"], tagName: "h2" }],
+      state: { heading: "Default Heading" },
+      tagName: "x-defroot-test",
+    });
+
+    const container = document.createElement("div");
+    document.body.append(container);
+    const handle = await renderResolvedDocument({
+      container,
+      doc: {
+        children: [{ children: ["Authored Heading"], tagName: "h2" }],
+        state: { heading: "Authored Heading" },
+        tagName: "x-defroot-test",
+      } as never,
+      docBase: "http://localhost:3000/components/x-defroot-test.json",
+      mapperCtx: ctx,
+      mode: "design",
+    });
+    // ConnectedCallback initialization is async (buildScope) — give it room to (not) fire.
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.tagName.toLowerCase()).toBe("x-defroot-test");
+    expect(root.dataset.jxDefinitionRoot).toBe("");
+    // The editable, path-stamped tree survived (not the instance's unstamped re-render).
+    const h2 = root.querySelector("h2") as HTMLElement;
+    expect(h2.textContent).toBe("Authored Heading");
+    expect(h2.dataset.jxPath).toBe('["children",0]');
+
+    handle.dispose();
+    container.remove();
+  });
 });
 
 describe("applySiteStyle", () => {

@@ -348,6 +348,14 @@ export function makeStamper(ctx: PathMapCtx) {
     if (!(created instanceof HTMLElement)) {
       return;
     }
+    // The OPENED document's root can itself be a component definition (`tagName: "eer-cta"`). If
+    // That tag is already registered in this realm (a previously-rendered page instantiated it —
+    // Hosts persist across tab switches), the upgrade's connectedCallback would wipe the stamped
+    // Editable tree and re-render a live instance with default state. Mark the root so the
+    // Runtime's element class leaves it alone (see defineElement's connectedCallback guard).
+    if (path.length === 0 && (def as { tagName?: string } | null)?.tagName?.includes("-")) {
+      created.dataset.jxDefinitionRoot = "";
+    }
     const classified = classifyRenderNode(path, def, ctx);
     if (classified.kind === "layout") {
       created.dataset.jxLayout = "";

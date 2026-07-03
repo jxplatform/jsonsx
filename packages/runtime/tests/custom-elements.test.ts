@@ -167,6 +167,43 @@ describe("Custom Elements", () => {
 
     el.remove();
   });
+
+  test("data-jx-definition-root suppresses self-initialization (studio edits the definition)", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      children: [{ tagName: "span", textContent: "${state.heading}" }],
+      state: { heading: "Default Heading" },
+      tagName: tag,
+    });
+
+    // An external renderer (the studio canvas) built the definition's tree itself and marked the
+    // Root; connectedCallback must NOT wipe it and re-render a live instance with default state.
+    const el = document.createElement(tag);
+    el.dataset.jxDefinitionRoot = "";
+    const authored = document.createElement("h2");
+    authored.dataset.jxPath = '["children",0]';
+    authored.textContent = "Authored Tree";
+    el.append(authored);
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect(el.children).toHaveLength(1);
+    expect(el.firstElementChild).toBe(authored);
+    expect(el.textContent).toBe("Authored Tree");
+
+    // A SIBLING instance without the marker still self-initializes normally.
+    const instance = document.createElement(tag);
+    document.body.append(instance);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+    expect(instance.textContent).toBe("Default Heading");
+
+    el.remove();
+    instance.remove();
+  });
 });
 
 // ─── Phase 5: component @media via the buildScope-direct (iframe) path ────────────

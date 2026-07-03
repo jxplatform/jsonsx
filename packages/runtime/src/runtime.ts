@@ -2133,6 +2133,13 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
     }
 
     async connectedCallback() {
+      // An element carrying `data-jx-definition-root` IS the definition being rendered by an
+      // External renderer (the studio canvas editing this component's own document) — its subtree
+      // Is authored DOM, not an instantiation site. Self-initializing here would wipe that tree
+      // And re-render it with default state (the "component editor shows a live instance" bug).
+      if (this.dataset.jxDefinitionRoot !== undefined) {
+        return;
+      }
       if (this._jxInitialized) {
         return;
       }
