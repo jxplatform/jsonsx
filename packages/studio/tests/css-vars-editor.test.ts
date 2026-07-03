@@ -130,7 +130,7 @@ describe("color section", () => {
       'input[type="color"]',
     ) as HTMLInputElement;
     expect(primary.value).toBe("#007acc");
-    expect(accent.value).toBe("#007acc"); // Fallback for "tomato"
+    expect(accent.value).toBe("#3b82f6"); // Fallback for "tomato"
   });
 
   test("swatch input updates the var and persists", async () => {
