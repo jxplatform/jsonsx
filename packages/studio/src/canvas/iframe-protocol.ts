@@ -210,7 +210,9 @@ export type IframeToParent =
   // The iframe box (hit-testable), and the parent-drawn overlay tracks it (it can't follow an internal
   // Scroll). Viewport units are transposed to container units (runtime `transposeCanvasUnits`) so a
   // `100vh` section can't feed back into an ever-growing height. Posted after each render and on reflow.
-  | { kind: "contentHeight"; height: number }
+  // `fragment` = the rendered root is a component DEFINITION (a fragment, not a page): the host then
+  // Drops the iframe's 480px pre-measurement floor so a short component hugs its content.
+  | { kind: "contentHeight"; height: number; fragment: boolean }
   // A serializable snapshot of the iframe's resolved `$defs` (buildScope's output — content
   // Collections / `$prototype` data sources eagerly resolved). The parent adopts it into
   // `S.canvas.scope` so the data-explorer panel shows live data instead of "pending" (the iframe,

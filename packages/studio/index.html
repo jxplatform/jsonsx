@@ -693,6 +693,15 @@
         width: 100%;
         min-height: 100%;
       }
+      /* A content PAGE fills the viewport (a document-like surface you can click into below the
+         text). A component DEFINITION is a fragment — flooring its column to the viewport and letting
+         the flex parent vertical-stretch it leaves dead scrollable space below a short component.
+         `is-component` (set by renderCanvas when the doc root is a custom element) makes the column
+         hug its iframe and sit at the top instead. */
+      .content-edit-column.is-component {
+        min-height: 0;
+        align-self: flex-start;
+      }
       .content-edit-column .canvas-panel.full-width {
         flex: 1;
         min-width: 0;

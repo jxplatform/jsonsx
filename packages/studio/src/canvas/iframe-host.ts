@@ -832,8 +832,12 @@ function handleMessage(state: HostState, msg: IframeToParent): void {
     case "contentHeight": {
       // Size the iframe element to its document so the canvas never scrolls internally — the parent
       // Canvas pans/scrolls instead, every node stays inside the iframe box (hit-testable), and the
-      // Overlay (drawn in canvas space) tracks it. `min-height` in cssText floors short documents.
+      // Overlay (drawn in canvas space) tracks it. The cssText's 480px `min-height` is a
+      // Pre-measurement floor so an empty/short PAGE stays a usable canvas; a component DEFINITION
+      // (fragment) instead hugs its content, so drop the floor for it once measured (else a short
+      // Component leaves dead space below — pages keep the floor and stay tall via #jx-canvas-root).
       state.iframe.style.height = `${msg.height}px`;
+      state.iframe.style.minHeight = msg.fragment ? "0px" : "480px";
       return;
     }
     case "dragOver": {

@@ -263,7 +263,11 @@ export function startCanvasIframe(opts: {
     const measured = Math.min(container.scrollHeight, MAX_CANVAS_HEIGHT);
     if (measured > 0 && Math.abs(measured - lastPostedHeight) >= 1) {
       lastPostedHeight = measured;
-      channel.post({ height: measured, kind: "contentHeight" });
+      // A component-definition root (marked by makeStamper) is a fragment, not a page — tell the host
+      // So it can drop its 480px iframe floor and let a short component hug its content.
+      const root = container.firstElementChild;
+      const fragment = root instanceof HTMLElement && root.dataset.jxDefinitionRoot !== undefined;
+      channel.post({ fragment, height: measured, kind: "contentHeight" });
     }
   }
   const ResizeObs = win?.ResizeObserver;

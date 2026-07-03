@@ -9,6 +9,11 @@
       body {
         margin: 0;
         height: 100%;
+        /* The iframe is sized to its content and NEVER scrolls internally (the parent canvas pans
+           instead, and the parent overlay can't track an internal scroll). Clip here to enforce that:
+           when the content is shorter than the fixed 800px query viewport below, the viewport's empty
+           excess would otherwise become a scrollbar exposing the white iframe background. */
+        overflow: hidden;
       }
       /* Fixed-size query container. The runtime transposes the document's viewport units (vh/vw/…) to
          container units (cqh/cqw/…) in the studio canvas (see runtime `transposeCanvasUnits`), so they
@@ -25,6 +30,14 @@
       }
       #jx-canvas-root {
         min-height: 100%;
+      }
+      /* A page's root should fill the design viewport (short pages still look like real pages —
+         footer at the bottom, full-height heroes). A component DEFINITION is a fragment, not a page:
+         flooring it to the viewport leaves dead space below a short component. When the render stamps
+         the root as a definition (see makeStamper's `data-jx-definition-root`), drop the floor so the
+         host sizes the iframe to the component's own content. */
+      #jx-canvas-root:has(> [data-jx-definition-root]) {
+        min-height: 0;
       }
     </style>
   </head>

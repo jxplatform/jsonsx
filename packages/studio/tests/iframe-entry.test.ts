@@ -694,7 +694,28 @@ describe("startCanvasIframe — content-height auto-sizing + wheel forwarding", 
     await flush(); // Let the async render settle (postContentHeight runs right after renderComplete).
     pair.flush(); // Deliver the acks back to the parent.
 
-    expect(acks).toContainEqual({ height: 1234, kind: "contentHeight" });
+    // A plain page root → fragment:false (the host keeps its 480px floor).
+    expect(acks).toContainEqual({ fragment: false, height: 1234, kind: "contentHeight" });
+  });
+
+  test("flags fragment:true when the rendered root is a component definition (data-jx-definition-root)", async () => {
+    const pair = fakeChannelPair<ParentToIframe, IframeToParent>();
+    const acks: IframeToParent[] = [];
+    pair.parent.onMessage((m) => acks.push(m));
+    const container = document.createElement("div");
+    document.body.append(container);
+    Object.defineProperty(container, "scrollHeight", { configurable: true, value: 400 });
+
+    teardown = startCanvasIframe({ channel: pair.iframe, container });
+    // A doc whose root tag is a custom element → makeStamper marks it data-jx-definition-root.
+    const compDoc = { children: [{ children: ["Hi"], tagName: "h2" }], tagName: "x-cta-frag" };
+    pair.parent.post(renderMsg(1, compDoc, compDoc));
+    pair.flush();
+    await flush();
+    pair.flush();
+
+    expect((container.firstElementChild as HTMLElement).dataset.jxDefinitionRoot).toBe("");
+    expect(acks).toContainEqual({ fragment: true, height: 400, kind: "contentHeight" });
   });
 
   test("forwards a wheel event (deltas) to the parent and prevents the default", async () => {

@@ -1436,11 +1436,23 @@ describe("iframe canvas host viewport plumbing", () => {
     resetWorkspaceWithTab();
   });
 
-  test("contentHeight sizes the host iframe element to the document height", async () => {
+  test("contentHeight sizes the host iframe element to the document height; a page keeps the 480px floor", async () => {
     const canvasEl = await mountReady();
     const iframe = canvasEl.querySelector("iframe")!;
-    channels[0]!.deliver({ height: 1234, kind: "contentHeight" });
+    channels[0]!.deliver({ fragment: false, height: 1234, kind: "contentHeight" });
     expect(iframe.style.height).toBe("1234px");
+    // A page keeps the pre-measurement floor (empty/short pages stay a usable canvas).
+    expect(iframe.style.minHeight).toBe("480px");
+  });
+
+  test("contentHeight drops the 480px floor for a component definition (fragment) so it hugs content", async () => {
+    const canvasEl = await mountReady();
+    const iframe = canvasEl.querySelector("iframe")!;
+    // The iframe mounts with the pre-measurement floor in its cssText.
+    expect(iframe.style.minHeight).toBe("480px");
+    channels[0]!.deliver({ fragment: true, height: 300, kind: "contentHeight" });
+    expect(iframe.style.height).toBe("300px");
+    expect(iframe.style.minHeight).toBe("0px");
   });
 
   test("forwardWheel re-dispatches a wheel on canvasWrap with the deltas and mapped cursor", async () => {

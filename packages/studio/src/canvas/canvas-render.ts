@@ -538,6 +538,11 @@ export function renderCanvas() {
 
     const { baseWidth } = parseMediaEntries(getEffectiveMedia(S.document.$media));
     const { tpl: panelTpl, panel } = canvasPanelTemplate(null, null, true);
+    // A component-definition doc (root tag is a custom element) is a fragment, not a page: it should
+    // Hug its content rather than have the column fill+stretch to the viewport (dead scroll space).
+    const rootTag = (S.document as { tagName?: unknown }).tagName;
+    const isComponentDoc = typeof rootTag === "string" && rootTag.includes("-");
+    const columnClass = isComponentDoc ? "content-edit-column is-component" : "content-edit-column";
     const editTpl = html`
       <div
         class="content-edit-canvas"
@@ -545,7 +550,7 @@ export function renderCanvas() {
           panel.scrollContainer = (el as HTMLElement) || null;
         })}
       >
-        <div class="content-edit-column" style="max-width:${baseWidth}px">${panelTpl}</div>
+        <div class=${columnClass} style="max-width:${baseWidth}px">${panelTpl}</div>
       </div>
     `;
     litRender(editTpl, canvasWrap);

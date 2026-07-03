@@ -367,6 +367,24 @@ describe("tab close/reopen lifecycle", () => {
     expect(canvasWrap.querySelector(".content-edit-column")).not.toBeNull();
   });
 
+  test("edit-mode column hugs a component definition (is-component) but fills for a page", async () => {
+    // A page root (plain div) → the column fills the viewport (document-like editing surface).
+    resetWorkspaceWithTab({ children: [{ tagName: "p", textContent: "Hi" }], tagName: "div" });
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+    const pageColumn = canvasWrap.querySelector(".content-edit-column")!;
+    expect(pageColumn.classList.contains("is-component")).toBe(false);
+
+    // A component-definition root (custom-element tag) → the column hugs its content.
+    resetWorkspaceWithTab({ children: [{ tagName: "h2", textContent: "Hi" }], tagName: "eer-cta" });
+    canvasMode = "edit";
+    renderCanvas();
+    await flush();
+    const compColumn = canvasWrap.querySelector(".content-edit-column")!;
+    expect(compColumn.classList.contains("is-component")).toBe(true);
+  });
+
   test("closing all tabs while in source mode disposes the monaco editor", async () => {
     resetWorkspaceWithTab();
     canvasMode = "source";
