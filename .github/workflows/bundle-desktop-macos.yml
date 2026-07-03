@@ -15,9 +15,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          # Pinned to macos-15 (arm64 GA image), NOT macos-latest. On 2026-06-15
+          # `macos-latest` migrated to the macOS 26 beta image, where posix_spawn
+          # of electrobun's ad-hoc/linker-signed arm64 CLI fails with ENOEXEC
+          # (the Developer-ID-signed x64 CLI runs fine on macos-26-intel below).
+          # Revisit once electrobun ships a properly-signed arm64 CLI or macOS 26 GA works.
+          - os: macos-15
             platform: macos-arm64
-          - os: macos-26-intel
+          - os: macos-15-intel
             platform: macos-x64
 
     runs-on: ${{ matrix.os }}
