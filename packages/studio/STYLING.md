@@ -12,16 +12,26 @@ There are three layers. Reach for the **most semantic** one that fits.
 1. **Spectrum tokens — `--spectrum-*`**
    Provided by `@spectrum-web-components/theme`. These are the source of truth
    for colour, spacing, radius, typography, etc. Examples:
-   `--spectrum-accent-color-900`, `--spectrum-gray-300`, `--spectrum-spacing-100`,
+   `--spectrum-accent-color-700`, `--spectrum-gray-300`, `--spectrum-spacing-100`,
    `--spectrum-corner-radius-100`, `--spectrum-font-size-75`,
    `--spectrum-sans-font-family-stack`.
+
+   The stock dark theme is re-valued by the **Jx brand fragment**
+   (`src/ui/jx-theme.ts`), registered as the Spectrum `'app'` theme fragment in
+   `src/ui/spectrum.ts`. It overrides only the gray and blue palette `-rgb`
+   triplets (plus the font stacks) with the canonical brand palette from
+   `sites/jxsuite.com/project.json`, so every derived Spectrum token — accent,
+   focus ring, background layers, alpha tints — follows the brand
+   automatically. Change brand colours there, not in chrome CSS. Under this
+   ramp `--spectrum-accent-color-700` is the exact brand blue (#3b82f6) and
+   `-900` is the soft on-dark tint (#93c5fd).
 
 2. **Studio semantic layer — `--bg`, `--accent`, `--radius`, …**
    A small set of studio aliases declared **on the `sp-theme` element** in
    `index.html`. Each maps to a Spectrum token with a hex fallback:
 
    ```css
-   --accent: var(--spectrum-accent-color-900, #007acc);
+   --accent: var(--spectrum-accent-color-700, #3b82f6);
    ```
 
    Use these for everyday chrome (`var(--bg)`, `var(--fg)`, `var(--accent)`,
@@ -72,10 +82,14 @@ background: color-mix(in srgb, var(--success) 15%, transparent);
 
 ### Typography
 
-- Sans chrome inherits `--spectrum-sans-font-family-stack` from `sp-theme`.
-- Monospace uses `var(--font-mono)` (keeps SF Mono / Fira Code ahead of the
-  Spectrum code stack). The Monaco editor and canvas text-measurement keep
-  literal font strings — those are JS API values, not CSS.
+- Sans chrome inherits `--spectrum-sans-font-family-stack` from `sp-theme`
+  (rebranded to the system-ui stack by the Jx brand fragment).
+- Monospace uses `var(--font-mono)`: JetBrains Mono (the Jx brand mono,
+  vendored as woff2 in `fonts/` with `@font-face` in `index.html`), then
+  SF Mono / Fira Code, ahead of the Spectrum code stack. The Monaco editor
+  keeps literal font strings — those are JS API values, not CSS — and
+  `src/services/monaco-setup.ts` remeasures fonts once webfonts finish
+  loading.
 - `font-size`: use `--spectrum-font-size-50` (11px), `-75` (12px), `-100` (14px).
   Off-grid sizes (10px, 13px) have no Spectrum step; keep them as literals.
 

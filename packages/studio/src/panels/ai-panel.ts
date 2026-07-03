@@ -218,13 +218,13 @@ function renderKeyGate() {
     <div class="ai-tab-body">
       <div class="ai-status-center" style="gap:10px;max-width:320px;text-align:left">
         <div style="font-weight:600;align-self:center">AI provider key</div>
-        <div style="font-size:11px;color:var(--spectrum-global-color-gray-600)">
+        <div style="font-size:11px;color:var(--fg-dim)">
           Any OpenAI-compatible key works. Stored locally in this browser; sent only to the Studio
           proxy (never to a third party except your chosen endpoint).
         </div>
         <input
           type="password"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
           placeholder="sk-… or any compatible key"
           .value=${keyDraft}
           @input=${(e: Event) => {
@@ -253,7 +253,7 @@ function renderKeyGate() {
           : html`
               <input
                 type="text"
-                style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+                style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
                 placeholder="Model ID (e.g. gpt-4o, claude-sonnet-4-20250514, etc.)"
                 .value=${modelDraft}
                 @input=${(e: Event) => {
@@ -270,14 +270,12 @@ function renderKeyGate() {
                 : "Fetch models"}
           </sp-button>
           ${modelsError
-            ? html`<span style="font-size:10px;color:var(--spectrum-global-color-red-600)"
-                >${modelsError}</span
-              >`
+            ? html`<span style="font-size:10px;color:var(--danger)">${modelsError}</span>`
             : nothing}
         </div>
         <input
           type="text"
-          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--spectrum-global-color-gray-400);background:var(--spectrum-global-color-gray-50);color:var(--spectrum-global-color-gray-900);font-size:12px"
+          style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:4px;border:1px solid var(--border);background:var(--bg-input);color:var(--fg);font-size:12px"
           placeholder="Endpoint (optional, e.g. http://localhost:11434/v1)"
           .value=${baseUrlDraft}
           @input=${(e: Event) => {

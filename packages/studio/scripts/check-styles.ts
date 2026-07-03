@@ -32,7 +32,13 @@ const ALLOWED_HEX = new Set([
 ]);
 
 /** Files where a hex is a colour _value_ (user data), not chrome styling. */
-const DATA_FILES = ["src/ui/color-selector.ts", "src/settings/css-vars-editor.ts"];
+const DATA_FILES = [
+  "src/ui/color-selector.ts",
+  "src/settings/css-vars-editor.ts",
+  /* Brand ramp source of truth: defines the Jx palette as Spectrum `-rgb`
+     triplets; hexes appear only in the annotation comments. */
+  "src/ui/jx-theme.ts",
+];
 
 /** Px values that have an exact Spectrum token and should be tokenized in new code. */
 const TOKENIZABLE_FONT_PX = new Set(["11", "12", "14"]); // Spectrum font-size-50 / -75 / -100

@@ -258,7 +258,7 @@ export function prepareForEditMode(node: JxMutableNode): JxMutableNode {
                     border: "1px dashed color-mix(in srgb, var(--danger) 40%, transparent)",
                     borderRadius: "4px",
                     color: "var(--danger)",
-                    fontFamily: "'SF Mono', 'Fira Code', monospace",
+                    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', monospace",
                     fontSize: "11px",
                     fontStyle: "italic",
                     padding: "6px 10px",

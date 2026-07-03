@@ -102,7 +102,7 @@ export function renderFunctionEditor() {
 
   view.functionEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
     automaticLayout: true,
-    fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+    fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
     fontSize: 12,
     language: "javascript",
     lineNumbers: "on",

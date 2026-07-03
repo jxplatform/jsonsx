@@ -114,7 +114,7 @@ function renderColorSection(
             <div class="css-var-swatch" style="background:${val}">
               <input
                 type="color"
-                .value=${val && String(val).startsWith("#") ? val : "#007acc"}
+                .value=${val && String(val).startsWith("#") ? val : "#3b82f6"}
                 @input=${(e: Event) => updateVar(name, (e.target as HTMLInputElement).value)}
               />
             </div>
@@ -131,7 +131,7 @@ function renderColorSection(
           </div>
         `,
       )}
-      ${renderAddRow("--color-", "Primary Blue", "#007acc", addVar)}
+      ${renderAddRow("--color-", "Primary Blue", "#3b82f6", addVar)}
     </div>
   `;
 }

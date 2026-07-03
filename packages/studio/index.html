@@ -7,6 +7,30 @@
     <link rel="stylesheet" href="./dist/studio.css" />
     <link rel="stylesheet" href="./node_modules/quikchat/dist/quikchat.css" />
     <style>
+      /* Jx brand mono font, vendored in ./fonts (SIL OFL 1.1, see fonts/OFL.txt).
+         Latin subset only; the stack falls back to SF Mono / Fira Code for
+         other scripts. Monaco remeasures after load (src/services/monaco-setup.ts). */
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url("./fonts/jetbrains-mono-400.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url("./fonts/jetbrains-mono-500.woff2") format("woff2");
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url("./fonts/jetbrains-mono-700.woff2") format("woff2");
+      }
       *,
       *::before,
       *::after {
@@ -23,7 +47,7 @@
         /* html/body sit outside <sp-theme>, so the --spectrum-* tokens are not
            in scope here; the hex fallback is the intentional pre-theme backdrop
            shown behind the app before sp-theme fills the viewport. */
-        background: var(--spectrum-background-layer-1-color, #1e1e1e);
+        background: var(--spectrum-background-layer-1-color, #111111);
       }
       /* Panel layout widths. These must live on :root (the <html> element),
          not on sp-theme or #app, because the resize logic in
@@ -45,34 +69,38 @@
       sp-theme {
         display: block;
         height: 100%;
-        /* Surfaces */
-        --bg: var(--spectrum-background-layer-1-color, #1e1e1e);
-        --bg-panel: var(--spectrum-background-layer-2-color, #252526);
-        --bg-input: var(--spectrum-gray-300, #3c3c3c);
-        --border: var(--spectrum-gray-300, #3c3c3c);
+        /* Surfaces. The hex fallbacks mirror the Jx brand ramp installed by
+           the 'app' theme fragment (src/ui/jx-theme.ts). */
+        --bg: var(--spectrum-background-layer-1-color, #111111);
+        --bg-panel: var(--spectrum-background-layer-2-color, #1a1a1a);
+        --bg-input: var(--spectrum-gray-100, #1a1a1a);
+        --border: var(--spectrum-gray-200, #222222);
         /* Text */
-        --fg: var(--spectrum-neutral-content-color-default, #cccccc);
-        --fg-dim: var(--spectrum-gray-600, #808080);
-        /* Accent and status */
-        --accent: var(--spectrum-accent-color-900, #007acc);
+        --fg: var(--spectrum-neutral-content-color-default, #e4e4e7);
+        --fg-dim: var(--spectrum-gray-600, #a1a1aa);
+        /* Accent and status. Under the brand ramp (src/ui/jx-theme.ts),
+           accent-color-700 is the exact Jx brand blue and 900 is the soft
+           on-dark tint. */
+        --accent: var(--spectrum-accent-color-700, #3b82f6);
         --accent-fg: var(--spectrum-white, #ffffff);
         --danger: var(--spectrum-negative-color-900, #f44747);
         --success: var(--spectrum-positive-color-900, #89d185);
-        --tag: var(--spectrum-informative-color-900, #569cd6);
+        --tag: var(--spectrum-informative-color-900, #93c5fd);
         --signal: var(--spectrum-notice-color-900, #dcdcaa);
         --handler: var(--spectrum-purple-900, #c586c0);
         --warning: var(--spectrum-orange-900, #c5a332);
         --map: var(--spectrum-indigo-900, #5b4fc7);
         --slot-c: var(--spectrum-seafoam-900, #1a8a7a);
         --switch-c: var(--danger);
-        --case-c: var(--spectrum-informative-color-800, #4f8bc7);
+        --case-c: var(--spectrum-informative-color-800, #60a5fa);
         /* Corner radius */
         --radius: var(--spectrum-corner-radius-100, 3px);
-        /* Monospace stack for code/source chrome. The Spectrum code token
-           resolves to Source Code Pro/Monaco; the studio prefers the developer
-           fonts SF Mono / Fira Code, so we keep those ahead of the Spectrum
-           stack rather than regressing to Monaco. */
-        --font-mono: "SF Mono", "Fira Code", var(--spectrum-code-font-family-stack, monospace);
+        /* Monospace stack for code/source chrome. JetBrains Mono is the Jx
+           brand mono (vendored in ./fonts); SF Mono / Fira Code remain as
+           system fallbacks ahead of the Spectrum stack (Source Code Pro /
+           Monaco). The brand fragment sets the same order on
+           --spectrum-code-font-family-stack for SWC components. */
+        --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", var(--spectrum-code-font-family-stack, monospace);
         /* Hover wash and accent tints */
         --hover-bg: rgba(255, 255, 255, 0.04);
         --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -143,7 +171,7 @@
           var(--spectrum-black, #000)
         );
         /* Data explorer syntax colors (mapped to nearest Spectrum hues) */
-        --data-key: var(--spectrum-blue-700, #9cdcfe);
+        --data-key: var(--spectrum-blue-700, #3b82f6);
         --data-string: var(--spectrum-orange-700, #ce9178);
         --data-number: var(--spectrum-celery-700, #b5cea8);
         --data-boolean: var(--tag);
@@ -178,7 +206,7 @@
         align-items: center;
         gap: 6px;
         padding: 0 8px;
-        background: var(--bg-panel);
+        background: var(--bg);
         border-bottom: 1px solid var(--border);
         overflow: hidden;
         min-width: 0;
@@ -347,7 +375,7 @@
         grid-column: 1;
         display: flex;
         flex-direction: column;
-        background: var(--spectrum-gray-200, #333333);
+        background: var(--bg);
         border-right: 1px solid var(--border);
       }
       #left-panel {
@@ -362,13 +390,13 @@
         grid-column: 3;
         position: relative;
         overflow: auto;
-        background: var(--bg);
+        background: var(--bg-panel);
       }
       #right-panel {
         grid-row: 2 / 5;
         grid-column: 4;
         overflow-y: auto;
-        background: var(--bg-panel);
+        background: var(--bg);
         border-left: 1px solid var(--border);
       }
       #right-panel:has(.ai-tab-body) {
@@ -528,7 +556,7 @@
         padding: 0 8px;
         font-size: var(--spectrum-font-size-50, 11px);
         color: var(--fg-dim);
-        background: var(--bg-panel);
+        background: var(--bg);
         border-top: 1px solid var(--border);
       }
       #statusbar .sb-path-seg {
@@ -628,7 +656,7 @@
       }
       .resize-handle:hover,
       .resize-handle.dragging {
-        background: var(--accent, #0078d4);
+        background: var(--accent, #3b82f6);
         opacity: 0.5;
       }
       #resize-left {
@@ -1169,7 +1197,7 @@
         width: 100%;
         background: var(--bg);
         color: inherit;
-        border: 1px solid var(--accent, #0078d4);
+        border: 1px solid var(--accent, #3b82f6);
         border-radius: var(--spectrum-corner-radius-75, 2px);
         font: inherit;
         font-size: inherit;
@@ -1333,11 +1361,11 @@
         text-overflow: ellipsis;
         flex: 1;
         white-space: nowrap;
-        font-family: var(--mono, "SF Mono", monospace);
+        font-family: var(--font-mono, monospace);
         font-size: 10px;
       }
       .import-mono {
-        font-family: var(--mono, "SF Mono", monospace);
+        font-family: var(--font-mono, monospace);
       }
       .imports-empty {
         padding: 8px 12px;
@@ -1834,10 +1862,7 @@
         flex: 0 0 auto;
         --mod-picker-button-border-start-start-radius: 0;
         --mod-picker-button-border-end-start-radius: 0;
-        --mod-picker-button-border-color: var(
-          --spectrum-global-color-gray-400,
-          var(--spectrum-gray-400)
-        );
+        --mod-picker-button-border-color: var(--spectrum-gray-400);
       }
       /* Number-unit compound input: textfield + picker-button */
       .style-input-number-unit {
@@ -1864,10 +1889,7 @@
         /* Zero out the inline-start corners to abut the textfield */
         --mod-picker-button-border-start-start-radius: 0;
         --mod-picker-button-border-end-start-radius: 0;
-        --mod-picker-button-border-color: var(
-          --spectrum-global-color-gray-400,
-          var(--spectrum-gray-400)
-        );
+        --mod-picker-button-border-color: var(--spectrum-gray-400);
       }
       .input-group.is-expression sp-picker-button {
         display: none;
@@ -1900,10 +1922,7 @@
         flex: 0 0 auto;
         --mod-picker-button-border-start-start-radius: 0;
         --mod-picker-button-border-end-start-radius: 0;
-        --mod-picker-button-border-color: var(
-          --spectrum-global-color-gray-400,
-          var(--spectrum-gray-400)
-        );
+        --mod-picker-button-border-color: var(--spectrum-gray-400);
         margin-inline-start: calc(-1 * var(--spectrum-border-width-100, 1px));
       }
       .button-group-combo sp-picker-button.has-selection {
@@ -2050,7 +2069,7 @@
       }
       .data-name {
         flex: 1;
-        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-family: var(--font-mono, monospace);
         font-size: var(--spectrum-font-size-50, 11px);
         overflow: hidden;
         text-overflow: ellipsis;
@@ -2069,7 +2088,7 @@
       .data-leaf,
       .data-branch {
         font-size: var(--spectrum-font-size-50, 11px);
-        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-family: var(--font-mono, monospace);
         padding: 1px 8px;
         line-height: 1.5;
         white-space: nowrap;
@@ -3010,10 +3029,7 @@
         height: 100%;
         background: var(--bg);
         color: var(--fg);
-        font:
-          11px/1.6 "SF Mono",
-          "Fira Code",
-          monospace;
+        font: 11px/1.6 var(--font-mono, monospace);
         border: none;
         padding: 8px;
         resize: none;
@@ -3440,7 +3456,7 @@
         font-size: 24px;
         font-weight: 700;
         letter-spacing: 2px;
-        font-family: var(--mono-font, monospace);
+        font-family: var(--font-mono, monospace);
         padding: 12px 16px;
         background: var(--hover-bg);
         border-radius: var(--radius);
@@ -3643,7 +3659,7 @@
       }
       .sb-var-size-bar {
         height: 100%;
-        background: var(--accent, #007acc);
+        background: var(--accent, #3b82f6);
         transition: width 0.3s;
         border-radius: var(--radius);
       }

@@ -381,7 +381,7 @@ export function renderCanvas() {
       });
     view.monacoEditor = monaco.editor.create(editorContainer as unknown as HTMLElement, {
       automaticLayout: true,
-      fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+      fontFamily: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace",
       fontSize: 12,
       lineNumbers: "on",
       minimap: { enabled: false },

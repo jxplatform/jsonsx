@@ -11,6 +11,7 @@ import { Theme } from "@spectrum-web-components/theme/src/Theme.js";
 import themeSpectrumCSS from "@spectrum-web-components/theme/src/theme.css.js";
 import themeDarkCSS from "@spectrum-web-components/theme/src/theme-dark.css.js";
 import scaleMediumCSS from "@spectrum-web-components/theme/src/scale-medium.css.js";
+import { jxTheme } from "./jx-theme";
 import { Tabs } from "@spectrum-web-components/tabs/src/Tabs.js";
 import { Tab } from "@spectrum-web-components/tabs/src/Tab.js";
 import { TabPanel } from "@spectrum-web-components/tabs/src/TabPanel.js";
@@ -296,5 +297,9 @@ for (const [tag, ctor] of components as [string, CustomElementConstructor][]) {
 Theme.registerThemeFragment("spectrum", "system", themeSpectrumCSS);
 Theme.registerThemeFragment("dark", "color", themeDarkCSS);
 Theme.registerThemeFragment("medium", "scale", scaleMediumCSS);
+/* Jx brand overrides. The 'app' kind must be registered under the literal
+   name "app" and, registered last, is adopted after the fragments above so
+   its :host declarations win the cascade (see src/ui/jx-theme.ts). */
+Theme.registerThemeFragment("app", "app", jxTheme);
 
 export { components };
