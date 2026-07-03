@@ -29,6 +29,10 @@ jobs:
       - run: |
           bun pm pack
           npm publish --provenance *.tgz
+        working-directory: packages/ai
+      - run: |
+          bun pm pack
+          npm publish --provenance *.tgz
         working-directory: packages/schema
       - run: |
           bun pm pack
