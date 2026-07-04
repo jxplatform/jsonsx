@@ -184,7 +184,7 @@ async function main(): Promise<void> {
           console.log(`✓ ${entry.id} (thumb ${kb(thumbB64)}KB · showcase ${kb(showcaseB64)}KB)`);
         } finally {
           await page.close();
-          server.stop(true);
+          await server.stop(true);
         }
       } catch (error) {
         failed += 1;
