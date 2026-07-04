@@ -15,9 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       releases_created: ${{ steps.rp.outputs.releases_created }}
-      # The root component (".") emits UNPREFIXED outputs, so it's `tag_name`,
-      # not `.--tag_name` (path prefixing only applies to non-root components).
-      tag_name: ${{ steps.rp.outputs.tag_name }}
+      # JSON array of the package paths released this run (drives npm publish).
+      paths_released: ${{ steps.rp.outputs.paths_released }}
+      # Per-component outputs are keyed by the manifest PATH with a `--` delimiter
+      # (path prefixing applies to every non-root component). The key contains `/`
+      # and `-`, so it MUST be read with bracket/quote syntax, not dot notation.
+      desktop_released: ${{ steps.rp.outputs['packages/desktop--release_created'] }}
+      desktop_tag: ${{ steps.rp.outputs['packages/desktop--tag_name'] }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v5
@@ -25,55 +29,62 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # The release tag is created by release-please using GITHUB_TOKEN, which does
+  # The release tags are created by release-please using GITHUB_TOKEN, which does
   # NOT trigger `on: push: tags` workflows. So we invoke the (now reusable)
-  # publish + desktop-bundler workflows directly once a release exists.
+  # publish + desktop-bundler workflows directly once releases exist.
   publish:
     needs: release-please
     if: needs.release-please.outputs.releases_created == 'true'
     uses: ./.github/workflows/publish.yml
     with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      # Publish only the packages actually released this run; all component tags
+      # point at github.sha (the release-PR merge commit).
+      paths_released: ${{ needs.release-please.outputs.paths_released }}
+      sha: ${{ github.sha }}
     secrets: inherit
 
+  # Desktop jobs gate on the DESKTOP component (not the global flag): they build
+  # and attach to `desktop-v<version>`, so they must only run when that tag exists.
+  # desktop's dependency closure covers ~the whole graph, so this fires on nearly
+  # every release anyway.
   desktop-linux:
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.desktop_released == 'true'
     uses: ./.github/workflows/bundle-desktop-linux.yml
     with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      tag_name: ${{ needs.release-please.outputs.desktop_tag }}
     secrets: inherit
 
   desktop-macos:
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.desktop_released == 'true'
     uses: ./.github/workflows/bundle-desktop-macos.yml
     with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      tag_name: ${{ needs.release-please.outputs.desktop_tag }}
     secrets: inherit
 
   desktop-windows:
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.desktop_released == 'true'
     uses: ./.github/workflows/bundle-desktop-windows.yml
     with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      tag_name: ${{ needs.release-please.outputs.desktop_tag }}
     secrets: inherit
 
   build-msix:
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.desktop_released == 'true'
     uses: ./.github/workflows/build-msix.yml
     with:
-      tag_name: ${{ needs.release-please.outputs.tag_name }}
+      tag_name: ${{ needs.release-please.outputs.desktop_tag }}
     secrets: inherit
 
-  # Append the platform Downloads table to the release notes (preserves the
+  # Append the platform Downloads table to the desktop release notes (preserves the
   # previous release-it footer). Links are static and resolve once the bundlers
   # upload their assets, so this can run in parallel with the build jobs.
   release-notes-downloads:
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.desktop_released == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -82,11 +93,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.release-please.outputs.tag_name }}
+          TAG: ${{ needs.release-please.outputs.desktop_tag }}
         run: |
           set -euo pipefail
-          version="${TAG#v}"
-          base="https://github.com/jxsuite/jx/releases/download/v${version}"
+          base="https://github.com/jxsuite/jx/releases/download/${TAG}"
           body="$(gh release view "$TAG" --json body --jq .body)"
           {
             printf '%s\n\n' "$body"
@@ -96,6 +106,34 @@ jobs:
             printf '| macOS | Apple Silicon | [DMG](%s/stable-macos-arm64-JxStudio.dmg) | [tar.zst](%s/stable-macos-arm64-JxStudio.app.tar.zst) |\n' "$base" "$base"
             printf '| macOS | Intel | [DMG](%s/stable-macos-x64-JxStudio.dmg) | [tar.zst](%s/stable-macos-x64-JxStudio.app.tar.zst) |\n' "$base" "$base"
             printf '| Linux | x64 | [tar.gz](%s/stable-linux-x64-JxStudio-Setup.tar.gz) | [tar.zst](%s/stable-linux-x64-JxStudio.tar.zst) |\n' "$base" "$base"
-            printf '| Windows | x64 | [MSI](%s/Jx.Studio.msi) | [ZIP](%s/stable-win-x64-JxStudio-Setup.zip) |\n' "$base" "$base"
+            printf '| Windows | x64 | [MSI](%s/JxStudio.msi) | [ZIP](%s/stable-win-x64-JxStudio-Setup.zip) |\n' "$base" "$base"
           } > notes.md
           gh release edit "$TAG" --notes-file notes.md
+
+  # The Electrobun updater fetches relatively off `releases/latest/download/`, so the
+  # desktop release MUST be GitHub's "latest". Every component release created this run
+  # shares the merge commit's created_at, so default "latest" selection is
+  # non-deterministic. The bundlers force `make_latest: true`, but on a batch that bumps
+  # only ai/runtime (outside desktop's closure) no desktop build runs — this guard
+  # re-pins the newest existing desktop release so "latest = desktop" holds every time.
+  pin-desktop-latest:
+    needs: [release-please, desktop-linux, desktop-macos, desktop-windows, build-msix]
+    if: always() && needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Pin newest desktop release as latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$(gh release list --limit 100 --json tagName \
+                  --jq '[.[] | select(.tagName | startswith("desktop-v"))][0].tagName')"
+          if [ -n "$tag" ]; then
+            echo "Pinning $tag as latest"
+            gh release edit "$tag" --latest
+          else
+            echo "No desktop-v* release found; nothing to pin"
+          fi

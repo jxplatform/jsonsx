@@ -120,10 +120,13 @@ console.log(`[build-msi] Created: ${msiOutput}`);
 const msiBuffer = await Bun.file(msiOutput).arrayBuffer();
 const sha256 = createHash("sha256").update(Buffer.from(msiBuffer)).digest("hex");
 const baseUrl = "https://github.com/jxsuite/jx/releases/download/";
+// The release tag is component-scoped (`desktop-v<version>`), passed in from CI.
+// Fall back to reconstructing it for local builds.
+const releaseTag = process.env.DESKTOP_RELEASE_TAG ?? `desktop-v${pkg.version}`;
 const updateMetadata = {
   date: new Date().toISOString(),
   sha256,
-  url: `${baseUrl}v${pkg.version}/JxStudio.msi`,
+  url: `${baseUrl}${releaseTag}/JxStudio.msi`,
   version: pkg.version,
 };
 await writeFile(join(distDir, "latest.json"), JSON.stringify(updateMetadata, null, 2));

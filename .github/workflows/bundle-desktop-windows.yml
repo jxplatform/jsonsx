@@ -37,6 +37,11 @@ jobs:
         run: bun run build
 
       - name: Build desktop installer
+        env:
+          # build-msi.ts stamps the MSI update manifest (latest.json) with the
+          # release download URL; feed it the actual desktop tag so it doesn't
+          # reconstruct the old `v<version>` scheme.
+          DESKTOP_RELEASE_TAG: ${{ inputs.tag_name }}
         run: bun run desktop:stable
 
       - name: Upload artifacts
@@ -52,4 +57,8 @@ jobs:
         with:
           tag_name: ${{ inputs.tag_name }}
           draft: false
+          # Force the desktop release to be GitHub's "latest" so the Electrobun
+          # updater's releases/latest/download/ feed resolves here. Idempotent
+          # across the concurrent bundler attach jobs.
+          make_latest: true
           files: packages/desktop/artifacts/*

@@ -6,10 +6,15 @@ permissions:
 on:
   workflow_call:
     inputs:
-      tag_name:
-        description: Tag to build and publish.
+      paths_released:
+        description: JSON array of package paths release-please released this run.
         required: true
         type: string
+      sha:
+        description: Release commit (all component tags point here).
+        required: false
+        type: string
+        default: ""
 
 jobs:
   publish:
@@ -17,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag_name }}
+          ref: ${{ inputs.sha || github.sha }}
       - uses: oven-sh/setup-bun@v2
       - uses: actions/setup-node@v6
         with:
@@ -26,35 +31,25 @@ jobs:
       - run: npm install -g npm@latest
       - run: bun install
       - run: bun run build
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/ai
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/schema
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/runtime
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/parser
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/compiler
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/server
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/studio
-      - run: |
-          bun pm pack
-          npm publish --provenance *.tgz
-        working-directory: packages/create
+      - name: Publish released packages (topological, idempotent)
+        env:
+          PATHS_RELEASED: ${{ inputs.paths_released }}
+        run: |
+          set -euo pipefail
+          # npm-publishable packages in dependency order. `desktop` is intentionally
+          # excluded — it ships as installers via the desktop bundlers, never to npm.
+          order=(schema ai runtime parser compiler starters create server studio)
+          mapfile -t released < <(printf '%s' "$PATHS_RELEASED" | jq -r '.[]' | sed 's#^packages/##')
+          is_released () { local x; for x in "${released[@]}"; do [ "$x" = "$1" ] && return 0; done; return 1; }
+          for pkg in "${order[@]}"; do
+            is_released "$pkg" || continue
+            name="$(node -p "require('./packages/$pkg/package.json').name")"
+            ver="$(node -p "require('./packages/$pkg/package.json').version")"
+            echo "::group::@jxsuite/$pkg -> $name@$ver"
+            if npm view "$name@$ver" version >/dev/null 2>&1; then
+              echo "already published, skipping"
+            else
+              ( cd "packages/$pkg" && bun pm pack && npm publish --provenance *.tgz )
+            fi
+            echo "::endgroup::"
+          done

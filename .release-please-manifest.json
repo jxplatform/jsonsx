@@ -1,3 +1,12 @@
 {
-  ".": "0.34.0"
+  "packages/ai": "0.33.0",
+  "packages/schema": "0.34.0",
+  "packages/runtime": "0.34.0",
+  "packages/parser": "0.34.0",
+  "packages/compiler": "0.34.0",
+  "packages/starters": "0.34.0",
+  "packages/create": "0.34.0",
+  "packages/server": "0.34.0",
+  "packages/studio": "0.34.0",
+  "packages/desktop": "0.34.0"
 }

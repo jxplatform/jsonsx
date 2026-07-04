@@ -61,4 +61,8 @@ jobs:
         with:
           tag_name: ${{ inputs.tag_name }}
           draft: false
+          # Force the desktop release to be GitHub's "latest" so the Electrobun
+          # updater's releases/latest/download/ feed resolves here. Idempotent
+          # across the concurrent bundler attach jobs.
+          make_latest: true
           files: packages/desktop/artifacts/*.msix
