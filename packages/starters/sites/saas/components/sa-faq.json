@@ -1,0 +1,413 @@
+{
+  "tagName": "sa-faq",
+  "state": {
+    "open": 0
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width-narrow)",
+    "margin": "0 auto",
+    "borderTop": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 0 },
+                  "value": -1
+                },
+                "value": 0
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "Can I change plans or cancel at any time?" },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 0 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 0 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "Absolutely. Upgrade, downgrade, or cancel from your billing settings whenever you like. Changes are prorated automatically, so you only ever pay for what you use."
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 1 },
+                  "value": -1
+                },
+                "value": 1
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "Is there a free plan?" },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 1 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 1 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "Yes. The Starter plan is free forever and includes up to three projects — no credit card required. It’s a great way to explore Flowlark before inviting your whole team."
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 2 },
+                  "value": -1
+                },
+                "value": 2
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "How does annual billing save me money?" },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 2 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 2 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "Choosing annual billing gives you roughly two months free — a 20% discount versus paying month to month. Toggle the switch above to compare the two side by side."
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 3 },
+                  "value": -1
+                },
+                "value": 3
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "textContent": "Do you offer discounts for startups or nonprofits?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 3 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 3 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "We do. Early-stage startups and registered nonprofits qualify for meaningful discounts on Pro and Scale. Reach out through the contact page and our team will get you set up."
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 4 },
+                  "value": -1
+                },
+                "value": 4
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "Is my data secure?" },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 4 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 4 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "Security is built in, not bolted on. Data is encrypted in transit and at rest, and the Scale plan adds SSO, SCIM provisioning, and audit logs for teams with stricter compliance needs."
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "borderBottom": "1px solid var(--color-border)" },
+      "children": [
+        {
+          "tagName": "button",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/open" },
+              "value": {
+                "operator": "||",
+                "target": {
+                  "operator": "&&",
+                  "target": { "operator": "===", "target": { "$ref": "#/state/open" }, "value": 5 },
+                  "value": -1
+                },
+                "value": 5
+              }
+            }
+          },
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "width": "100%",
+            "padding": "1.4rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-primary)"
+          },
+          "children": [
+            { "tagName": "span", "textContent": "What kind of support do you offer?" },
+            {
+              "tagName": "span",
+              "style": {
+                "flexShrink": "0",
+                "color": "var(--color-primary)",
+                "fontSize": "1.1rem",
+                "transition": "transform 0.2s",
+                "transform": "${state.open === 5 ? 'rotate(180deg)' : 'rotate(0deg)'}"
+              },
+              "textContent": "⌄"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 5 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.4rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.7",
+            "maxWidth": "60ch"
+          },
+          "textContent": "Every plan includes documentation and community help. Pro adds priority email support, and Scale includes a dedicated success manager plus guaranteed response times."
+        }
+      ]
+    }
+  ]
+}

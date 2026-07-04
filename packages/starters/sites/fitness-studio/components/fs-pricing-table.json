@@ -1,0 +1,458 @@
+{
+  "tagName": "fs-pricing-table",
+  "state": {
+    "tier1": "Drop-in",
+    "price1": "$22 / class",
+    "tier2": "Monthly Unlimited",
+    "price2": "$129 / month",
+    "tier3": "Annual Unlimited",
+    "price3": "$1,290 / year"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto",
+    "overflowX": "auto",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)"
+  },
+  "children": [
+    {
+      "tagName": "table",
+      "style": {
+        "width": "100%",
+        "minWidth": "640px",
+        "borderCollapse": "collapse",
+        "fontSize": "0.95rem"
+      },
+      "children": [
+        {
+          "tagName": "thead",
+          "children": [
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "th",
+                  "style": {
+                    "textAlign": "left",
+                    "padding": "1.25rem 1.25rem 1rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "0.8rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.08em",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "What's included"
+                },
+                {
+                  "tagName": "th",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "1.25rem 1rem 1rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "${state.tier1}"
+                },
+                {
+                  "tagName": "th",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "1.25rem 1rem 1rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "2px solid var(--color-primary)"
+                  },
+                  "textContent": "${state.tier2}"
+                },
+                {
+                  "tagName": "th",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "1.25rem 1.25rem 1rem",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "${state.tier3}"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.75rem 1.25rem",
+                    "fontWeight": "600",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Price"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.75rem 1rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "${state.price1}"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.75rem 1rem",
+                    "fontWeight": "600",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "${state.price2}"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.75rem 1.25rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "${state.price3}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "tbody",
+          "children": [
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Unlimited classes"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "All class types (yoga, pilates, HIIT, strength)"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Mat & prop rental"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Free mat storage"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "✓"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Workshop discount"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "fontWeight": "600",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "10%"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "20%"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": {
+                    "padding": "0.85rem 1.25rem",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "Guest passes"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "backgroundColor": "var(--color-bg-cream)",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "fontWeight": "600",
+                    "borderBottom": "1px solid var(--color-border)"
+                  },
+                  "textContent": "4 / year"
+                }
+              ]
+            },
+            {
+              "tagName": "tr",
+              "children": [
+                {
+                  "tagName": "td",
+                  "style": { "padding": "0.85rem 1.25rem" },
+                  "textContent": "Priority booking"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1rem",
+                    "color": "var(--color-text-muted)",
+                    "backgroundColor": "var(--color-bg-cream)"
+                  },
+                  "textContent": "—"
+                },
+                {
+                  "tagName": "td",
+                  "style": {
+                    "textAlign": "center",
+                    "padding": "0.85rem 1.25rem",
+                    "color": "var(--color-accent)",
+                    "fontWeight": "700"
+                  },
+                  "textContent": "✓"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

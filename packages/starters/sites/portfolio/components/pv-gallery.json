@@ -1,0 +1,50 @@
+{
+  "tagName": "pv-gallery",
+  "state": {
+    "img1": { "type": "string", "format": "image", "default": "" },
+    "img2": { "type": "string", "format": "image", "default": "" },
+    "img3": { "type": "string", "format": "image", "default": "" },
+    "alt": "Photograph from the studio"
+  },
+  "style": {
+    "display": "grid",
+    "gridTemplateColumns": "repeat(3, 1fr)",
+    "gap": "1rem",
+    "@--sm": { "gridTemplateColumns": "1fr" }
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": { "src": "${state.img1}", "alt": "${state.alt}", "loading": "lazy" },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "4 / 5",
+        "objectFit": "cover",
+        "borderRadius": "var(--radius)",
+        "display": "block"
+      }
+    },
+    {
+      "tagName": "img",
+      "attributes": { "src": "${state.img2}", "alt": "${state.alt}", "loading": "lazy" },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "4 / 5",
+        "objectFit": "cover",
+        "borderRadius": "var(--radius)",
+        "display": "block"
+      }
+    },
+    {
+      "tagName": "img",
+      "attributes": { "src": "${state.img3}", "alt": "${state.alt}", "loading": "lazy" },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "4 / 5",
+        "objectFit": "cover",
+        "borderRadius": "var(--radius)",
+        "display": "block"
+      }
+    }
+  ]
+}

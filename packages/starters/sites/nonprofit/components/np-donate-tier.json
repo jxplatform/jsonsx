@@ -1,0 +1,89 @@
+{
+  "tagName": "np-donate-tier",
+  "state": {
+    "amount": "",
+    "title": "",
+    "text": "",
+    "featured": false,
+    "cta": "Give this amount",
+    "ctaHref": "/get-involved/"
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "border": "${state.featured ? '2px solid var(--color-accent)' : '1px solid var(--color-border)'}",
+    "boxShadow": "${state.featured ? '0 12px 32px rgba(234,88,12,0.14)' : '0 4px 20px rgba(20,49,42,0.05)'}"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.featured ? 'inline-block' : 'none'}",
+        "alignSelf": "flex-start",
+        "backgroundColor": "var(--color-accent)",
+        "color": "var(--color-text-white)",
+        "fontSize": "0.72rem",
+        "fontWeight": "600",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "padding": "0.25rem 0.7rem",
+        "borderRadius": "999px",
+        "marginBottom": "0.9rem"
+      },
+      "textContent": "Most popular"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "2.5rem",
+        "fontWeight": "700",
+        "lineHeight": "1",
+        "color": "var(--color-primary)"
+      },
+      "textContent": "${state.amount}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.15rem",
+        "fontWeight": "600",
+        "margin": "0.9rem 0 0.4rem"
+      },
+      "textContent": "${state.title}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0 0 1.5rem",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.95rem",
+        "lineHeight": "1.6",
+        "flex": "1"
+      },
+      "textContent": "${state.text}"
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.ctaHref}" },
+      "style": {
+        "display": "block",
+        "textAlign": "center",
+        "backgroundColor": "${state.featured ? 'var(--color-accent)' : 'var(--color-primary)'}",
+        "color": "var(--color-text-white)",
+        "padding": "0.75rem 1.25rem",
+        "borderRadius": "999px",
+        "textDecoration": "none",
+        "fontWeight": "600",
+        "fontSize": "0.98rem",
+        "transition": "opacity 0.15s",
+        ":hover": { "opacity": "0.9" }
+      },
+      "textContent": "${state.cta}"
+    }
+  ]
+}

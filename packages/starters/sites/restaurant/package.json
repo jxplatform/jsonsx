@@ -1,0 +1,15 @@
+{
+  "name": "bistro-cafe",
+  "private": true,
+  "description": "A neighborhood bistro and café serving seasonal plates, house pastries, and small-batch coffee.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^0.19.0",
+    "@jxsuite/runtime": "^0.19.0"
+  }
+}

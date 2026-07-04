@@ -85,6 +85,20 @@
             },
             {
               "tagName": "a",
+              "attributes": { "href": "/templates" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "transition": "color 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Templates"]
+            },
+            {
+              "tagName": "a",
               "attributes": { "href": "/compare" },
               "style": {
                 "color": "var(--color-text-secondary)",

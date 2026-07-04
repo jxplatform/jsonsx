@@ -1,0 +1,97 @@
+{
+  "tagName": "ev-cta",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "text": "",
+    "cta": "Get Tickets",
+    "ctaHref": "/tickets/",
+    "note": ""
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundImage": "linear-gradient(120deg, rgba(124, 58, 237, 0.55), rgba(236, 72, 153, 0.35))",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
+    "textAlign": "center",
+    "overflow": "hidden"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto",
+        "position": "relative",
+        "zIndex": "1"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.eyebrow ? 'block' : 'none'}",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "fontSize": "0.8rem",
+            "fontWeight": "600",
+            "opacity": "0.85",
+            "margin": "0 0 0.9rem"
+          },
+          "textContent": "${state.eyebrow}"
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(1.9rem, 4vw, 2.9rem)",
+            "fontWeight": "700",
+            "lineHeight": "1.12",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "1.1rem",
+            "lineHeight": "1.7",
+            "opacity": "0.9",
+            "margin": "0 0 2rem"
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.ctaHref}" },
+          "style": {
+            "display": "inline-block",
+            "backgroundColor": "var(--color-text-white)",
+            "color": "var(--color-primary)",
+            "padding": "0.95rem 2.5rem",
+            "borderRadius": "999px",
+            "fontSize": "1.05rem",
+            "fontWeight": "700",
+            "textDecoration": "none",
+            "transition": "transform 0.15s, box-shadow 0.15s",
+            "boxShadow": "0 10px 30px rgba(0, 0, 0, 0.25)",
+            ":hover": { "transform": "translateY(-2px)" }
+          },
+          "textContent": "${state.cta}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "margin": "1.1rem 0 0",
+            "fontSize": "0.9rem",
+            "opacity": "0.8"
+          },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { handleStudioApi } from "../src/studio-api";
 import { join, resolve } from "node:path";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const FIXTURES = resolve(import.meta.dir, "_studio_gaps_fixtures");
@@ -289,6 +289,32 @@ describe("create-project", () => {
     expect(readFileSync(join(ROOT, "generated-site", "project.json"), "utf8")).toContain(
       "Generated Site",
     );
+  });
+
+  test("clones a starter template when one is selected", async () => {
+    const { req, url } = jsonReq("/__studio/create-project", "POST", {
+      directory: "from-starter",
+      name: "My Cafe",
+      starter: "restaurant",
+    });
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.root).toBe("from-starter");
+    expect(body.config.name).toBe("My Cafe");
+    // The starter's menu content collection came along with the clone.
+    expect(existsSync(join(ROOT, "from-starter", "content", "menu"))).toBe(true);
+  });
+});
+
+describe("starters", () => {
+  test("lists the available starter templates", async () => {
+    const { req, url } = getReq("/__studio/starters");
+    const res = await callApi(req, url);
+    expect(res.status).toBe(200);
+    const starters = (await res.json()) as { id: string }[];
+    expect(Array.isArray(starters)).toBe(true);
+    expect(starters.some((s) => s.id === "restaurant")).toBe(true);
   });
 });
 

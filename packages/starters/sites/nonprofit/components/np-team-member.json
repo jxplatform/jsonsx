@@ -1,0 +1,67 @@
+{
+  "tagName": "np-team-member",
+  "state": {
+    "initials": "",
+    "name": "",
+    "role": "",
+    "bio": ""
+  },
+  "style": {
+    "display": "block",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "width": "4.5rem",
+        "height": "4.5rem",
+        "margin": "0 auto 1rem",
+        "borderRadius": "999px",
+        "backgroundColor": "var(--color-primary)",
+        "color": "var(--color-text-white)",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "fontFamily": "var(--font-heading)",
+        "fontWeight": "700",
+        "fontSize": "1.4rem"
+      },
+      "textContent": "${state.initials}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.2rem",
+        "fontWeight": "600",
+        "margin": "0 0 0.2rem"
+      },
+      "textContent": "${state.name}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0 0 0.75rem",
+        "color": "var(--color-primary)",
+        "fontWeight": "600",
+        "fontSize": "0.9rem"
+      },
+      "textContent": "${state.role}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.95rem",
+        "lineHeight": "1.6"
+      },
+      "textContent": "${state.bio}"
+    }
+  ]
+}

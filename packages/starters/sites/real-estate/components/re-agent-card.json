@@ -1,0 +1,66 @@
+{
+  "tagName": "re-agent-card",
+  "state": {
+    "name": "",
+    "role": "",
+    "phone": "",
+    "image": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": { "src": "${state.image}", "alt": "${state.name}", "loading": "lazy" },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "1 / 1",
+        "objectFit": "cover",
+        "display": "block"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": { "padding": "1.25rem" },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.15rem",
+            "fontWeight": "700",
+            "margin": "0 0 0.25rem"
+          },
+          "textContent": "${state.name}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0 0 0.75rem",
+            "color": "var(--color-primary)",
+            "fontSize": "0.85rem",
+            "fontWeight": "700",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.08em"
+          },
+          "textContent": "${state.role}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "color": "var(--color-text-muted)",
+            "fontSize": "0.95rem"
+          },
+          "textContent": "${state.phone}"
+        }
+      ]
+    }
+  ]
+}

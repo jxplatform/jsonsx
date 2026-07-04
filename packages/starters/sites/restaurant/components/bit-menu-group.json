@@ -1,0 +1,29 @@
+{
+  "tagName": "bit-menu-group",
+  "state": {
+    "heading": ""
+  },
+  "style": {
+    "display": "block",
+    "marginBottom": "3rem"
+  },
+  "children": [
+    {
+      "tagName": "h2",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.7rem",
+        "fontWeight": "700",
+        "color": "var(--color-primary)",
+        "margin": "0 0 1.25rem",
+        "paddingBottom": "0.5rem",
+        "borderBottom": "2px solid var(--color-primary)"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "div",
+      "children": [{ "tagName": "slot" }]
+    }
+  ]
+}

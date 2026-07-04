@@ -1,0 +1,22 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/sa-nav.json" },
+    { "$ref": "../components/sa-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "sa-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    { "tagName": "sa-footer" }
+  ]
+}

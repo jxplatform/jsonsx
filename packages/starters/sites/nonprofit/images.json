@@ -1,0 +1,54 @@
+{
+  "site": "nonprofit",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "community volunteers helping",
+      "orientation": "landscape",
+      "photoId": 6647015
+    },
+    {
+      "role": "about",
+      "query": "volunteers group community",
+      "orientation": "landscape",
+      "photoId": 6647025
+    },
+    {
+      "role": "program-1",
+      "query": "food bank donation",
+      "orientation": "landscape",
+      "photoId": 7156158
+    },
+    {
+      "role": "program-2",
+      "query": "youth mentoring education",
+      "orientation": "landscape",
+      "photoId": 7692637
+    },
+    {
+      "role": "program-3",
+      "query": "community garden volunteers",
+      "orientation": "landscape",
+      "photoId": 26614518
+    },
+    {
+      "role": "program-4",
+      "query": "family home keys housing support",
+      "orientation": "landscape",
+      "photoId": 7766930
+    },
+    {
+      "role": "program-5",
+      "query": "job training workshop adults",
+      "orientation": "landscape",
+      "photoId": 29521026
+    },
+    {
+      "role": "cta-bg",
+      "query": "hands helping community",
+      "orientation": "landscape",
+      "photoId": 7345444
+    }
+  ]
+}

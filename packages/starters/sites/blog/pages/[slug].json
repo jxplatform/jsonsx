@@ -1,0 +1,148 @@
+{
+  "$layout": "./layouts/post.json",
+  "$paths": {
+    "contentType": "posts",
+    "param": "slug",
+    "field": "id"
+  },
+  "title": "${state.entry.data.title} — The Long Field",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "${state.entry.data.excerpt}"
+      }
+    }
+  ],
+  "state": {
+    "entry": {
+      "$prototype": "ContentEntry",
+      "contentType": "posts",
+      "field": "id",
+      "id": { "$ref": "#/$params/slug" },
+      "$src": "@jxsuite/parser/ContentEntry.class.json"
+    }
+  },
+  "children": [
+    {
+      "tagName": "a",
+      "attributes": { "href": "/" },
+      "style": {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "gap": "0.4rem",
+        "color": "var(--color-primary)",
+        "textDecoration": "none",
+        "fontWeight": "600",
+        "fontSize": "0.95rem",
+        "marginBottom": "2rem",
+        ":hover": { "textDecoration": "underline" }
+      },
+      "textContent": "← All writing"
+    },
+    {
+      "tagName": "header",
+      "style": { "marginBottom": "2rem" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "marginBottom": "1.1rem" },
+          "children": [
+            { "tagName": "bl-tag-pill", "$props": { "label": "${state.entry.data.tag}" } }
+          ]
+        },
+        {
+          "tagName": "h1",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(2.1rem, 5vw, 3.2rem)",
+            "fontWeight": "600",
+            "lineHeight": "1.1",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem",
+            "color": "var(--color-text-primary)"
+          },
+          "textContent": "${state.entry.data.title}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.35rem",
+            "lineHeight": "1.5",
+            "color": "var(--color-text-muted)",
+            "fontStyle": "italic",
+            "margin": "0 0 1.5rem"
+          },
+          "textContent": "${state.entry.data.excerpt}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "0.6rem",
+            "fontSize": "0.9rem",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.06em",
+            "color": "var(--color-text-muted)",
+            "borderTop": "1px solid var(--color-border)",
+            "paddingTop": "1.25rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "fontWeight": "600", "color": "var(--color-text-primary)" },
+              "textContent": "${state.entry.data.author}"
+            },
+            { "tagName": "span", "textContent": "·" },
+            { "tagName": "span", "textContent": "${state.entry.data.date}" }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "img",
+      "attributes": {
+        "src": "${state.entry.data.cover}",
+        "alt": "${state.entry.data.title}",
+        "loading": "lazy"
+      },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "16 / 9",
+        "objectFit": "cover",
+        "borderRadius": "var(--radius)",
+        "marginBottom": "2.5rem",
+        "display": "${state.entry.data.cover ? 'block' : 'none'}"
+      }
+    },
+    {
+      "tagName": "bl-prose",
+      "children": "${state.entry.$children}"
+    },
+    {
+      "tagName": "hr",
+      "style": {
+        "border": "none",
+        "borderTop": "1px solid var(--color-border)",
+        "margin": "3rem 0 2.5rem"
+      }
+    },
+    {
+      "tagName": "bl-author-bio",
+      "$props": {
+        "name": "${state.entry.data.author}",
+        "role": "Writer & editor",
+        "bio": "Marren Oda writes The Long Field — slow essays on design, technology, and the craft of making things well.",
+        "avatar": "/images/author.jpg"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": { "marginTop": "2.5rem" },
+      "children": [{ "tagName": "bl-newsletter-cta" }]
+    }
+  ]
+}

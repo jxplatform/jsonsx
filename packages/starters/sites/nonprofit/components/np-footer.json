@@ -1,0 +1,187 @@
+{
+  "tagName": "np-footer",
+  "state": {
+    "brand": "Rivertown Foundation",
+    "tagline": "Neighbors helping neighbors across Rivertown since 2007.",
+    "address": "240 Riverside Avenue, Rivertown",
+    "phone": "(555) 204-7788",
+    "email": "hello@rivertownfoundation.org"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.35rem",
+                "fontWeight": "700",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 1.25rem", "opacity": "0.75", "maxWidth": "34ch" },
+              "textContent": "${state.tagline}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/get-involved/" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-accent)",
+                "color": "var(--color-text-white)",
+                "padding": "0.6rem 1.5rem",
+                "borderRadius": "999px",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem"
+              },
+              "textContent": "Donate"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/programs/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Programs"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/get-involved/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Get Involved"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Visit"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.address}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.phone}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.85" },
+              "textContent": "${state.email}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.6",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "flexWrap": "wrap",
+        "gap": "0.5rem"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Rivertown Foundation. A registered 501(c)(3) nonprofit."
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "Built with Jx."
+        }
+      ]
+    }
+  ]
+}

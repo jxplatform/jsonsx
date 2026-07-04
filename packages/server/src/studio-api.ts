@@ -436,8 +436,9 @@ export async function handleStudioApi(
         url?: string;
         adapter?: "static" | "cloudflare-pages" | "cloudflare-workers" | "node" | "bun";
         directory?: string;
+        starter?: string;
       };
-      const { name, description, url: siteUrl, adapter, directory } = body;
+      const { name, description, url: siteUrl, adapter, directory, starter } = body;
       if (!name || !directory) {
         return Response.json({ error: "name and directory are required" }, { status: 400 });
       }
@@ -450,6 +451,7 @@ export async function handleStudioApi(
         ...(adapter !== undefined ? { adapter } : {}),
         ...(description !== undefined ? { description } : {}),
         ...(siteUrl !== undefined ? { url: siteUrl } : {}),
+        ...(starter !== undefined ? { starter } : {}),
       });
 
       const config = JSON.parse(
@@ -457,6 +459,16 @@ export async function handleStudioApi(
       ) as ProjectConfig;
       const projectRoot = fwd(relative(root, destPath));
       return Response.json({ config, root: projectRoot });
+    } catch (error) {
+      return Response.json({ error: errorMessage(error) }, { status: 500 });
+    }
+  }
+
+  // List available starter templates (for the New Project picker)
+  if (path === "/__studio/starters" && req.method === "GET") {
+    try {
+      const { listStarters } = await import("@jxsuite/starters");
+      return Response.json(listStarters());
     } catch (error) {
       return Response.json({ error: errorMessage(error) }, { status: 500 });
     }

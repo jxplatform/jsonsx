@@ -1,0 +1,83 @@
+{
+  "tagName": "shp-service",
+  "state": {
+    "icon": "",
+    "title": "",
+    "text": "",
+    "price": ""
+  },
+  "style": {
+    "display": "flex",
+    "gap": "1rem",
+    "alignItems": "flex-start",
+    "padding": "1.5rem",
+    "backgroundColor": "var(--color-bg-cream)",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "flex": "0 0 auto",
+        "width": "2.75rem",
+        "height": "2.75rem",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "borderRadius": "0.6rem",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
+        "fontSize": "1.35rem",
+        "lineHeight": "1"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "baseline",
+            "justifyContent": "space-between",
+            "gap": "0.75rem"
+          },
+          "children": [
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.15rem",
+                "fontWeight": "600",
+                "margin": "0"
+              },
+              "textContent": "${state.title}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.price ? 'inline' : 'none'}",
+                "fontWeight": "700",
+                "color": "var(--color-primary)",
+                "whiteSpace": "nowrap"
+              },
+              "textContent": "${state.price}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0.35rem 0 0",
+            "color": "var(--color-text-muted)",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.6"
+          },
+          "textContent": "${state.text}"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "tagName": "hs-cta",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "text": "",
+    "cta": "Get a Free Quote",
+    "ctaHref": "/contact/",
+    "phone": "",
+    "phoneHref": "tel:+19705550148",
+    "bg": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundImage": "url('${state.bg}')",
+    "backgroundSize": "cover",
+    "backgroundPosition": "center",
+    "color": "var(--color-text-white)",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "linear-gradient(180deg, rgba(28,25,23,0.82) 0%, rgba(28,25,23,0.9) 100%)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto",
+        "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.eyebrow ? 'block' : 'none'}",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "fontSize": "0.8rem",
+            "fontWeight": "700",
+            "color": "#fed7aa",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "${state.eyebrow}"
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
+            "fontWeight": "800",
+            "lineHeight": "1.12",
+            "letterSpacing": "-0.03em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "1.1rem",
+            "lineHeight": "1.7",
+            "opacity": "0.9",
+            "margin": "0 0 2rem"
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "gap": "0.75rem",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "center"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.ctaHref}" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.9rem 2.25rem",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1.05rem",
+                "fontWeight": "700",
+                "textDecoration": "none",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "${state.cta}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.phoneHref}" },
+              "style": {
+                "display": "${state.phone ? 'inline-block' : 'none'}",
+                "color": "var(--color-text-white)",
+                "fontSize": "1.05rem",
+                "fontWeight": "700",
+                "textDecoration": "none",
+                "opacity": "0.95",
+                ":hover": { "color": "#fed7aa" }
+              },
+              "textContent": "or call ${state.phone}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

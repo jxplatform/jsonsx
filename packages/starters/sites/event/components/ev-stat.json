@@ -1,0 +1,42 @@
+{
+  "tagName": "ev-stat",
+  "state": {
+    "value": "",
+    "label": ""
+  },
+  "style": {
+    "display": "block",
+    "textAlign": "center",
+    "padding": "0.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2.25rem, 5vw, 3.25rem)",
+        "fontWeight": "700",
+        "lineHeight": "1",
+        "letterSpacing": "-0.02em",
+        "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
+        "WebkitBackgroundClip": "text",
+        "backgroundClip": "text",
+        "WebkitTextFillColor": "transparent",
+        "color": "var(--color-primary)"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "0.5rem",
+        "fontSize": "0.9rem",
+        "fontWeight": "500",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

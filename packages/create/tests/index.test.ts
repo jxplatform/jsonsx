@@ -6,7 +6,8 @@ import { describe, expect, mock, test } from "bun:test";
 import { basename, resolve } from "node:path";
 
 const prompts: string[] = [];
-const answers = ["", "A test site", "https://test.example", "2"];
+// Answers in prompt order: name, description, url, template (2 = first starter), adapter (2 = cf).
+const answers = ["", "A test site", "https://test.example", "2", "2"];
 
 void mock.module("node:readline/promises", () => ({
   createInterface: () => ({
@@ -16,6 +17,10 @@ void mock.module("node:readline/promises", () => ({
       return Promise.resolve(answers.shift() ?? "");
     },
   }),
+}));
+
+void mock.module("@jxsuite/starters", () => ({
+  listStarters: () => [{ id: "restaurant", name: "Bistro & Café", tagline: "A menu-driven site." }],
 }));
 
 const generateProject = mock(() => Promise.resolve());
@@ -39,21 +44,29 @@ await cliModule.ready;
 const destPath = resolve("my-test-site");
 
 describe("create-jxsuite CLI", () => {
-  test("asks for name, description, URL, and adapter", () => {
-    expect(prompts).toHaveLength(4);
+  test("asks for name, description, URL, template, and adapter", () => {
+    expect(prompts).toHaveLength(5);
     expect(prompts[0]).toBe(`Project name (${basename(destPath)}): `);
     expect(prompts[1]).toBe("Description: ");
     expect(prompts[2]).toBe("Production URL (https://example.com): ");
-    expect(prompts[3]).toBe("Adapter [1]: ");
+    expect(prompts[3]).toBe("Template [1]: ");
+    expect(prompts[4]).toBe("Adapter [1]: ");
   });
 
-  test("defaults the project name to the directory name when left blank", () => {
+  test("defaults the project name to the directory name and applies the chosen starter", () => {
     expect(generateProject).toHaveBeenCalledWith(destPath, {
       adapter: "cloudflare-pages",
       description: "A test site",
       name: basename(destPath),
+      starter: "restaurant",
       url: "https://test.example",
     });
+  });
+
+  test("lists the available starter templates", () => {
+    const output = logs.join("\n");
+    expect(output).toContain("Start from a template:");
+    expect(output).toContain("Bistro & Café");
   });
 
   test("resolves the destination relative to the working directory", () => {

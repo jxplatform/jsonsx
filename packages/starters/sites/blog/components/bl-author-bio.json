@@ -1,0 +1,82 @@
+{
+  "tagName": "bl-author-bio",
+  "state": {
+    "name": "",
+    "role": "Writer & editor",
+    "bio": "",
+    "avatar": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "padding": "1.75rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "gap": "1.25rem",
+        "alignItems": "center",
+        "@--sm": { "flexDirection": "column", "textAlign": "center" }
+      },
+      "children": [
+        {
+          "tagName": "img",
+          "attributes": {
+            "src": "${state.avatar}",
+            "alt": "${state.name}",
+            "loading": "lazy"
+          },
+          "style": {
+            "display": "${state.avatar ? 'block' : 'none'}",
+            "width": "72px",
+            "height": "72px",
+            "borderRadius": "999px",
+            "objectFit": "cover",
+            "flexShrink": "0"
+          }
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "600",
+                "color": "var(--color-primary)",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "${state.role}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.3rem",
+                "fontWeight": "600",
+                "margin": "0 0 0.4rem"
+              },
+              "textContent": "${state.name}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.6"
+              },
+              "textContent": "${state.bio}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

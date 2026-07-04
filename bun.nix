@@ -755,6 +755,7 @@
   "@jxsuite/schema" = copyPathToStore ./packages/schema;
   "@jxsuite/server" = copyPathToStore ./packages/server;
   "@jxsuite/site-jxsuite.com" = copyPathToStore ./sites/jxsuite.com;
+  "@jxsuite/starters" = copyPathToStore ./packages/starters;
   "@jxsuite/studio" = copyPathToStore ./packages/studio;
   "@lit-labs/observers@2.0.2" = fetchurl {
     url = "https://registry.npmjs.org/@lit-labs/observers/-/observers-2.0.2.tgz";

@@ -1,0 +1,66 @@
+{
+  "site": "restaurant",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "cozy restaurant interior warm lighting",
+      "orientation": "landscape",
+      "photoId": 14590691
+    },
+    {
+      "role": "intro",
+      "query": "chef plating gourmet dish kitchen",
+      "orientation": "landscape",
+      "photoId": 36430088
+    },
+    {
+      "role": "about",
+      "query": "restaurant kitchen chef cooking",
+      "orientation": "landscape",
+      "photoId": 2977514
+    },
+    {
+      "role": "gallery-1",
+      "query": "gourmet plated food fine dining",
+      "orientation": "square",
+      "photoId": 1327393
+    },
+    {
+      "role": "gallery-2",
+      "query": "latte art coffee cafe",
+      "orientation": "square",
+      "photoId": 19252265
+    },
+    {
+      "role": "gallery-3",
+      "query": "fresh croissants pastries bakery",
+      "orientation": "square",
+      "photoId": 16192282
+    },
+    {
+      "role": "gallery-4",
+      "query": "restaurant dining table place setting",
+      "orientation": "square",
+      "photoId": 17057034
+    },
+    {
+      "role": "dish-starters",
+      "query": "fresh salad appetizer plate",
+      "orientation": "landscape",
+      "photoId": 251599
+    },
+    {
+      "role": "dish-mains",
+      "query": "seared steak main course plated",
+      "orientation": "landscape",
+      "photoId": 25205263
+    },
+    {
+      "role": "dish-desserts",
+      "query": "chocolate dessert plate restaurant",
+      "orientation": "landscape",
+      "photoId": 33731580
+    }
+  ]
+}

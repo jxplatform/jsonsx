@@ -1,0 +1,42 @@
+{
+  "site": "event",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "conference stage audience",
+      "orientation": "landscape",
+      "photoId": 9275222
+    },
+    {
+      "role": "speaker-1",
+      "query": "professional speaker headshot",
+      "orientation": "portrait",
+      "photoId": 37148334
+    },
+    {
+      "role": "speaker-2",
+      "query": "professional speaker headshot",
+      "orientation": "portrait",
+      "photoId": 37148334
+    },
+    {
+      "role": "speaker-3",
+      "query": "professional speaker headshot",
+      "orientation": "portrait",
+      "photoId": 37148334
+    },
+    {
+      "role": "speaker-4",
+      "query": "professional speaker headshot",
+      "orientation": "portrait",
+      "photoId": 37148334
+    },
+    {
+      "role": "venue",
+      "query": "conference venue hall",
+      "orientation": "landscape",
+      "photoId": 16859956
+    }
+  ]
+}

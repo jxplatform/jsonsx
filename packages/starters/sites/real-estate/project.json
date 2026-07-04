@@ -1,0 +1,109 @@
+{
+  "name": "Northshore Realty",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Northshore Realty helps buyers and sellers find their place on the north shore — browse current listings, filter by price and bedrooms, and work with agents who know the neighborhood."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#0e7490",
+    "--color-primary-hover": "#155e75",
+    "--color-navy": "#1e3a8a",
+    "--color-bg-dark": "#0f172a",
+    "--color-bg-cream": "#f1f5f9",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#0f172a",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#64748b",
+    "--color-border": "#e2e8f0",
+    "--color-accent": "#0e7490",
+    "--font-heading": "'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.5rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "Csv": "@jxsuite/parser/Csv.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "listings": {
+      "source": "./content/listings.csv",
+      "format": "Csv",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "Title": { "type": "string" },
+          "slug": { "type": "string" },
+          "price": { "type": "number" },
+          "beds": { "type": "number" },
+          "baths": { "type": "number" },
+          "sqft": { "type": "number" },
+          "city": { "type": "string" },
+          "image": { "type": "string", "format": "image" },
+          "order": { "type": "number" }
+        },
+        "required": ["Title", "slug"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

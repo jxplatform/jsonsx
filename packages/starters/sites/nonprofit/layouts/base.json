@@ -1,0 +1,22 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/np-nav.json" },
+    { "$ref": "../components/np-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "np-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    { "tagName": "np-footer" }
+  ]
+}

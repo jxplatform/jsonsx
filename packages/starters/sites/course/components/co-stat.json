@@ -1,0 +1,36 @@
+{
+  "tagName": "co-stat",
+  "state": {
+    "value": "",
+    "label": ""
+  },
+  "style": {
+    "display": "block",
+    "textAlign": "center",
+    "padding": "0.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2rem, 4vw, 2.75rem)",
+        "fontWeight": "800",
+        "lineHeight": "1",
+        "color": "var(--color-primary)",
+        "letterSpacing": "-0.02em"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "0.5rem",
+        "fontSize": "0.9rem",
+        "fontWeight": "500",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

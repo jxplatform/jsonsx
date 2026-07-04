@@ -1,0 +1,133 @@
+{
+  "tagName": "co-pricing",
+  "state": {
+    "badge": "",
+    "plan": "Full Program",
+    "price": "",
+    "period": "",
+    "description": "",
+    "cta": "Enroll Now",
+    "ctaHref": "/enroll/",
+    "note": ""
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "460px",
+    "margin": "0 auto",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "1rem",
+    "overflow": "hidden",
+    "boxShadow": "0 20px 60px rgba(15,23,42,0.1)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.badge ? 'block' : 'none'}",
+        "backgroundColor": "var(--color-primary)",
+        "color": "var(--color-text-white)",
+        "textAlign": "center",
+        "padding": "0.6rem 1rem",
+        "fontSize": "0.8rem",
+        "fontWeight": "700",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em"
+      },
+      "textContent": "${state.badge}"
+    },
+    {
+      "tagName": "div",
+      "style": { "padding": "clamp(1.75rem, 4vw, 2.5rem)" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.1rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-muted)",
+            "marginBottom": "0.5rem"
+          },
+          "textContent": "${state.plan}"
+        },
+        {
+          "tagName": "div",
+          "style": { "display": "flex", "alignItems": "baseline", "gap": "0.4rem" },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(2.5rem, 6vw, 3.25rem)",
+                "fontWeight": "800",
+                "letterSpacing": "-0.03em",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.price}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.period ? 'inline' : 'none'}",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "fontWeight": "500"
+              },
+              "textContent": "${state.period}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.description ? 'block' : 'none'}",
+            "margin": "0.85rem 0 1.5rem",
+            "color": "var(--color-text-muted)",
+            "fontSize": "1rem",
+            "lineHeight": "1.65"
+          },
+          "textContent": "${state.description}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "margin": "0 0 1.75rem",
+            "fontSize": "0.98rem",
+            "lineHeight": "1.6"
+          },
+          "children": [{ "tagName": "slot" }]
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.ctaHref}" },
+          "style": {
+            "display": "block",
+            "textAlign": "center",
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.9rem 1.5rem",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1.05rem",
+            "fontWeight": "700",
+            "textDecoration": "none",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          },
+          "textContent": "${state.cta}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "margin": "1rem 0 0",
+            "textAlign": "center",
+            "fontSize": "0.85rem",
+            "color": "var(--color-text-muted)"
+          },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

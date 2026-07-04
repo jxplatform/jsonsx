@@ -1,0 +1,170 @@
+{
+  "tagName": "co-application",
+  "state": {
+    "heading": "Start your application"
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "1rem", "alignContent": "start", "marginTop": "1.5rem" },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Email address",
+            "required": "true",
+            "aria-label": "Email address"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "1rem",
+            "@--sm": { "gridTemplateColumns": "1fr" }
+          },
+          "children": [
+            {
+              "tagName": "select",
+              "attributes": { "name": "cohort", "aria-label": "Preferred cohort" },
+              "style": {
+                "width": "100%",
+                "padding": "0.8rem 0.95rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem",
+                "backgroundColor": "var(--color-bg-white)"
+              },
+              "children": [
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                  "textContent": "Preferred cohort"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "fall" },
+                  "textContent": "Fall 2026 · Sept 8"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "winter" },
+                  "textContent": "Winter 2027 · Jan 12"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "unsure" },
+                  "textContent": "Not sure yet"
+                }
+              ]
+            },
+            {
+              "tagName": "select",
+              "attributes": { "name": "experience", "aria-label": "Coding experience" },
+              "style": {
+                "width": "100%",
+                "padding": "0.8rem 0.95rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem",
+                "backgroundColor": "var(--color-bg-white)"
+              },
+              "children": [
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "", "disabled": "true", "selected": "true" },
+                  "textContent": "Coding experience"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "none" },
+                  "textContent": "Complete beginner"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "some" },
+                  "textContent": "Some self-taught"
+                },
+                {
+                  "tagName": "option",
+                  "attributes": { "value": "cs" },
+                  "textContent": "CS / bootcamp background"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "goals",
+            "rows": "3",
+            "placeholder": "What are you hoping to build or become?",
+            "aria-label": "Your goals"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.8rem 0.95rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "textContent": "Submit Application",
+          "style": {
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.9rem 1.75rem",
+            "border": "none",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontWeight": "700",
+            "cursor": "pointer",
+            "justifySelf": "start",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          }
+        },
+        {
+          "tagName": "p",
+          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
+          "textContent": "This is a demo form. Wire it to your CRM or email in pages/enroll.md."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "tagName": "co-module-card",
+  "state": {
+    "order": "",
+    "title": "",
+    "summary": "",
+    "duration": ""
+  },
+  "style": {
+    "display": "flex",
+    "gap": "1.25rem",
+    "alignItems": "flex-start",
+    "padding": "1.5rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "flex": "none",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "2.75rem",
+        "height": "2.75rem",
+        "borderRadius": "0.6rem",
+        "backgroundColor": "var(--color-primary)",
+        "color": "var(--color-text-white)",
+        "fontFamily": "var(--font-heading)",
+        "fontWeight": "800",
+        "fontSize": "1.1rem"
+      },
+      "textContent": "${state.order}"
+    },
+    {
+      "tagName": "div",
+      "style": { "flex": "1" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "alignItems": "baseline",
+            "gap": "1rem",
+            "flexWrap": "wrap"
+          },
+          "children": [
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "margin": "0"
+              },
+              "textContent": "${state.title}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "display": "${state.duration ? 'inline-block' : 'none'}",
+                "flex": "none",
+                "fontSize": "0.75rem",
+                "fontWeight": "700",
+                "textTransform": "uppercase",
+                "letterSpacing": "0.06em",
+                "color": "var(--color-primary)",
+                "backgroundColor": "rgba(37,99,235,0.1)",
+                "padding": "0.25rem 0.65rem",
+                "borderRadius": "999px"
+              },
+              "textContent": "${state.duration}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.summary ? 'block' : 'none'}",
+            "margin": "0.4rem 0 0",
+            "color": "var(--color-text-muted)",
+            "fontSize": "0.98rem",
+            "lineHeight": "1.65"
+          },
+          "textContent": "${state.summary}"
+        }
+      ]
+    }
+  ]
+}

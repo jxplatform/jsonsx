@@ -1,0 +1,43 @@
+{
+  "tagName": "hs-feature",
+  "state": {
+    "icon": "",
+    "title": "",
+    "text": ""
+  },
+  "style": {
+    "display": "block",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "fontSize": "1.75rem", "marginBottom": "0.75rem", "lineHeight": "1" },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.25rem",
+        "fontWeight": "700",
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 0.5rem"
+      },
+      "textContent": "${state.title}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.98rem",
+        "lineHeight": "1.65"
+      },
+      "textContent": "${state.text}"
+    }
+  ]
+}

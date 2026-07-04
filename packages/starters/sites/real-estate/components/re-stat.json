@@ -1,0 +1,36 @@
+{
+  "tagName": "re-stat",
+  "state": {
+    "value": "",
+    "label": ""
+  },
+  "style": {
+    "display": "block",
+    "textAlign": "center",
+    "padding": "1rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2.25rem, 5vw, 3rem)",
+        "fontWeight": "800",
+        "lineHeight": "1",
+        "color": "var(--color-primary)",
+        "letterSpacing": "-0.02em"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "0.5rem",
+        "fontSize": "0.95rem",
+        "color": "var(--color-text-muted)",
+        "fontWeight": "600"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

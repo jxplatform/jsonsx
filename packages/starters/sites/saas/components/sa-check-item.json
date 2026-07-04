@@ -1,0 +1,40 @@
+{
+  "tagName": "sa-check-item",
+  "state": {
+    "text": ""
+  },
+  "style": {
+    "display": "flex",
+    "alignItems": "flex-start",
+    "gap": "0.7rem"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "flexShrink": "0",
+        "width": "1.4rem",
+        "height": "1.4rem",
+        "borderRadius": "50%",
+        "backgroundColor": "var(--color-accent-soft)",
+        "color": "var(--color-primary)",
+        "fontSize": "0.8rem",
+        "fontWeight": "700",
+        "marginTop": "0.1rem"
+      },
+      "textContent": "✓"
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "color": "var(--color-text-primary)",
+        "fontSize": "1rem",
+        "lineHeight": "1.6"
+      },
+      "textContent": "${state.text}"
+    }
+  ]
+}

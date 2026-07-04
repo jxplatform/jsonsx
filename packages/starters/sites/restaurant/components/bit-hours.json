@@ -1,0 +1,90 @@
+{
+  "tagName": "bit-hours",
+  "state": {
+    "heading": "Hours",
+    "weekdays": "7:00am – 3:00pm",
+    "saturday": "8:00am – 4:00pm",
+    "sunday": "8:00am – 2:00pm",
+    "note": "Kitchen closes 30 minutes before close."
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "padding": "2rem"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.4rem",
+        "fontWeight": "700",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "justifyContent": "space-between",
+        "padding": "0.6rem 0",
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Monday – Friday" },
+        {
+          "tagName": "span",
+          "style": { "color": "var(--color-text-muted)" },
+          "textContent": "${state.weekdays}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "justifyContent": "space-between",
+        "padding": "0.6rem 0",
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
+        {
+          "tagName": "span",
+          "style": { "color": "var(--color-text-muted)" },
+          "textContent": "${state.saturday}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "justifyContent": "space-between",
+        "padding": "0.6rem 0"
+      },
+      "children": [
+        { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
+        {
+          "tagName": "span",
+          "style": { "color": "var(--color-text-muted)" },
+          "textContent": "${state.sunday}"
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.note ? 'block' : 'none'}",
+        "margin": "1.25rem 0 0",
+        "fontSize": "0.85rem",
+        "color": "var(--color-text-muted)",
+        "fontStyle": "italic"
+      },
+      "textContent": "${state.note}"
+    }
+  ]
+}

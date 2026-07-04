@@ -1,0 +1,22 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/hs-nav.json" },
+    { "$ref": "../components/hs-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "hs-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    { "tagName": "hs-footer" }
+  ]
+}

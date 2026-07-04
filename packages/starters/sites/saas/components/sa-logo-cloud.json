@@ -1,0 +1,119 @@
+{
+  "tagName": "sa-logo-cloud",
+  "state": {
+    "label": "Trusted by fast-moving teams everywhere",
+    "logo1": "◈ Northwind",
+    "logo2": "✦ Lumen",
+    "logo3": "▲ Apex",
+    "logo4": "❖ Corva",
+    "logo5": "⬡ Hivebase",
+    "logo6": "◐ Halcyon"
+  },
+  "style": {
+    "display": "block",
+    "padding": "clamp(2.5rem, 5vw, 3.5rem) 1.5rem",
+    "borderTop": "1px solid var(--color-border)",
+    "borderBottom": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-cream)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width)", "margin": "0 auto", "textAlign": "center" },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.8rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.12em",
+            "color": "var(--color-text-muted)",
+            "margin": "0 0 1.75rem"
+          },
+          "textContent": "${state.label}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "justifyContent": "center",
+            "alignItems": "center",
+            "gap": "clamp(1.5rem, 5vw, 3.5rem)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65"
+              },
+              "textContent": "${state.logo1}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65"
+              },
+              "textContent": "${state.logo2}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65"
+              },
+              "textContent": "${state.logo3}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65"
+              },
+              "textContent": "${state.logo4}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": "${state.logo5}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "600",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.65",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": "${state.logo6}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+{
+  "tagName": "sa-footer",
+  "state": {
+    "brand": "Flowlark",
+    "tagline": "The product platform for teams that ship. Plan, build, and scale without the busywork.",
+    "email": "hello@flowlark.app"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.35rem",
+                "fontWeight": "700",
+                "marginBottom": "0.75rem",
+                "letterSpacing": "-0.02em"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.7", "maxWidth": "36ch", "lineHeight": "1.7" },
+              "textContent": "${state.tagline}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.55",
+                "marginBottom": "0.9rem"
+              },
+              "textContent": "Product"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/features/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none",
+                "marginBottom": "0.4rem"
+              },
+              "textContent": "Features"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/pricing/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none",
+                "marginBottom": "0.4rem"
+              },
+              "textContent": "Pricing"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.55",
+                "marginBottom": "0.9rem"
+              },
+              "textContent": "Get in touch"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.4rem", "opacity": "0.8" },
+              "textContent": "${state.email}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.8" },
+              "textContent": "Remote-first · Worldwide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.55"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Flowlark. Built with Jx."
+        }
+      ]
+    }
+  ]
+}

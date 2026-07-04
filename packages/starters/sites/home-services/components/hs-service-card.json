@@ -1,0 +1,79 @@
+{
+  "tagName": "hs-service-card",
+  "state": {
+    "icon": "",
+    "name": "",
+    "summary": "",
+    "cta": "",
+    "href": "/services/"
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "height": "100%",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)",
+    "boxShadow": "0 4px 20px rgba(28,25,23,0.05)",
+    "transition": "transform 0.15s, box-shadow 0.15s",
+    ":hover": {
+      "transform": "translateY(-3px)",
+      "boxShadow": "0 14px 34px rgba(28,25,23,0.12)"
+    }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "3.25rem",
+        "height": "3.25rem",
+        "borderRadius": "0.75rem",
+        "backgroundColor": "rgba(234, 88, 12, 0.1)",
+        "fontSize": "1.6rem",
+        "lineHeight": "1",
+        "marginBottom": "1.1rem"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.3rem",
+        "fontWeight": "700",
+        "letterSpacing": "-0.01em",
+        "margin": "0 0 0.5rem"
+      },
+      "textContent": "${state.name}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "flex": "1",
+        "margin": "0",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.98rem",
+        "lineHeight": "1.65"
+      },
+      "textContent": "${state.summary}"
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "display": "${state.cta ? 'inline-block' : 'none'}",
+        "marginTop": "1.1rem",
+        "color": "var(--color-primary)",
+        "fontWeight": "700",
+        "fontSize": "0.95rem",
+        "textDecoration": "none",
+        ":hover": { "color": "var(--color-primary-hover)" }
+      },
+      "textContent": "${state.cta} →"
+    }
+  ]
+}

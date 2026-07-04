@@ -1,0 +1,48 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/pf-nav.json" },
+    { "$ref": "../components/pf-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "pf-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "720px",
+            "margin": "0 auto",
+            "padding": "clamp(2.5rem, 6vw, 4.5rem) 1.5rem clamp(3rem, 8vw, 5rem)"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/insights/" },
+              "style": {
+                "display": "inline-block",
+                "marginBottom": "2rem",
+                "color": "var(--color-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.9rem",
+                ":hover": { "color": "var(--color-primary-hover)" }
+              },
+              "textContent": "← Back to insights"
+            },
+            { "tagName": "slot" }
+          ]
+        }
+      ]
+    },
+    { "tagName": "pf-footer" }
+  ]
+}

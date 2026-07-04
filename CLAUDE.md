@@ -14,7 +14,7 @@ Every package must keep full unit-test coverage. Enforcement has three layers:
    (Bun only counts files imported during the run, so a brand-new untested
    file is otherwise invisible to thresholds). Type-only files are allowlisted
    inside the script.
-3. **CI** — `.github/workflows/test.yml` runs a 9-package matrix:
+3. **CI** — `.github/workflows/test.yml` runs a 10-package matrix:
    `bun test --isolate --coverage` (cwd = the package, so its bunfig applies)
    plus the manifest check, and a separate lint + typecheck job. The Bun
    version is pinned there; bump it together with re-baselining thresholds.

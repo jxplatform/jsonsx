@@ -1,0 +1,54 @@
+{
+  "tagName": "co-testimonial-card",
+  "state": {
+    "quote": "",
+    "author": "",
+    "role": ""
+  },
+  "style": {
+    "display": "block",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "boxShadow": "0 4px 20px rgba(15,23,42,0.05)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "color": "#f59e0b",
+        "fontSize": "1.1rem",
+        "marginBottom": "0.75rem",
+        "letterSpacing": "0.1em"
+      },
+      "textContent": "★★★★★"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.1rem",
+        "lineHeight": "1.6",
+        "fontWeight": "500",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "“${state.quote}”"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "fontWeight": "700" },
+          "textContent": "${state.author}"
+        },
+        {
+          "tagName": "div",
+          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+          "textContent": "${state.role}"
+        }
+      ]
+    }
+  ]
+}

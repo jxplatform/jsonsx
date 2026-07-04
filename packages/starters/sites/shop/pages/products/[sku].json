@@ -1,0 +1,191 @@
+{
+  "$paths": {
+    "contentType": "product",
+    "param": "sku",
+    "field": "sku"
+  },
+  "title": "${state.product.data.title} — Cadence Cycles",
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "${state.product.data.title} — ${state.product.data.category} bike at Cadence Cycles, ${state.product.data.price}."
+      }
+    }
+  ],
+  "state": {
+    "product": {
+      "$prototype": "ContentEntry",
+      "contentType": "product",
+      "field": "sku",
+      "id": { "$ref": "#/$params/sku" },
+      "$src": "@jxsuite/parser/ContentEntry.class.json"
+    }
+  },
+  "children": [
+    {
+      "tagName": "article",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "clamp(2rem, 5vw, 3.5rem) 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "/products/" },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.4rem",
+            "color": "var(--color-primary)",
+            "textDecoration": "none",
+            "fontWeight": "600",
+            "fontSize": "0.95rem",
+            "marginBottom": "2rem"
+          },
+          "textContent": "← Back to the shop"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(2rem, 5vw, 3.5rem)",
+            "alignItems": "start",
+            "@--md": { "gridTemplateColumns": "1fr" }
+          },
+          "children": [
+            {
+              "tagName": "img",
+              "attributes": {
+                "src": "${state.product.data.image}",
+                "alt": "${state.product.data.title}",
+                "loading": "eager"
+              },
+              "style": {
+                "width": "100%",
+                "aspectRatio": "1 / 1",
+                "objectFit": "cover",
+                "borderRadius": "var(--radius)",
+                "display": "block",
+                "backgroundColor": "var(--color-bg-cream)",
+                "boxShadow": "0 12px 40px rgba(15,23,42,0.12)"
+              }
+            },
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "inline-block",
+                    "padding": "0.3rem 0.8rem",
+                    "borderRadius": "999px",
+                    "fontSize": "0.75rem",
+                    "fontWeight": "600",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.06em",
+                    "backgroundColor": "rgba(22, 163, 74, 0.12)",
+                    "color": "var(--color-primary-hover)"
+                  },
+                  "textContent": "${state.product.data.category}"
+                },
+                {
+                  "tagName": "h1",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(2rem, 5vw, 2.9rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "1.1",
+                    "letterSpacing": "-0.02em",
+                    "margin": "1rem 0 0.5rem"
+                  },
+                  "textContent": "${state.product.data.title}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.9rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-primary)",
+                    "margin": "0 0 1.5rem"
+                  },
+                  "textContent": "${state.product.data.price}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontSize": "1.08rem",
+                    "lineHeight": "1.75",
+                    "color": "var(--color-text-primary)",
+                    "borderTop": "1px solid var(--color-border)",
+                    "paddingTop": "1.5rem"
+                  },
+                  "children": "${state.product.$children ?? []}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexWrap": "wrap",
+                    "gap": "0.75rem",
+                    "marginTop": "2rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "a",
+                      "attributes": { "href": "/contact/" },
+                      "style": {
+                        "display": "inline-block",
+                        "backgroundColor": "var(--color-primary)",
+                        "color": "var(--color-text-white)",
+                        "padding": "0.9rem 2rem",
+                        "borderRadius": "999px",
+                        "fontSize": "1.05rem",
+                        "fontWeight": "600",
+                        "textDecoration": "none",
+                        "transition": "background-color 0.15s",
+                        ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                      },
+                      "textContent": "Reserve this bike →"
+                    },
+                    {
+                      "tagName": "a",
+                      "attributes": { "href": "/products/" },
+                      "style": {
+                        "display": "inline-block",
+                        "border": "1px solid var(--color-border)",
+                        "color": "var(--color-text-primary)",
+                        "padding": "0.9rem 2rem",
+                        "borderRadius": "999px",
+                        "fontSize": "1.05rem",
+                        "fontWeight": "600",
+                        "textDecoration": "none",
+                        "transition": "border-color 0.15s",
+                        ":hover": { "borderColor": "var(--color-primary)" }
+                      },
+                      "textContent": "Keep browsing"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "marginTop": "1.5rem",
+                    "fontSize": "0.9rem",
+                    "color": "var(--color-text-muted)",
+                    "lineHeight": "1.6"
+                  },
+                  "textContent": "Every bike is fitted and safety-checked in-store before you ride away. Free first tune-up included."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

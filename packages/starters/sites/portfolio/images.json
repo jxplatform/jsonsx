@@ -1,0 +1,54 @@
+{
+  "site": "portfolio",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "photographer studio dramatic",
+      "orientation": "landscape",
+      "photoId": 6242218
+    },
+    {
+      "role": "about",
+      "query": "photographer with camera portrait",
+      "orientation": "portrait",
+      "photoId": 33273434
+    },
+    {
+      "role": "project-1",
+      "query": "wedding photography",
+      "orientation": "landscape",
+      "photoId": 13434418
+    },
+    {
+      "role": "project-2",
+      "query": "portrait photography",
+      "orientation": "square",
+      "photoId": 18665999
+    },
+    {
+      "role": "project-3",
+      "query": "editorial fashion photo",
+      "orientation": "landscape",
+      "photoId": 6611662
+    },
+    {
+      "role": "project-4",
+      "query": "travel landscape photography",
+      "orientation": "landscape",
+      "photoId": 35479203
+    },
+    {
+      "role": "project-5",
+      "query": "food photography",
+      "orientation": "square",
+      "photoId": 37322902
+    },
+    {
+      "role": "project-6",
+      "query": "architecture photography",
+      "orientation": "landscape",
+      "photoId": 34661673
+    }
+  ]
+}

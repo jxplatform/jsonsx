@@ -1,0 +1,63 @@
+{
+  "tagName": "re-cta",
+  "state": {
+    "heading": "",
+    "text": "",
+    "cta": "Contact an Agent",
+    "ctaHref": "/contact/"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(3.5rem, 8vw, 5.5rem) 1.5rem",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(1.9rem, 4vw, 2.75rem)",
+            "fontWeight": "800",
+            "lineHeight": "1.15",
+            "letterSpacing": "-0.02em",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "1.1rem",
+            "lineHeight": "1.7",
+            "opacity": "0.85",
+            "margin": "0 0 2rem"
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.ctaHref}" },
+          "style": {
+            "display": "inline-block",
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.9rem 2.25rem",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1.05rem",
+            "fontWeight": "700",
+            "textDecoration": "none",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          },
+          "textContent": "${state.cta}"
+        }
+      ]
+    }
+  ]
+}

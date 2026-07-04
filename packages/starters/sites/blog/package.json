@@ -1,0 +1,15 @@
+{
+  "name": "the-long-field",
+  "private": true,
+  "description": "A personal editorial blog — essays and field notes on design, technology, and the craft of making things well.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^0.19.0",
+    "@jxsuite/runtime": "^0.19.0"
+  }
+}

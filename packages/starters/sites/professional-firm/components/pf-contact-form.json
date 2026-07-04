@@ -1,0 +1,138 @@
+{
+  "tagName": "pf-contact-form",
+  "state": {
+    "heading": "Request a consultation",
+    "note": "This is a demo form. Wire it to your CRM or email in pages/contact.md."
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.6rem",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "1rem", "alignContent": "start" },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Work email",
+            "required": "true",
+            "aria-label": "Work email"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": { "display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "1rem" },
+          "children": [
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "text",
+                "name": "company",
+                "placeholder": "Company",
+                "aria-label": "Company"
+              },
+              "style": {
+                "width": "100%",
+                "padding": "0.75rem 0.9rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem"
+              }
+            },
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "text",
+                "name": "revenue",
+                "placeholder": "Annual revenue (approx.)",
+                "aria-label": "Annual revenue"
+              },
+              "style": {
+                "width": "100%",
+                "padding": "0.75rem 0.9rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "notes",
+            "rows": "4",
+            "placeholder": "What can we help with?",
+            "aria-label": "What can we help with?"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "textContent": "Request a Consultation",
+          "style": {
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.85rem 1.5rem",
+            "border": "none",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontWeight": "600",
+            "cursor": "pointer",
+            "justifySelf": "start"
+          }
+        },
+        {
+          "tagName": "p",
+          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

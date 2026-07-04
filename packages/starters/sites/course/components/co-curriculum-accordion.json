@@ -1,0 +1,1476 @@
+{
+  "tagName": "co-curriculum-accordion",
+  "state": {
+    "open": -1,
+    "toggle0": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 0,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 0
+            },
+            "value": 1
+          }
+        }
+      }
+    },
+    "toggle1": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 1,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 1
+            },
+            "value": 2
+          }
+        }
+      }
+    },
+    "toggle2": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 2,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 2
+            },
+            "value": 3
+          }
+        }
+      }
+    },
+    "toggle3": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 3,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 3
+            },
+            "value": 4
+          }
+        }
+      }
+    },
+    "toggle4": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 4,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 4
+            },
+            "value": 5
+          }
+        }
+      }
+    },
+    "toggle5": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 5,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 5
+            },
+            "value": 6
+          }
+        }
+      }
+    }
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width-narrow)",
+    "margin": "0 auto",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden",
+    "boxShadow": "0 12px 40px rgba(15,23,42,0.06)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle Foundations of the Web"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle0"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 0 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 0 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 0 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "1"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Foundations of the Web"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "1 week"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 0 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 0 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "How the web works: DNS, HTTP & the browser"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "The command line & your dev environment"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Version control with Git & GitHub"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Your first deploy to the internet"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle HTML & CSS"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle1"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 1 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 1 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 1 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "2"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "HTML & CSS"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "2 weeks"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 1 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 1 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Semantic HTML & document structure"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "The box model & modern CSS layout"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Flexbox & CSS Grid in depth"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Responsive, accessible interfaces"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle JavaScript Programming"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle2"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 2 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 2 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 2 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "3"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "JavaScript Programming"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "3 weeks"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 2 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 2 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Language fundamentals & data structures"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Functions, scope & the DOM"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Events & form handling"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Async, fetch & working with APIs"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle Frontend Frameworks"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle3"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 3 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 3 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 3 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "4"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Frontend Frameworks"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "3 weeks"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 3 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 3 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Components & reactive state"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Props, events & composition"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Client-side routing"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Fetching & displaying live data"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle Backend & Databases"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle4"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 4 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 4 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 4 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "5"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Backend & Databases"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "2 weeks"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 4 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 4 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "HTTP servers & REST API design"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Relational data & SQL"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Authentication & sessions"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Deploying your API to the cloud"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Toggle Capstone Project"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle5"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1rem",
+            "padding": "1.1rem 1.35rem",
+            "border": "none",
+            "background": "${state.open === 5 ? 'rgba(37,99,235,0.06)' : 'transparent'}",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit",
+            "transition": "background 0.15s"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "2.25rem",
+                "height": "2.25rem",
+                "borderRadius": "0.5rem",
+                "backgroundColor": "${state.open === 5 ? 'var(--color-primary)' : 'rgba(37,99,235,0.1)'}",
+                "color": "${state.open === 5 ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+                "fontFamily": "var(--font-heading)",
+                "fontWeight": "800",
+                "fontSize": "1rem",
+                "transition": "background-color 0.15s, color 0.15s"
+              },
+              "textContent": "6"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "1"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.15rem",
+                    "fontWeight": "700",
+                    "color": "var(--color-text-primary)"
+                  },
+                  "textContent": "Capstone Project"
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "display": "block",
+                    "fontSize": "0.85rem",
+                    "color": "var(--color-text-muted)",
+                    "marginTop": "0.15rem"
+                  },
+                  "textContent": "3 weeks"
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "fontWeight": "400",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 5 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 5 ? 'block' : 'none'}",
+            "padding": "0.25rem 1.35rem 1.5rem"
+          },
+          "children": [
+            {
+              "tagName": "ul",
+              "style": {
+                "listStyle": "none",
+                "margin": "0",
+                "padding": "0"
+              },
+              "children": [
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Scoping & planning your build"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Building with live mentor code review"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Testing, polish & performance"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "li",
+                  "style": {
+                    "padding": "0.5rem 0",
+                    "borderTop": "1px solid var(--color-border)",
+                    "color": "var(--color-text-muted)",
+                    "fontSize": "0.98rem",
+                    "display": "flex",
+                    "gap": "0.6rem",
+                    "alignItems": "baseline"
+                  },
+                  "children": [
+                    {
+                      "tagName": "span",
+                      "style": {
+                        "color": "var(--color-primary)",
+                        "fontWeight": "700"
+                      },
+                      "textContent": "→"
+                    },
+                    {
+                      "tagName": "span",
+                      "textContent": "Demo-day presentation"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

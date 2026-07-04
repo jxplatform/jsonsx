@@ -307,6 +307,7 @@ export interface StudioRPC {
           url?: string;
           adapter?: string;
           directory: string;
+          starter?: string;
         };
         response: { root: string; config: ProjectConfig };
       };

@@ -1,0 +1,145 @@
+{
+  "tagName": "pv-footer",
+  "state": {
+    "brand": "Aperture Studio",
+    "tagline": "An image-forward photography studio telling honest, timeless stories.",
+    "email": "hello@aperturestudio.example",
+    "phone": "(555) 204-7788"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "4rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.6rem",
+                "fontWeight": "600",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.7", "maxWidth": "34ch", "lineHeight": "1.7" },
+              "textContent": "${state.tagline}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "opacity": "0.55",
+                "marginBottom": "0.85rem"
+              },
+              "textContent": "Studio"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.4rem", "opacity": "0.8" },
+              "textContent": "${state.email}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.8" },
+              "textContent": "${state.phone}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "opacity": "0.55",
+                "marginBottom": "0.85rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/work/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none",
+                "marginBottom": "0.4rem"
+              },
+              "textContent": "Work"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none",
+                "marginBottom": "0.4rem"
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.8",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.14)",
+        "fontSize": "0.82rem",
+        "opacity": "0.55"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Aperture Studio. Built with Jx."
+        }
+      ]
+    }
+  ]
+}

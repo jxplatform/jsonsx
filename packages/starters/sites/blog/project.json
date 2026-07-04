@@ -1,0 +1,107 @@
+{
+  "name": "The Long Field",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "The Long Field — essays and field notes on design, technology, and the craft of making things well."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#0ea5e9",
+    "--color-primary-hover": "#0284c7",
+    "--color-ink": "#111111",
+    "--color-bg-dark": "#111111",
+    "--color-bg-cream": "#f6f5f2",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#141414",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#6b7280",
+    "--color-border": "#e5e4e0",
+    "--color-accent": "#0ea5e9",
+    "--font-heading": "'Fraunces', Georgia, 'Times New Roman', serif",
+    "--font-body": "'Newsreader', Georgia, 'Times New Roman', serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "740px",
+    "--radius": "0.5rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "var(--font-body)",
+    "lineHeight": "1.7",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "posts": {
+      "source": "./content/posts/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "excerpt": { "type": "string" },
+          "date": { "type": "string" },
+          "author": { "type": "string" },
+          "tag": { "type": "string" },
+          "cover": { "type": "string", "format": "image" },
+          "order": { "type": "number" }
+        },
+        "required": ["title", "excerpt", "date"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

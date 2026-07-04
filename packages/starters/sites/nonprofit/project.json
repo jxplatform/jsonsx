@@ -1,0 +1,103 @@
+{
+  "name": "Rivertown Foundation",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Rivertown Foundation is a community nonprofit running local programs in food security, youth mentoring, housing, and job training — powered by neighbors helping neighbors."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#15803d",
+    "--color-primary-hover": "#166534",
+    "--color-ink": "#14261c",
+    "--color-bg-dark": "#14312a",
+    "--color-bg-cream": "#f3f7f1",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#1a2e22",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#5b6b60",
+    "--color-border": "#dfe7dc",
+    "--color-accent": "#ea580c",
+    "--color-accent-hover": "#c2410c",
+    "--font-heading": "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.75rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "programs": {
+      "source": "./content/programs/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "image": { "type": "string", "format": "image" },
+          "order": { "type": "number" }
+        },
+        "required": ["title", "summary"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

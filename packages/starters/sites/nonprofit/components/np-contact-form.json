@@ -1,0 +1,134 @@
+{
+  "tagName": "np-contact-form",
+  "state": {
+    "heading": "Send us a message"
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.6rem",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "1rem", "alignContent": "start" },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Email address",
+            "required": "true",
+            "aria-label": "Email address"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "select",
+          "attributes": { "name": "interest", "aria-label": "I'm interested in" },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "backgroundColor": "var(--color-bg-white)",
+            "fontFamily": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "option",
+              "attributes": { "value": "general" },
+              "textContent": "General question"
+            },
+            {
+              "tagName": "option",
+              "attributes": { "value": "volunteer" },
+              "textContent": "I want to volunteer"
+            },
+            {
+              "tagName": "option",
+              "attributes": { "value": "donate" },
+              "textContent": "I want to donate or fundraise"
+            },
+            {
+              "tagName": "option",
+              "attributes": { "value": "partner" },
+              "textContent": "Partnership or sponsorship"
+            }
+          ]
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "message",
+            "rows": "4",
+            "placeholder": "How can we help?",
+            "aria-label": "Message"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "textContent": "Send message",
+          "style": {
+            "backgroundColor": "var(--color-accent)",
+            "color": "var(--color-text-white)",
+            "padding": "0.85rem 1.5rem",
+            "border": "none",
+            "borderRadius": "999px",
+            "fontSize": "1rem",
+            "fontWeight": "600",
+            "cursor": "pointer",
+            "justifySelf": "start"
+          }
+        },
+        {
+          "tagName": "p",
+          "style": { "fontSize": "0.85rem", "color": "var(--color-text-muted)", "margin": "0" },
+          "textContent": "This is a demo form. Wire it to your email or CRM in pages/contact.md."
+        }
+      ]
+    }
+  ]
+}

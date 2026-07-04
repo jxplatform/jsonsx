@@ -1,0 +1,42 @@
+{
+  "site": "home-services",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "hvac technician repairing air conditioner",
+      "orientation": "landscape",
+      "photoId": 5463581
+    },
+    {
+      "role": "about",
+      "query": "hvac service van technician",
+      "orientation": "landscape",
+      "photoId": 32497161
+    },
+    {
+      "role": "gallery-1",
+      "query": "air conditioner unit installation",
+      "orientation": "square",
+      "photoId": 3964341
+    },
+    {
+      "role": "gallery-2",
+      "query": "furnace heating system",
+      "orientation": "square",
+      "photoId": 36788832
+    },
+    {
+      "role": "gallery-3",
+      "query": "technician inspecting hvac",
+      "orientation": "square",
+      "photoId": 32497161
+    },
+    {
+      "role": "cta-bg",
+      "query": "modern home exterior",
+      "orientation": "landscape",
+      "photoId": 11018246
+    }
+  ]
+}

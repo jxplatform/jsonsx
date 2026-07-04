@@ -1,0 +1,110 @@
+{
+  "tagName": "pf-nav",
+  "state": {
+    "brand": "Meridian Advisory"
+  },
+  "style": {
+    "display": "block",
+    "position": "sticky",
+    "top": "0",
+    "zIndex": "50",
+    "backgroundColor": "rgba(255, 255, 255, 0.9)",
+    "backdropFilter": "blur(8px)",
+    "borderBottom": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "1rem 1.5rem",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "/" },
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.4rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-primary)",
+            "textDecoration": "none",
+            "letterSpacing": "-0.01em"
+          },
+          "textContent": "${state.brand}"
+        },
+        {
+          "tagName": "nav",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1.75rem",
+            "@--sm": { "gap": "1rem" }
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/services/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Services"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/team/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Team"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/insights/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Insights"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.55rem 1.25rem",
+                "borderRadius": "var(--radius)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "Book a Consultation"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -507,6 +507,7 @@ export function createDesktopPlatform() {
       url?: string;
       adapter?: string;
       directory: string;
+      starter?: string;
     }) {
       return rpc.request.createProject(opts) as Promise<{
         root: string;

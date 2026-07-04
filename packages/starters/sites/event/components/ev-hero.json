@@ -1,0 +1,196 @@
+{
+  "tagName": "ev-hero",
+  "state": {
+    "eyebrow": "",
+    "date": "",
+    "location": "",
+    "heading": "",
+    "subheading": "",
+    "cta": "Get Tickets",
+    "ctaHref": "/tickets/",
+    "cta2": "",
+    "cta2Href": "/schedule/",
+    "bg": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "minHeight": "82vh",
+    "color": "var(--color-text-white)",
+    "backgroundColor": "var(--color-bg-dark)",
+    "backgroundImage": "linear-gradient(125deg, rgba(124, 58, 237, 0.92) 0%, rgba(20, 11, 46, 0.86) 55%, rgba(236, 72, 153, 0.55) 100%), url('${state.bg}')",
+    "backgroundSize": "cover",
+    "backgroundPosition": "center",
+    "overflow": "hidden"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "top": "-30%",
+        "right": "-10%",
+        "width": "50%",
+        "height": "120%",
+        "background": "radial-gradient(circle, rgba(236, 72, 153, 0.35) 0%, transparent 60%)",
+        "pointerEvents": "none"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "display": "flex",
+        "alignItems": "center",
+        "minHeight": "82vh",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "5rem 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "720px" },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.6rem",
+                "padding": "0.45rem 1rem",
+                "borderRadius": "999px",
+                "border": "1px solid rgba(255, 255, 255, 0.28)",
+                "background": "rgba(255, 255, 255, 0.08)",
+                "backdropFilter": "blur(4px)",
+                "fontSize": "0.85rem",
+                "fontWeight": "600",
+                "letterSpacing": "0.04em",
+                "marginBottom": "1.5rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "0.5rem",
+                    "height": "0.5rem",
+                    "borderRadius": "50%",
+                    "background": "var(--color-accent)"
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "textContent": "${state.eyebrow}"
+                }
+              ]
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(2.75rem, 7vw, 5rem)",
+                "fontWeight": "700",
+                "lineHeight": "1.02",
+                "margin": "0 0 1.25rem",
+                "letterSpacing": "-0.03em"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.15rem, 2vw, 1.4rem)",
+                "lineHeight": "1.6",
+                "margin": "0 0 1.75rem",
+                "opacity": "0.94",
+                "maxWidth": "50ch"
+              },
+              "textContent": "${state.subheading}"
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "center",
+                "gap": "1.25rem",
+                "flexWrap": "wrap",
+                "marginBottom": "2.25rem",
+                "fontSize": "1.05rem",
+                "fontWeight": "600"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "alignItems": "center", "gap": "0.5rem" },
+                  "children": [
+                    { "tagName": "span", "textContent": "📅" },
+                    { "tagName": "span", "textContent": "${state.date}" }
+                  ]
+                },
+                {
+                  "tagName": "span",
+                  "style": {
+                    "width": "1px",
+                    "height": "1.1rem",
+                    "background": "rgba(255,255,255,0.4)",
+                    "@--sm": { "display": "none" }
+                  }
+                },
+                {
+                  "tagName": "span",
+                  "style": { "display": "flex", "alignItems": "center", "gap": "0.5rem" },
+                  "children": [
+                    { "tagName": "span", "textContent": "📍" },
+                    { "tagName": "span", "textContent": "${state.location}" }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "gap": "0.75rem", "flexWrap": "wrap" },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.ctaHref}" },
+                  "style": {
+                    "display": "inline-block",
+                    "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.9rem 2.25rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "600",
+                    "textDecoration": "none",
+                    "transition": "transform 0.15s, box-shadow 0.15s",
+                    "boxShadow": "0 10px 30px rgba(124, 58, 237, 0.45)",
+                    ":hover": { "transform": "translateY(-2px)" }
+                  },
+                  "textContent": "${state.cta}"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.cta2Href}" },
+                  "style": {
+                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
+                    "border": "1px solid rgba(255,255,255,0.55)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.9rem 2.25rem",
+                    "borderRadius": "999px",
+                    "fontSize": "1.05rem",
+                    "fontWeight": "600",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "rgba(255,255,255,0.12)" }
+                  },
+                  "textContent": "${state.cta2}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

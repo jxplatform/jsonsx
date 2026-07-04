@@ -319,6 +319,7 @@ export function createDesktopPlatform(): StudioPlatform {
       url?: string;
       adapter?: string;
       directory: string;
+      starter?: string;
     }) {
       return request("createProject", opts) as Promise<{
         root: string;

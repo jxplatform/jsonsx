@@ -73,6 +73,9 @@
       "bin": {
         "create-jxsuite": "./index.ts",
       },
+      "dependencies": {
+        "@jxsuite/starters": "workspace:^",
+      },
     },
     "packages/desktop": {
       "name": "@jxsuite/desktop",
@@ -157,8 +160,16 @@
         "@jxsuite/parser": "workspace:^",
         "@jxsuite/runtime": "workspace:^",
         "@jxsuite/schema": "workspace:^",
+        "@jxsuite/starters": "workspace:^",
         "chokidar": "^5.0.0",
         "zod": "^4.4.3",
+      },
+    },
+    "packages/starters": {
+      "name": "@jxsuite/starters",
+      "version": "0.34.0",
+      "devDependencies": {
+        "@jxsuite/schema": "workspace:^",
       },
     },
     "packages/studio": {
@@ -612,6 +623,8 @@
     "@jxsuite/server": ["@jxsuite/server@workspace:packages/server"],
 
     "@jxsuite/site-jxsuite.com": ["@jxsuite/site-jxsuite.com@workspace:sites/jxsuite.com"],
+
+    "@jxsuite/starters": ["@jxsuite/starters@workspace:packages/starters"],
 
     "@jxsuite/studio": ["@jxsuite/studio@workspace:packages/studio"],
 

@@ -1,0 +1,31 @@
+{
+  "name": "@jxsuite/starters",
+  "version": "0.34.0",
+  "description": "Starter site templates for new Jx projects",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jxsuite/jx.git",
+    "directory": "packages/starters"
+  },
+  "files": [
+    "index.ts",
+    "registry.json",
+    "sites/"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./registry.json": "./registry.json"
+  },
+  "publishConfig": {
+    "provenance": true
+  },
+  "scripts": {
+    "test": "bun test --isolate",
+    "test:coverage": "bun test --isolate --coverage"
+  },
+  "devDependencies": {
+    "@jxsuite/schema": "workspace:^"
+  }
+}

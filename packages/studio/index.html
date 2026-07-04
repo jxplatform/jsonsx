@@ -100,7 +100,9 @@
            system fallbacks ahead of the Spectrum stack (Source Code Pro /
            Monaco). The brand fragment sets the same order on
            --spectrum-code-font-family-stack for SWC components. */
-        --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", var(--spectrum-code-font-family-stack, monospace);
+        --font-mono:
+          "JetBrains Mono", "SF Mono", "Fira Code",
+          var(--spectrum-code-font-family-stack, monospace);
         /* Hover wash and accent tints */
         --hover-bg: rgba(255, 255, 255, 0.04);
         --accent-8: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -2800,6 +2802,62 @@
         font-size: var(--spectrum-font-size-75, 12px);
         color: var(--danger);
         padding: 4px 0;
+      }
+      .new-project-modal-wide {
+        width: 680px;
+      }
+      .new-project-templates {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+      .new-project-template {
+        text-align: left;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+        cursor: pointer;
+        background: var(--bg-panel);
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .new-project-template:hover {
+        border-color: var(--fg-dim);
+      }
+      .new-project-template.selected {
+        border-color: var(--accent, #3b82f6);
+        box-shadow: 0 0 0 1px var(--accent, #3b82f6);
+      }
+      .new-project-template-thumb {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        object-fit: cover;
+        display: block;
+        background: var(--bg-elevated, #1a1a1a);
+      }
+      .new-project-template-blank {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 16 / 10;
+        color: var(--fg-dim);
+        font-size: 28px;
+        background: var(--bg-elevated, #1a1a1a);
+      }
+      .new-project-template-body {
+        padding: 6px 8px 8px;
+      }
+      .new-project-template-name {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg);
+      }
+      .new-project-template-tag {
+        font-size: 11px;
+        color: var(--fg-dim);
+        margin-top: 2px;
+        line-height: 1.3;
       }
       /* CSS Vars editor */
       .css-vars-group {

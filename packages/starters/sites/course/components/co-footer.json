@@ -1,0 +1,145 @@
+{
+  "tagName": "co-footer",
+  "state": {
+    "brand": "Craft & Code Academy",
+    "tagline": "A project-based web development bootcamp with live mentorship and a portfolio-ready capstone.",
+    "email": "admissions@craftcode.academy",
+    "phone": "(555) 240-7788"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.4rem",
+                "fontWeight": "800",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "38ch" },
+              "textContent": "${state.tagline}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Admissions"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.email}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.85" },
+              "textContent": "${state.phone}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/curriculum/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Curriculum"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/enroll/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none"
+              },
+              "textContent": "Enroll"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.6"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Craft & Code Academy. Built with Jx."
+        }
+      ]
+    }
+  ]
+}

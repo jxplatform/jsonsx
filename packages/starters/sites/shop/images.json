@@ -1,0 +1,54 @@
+{
+  "site": "shop",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "bicycle shop interior",
+      "orientation": "landscape",
+      "photoId": 2817452
+    },
+    {
+      "role": "about",
+      "query": "bike mechanic workshop",
+      "orientation": "landscape",
+      "photoId": 35305055
+    },
+    {
+      "role": "product-1",
+      "query": "road bicycle",
+      "orientation": "square",
+      "photoId": 5807638
+    },
+    {
+      "role": "product-2",
+      "query": "mountain bike",
+      "orientation": "square",
+      "photoId": 38239535
+    },
+    {
+      "role": "product-3",
+      "query": "gravel bike",
+      "orientation": "square",
+      "photoId": 12266469
+    },
+    {
+      "role": "product-4",
+      "query": "kids bicycle",
+      "orientation": "square",
+      "photoId": 28506741
+    },
+    {
+      "role": "product-5",
+      "query": "bike helmet",
+      "orientation": "square",
+      "photoId": 12956080
+    },
+    {
+      "role": "product-6",
+      "query": "cycling accessories",
+      "orientation": "square",
+      "photoId": 30443844
+    }
+  ]
+}

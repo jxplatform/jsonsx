@@ -1,0 +1,24 @@
+{
+  "site": "course",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "student learning laptop online course",
+      "orientation": "landscape",
+      "photoId": 6266990
+    },
+    {
+      "role": "instructor",
+      "query": "teacher instructor portrait",
+      "orientation": "portrait",
+      "photoId": 8423069
+    },
+    {
+      "role": "about",
+      "query": "people studying coding",
+      "orientation": "landscape",
+      "photoId": 7988079
+    }
+  ]
+}

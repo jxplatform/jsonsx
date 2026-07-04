@@ -1,0 +1,184 @@
+{
+  "tagName": "shp-product-filter",
+  "state": {
+    "category": "all"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto 2rem",
+    "padding": "0 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "style",
+      "textContent": "${state.category === 'all' ? '' : '#shop-grid > div[data-category]{display:none} #shop-grid > div[data-category=\"' + state.category + '\"]{display:block}'}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "0.6rem",
+        "alignItems": "center",
+        "justifyContent": "center"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "textContent": "All bikes",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "all"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'all' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'all' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Road",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "Road"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'Road' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'Road' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Mountain",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "Mountain"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'Mountain' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'Mountain' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Gravel",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "Gravel"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'Gravel' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'Gravel' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Kids",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "Kids"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'Kids' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'Kids' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Accessories",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/category" },
+              "value": "Accessories"
+            }
+          },
+          "style": {
+            "cursor": "pointer",
+            "fontFamily": "inherit",
+            "fontSize": "0.92rem",
+            "fontWeight": "600",
+            "padding": "0.55rem 1.15rem",
+            "borderRadius": "999px",
+            "border": "1px solid var(--color-border)",
+            "transition": "background-color 0.15s, color 0.15s, border-color 0.15s",
+            "backgroundColor": "${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+            "color": "${state.category === 'Accessories' ? '#ffffff' : 'var(--color-text-primary)'}",
+            "borderColor": "${state.category === 'Accessories' ? 'var(--color-primary)' : 'var(--color-border)'}"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "textAlign": "center",
+        "margin": "1rem 0 0",
+        "fontSize": "0.9rem",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.category === 'all' ? 'Showing every bike and accessory in the shop.' : 'Showing ' + state.category + ' — tap “All bikes” to reset.'}"
+    }
+  ]
+}

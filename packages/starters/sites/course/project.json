@@ -1,0 +1,102 @@
+{
+  "name": "Craft & Code Academy",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Craft & Code Academy is a project-based web development bootcamp — six guided modules, live mentorship, and a portfolio-ready capstone."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#2563eb",
+    "--color-primary-hover": "#1d4ed8",
+    "--color-ink": "#0f172a",
+    "--color-bg-dark": "#0f172a",
+    "--color-bg-cream": "#f4f6fb",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#0f172a",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#64748b",
+    "--color-border": "#e2e8f0",
+    "--color-accent": "#2563eb",
+    "--font-heading": "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.75rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "modules": {
+      "source": "./content/modules/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "duration": { "type": "string" },
+          "order": { "type": "number" }
+        },
+        "required": ["title", "order"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

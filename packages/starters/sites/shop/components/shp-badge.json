@@ -1,0 +1,18 @@
+{
+  "tagName": "shp-badge",
+  "state": {
+    "label": ""
+  },
+  "style": {
+    "display": "inline-block",
+    "padding": "0.25rem 0.7rem",
+    "borderRadius": "999px",
+    "fontSize": "0.72rem",
+    "fontWeight": "600",
+    "textTransform": "uppercase",
+    "letterSpacing": "0.06em",
+    "backgroundColor": "rgba(22, 163, 74, 0.12)",
+    "color": "var(--color-primary-hover)"
+  },
+  "children": [{ "tagName": "span", "textContent": "${state.label}" }]
+}

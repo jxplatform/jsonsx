@@ -1,0 +1,524 @@
+{
+  "tagName": "co-faq",
+  "state": {
+    "open": -1,
+    "toggle0": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 0,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 0
+            },
+            "value": 1
+          }
+        }
+      }
+    },
+    "toggle1": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 1,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 1
+            },
+            "value": 2
+          }
+        }
+      }
+    },
+    "toggle2": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 2,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 2
+            },
+            "value": 3
+          }
+        }
+      }
+    },
+    "toggle3": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 3,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 3
+            },
+            "value": 4
+          }
+        }
+      }
+    },
+    "toggle4": {
+      "$expression": {
+        "operator": "=",
+        "target": {
+          "$ref": "#/state/open"
+        },
+        "value": {
+          "operator": "-",
+          "target": 4,
+          "value": {
+            "operator": "*",
+            "target": {
+              "operator": "===",
+              "target": {
+                "$ref": "#/state/open"
+              },
+              "value": 4
+            },
+            "value": 5
+          }
+        }
+      }
+    }
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width-narrow)",
+    "margin": "0 auto",
+    "borderTop": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Do I need prior coding experience?"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle0"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "padding": "1.25rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.1rem",
+                "fontWeight": "700",
+                "color": "${state.open === 0 ? 'var(--color-primary)' : 'var(--color-text-primary)'}",
+                "transition": "color 0.15s"
+              },
+              "textContent": "Do I need prior coding experience?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 0 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 0 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.35rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.7",
+                "maxWidth": "64ch"
+              },
+              "textContent": "No. The program starts from absolute foundations and assumes no background. If you can use a web browser and are ready to put in the hours, you're ready for week one."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "How much time should I plan to commit?"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle1"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "padding": "1.25rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.1rem",
+                "fontWeight": "700",
+                "color": "${state.open === 1 ? 'var(--color-primary)' : 'var(--color-text-primary)'}",
+                "transition": "color 0.15s"
+              },
+              "textContent": "How much time should I plan to commit?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 1 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 1 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.35rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.7",
+                "maxWidth": "64ch"
+              },
+              "textContent": "Around 20–25 hours per week across live sessions, guided projects, and independent practice. The pace is intensive but designed for people learning alongside other commitments."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Is the program online or in person?"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle2"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "padding": "1.25rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.1rem",
+                "fontWeight": "700",
+                "color": "${state.open === 2 ? 'var(--color-primary)' : 'var(--color-text-primary)'}",
+                "transition": "color 0.15s"
+              },
+              "textContent": "Is the program online or in person?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 2 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 2 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.35rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.7",
+                "maxWidth": "64ch"
+              },
+              "textContent": "Fully online. Live sessions run over video, and every module is project-based so you learn by building. Recordings are available if you miss a session."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "Will I get help when I'm stuck?"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle3"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "padding": "1.25rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.1rem",
+                "fontWeight": "700",
+                "color": "${state.open === 3 ? 'var(--color-primary)' : 'var(--color-text-primary)'}",
+                "transition": "color 0.15s"
+              },
+              "textContent": "Will I get help when I'm stuck?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 3 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 3 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.35rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.7",
+                "maxWidth": "64ch"
+              },
+              "textContent": "Yes. You'll have live mentorship, small-group code review, and a community of peers. Getting unstuck quickly is a core part of how we teach."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "borderBottom": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "attributes": {
+            "type": "button",
+            "aria-label": "What will I have to show at the end?"
+          },
+          "onclick": {
+            "$ref": "#/state/toggle4"
+          },
+          "style": {
+            "width": "100%",
+            "display": "flex",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem",
+            "padding": "1.25rem 0.25rem",
+            "border": "none",
+            "background": "transparent",
+            "cursor": "pointer",
+            "textAlign": "left",
+            "font": "inherit"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.1rem",
+                "fontWeight": "700",
+                "color": "${state.open === 4 ? 'var(--color-primary)' : 'var(--color-text-primary)'}",
+                "transition": "color 0.15s"
+              },
+              "textContent": "What will I have to show at the end?"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "flex": "none",
+                "width": "1.75rem",
+                "height": "1.75rem",
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "1.4rem",
+                "color": "var(--color-primary)",
+                "lineHeight": "1"
+              },
+              "textContent": "${state.open === 4 ? '−' : '+'}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.open === 4 ? 'block' : 'none'}",
+            "padding": "0 0.25rem 1.35rem"
+          },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "color": "var(--color-text-muted)",
+                "fontSize": "1rem",
+                "lineHeight": "1.7",
+                "maxWidth": "64ch"
+              },
+              "textContent": "A deployed full-stack capstone project, a portfolio of module builds, and the fundamentals to keep learning on your own — everything you need to apply for junior developer roles."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

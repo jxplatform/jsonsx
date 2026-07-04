@@ -20,9 +20,17 @@ There's no hosted Studio to sign into — it runs on your machine, against your 
 
 ## 2. Create a project
 
-In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare, Node, or Bun. Studio scaffolds a clean starter you can build on.
+In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare, Node, or Bun.
 
-![Jx Studio New Project dialog — name, directory, production URL, and deployment adapter picker](/screenshots/new-project-modal.png)
+Then pick a **template**. Start from **Blank** for an empty project, or clone one of the [starter sites](/templates) — a restaurant, shop, portfolio, SaaS landing, blog, and more. Each one is a complete, themed site (pages, components, content, and images) you can reshape into your own. Studio copies it in as plain files and opens it on the canvas.
+
+![Jx Studio New Project dialog — template gallery, name, directory, production URL, and deployment adapter picker](/screenshots/new-project-modal.png)
+
+Prefer the terminal? The CLI takes the same templates:
+
+```bash
+bun create @jxsuite my-site --template restaurant
+```
 
 Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git.
 

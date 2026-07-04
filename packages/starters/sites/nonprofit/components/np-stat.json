@@ -1,0 +1,48 @@
+{
+  "tagName": "np-stat",
+  "state": {
+    "number": "",
+    "label": "",
+    "note": ""
+  },
+  "style": {
+    "display": "block",
+    "textAlign": "center",
+    "padding": "0.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2.5rem, 6vw, 3.75rem)",
+        "fontWeight": "700",
+        "lineHeight": "1",
+        "color": "var(--color-accent)",
+        "letterSpacing": "-0.02em"
+      },
+      "textContent": "${state.number}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "margin": "0.6rem 0 0",
+        "fontWeight": "600",
+        "fontSize": "1.05rem",
+        "color": "inherit"
+      },
+      "textContent": "${state.label}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.note ? 'block' : 'none'}",
+        "margin": "0.35rem 0 0",
+        "fontSize": "0.9rem",
+        "opacity": "0.75",
+        "lineHeight": "1.55"
+      },
+      "textContent": "${state.note}"
+    }
+  ]
+}

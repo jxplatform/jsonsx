@@ -1,0 +1,132 @@
+{
+  "tagName": "re-contact-form",
+  "state": {
+    "note": "This is a demo form. Wire it to your CRM or email in pages/contact.md."
+  },
+  "style": { "display": "block" },
+  "children": [
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "1rem", "marginTop": "1.5rem" },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Email address",
+            "required": "true",
+            "aria-label": "Email address"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": { "display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "1rem" },
+          "children": [
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "text",
+                "name": "intent",
+                "placeholder": "Buying or selling?",
+                "aria-label": "Buying or selling"
+              },
+              "style": {
+                "width": "100%",
+                "padding": "0.75rem 0.9rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem"
+              }
+            },
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "text",
+                "name": "area",
+                "placeholder": "Preferred area",
+                "aria-label": "Preferred area"
+              },
+              "style": {
+                "width": "100%",
+                "padding": "0.75rem 0.9rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "notes",
+            "rows": "4",
+            "placeholder": "What are you looking for? Budget, bedrooms, timing…",
+            "aria-label": "Notes"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "textContent": "Send Message",
+          "style": {
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.85rem 1.5rem",
+            "border": "none",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontWeight": "700",
+            "cursor": "pointer",
+            "justifySelf": "start",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "fontSize": "0.85rem",
+        "color": "var(--color-text-muted)",
+        "margin": "1rem 0 0"
+      },
+      "textContent": "${state.note}"
+    }
+  ]
+}

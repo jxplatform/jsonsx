@@ -1,0 +1,15 @@
+{
+  "name": "craft-code-academy",
+  "private": true,
+  "description": "A project-based web development bootcamp — six guided modules, live mentorship, and a portfolio-ready capstone.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^0.19.0",
+    "@jxsuite/runtime": "^0.19.0"
+  }
+}

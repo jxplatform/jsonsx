@@ -9,7 +9,7 @@
  */
 
 import type { ProjectConfig } from "@jxsuite/schema/types";
-import type { DirEntry, FsEvent, RenameResult } from "../types";
+import type { DirEntry, FsEvent, RenameResult, StarterInfo } from "../types";
 
 /** A directory entry from the server, tolerating extra wire fields. */
 type WireDirEntry = DirEntry & Record<string, unknown>;
@@ -215,6 +215,7 @@ export function createDevServerPlatform() {
       url?: string;
       adapter?: string;
       directory: string;
+      starter?: string;
     }) {
       const res = await fetch("/__studio/create-project", {
         body: JSON.stringify(opts),
@@ -226,6 +227,15 @@ export function createDevServerPlatform() {
         throw new Error(data.error || "Failed to create project");
       }
       return await res.json();
+    },
+
+    /** List starter templates from the dev server. */
+    async listStarters(): Promise<StarterInfo[]> {
+      const res = await fetch("/__studio/starters");
+      if (!res.ok) {
+        throw new Error("Failed to load starters");
+      }
+      return await readJson<StarterInfo[]>(res);
     },
 
     // ─── File operations ──────────────────────────────────────────────────

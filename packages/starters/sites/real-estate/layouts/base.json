@@ -1,0 +1,22 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/re-nav.json" },
+    { "$ref": "../components/re-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "re-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    { "tagName": "re-footer" }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "tagName": "re-footer",
+  "state": {
+    "brand": "Northshore Realty",
+    "tagline": "Helping buyers and sellers find their place on the north shore since 2004.",
+    "address": "45 Lakeshore Drive, Bayport",
+    "phone": "(555) 204-7788",
+    "license": "License #RE-0294187"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.4rem",
+                "fontWeight": "800",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.75rem", "opacity": "0.75", "maxWidth": "38ch" },
+              "textContent": "${state.tagline}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.5", "fontSize": "0.8rem" },
+              "textContent": "${state.license}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Office"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.address}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.85" },
+              "textContent": "${state.phone}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/listings/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Listings"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.6"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Northshore Realty. Equal Housing Opportunity. Built with Jx."
+        }
+      ]
+    }
+  ]
+}

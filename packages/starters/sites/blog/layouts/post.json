@@ -1,0 +1,15 @@
+{
+  "tagName": "div",
+  "$layout": "./layouts/base.json",
+  "children": [
+    {
+      "tagName": "article",
+      "style": {
+        "maxWidth": "var(--max-width-narrow)",
+        "margin": "0 auto",
+        "padding": "clamp(2.5rem, 6vw, 4.5rem) 1.5rem"
+      },
+      "children": [{ "tagName": "slot" }]
+    }
+  ]
+}

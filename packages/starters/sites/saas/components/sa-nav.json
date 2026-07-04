@@ -1,0 +1,130 @@
+{
+  "tagName": "sa-nav",
+  "state": {
+    "brand": "Flowlark"
+  },
+  "style": {
+    "display": "block",
+    "position": "sticky",
+    "top": "0",
+    "zIndex": "50",
+    "backgroundColor": "rgba(255, 255, 255, 0.85)",
+    "backdropFilter": "blur(10px)",
+    "borderBottom": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "0.9rem 1.5rem",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "/" },
+          "style": {
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "0.55rem",
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.3rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-primary)",
+            "textDecoration": "none",
+            "letterSpacing": "-0.02em"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "width": "1.6rem",
+                "height": "1.6rem",
+                "borderRadius": "0.45rem",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "fontSize": "1rem"
+              },
+              "textContent": "◆"
+            },
+            { "tagName": "span", "textContent": "${state.brand}" }
+          ]
+        },
+        {
+          "tagName": "nav",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1.6rem",
+            "@--sm": { "gap": "0.9rem" }
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/features/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Features"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/pricing/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Pricing"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "500",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Contact"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/pricing/" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.55rem 1.2rem",
+                "borderRadius": "var(--radius)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "Get started"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "tagName": "ev-session-row",
+  "state": {
+    "time": "",
+    "title": "",
+    "track": "",
+    "speaker": ""
+  },
+  "style": {
+    "display": "grid",
+    "gridTemplateColumns": "7rem 1fr auto",
+    "gap": "1.25rem",
+    "alignItems": "center",
+    "padding": "1.15rem 0",
+    "borderBottom": "1px solid var(--color-border)",
+    "@--sm": { "gridTemplateColumns": "1fr", "gap": "0.4rem" }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.05rem",
+        "fontWeight": "600",
+        "color": "var(--color-primary)",
+        "fontVariantNumeric": "tabular-nums"
+      },
+      "textContent": "${state.time}"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.15rem",
+            "fontWeight": "600",
+            "margin": "0 0 0.2rem",
+            "lineHeight": "1.3"
+          },
+          "textContent": "${state.title}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.speaker ? 'block' : 'none'}",
+            "margin": "0",
+            "fontSize": "0.92rem",
+            "color": "var(--color-text-muted)"
+          },
+          "textContent": "with ${state.speaker}"
+        }
+      ]
+    },
+    {
+      "tagName": "span",
+      "style": {
+        "justifySelf": "start",
+        "whiteSpace": "nowrap",
+        "fontSize": "0.78rem",
+        "fontWeight": "600",
+        "letterSpacing": "0.02em",
+        "padding": "0.3rem 0.75rem",
+        "borderRadius": "999px",
+        "color": "${state.track === 'Design' ? '#be185d' : state.track === 'Workshops' ? '#0e7490' : '#6d28d9'}",
+        "backgroundColor": "${state.track === 'Design' ? 'rgba(236, 72, 153, 0.12)' : state.track === 'Workshops' ? 'rgba(6, 182, 212, 0.12)' : 'rgba(124, 58, 237, 0.12)'}"
+      },
+      "textContent": "${state.track}"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "site": "saas",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "software dashboard abstract technology",
+      "orientation": "landscape",
+      "photoId": 27141316
+    },
+    {
+      "role": "feature-1",
+      "query": "team collaboration software",
+      "orientation": "landscape",
+      "photoId": 6804068
+    },
+    {
+      "role": "feature-2",
+      "query": "data analytics dashboard",
+      "orientation": "landscape",
+      "photoId": 97080
+    },
+    {
+      "role": "feature-3",
+      "query": "mobile app interface",
+      "orientation": "landscape",
+      "photoId": 3850263
+    }
+  ]
+}

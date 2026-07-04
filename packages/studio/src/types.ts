@@ -123,6 +123,19 @@ export interface RenameResult {
   error?: string;
 }
 
+/** A starter template surfaced in the New Project picker (mirrors @jxsuite/starters StarterMeta). */
+export interface StarterInfo {
+  id: string;
+  name: string;
+  industry: string;
+  tagline: string;
+  description: string;
+  features: string[];
+  accent: string;
+  /** Preview image as a self-contained `data:` URI. */
+  thumbnail: string;
+}
+
 export interface StudioPlatform {
   id: string;
   projectRoot: string;
@@ -227,7 +240,14 @@ export interface StudioPlatform {
     url?: string;
     adapter?: string;
     directory: string;
+    /** Id of a starter template to clone, or "blank"/undefined for the minimal template. */
+    starter?: string;
   }) => Promise<{ root: string; config: ProjectConfig }>;
+  /**
+   * List the starter templates available in the New Project picker. Absent on platforms that don't
+   * ship starters (the picker then offers only a blank project).
+   */
+  listStarters?: () => Promise<StarterInfo[]>;
   /** Stack B AI assistant: URL of the OpenAI-compatible SSE chat proxy (`/__studio/ai/chat`). */
   aiChatUrl: () => string | Promise<string>;
   // ─── Multi-window (desktop only; undefined on dev-server) ───────────────────

@@ -1,0 +1,58 @@
+{
+  "tagName": "co-outcome-card",
+  "state": {
+    "icon": "",
+    "title": "",
+    "text": ""
+  },
+  "style": {
+    "display": "block",
+    "padding": "1.75rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)",
+    "transition": "transform 0.15s, box-shadow 0.15s",
+    ":hover": {
+      "transform": "translateY(-3px)",
+      "boxShadow": "0 12px 32px rgba(37,99,235,0.12)"
+    }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "inline-flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+        "width": "2.75rem",
+        "height": "2.75rem",
+        "borderRadius": "0.6rem",
+        "backgroundColor": "rgba(37,99,235,0.1)",
+        "fontSize": "1.4rem",
+        "marginBottom": "1rem",
+        "lineHeight": "1"
+      },
+      "textContent": "${state.icon}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.2rem",
+        "fontWeight": "700",
+        "margin": "0 0 0.5rem"
+      },
+      "textContent": "${state.title}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.98rem",
+        "lineHeight": "1.65"
+      },
+      "textContent": "${state.text}"
+    }
+  ]
+}

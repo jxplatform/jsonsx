@@ -128,6 +128,72 @@ describe("openNewProjectModal — directory derivation", () => {
   });
 });
 
+describe("openNewProjectModal — template gallery", () => {
+  const sampleStarters = [
+    {
+      accent: "#b45309",
+      description: "Full description of the bistro starter.",
+      features: ["Menu collection"],
+      id: "restaurant",
+      industry: "Restaurant & Food",
+      name: "Bistro & Café",
+      tagline: "A menu-driven site.",
+      thumbnail: "data:image/png;base64,AAAA",
+    },
+  ];
+
+  function templateCards(): any[] {
+    return [...document.querySelectorAll("#layer-modal .new-project-template")];
+  }
+
+  test("shows no gallery (Blank only) when the platform has no starters", async () => {
+    installMockPlatform();
+    void openNewProjectModal();
+    await flush();
+    expect(templateCards()).toHaveLength(0);
+    expect(document.querySelector("#layer-modal .new-project-modal-wide")).toBeNull();
+  });
+
+  test("renders Blank + starter cards, defaulting the selection to Blank", async () => {
+    installMockPlatform({ listStarters: (async () => sampleStarters) as never });
+    void openNewProjectModal();
+    await flush();
+    const cards = templateCards();
+    expect(cards).toHaveLength(2);
+    expect(cards[0].textContent).toContain("Blank");
+    expect(cards[0].classList.contains("selected")).toBe(true);
+    expect(cards[1].textContent).toContain("Bistro & Café");
+    expect(document.querySelector("#layer-modal .new-project-modal-wide")).toBeTruthy();
+  });
+
+  test("selecting a starter marks it, prefills description, and threads it to createProject", async () => {
+    const { state } = installMockPlatform({ listStarters: (async () => sampleStarters) as never });
+    void openNewProjectModal();
+    await flush();
+    templateCards()[1].dispatchEvent(new Event("click", { bubbles: true }));
+    expect(templateCards()[1].classList.contains("selected")).toBe(true);
+    expect(field(2).value).toBe("A menu-driven site.");
+
+    typeInto(field(0), "My Diner");
+    clickCreate();
+    await flush();
+    const call = state.calls.find((c) => c[0] === "createProject");
+    expect(call?.[1]).toMatchObject({ name: "My Diner", starter: "restaurant" });
+  });
+
+  test("a failing listStarters leaves the modal usable with Blank only", async () => {
+    installMockPlatform({
+      listStarters: (async () => {
+        throw new Error("nope");
+      }) as never,
+    });
+    void openNewProjectModal();
+    await flush();
+    expect(modal()).toBeTruthy();
+    expect(templateCards()).toHaveLength(0);
+  });
+});
+
 describe("openNewProjectModal — submit", () => {
   test("rejects an empty project name with an inline error", () => {
     const { state } = installMockPlatform();
@@ -169,6 +235,7 @@ describe("openNewProjectModal — submit", () => {
       description: "A demo site",
       directory: "my-site",
       name: "My Site",
+      starter: "blank",
       url: "https://example.com",
     });
   });

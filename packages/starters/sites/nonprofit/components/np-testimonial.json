@@ -1,0 +1,54 @@
+{
+  "tagName": "np-testimonial",
+  "state": {
+    "quote": "",
+    "author": "",
+    "role": ""
+  },
+  "style": {
+    "display": "block",
+    "padding": "2rem",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "2.5rem",
+        "lineHeight": "1",
+        "color": "var(--color-primary)",
+        "marginBottom": "0.5rem"
+      },
+      "textContent": "“"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.2rem",
+        "lineHeight": "1.6",
+        "fontWeight": "500",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.quote}"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "fontWeight": "600" },
+          "textContent": "${state.author}"
+        },
+        {
+          "tagName": "div",
+          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+          "textContent": "${state.role}"
+        }
+      ]
+    }
+  ]
+}

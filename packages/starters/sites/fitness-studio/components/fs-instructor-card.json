@@ -1,0 +1,73 @@
+{
+  "tagName": "fs-instructor-card",
+  "state": {
+    "name": "",
+    "specialty": "",
+    "bio": "",
+    "image": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "height": "100%",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden",
+    "boxShadow": "0 4px 20px rgba(31,23,41,0.05)"
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": {
+        "src": "${state.image}",
+        "alt": "Portrait of ${state.name}",
+        "loading": "lazy"
+      },
+      "style": {
+        "width": "100%",
+        "aspectRatio": "4 / 5",
+        "objectFit": "cover",
+        "display": "block"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": { "padding": "1.5rem" },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.3rem",
+            "fontWeight": "600",
+            "margin": "0 0 0.25rem"
+          },
+          "textContent": "${state.name}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.specialty ? 'block' : 'none'}",
+            "margin": "0 0 0.75rem",
+            "color": "var(--color-accent)",
+            "fontWeight": "600",
+            "fontSize": "0.9rem"
+          },
+          "textContent": "${state.specialty}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.bio ? 'block' : 'none'}",
+            "margin": "0",
+            "color": "var(--color-text-muted)",
+            "fontSize": "0.95rem",
+            "lineHeight": "1.65"
+          },
+          "textContent": "${state.bio}"
+        }
+      ]
+    }
+  ]
+}

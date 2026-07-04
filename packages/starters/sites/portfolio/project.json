@@ -1,0 +1,105 @@
+{
+  "name": "Aperture Studio",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Aperture Studio — a photography and creative studio crafting image-forward stories across weddings, portraits, editorial, travel, food, and architecture."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#d97706",
+    "--color-primary-hover": "#b45309",
+    "--color-ink": "#111827",
+    "--color-bg-dark": "#111827",
+    "--color-bg-cream": "#f8f7f4",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#111827",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#6b7280",
+    "--color-border": "#e5e7eb",
+    "--color-accent": "#d97706",
+    "--font-heading": "'Cormorant Garamond', Georgia, 'Times New Roman', serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.25rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "projects": {
+      "source": "./content/projects/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "category": { "type": "string" },
+          "cover": { "type": "string", "format": "image" },
+          "year": { "type": "number" },
+          "order": { "type": "number" },
+          "slug": { "type": "string" }
+        },
+        "required": ["title", "category", "slug"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

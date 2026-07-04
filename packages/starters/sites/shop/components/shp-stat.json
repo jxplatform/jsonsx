@@ -1,0 +1,37 @@
+{
+  "tagName": "shp-stat",
+  "state": {
+    "value": "",
+    "label": ""
+  },
+  "style": {
+    "display": "block",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2.25rem, 5vw, 3rem)",
+        "fontWeight": "700",
+        "lineHeight": "1",
+        "color": "var(--color-primary)",
+        "letterSpacing": "-0.02em"
+      },
+      "textContent": "${state.value}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "0.5rem",
+        "fontSize": "0.9rem",
+        "color": "var(--color-text-muted)",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "fontWeight": "500"
+      },
+      "textContent": "${state.label}"
+    }
+  ]
+}

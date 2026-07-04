@@ -1,0 +1,134 @@
+{
+  "name": "Flowlark",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Flowlark is the modern product platform that helps teams plan, ship, and scale — with pricing that flexes from your first project to your thousandth."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#6366f1",
+    "--color-primary-hover": "#4f46e5",
+    "--color-ink": "#0d0d1a",
+    "--color-bg-dark": "#0d0d1a",
+    "--color-bg-cream": "#f6f6fb",
+    "--color-bg-surface": "#f6f6fb",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#14142b",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#64647a",
+    "--color-border": "#e6e6f0",
+    "--color-accent": "#6366f1",
+    "--color-accent-soft": "rgba(99, 102, 241, 0.12)",
+    "--font-heading": "'Space Grotesk', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.75rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)",
+    "table": {
+      "width": "100%",
+      "borderCollapse": "collapse",
+      "fontSize": "0.95rem",
+      "textAlign": "left",
+      "backgroundColor": "var(--color-bg-white)",
+      "thead": {
+        "borderBottom": "1px solid var(--color-border)",
+        "th": {
+          "padding": "1rem 1.1rem",
+          "fontFamily": "var(--font-heading)",
+          "fontSize": "0.9rem",
+          "fontWeight": "600",
+          "color": "var(--color-text-primary)"
+        }
+      },
+      "tbody": {
+        "tr": {
+          "borderBottom": "1px solid var(--color-border)"
+        },
+        "td": {
+          "padding": "0.9rem 1.1rem",
+          "color": "var(--color-text-muted)",
+          ":first-child": {
+            "color": "var(--color-text-primary)",
+            "fontWeight": "600"
+          }
+        }
+      }
+    }
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "testimonials": {
+      "source": "./content/testimonials/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "quote": { "type": "string" },
+          "author": { "type": "string" },
+          "company": { "type": "string" },
+          "order": { "type": "number" }
+        },
+        "required": ["quote", "author"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

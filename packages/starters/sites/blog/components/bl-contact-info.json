@@ -1,0 +1,54 @@
+{
+  "tagName": "bl-contact-info",
+  "state": {
+    "heading": "Elsewhere",
+    "intro": "For letters, pitches, or corrections:",
+    "email": "hello@thelongfield.co",
+    "note": "New essays publish most Sundays. Replies to the newsletter come straight to me."
+  },
+  "style": {
+    "display": "block",
+    "padding": "2rem",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.4rem",
+        "fontWeight": "600",
+        "margin": "0 0 1rem"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "p",
+      "style": { "margin": "0 0 0.5rem", "color": "var(--color-text-muted)" },
+      "textContent": "${state.intro}"
+    },
+    {
+      "tagName": "p",
+      "style": { "margin": "0 0 1.25rem" },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "mailto:${state.email}" },
+          "style": {
+            "color": "var(--color-primary)",
+            "textDecoration": "none",
+            "fontWeight": "600"
+          },
+          "textContent": "${state.email}"
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": { "margin": "0", "color": "var(--color-text-muted)" },
+      "textContent": "${state.note}"
+    }
+  ]
+}

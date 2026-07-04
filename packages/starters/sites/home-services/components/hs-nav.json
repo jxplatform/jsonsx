@@ -1,0 +1,113 @@
+{
+  "tagName": "hs-nav",
+  "state": {
+    "brand": "Summit Heating & Cooling",
+    "phone": "(970) 555-0148",
+    "phoneHref": "tel:+19705550148"
+  },
+  "style": {
+    "display": "block",
+    "position": "sticky",
+    "top": "0",
+    "zIndex": "50",
+    "backgroundColor": "rgba(255, 255, 255, 0.9)",
+    "backdropFilter": "blur(8px)",
+    "borderBottom": "1px solid var(--color-border)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "0.9rem 1.5rem",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "space-between",
+        "gap": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "/" },
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.25rem",
+            "fontWeight": "800",
+            "color": "var(--color-text-primary)",
+            "textDecoration": "none",
+            "letterSpacing": "-0.02em"
+          },
+          "textContent": "${state.brand}"
+        },
+        {
+          "tagName": "nav",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "1.75rem",
+            "@--sm": { "gap": "0.9rem" }
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/services/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "Services"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.phoneHref}" },
+              "style": {
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "fontSize": "0.95rem",
+                "@--md": { "display": "none" },
+                ":hover": { "color": "var(--color-primary)" }
+              },
+              "textContent": "${state.phone}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.55rem 1.25rem",
+                "borderRadius": "var(--radius)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "fontSize": "0.95rem",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "Free Quote"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

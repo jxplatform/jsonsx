@@ -1,0 +1,22 @@
+{
+  "tagName": "div",
+  "$elements": [
+    { "$ref": "../components/co-nav.json" },
+    { "$ref": "../components/co-footer.json" }
+  ],
+  "style": {
+    "minHeight": "100vh",
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "children": [
+    { "tagName": "co-nav" },
+    {
+      "tagName": "main",
+      "style": { "flex": "1" },
+      "children": [{ "tagName": "slot" }]
+    },
+    { "tagName": "co-footer" }
+  ]
+}

@@ -1,0 +1,337 @@
+{
+  "tagName": "re-listings-filter",
+  "$elements": [{ "$ref": "./re-listing-card.json" }],
+  "state": {
+    "minBeds": 0,
+    "maxPrice": 0,
+    "listings": [
+      {
+        "Title": "Cedar Lane Colonial",
+        "link": "/cedar-lane-colonial/",
+        "price": 425000,
+        "beds": 3,
+        "baths": 2,
+        "sqft": 1850,
+        "city": "Maplewood",
+        "image": "/images/listing-1.jpg"
+      },
+      {
+        "Title": "Harbor View Modern",
+        "link": "/harbor-view-modern/",
+        "price": 875000,
+        "beds": 4,
+        "baths": 3,
+        "sqft": 2600,
+        "city": "Bayport",
+        "image": "/images/listing-2.jpg"
+      },
+      {
+        "Title": "Lakeview Loft",
+        "link": "/lakeview-loft/",
+        "price": 389000,
+        "beds": 2,
+        "baths": 2,
+        "sqft": 1200,
+        "city": "Lakeview",
+        "image": "/images/listing-3.jpg"
+      },
+      {
+        "Title": "Willow Creek Cottage",
+        "link": "/willow-creek-cottage/",
+        "price": 315000,
+        "beds": 2,
+        "baths": 1,
+        "sqft": 980,
+        "city": "Cedar Grove",
+        "image": "/images/listing-4.jpg"
+      },
+      {
+        "Title": "Summit Ridge Contemporary",
+        "link": "/summit-ridge-contemporary/",
+        "price": 1150000,
+        "beds": 5,
+        "baths": 4,
+        "sqft": 3400,
+        "city": "Harbor Hills",
+        "image": "/images/listing-5.jpg"
+      },
+      {
+        "Title": "Birchwood Family Home",
+        "link": "/birchwood-family-home/",
+        "price": 549000,
+        "beds": 4,
+        "baths": 3,
+        "sqft": 2200,
+        "city": "Northshore",
+        "image": "/images/listing-6.jpg"
+      }
+    ],
+    "visibleCount": {
+      "$prototype": "Function",
+      "body": "return state.listings.filter(l => (state.minBeds === 0 || l.beds >= state.minBeds) && (state.maxPrice === 0 || l.price <= state.maxPrice)).length;"
+    },
+    "setBeds0": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/minBeds" }, "value": 0 }
+    },
+    "setBeds2": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/minBeds" }, "value": 2 }
+    },
+    "setBeds3": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/minBeds" }, "value": 3 }
+    },
+    "setBeds4": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/minBeds" }, "value": 4 }
+    },
+    "setPrice0": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/maxPrice" }, "value": 0 }
+    },
+    "setPrice400": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/maxPrice" }, "value": 400000 }
+    },
+    "setPrice700": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/maxPrice" }, "value": 700000 }
+    },
+    "setPrice1200": {
+      "$expression": { "operator": "=", "target": { "$ref": "#/state/maxPrice" }, "value": 1200000 }
+    }
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto",
+    "padding": "0 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "2rem",
+        "alignItems": "flex-end",
+        "justifyContent": "space-between",
+        "padding": "1.5rem",
+        "backgroundColor": "var(--color-bg-cream)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)",
+        "marginBottom": "2rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-muted)",
+                "marginBottom": "0.6rem"
+              },
+              "textContent": "Bedrooms"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "gap": "0.4rem", "flexWrap": "wrap" },
+              "children": [
+                {
+                  "tagName": "button",
+                  "textContent": "Any",
+                  "onclick": { "$ref": "#/state/setBeds0" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.minBeds === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.minBeds === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "2+",
+                  "onclick": { "$ref": "#/state/setBeds2" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.minBeds === 2 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.minBeds === 2 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "3+",
+                  "onclick": { "$ref": "#/state/setBeds3" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.minBeds === 3 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.minBeds === 3 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "4+",
+                  "onclick": { "$ref": "#/state/setBeds4" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.minBeds === 4 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.minBeds === 4 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.12em",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-muted)",
+                "marginBottom": "0.6rem"
+              },
+              "textContent": "Max Price"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "gap": "0.4rem", "flexWrap": "wrap" },
+              "children": [
+                {
+                  "tagName": "button",
+                  "textContent": "Any",
+                  "onclick": { "$ref": "#/state/setPrice0" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.maxPrice === 0 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.maxPrice === 0 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "$400k",
+                  "onclick": { "$ref": "#/state/setPrice400" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.maxPrice === 400000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.maxPrice === 400000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "$700k",
+                  "onclick": { "$ref": "#/state/setPrice700" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.maxPrice === 700000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.maxPrice === 700000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                },
+                {
+                  "tagName": "button",
+                  "textContent": "$1.2M",
+                  "onclick": { "$ref": "#/state/setPrice1200" },
+                  "style": {
+                    "padding": "0.5rem 1rem",
+                    "borderRadius": "999px",
+                    "border": "1px solid var(--color-border)",
+                    "cursor": "pointer",
+                    "fontWeight": "600",
+                    "fontSize": "0.9rem",
+                    "transition": "all 0.15s",
+                    "backgroundColor": "${state.maxPrice === 1200000 ? 'var(--color-primary)' : 'var(--color-bg-white)'}",
+                    "color": "${state.maxPrice === 1200000 ? 'var(--color-text-white)' : 'var(--color-text-primary)'}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "fontSize": "0.95rem",
+            "fontWeight": "700",
+            "color": "var(--color-text-primary)",
+            "whiteSpace": "nowrap"
+          },
+          "textContent": "${state.visibleCount} homes"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "repeat(3, 1fr)",
+        "gap": "1.5rem",
+        "@--md": { "gridTemplateColumns": "repeat(2, 1fr)" },
+        "@--sm": { "gridTemplateColumns": "1fr" }
+      },
+      "children": {
+        "$prototype": "Array",
+        "items": { "$ref": "#/state/listings" },
+        "map": {
+          "tagName": "re-listing-card",
+          "$props": {
+            "heading": { "$ref": "$map/item/Title" },
+            "price": { "$ref": "$map/item/price" },
+            "beds": { "$ref": "$map/item/beds" },
+            "baths": { "$ref": "$map/item/baths" },
+            "sqft": { "$ref": "$map/item/sqft" },
+            "city": { "$ref": "$map/item/city" },
+            "image": { "$ref": "$map/item/image" },
+            "href": { "$ref": "$map/item/link" }
+          },
+          "style": {
+            "display": "${(state.minBeds === 0 || item.beds >= state.minBeds) && (state.maxPrice === 0 || item.price <= state.maxPrice) ? 'block' : 'none'}"
+          }
+        }
+      }
+    }
+  ]
+}

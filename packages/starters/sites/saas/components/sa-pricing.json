@@ -1,0 +1,427 @@
+{
+  "tagName": "sa-pricing",
+  "state": {
+    "billing": "monthly",
+    "starterMonthly": "0",
+    "starterAnnual": "0",
+    "proMonthly": "29",
+    "proAnnual": "24",
+    "scaleMonthly": "79",
+    "scaleAnnual": "63"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto",
+    "padding": "0 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "alignItems": "center",
+        "gap": "0.6rem",
+        "marginBottom": "2.75rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "inline-flex",
+            "padding": "0.3rem",
+            "borderRadius": "999px",
+            "backgroundColor": "var(--color-bg-cream)",
+            "border": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "button",
+              "textContent": "Monthly",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": { "$ref": "#/state/billing" },
+                  "value": "monthly"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.25rem",
+                "border": "none",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontSize": "0.9rem",
+                "fontWeight": "600",
+                "fontFamily": "inherit",
+                "transition": "background-color 0.15s, color 0.15s, box-shadow 0.15s",
+                "backgroundColor": "${state.billing === 'monthly' ? 'var(--color-bg-white)' : 'transparent'}",
+                "color": "${state.billing === 'monthly' ? 'var(--color-text-primary)' : 'var(--color-text-muted)'}",
+                "boxShadow": "${state.billing === 'monthly' ? '0 1px 4px rgba(20, 20, 43, 0.1)' : 'none'}"
+              }
+            },
+            {
+              "tagName": "button",
+              "textContent": "Annual",
+              "onclick": {
+                "$expression": {
+                  "operator": "=",
+                  "target": { "$ref": "#/state/billing" },
+                  "value": "annual"
+                }
+              },
+              "style": {
+                "padding": "0.5rem 1.25rem",
+                "border": "none",
+                "borderRadius": "999px",
+                "cursor": "pointer",
+                "fontSize": "0.9rem",
+                "fontWeight": "600",
+                "fontFamily": "inherit",
+                "transition": "background-color 0.15s, color 0.15s, box-shadow 0.15s",
+                "backgroundColor": "${state.billing === 'annual' ? 'var(--color-bg-white)' : 'transparent'}",
+                "color": "${state.billing === 'annual' ? 'var(--color-text-primary)' : 'var(--color-text-muted)'}",
+                "boxShadow": "${state.billing === 'annual' ? '0 1px 4px rgba(20, 20, 43, 0.1)' : 'none'}"
+              }
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "margin": "0",
+            "fontSize": "0.85rem",
+            "fontWeight": "600",
+            "color": "var(--color-primary)"
+          },
+          "textContent": "${state.billing === 'annual' ? 'You’re saving 20% with annual billing' : 'Switch to annual and save 20%'}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "grid",
+        "gridTemplateColumns": "repeat(3, 1fr)",
+        "gap": "1.25rem",
+        "alignItems": "stretch",
+        "@--md": { "gridTemplateColumns": "1fr", "maxWidth": "420px", "margin": "0 auto" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "padding": "2rem",
+            "borderRadius": "var(--radius)",
+            "border": "1px solid var(--color-border)",
+            "backgroundColor": "var(--color-bg-white)"
+          },
+          "children": [
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "600",
+                "margin": "0 0 0.35rem"
+              },
+              "textContent": "Starter"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-muted)",
+                "fontSize": "0.92rem",
+                "lineHeight": "1.55"
+              },
+              "textContent": "For individuals and side projects getting off the ground."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "0.25rem",
+                "marginBottom": "0.25rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "2.75rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "lineHeight": "1"
+                  },
+                  "textContent": "$${state.billing === 'monthly' ? state.starterMonthly : state.starterAnnual}"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-text-muted)", "fontSize": "0.95rem" },
+                  "textContent": "/mo"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.5rem",
+                "fontSize": "0.82rem",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "${state.billing === 'annual' ? 'per user · billed annually' : 'per user · billed monthly'}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "textAlign": "center",
+                "padding": "0.7rem 1rem",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid var(--color-border)",
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "marginBottom": "1.5rem",
+                "transition": "border-color 0.15s",
+                ":hover": { "borderColor": "var(--color-primary)" }
+              },
+              "textContent": "Start for free"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
+              "children": [
+                { "tagName": "sa-check-item", "state": { "text": "Up to 3 projects" } },
+                { "tagName": "sa-check-item", "state": { "text": "Community support" } },
+                { "tagName": "sa-check-item", "state": { "text": "1 GB storage" } }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "position": "relative",
+            "display": "flex",
+            "flexDirection": "column",
+            "padding": "2rem",
+            "borderRadius": "var(--radius)",
+            "border": "2px solid var(--color-primary)",
+            "backgroundColor": "var(--color-bg-white)",
+            "boxShadow": "0 20px 48px rgba(99, 102, 241, 0.18)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "position": "absolute",
+                "top": "-0.75rem",
+                "left": "2rem",
+                "padding": "0.25rem 0.75rem",
+                "borderRadius": "999px",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "fontSize": "0.72rem",
+                "fontWeight": "700",
+                "letterSpacing": "0.05em",
+                "textTransform": "uppercase"
+              },
+              "textContent": "Most popular"
+            },
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "600",
+                "margin": "0 0 0.35rem"
+              },
+              "textContent": "Pro"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-muted)",
+                "fontSize": "0.92rem",
+                "lineHeight": "1.55"
+              },
+              "textContent": "For growing teams that need automation and insight."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "0.25rem",
+                "marginBottom": "0.25rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "2.75rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "lineHeight": "1",
+                    "color": "var(--color-primary)"
+                  },
+                  "textContent": "$${state.billing === 'monthly' ? state.proMonthly : state.proAnnual}"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-text-muted)", "fontSize": "0.95rem" },
+                  "textContent": "/mo"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.5rem",
+                "fontSize": "0.82rem",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "${state.billing === 'annual' ? 'per user · billed annually' : 'per user · billed monthly'}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "textAlign": "center",
+                "padding": "0.7rem 1rem",
+                "borderRadius": "var(--radius)",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "marginBottom": "1.5rem",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "Start 14-day trial"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
+              "children": [
+                { "tagName": "sa-check-item", "state": { "text": "Unlimited projects" } },
+                { "tagName": "sa-check-item", "state": { "text": "Automations & workflows" } },
+                { "tagName": "sa-check-item", "state": { "text": "Analytics dashboard" } },
+                { "tagName": "sa-check-item", "state": { "text": "Priority email support" } }
+              ]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "padding": "2rem",
+            "borderRadius": "var(--radius)",
+            "border": "1px solid var(--color-border)",
+            "backgroundColor": "var(--color-bg-white)"
+          },
+          "children": [
+            {
+              "tagName": "h3",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.25rem",
+                "fontWeight": "600",
+                "margin": "0 0 0.35rem"
+              },
+              "textContent": "Scale"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.25rem",
+                "color": "var(--color-text-muted)",
+                "fontSize": "0.92rem",
+                "lineHeight": "1.55"
+              },
+              "textContent": "For organizations that need control, security, and SLAs."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "0.25rem",
+                "marginBottom": "0.25rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "2.75rem",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.03em",
+                    "lineHeight": "1"
+                  },
+                  "textContent": "$${state.billing === 'monthly' ? state.scaleMonthly : state.scaleAnnual}"
+                },
+                {
+                  "tagName": "span",
+                  "style": { "color": "var(--color-text-muted)", "fontSize": "0.95rem" },
+                  "textContent": "/mo"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0 0 1.5rem",
+                "fontSize": "0.82rem",
+                "color": "var(--color-text-muted)"
+              },
+              "textContent": "${state.billing === 'annual' ? 'per user · billed annually' : 'per user · billed monthly'}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "textAlign": "center",
+                "padding": "0.7rem 1rem",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid var(--color-border)",
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600",
+                "fontSize": "0.95rem",
+                "marginBottom": "1.5rem",
+                "transition": "border-color 0.15s",
+                ":hover": { "borderColor": "var(--color-primary)" }
+              },
+              "textContent": "Talk to sales"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "flexDirection": "column", "gap": "0.6rem" },
+              "children": [
+                { "tagName": "sa-check-item", "state": { "text": "Everything in Pro" } },
+                { "tagName": "sa-check-item", "state": { "text": "SSO & SCIM provisioning" } },
+                { "tagName": "sa-check-item", "state": { "text": "Advanced permissions" } },
+                { "tagName": "sa-check-item", "state": { "text": "99.9% uptime SLA" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,223 @@
+{
+  "tagName": "fs-pricing-card",
+  "state": {
+    "tier": "",
+    "price": "",
+    "per": "",
+    "description": "",
+    "badge": "",
+    "featured": false,
+    "cta": "Get started",
+    "ctaHref": "/contact/",
+    "perk1": "",
+    "perk2": "",
+    "perk3": "",
+    "perk4": "",
+    "perk5": ""
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "height": "100%",
+    "position": "relative",
+    "padding": "2rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "${state.featured ? '2px solid var(--color-primary)' : '1px solid var(--color-border)'}",
+    "borderRadius": "var(--radius)",
+    "boxShadow": "${state.featured ? '0 16px 40px rgba(219,39,119,0.16)' : '0 4px 20px rgba(31,23,41,0.05)'}"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "display": "${state.badge ? 'inline-block' : 'none'}",
+        "position": "absolute",
+        "top": "-0.85rem",
+        "left": "2rem",
+        "backgroundColor": "var(--color-primary)",
+        "color": "var(--color-text-white)",
+        "fontSize": "0.72rem",
+        "fontWeight": "600",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.06em",
+        "padding": "0.35rem 0.85rem",
+        "borderRadius": "999px"
+      },
+      "textContent": "${state.badge}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.35rem",
+        "fontWeight": "600",
+        "margin": "0 0 0.5rem"
+      },
+      "textContent": "${state.tier}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "alignItems": "baseline",
+        "gap": "0.35rem",
+        "margin": "0 0 0.5rem"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "2.4rem",
+            "fontWeight": "700",
+            "lineHeight": "1",
+            "color": "var(--color-primary)"
+          },
+          "textContent": "${state.price}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "display": "${state.per ? 'inline' : 'none'}",
+            "color": "var(--color-text-muted)",
+            "fontSize": "0.95rem",
+            "fontWeight": "500"
+          },
+          "textContent": "${state.per}"
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.description ? 'block' : 'none'}",
+        "margin": "0 0 1.5rem",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.95rem",
+        "lineHeight": "1.6"
+      },
+      "textContent": "${state.description}"
+    },
+    {
+      "tagName": "ul",
+      "style": {
+        "listStyle": "none",
+        "margin": "0 0 1.75rem",
+        "padding": "0",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.65rem"
+      },
+      "children": [
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk1 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)", "fontWeight": "700", "flexShrink": "0" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk1}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk2 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)", "fontWeight": "700", "flexShrink": "0" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk2}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk3 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)", "fontWeight": "700", "flexShrink": "0" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk3}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk4 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)", "fontWeight": "700", "flexShrink": "0" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk4}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk5 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-accent)", "fontWeight": "700", "flexShrink": "0" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk5}" }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.ctaHref}" },
+      "style": {
+        "marginTop": "auto",
+        "display": "block",
+        "textAlign": "center",
+        "backgroundColor": "${state.featured ? 'var(--color-primary)' : 'transparent'}",
+        "color": "${state.featured ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+        "border": "${state.featured ? '1px solid var(--color-primary)' : '1px solid var(--color-primary)'}",
+        "padding": "0.8rem 1.5rem",
+        "borderRadius": "var(--radius)",
+        "fontSize": "1rem",
+        "fontWeight": "600",
+        "textDecoration": "none",
+        "transition": "background-color 0.15s, color 0.15s",
+        ":hover": {
+          "backgroundColor": "var(--color-primary)",
+          "color": "var(--color-text-white)"
+        }
+      },
+      "textContent": "${state.cta}"
+    }
+  ]
+}

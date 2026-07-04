@@ -1,0 +1,15 @@
+{
+  "name": "rivertown-foundation",
+  "private": true,
+  "description": "A local community nonprofit running programs in food security, youth mentoring, housing, and job training.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^0.19.0",
+    "@jxsuite/runtime": "^0.19.0"
+  }
+}

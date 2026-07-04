@@ -1,0 +1,196 @@
+{
+  "tagName": "ev-ticket-card",
+  "state": {
+    "tier": "",
+    "price": "",
+    "period": "",
+    "description": "",
+    "perk1": "",
+    "perk2": "",
+    "perk3": "",
+    "perk4": "",
+    "cta": "Get Tickets",
+    "ctaHref": "/tickets/",
+    "featured": false,
+    "badge": "Most popular"
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "position": "relative",
+    "padding": "2rem",
+    "borderRadius": "var(--radius)",
+    "border": "${state.featured ? '2px solid var(--color-primary)' : '1px solid var(--color-border)'}",
+    "backgroundColor": "${state.featured ? 'var(--color-bg-white)' : 'var(--color-bg-white)'}",
+    "boxShadow": "${state.featured ? '0 24px 60px rgba(124, 58, 237, 0.18)' : '0 4px 20px rgba(23, 18, 43, 0.05)'}"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": {
+        "display": "${state.featured ? 'inline-block' : 'none'}",
+        "position": "absolute",
+        "top": "-0.85rem",
+        "left": "50%",
+        "transform": "translateX(-50%)",
+        "background": "linear-gradient(135deg, var(--color-primary), var(--color-accent))",
+        "color": "var(--color-text-white)",
+        "fontSize": "0.72rem",
+        "fontWeight": "700",
+        "letterSpacing": "0.08em",
+        "textTransform": "uppercase",
+        "padding": "0.35rem 0.9rem",
+        "borderRadius": "999px",
+        "whiteSpace": "nowrap"
+      },
+      "textContent": "${state.badge}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.35rem",
+        "fontWeight": "700",
+        "margin": "0 0 0.4rem"
+      },
+      "textContent": "${state.tier}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0 0 1.25rem",
+        "fontSize": "0.95rem",
+        "lineHeight": "1.55",
+        "color": "var(--color-text-muted)"
+      },
+      "textContent": "${state.description}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "alignItems": "baseline",
+        "gap": "0.35rem",
+        "marginBottom": "1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "2.5rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em"
+          },
+          "textContent": "${state.price}"
+        },
+        {
+          "tagName": "span",
+          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+          "textContent": "${state.period}"
+        }
+      ]
+    },
+    {
+      "tagName": "ul",
+      "style": {
+        "listStyle": "none",
+        "margin": "0 0 1.75rem",
+        "padding": "0",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.65rem",
+        "flex": "1"
+      },
+      "children": [
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk1 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk1}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk2 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk2}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk3 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk3}" }
+          ]
+        },
+        {
+          "tagName": "li",
+          "style": {
+            "display": "${state.perk4 ? 'flex' : 'none'}",
+            "gap": "0.6rem",
+            "alignItems": "flex-start",
+            "fontSize": "0.95rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-primary)", "fontWeight": "700" },
+              "textContent": "✓"
+            },
+            { "tagName": "span", "textContent": "${state.perk4}" }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.ctaHref}" },
+      "style": {
+        "display": "block",
+        "textAlign": "center",
+        "padding": "0.85rem 1.5rem",
+        "borderRadius": "999px",
+        "fontSize": "1rem",
+        "fontWeight": "600",
+        "textDecoration": "none",
+        "transition": "transform 0.15s, box-shadow 0.15s",
+        "color": "${state.featured ? 'var(--color-text-white)' : 'var(--color-primary)'}",
+        "background": "${state.featured ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'transparent'}",
+        "border": "${state.featured ? 'none' : '1px solid var(--color-primary)'}",
+        ":hover": { "transform": "translateY(-2px)" }
+      },
+      "textContent": "${state.cta}"
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "tagName": "bl-contact-form",
+  "state": {
+    "heading": "Send a note",
+    "cta": "Send note",
+    "note": "This is a demo form. Wire it to your email provider or inbox in components/bl-contact-form.json."
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.6rem",
+        "fontWeight": "600",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "form",
+      "attributes": { "action": "#", "method": "post" },
+      "style": { "display": "grid", "gap": "1rem", "alignContent": "start" },
+      "children": [
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "text",
+            "name": "name",
+            "placeholder": "Your name",
+            "required": "true",
+            "aria-label": "Your name"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)"
+          }
+        },
+        {
+          "tagName": "input",
+          "attributes": {
+            "type": "email",
+            "name": "email",
+            "placeholder": "Email address",
+            "required": "true",
+            "aria-label": "Email address"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)"
+          }
+        },
+        {
+          "tagName": "textarea",
+          "attributes": {
+            "name": "message",
+            "rows": "5",
+            "placeholder": "What's on your mind?",
+            "aria-label": "Message"
+          },
+          "style": {
+            "width": "100%",
+            "padding": "0.75rem 0.9rem",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontFamily": "inherit",
+            "backgroundColor": "var(--color-bg-white)"
+          }
+        },
+        {
+          "tagName": "button",
+          "attributes": { "type": "submit" },
+          "textContent": "${state.cta}",
+          "style": {
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.85rem 1.5rem",
+            "border": "none",
+            "borderRadius": "var(--radius)",
+            "fontSize": "1rem",
+            "fontWeight": "600",
+            "cursor": "pointer",
+            "justifySelf": "start",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          }
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "fontSize": "0.85rem",
+            "color": "var(--color-text-muted)",
+            "margin": "0"
+          },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

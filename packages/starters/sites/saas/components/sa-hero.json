@@ -1,0 +1,160 @@
+{
+  "tagName": "sa-hero",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "subheading": "",
+    "cta": "Get started free",
+    "ctaHref": "/pricing/",
+    "cta2": "",
+    "cta2Href": "/features/",
+    "note": "",
+    "image": { "type": "string", "format": "image", "default": "" },
+    "imageAlt": "Product dashboard preview"
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "overflow": "hidden",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "background": "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(99, 102, 241, 0.35), transparent 70%), var(--color-bg-dark)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "clamp(4.5rem, 11vw, 8rem) 1.5rem clamp(3rem, 7vw, 5rem)",
+        "textAlign": "center"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.eyebrow ? 'inline-flex' : 'none'}",
+            "alignItems": "center",
+            "gap": "0.5rem",
+            "padding": "0.375rem 0.9rem",
+            "borderRadius": "999px",
+            "border": "1px solid rgba(255, 255, 255, 0.18)",
+            "backgroundColor": "rgba(255, 255, 255, 0.06)",
+            "fontSize": "0.8125rem",
+            "fontWeight": "500",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "margin": "0 0 1.75rem"
+          },
+          "textContent": "${state.eyebrow}"
+        },
+        {
+          "tagName": "h1",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(2.5rem, 6.5vw, 4.5rem)",
+            "fontWeight": "700",
+            "lineHeight": "1.05",
+            "letterSpacing": "-0.04em",
+            "margin": "0 auto 1.5rem",
+            "maxWidth": "16ch"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "clamp(1.05rem, 2vw, 1.3rem)",
+            "lineHeight": "1.65",
+            "color": "rgba(255, 255, 255, 0.72)",
+            "margin": "0 auto 2.25rem",
+            "maxWidth": "52ch"
+          },
+          "textContent": "${state.subheading}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "gap": "0.75rem",
+            "justifyContent": "center",
+            "flexWrap": "wrap"
+          },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.ctaHref}" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.85rem 2rem",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1.02rem",
+                "fontWeight": "600",
+                "textDecoration": "none",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "${state.cta}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.cta2Href}" },
+              "style": {
+                "display": "${state.cta2 ? 'inline-block' : 'none'}",
+                "border": "1px solid rgba(255, 255, 255, 0.28)",
+                "color": "var(--color-text-white)",
+                "padding": "0.85rem 2rem",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1.02rem",
+                "fontWeight": "600",
+                "textDecoration": "none",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "rgba(255, 255, 255, 0.1)" }
+              },
+              "textContent": "${state.cta2}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "fontSize": "0.85rem",
+            "color": "rgba(255, 255, 255, 0.5)",
+            "margin": "1.25rem 0 0"
+          },
+          "textContent": "${state.note}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.image ? 'block' : 'none'}",
+            "maxWidth": "960px",
+            "margin": "3.5rem auto 0"
+          },
+          "children": [
+            {
+              "tagName": "img",
+              "attributes": {
+                "src": "${state.image}",
+                "alt": "${state.imageAlt}",
+                "loading": "eager"
+              },
+              "style": {
+                "display": "block",
+                "width": "100%",
+                "height": "auto",
+                "borderRadius": "var(--radius)",
+                "border": "1px solid rgba(255, 255, 255, 0.12)",
+                "boxShadow": "0 32px 80px rgba(0, 0, 0, 0.5)"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "tagName": "sa-testimonial-card",
+  "state": {
+    "quote": "",
+    "author": "",
+    "company": ""
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "gap": "1.25rem",
+    "padding": "1.9rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "boxShadow": "0 4px 24px rgba(20, 20, 43, 0.05)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "color": "var(--color-primary)",
+        "fontSize": "1rem",
+        "letterSpacing": "0.15em"
+      },
+      "textContent": "★★★★★"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.12rem",
+        "lineHeight": "1.6",
+        "fontWeight": "500",
+        "margin": "0",
+        "flex": "1",
+        "color": "var(--color-text-primary)"
+      },
+      "textContent": "“${state.quote}”"
+    },
+    {
+      "tagName": "div",
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "fontWeight": "600", "color": "var(--color-text-primary)" },
+          "textContent": "${state.author}"
+        },
+        {
+          "tagName": "div",
+          "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+          "textContent": "${state.company}"
+        }
+      ]
+    }
+  ]
+}

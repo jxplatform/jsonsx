@@ -1,0 +1,48 @@
+{
+  "tagName": "pv-feature",
+  "state": {
+    "number": "",
+    "title": "",
+    "text": ""
+  },
+  "style": {
+    "display": "block",
+    "paddingTop": "1.75rem",
+    "borderTop": "2px solid var(--color-ink)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "${state.number ? 'block' : 'none'}",
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.4rem",
+        "fontWeight": "600",
+        "color": "var(--color-primary)",
+        "marginBottom": "0.75rem",
+        "lineHeight": "1"
+      },
+      "textContent": "${state.number}"
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.4rem",
+        "fontWeight": "600",
+        "margin": "0 0 0.5rem"
+      },
+      "textContent": "${state.title}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0",
+        "color": "var(--color-text-muted)",
+        "fontSize": "1rem",
+        "lineHeight": "1.7"
+      },
+      "textContent": "${state.text}"
+    }
+  ]
+}

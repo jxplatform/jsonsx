@@ -1,0 +1,84 @@
+{
+  "site": "real-estate",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "modern luxury house exterior",
+      "orientation": "landscape",
+      "photoId": 7031406
+    },
+    {
+      "role": "about",
+      "query": "real estate agent professional",
+      "orientation": "landscape",
+      "photoId": 8815820
+    },
+    {
+      "role": "listing-1",
+      "query": "modern house exterior",
+      "orientation": "landscape",
+      "photoId": 30580640
+    },
+    {
+      "role": "listing-2",
+      "query": "suburban home",
+      "orientation": "landscape",
+      "photoId": 15504477
+    },
+    {
+      "role": "listing-3",
+      "query": "luxury apartment interior",
+      "orientation": "landscape",
+      "photoId": 8135492
+    },
+    {
+      "role": "listing-4",
+      "query": "cozy cottage",
+      "orientation": "landscape",
+      "photoId": 15888628
+    },
+    {
+      "role": "listing-5",
+      "query": "contemporary home",
+      "orientation": "landscape",
+      "photoId": 8089172
+    },
+    {
+      "role": "listing-6",
+      "query": "family house",
+      "orientation": "landscape",
+      "photoId": 30580640
+    },
+    {
+      "role": "interior-1",
+      "query": "bright living room interior",
+      "orientation": "landscape",
+      "photoId": 29012619
+    },
+    {
+      "role": "interior-2",
+      "query": "modern kitchen interior",
+      "orientation": "landscape",
+      "photoId": 7045356
+    },
+    {
+      "role": "agent-1",
+      "query": "professional real estate agent portrait woman",
+      "orientation": "square",
+      "photoId": 7414903
+    },
+    {
+      "role": "agent-2",
+      "query": "professional real estate agent portrait man",
+      "orientation": "square",
+      "photoId": 7578866
+    },
+    {
+      "role": "agent-3",
+      "query": "friendly real estate agent portrait",
+      "orientation": "square",
+      "photoId": 7578856
+    }
+  ]
+}

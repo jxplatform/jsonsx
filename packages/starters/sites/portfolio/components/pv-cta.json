@@ -1,0 +1,64 @@
+{
+  "tagName": "pv-cta",
+  "state": {
+    "heading": "",
+    "text": "",
+    "cta": "Start a Project",
+    "ctaHref": "/contact/"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(4rem, 9vw, 6.5rem) 1.5rem",
+    "textAlign": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto" },
+      "children": [
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(2rem, 4.5vw, 3.25rem)",
+            "fontWeight": "600",
+            "lineHeight": "1.12",
+            "margin": "0 0 1.1rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "1.15rem",
+            "lineHeight": "1.7",
+            "opacity": "0.82",
+            "margin": "0 0 2.25rem"
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.ctaHref}" },
+          "style": {
+            "display": "inline-block",
+            "backgroundColor": "var(--color-primary)",
+            "color": "var(--color-text-white)",
+            "padding": "0.95rem 2.4rem",
+            "borderRadius": "var(--radius)",
+            "fontSize": "0.95rem",
+            "fontWeight": "600",
+            "letterSpacing": "0.05em",
+            "textTransform": "uppercase",
+            "textDecoration": "none",
+            "transition": "background-color 0.15s",
+            ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+          },
+          "textContent": "${state.cta}"
+        }
+      ]
+    }
+  ]
+}

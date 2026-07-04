@@ -1,0 +1,22 @@
+{
+  "tagName": "pv-project-grid",
+  "state": {},
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width)",
+    "margin": "0 auto",
+    "padding": "0 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "columns": "3",
+        "columnGap": "1.75rem",
+        "@--md": { "columns": "2" },
+        "@--sm": { "columns": "1" }
+      },
+      "children": [{ "tagName": "slot" }]
+    }
+  ]
+}

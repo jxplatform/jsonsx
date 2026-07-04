@@ -1,0 +1,112 @@
+{
+  "tagName": "fs-class-card",
+  "state": {
+    "name": "",
+    "level": "",
+    "time": "",
+    "instructor": "",
+    "focus": ""
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "height": "100%",
+    "padding": "1.6rem",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "boxShadow": "0 4px 20px rgba(31,23,41,0.05)",
+    "transition": "transform 0.15s, box-shadow 0.15s",
+    ":hover": {
+      "transform": "translateY(-3px)",
+      "boxShadow": "0 12px 32px rgba(31,23,41,0.10)"
+    }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "justifyContent": "space-between",
+        "alignItems": "flex-start",
+        "gap": "0.75rem",
+        "marginBottom": "0.75rem"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.3rem",
+            "fontWeight": "600",
+            "margin": "0"
+          },
+          "textContent": "${state.name}"
+        },
+        {
+          "tagName": "span",
+          "style": {
+            "display": "${state.level ? 'inline-block' : 'none'}",
+            "flexShrink": "0",
+            "backgroundColor": "rgba(13,148,136,0.12)",
+            "color": "var(--color-accent)",
+            "fontSize": "0.72rem",
+            "fontWeight": "600",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.06em",
+            "padding": "0.3rem 0.65rem",
+            "borderRadius": "999px",
+            "whiteSpace": "nowrap"
+          },
+          "textContent": "${state.level}"
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.focus ? 'block' : 'none'}",
+        "margin": "0 0 1.1rem",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.95rem",
+        "lineHeight": "1.6"
+      },
+      "textContent": "${state.focus}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "auto",
+        "paddingTop": "1rem",
+        "borderTop": "1px solid var(--color-border)",
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.4rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "0.5rem",
+            "fontWeight": "600",
+            "color": "var(--color-primary)"
+          },
+          "children": [
+            { "tagName": "span", "style": { "fontSize": "1rem" }, "textContent": "🕑" },
+            { "tagName": "span", "textContent": "${state.time}" }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "fontSize": "0.9rem",
+            "color": "var(--color-text-muted)"
+          },
+          "textContent": "with ${state.instructor}"
+        }
+      ]
+    }
+  ]
+}

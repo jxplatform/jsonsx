@@ -23,6 +23,7 @@ jobs:
           - runtime
           - schema
           - server
+          - starters
           - studio
     steps:
       - uses: actions/checkout@v7

@@ -1,0 +1,112 @@
+{
+  "tagName": "pf-logo-bar",
+  "state": {
+    "label": "Trusted by teams across the region",
+    "logo1": "Northwind Labs",
+    "logo2": "Harbor Freight Co.",
+    "logo3": "Cedar & Vine",
+    "logo4": "Atlas Robotics",
+    "logo5": "Riverstone Health"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-cream)",
+    "borderTop": "1px solid var(--color-border)",
+    "borderBottom": "1px solid var(--color-border)",
+    "padding": "2.5rem 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "textAlign": "center",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.14em",
+            "fontSize": "0.75rem",
+            "fontWeight": "600",
+            "color": "var(--color-text-muted)",
+            "margin": "0 0 1.5rem"
+          },
+          "textContent": "${state.label}"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1.5rem 2.5rem"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.6"
+              },
+              "textContent": "${state.logo1}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.6"
+              },
+              "textContent": "${state.logo2}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.6",
+                "@--sm": { "display": "none" }
+              },
+              "textContent": "${state.logo3}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.6",
+                "@--md": { "display": "none" }
+              },
+              "textContent": "${state.logo4}"
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.2rem",
+                "fontWeight": "700",
+                "color": "var(--color-text-primary)",
+                "opacity": "0.6",
+                "@--md": { "display": "none" }
+              },
+              "textContent": "${state.logo5}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

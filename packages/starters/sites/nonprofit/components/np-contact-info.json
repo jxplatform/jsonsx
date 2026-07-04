@@ -1,0 +1,153 @@
+{
+  "tagName": "np-contact-info",
+  "state": {
+    "line1": "240 Riverside Avenue",
+    "line2": "Rivertown, CA 90210",
+    "phone": "(555) 204-7788",
+    "phoneHref": "tel:+15552047788",
+    "email": "hello@rivertownfoundation.org",
+    "emailHref": "mailto:hello@rivertownfoundation.org"
+  },
+  "style": {
+    "display": "block"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "padding": "2rem",
+        "backgroundColor": "var(--color-bg-cream)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.4rem",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Visit us"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0 0 0.35rem" },
+          "textContent": "${state.line1}"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0 0 0.35rem" },
+          "textContent": "${state.line2}"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0.75rem 0 0.35rem" },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.phoneHref}" },
+              "style": {
+                "color": "var(--color-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600"
+              },
+              "textContent": "${state.phone}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.emailHref}" },
+              "style": {
+                "color": "var(--color-primary)",
+                "textDecoration": "none",
+                "fontWeight": "600"
+              },
+              "textContent": "${state.email}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "marginTop": "1.5rem",
+        "padding": "2rem",
+        "backgroundColor": "var(--color-bg-cream)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.4rem",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Office hours"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "fontWeight": "500" },
+              "textContent": "Monday – Friday"
+            },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "9:00am – 5:00pm"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "9:00am – 1:00pm (Pantry)"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0"
+          },
+          "children": [
+            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "Closed"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

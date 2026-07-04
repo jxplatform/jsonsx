@@ -1,0 +1,53 @@
+{
+  "tagName": "pf-section-header",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "subheading": "",
+    "align": "center"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width-narrow)",
+    "margin": "0 auto 2.5rem",
+    "textAlign": "${state.align}"
+  },
+  "children": [
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.eyebrow ? 'block' : 'none'}",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.16em",
+        "fontSize": "0.8rem",
+        "fontWeight": "600",
+        "color": "var(--color-primary)",
+        "margin": "0 0 0.75rem"
+      },
+      "textContent": "${state.eyebrow}"
+    },
+    {
+      "tagName": "h2",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(1.9rem, 4vw, 2.6rem)",
+        "fontWeight": "700",
+        "lineHeight": "1.15",
+        "letterSpacing": "-0.02em",
+        "margin": "0"
+      },
+      "textContent": "${state.heading}"
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "display": "${state.subheading ? 'block' : 'none'}",
+        "fontSize": "1.1rem",
+        "lineHeight": "1.7",
+        "color": "var(--color-text-muted)",
+        "margin": "1rem 0 0"
+      },
+      "textContent": "${state.subheading}"
+    }
+  ]
+}

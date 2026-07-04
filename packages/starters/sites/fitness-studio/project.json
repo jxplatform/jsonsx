@@ -1,0 +1,104 @@
+{
+  "name": "Ember Yoga & Fitness",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "A boutique yoga and fitness studio offering vinyasa, pilates, strength, and HIIT — small classes, all levels welcome."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#db2777",
+    "--color-primary-hover": "#be185d",
+    "--color-ink": "#1f1729",
+    "--color-bg-dark": "#241a2b",
+    "--color-bg-cream": "#fdf2f8",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#1f1729",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#6b6472",
+    "--color-border": "#f0e4ec",
+    "--color-accent": "#0d9488",
+    "--font-heading": "'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.75rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "classes": {
+      "source": "./content/classes/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "level": { "type": "string" },
+          "time": { "type": "string" },
+          "instructor": { "type": "string" },
+          "focus": { "type": "string" },
+          "order": { "type": "number" }
+        },
+        "required": ["name", "level", "time", "instructor"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

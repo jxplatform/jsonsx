@@ -1,0 +1,132 @@
+{
+  "tagName": "shp-visit-info",
+  "state": {
+    "address1": "412 Spoke Avenue",
+    "address2": "Riverbend, CA 90210",
+    "phone": "(555) 042-7100",
+    "phoneHref": "tel:+15550427100",
+    "weekdays": "9:00am – 6:30pm",
+    "saturday": "9:00am – 5:00pm",
+    "sunday": "10:00am – 4:00pm"
+  },
+  "style": {
+    "display": "grid",
+    "gap": "1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "padding": "2rem",
+        "backgroundColor": "var(--color-bg-cream)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.4rem",
+            "margin": "0 0 1rem"
+          },
+          "textContent": "Find us"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0 0 0.35rem" },
+          "textContent": "${state.address1}"
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0 0 0.75rem" },
+          "textContent": "${state.address2}"
+        },
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.phoneHref}" },
+          "style": {
+            "color": "var(--color-primary)",
+            "textDecoration": "none",
+            "fontWeight": "600"
+          },
+          "textContent": "${state.phone}"
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "padding": "2rem",
+        "backgroundColor": "var(--color-bg-white)",
+        "border": "1px solid var(--color-border)",
+        "borderRadius": "var(--radius)"
+      },
+      "children": [
+        {
+          "tagName": "h3",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "1.4rem",
+            "margin": "0 0 1.25rem"
+          },
+          "textContent": "Shop hours"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "span",
+              "style": { "fontWeight": "500" },
+              "textContent": "Monday – Friday"
+            },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "${state.weekdays}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Saturday" },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "${state.saturday}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "flex",
+            "justifyContent": "space-between",
+            "padding": "0.6rem 0"
+          },
+          "children": [
+            { "tagName": "span", "style": { "fontWeight": "500" }, "textContent": "Sunday" },
+            {
+              "tagName": "span",
+              "style": { "color": "var(--color-text-muted)" },
+              "textContent": "${state.sunday}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

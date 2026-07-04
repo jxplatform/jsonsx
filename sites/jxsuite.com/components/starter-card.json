@@ -1,0 +1,98 @@
+{
+  "tagName": "starter-card",
+  "state": {
+    "name": "Starter",
+    "industry": "Industry",
+    "tagline": "",
+    "image": "",
+    "accent": "#3b82f6",
+    "slug": ""
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "borderRadius": "var(--radius-lg)",
+    "border": "1px solid var(--color-border)",
+    "backgroundColor": "var(--color-bg-surface)",
+    "overflow": "hidden",
+    "borderTop": "3px solid ${state.accent}"
+  },
+  "children": [
+    {
+      "tagName": "img",
+      "attributes": {
+        "src": "${state.image}",
+        "alt": "Preview of the ${state.name} starter site",
+        "width": "1600",
+        "height": "1000",
+        "loading": "lazy",
+        "decoding": "async"
+      },
+      "style": {
+        "display": "block",
+        "width": "100%",
+        "aspectRatio": "16 / 10",
+        "objectFit": "cover",
+        "borderBottom": "1px solid var(--color-border)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexDirection": "column",
+        "gap": "0.5rem",
+        "padding": "1.25rem 1.5rem 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": {
+            "fontSize": "0.6875rem",
+            "fontWeight": "600",
+            "letterSpacing": "0.08em",
+            "textTransform": "uppercase",
+            "color": "${state.accent}"
+          },
+          "textContent": "${state.industry}"
+        },
+        {
+          "tagName": "h3",
+          "style": {
+            "fontSize": "1.125rem",
+            "fontWeight": "700",
+            "letterSpacing": "-0.02em",
+            "margin": "0",
+            "color": "var(--color-text-primary)"
+          },
+          "textContent": "${state.name}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.875rem",
+            "lineHeight": "1.6",
+            "color": "var(--color-text-secondary)",
+            "margin": "0 0 0.25rem"
+          },
+          "textContent": "${state.tagline}"
+        },
+        {
+          "tagName": "code",
+          "style": {
+            "fontFamily": "var(--font-mono)",
+            "fontSize": "0.75rem",
+            "color": "var(--color-text-muted)",
+            "backgroundColor": "var(--color-bg-primary)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "padding": "0.4rem 0.6rem",
+            "overflowX": "auto",
+            "whiteSpace": "nowrap"
+          },
+          "textContent": "bun create @jxsuite my-site --template ${state.slug}"
+        }
+      ]
+    }
+  ]
+}

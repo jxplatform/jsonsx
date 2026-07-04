@@ -1,0 +1,120 @@
+{
+  "tagName": "bl-newsletter-cta",
+  "state": {
+    "eyebrow": "The Long Field Letter",
+    "heading": "One essay, most Sundays.",
+    "text": "Field notes on design, technology, and craft — sent when there's something worth saying. No noise, unsubscribe anytime.",
+    "placeholder": "you@example.com",
+    "cta": "Subscribe",
+    "note": "This is a demo form. Wire it to your email provider in components/bl-newsletter-cta.json."
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-cream)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "padding": "clamp(2rem, 5vw, 3rem)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": { "maxWidth": "var(--max-width-narrow)", "margin": "0 auto", "textAlign": "center" },
+      "children": [
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.eyebrow ? 'block' : 'none'}",
+            "textTransform": "uppercase",
+            "letterSpacing": "0.16em",
+            "fontSize": "0.78rem",
+            "fontWeight": "600",
+            "color": "var(--color-primary)",
+            "margin": "0 0 0.75rem"
+          },
+          "textContent": "${state.eyebrow}"
+        },
+        {
+          "tagName": "h2",
+          "style": {
+            "fontFamily": "var(--font-heading)",
+            "fontSize": "clamp(1.7rem, 3.5vw, 2.3rem)",
+            "fontWeight": "600",
+            "lineHeight": "1.15",
+            "margin": "0 0 0.85rem"
+          },
+          "textContent": "${state.heading}"
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "1.08rem",
+            "lineHeight": "1.65",
+            "color": "var(--color-text-muted)",
+            "margin": "0 auto 1.75rem",
+            "maxWidth": "52ch"
+          },
+          "textContent": "${state.text}"
+        },
+        {
+          "tagName": "form",
+          "attributes": { "action": "#", "method": "post" },
+          "style": {
+            "display": "flex",
+            "gap": "0.75rem",
+            "maxWidth": "460px",
+            "margin": "0 auto",
+            "@--sm": { "flexDirection": "column" }
+          },
+          "children": [
+            {
+              "tagName": "input",
+              "attributes": {
+                "type": "email",
+                "name": "email",
+                "placeholder": "${state.placeholder}",
+                "required": "true",
+                "aria-label": "Email address"
+              },
+              "style": {
+                "flex": "1",
+                "padding": "0.8rem 1rem",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem",
+                "fontFamily": "inherit",
+                "backgroundColor": "var(--color-bg-white)"
+              }
+            },
+            {
+              "tagName": "button",
+              "attributes": { "type": "submit" },
+              "style": {
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.8rem 1.75rem",
+                "border": "none",
+                "borderRadius": "var(--radius)",
+                "fontSize": "1rem",
+                "fontWeight": "600",
+                "cursor": "pointer",
+                "transition": "background-color 0.15s",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "${state.cta}"
+            }
+          ]
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "display": "${state.note ? 'block' : 'none'}",
+            "fontSize": "0.8rem",
+            "color": "var(--color-text-muted)",
+            "margin": "1rem 0 0"
+          },
+          "textContent": "${state.note}"
+        }
+      ]
+    }
+  ]
+}

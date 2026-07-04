@@ -1,0 +1,132 @@
+{
+  "tagName": "pv-hero",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "subheading": "",
+    "cta": "View the Work",
+    "ctaHref": "/work/",
+    "cta2": "",
+    "cta2Href": "/contact/",
+    "bg": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "minHeight": "88vh",
+    "color": "var(--color-text-white)",
+    "backgroundImage": "url('${state.bg}')",
+    "backgroundSize": "cover",
+    "backgroundPosition": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "linear-gradient(180deg, rgba(17,24,39,0.30) 0%, rgba(17,24,39,0.78) 100%)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "display": "flex",
+        "alignItems": "flex-end",
+        "minHeight": "88vh",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "4rem 1.5rem 5rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "720px" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.24em",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "marginBottom": "1.25rem",
+                "color": "var(--color-primary)"
+              },
+              "textContent": "${state.eyebrow}"
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(2.75rem, 7vw, 5rem)",
+                "fontWeight": "600",
+                "lineHeight": "1.04",
+                "margin": "0 0 1.5rem",
+                "letterSpacing": "-0.01em"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
+                "lineHeight": "1.65",
+                "margin": "0 0 2.25rem",
+                "opacity": "0.92",
+                "maxWidth": "50ch"
+              },
+              "textContent": "${state.subheading}"
+            },
+            {
+              "tagName": "div",
+              "style": { "display": "flex", "gap": "0.85rem", "flexWrap": "wrap" },
+              "children": [
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.ctaHref}" },
+                  "style": {
+                    "display": "inline-block",
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.9rem 2.1rem",
+                    "borderRadius": "var(--radius)",
+                    "fontSize": "0.95rem",
+                    "fontWeight": "600",
+                    "letterSpacing": "0.04em",
+                    "textTransform": "uppercase",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                  },
+                  "textContent": "${state.cta}"
+                },
+                {
+                  "tagName": "a",
+                  "attributes": { "href": "${state.cta2Href}" },
+                  "style": {
+                    "display": "${state.cta2 ? 'inline-block' : 'none'}",
+                    "border": "1px solid rgba(255,255,255,0.6)",
+                    "color": "var(--color-text-white)",
+                    "padding": "0.9rem 2.1rem",
+                    "borderRadius": "var(--radius)",
+                    "fontSize": "0.95rem",
+                    "fontWeight": "600",
+                    "letterSpacing": "0.04em",
+                    "textTransform": "uppercase",
+                    "textDecoration": "none",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "rgba(255,255,255,0.14)" }
+                  },
+                  "textContent": "${state.cta2}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

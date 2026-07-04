@@ -1,0 +1,48 @@
+{
+  "site": "fitness-studio",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "yoga studio class",
+      "orientation": "landscape",
+      "photoId": 8436610
+    },
+    {
+      "role": "about",
+      "query": "yoga instructor stretching",
+      "orientation": "landscape",
+      "photoId": 8436603
+    },
+    {
+      "role": "class-1",
+      "query": "yoga pose",
+      "orientation": "square",
+      "photoId": 16131310
+    },
+    {
+      "role": "class-2",
+      "query": "pilates class",
+      "orientation": "square",
+      "photoId": 18499504
+    },
+    {
+      "role": "class-3",
+      "query": "gym strength training",
+      "orientation": "square",
+      "photoId": 3888405
+    },
+    {
+      "role": "instructor-1",
+      "query": "fitness instructor portrait",
+      "orientation": "portrait",
+      "photoId": 6739935
+    },
+    {
+      "role": "instructor-2",
+      "query": "fitness instructor portrait",
+      "orientation": "portrait",
+      "photoId": 6739935
+    }
+  ]
+}

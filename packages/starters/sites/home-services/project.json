@@ -1,0 +1,103 @@
+{
+  "name": "Summit Heating & Cooling",
+  "url": "https://example.com",
+  "defaults": {
+    "layout": "./layouts/base.json",
+    "lang": "en"
+  },
+  "$head": [
+    {
+      "tagName": "meta",
+      "attributes": { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    },
+    {
+      "tagName": "meta",
+      "attributes": {
+        "name": "description",
+        "content": "Summit Heating & Cooling — licensed, insured HVAC contractor serving Northern Colorado with AC and furnace installation, repair, heat pumps, and 24/7 emergency service."
+      }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "icon", "href": "/favicon.svg" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.googleapis.com" }
+    },
+    {
+      "tagName": "link",
+      "attributes": { "rel": "preconnect", "href": "https://fonts.gstatic.com", "crossorigin": "" }
+    },
+    {
+      "tagName": "link",
+      "attributes": {
+        "rel": "stylesheet",
+        "href": "https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap"
+      }
+    }
+  ],
+  "$media": {
+    "--": "1200px",
+    "--lg": "(max-width: 1024px)",
+    "--md": "(max-width: 768px)",
+    "--sm": "(max-width: 640px)"
+  },
+  "style": {
+    "--color-primary": "#ea580c",
+    "--color-primary-hover": "#c2410c",
+    "--color-ink": "#1c1917",
+    "--color-bg-dark": "#1c1917",
+    "--color-bg-cream": "#f5f5f4",
+    "--color-bg-white": "#ffffff",
+    "--color-text-primary": "#1c1917",
+    "--color-text-white": "#ffffff",
+    "--color-text-muted": "#57534e",
+    "--color-border": "#e7e5e4",
+    "--color-accent": "#ea580c",
+    "--font-heading": "'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "--max-width": "1200px",
+    "--max-width-narrow": "820px",
+    "--radius": "0.5rem",
+    "margin": "0",
+    "padding": "0",
+    "fontFamily": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "lineHeight": "1.6",
+    "color": "var(--color-text-primary)",
+    "backgroundColor": "var(--color-bg-white)"
+  },
+  "imports": {
+    "Markdown": "@jxsuite/parser/Markdown.class.json",
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json"
+  },
+  "images": {
+    "optimize": true,
+    "widths": [320, 640, 960, 1280, 1920],
+    "formats": ["webp", "avif"],
+    "quality": { "webp": 80, "avif": 65, "jpeg": 80, "png": 80 },
+    "sizes": "(max-width: 768px) 100vw, 50vw",
+    "lazyLoad": true
+  },
+  "contentTypes": {
+    "services": {
+      "source": "./content/services/",
+      "format": "Markdown",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "summary": { "type": "string" },
+          "icon": { "type": "string" },
+          "order": { "type": "number" }
+        },
+        "required": ["name", "summary"]
+      }
+    }
+  },
+  "build": {
+    "outDir": "./dist",
+    "format": "directory",
+    "trailingSlash": "always"
+  }
+}

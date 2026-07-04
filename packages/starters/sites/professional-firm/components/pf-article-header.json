@@ -1,0 +1,79 @@
+{
+  "tagName": "pf-article-header",
+  "state": {
+    "eyebrow": "Insight",
+    "title": "",
+    "date": "",
+    "author": "",
+    "readingTime": ""
+  },
+  "style": {
+    "display": "block",
+    "borderBottom": "1px solid var(--color-border)",
+    "paddingBottom": "2rem",
+    "marginBottom": "2.5rem"
+  },
+  "children": [
+    {
+      "tagName": "p",
+      "style": {
+        "textTransform": "uppercase",
+        "letterSpacing": "0.16em",
+        "fontSize": "0.8rem",
+        "fontWeight": "600",
+        "color": "var(--color-primary)",
+        "margin": "0 0 1rem"
+      },
+      "textContent": "${state.eyebrow}"
+    },
+    {
+      "tagName": "h1",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "clamp(2rem, 5vw, 3rem)",
+        "fontWeight": "700",
+        "lineHeight": "1.12",
+        "letterSpacing": "-0.02em",
+        "margin": "0 0 1.25rem"
+      },
+      "textContent": "${state.title}"
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "alignItems": "center",
+        "gap": "0.6rem",
+        "fontSize": "0.95rem",
+        "color": "var(--color-text-muted)"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "style": { "fontWeight": "600", "color": "var(--color-text-primary)" },
+          "textContent": "${state.author}"
+        },
+        {
+          "tagName": "span",
+          "style": { "opacity": "0.5" },
+          "textContent": "·"
+        },
+        {
+          "tagName": "span",
+          "textContent": "${state.date}"
+        },
+        {
+          "tagName": "span",
+          "style": { "display": "${state.readingTime ? 'inline' : 'none'}", "opacity": "0.5" },
+          "textContent": "·"
+        },
+        {
+          "tagName": "span",
+          "style": { "display": "${state.readingTime ? 'inline' : 'none'}" },
+          "textContent": "${state.readingTime} min read"
+        }
+      ]
+    }
+  ]
+}

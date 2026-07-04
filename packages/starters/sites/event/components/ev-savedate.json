@@ -1,0 +1,244 @@
+{
+  "tagName": "ev-savedate",
+  "state": {
+    "eyebrow": "Save the date",
+    "heading": "June 12, 2026 — Portland",
+    "text": "One day, three tracks, and a room full of the people building what's next. Early-bird tickets are live.",
+    "days": "42",
+    "hours": "18",
+    "minutes": "05",
+    "seconds": "30",
+    "cta": "Get Tickets",
+    "ctaHref": "/tickets/"
+  },
+  "style": {
+    "display": "block",
+    "background": "linear-gradient(120deg, var(--color-bg-dark) 0%, #3b1e6e 55%, #7c3aed 100%)",
+    "color": "var(--color-text-white)",
+    "padding": "clamp(2.5rem, 6vw, 4rem) 1.5rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "1.1fr 1fr",
+        "gap": "clamp(2rem, 5vw, 3.5rem)",
+        "alignItems": "center",
+        "@--md": { "gridTemplateColumns": "1fr", "textAlign": "center" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.18em",
+                "fontSize": "0.8rem",
+                "fontWeight": "600",
+                "color": "var(--color-accent)",
+                "margin": "0 0 0.75rem"
+              },
+              "textContent": "${state.eyebrow}"
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(1.8rem, 4vw, 2.6rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "lineHeight": "1.12",
+                "margin": "0 0 0.9rem"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "1.05rem",
+                "lineHeight": "1.7",
+                "opacity": "0.88",
+                "margin": "0 0 1.75rem",
+                "maxWidth": "46ch"
+              },
+              "textContent": "${state.text}"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "${state.ctaHref}" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-text-white)",
+                "color": "var(--color-primary)",
+                "padding": "0.85rem 2.25rem",
+                "borderRadius": "999px",
+                "fontSize": "1.02rem",
+                "fontWeight": "700",
+                "textDecoration": "none",
+                "transition": "transform 0.15s",
+                ":hover": { "transform": "translateY(-2px)" }
+              },
+              "textContent": "${state.cta}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "grid",
+            "gridTemplateColumns": "repeat(4, 1fr)",
+            "gap": "0.75rem",
+            "@--sm": { "gap": "0.5rem" }
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textAlign": "center",
+                "padding": "1.25rem 0.5rem",
+                "borderRadius": "var(--radius)",
+                "background": "rgba(255, 255, 255, 0.1)",
+                "border": "1px solid rgba(255, 255, 255, 0.18)",
+                "backdropFilter": "blur(4px)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "1",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.days}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.4rem",
+                    "fontSize": "0.7rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "opacity": "0.75"
+                  },
+                  "textContent": "Days"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "textAlign": "center",
+                "padding": "1.25rem 0.5rem",
+                "borderRadius": "var(--radius)",
+                "background": "rgba(255, 255, 255, 0.1)",
+                "border": "1px solid rgba(255, 255, 255, 0.18)",
+                "backdropFilter": "blur(4px)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "1",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.hours}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.4rem",
+                    "fontSize": "0.7rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "opacity": "0.75"
+                  },
+                  "textContent": "Hours"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "textAlign": "center",
+                "padding": "1.25rem 0.5rem",
+                "borderRadius": "var(--radius)",
+                "background": "rgba(255, 255, 255, 0.1)",
+                "border": "1px solid rgba(255, 255, 255, 0.18)",
+                "backdropFilter": "blur(4px)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "1",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.minutes}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.4rem",
+                    "fontSize": "0.7rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "opacity": "0.75"
+                  },
+                  "textContent": "Mins"
+                }
+              ]
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "textAlign": "center",
+                "padding": "1.25rem 0.5rem",
+                "borderRadius": "var(--radius)",
+                "background": "rgba(255, 255, 255, 0.1)",
+                "border": "1px solid rgba(255, 255, 255, 0.18)",
+                "backdropFilter": "blur(4px)"
+              },
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "clamp(1.75rem, 4vw, 2.5rem)",
+                    "fontWeight": "700",
+                    "lineHeight": "1",
+                    "fontVariantNumeric": "tabular-nums"
+                  },
+                  "textContent": "${state.seconds}"
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "marginTop": "0.4rem",
+                    "fontSize": "0.7rem",
+                    "textTransform": "uppercase",
+                    "letterSpacing": "0.1em",
+                    "opacity": "0.75"
+                  },
+                  "textContent": "Secs"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

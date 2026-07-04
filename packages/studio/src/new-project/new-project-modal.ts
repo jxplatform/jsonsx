@@ -9,6 +9,7 @@ import { errorMessage } from "@jxsuite/schema/parse";
 import { openModal } from "../ui/layers";
 import { getPlatform } from "../platform";
 import type { ProjectConfig } from "@jxsuite/schema/types";
+import type { StarterInfo } from "../types";
 
 let _handle: ReturnType<typeof openModal> | null = null;
 
@@ -19,6 +20,7 @@ let _handle: ReturnType<typeof openModal> | null = null;
  *   url: string;
  *   adapter: string;
  *   directory: string;
+ *   starter: string;
  * }}
  */
 let _form = {
@@ -26,12 +28,16 @@ let _form = {
   description: "",
   directory: "",
   name: "",
+  starter: "blank",
   url: "",
 };
 
 let _error = "";
 
 let _creating = false;
+
+/** Starter templates offered in the picker (empty until loaded / on platforms without starters). */
+let _starters: StarterInfo[] = [];
 
 /** @type {((result: { root: string; config: object } | null) => void) | null} */
 let _resolve: ((result: { root: string; config: ProjectConfig } | null) => void) | null = null;
@@ -54,10 +60,29 @@ export function openNewProjectModal(): Promise<{
     description: "",
     directory: "",
     name: "",
+    starter: "blank",
     url: "",
   };
   _error = "";
   _creating = false;
+  _starters = [];
+
+  // Load starter templates in the background; re-render when they arrive. Platforms without
+  // Starters simply leave the picker showing only "Blank".
+  const platform = getPlatform();
+  if (platform.listStarters) {
+    void platform
+      .listStarters()
+      .then((starters) => {
+        _starters = starters;
+        if (_handle) {
+          renderModal();
+        }
+      })
+      .catch(() => {
+        /* Non-fatal: the picker falls back to Blank-only. */
+      });
+  }
 
   return new Promise((resolve) => {
     _resolve = resolve;
@@ -102,6 +127,16 @@ function renderModal() {
     renderModal();
   };
 
+  const selectStarter = (id: string) => {
+    _form.starter = id;
+    // Offer the starter's own tagline as a description default, without clobbering user input.
+    const meta = _starters.find((s) => s.id === id);
+    if (meta && !_form.description.trim()) {
+      _form.description = meta.tagline;
+    }
+    renderModal();
+  };
+
   const onSubmit = async () => {
     if (!_form.name.trim()) {
       _error = "Project name is required";
@@ -141,7 +176,7 @@ function renderModal() {
   const tpl = html`
     <sp-underlay open @close=${closeNewProjectModal}></sp-underlay>
     <div
-      class="new-project-modal"
+      class="new-project-modal ${_starters.length > 0 ? "new-project-modal-wide" : ""}"
       @keydown=${(e: KeyboardEvent) => {
         if (e.key === "Escape") {
           closeNewProjectModal();
@@ -155,6 +190,43 @@ function renderModal() {
         </sp-action-button>
       </div>
       <div class="new-project-modal-body">
+        ${_starters.length > 0
+          ? html`
+              <div class="new-project-field">
+                <span class="new-project-label">Template</span>
+                <div class="new-project-templates">
+                  <button
+                    type="button"
+                    class="new-project-template ${_form.starter === "blank" ? "selected" : ""}"
+                    @click=${() => selectStarter("blank")}
+                    title="Start from a blank project"
+                  >
+                    <div class="new-project-template-blank">+</div>
+                    <div class="new-project-template-body">
+                      <div class="new-project-template-name">Blank</div>
+                      <div class="new-project-template-tag">Start from scratch</div>
+                    </div>
+                  </button>
+                  ${_starters.map(
+                    (s) => html`
+                      <button
+                        type="button"
+                        class="new-project-template ${_form.starter === s.id ? "selected" : ""}"
+                        @click=${() => selectStarter(s.id)}
+                        title=${s.description}
+                      >
+                        <img class="new-project-template-thumb" src=${s.thumbnail} alt="" />
+                        <div class="new-project-template-body">
+                          <div class="new-project-template-name">${s.name}</div>
+                          <div class="new-project-template-tag">${s.tagline}</div>
+                        </div>
+                      </button>
+                    `,
+                  )}
+                </div>
+              </div>
+            `
+          : ""}
         <label class="new-project-field">
           <span class="new-project-label">Project Name *</span>
           <sp-textfield

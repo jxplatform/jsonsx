@@ -1,0 +1,157 @@
+{
+  "tagName": "hs-footer",
+  "state": {
+    "brand": "Summit Heating & Cooling",
+    "tagline": "Reliable heating and cooling for Northern Colorado homes — repairs, installs, and 24/7 emergency service.",
+    "address": "1420 Prospect Road, Fort Collins, CO 80525",
+    "phone": "(970) 555-0148",
+    "license": "CO HVAC Lic. #C-48219"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.35rem",
+                "fontWeight": "800",
+                "letterSpacing": "-0.02em",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.9rem", "opacity": "0.75", "maxWidth": "40ch" },
+              "textContent": "${state.tagline}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "0",
+                "fontSize": "0.8rem",
+                "letterSpacing": "0.04em",
+                "opacity": "0.55"
+              },
+              "textContent": "${state.license}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Contact"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.address}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.85" },
+              "textContent": "${state.phone}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Explore"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/services/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Services"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/about/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "About"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.6"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Summit Heating & Cooling. Built with Jx."
+        }
+      ]
+    }
+  ]
+}

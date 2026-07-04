@@ -1,0 +1,15 @@
+{
+  "name": "portfolio",
+  "private": true,
+  "description": "Aperture Studio — an image-forward photography and creative studio portfolio with a project gallery and dynamic case-study pages.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "jx build",
+    "dev": "jx dev"
+  },
+  "devDependencies": {
+    "@jxsuite/compiler": "^0.19.0",
+    "@jxsuite/runtime": "^0.19.0"
+  }
+}

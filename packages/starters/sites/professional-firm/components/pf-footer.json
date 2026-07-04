@@ -1,0 +1,172 @@
+{
+  "tagName": "pf-footer",
+  "state": {
+    "brand": "Meridian Advisory",
+    "tagline": "Accounting, tax, and advisory for founders and growing companies.",
+    "address": "410 Corniche Plaza, Suite 900, Harborview",
+    "phone": "(555) 204-8830",
+    "email": "hello@meridianadvisory.com"
+  },
+  "style": {
+    "display": "block",
+    "backgroundColor": "var(--color-bg-dark)",
+    "color": "var(--color-text-white)",
+    "padding": "3.5rem 1.5rem 2rem"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "display": "grid",
+        "gridTemplateColumns": "2fr 1fr 1fr",
+        "gap": "2.5rem",
+        "@--md": { "gridTemplateColumns": "1fr" }
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "1.4rem",
+                "fontWeight": "700",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "${state.brand}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.75", "maxWidth": "36ch" },
+              "textContent": "${state.tagline}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Office"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.address}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0 0 0.35rem", "opacity": "0.85" },
+              "textContent": "${state.phone}"
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "opacity": "0.85" },
+              "textContent": "${state.email}"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.08em",
+                "fontSize": "0.75rem",
+                "opacity": "0.6",
+                "marginBottom": "0.75rem"
+              },
+              "textContent": "Firm"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/services/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Services"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/team/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Team"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/insights/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none",
+                "marginBottom": "0.35rem"
+              },
+              "textContent": "Insights"
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-white)",
+                "opacity": "0.85",
+                "textDecoration": "none"
+              },
+              "textContent": "Contact"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "2.5rem auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid rgba(255, 255, 255, 0.15)",
+        "fontSize": "0.85rem",
+        "opacity": "0.6",
+        "display": "flex",
+        "justifyContent": "space-between",
+        "gap": "1rem",
+        "flexWrap": "wrap"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "© Meridian Advisory. Built with Jx."
+        },
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "textContent": "Registered CPAs · Member, State Society of Accountants"
+        }
+      ]
+    }
+  ]
+}

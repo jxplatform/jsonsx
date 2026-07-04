@@ -1,0 +1,542 @@
+{
+  "tagName": "ev-agenda-tabs",
+  "state": {
+    "track": "all"
+  },
+  "style": {
+    "display": "block",
+    "maxWidth": "var(--max-width-narrow)",
+    "margin": "0 auto",
+    "backgroundColor": "var(--color-bg-white)",
+    "border": "1px solid var(--color-border)",
+    "borderRadius": "var(--radius)",
+    "overflow": "hidden",
+    "boxShadow": "0 10px 40px rgba(23, 18, 43, 0.06)"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "flexWrap": "wrap",
+        "gap": "0.6rem",
+        "padding": "1.1rem 1.4rem",
+        "borderBottom": "1px solid var(--color-border)",
+        "backgroundColor": "var(--color-bg-cream)"
+      },
+      "children": [
+        {
+          "tagName": "button",
+          "textContent": "All tracks",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/track" },
+              "value": "all"
+            }
+          },
+          "style": {
+            "padding": "0.5rem 1.15rem",
+            "borderRadius": "999px",
+            "cursor": "pointer",
+            "fontSize": "0.9rem",
+            "fontWeight": "600",
+            "fontFamily": "inherit",
+            "transition": "all 0.15s",
+            "border": "1px solid ${state.track === 'all' ? 'transparent' : 'var(--color-border)'}",
+            "color": "${state.track === 'all' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
+            "background": "${state.track === 'all' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Main Stage",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/track" },
+              "value": "main"
+            }
+          },
+          "style": {
+            "padding": "0.5rem 1.15rem",
+            "borderRadius": "999px",
+            "cursor": "pointer",
+            "fontSize": "0.9rem",
+            "fontWeight": "600",
+            "fontFamily": "inherit",
+            "transition": "all 0.15s",
+            "border": "1px solid ${state.track === 'main' ? 'transparent' : 'var(--color-border)'}",
+            "color": "${state.track === 'main' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
+            "background": "${state.track === 'main' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Workshops",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/track" },
+              "value": "workshops"
+            }
+          },
+          "style": {
+            "padding": "0.5rem 1.15rem",
+            "borderRadius": "999px",
+            "cursor": "pointer",
+            "fontSize": "0.9rem",
+            "fontWeight": "600",
+            "fontFamily": "inherit",
+            "transition": "all 0.15s",
+            "border": "1px solid ${state.track === 'workshops' ? 'transparent' : 'var(--color-border)'}",
+            "color": "${state.track === 'workshops' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
+            "background": "${state.track === 'workshops' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+          }
+        },
+        {
+          "tagName": "button",
+          "textContent": "Design",
+          "onclick": {
+            "$expression": {
+              "operator": "=",
+              "target": { "$ref": "#/state/track" },
+              "value": "design"
+            }
+          },
+          "style": {
+            "padding": "0.5rem 1.15rem",
+            "borderRadius": "999px",
+            "cursor": "pointer",
+            "fontSize": "0.9rem",
+            "fontWeight": "600",
+            "fontFamily": "inherit",
+            "transition": "all 0.15s",
+            "border": "1px solid ${state.track === 'design' ? 'transparent' : 'var(--color-border)'}",
+            "color": "${state.track === 'design' ? 'var(--color-text-white)' : 'var(--color-text-primary)'}",
+            "background": "${state.track === 'design' ? 'linear-gradient(135deg, var(--color-primary), var(--color-accent))' : 'var(--color-bg-white)'}"
+          }
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": { "padding": "0.5rem 1.4rem 1.4rem" },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'main' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "09:00"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Opening Keynote: The Next Decade of the Web"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Ada Okafor"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#6d28d9",
+                "backgroundColor": "rgba(124, 58, 237, 0.12)"
+              },
+              "textContent": "Main Stage"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'design' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "10:30"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Designing for Trust at Scale"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Mateo Rivas"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#be185d",
+                "backgroundColor": "rgba(236, 72, 153, 0.12)"
+              },
+              "textContent": "Design"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'workshops' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "11:45"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Hands-on: Building Reactive Islands"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Priya Nair"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#0e7490",
+                "backgroundColor": "rgba(6, 182, 212, 0.12)"
+              },
+              "textContent": "Workshops"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'main' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "13:30"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Scaling Systems Without Scaling Teams"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Jonas Berg"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#6d28d9",
+                "backgroundColor": "rgba(124, 58, 237, 0.12)"
+              },
+              "textContent": "Main Stage"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'design' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0",
+            "borderBottom": "1px solid var(--color-border)"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "15:00"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Motion, Meaning & Microinteractions"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Lena Cho"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#be185d",
+                "backgroundColor": "rgba(236, 72, 153, 0.12)"
+              },
+              "textContent": "Design"
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "display": "${state.track === 'all' || state.track === 'workshops' ? 'flex' : 'none'}",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "0.75rem",
+            "padding": "1.15rem 0"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "alignItems": "baseline",
+                "gap": "1.1rem",
+                "flex": "1",
+                "minWidth": "16rem"
+              },
+              "children": [
+                {
+                  "tagName": "span",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontWeight": "600",
+                    "color": "var(--color-primary)",
+                    "fontVariantNumeric": "tabular-nums",
+                    "minWidth": "4rem"
+                  },
+                  "textContent": "16:15"
+                },
+                {
+                  "tagName": "div",
+                  "children": [
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "fontFamily": "var(--font-heading)",
+                        "fontWeight": "600",
+                        "fontSize": "1.08rem"
+                      },
+                      "textContent": "Ship It: From Prototype to Production"
+                    },
+                    {
+                      "tagName": "div",
+                      "style": { "fontSize": "0.9rem", "color": "var(--color-text-muted)" },
+                      "textContent": "with Sam Whitfield"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "span",
+              "style": {
+                "whiteSpace": "nowrap",
+                "fontSize": "0.78rem",
+                "fontWeight": "600",
+                "padding": "0.3rem 0.75rem",
+                "borderRadius": "999px",
+                "color": "#0e7490",
+                "backgroundColor": "rgba(6, 182, 212, 0.12)"
+              },
+              "textContent": "Workshops"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

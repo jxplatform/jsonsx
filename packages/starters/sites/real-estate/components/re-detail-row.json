@@ -1,0 +1,26 @@
+{
+  "tagName": "re-detail-row",
+  "state": {
+    "label": "",
+    "value": ""
+  },
+  "style": {
+    "display": "flex",
+    "justifyContent": "space-between",
+    "gap": "1rem",
+    "padding": "0.55rem 0",
+    "borderTop": "1px solid rgba(255, 255, 255, 0.15)"
+  },
+  "children": [
+    {
+      "tagName": "span",
+      "style": { "fontWeight": "600" },
+      "textContent": "${state.label}"
+    },
+    {
+      "tagName": "span",
+      "style": { "opacity": "0.8" },
+      "textContent": "${state.value}"
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "$layout": "./layouts/article.json",
+  "$paths": { "contentType": "insights", "param": "slug", "field": "id" },
+  "title": "${state.entry.data.title} — Meridian Advisory",
+  "state": {
+    "entry": {
+      "$prototype": "ContentEntry",
+      "$src": "@jxsuite/parser/ContentEntry.class.json",
+      "contentType": "insights",
+      "field": "id",
+      "id": { "$ref": "#/$params/slug" }
+    }
+  },
+  "children": [
+    {
+      "tagName": "article",
+      "children": [
+        {
+          "tagName": "pf-article-header",
+          "$props": {
+            "eyebrow": "Insight",
+            "title": "${state.entry.data.title}",
+            "date": "${state.entry.data.date}",
+            "author": "${state.entry.data.author}",
+            "readingTime": "${state.entry._meta.readingTime}"
+          }
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "fontSize": "1.15rem",
+            "lineHeight": "1.85",
+            "color": "var(--color-text-primary)"
+          },
+          "children": {
+            "$prototype": "Array",
+            "items": { "$ref": "#/state/entry/$children" },
+            "map": {
+              "tagName": "p",
+              "style": { "margin": "0 0 1.5rem" },
+              "textContent": "${item.textContent}"
+            }
+          }
+        },
+        {
+          "tagName": "hr",
+          "style": {
+            "border": "none",
+            "borderTop": "1px solid var(--color-border)",
+            "margin": "2.5rem 0 2rem"
+          }
+        },
+        {
+          "tagName": "p",
+          "style": {
+            "fontSize": "0.95rem",
+            "color": "var(--color-text-muted)",
+            "margin": "0 0 2rem"
+          },
+          "textContent": "Written by ${state.entry.data.author} · Meridian Advisory"
+        },
+        {
+          "tagName": "div",
+          "style": {
+            "backgroundColor": "var(--color-bg-cream)",
+            "border": "1px solid var(--color-border)",
+            "borderRadius": "var(--radius)",
+            "padding": "1.75rem 2rem",
+            "display": "flex",
+            "flexWrap": "wrap",
+            "alignItems": "center",
+            "justifyContent": "space-between",
+            "gap": "1rem"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "div",
+                  "style": {
+                    "fontFamily": "var(--font-heading)",
+                    "fontSize": "1.2rem",
+                    "fontWeight": "600",
+                    "marginBottom": "0.25rem"
+                  },
+                  "textContent": "Have a question this raised?"
+                },
+                {
+                  "tagName": "div",
+                  "style": { "color": "var(--color-text-muted)", "fontSize": "0.95rem" },
+                  "textContent": "Book a free consultation with a Meridian advisor."
+                }
+              ]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/contact/" },
+              "style": {
+                "display": "inline-block",
+                "backgroundColor": "var(--color-primary)",
+                "color": "var(--color-text-white)",
+                "padding": "0.8rem 1.75rem",
+                "borderRadius": "var(--radius)",
+                "fontWeight": "600",
+                "fontSize": "0.98rem",
+                "textDecoration": "none",
+                "whiteSpace": "nowrap",
+                ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+              },
+              "textContent": "Book a Consultation"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

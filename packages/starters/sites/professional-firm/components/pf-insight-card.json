@@ -1,0 +1,99 @@
+{
+  "tagName": "pf-insight-card",
+  "state": {
+    "title": "",
+    "excerpt": "",
+    "date": "",
+    "author": "",
+    "href": "/insights/"
+  },
+  "style": {
+    "display": "flex",
+    "flexDirection": "column",
+    "backgroundColor": "var(--color-bg-white)",
+    "borderRadius": "var(--radius)",
+    "border": "1px solid var(--color-border)",
+    "padding": "1.75rem",
+    "transition": "box-shadow 0.15s, border-color 0.15s",
+    ":hover": {
+      "boxShadow": "0 12px 32px rgba(15,23,42,0.10)",
+      "borderColor": "var(--color-primary)"
+    }
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "display": "flex",
+        "gap": "0.6rem",
+        "alignItems": "center",
+        "fontSize": "0.8rem",
+        "color": "var(--color-text-muted)",
+        "textTransform": "uppercase",
+        "letterSpacing": "0.08em",
+        "marginBottom": "0.9rem"
+      },
+      "children": [
+        {
+          "tagName": "span",
+          "textContent": "${state.date}"
+        },
+        {
+          "tagName": "span",
+          "style": { "display": "${state.author ? 'inline' : 'none'}", "opacity": "0.5" },
+          "textContent": "·"
+        },
+        {
+          "tagName": "span",
+          "style": { "display": "${state.author ? 'inline' : 'none'}" },
+          "textContent": "${state.author}"
+        }
+      ]
+    },
+    {
+      "tagName": "h3",
+      "style": {
+        "fontFamily": "var(--font-heading)",
+        "fontSize": "1.3rem",
+        "fontWeight": "600",
+        "lineHeight": "1.25",
+        "margin": "0 0 0.6rem"
+      },
+      "children": [
+        {
+          "tagName": "a",
+          "attributes": { "href": "${state.href}" },
+          "style": {
+            "color": "var(--color-text-primary)",
+            "textDecoration": "none",
+            ":hover": { "color": "var(--color-primary)" }
+          },
+          "textContent": "${state.title}"
+        }
+      ]
+    },
+    {
+      "tagName": "p",
+      "style": {
+        "margin": "0 0 1.25rem",
+        "color": "var(--color-text-muted)",
+        "fontSize": "0.98rem",
+        "lineHeight": "1.65",
+        "flex": "1"
+      },
+      "textContent": "${state.excerpt}"
+    },
+    {
+      "tagName": "a",
+      "attributes": { "href": "${state.href}" },
+      "style": {
+        "color": "var(--color-primary)",
+        "fontWeight": "600",
+        "fontSize": "0.95rem",
+        "textDecoration": "none",
+        ":hover": { "color": "var(--color-primary-hover)" }
+      },
+      "textContent": "Read insight →"
+    }
+  ]
+}

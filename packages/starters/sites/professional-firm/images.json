@@ -1,0 +1,48 @@
+{
+  "site": "professional-firm",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "modern office meeting professional",
+      "orientation": "landscape",
+      "photoId": 7698712
+    },
+    {
+      "role": "about",
+      "query": "business team office",
+      "orientation": "landscape",
+      "photoId": 4872048
+    },
+    {
+      "role": "team-1",
+      "query": "professional business headshot",
+      "orientation": "portrait",
+      "photoId": 37148308
+    },
+    {
+      "role": "team-2",
+      "query": "professional business headshot",
+      "orientation": "portrait",
+      "photoId": 37148308
+    },
+    {
+      "role": "team-3",
+      "query": "professional business headshot",
+      "orientation": "portrait",
+      "photoId": 37148308
+    },
+    {
+      "role": "team-4",
+      "query": "professional business headshot",
+      "orientation": "portrait",
+      "photoId": 37148308
+    },
+    {
+      "role": "insight-cover",
+      "query": "business charts documents",
+      "orientation": "landscape",
+      "photoId": 9034283
+    }
+  ]
+}

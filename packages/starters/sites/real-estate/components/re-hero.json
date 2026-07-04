@@ -1,0 +1,183 @@
+{
+  "tagName": "re-hero",
+  "state": {
+    "eyebrow": "",
+    "heading": "",
+    "subheading": "",
+    "cta": "Browse Listings",
+    "ctaHref": "/listings/",
+    "bg": { "type": "string", "format": "image", "default": "" }
+  },
+  "style": {
+    "display": "block",
+    "position": "relative",
+    "minHeight": "82vh",
+    "color": "var(--color-text-white)",
+    "backgroundImage": "url('${state.bg}')",
+    "backgroundSize": "cover",
+    "backgroundPosition": "center"
+  },
+  "children": [
+    {
+      "tagName": "div",
+      "style": {
+        "position": "absolute",
+        "inset": "0",
+        "background": "linear-gradient(180deg, rgba(15,23,42,0.45) 0%, rgba(15,23,42,0.78) 100%)"
+      }
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "position": "relative",
+        "zIndex": "10",
+        "display": "flex",
+        "alignItems": "center",
+        "minHeight": "82vh",
+        "maxWidth": "var(--max-width)",
+        "margin": "0 auto",
+        "padding": "4rem 1.5rem"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "680px", "width": "100%" },
+          "children": [
+            {
+              "tagName": "p",
+              "style": {
+                "textTransform": "uppercase",
+                "letterSpacing": "0.18em",
+                "fontSize": "0.8rem",
+                "fontWeight": "700",
+                "marginBottom": "1rem",
+                "color": "#a5f3fc"
+              },
+              "textContent": "${state.eyebrow}"
+            },
+            {
+              "tagName": "h1",
+              "style": {
+                "fontFamily": "var(--font-heading)",
+                "fontSize": "clamp(2.5rem, 6vw, 4.25rem)",
+                "fontWeight": "800",
+                "lineHeight": "1.08",
+                "margin": "0 0 1.25rem",
+                "letterSpacing": "-0.03em"
+              },
+              "textContent": "${state.heading}"
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "fontSize": "clamp(1.1rem, 2vw, 1.35rem)",
+                "lineHeight": "1.6",
+                "margin": "0 0 2rem",
+                "opacity": "0.92",
+                "maxWidth": "52ch"
+              },
+              "textContent": "${state.subheading}"
+            },
+            {
+              "tagName": "form",
+              "attributes": { "action": "/listings/", "method": "get" },
+              "style": {
+                "display": "flex",
+                "gap": "0.5rem",
+                "backgroundColor": "var(--color-bg-white)",
+                "padding": "0.6rem",
+                "borderRadius": "calc(var(--radius) + 0.25rem)",
+                "boxShadow": "0 20px 50px rgba(15,23,42,0.35)",
+                "@--sm": { "flexDirection": "column" }
+              },
+              "children": [
+                {
+                  "tagName": "input",
+                  "attributes": {
+                    "type": "text",
+                    "name": "location",
+                    "placeholder": "City or neighborhood",
+                    "aria-label": "Search by city or neighborhood"
+                  },
+                  "style": {
+                    "flex": "1",
+                    "border": "none",
+                    "outline": "none",
+                    "padding": "0.75rem 0.9rem",
+                    "fontSize": "1rem",
+                    "color": "var(--color-text-primary)",
+                    "backgroundColor": "transparent",
+                    "minWidth": "0"
+                  }
+                },
+                {
+                  "tagName": "select",
+                  "attributes": { "name": "beds", "aria-label": "Minimum bedrooms" },
+                  "style": {
+                    "border": "none",
+                    "borderLeft": "1px solid var(--color-border)",
+                    "outline": "none",
+                    "padding": "0.75rem 0.9rem",
+                    "fontSize": "1rem",
+                    "color": "var(--color-text-muted)",
+                    "backgroundColor": "transparent",
+                    "@--sm": { "borderLeft": "none", "borderTop": "1px solid var(--color-border)" }
+                  },
+                  "children": [
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "" },
+                      "textContent": "Any beds"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "2" },
+                      "textContent": "2+ beds"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "3" },
+                      "textContent": "3+ beds"
+                    },
+                    {
+                      "tagName": "option",
+                      "attributes": { "value": "4" },
+                      "textContent": "4+ beds"
+                    }
+                  ]
+                },
+                {
+                  "tagName": "button",
+                  "attributes": { "type": "submit" },
+                  "style": {
+                    "backgroundColor": "var(--color-primary)",
+                    "color": "var(--color-text-white)",
+                    "border": "none",
+                    "padding": "0.75rem 1.75rem",
+                    "borderRadius": "var(--radius)",
+                    "fontSize": "1rem",
+                    "fontWeight": "700",
+                    "cursor": "pointer",
+                    "whiteSpace": "nowrap",
+                    "transition": "background-color 0.15s",
+                    ":hover": { "backgroundColor": "var(--color-primary-hover)" }
+                  },
+                  "textContent": "${state.cta}"
+                }
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "margin": "1rem 0 0",
+                "fontSize": "0.85rem",
+                "opacity": "0.75"
+              },
+              "textContent": "Popular: Bayport · Maplewood · Lakeview · Harbor Hills"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -153,6 +153,39 @@
         { "type": "timeout", "ms": 5000 },
         { "type": "settle", "frames": 4 }
       ]
+    },
+    {
+      "name": "starter-restaurant",
+      "project": "packages/starters/sites/restaurant",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "viewport": { "width": 1440, "height": 1000 },
+      "actions": [
+        { "do": "setActivity", "value": "files" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "starter-portfolio",
+      "project": "packages/starters/sites/portfolio",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "viewport": { "width": 1440, "height": 1000 },
+      "actions": [
+        { "do": "setActivity", "value": "files" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "starter-real-estate",
+      "project": "packages/starters/sites/real-estate",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "viewport": { "width": 1440, "height": 1000 },
+      "actions": [
+        { "do": "setActivity", "value": "files" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
     }
   ]
 }

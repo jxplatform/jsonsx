@@ -1,0 +1,54 @@
+{
+  "site": "blog",
+  "thumbnail": "hero",
+  "images": [
+    {
+      "role": "hero",
+      "query": "writing desk notebook coffee",
+      "orientation": "landscape",
+      "photoId": 204511
+    },
+    {
+      "role": "author",
+      "query": "writer portrait",
+      "orientation": "portrait",
+      "photoId": 27471474
+    },
+    {
+      "role": "post-1",
+      "query": "minimal workspace desk",
+      "orientation": "landscape",
+      "photoId": 4884116
+    },
+    {
+      "role": "post-2",
+      "query": "typography design print",
+      "orientation": "landscape",
+      "photoId": 5045979
+    },
+    {
+      "role": "post-3",
+      "query": "nature landscape misty hills",
+      "orientation": "landscape",
+      "photoId": 4316213
+    },
+    {
+      "role": "post-4",
+      "query": "city architecture street",
+      "orientation": "landscape",
+      "photoId": 37718865
+    },
+    {
+      "role": "post-5",
+      "query": "books reading library",
+      "orientation": "landscape",
+      "photoId": 8762862
+    },
+    {
+      "role": "post-6",
+      "query": "abstract texture paper",
+      "orientation": "landscape",
+      "photoId": 8749388
+    }
+  ]
+}
