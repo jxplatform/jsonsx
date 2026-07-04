@@ -22,3 +22,7 @@ packages/desktop/.jx/
 
 # Compiler-generated component sidecars — built into dist/, never committed to source
 sites/*/components/*.js
+
+# Starter templates are not installed projects — a stray `bun install` (e.g. opening one in Studio)
+# drops a lockfile we don't track here. (node_modules/dist/.cache are already ignored above.)
+packages/starters/sites/*/bun.lock

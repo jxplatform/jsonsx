@@ -7,6 +7,14 @@ drives Studio in headless Chromium via the gated `window.__jxAutomation` hook
 and writes PNGs to `sites/jxsuite.com/public/screenshots/` — where the site's Sharp/srcset image
 pipeline and the root README consume them.
 
+Shots drive the **starter sites** (`packages/starters/sites/*`) so the docs and marketing show real
+sample projects, not Jx's own internals. `real-estate` is the default (Manage / Script / State /
+Git — its `re-listings-filter` has an editable `visibleCount` function for the "Script" shot). The
+content-rendering shots pick the most colorful fit: **Edit** renders the `restaurant` homepage
+(edit/preview modes run the page, so content resolves), and **Design** styles the `event` site's
+violet `ev-savedate` component (design mode shows the un-run template, so it emphasizes the
+breakpoint canvas + CSS inspector rather than resolved text).
+
 ## Usage
 
 ```bash
@@ -30,7 +38,7 @@ support), waits for the canvas iframe to ack `renderComplete`, then applies acti
 ```jsonc
 {
   "name": "hero", // output file name (hero.png)
-  "project": "sites/jxsuite.com", // repo-relative project dir (default from `defaults`)
+  "project": "packages/starters/sites/real-estate", // repo-relative project dir (default from `defaults`)
   "file": "pages/index.md", // file to open in a tab
   "canvasMode": "design", // design | edit | preview | stylebook
   "viewport": { "width": 1920, "height": 1200 },

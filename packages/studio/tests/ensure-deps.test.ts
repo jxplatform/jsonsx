@@ -69,6 +69,31 @@ describe("ensureDependenciesInstalled", () => {
     expect(card()?.textContent).toContain("EACCES denied");
   });
 
+  test("skips install entirely in automation mode (never mutates the project)", async () => {
+    const { happyDOM } = globalThis as unknown as { happyDOM: { setURL: (u: string) => void } };
+    happyDOM.setURL("http://localhost:3000/packages/studio/index.html?automation=1");
+    let installs = 0;
+    let checked = 0;
+    installMockPlatform({
+      dependenciesNeedInstall: async () => {
+        checked += 1;
+        return true;
+      },
+      installDependencies: async () => {
+        installs += 1;
+        return { ok: true };
+      },
+    });
+    try {
+      await ensureDependenciesInstalled();
+      expect(checked).toBe(0);
+      expect(installs).toBe(0);
+      expect(card()).toBeNull();
+    } finally {
+      happyDOM.setURL("http://localhost:3000/packages/studio/index.html");
+    }
+  });
+
   test("swallows a throwing dependenciesNeedInstall", async () => {
     installMockPlatform({
       dependenciesNeedInstall: async () => {

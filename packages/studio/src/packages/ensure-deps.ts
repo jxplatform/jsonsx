@@ -7,8 +7,14 @@
 
 import { getPlatform } from "../platform";
 import { showProgressModal } from "../ui/progress-modal";
+import { shouldInstallAutomation } from "../services/automation";
 
 export async function ensureDependenciesInstalled(): Promise<void> {
+  // Automation/screenshot runs open projects read-only to drive the canvas — they must never mutate
+  // The project on disk (a `bun install` would litter node_modules/bun.lock into starter templates).
+  if (shouldInstallAutomation(location.search)) {
+    return;
+  }
   const platform = getPlatform();
   if (!platform.dependenciesNeedInstall || !platform.installDependencies) {
     return;
