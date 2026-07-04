@@ -23,6 +23,7 @@ export type ShotAction =
   | { defName: string; do: "editDef" }
   | { do: "editFunction"; eventKey: string; path: (string | number)[] }
   | { do: "openBrowse" }
+  | { do: "openNewProject" }
   | { do: "select"; path: (string | number)[] | null }
   | { do: "setActivity"; value: string }
   | { do: "setCanvasMode"; value: string }
@@ -35,6 +36,7 @@ export type ShotAction =
 
 export type ClipSpec =
   | "fullPage"
+  | "none"
   | { selector: string }
   | {
       height: number;
@@ -42,6 +44,20 @@ export type ClipSpec =
       x: number;
       y: number;
     };
+
+/**
+ * A cropped sub-capture of the same shot. One shot boots Studio once, drives its state, then emits
+ * each region as its own PNG (`<region.name>.png`) — ideal for tight crops of individual control
+ * surfaces (a panel, an inspector section, a toolbar) to embed in docs.
+ */
+export interface ShotRegion {
+  /** Output basename (without .png); must be unique across the whole manifest, like a shot name. */
+  name: string;
+  /** CSS selector, resolved in the main frame (Studio panels are light DOM). */
+  selector: string;
+  /** CSS px of breathing room added on every side before clipping (default 0). */
+  padding?: number;
+}
 
 export interface ShotVariant {
   actions?: ShotAction[];
@@ -63,6 +79,7 @@ export interface Shot extends ShotDefaults {
   canvasMode?: string;
   file: string;
   name: string;
+  regions?: ShotRegion[];
   variants?: ShotVariant[];
 }
 
@@ -88,6 +105,7 @@ const ACTION_KINDS = new Set([
   "editDef",
   "editFunction",
   "openBrowse",
+  "openNewProject",
   "select",
   "setActivity",
   "setCanvasMode",
@@ -118,15 +136,25 @@ export function validateManifest(raw: unknown): Manifest {
   if (!Array.isArray(m.shots) || m.shots.length === 0) {
     fail("shots must be a non-empty array");
   }
-  const names = new Set<string>();
+  // Two namespaces: shot names (for --only targeting) and output basenames (the PNGs actually
+  // Written). A shot with `clip: "none"` writes no `<shot.name>.png`, so a region may reuse the
+  // Shot's name for the primary crop (e.g. a git-panel shot whose git-panel.png comes from a region).
+  const shotNames = new Set<string>();
+  const outputNames = new Set<string>();
+  const claimOutput = (name: string, where: string) => {
+    if (outputNames.has(name)) {
+      fail(`duplicate output name "${name}" (${where})`);
+    }
+    outputNames.add(name);
+  };
   for (const shot of m.shots) {
     if (typeof shot.name !== "string" || !shot.name) {
       fail("every shot needs a name");
     }
-    if (names.has(shot.name)) {
+    if (shotNames.has(shot.name)) {
       fail(`duplicate shot name "${shot.name}"`);
     }
-    names.add(shot.name);
+    shotNames.add(shot.name);
     if (typeof shot.file !== "string" || !shot.file) {
       fail(`shot "${shot.name}": file is required`);
     }
@@ -139,6 +167,19 @@ export function validateManifest(raw: unknown): Manifest {
       if (!WAIT_KINDS.has(wait.type)) {
         fail(`shot "${shot.name}": unknown wait "${wait.type}"`);
       }
+    }
+    const effectiveClip = shot.clip ?? m.defaults?.clip;
+    if (effectiveClip !== "none") {
+      claimOutput(shot.name, `shot "${shot.name}"`);
+    }
+    for (const region of shot.regions ?? []) {
+      if (typeof region.name !== "string" || !region.name) {
+        fail(`shot "${shot.name}": every region needs a name`);
+      }
+      if (typeof region.selector !== "string" || !region.selector) {
+        fail(`shot "${shot.name}": region "${region.name}" needs a selector`);
+      }
+      claimOutput(region.name, `region in shot "${shot.name}"`);
     }
   }
   return m as Manifest;

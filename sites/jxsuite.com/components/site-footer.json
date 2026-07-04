@@ -4,9 +4,9 @@
     "display": "block",
     "borderTop": "1px solid var(--color-border)",
     "color": "var(--color-text-muted)",
-    "padding": "clamp(2rem, 4vw, 3rem) clamp(1rem, 3vw, 2rem)",
+    "padding": "clamp(3rem, 6vw, 4rem) clamp(1rem, 3vw, 2rem) clamp(2rem, 4vw, 3rem)",
     "fontSize": "0.8125rem",
-    "lineHeight": "1.8"
+    "lineHeight": "1.9"
   },
   "children": [
     {
@@ -14,31 +14,167 @@
       "style": {
         "maxWidth": "var(--max-width)",
         "margin": "0 auto",
-        "display": "flex",
-        "justifyContent": "space-between",
-        "alignItems": "center",
-        "flexWrap": "wrap",
-        "gap": "1rem"
+        "display": "grid",
+        "gridTemplateColumns": "1.5fr 1fr 1fr 1fr",
+        "gap": "2rem",
+        "@--md": { "gridTemplateColumns": "1fr 1fr" },
+        "@--sm": { "gridTemplateColumns": "1fr" }
       },
       "children": [
         {
-          "tagName": "p",
-          "style": { "margin": "0" },
-          "children": ["Built with Jx Suite. MIT License."]
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "a",
+              "attributes": { "href": "/" },
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "0.5rem",
+                "color": "var(--color-text-primary)",
+                "textDecoration": "none",
+                "fontWeight": "700",
+                "fontSize": "1.0625rem",
+                "letterSpacing": "-0.02em",
+                "marginBottom": "0.75rem"
+              },
+              "children": [
+                {
+                  "tagName": "img",
+                  "attributes": {
+                    "src": "/favicon.svg",
+                    "alt": "Jx Suite",
+                    "width": "20",
+                    "height": "20"
+                  }
+                },
+                "Suite"
+              ]
+            },
+            {
+              "tagName": "p",
+              "style": { "margin": "0", "maxWidth": "22rem" },
+              "children": [
+                "The visual IDE for the web. Build any website, save it as plain files, own it forever. MIT licensed."
+              ]
+            }
+          ]
         },
         {
           "tagName": "div",
-          "style": { "display": "flex", "gap": "1.5rem" },
           "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.6875rem",
+                "letterSpacing": "0.1em",
+                "textTransform": "uppercase",
+                "color": "var(--color-text-secondary)",
+                "marginBottom": "0.75rem"
+              },
+              "children": ["Product"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/studio" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Studio"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/download" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Download"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/features" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Features"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/compare" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Compare"]
+            }
+          ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.6875rem",
+                "letterSpacing": "0.1em",
+                "textTransform": "uppercase",
+                "color": "var(--color-text-secondary)",
+                "marginBottom": "0.75rem"
+              },
+              "children": ["Developers"]
+            },
             {
               "tagName": "a",
               "attributes": { "href": "/docs/getting-started" },
               "style": {
+                "display": "block",
                 "color": "var(--color-text-muted)",
                 "textDecoration": "none",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["Docs"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/get-studio" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Get Studio"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/docs/spec" },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Spec"]
             },
             {
               "tagName": "a",
@@ -48,13 +184,80 @@
                 "rel": "noopener noreferrer"
               },
               "style": {
+                "display": "block",
                 "color": "var(--color-text-muted)",
                 "textDecoration": "none",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["GitHub"]
             }
           ]
+        },
+        {
+          "tagName": "div",
+          "children": [
+            {
+              "tagName": "div",
+              "style": {
+                "fontFamily": "var(--font-mono)",
+                "fontSize": "0.6875rem",
+                "letterSpacing": "0.1em",
+                "textTransform": "uppercase",
+                "color": "var(--color-text-secondary)",
+                "marginBottom": "0.75rem"
+              },
+              "children": ["Project"]
+            },
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "https://github.com/jxsuite/jx/blob/main/LICENSE",
+                "target": "_blank",
+                "rel": "noopener noreferrer"
+              },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["MIT License"]
+            },
+            {
+              "tagName": "a",
+              "attributes": {
+                "href": "https://github.com/jxsuite/jx/releases/latest",
+                "target": "_blank",
+                "rel": "noopener noreferrer"
+              },
+              "style": {
+                "display": "block",
+                "color": "var(--color-text-muted)",
+                "textDecoration": "none",
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Releases"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "div",
+      "style": {
+        "maxWidth": "var(--max-width)",
+        "margin": "clamp(2rem, 4vw, 3rem) auto 0",
+        "paddingTop": "1.5rem",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "p",
+          "style": { "margin": "0" },
+          "children": ["Built with Jx Suite. MIT License."]
         }
       ]
     }

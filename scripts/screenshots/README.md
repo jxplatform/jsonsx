@@ -52,8 +52,44 @@ support), waits for the canvas iframe to ack `renderComplete`, then applies acti
     { "type": "fonts" },
     { "type": "settle", "frames": 2 },
   ],
-  "clip": { "selector": "#app" }, // or "fullPage" or {x,y,width,height}
+  "clip": { "selector": "#app" }, // "#app" full window | "fullPage" | {x,y,width,height} | "none"
+  "regions": [
+    // Extra cropped captures from the SAME boot — each emits <name>.png. Great for tight
+    // shots of individual control surfaces (a panel, an inspector section, a toolbar).
+    { "name": "git-commit", "selector": ".git-commit-area", "padding": 16 },
+  ],
   "variants": [{ "suffix": ".light", "theme": "light" }],
+}
+```
+
+## Partial / region captures
+
+A shot's `clip` controls the primary `<name>.png`:
+
+- `{ "selector": "#app" }` — the studio window (default)
+- `"fullPage"` — the whole scrollable page
+- `{ "x", "y", "width", "height" }` — an explicit rect in CSS px
+- `"none"` — skip the primary capture entirely (use with `regions` for a region-only shot)
+
+`regions` adds any number of extra crops from the same Studio boot — one Studio launch, drive the
+state once, emit several tightly-cropped PNGs. Each region is `{ name, selector, padding? }`:
+`name` is the output basename (unique across the whole manifest, like a shot name), `selector`
+resolves in the main frame (Studio panels are light DOM, so `.git-panel`, `.signals-panel`,
+`#right-panel`, `.new-project-modal`, etc. all work), and `padding` (CSS px, default 0) adds
+breathing room. The runner scrolls the element into view, measures its box, pads it, and clamps to
+the page before clipping. Region-only shot:
+
+```jsonc
+{
+  "name": "control-surfaces",
+  "file": "components/todo-app.json",
+  "canvasMode": "design",
+  "actions": [{ "do": "setActivity", "value": "git" }],
+  "clip": "none",
+  "regions": [
+    { "name": "git-commit", "selector": ".git-commit-area", "padding": 16 },
+    { "name": "git-branch", "selector": ".git-branch-row", "padding": 8 },
+  ],
 }
 ```
 

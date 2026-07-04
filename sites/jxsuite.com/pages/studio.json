@@ -6,20 +6,15 @@
       "tagName": "meta",
       "attributes": {
         "name": "description",
-        "content": "Jx Studio is a visual IDE for designing, editing, and scripting websites. Design on a canvas. Save as plain JSON files. No lock-in."
+        "content": "Jx Studio is a visual IDE for designing, editing, and shipping websites. Create a project, design on a canvas, wire up logic, and commit to git — all in one app. Saves as plain files. No lock-in."
       }
     }
   ],
   "$elements": [
-    {
-      "$ref": "../components/section-label.json"
-    },
-    {
-      "$ref": "../components/check-item.json"
-    },
-    {
-      "$ref": "../components/cta-button.json"
-    }
+    { "$ref": "../components/section-label.json" },
+    { "$ref": "../components/mode-card.json" },
+    { "$ref": "../components/check-item.json" },
+    { "$ref": "../components/cta-button.json" }
   ],
   "tagName": "div",
   "children": [
@@ -33,16 +28,11 @@
       "children": [
         {
           "tagName": "div",
-          "style": {
-            "maxWidth": "800px",
-            "margin": "0 auto"
-          },
+          "style": { "maxWidth": "960px", "margin": "0 auto" },
           "children": [
             {
               "tagName": "section-label",
-              "attributes": {
-                "props.text": "Jx Studio"
-              }
+              "attributes": { "props.text": "Jx Studio" }
             },
             {
               "tagName": "h1",
@@ -65,13 +55,41 @@
                 "margin": "0 auto 2.5rem",
                 "maxWidth": "640px"
               },
-              "textContent": "Design components on a canvas. Edit content inline. Write event handlers. Everything saves to plain JSON files — the same files your compiler reads, your git tracks, and your team reviews."
+              "textContent": "Create a project, design on a canvas, edit content inline, and wire up interactivity — then commit to git without leaving the app. Everything saves to plain JSON and Markdown: the same files your compiler reads, your git tracks, and your team reviews."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "flex",
+                "gap": "0.75rem",
+                "justifyContent": "center",
+                "flexWrap": "wrap",
+                "marginBottom": "3rem"
+              },
+              "children": [
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/download",
+                    "props.label": "Download Studio",
+                    "props.variant": "primary"
+                  }
+                },
+                {
+                  "tagName": "cta-button",
+                  "attributes": {
+                    "props.href": "/docs/getting-started",
+                    "props.label": "Install via CLI",
+                    "props.variant": "secondary"
+                  }
+                }
+              ]
             },
             {
               "tagName": "img",
               "attributes": {
                 "src": "/screenshots/hero.png",
-                "alt": "Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector",
+                "alt": "Jx Studio editing a website — layers panel, live canvas, and element inspector",
                 "width": "3840",
                 "height": "2400",
                 "loading": "eager",
@@ -101,23 +119,15 @@
       "children": [
         {
           "tagName": "div",
-          "style": {
-            "maxWidth": "var(--max-width)",
-            "margin": "0 auto"
-          },
+          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
           "children": [
             {
               "tagName": "div",
-              "style": {
-                "textAlign": "center",
-                "marginBottom": "3rem"
-              },
+              "style": { "textAlign": "center", "marginBottom": "3rem" },
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": {
-                    "props.text": "Four Modes"
-                  }
+                  "attributes": { "props.text": "What you do in Studio" }
                 },
                 {
                   "tagName": "h2",
@@ -137,7 +147,7 @@
                     "margin": "0 auto",
                     "fontSize": "1.0625rem"
                   },
-                  "textContent": "Switch between modes as the work changes — from file management to content authoring to visual design to scripting."
+                  "textContent": "Move between surfaces as the work changes — from file management to content authoring to visual design to scripting."
                 }
               ]
             },
@@ -150,296 +160,40 @@
               },
               "children": [
                 {
-                  "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "borderRadius": "var(--radius-lg)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)",
-                    "overflow": "hidden"
-                  },
-                  "children": [
-                    {
-                      "tagName": "img",
-                      "attributes": {
-                        "src": "/screenshots/mode-manage.png",
-                        "alt": "Jx Studio manage mode — Manage Files modal with live previews of every project file",
-                        "width": "3840",
-                        "height": "2000",
-                        "loading": "lazy",
-                        "decoding": "async"
-                      },
-                      "style": {
-                        "display": "block",
-                        "width": "100%",
-                        "height": "auto",
-                        "borderBottom": "1px solid var(--color-border)"
-                      }
-                    },
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0.75rem",
-                        "padding": "1.5rem"
-                      },
-                      "children": [
-                        {
-                          "tagName": "div",
-                          "style": {
-                            "fontFamily": "var(--font-mono)",
-                            "fontSize": "0.6875rem",
-                            "letterSpacing": "0.1em",
-                            "textTransform": "uppercase",
-                            "color": "var(--color-accent)"
-                          },
-                          "textContent": "Mode 01"
-                        },
-                        {
-                          "tagName": "h3",
-                          "style": {
-                            "fontSize": "1.125rem",
-                            "fontWeight": "700",
-                            "letterSpacing": "-0.02em",
-                            "margin": "0",
-                            "color": "var(--color-text-primary)"
-                          },
-                          "textContent": "Manage"
-                        },
-                        {
-                          "tagName": "p",
-                          "style": {
-                            "fontSize": "0.875rem",
-                            "lineHeight": "1.6",
-                            "color": "var(--color-text-secondary)",
-                            "margin": "0"
-                          },
-                          "textContent": "Project explorer, content collections, and file operations. Create pages, organize assets, manage your content — the CMS layer without the CMS."
-                        }
-                      ]
-                    }
-                  ]
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.name": "Manage",
+                    "props.image": "/screenshots/mode-manage.png",
+                    "props.imageAlt": "Jx Studio Manage Files modal with live previews of every project file",
+                    "props.description": "Project explorer, content collections, and file operations with live previews. Create pages, upload media, and build content models — the CMS layer, without the CMS."
+                  }
                 },
                 {
-                  "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "borderRadius": "var(--radius-lg)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)",
-                    "overflow": "hidden"
-                  },
-                  "children": [
-                    {
-                      "tagName": "img",
-                      "attributes": {
-                        "src": "/screenshots/mode-edit.png",
-                        "alt": "Jx Studio edit mode — WYSIWYG markdown authoring in the Jx examples project",
-                        "width": "3840",
-                        "height": "2000",
-                        "loading": "lazy",
-                        "decoding": "async"
-                      },
-                      "style": {
-                        "display": "block",
-                        "width": "100%",
-                        "height": "auto",
-                        "borderBottom": "1px solid var(--color-border)"
-                      }
-                    },
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0.75rem",
-                        "padding": "1.5rem"
-                      },
-                      "children": [
-                        {
-                          "tagName": "div",
-                          "style": {
-                            "fontFamily": "var(--font-mono)",
-                            "fontSize": "0.6875rem",
-                            "letterSpacing": "0.1em",
-                            "textTransform": "uppercase",
-                            "color": "var(--color-accent)"
-                          },
-                          "textContent": "Mode 02"
-                        },
-                        {
-                          "tagName": "h3",
-                          "style": {
-                            "fontSize": "1.125rem",
-                            "fontWeight": "700",
-                            "letterSpacing": "-0.02em",
-                            "margin": "0",
-                            "color": "var(--color-text-primary)"
-                          },
-                          "textContent": "Edit"
-                        },
-                        {
-                          "tagName": "p",
-                          "style": {
-                            "fontSize": "0.875rem",
-                            "lineHeight": "1.6",
-                            "color": "var(--color-text-secondary)",
-                            "margin": "0"
-                          },
-                          "textContent": "Click any text, type. Slash commands for blocks. Frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as Markdown."
-                        }
-                      ]
-                    }
-                  ]
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.name": "Edit",
+                    "props.image": "/screenshots/mode-edit.png",
+                    "props.imageAlt": "Jx Studio editing markdown content inline with a WYSIWYG editor",
+                    "props.description": "Click any text and type. Slash commands for blocks, frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as clean Markdown."
+                  }
                 },
                 {
-                  "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "borderRadius": "var(--radius-lg)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)",
-                    "overflow": "hidden"
-                  },
-                  "children": [
-                    {
-                      "tagName": "img",
-                      "attributes": {
-                        "src": "/screenshots/mode-design.png",
-                        "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
-                        "width": "3840",
-                        "height": "2000",
-                        "loading": "lazy",
-                        "decoding": "async"
-                      },
-                      "style": {
-                        "display": "block",
-                        "width": "100%",
-                        "height": "auto",
-                        "borderBottom": "1px solid var(--color-border)"
-                      }
-                    },
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0.75rem",
-                        "padding": "1.5rem"
-                      },
-                      "children": [
-                        {
-                          "tagName": "div",
-                          "style": {
-                            "fontFamily": "var(--font-mono)",
-                            "fontSize": "0.6875rem",
-                            "letterSpacing": "0.1em",
-                            "textTransform": "uppercase",
-                            "color": "var(--color-accent)"
-                          },
-                          "textContent": "Mode 03"
-                        },
-                        {
-                          "tagName": "h3",
-                          "style": {
-                            "fontSize": "1.125rem",
-                            "fontWeight": "700",
-                            "letterSpacing": "-0.02em",
-                            "margin": "0",
-                            "color": "var(--color-text-primary)"
-                          },
-                          "textContent": "Design"
-                        },
-                        {
-                          "tagName": "p",
-                          "style": {
-                            "fontSize": "0.875rem",
-                            "lineHeight": "1.6",
-                            "color": "var(--color-text-secondary)",
-                            "margin": "0"
-                          },
-                          "textContent": "Visual canvas with live rendering. Edit CSS properties, responsive breakpoints, hover states, and design tokens. Everything you'd do in DevTools — but persistent."
-                        }
-                      ]
-                    }
-                  ]
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.name": "Design",
+                    "props.image": "/screenshots/mode-design.png",
+                    "props.imageAlt": "Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector",
+                    "props.description": "A live canvas for every breakpoint and a full CSS inspector — spacing, type, color, layout, hover states, and design tokens. Everything you'd do in DevTools, but persistent."
+                  }
                 },
                 {
-                  "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "borderRadius": "var(--radius-lg)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)",
-                    "overflow": "hidden"
-                  },
-                  "children": [
-                    {
-                      "tagName": "img",
-                      "attributes": {
-                        "src": "/screenshots/mode-script.png",
-                        "alt": "Jx Studio script mode — Monaco editor open on a component state function",
-                        "width": "3840",
-                        "height": "2000",
-                        "loading": "lazy",
-                        "decoding": "async"
-                      },
-                      "style": {
-                        "display": "block",
-                        "width": "100%",
-                        "height": "auto",
-                        "borderBottom": "1px solid var(--color-border)"
-                      }
-                    },
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "display": "flex",
-                        "flexDirection": "column",
-                        "gap": "0.75rem",
-                        "padding": "1.5rem"
-                      },
-                      "children": [
-                        {
-                          "tagName": "div",
-                          "style": {
-                            "fontFamily": "var(--font-mono)",
-                            "fontSize": "0.6875rem",
-                            "letterSpacing": "0.1em",
-                            "textTransform": "uppercase",
-                            "color": "var(--color-accent)"
-                          },
-                          "textContent": "Mode 04"
-                        },
-                        {
-                          "tagName": "h3",
-                          "style": {
-                            "fontSize": "1.125rem",
-                            "fontWeight": "700",
-                            "letterSpacing": "-0.02em",
-                            "margin": "0",
-                            "color": "var(--color-text-primary)"
-                          },
-                          "textContent": "Script"
-                        },
-                        {
-                          "tagName": "p",
-                          "style": {
-                            "fontSize": "0.875rem",
-                            "lineHeight": "1.6",
-                            "color": "var(--color-text-secondary)",
-                            "margin": "0"
-                          },
-                          "textContent": "Monaco-powered code editor for event handlers, computed state, and API integrations. When a client asks for 'one little interactive thing' — you stop saying no."
-                        }
-                      ]
-                    }
-                  ]
+                  "tagName": "mode-card",
+                  "attributes": {
+                    "props.name": "Script",
+                    "props.image": "/screenshots/mode-script.png",
+                    "props.imageAlt": "Jx Studio editing a component state function in the Monaco code editor",
+                    "props.description": "State, data, and events in structured panels, plus a Monaco editor for functions and integrations. When a client asks for 'one little interactive thing,' you stop saying no."
+                  }
                 }
               ]
             }
@@ -462,7 +216,8 @@
             "display": "grid",
             "gridTemplateColumns": "1fr 1fr",
             "gap": "clamp(3rem, 6vw, 5rem)",
-            "alignItems": "center"
+            "alignItems": "center",
+            "@--md": { "gridTemplateColumns": "1fr" }
           },
           "children": [
             {
@@ -470,9 +225,7 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": {
-                    "props.text": "Philosophy"
-                  }
+                  "attributes": { "props.text": "Start a project" }
                 },
                 {
                   "tagName": "h2",
@@ -483,7 +236,7 @@
                     "lineHeight": "1.2",
                     "margin": "0 0 1rem"
                   },
-                  "textContent": "The visual builder that doesn't own your files."
+                  "textContent": "From zero to editing in a minute."
                 },
                 {
                   "tagName": "p",
@@ -493,116 +246,226 @@
                     "lineHeight": "1.7",
                     "margin": "0 0 2rem"
                   },
-                  "textContent": "Most visual builders create a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON files you'd write by hand. Close the app — your files are still there, still readable, still yours."
+                  "textContent": "Name a project, pick where it lives, choose how it deploys, and Studio scaffolds a clean starter you can build on. Already have a project? Open it from disk or clone it straight from git."
                 },
                 {
                   "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "gap": "0.75rem"
-                  },
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
                   "children": [
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Opens any Jx project from disk — no import step"
+                        "props.text": "Guided setup — name, directory, and production URL"
                       }
                     },
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Saves standard JSON — readable by any tool"
+                        "props.text": "Pick a deploy target: Static, Cloudflare, Node, or Bun"
                       }
                     },
                     {
                       "tagName": "check-item",
                       "attributes": {
-                        "props.text": "Works offline — no cloud dependency"
+                        "props.text": "Open any Jx project from disk, or clone from git"
                       }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Git-friendly output — clean diffs, no binary blobs"
-                      }
+                      "attributes": { "props.text": "Jump back into recent projects and files" }
                     }
                   ]
                 }
               ]
             },
             {
-              "tagName": "div",
-              "style": {
-                "display": "flex",
-                "flexDirection": "column",
-                "gap": "1rem"
+              "tagName": "img",
+              "attributes": {
+                "src": "/screenshots/new-project.png",
+                "alt": "Jx Studio New Project dialog — name, directory, production URL, and deployment adapter picker",
+                "width": "3840",
+                "height": "2000",
+                "loading": "lazy",
+                "decoding": "async"
               },
+              "style": {
+                "display": "block",
+                "width": "100%",
+                "height": "auto",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center",
+            "@--md": { "gridTemplateColumns": "1fr" }
+          },
+          "children": [
+            {
+              "tagName": "img",
+              "attributes": {
+                "src": "/screenshots/git-panel.png",
+                "alt": "Jx Studio Source Control panel — branch, commit-and-sync, and a tree of changed files",
+                "width": "480",
+                "height": "1880",
+                "loading": "lazy",
+                "decoding": "async"
+              },
+              "style": {
+                "display": "block",
+                "width": "100%",
+                "maxWidth": "320px",
+                "height": "auto",
+                "margin": "0 auto",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)",
+                "@--md": { "order": "2" }
+              }
+            },
+            {
+              "tagName": "div",
               "children": [
                 {
-                  "tagName": "div",
+                  "tagName": "section-label",
+                  "attributes": { "props.text": "Ship code, not deploys" }
+                },
+                {
+                  "tagName": "h2",
                   "style": {
-                    "padding": "1.5rem",
-                    "borderRadius": "var(--radius)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)"
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
                   },
-                  "children": [
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "fontFamily": "var(--font-mono)",
-                        "fontSize": "0.6875rem",
-                        "letterSpacing": "0.1em",
-                        "textTransform": "uppercase",
-                        "color": "var(--color-accent)",
-                        "marginBottom": "0.75rem"
-                      },
-                      "textContent": "Workflow"
-                    },
-                    {
-                      "tagName": "div",
-                      "style": {
-                        "fontFamily": "var(--font-mono)",
-                        "fontSize": "0.8125rem",
-                        "lineHeight": "2",
-                        "color": "var(--color-text-secondary)"
-                      },
-                      "textContent": "1. Design in Studio\n2. git commit -m \"update hero\"\n3. git push → CI builds\n4. Live on CDN in <30 seconds"
-                    }
-                  ]
+                  "textContent": "Git is built in. Deploys just happen."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Review changes, write a message, and commit-and-sync — right from Studio. Starting fresh? Publish to GitHub in a click and Studio creates the repo for you. From there, your host builds the static site on every push."
                 },
                 {
                   "tagName": "div",
-                  "style": {
-                    "padding": "1.5rem",
-                    "borderRadius": "var(--radius)",
-                    "border": "1px solid var(--color-border)",
-                    "backgroundColor": "var(--color-bg-surface)"
-                  },
+                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
                   "children": [
                     {
-                      "tagName": "div",
-                      "style": {
-                        "fontFamily": "var(--font-mono)",
-                        "fontSize": "0.6875rem",
-                        "letterSpacing": "0.1em",
-                        "textTransform": "uppercase",
-                        "color": "var(--color-accent)",
-                        "marginBottom": "0.75rem"
-                      },
-                      "textContent": "No servers required"
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Stage, diff, commit, branch, and push — all in-app"
+                      }
                     },
                     {
-                      "tagName": "div",
-                      "style": {
-                        "fontSize": "0.9375rem",
-                        "lineHeight": "1.6",
-                        "color": "var(--color-text-secondary)"
-                      },
-                      "textContent": "No database. No PHP runtime. No origin server. Static HTML on a global CDN — fast everywhere, costs pennies, online forever."
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Publish to GitHub with one click (creates the repo)"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Your host builds on push — no deploy scripts to babysit"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": { "props.text": "Every change is a clean, reviewable git diff" }
                     }
                   ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": { "maxWidth": "720px", "margin": "0 auto", "textAlign": "center" },
+          "children": [
+            {
+              "tagName": "section-label",
+              "attributes": { "props.text": "No lock-in" }
+            },
+            {
+              "tagName": "h2",
+              "style": {
+                "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                "fontWeight": "700",
+                "letterSpacing": "-0.02em",
+                "lineHeight": "1.2",
+                "margin": "0 0 1rem"
+              },
+              "textContent": "The visual builder that doesn't own your files."
+            },
+            {
+              "tagName": "p",
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "fontSize": "1.0625rem",
+                "lineHeight": "1.7",
+                "margin": "0 auto 2rem",
+                "maxWidth": "560px"
+              },
+              "textContent": "Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown you'd write by hand. Close the app — your site is still there, still readable, still yours."
+            },
+            {
+              "tagName": "div",
+              "style": {
+                "display": "grid",
+                "gridTemplateColumns": "1fr 1fr",
+                "gap": "0.75rem",
+                "textAlign": "left",
+                "maxWidth": "560px",
+                "margin": "0 auto",
+                "@--sm": { "gridTemplateColumns": "1fr" }
+              },
+              "children": [
+                {
+                  "tagName": "check-item",
+                  "attributes": { "props.text": "Opens any Jx project from disk — no import step" }
+                },
+                {
+                  "tagName": "check-item",
+                  "attributes": { "props.text": "Saves standard JSON and Markdown" }
+                },
+                {
+                  "tagName": "check-item",
+                  "attributes": { "props.text": "Works offline — no cloud, no account" }
+                },
+                {
+                  "tagName": "check-item",
+                  "attributes": { "props.text": "Git-friendly output — clean diffs, no blobs" }
                 }
               ]
             }
@@ -621,10 +484,7 @@
       "children": [
         {
           "tagName": "div",
-          "style": {
-            "maxWidth": "560px",
-            "margin": "0 auto"
-          },
+          "style": { "maxWidth": "560px", "margin": "0 auto" },
           "children": [
             {
               "tagName": "h2",
@@ -634,7 +494,7 @@
                 "letterSpacing": "-0.03em",
                 "margin": "0 0 1rem"
               },
-              "textContent": "Try it now."
+              "textContent": "Download and start building."
             },
             {
               "tagName": "p",
@@ -644,7 +504,7 @@
                 "fontSize": "1.0625rem",
                 "lineHeight": "1.7"
               },
-              "textContent": "Clone the repo, open a project, and start designing. No accounts, no subscriptions, no vendor approval."
+              "textContent": "Free, open source, and yours to keep. No accounts, no subscriptions, no vendor approval."
             },
             {
               "tagName": "div",
@@ -658,8 +518,8 @@
                 {
                   "tagName": "cta-button",
                   "attributes": {
-                    "props.href": "/docs/getting-started",
-                    "props.label": "Get Started",
+                    "props.href": "/download",
+                    "props.label": "Download Studio",
                     "props.variant": "primary"
                   }
                 },
@@ -667,7 +527,7 @@
                   "tagName": "cta-button",
                   "attributes": {
                     "props.href": "/features",
-                    "props.label": "See All Features",
+                    "props.label": "See all features",
                     "props.variant": "secondary"
                   }
                 }

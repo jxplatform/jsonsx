@@ -68,7 +68,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "WordPress, Webflow, and Wix solved real problems — but they come with hidden costs, vendor lock-in, and architectural debt. Here's how Jx compares."
+              "textContent": "WordPress, Webflow, and Wix each solved one thing and traded away another — your files, your speed, or your budget. Jx Studio is the only open-source visual builder that hands you the files. Here's how it compares."
             }
           ]
         }
@@ -1211,16 +1211,16 @@
                 {
                   "tagName": "cta-button",
                   "attributes": {
-                    "props.href": "/docs/getting-started",
-                    "props.label": "Get Started",
+                    "props.href": "/download",
+                    "props.label": "Download Studio",
                     "props.variant": "primary"
                   }
                 },
                 {
                   "tagName": "cta-button",
                   "attributes": {
-                    "props.href": "/features",
-                    "props.label": "See All Features",
+                    "props.href": "/studio",
+                    "props.label": "See Studio",
                     "props.variant": "secondary"
                   }
                 }

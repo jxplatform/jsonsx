@@ -350,6 +350,7 @@ if (!hasPlatform()) {
 installAutomationHook({
   getCanvasMode,
   openBrowseModal,
+  openNewProjectModal,
   render,
   renderActivityBar,
   setCanvasMode,

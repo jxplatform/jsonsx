@@ -12,6 +12,7 @@ const { updateCanvas } = await import("../src/store");
 
 function makeDeps(): AutomationDeps & {
   openBrowseModal: ReturnType<typeof mock>;
+  openNewProjectModal: ReturnType<typeof mock>;
   render: ReturnType<typeof mock>;
   renderActivityBar: ReturnType<typeof mock>;
   setCanvasMode: ReturnType<typeof mock>;
@@ -20,6 +21,7 @@ function makeDeps(): AutomationDeps & {
   return {
     getCanvasMode: () => "design",
     openBrowseModal: mock(() => {}),
+    openNewProjectModal: mock(() => {}),
     render: mock(() => {}),
     renderActivityBar: mock(() => {}),
     setCanvasMode: mock(() => {}),
@@ -140,6 +142,12 @@ describe("createAutomationApi", () => {
     const deps = makeDeps();
     createAutomationApi(deps).openBrowse();
     expect(deps.openBrowseModal).toHaveBeenCalledTimes(1);
+  });
+
+  test("openNewProject delegates to the new-project modal opener", () => {
+    const deps = makeDeps();
+    createAutomationApi(deps).openNewProject();
+    expect(deps.openNewProjectModal).toHaveBeenCalledTimes(1);
   });
 
   test("setStatus delegates to statusMessage", () => {

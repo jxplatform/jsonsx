@@ -5,6 +5,8 @@ description: "How Jx components work: self-describing JSON, state management, ex
 
 # Component Model
 
+> **Studio writes this format for you.** This page documents the underlying JSON — useful when you want to hand-edit a file, review a diff, or understand what the visual tools produce.
+
 A Jx component is a single `.json` file. All state, computed values, and functions are declared in `state`. Simple components need no sidecar file.
 
 ## Self-Describing Components

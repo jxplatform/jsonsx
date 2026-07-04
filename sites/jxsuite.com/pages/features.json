@@ -54,7 +54,7 @@
                 "margin": "0 0 1.5rem",
                 "color": "var(--color-text-primary)"
               },
-              "textContent": "Four systems. One framework. Zero lock-in."
+              "textContent": "One studio. A framework underneath."
             },
             {
               "tagName": "p",
@@ -65,7 +65,7 @@
                 "margin": "0 auto",
                 "maxWidth": "640px"
               },
-              "textContent": "Jx Suite replaces the CMS, the build tool, the page builder, and the framework — with plain files in a git repository."
+              "textContent": "Jx Studio is how you build. Underneath it runs a file-based CMS, a reactive framework, and a static generator — all plain files, zero lock-in."
             }
           ]
         }
@@ -95,7 +95,119 @@
                 {
                   "tagName": "section-label",
                   "attributes": {
-                    "props.text": "Pillar 01 — CMS"
+                    "props.text": "Jx Studio"
+                  }
+                },
+                {
+                  "tagName": "h2",
+                  "style": {
+                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
+                    "fontWeight": "700",
+                    "letterSpacing": "-0.02em",
+                    "lineHeight": "1.2",
+                    "margin": "0 0 1rem"
+                  },
+                  "textContent": "Design visually. Save as plain files."
+                },
+                {
+                  "tagName": "p",
+                  "style": {
+                    "color": "var(--color-text-secondary)",
+                    "fontSize": "1.0625rem",
+                    "lineHeight": "1.7",
+                    "margin": "0 0 2rem"
+                  },
+                  "textContent": "Jx Studio is a desktop visual IDE. Create a project, design on a canvas, edit content inline, wire up logic, and commit to git — everything saves to the same JSON and Markdown your compiler reads. No proprietary format. No export step."
+                },
+                {
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
+                  "children": [
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Visual canvas with live component rendering"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Property inspector with full CSS editing"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Inline content editing — click any text, type"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Responsive breakpoint preview"
+                      }
+                    },
+                    {
+                      "tagName": "check-item",
+                      "attributes": {
+                        "props.text": "Script editor for event handlers and logic"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tagName": "img",
+              "attributes": {
+                "src": "/screenshots/mode-design.png",
+                "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
+                "width": "3840",
+                "height": "2000",
+                "loading": "lazy",
+                "decoding": "async"
+              },
+              "style": {
+                "display": "block",
+                "width": "100%",
+                "height": "auto",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tagName": "section",
+      "style": {
+        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
+        "borderTop": "1px solid var(--color-border)"
+      },
+      "children": [
+        {
+          "tagName": "div",
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto",
+            "display": "grid",
+            "gridTemplateColumns": "1fr 1fr",
+            "gap": "clamp(3rem, 6vw, 5rem)",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "tagName": "div",
+              "children": [
+                {
+                  "tagName": "section-label",
+                  "attributes": {
+                    "props.text": "The engine · Content"
                   }
                 },
                 {
@@ -219,7 +331,7 @@
                 {
                   "tagName": "section-label",
                   "attributes": {
-                    "props.text": "Pillar 02 — Framework"
+                    "props.text": "The engine · Reactivity"
                   }
                 },
                 {
@@ -309,118 +421,6 @@
           "children": [
             {
               "tagName": "div",
-              "children": [
-                {
-                  "tagName": "section-label",
-                  "attributes": {
-                    "props.text": "Pillar 03 — Visual Composer"
-                  }
-                },
-                {
-                  "tagName": "h2",
-                  "style": {
-                    "fontSize": "clamp(1.5rem, 3vw, 2.25rem)",
-                    "fontWeight": "700",
-                    "letterSpacing": "-0.02em",
-                    "lineHeight": "1.2",
-                    "margin": "0 0 1rem"
-                  },
-                  "textContent": "Design visually. Save as plain files."
-                },
-                {
-                  "tagName": "p",
-                  "style": {
-                    "color": "var(--color-text-secondary)",
-                    "fontSize": "1.0625rem",
-                    "lineHeight": "1.7",
-                    "margin": "0 0 2rem"
-                  },
-                  "textContent": "Jx Studio is a visual IDE that runs in your browser. Design on a canvas, edit content inline, write event handlers — everything saves to the same JSON files your compiler reads. No proprietary format. No export step."
-                },
-                {
-                  "tagName": "div",
-                  "style": {
-                    "display": "flex",
-                    "flexDirection": "column",
-                    "gap": "0.75rem"
-                  },
-                  "children": [
-                    {
-                      "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Visual canvas with live component rendering"
-                      }
-                    },
-                    {
-                      "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Property inspector with full CSS editing"
-                      }
-                    },
-                    {
-                      "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Inline content editing — click any text, type"
-                      }
-                    },
-                    {
-                      "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Responsive breakpoint preview"
-                      }
-                    },
-                    {
-                      "tagName": "check-item",
-                      "attributes": {
-                        "props.text": "Script editor for event handlers and logic"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "tagName": "img",
-              "attributes": {
-                "src": "/screenshots/mode-design.png",
-                "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
-                "width": "3840",
-                "height": "2000",
-                "loading": "lazy",
-                "decoding": "async"
-              },
-              "style": {
-                "display": "block",
-                "width": "100%",
-                "height": "auto",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius-lg)"
-              }
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "tagName": "section",
-      "style": {
-        "padding": "clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)",
-        "borderTop": "1px solid var(--color-border)"
-      },
-      "children": [
-        {
-          "tagName": "div",
-          "style": {
-            "maxWidth": "var(--max-width)",
-            "margin": "0 auto",
-            "display": "grid",
-            "gridTemplateColumns": "1fr 1fr",
-            "gap": "clamp(3rem, 6vw, 5rem)",
-            "alignItems": "center"
-          },
-          "children": [
-            {
-              "tagName": "div",
               "style": {
                 "backgroundColor": "var(--color-bg-secondary)",
                 "border": "1px solid var(--color-border)",
@@ -440,7 +440,7 @@
                 {
                   "tagName": "section-label",
                   "attributes": {
-                    "props.text": "Pillar 04 — Static Generator"
+                    "props.text": "The engine · Output"
                   }
                 },
                 {
@@ -689,8 +689,8 @@
                 {
                   "tagName": "cta-button",
                   "attributes": {
-                    "props.href": "/docs/getting-started",
-                    "props.label": "Get Started",
+                    "props.href": "/download",
+                    "props.label": "Download Studio",
                     "props.variant": "primary"
                   }
                 },

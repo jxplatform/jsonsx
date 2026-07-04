@@ -18,6 +18,7 @@ import type { JxPath } from "../state";
 export interface AutomationDeps {
   getCanvasMode: () => string;
   openBrowseModal: () => void;
+  openNewProjectModal: () => void;
   render: () => void;
   renderActivityBar: () => void;
   setCanvasMode: (mode: string) => void;
@@ -28,6 +29,7 @@ export interface AutomationApi {
   editDef: (defName: string) => void;
   editFunction: (path: JxPath, eventKey: string) => void;
   openBrowse: () => void;
+  openNewProject: () => void;
   getState: () => {
     activeTabId: string | null;
     canvasMode: string;
@@ -61,6 +63,9 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     },
     openBrowse() {
       deps.openBrowseModal();
+    },
+    openNewProject() {
+      deps.openNewProjectModal();
     },
     getState() {
       return {

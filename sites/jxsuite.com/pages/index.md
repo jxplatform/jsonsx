@@ -1,94 +1,140 @@
 ---
-title: "Jx Suite — The full-stack website framework. Open source. Zero lock-in."
+title: "Jx Studio — the visual IDE for the web. Free & open source."
 $head:
   - tagName: meta
     attributes:
       name: description
-      content: "A complete website framework: file-based CMS, reactive components, visual composer, and static site generator. MIT licensed. Deploy anywhere."
+      content: "Jx Studio is a free, open-source visual IDE for building real websites — design on a canvas, edit content, wire up logic, and commit to git. Every change saves as plain files you own forever."
   - tagName: meta
     attributes:
       property: "og:title"
-      content: "Jx Suite — The full-stack website framework."
+      content: "Jx Studio — the visual IDE for the web."
   - tagName: meta
     attributes:
       property: "og:description"
-      content: "File-based CMS. Reactive framework. Visual composer. Static generator. Open source. Zero lock-in."
+      content: "Design, manage, and ship websites from one desktop app. Saves as plain JSON and Markdown. Open source. Zero lock-in."
   - tagName: meta
     attributes:
       property: "og:type"
       content: website
 $elements:
   - "$ref": "../components/cta-button.json"
-  - "$ref": "../components/feature-card.json"
+  - "$ref": "../components/mode-card.json"
   - "$ref": "../components/step-card.json"
   - "$ref": "../components/check-item.json"
-  - "$ref": "../components/code-panel.json"
   - "$ref": "../components/stat-card.json"
   - "$ref": "../components/pillar-card.json"
   - "$ref": "../components/section-label.json"
   - "$ref": "../components/interactive-demo.json"
 ---
 
-::::::hero{style.padding="clamp(5rem, 12vw, 10rem) clamp(1rem, 3vw, 2rem) clamp(4rem, 8vw, 6rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
-:::::div{style.maxWidth="900px" style.margin="0 auto"}
+::::::hero{style.padding="clamp(5rem, 12vw, 9rem) clamp(1rem, 3vw, 2rem) clamp(3rem, 6vw, 5rem)" style.textAlign="center" style.background="radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59, 130, 246, 0.15), transparent)"}
+:::::div{style.maxWidth="960px" style.margin="0 auto"}
 :::div{style.display="inline-flex" style.alignItems="center" style.gap="0.5rem" style.padding="0.375rem 0.875rem" style.borderRadius="999px" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.fontSize="0.8125rem" style.color="var(--color-text-secondary)" style.marginBottom="2rem"}
 ::span{style.width="6px" style.height="6px" style.borderRadius="50%" style.backgroundColor="#22c55e" style.display="inline-block"}
 
-Open source · MIT License · Deploy anywhere
+Free · Open source · macOS, Windows &amp; Linux
 :::
 
 :::h1{style.fontSize="clamp(2.5rem, 6vw, 4.5rem)" style.fontWeight="700" style.letterSpacing="-0.04em" style.lineHeight="1.05" style.margin="0 0 1.5rem" style.color="var(--color-text-primary)"}
-Build any website.\
-:span[Ship as static HTML.]{style.color="var(--color-accent)"}
+Build websites visually.\
+:span[Own every file.]{style.color="var(--color-accent)"}
 :::
 
 :::p{style.fontSize="clamp(1.0625rem, 2vw, 1.3125rem)" style.color="var(--color-text-secondary)" style.lineHeight="1.7" style.margin="0 auto 1rem" style.maxWidth="680px"}
-Jx Suite is a complete website framework — file-based CMS, reactive components, visual composer, and static site generator — in one open-source toolkit.
+Jx Studio is a desktop visual IDE for building real websites. Design on a canvas, edit content inline, wire up interactivity, and commit to git — without leaving the app. Every change saves as plain JSON and Markdown you keep forever.
 :::
 
 :::p{style.fontSize="1rem" style.color="var(--color-text-muted)" style.margin="0 auto 2.5rem" style.maxWidth="600px" style.fontFamily="var(--font-mono)" style.letterSpacing="0.02em"}
-The freedom of hand-coded HTML. The speed of a visual builder. The power of a framework.
+The feel of a visual builder. The power of a framework. The permanence of plain files.
 :::
 
-:::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="3rem"}
-::cta-button{props.href="/docs/getting-started" props.label="Get Started" props.variant="primary"}
+:::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.marginBottom="0.75rem"}
+::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
-::cta-button{props.href="https://github.com/jxsuite/jx" props.label="View on GitHub" props.variant="secondary"}
+::cta-button{props.href="/docs/getting-started" props.label="Install via CLI" props.variant="secondary"}
 :::
 
-::::div{style.backgroundColor="var(--color-bg-surface)" style.border="1px solid var(--color-border)" style.borderRadius="var(--radius)" style.padding="0.75rem 1.25rem" style.fontFamily="var(--font-mono)" style.fontSize="0.875rem" style.color="var(--color-text-secondary)" style.display="inline-flex" style.alignItems="center" style.gap="0.75rem"}
-:::span{style.color="var(--color-text-muted)"}
-$
+:::p{style.fontSize="0.8125rem" style.color="var(--color-text-muted)" style.margin="0 0 3rem"}
+Free forever · macOS, Windows &amp; Linux · or `bun create @jxsuite my-site`
 :::
 
-bun create @jxsuite my-site
+::::div{style.maxWidth="960px" style.margin="0 auto"}
+:::img{src="/screenshots/hero.png" width="3840" height="2400" alt="Jx Studio editing a website — layers panel, live canvas, and element inspector" loading="eager" decoding="async" style.display="block" style.width="100%" style.height="auto" style.borderRadius="var(--radius-lg)" style.border="1px solid var(--color-border)" style.boxShadow="0 24px 64px rgba(0, 0, 0, 0.45)"}
 ::::
 :::::
 ::::::
 
-::::::pillars{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+::::::studio-capabilities{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 ::::div{style.textAlign="center" style.marginBottom="3rem"}
-::section-label{props.text="The Four Pillars"}
+::section-label{props.text="What you do in Studio"}
 
 :::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
-Everything a website needs. Nothing it doesn't.
+One window. The whole website.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="600px" style.margin="0 auto" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-Four integrated systems that replace the WordPress stack, the headless CMS, the build tool, and the page builder — with plain files in git.
+From the first file to the final commit — organize, write, design, and wire up interactivity, all on one canvas.
 :::
 ::::
 
-:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))" style.gap="1rem"}
-::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No database. No admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
+:::div{style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(min(420px, 100%), 1fr))" style.gap="1.5rem"}
+::mode-card{props.name="Manage" props.image="/screenshots/mode-manage.png" props.imageAlt="Jx Studio Manage Files modal with live previews of every page, component, and content file" props.description="Browse every page, component, and content type with live previews. Upload media, and build content models with schemas — the CMS layer, without the CMS."}
 
-::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Signals-based reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="TC39 Signals · Web Components · Template literals · Zero JS by default"}
+::mode-card{props.name="Edit" props.image="/screenshots/mode-edit.png" props.imageAlt="Jx Studio editing markdown content inline with a WYSIWYG editor" props.description="Click any text and type. Slash commands for headings, lists, images, and tables. Frontmatter forms alongside. Saves as clean Markdown."}
 
-::pillar-card{props.icon="🎨" props.title="Visual Composer" props.description="Jx Studio — a visual IDE for designing, editing, and scripting websites. Every change saves to plain JSON files on disk." props.features="Design mode · Content editing · Script editor · Responsive preview"}
+::mode-card{props.name="Design" props.image="/screenshots/mode-design.png" props.imageAlt="Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector" props.description="A live canvas for every breakpoint and a full CSS inspector — spacing, type, color, layout, hover states, and design tokens."}
 
-::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Code splitting · <100ms builds"}
+::mode-card{props.name="Script" props.image="/screenshots/mode-script.png" props.imageAlt="Jx Studio editing a component state function in the Monaco code editor" props.description="State, data, and events in structured panels, plus a Monaco editor for functions. Add a calculator, a form, or a live fetch — without ejecting."}
 :::
+
+:::div{style.textAlign="center" style.marginTop="2.5rem"}
+:::a{href="/studio" style.color="var(--color-accent)" style.textDecoration="none" style.fontWeight="600" style.fontSize="1rem"}
+Take the full tour of Studio →
+:::
+:::
+:::::
+::::::
+
+::::::files{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="1fr 1fr" style.gap="clamp(3rem, 6vw, 5rem)" style.alignItems="center" style.--md.gridTemplateColumns="1fr"}
+::::div
+::section-label{props.text="No lock-in"}
+
+:::h2{style.fontSize="clamp(1.5rem, 3vw, 2.25rem)" style.fontWeight="700" style.letterSpacing="-0.02em" style.lineHeight="1.2" style.margin="0 0 1rem"}
+The visual builder that doesn't own your files.
+:::
+
+:::p{style.color="var(--color-text-secondary)" style.fontSize="1.0625rem" style.lineHeight="1.7" style.margin="0 0 2rem"}
+Most visual builders trap your work in a proprietary format you can't read, can't version, and can't leave. Jx Studio reads and writes the same JSON and Markdown files you'd write by hand. Close the app — your site is still there, still readable, still yours.
+:::
+
+:::div{style.display="flex" style.flexDirection="column" style.gap="0.75rem"}
+::check-item{props.text="Opens any Jx project from disk — no import step"}
+
+::check-item{props.text="Saves standard JSON and Markdown — readable by any tool"}
+
+::check-item{props.text="Works offline — no cloud, no account"}
+
+::check-item{props.text="Git-friendly output — clean diffs, no binary blobs"}
+:::
+::::
+
+::::div{style.display="flex" style.flexDirection="column" style.gap="1rem"}
+:::div{style.padding="1.5rem" style.borderRadius="var(--radius)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)" style.fontFamily="var(--font-mono)" style.fontSize="0.8125rem" style.lineHeight="2" style.color="var(--color-text-secondary)"}
+:span[Workflow]{style.display="block" style.fontSize="0.6875rem" style.letterSpacing="0.1em" style.textTransform="uppercase" style.color="var(--color-accent)" style.marginBottom="0.5rem"}
+1\. Design in Studio\
+2\. Commit &amp; push from Studio's git panel\
+3\. Your host builds on push\
+4\. Live on a CDN in seconds
+:::
+
+:::div{style.padding="1.5rem" style.borderRadius="var(--radius)" style.border="1px solid var(--color-border)" style.backgroundColor="var(--color-bg-surface)"}
+:span[No servers required]{style.display="block" style.fontFamily="var(--font-mono)" style.fontSize="0.6875rem" style.letterSpacing="0.1em" style.textTransform="uppercase" style.color="var(--color-accent)" style.marginBottom="0.75rem"}
+:span[No database. No PHP runtime. No origin server. Static HTML on a global CDN — fast everywhere, costs pennies, online forever.]{style.fontSize="0.9375rem" style.lineHeight="1.6" style.color="var(--color-text-secondary)"}
+:::
+::::
 :::::
 ::::::
 
@@ -98,11 +144,11 @@ Four integrated systems that replace the WordPress stack, the headless CMS, the 
 ::section-label{props.text="The Landscape"}
 
 :::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
-The only tool that checks every box.
+The only visual builder that hands you the files.
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
-Every alternative solves one problem and creates another. Jx is the synthesis.
+Webflow and Wix give you a canvas but keep your work. Astro and Hugo give you the files but no canvas. Jx gives you both.
 :::
 ::::
 
@@ -115,7 +161,7 @@ Every alternative solves one problem and creates another. Jx is the synthesis.
 | Astro / Hugo       | ✗ None         | ✓ Light         | ✓ Strong      | ✓ Open     |
 | Webflow            | ✓ Yes          | ✓ Light         | ✓ Strong      | ✗ Total    |
 | Wix / Squarespace  | ✓ Yes          | ✓ Light         | ✗ Slow        | ✗ Total    |
-| **Jx Suite**       | **✓ Yes**      | **✓ Zero**      | **✓ Perfect** | **✓ MIT**  |
+| **Jx Studio**      | **✓ Studio**   | **✓ Zero**      | **✓ Perfect** | **✓ MIT**  |
 
 ::::
 :::::
@@ -135,21 +181,37 @@ Every alternative solves one problem and creates another. Jx is the synthesis.
 :::::
 ::::::
 
-::::::code-example{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
+::::::under-the-hood{style.padding="clamp(4rem, 8vw, 6rem) clamp(1rem, 3vw, 2rem)" style.borderTop="1px solid var(--color-border)"}
 :::::div{style.maxWidth="var(--max-width)" style.margin="0 auto"}
 ::::div{style.textAlign="center" style.marginBottom="3rem"}
-::section-label{props.text="How It Works"}
+::section-label{props.text="Under the hood · For developers"}
 
 :::h2{style.fontSize="clamp(1.75rem, 4vw, 2.5rem)" style.fontWeight="700" style.letterSpacing="-0.03em" style.margin="0 0 1rem"}
-JSON in, components out.
+Studio is a window onto one idea: your site is JSON.
 :::
 
-:::p{style.color="var(--color-text-secondary)" style.maxWidth="560px" style.margin="0 auto" style.fontSize="1.0625rem"}
-Declare state and behavior in JSON. The compiler produces a reactive web component — or static HTML with zero JavaScript.
+:::p{style.color="var(--color-text-secondary)" style.maxWidth="620px" style.margin="0 auto" style.fontSize="1.0625rem" style.lineHeight="1.7"}
+Everything you design compiles from — and saves back to — plain JSON-DOM. Read it, hand-edit it, diff it, or generate it with an LLM. Studio and the compiler are two views of the same files.
 :::
 ::::
 
 ::interactive-demo{}
+
+:::div{style.marginTop="3rem" style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(260px, 1fr))" style.gap="1rem"}
+::pillar-card{props.icon="📄" props.title="File-Based CMS" props.description="JSON documents and Markdown content. No database, no admin panel. Git is your CMS — branch, merge, review, deploy." props.features="Content collections · Markdown + directives · Frontmatter schemas · Dynamic routes"}
+
+::pillar-card{props.icon="⚡" props.title="Reactive Framework" props.description="Signals-based reactivity, web components, and template bindings. Interactive islands hydrate only where needed." props.features="TC39 Signals · Web Components · Template literals · Zero JS by default"}
+
+::pillar-card{props.icon="🚀" props.title="Static Generator" props.description="Compiles to pure HTML, CSS, and minimal JS. Deploy to any static host — Cloudflare Pages, GitHub Pages, Vercel, or a $5 VPS." props.features="Zero runtime · Image optimization · Code splitting · <100ms builds"}
+:::
+
+:::div{style.textAlign="center" style.marginTop="2.5rem" style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap" style.alignItems="center"}
+:::p{style.color="var(--color-text-muted)" style.fontSize="0.9375rem" style.margin="0" style.fontFamily="var(--font-mono)"}
+Rather script than click? `bun create @jxsuite my-site`
+:::
+
+::cta-button{props.href="https://github.com/jxsuite/jx" props.label="View on GitHub" props.variant="secondary" props.newTab="true"}
+:::
 :::::
 ::::::
 
@@ -164,11 +226,11 @@ Three steps to production.
 ::::
 
 :::div{style.display="grid" style.gridTemplateColumns="repeat(3, 1fr)" style.gap="2rem" style.--md.gridTemplateColumns="1fr"}
-::step-card{props.number="1" props.title="Author" props.description="Design visually in Studio, write JSON by hand, or author content in Markdown. Every format is a plain file in git."}
+::step-card{props.number="1" props.title="Author" props.description="Design visually in Studio, or hand-write JSON and Markdown. Every format is a plain file in git."}
 
-::step-card{props.number="2" props.title="Commit" props.description="Push to your repository. CI builds static HTML in under a second. No origin server, no database migrations, no deploy scripts."}
+::step-card{props.number="2" props.title="Commit &amp; push" props.description="Commit and sync straight from Studio's git panel — or the CLI. No deploy scripts, no origin server."}
 
-::step-card{props.number="3" props.title="Live" props.description="Ship to Cloudflare Pages, GitHub Pages, Vercel, or any web server. Static files on a CDN — fast everywhere, costs pennies."}
+::step-card{props.number="3" props.title="Go live" props.description="Your host builds on push — Cloudflare, GitHub Pages, a Node or Bun adapter, or any static server. Live on a CDN in seconds."}
 :::
 :::::
 ::::::
@@ -181,13 +243,13 @@ The websites of 2030\
 :::
 
 :::p{style.color="var(--color-text-secondary)" style.margin="0 0 2.5rem" style.fontSize="1.0625rem" style.lineHeight="1.7"}
-Start building with Jx Suite. No accounts, no subscriptions, no vendor approval. Clone the repo and go.
+No accounts, no subscriptions, no vendor approval. Download Studio, or clone the repo and go.
 :::
 
 :::div{style.display="flex" style.gap="0.75rem" style.justifyContent="center" style.flexWrap="wrap"}
-::cta-button{props.href="/docs/getting-started" props.label="Get Started" props.variant="primary"}
+::cta-button{props.href="/download" props.label="Download Studio" props.variant="primary"}
 
-::cta-button{props.href="/features" props.label="Explore Features" props.variant="secondary"}
+::cta-button{props.href="/docs/getting-started" props.label="Read the docs" props.variant="secondary"}
 :::
 :::::
 ::::::

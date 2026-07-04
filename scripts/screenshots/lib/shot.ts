@@ -111,6 +111,10 @@ async function runAction(page: Page, action: ShotAction): Promise<void> {
       await hook(page, "openBrowse");
       return;
     }
+    case "openNewProject": {
+      await hook(page, "openNewProject");
+      return;
+    }
     case "select": {
       await hook(page, "select", action.path);
       return;
@@ -174,7 +178,10 @@ async function captureVariant(
   shot: ResolvedShot,
   ctx: ShotContext,
   fileName: string,
-): Promise<string> {
+): Promise<string | null> {
+  if (shot.clip === "none") {
+    return null; // Region-only shot: skip the full-view capture.
+  }
   const clip = await resolveClip(page, shot.clip);
   const outPath = join(ctx.outDir, fileName);
   await page.screenshot({
@@ -182,6 +189,59 @@ async function captureVariant(
     path: outPath as `${string}.png`,
   });
   return outPath;
+}
+
+/**
+ * Measure a region element's on-screen box, expand it by `padding`, and clamp it to the page so
+ * puppeteer's clip never falls outside the rendered area. Scrolls the element into view first so a
+ * control nested in a scrollable panel still lands in frame.
+ */
+async function resolveRegionClip(
+  page: Page,
+  region: { padding?: number; selector: string },
+): Promise<{ height: number; width: number; x: number; y: number }> {
+  await page.waitForSelector(region.selector, { timeout: 15_000 });
+  const viewport = page.viewport() ?? { height: 0, width: 0 };
+  const rect = await page.evaluate(
+    (selector, pad, vw, vh) => {
+      const el = document.querySelector(selector);
+      if (!el) {
+        return null;
+      }
+      el.scrollIntoView({ block: "nearest", inline: "nearest" });
+      const r = el.getBoundingClientRect();
+      const x = Math.max(0, r.x - pad);
+      const y = Math.max(0, r.y - pad);
+      return {
+        height: Math.min(vh - y, r.height + pad + (r.y - y)),
+        width: Math.min(vw - x, r.width + pad + (r.x - x)),
+        x,
+        y,
+      };
+    },
+    region.selector,
+    region.padding ?? 0,
+    viewport.width,
+    viewport.height,
+  );
+  if (!rect || rect.width <= 0 || rect.height <= 0) {
+    throw new Error(`region selector "${region.selector}" matched nothing visible`);
+  }
+  return rect;
+}
+
+async function captureRegions(page: Page, shot: ResolvedShot, ctx: ShotContext): Promise<string[]> {
+  const written: string[] = [];
+  for (const region of shot.regions ?? []) {
+    // Re-settle so any scroll from the previous region's scrollIntoView is stable before measuring.
+    await runWait(page, { frames: 1, type: "settle" });
+    const clip = await resolveRegionClip(page, region);
+    const outPath = join(ctx.outDir, `${region.name}.png`);
+    await page.screenshot({ clip, path: outPath as `${string}.png` });
+    ctx.log(`[shot:${shot.name}] region → ${outPath}`);
+    written.push(outPath);
+  }
+  return written;
 }
 
 export async function executeShot(
@@ -232,7 +292,12 @@ export async function executeShot(
   }
   await runWaits(page, shot.waitFor);
 
-  written.push(await captureVariant(page, shot, ctx, `${shot.name}.png`));
+  const main = await captureVariant(page, shot, ctx, `${shot.name}.png`);
+  if (main) {
+    written.push(main);
+  }
+
+  written.push(...(await captureRegions(page, shot, ctx)));
 
   for (const variant of shot.variants ?? []) {
     if (variant.theme) {
@@ -242,7 +307,10 @@ export async function executeShot(
       await runAction(page, action);
     }
     await runWaits(page, shot.waitFor);
-    written.push(await captureVariant(page, shot, ctx, `${shot.name}${variant.suffix}.png`));
+    const v = await captureVariant(page, shot, ctx, `${shot.name}${variant.suffix}.png`);
+    if (v) {
+      written.push(v);
+    }
   }
 
   return written;

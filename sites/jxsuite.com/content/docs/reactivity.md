@@ -5,6 +5,8 @@ description: "Template strings, signals, computed values, and reactive bindings 
 
 # Reactivity
 
+> **Studio writes this format for you.** The State, Data, and Events panels ([Script & logic](/docs/logic)) generate everything below — this page documents the model if you want to hand-edit or understand it.
+
 Template literal syntax `${}` is valid **anywhere a string value appears** in the document tree. All reactivity is powered by `@vue/reactivity`.
 
 ## Reactive Element Properties

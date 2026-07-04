@@ -5,6 +5,8 @@ description: "Inline styles, nested CSS selectors, and named media breakpoints i
 
 # Styling
 
+> **Studio writes this format for you.** The [Design](/docs/design) inspector and Stylebook produce everything below — this page documents the style model for hand-editing and reference.
+
 Jx uses JSON objects for styling with camelCase CSS property names, nested selectors, and named media breakpoints.
 
 ## Inline Styles
@@ -79,7 +81,7 @@ The compiler extracts all static `style` definitions into a single `<style>` blo
 
 ## Design Tokens with CSS Custom Properties
 
-Define tokens in `site.json` and use them everywhere:
+Define tokens in your `project.json` `style` block and use them everywhere:
 
 ```json
 {

@@ -4,6 +4,7 @@
     "href": "/",
     "label": "Click",
     "variant": "primary",
+    "newTab": false,
     "isPrimary": "${state.variant === 'primary'}"
   },
   "style": {
@@ -12,7 +13,11 @@
   "children": [
     {
       "tagName": "a",
-      "attributes": { "href": "${state.href}" },
+      "attributes": {
+        "href": "${state.href}",
+        "target": "${state.newTab ? '_blank' : '_self'}",
+        "rel": "${state.newTab ? 'noopener noreferrer' : ''}"
+      },
       "style": {
         "display": "inline-flex",
         "alignItems": "center",

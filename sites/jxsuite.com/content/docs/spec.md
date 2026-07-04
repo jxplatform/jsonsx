@@ -5,6 +5,8 @@ description: "The Jx specification: a declarative DOM format using plain JSON wi
 
 # Spec Overview
 
+> This is the conceptual foundation beneath [Jx Studio](/studio). You never have to read it to build with Studio — but if you want to know exactly what the format is, start here.
+
 Jx is a schema and runtime for building reactive web applications using plain JSON. A Jx application is a tree of JSON objects whose structure mirrors the DOM API, whose reactivity is powered by `@vue/reactivity`, and whose behavior is declared in `state` entries.
 
 ## Core Premise

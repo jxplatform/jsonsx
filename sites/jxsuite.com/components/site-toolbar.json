@@ -53,21 +53,9 @@
           "style": {
             "display": "flex",
             "alignItems": "center",
-            "gap": "clamp(1.25rem, 3vw, 2rem)"
+            "gap": "clamp(1rem, 3vw, 1.75rem)"
           },
           "children": [
-            {
-              "tagName": "a",
-              "attributes": { "href": "/features" },
-              "style": {
-                "color": "var(--color-text-secondary)",
-                "textDecoration": "none",
-                "fontSize": "0.875rem",
-                "fontWeight": "500",
-                "transition": "color 0.15s"
-              },
-              "children": ["Features"]
-            },
             {
               "tagName": "a",
               "attributes": { "href": "/studio" },
@@ -76,9 +64,24 @@
                 "textDecoration": "none",
                 "fontSize": "0.875rem",
                 "fontWeight": "500",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["Studio"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/features" },
+              "style": {
+                "color": "var(--color-text-secondary)",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "500",
+                "transition": "color 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-text-primary)" }
+              },
+              "children": ["Features"]
             },
             {
               "tagName": "a",
@@ -88,7 +91,9 @@
                 "textDecoration": "none",
                 "fontSize": "0.875rem",
                 "fontWeight": "500",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["Compare"]
             },
@@ -100,7 +105,8 @@
                 "textDecoration": "none",
                 "fontSize": "0.875rem",
                 "fontWeight": "500",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["Docs"]
             },
@@ -116,9 +122,28 @@
                 "textDecoration": "none",
                 "fontSize": "0.875rem",
                 "fontWeight": "500",
-                "transition": "color 0.15s"
+                "transition": "color 0.15s",
+                "@--sm": { "display": "none" },
+                ":hover": { "color": "var(--color-text-primary)" }
               },
               "children": ["GitHub"]
+            },
+            {
+              "tagName": "a",
+              "attributes": { "href": "/download" },
+              "style": {
+                "display": "inline-flex",
+                "alignItems": "center",
+                "backgroundColor": "var(--color-accent)",
+                "color": "white",
+                "textDecoration": "none",
+                "fontSize": "0.875rem",
+                "fontWeight": "600",
+                "padding": "0.4rem 1rem",
+                "borderRadius": "var(--radius)",
+                "transition": "background-color 0.15s"
+              },
+              "children": ["Download"]
             }
           ]
         }

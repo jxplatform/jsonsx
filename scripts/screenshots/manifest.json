@@ -76,6 +76,83 @@
         { "type": "fonts" },
         { "type": "settle", "frames": 2 }
       ]
+    },
+    {
+      "name": "new-project",
+      "file": "pages/index.json",
+      "canvasMode": "preview",
+      "actions": [{ "do": "openNewProject" }, { "do": "setStatus", "value": "Ready" }],
+      "waitFor": [
+        { "type": "selector", "selector": ".new-project-modal" },
+        { "type": "fonts" },
+        { "type": "timeout", "ms": 400 },
+        { "type": "settle", "frames": 3 }
+      ],
+      "regions": [{ "name": "new-project-modal", "selector": ".new-project-modal", "padding": 24 }]
+    },
+    {
+      "name": "git-panel",
+      "file": "components/todo-app.json",
+      "canvasMode": "design",
+      "actions": [
+        { "do": "setActivity", "value": "git" },
+        { "do": "setStatus", "value": "Ready" }
+      ],
+      "waitFor": [
+        { "type": "selector", "selector": ".git-panel" },
+        { "type": "fonts" },
+        { "type": "timeout", "ms": 1500 },
+        { "type": "settle", "frames": 3 }
+      ],
+      "clip": "none",
+      "regions": [
+        { "name": "git-panel", "selector": "#left-panel", "padding": 0 },
+        { "name": "git-commit", "selector": ".git-commit-area", "padding": 16 }
+      ]
+    },
+    {
+      "name": "state-panel",
+      "file": "components/todo-app.json",
+      "canvasMode": "design",
+      "actions": [
+        { "do": "setActivity", "value": "state" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "design-inspector",
+      "file": "components/responsive-card.json",
+      "canvasMode": "design",
+      "actions": [
+        { "do": "setActivity", "value": "layers" },
+        { "do": "select", "path": ["children", 0] },
+        { "do": "setRightTab", "value": "style" },
+        { "do": "setStatus", "value": "Ready" }
+      ],
+      "waitFor": [
+        { "type": "canvasReady" },
+        { "type": "selector", "selector": "#right-panel" },
+        { "type": "fonts" },
+        { "type": "settle", "frames": 3 }
+      ],
+      "clip": "none",
+      "regions": [{ "name": "design-inspector", "selector": "#right-panel", "padding": 0 }]
+    },
+    {
+      "name": "stylebook",
+      "project": "sites/jxsuite.com",
+      "file": "components/feature-card.json",
+      "canvasMode": "stylebook",
+      "actions": [
+        { "do": "setZoom", "value": 0.6 },
+        { "do": "setStatus", "value": "Ready" }
+      ],
+      "waitFor": [
+        { "type": "canvasReady" },
+        { "type": "fonts" },
+        { "type": "timeout", "ms": 5000 },
+        { "type": "settle", "frames": 4 }
+      ]
     }
   ]
 }

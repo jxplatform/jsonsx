@@ -1,78 +1,62 @@
 ---
-title: "Getting Started — Jx Suite"
-description: "Install Jx Suite and build your first component in under 5 minutes."
+title: "Your first project — Jx Suite"
+description: "Build and publish a website with Jx Studio — design visually, wire up interactivity, and commit to git, without hand-writing JSON."
 ---
 
-# Getting Started
+# Your first project
 
-Get up and running with Jx Suite in under 5 minutes.
+In about ten minutes you'll create a site in Jx Studio, design a page, add a bit of interactivity, and publish it to git — all without hand-writing a line of JSON. (If you _do_ want to see the underlying format, every page here has a counterpart under **Format & Reference**.)
 
-## Installation
+## 1. Get Studio
 
-Install the JX packages with your preferred package manager:
-
-```bash
-# Using bun (recommended)
-bun add @jxsuite/runtime @jxsuite/compiler
-
-# Using npm
-npm install @jxsuite/runtime @jxsuite/compiler
-```
-
-## Your First Component
-
-Create a file called `counter.json`:
-
-```json
-{
-  "tagName": "my-counter",
-  "state": {
-    "count": 0,
-    "increment": {
-      "$prototype": "Function",
-      "body": "state.count++"
-    }
-  },
-  "children": [
-    {
-      "tagName": "span",
-      "textContent": "${state.count}"
-    },
-    {
-      "tagName": "button",
-      "textContent": "+",
-      "onclick": { "$ref": "#/state/increment" }
-    }
-  ]
-}
-```
-
-This defines a reactive counter component entirely in JSON — state, behavior, and UI in one declarative document.
-
-## Run the Dev Server
-
-Start the development server:
+Download the desktop app for [macOS, Windows, or Linux](/docs/get-studio), or install the CLI and run Studio locally:
 
 ```bash
-bun run dev
+bun create @jxsuite my-site
+cd my-site && bun run dev
 ```
 
-Open `http://localhost:3000` in your browser. Changes to your JSON files trigger live reload automatically.
+There's no hosted Studio to sign into — it runs on your machine, against your files. Full details on both paths are in **[Get Studio](/docs/get-studio)**.
 
-## Build for Production
+## 2. Create a project
 
-Compile your site to static HTML:
+In Studio, choose **New Project**. Give it a name and a folder, set your production URL, and pick a **deployment adapter** — Static, Cloudflare, Node, or Bun. Studio scaffolds a clean starter you can build on.
 
-```bash
-bun run build
-```
+![Jx Studio New Project dialog — name, directory, production URL, and deployment adapter picker](/screenshots/new-project-modal.png)
 
-The output goes to `dist/` — plain HTML, CSS, and optional JavaScript. Deploy anywhere.
+Already have a Jx project? Use **Open Project** to point Studio at a folder on disk, or **Clone** to pull one from git.
 
-## What's Next
+## 3. Manage, edit, design
 
-- **[Spec Overview](/docs/spec)** — The full Jx specification
-- **[Component Model](/docs/components)** — How components work
-- **[Reactivity](/docs/reactivity)** — Template strings, signals, and computed values
-- **[Styling](/docs/styling)** — Inline styles, nested selectors, media breakpoints
-- **[Site Architecture](/docs/site-architecture)** — Routing, layouts, content collections
+Studio gives you a surface for each part of the job. Start in **[Manage](/docs/manage)** to see your project — pages, components, content, and media — with live previews.
+
+![Jx Studio Manage Files modal with live previews of every project file](/screenshots/mode-manage.png)
+
+Open a content page and switch to **[Edit](/docs/edit)** to write inline — click any text and type, use slash commands for blocks, fill in frontmatter on the side. Open a component and switch to **[Design](/docs/design)** for the visual canvas: a live preview at every breakpoint, and a full CSS inspector for spacing, type, color, and hover states.
+
+![Jx Studio design canvas showing one component across four responsive breakpoints with a style inspector](/screenshots/mode-design.png)
+
+## 4. Add an interaction
+
+Websites do things. In Studio, interactivity comes from three panels working together — no separate "code mode" required:
+
+- **State** — declare a value or a computed one (a counter, a total, a fetched list).
+- **Events** — bind a handler to a click, input, or submit with the structured expression editor.
+- **Code** — drop into the Monaco editor when a handler needs real JavaScript.
+
+![Jx Studio editing a component state function in the Monaco code editor](/screenshots/mode-script.png)
+
+Add a `count` to state, a button, and an `onclick` that increments it — you've built a reactive component. See **[Script & logic](/docs/logic)** for the full toolkit.
+
+## 5. Commit and publish
+
+When you're happy, open **Source Control**. Review your changes, write a message, and **commit and sync** — or, for a brand-new project, **Publish to GitHub** and Studio creates the repository for you.
+
+![Jx Studio commit box — write a message and commit-and-sync straight from the Source Control panel](/screenshots/git-commit.png)
+
+Here's the one boundary worth knowing: **Studio publishes code; it doesn't build or deploy the site.** It commits and pushes, and it sets the deploy adapter you chose in step 2. Your host takes it from there — building the static site (`bunx jx build`) on every push and serving the `dist/` output from a CDN. See **[Git & publish](/docs/git-publish)** for the full flow.
+
+## What's next
+
+- **Using Studio:** [Manage](/docs/manage) · [Edit](/docs/edit) · [Design](/docs/design) · [Script & logic](/docs/logic) · [Git & publish](/docs/git-publish)
+- **For developers:** [Site architecture](/docs/site-architecture) · [Component model](/docs/components) · [Spec overview](/docs/spec)

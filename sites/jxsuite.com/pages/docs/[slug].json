@@ -22,7 +22,19 @@
   "children": [
     {
       "tagName": "article",
-      "style": { "maxWidth": "720px" },
+      "style": {
+        "maxWidth": "720px",
+        "& img": {
+          "display": "block",
+          "maxWidth": "100%",
+          "maxHeight": "900px",
+          "width": "auto",
+          "height": "auto",
+          "borderRadius": "8px",
+          "border": "1px solid var(--color-border)",
+          "margin": "1.75rem auto"
+        }
+      },
       "children": "${state.page.$children ?? []}"
     }
   ]
