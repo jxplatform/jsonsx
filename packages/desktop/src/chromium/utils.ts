@@ -13,7 +13,19 @@ interface DbusRequest {
   on: (event: "Response", handler: (response: number, results: unknown) => void) => void;
 }
 
-export async function openFileDialog(): Promise<string | null> {
+/**
+ * Open the freedesktop FileChooser portal and resolve to the first selected path (or null on
+ * cancel/error). `directory: true` selects a folder (used by New Project to pick a parent dir);
+ * `directory: false` selects a project.json file (used by Open Project).
+ *
+ * @param {{ directory: boolean; title: string; filters?: boolean }} opts
+ * @returns {Promise<string | null>}
+ */
+async function chooseViaPortal(opts: {
+  directory: boolean;
+  title: string;
+  filters?: boolean;
+}): Promise<string | null> {
   const bus = await sessionBus();
 
   try {
@@ -25,18 +37,16 @@ export async function openFileDialog(): Promise<string | null> {
 
     const handleToken = `bun_${Math.random().toString(36).slice(2, 11)}`;
 
-    const options = [
-      ["directory", ["b", false]],
+    const options: [string, [string, unknown]][] = [
+      ["directory", ["b", opts.directory]],
       ["modal", ["b", true]],
       ["handle_token", ["s", handleToken]],
-      ["filters", ["a(sa(us))", [["Project files", [[0, "*.json"]]]]]],
     ];
+    if (opts.filters) {
+      options.push(["filters", ["a(sa(us))", [["Project files", [[0, "*.json"]]]]]]);
+    }
 
-    const [handle] = await portal.OpenFile(
-      "",
-      "Open project.json",
-      options as [string, [string, unknown]][],
-    );
+    const [handle] = await portal.OpenFile("", opts.title, options);
 
     const result = await new Promise<string | null>((resolve) => {
       const timeout = setTimeout(() => resolve(null), 60_000);
@@ -71,4 +81,13 @@ export async function openFileDialog(): Promise<string | null> {
   } finally {
     bus.connection.end();
   }
+}
+
+export function openFileDialog(): Promise<string | null> {
+  return chooseViaPortal({ directory: false, filters: true, title: "Open project.json" });
+}
+
+/** Pick a folder — used by New Project to choose where to scaffold the project. */
+export function openDirectoryDialog(): Promise<string | null> {
+  return chooseViaPortal({ directory: true, title: "Choose a folder for your new project" });
 }

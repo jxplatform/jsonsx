@@ -12,6 +12,7 @@ import { applyUpdate, checkForUpdate, downloadUpdate, getLocalInfo, getStatus } 
 import { createGitOps } from "./git";
 import { createPackageOps } from "./packages";
 import { createProjectServer } from "@jxsuite/server/project-server";
+import { listStarters } from "@jxsuite/starters";
 import { createProjectSession } from "./project-session";
 import { readRecents, writeRecents } from "./recent-store";
 import { studioDir } from "./canvas-runtime";
@@ -256,6 +257,15 @@ function buildWindowRpc(entry: WindowEntry, getWin: () => BrowserWindow) {
           }
           return result;
         },
+        createProject: async (params) => {
+          const result = await session.createProject(params);
+          entry.projectRoot = session.projectRoot;
+          try {
+            getWin().setTitle(titleFor(session.projectRoot));
+          } catch {}
+          return result;
+        },
+        listStarters: () => Promise.resolve(listStarters()),
         readFile: (params) => session.handleReadFile(params),
         renameFile: (params) => session.handleRenameFile(params),
         resolveSiteContext: (params) => session.handleResolveSiteContext(params),

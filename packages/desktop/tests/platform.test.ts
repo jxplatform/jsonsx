@@ -439,6 +439,7 @@ describe("platform methods", () => {
         name: "p",
       },
     ],
+    ["listStarters", [], "listStarters", undefined],
     ["aiChatUrl", [], "aiChatUrl", undefined],
     ["setWindowProject", ["/proj/x"], "setWindowProject", { root: "/proj/x" }],
     ["getProjectRoot", [], "getProjectRoot", undefined],

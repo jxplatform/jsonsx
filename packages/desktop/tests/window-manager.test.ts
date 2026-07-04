@@ -81,6 +81,10 @@ function makeSession(initialRoot: string | null) {
         handle: { name: "Proj", projectConfig: {}, root: "." },
       };
     }),
+    createProject: mock(async (opts: { directory: string }) => {
+      root = `/proj/${opts.directory}`;
+      return { config: { name: "New" }, root };
+    }),
   };
   return s;
 }
@@ -512,6 +516,30 @@ describe("openProject request handler", () => {
     } as never);
     expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/opened");
     expect(win.setTitle).toHaveBeenLastCalledWith(`opened ${DASH} Jx Studio`);
+  });
+});
+
+describe("createProject request handler", () => {
+  test("scaffolds a project, binds the root and updates the window title", async () => {
+    const win = openProjectWindow(null) as unknown as MockWindow;
+    const reqs = lastRequests();
+    const session = sessions.at(-1)!;
+
+    const result = await reqs.createProject({ directory: "shiny", name: "New" } as never);
+    expect(session.createProject).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ config: { name: "New" }, root: "/proj/shiny" } as never);
+    expect(listOpenWindows().find((w) => w.id === win.id)?.projectRoot).toBe("/proj/shiny");
+    expect(win.setTitle).toHaveBeenLastCalledWith(`shiny ${DASH} Jx Studio`);
+  });
+});
+
+describe("listStarters request handler", () => {
+  test("returns the starter template registry", async () => {
+    openProjectWindow(null);
+    const reqs = lastRequests();
+    const starters = (await reqs.listStarters()) as { id: string }[];
+    expect(Array.isArray(starters)).toBe(true);
+    expect(starters.some((s) => s.id === "restaurant")).toBe(true);
   });
 });
 

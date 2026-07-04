@@ -1,6 +1,6 @@
 // oxlint-disable typescript/await-thenable -- bun test .resolves/.rejects matchers are typed `void` but return real Promises at runtime; the await is required.
 import { describe, expect, mock, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ComponentMeta, DirEntry } from "../src/rpc-schema";
 import type { StudioSchema } from "../src/handlers";
@@ -15,6 +15,7 @@ const {
   setProjectRoot,
   getProjectRoot,
   setFileDialog,
+  setDirectoryDialog,
   listDirectory,
   handleReadFile,
   handleWriteFile,
@@ -28,6 +29,7 @@ const {
   locateFile,
   fetchPluginSchema,
   openProject,
+  createProject,
 } = await import("../src/handlers");
 
 const FIXTURES = join(import.meta.dir, "_fixtures_handlers");
@@ -967,6 +969,63 @@ describe("openProject", () => {
       expect(result!.handle.name).toBe("_fixtures_handlers");
     } finally {
       setFileDialog(null as unknown as () => Promise<string | null>);
+      cleanup();
+    }
+  });
+});
+
+// ─── createProject ─────────────────────────────────────────────────────────
+
+describe("createProject", () => {
+  const clearDialog = () => setDirectoryDialog(null as unknown as () => Promise<string | null>);
+
+  test("throws when no directory dialog is configured", async () => {
+    clearDialog();
+    await expect(createProject({ directory: "x", name: "X" })).rejects.toThrow(
+      "No directory dialog configured",
+    );
+  });
+
+  test("throws when name or directory is missing", async () => {
+    setDirectoryDialog(async () => FIXTURES);
+    try {
+      await expect(createProject({ directory: "", name: "" })).rejects.toThrow(
+        "name and directory are required",
+      );
+    } finally {
+      clearDialog();
+    }
+  });
+
+  test("throws when the folder picker is cancelled", async () => {
+    setDirectoryDialog(async () => null);
+    try {
+      await expect(createProject({ directory: "x", name: "X" })).rejects.toThrow(
+        "No destination folder was selected.",
+      );
+    } finally {
+      clearDialog();
+    }
+  });
+
+  test("scaffolds a blank project into the chosen folder and returns its config", async () => {
+    setup();
+    setDirectoryDialog(async () => FIXTURES);
+    try {
+      const result = await createProject({
+        description: "A new site",
+        directory: "my-new-site",
+        name: "My New Site",
+        url: "https://new.example",
+      });
+      expect(result.root).toBe(join(FIXTURES, "my-new-site"));
+      expect(result.config.name).toBe("My New Site");
+      expect(existsSync(join(FIXTURES, "my-new-site", "project.json"))).toBe(true);
+      expect(existsSync(join(FIXTURES, "my-new-site", "pages"))).toBe(true);
+      // The freshly-scaffolded project becomes the active project.
+      expect(getProjectRoot()).toBe(join(FIXTURES, "my-new-site"));
+    } finally {
+      clearDialog();
       cleanup();
     }
   });

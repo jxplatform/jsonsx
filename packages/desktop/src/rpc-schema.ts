@@ -2,6 +2,7 @@
 import type { RPCSchema } from "electrobun/bun";
 import type { ProjectConfig } from "@jxsuite/schema/types";
 import type { FsEventPayload, RenameReport } from "@jxsuite/server/refactor";
+import type { StarterMeta } from "@jxsuite/starters";
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -310,6 +311,10 @@ export interface StudioRPC {
           starter?: string;
         };
         response: { root: string; config: ProjectConfig };
+      };
+      listStarters: {
+        params: void;
+        response: StarterMeta[];
       };
       // Updates
       updaterGetLocalInfo: {

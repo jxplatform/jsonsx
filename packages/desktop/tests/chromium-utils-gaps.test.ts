@@ -54,7 +54,7 @@ void mock.module("dbus-ts", () => ({
   sessionBus: () => Promise.resolve(fakeBus),
 }));
 
-const { openFileDialog } = await import("../src/chromium/utils");
+const { openFileDialog, openDirectoryDialog } = await import("../src/chromium/utils");
 
 beforeEach(() => {
   config = {};
@@ -144,5 +144,28 @@ describe("openFileDialog (chromium / D-Bus portal)", () => {
     };
     const result = await openFileDialog();
     expect(result).toBe("/delayed/project.json");
+  });
+});
+
+describe("openDirectoryDialog (chromium / D-Bus portal)", () => {
+  test("resolves the chosen folder path", async () => {
+    config.respond = (fire) => fire(0, { uris: ["file:///home/user/projects"] });
+    const result = await openDirectoryDialog();
+    expect(result).toBe("/home/user/projects");
+  });
+
+  test("requests a directory and omits the *.json filter", async () => {
+    config.respond = (fire) => fire(0, { uris: ["file:///home/user/x"] });
+    await openDirectoryDialog();
+    expect(openFileArgs[1]).toBe("Choose a folder for your new project");
+    const options = openFileArgs[2] as [string, [string, unknown]][];
+    const directoryEntry = options.find(([key]) => key === "directory");
+    expect(directoryEntry?.[1][1]).toBe(true);
+    expect(options.map(([key]) => key)).not.toContain("filters");
+  });
+
+  test("returns null when the user cancels", async () => {
+    config.respond = (fire) => fire(1, {});
+    expect(await openDirectoryDialog()).toBeNull();
   });
 });

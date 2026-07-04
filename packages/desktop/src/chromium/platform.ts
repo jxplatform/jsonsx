@@ -3,6 +3,7 @@ import type {
   ComponentMeta,
   RecentProjectEntry,
   RenameResult,
+  StarterInfo,
   StudioPlatform,
 } from "@jxsuite/studio/types";
 import type { ProjectConfig } from "@jxsuite/schema/types";
@@ -325,6 +326,10 @@ export function createDesktopPlatform(): StudioPlatform {
         root: string;
         config: ProjectConfig;
       }>;
+    },
+
+    async listStarters() {
+      return request("listStarters") as Promise<StarterInfo[]>;
     },
 
     // AI Assistant (Stack B: OpenAI-compatible SSE proxy on the local chromium server)

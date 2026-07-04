@@ -15,7 +15,7 @@ void mock.module("electrobun/bun", () => ({
   Utils: { openFileDialog: mockOpenFileDialog },
 }));
 
-const { init, openFileDialog } = await import("../src/utils");
+const { init, openFileDialog, openDirectoryDialog } = await import("../src/utils");
 
 beforeEach(() => {
   mockOpenFileDialog.mockClear();
@@ -75,5 +75,31 @@ describe("openFileDialog", () => {
     mockOpenFileDialog.mockImplementationOnce(async () => ["  /path/to/file.json  "]);
     const result = await openFileDialog();
     expect(result).toBe("/path/to/file.json");
+  });
+});
+
+// ─── openDirectoryDialog ─────────────────────────────────────────────────────
+
+describe("openDirectoryDialog", () => {
+  test("returns the chosen folder and requests a directory (not a file)", async () => {
+    await init();
+    mockOpenFileDialog.mockImplementationOnce(async () => ["/home/user/projects"]);
+    const result = await openDirectoryDialog();
+    expect(result).toBe("/home/user/projects");
+    const [call] = mockOpenFileDialog.mock.calls[0] as unknown as [Record<string, unknown>];
+    expect(call.canChooseDirectory).toBe(true);
+    expect(call.canChooseFiles).toBe(false);
+  });
+
+  test("returns null when the picker is cancelled", async () => {
+    await init();
+    mockOpenFileDialog.mockImplementationOnce(async () => []);
+    expect(await openDirectoryDialog()).toBeNull();
+  });
+
+  test("trims whitespace from the returned folder", async () => {
+    await init();
+    mockOpenFileDialog.mockImplementationOnce(async () => ["  /home/user/proj  "]);
+    expect(await openDirectoryDialog()).toBe("/home/user/proj");
   });
 });

@@ -20,7 +20,10 @@ void mock.module("electrobun/bun", () => ({
 // ─── Mock ./utils and ./window-manager ──────────────────────────────────────
 
 const openFileDialog = mock(async (): Promise<string | null> => null);
-void mock.module("../src/utils", () => ({ openFileDialog }));
+void mock.module("../src/utils", () => ({
+  openDirectoryDialog: mock(async (): Promise<string | null> => null),
+  openFileDialog,
+}));
 
 const openProjectWindow = mock((_root: string | null) => ({}));
 void mock.module("../src/window-manager", () => ({ openProjectWindow }));

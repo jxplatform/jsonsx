@@ -8,7 +8,7 @@
 
 import { createProjectSession } from "./project-session";
 
-export { setFileDialog } from "./project-session";
+export { setFileDialog, setDirectoryDialog } from "./project-session";
 export type { ProjectSession, ProxyResult, StudioSchema } from "./project-session";
 
 const _default = createProjectSession(null);
@@ -24,6 +24,7 @@ export function getProjectRoot(): string | null {
 export const { listFormats } = _default;
 export const { formatAction } = _default;
 export const { openProject } = _default;
+export const { createProject } = _default;
 export const { listDirectory } = _default;
 export const { handleReadFile } = _default;
 export const { handleWriteFile } = _default;

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import {
   codeService,
+  createProject,
   discoverComponents,
   fetchPluginSchema,
   formatAction,
@@ -20,6 +21,7 @@ import {
   listFormats,
   locateFile,
   openProject,
+  setDirectoryDialog,
   setFileDialog,
   setProjectRoot,
 } from "../handlers";
@@ -49,8 +51,9 @@ import {
   removePackage,
   setPackageVersions,
 } from "../packages";
-import { openFileDialog } from "./utils";
+import { openDirectoryDialog, openFileDialog } from "./utils";
 import { createProjectServer } from "@jxsuite/server/project-server";
+import { listStarters } from "@jxsuite/starters";
 import { readRecents, writeRecents } from "../recent-store";
 import type { RecentProjectEntry } from "../rpc-schema";
 
@@ -59,6 +62,7 @@ import type { RecentProjectEntry } from "../rpc-schema";
 const projectRoot = process.argv[2] || process.env.JSONSX_PROJECT_ROOT || process.cwd();
 setProjectRoot(projectRoot);
 setFileDialog(openFileDialog);
+setDirectoryDialog(openDirectoryDialog);
 
 // ─── RPC handler dispatch map ────────────────────────────────────────────────
 
@@ -105,6 +109,18 @@ const handlers: Record<string, (params: unknown) => Promise<unknown>> = {
   setPackageVersions: (params) =>
     setPackageVersions(params as { updates: { name: string; version: string; dev?: boolean }[] }),
   openProject: () => openProject(),
+  createProject: (params) =>
+    createProject(
+      params as {
+        name: string;
+        description?: string;
+        url?: string;
+        adapter?: string;
+        directory: string;
+        starter?: string;
+      },
+    ),
+  listStarters: () => Promise.resolve(listStarters()),
   getProjectRoot: () => Promise.resolve({ root: getProjectRoot() }),
   setWindowProject: (params) => {
     // Single-window launcher: rebind the process-global root in place. Studio re-reads the

@@ -121,6 +121,13 @@ export function setFileDialog(fn: () => Promise<string | null>) {
   fileDialogFn = fn;
 }
 
+// Directory picker used by New Project to choose the parent folder for the scaffolded project.
+let directoryDialogFn: (() => Promise<string | null>) | null = null;
+
+export function setDirectoryDialog(fn: () => Promise<string | null>) {
+  directoryDialogFn = fn;
+}
+
 // ─── Pure helpers (no session state) ──────────────────────────────────────────
 
 // Path convention: every path returned to the studio MUST be forward-slash and project-relative.
@@ -451,6 +458,63 @@ export function createProjectSession(initialRoot: string | null) {
     };
   }
 
+  /**
+   * Scaffold a new project. Unlike the dev server (which resolves the directory against a fixed
+   * server root), the desktop app has no single root, so it prompts for a parent folder with the
+   * native directory picker and creates `<parent>/<directory>`. The freshly-scaffolded project
+   * becomes this window's active project.
+   *
+   * @param {{
+   *   name: string;
+   *   description?: string;
+   *   url?: string;
+   *   adapter?: string;
+   *   directory: string;
+   *   starter?: string;
+   * }} opts
+   * @returns {Promise<{ root: string; config: SiteConfig }>}
+   */
+  async function createProject(opts: {
+    name: string;
+    description?: string;
+    url?: string;
+    adapter?: string;
+    directory: string;
+    starter?: string;
+  }): Promise<{ root: string; config: SiteConfig }> {
+    if (!directoryDialogFn) {
+      throw new Error("No directory dialog configured");
+    }
+    if (!opts.name || !opts.directory) {
+      throw new Error("name and directory are required");
+    }
+    const parent = await directoryDialogFn();
+    if (!parent) {
+      throw new Error("No destination folder was selected.");
+    }
+    const destPath = resolve(parent, opts.directory);
+
+    const { generateProject } = await import("@jxsuite/create/generate");
+    await generateProject(destPath, {
+      name: opts.name,
+      ...(opts.adapter === undefined
+        ? {}
+        : { adapter: opts.adapter as Parameters<typeof generateProject>[1]["adapter"] }),
+      ...(opts.description === undefined ? {} : { description: opts.description }),
+      ...(opts.url === undefined ? {} : { url: opts.url }),
+      ...(opts.starter === undefined ? {} : { starter: opts.starter }),
+    });
+
+    const config = JSON.parse(
+      await readFile(resolve(destPath, "project.json"), "utf8"),
+    ) as SiteConfig;
+    projectRoot = destPath;
+    formatRegistry = null;
+    startWatching();
+
+    return { config, root: destPath };
+  }
+
   async function listDirectory(params: { dir: string }): Promise<DirEntry[]> {
     const root = requireRoot();
     const absDir = resolve(root, params.dir);
@@ -771,6 +835,7 @@ export function createProjectSession(initialRoot: string | null) {
     listFormats,
     formatAction,
     openProject,
+    createProject,
     listDirectory,
     handleReadFile: readFileHandler,
     handleWriteFile: writeFileHandler,

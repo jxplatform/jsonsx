@@ -36,7 +36,10 @@ const installApplicationMenu = mock(() => {});
 void mock.module("../src/menu", () => ({ installApplicationMenu }));
 
 const setFileDialog = mock((_fn: unknown) => {});
-void mock.module("../src/project-session", () => ({ setFileDialog }));
+void mock.module("../src/project-session", () => ({
+  setDirectoryDialog: mock(() => {}),
+  setFileDialog,
+}));
 
 let notifyWebview: ((version: string) => void) | null = null;
 const startBackgroundChecks = mock(() => {});
@@ -47,8 +50,10 @@ void mock.module("../src/updater", () => ({ setNotifyWebview, startBackgroundChe
 
 const openFileDialogSentinel = mock(async () => null);
 const initUtils = mock(async () => {});
+const openDirectoryDialogSentinel = mock(async () => null);
 void mock.module("../src/utils", () => ({
   init: initUtils,
+  openDirectoryDialog: openDirectoryDialogSentinel,
   openFileDialog: openFileDialogSentinel,
 }));
 

@@ -76,6 +76,8 @@ const handlerMocks = {
   listFormats: mock(() => Promise.resolve([{ format: "markdown" }])),
   locateFile: mock(() => Promise.resolve("located/file.json")),
   openProject: mock(() => Promise.resolve({ config: { name: "P" }, handle: { root: "." } })),
+  createProject: mock(() => Promise.resolve({ config: { name: "New" }, root: "/new" })),
+  setDirectoryDialog: mock(() => {}),
   setFileDialog: mock(() => {}),
   setProjectRoot: mock(() => {}),
 };
@@ -121,7 +123,11 @@ const writeRecentsMock = mock(() => Promise.resolve());
 void mock.module("../src/handlers", () => handlerMocks);
 void mock.module("../src/git", () => gitMocks);
 void mock.module("../src/packages", () => packageMocks);
-void mock.module("../src/chromium/utils", () => ({ openFileDialog: openFileDialogMock }));
+const openDirectoryDialogMock = mock(async () => null);
+void mock.module("../src/chromium/utils", () => ({
+  openDirectoryDialog: openDirectoryDialogMock,
+  openFileDialog: openFileDialogMock,
+}));
 void mock.module("../src/recent-store", () => ({
   readRecents: readRecentsMock,
   writeRecents: writeRecentsMock,
@@ -333,6 +339,18 @@ describe("chromium launcher RPC dispatch", () => {
 
   test("getProjectRoot wraps the handler value in { root }", async () => {
     expect(await rpc("getProjectRoot")).toEqual({ root: projectRootValue });
+  });
+
+  test("createProject dispatches to the createProject handler", async () => {
+    const result = await rpc("createProject", { directory: "n", name: "New" });
+    expect(result).toEqual({ config: { name: "New" }, root: "/new" });
+    expect(handlerMocks.createProject).toHaveBeenCalledWith({ directory: "n", name: "New" });
+  });
+
+  test("listStarters dispatches to the real starter registry", async () => {
+    const result = (await rpc("listStarters")) as { id: string }[];
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.some((s) => s.id === "restaurant")).toBe(true);
   });
 
   test("jxResolve / jxServerFunction WS methods dispatch to the handlers", async () => {

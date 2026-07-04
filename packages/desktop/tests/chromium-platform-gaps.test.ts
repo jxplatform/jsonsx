@@ -20,6 +20,7 @@ const responses: Record<string, unknown> = {
   gitShow: "old file content",
   listFormats: [{ extensions: [".md"], format: "markdown" }],
   listPackages: [{ name: "left-pad", version: "^1.0.0" }],
+  listStarters: [{ id: "restaurant", name: "Bistro & Café", tagline: "A menu-driven site." }],
   removePackage: { removed: "left-pad" },
   searchFiles: [{ name: "found.json", path: "a/found.json", type: "file" }],
 };
@@ -205,6 +206,12 @@ describe("chromium platform: search, formats and packages", () => {
         url: "https://fresh.example",
       },
     });
+  });
+
+  test("listStarters returns the starter template list", async () => {
+    const starters = await platform.listStarters!();
+    expect(starters).toEqual(responses.listStarters as never);
+    expect(lastRequest().method).toBe("listStarters");
   });
 
   test("rejects when the server reports an unknown method", async () => {

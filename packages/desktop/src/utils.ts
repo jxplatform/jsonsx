@@ -34,3 +34,20 @@ export async function openFileDialog(): Promise<string | null> {
   }
   return paths[0].trim() || null;
 }
+
+/** Pick a folder — used by New Project to choose where to scaffold the project. */
+export async function openDirectoryDialog(): Promise<string | null> {
+  if (!Utils) {
+    return null;
+  }
+  const paths = await Utils.openFileDialog({
+    allowsMultipleSelection: false,
+    canChooseDirectory: true,
+    canChooseFiles: false,
+    startingFolder: homedir(),
+  });
+  if (!paths || paths.length === 0 || (paths.length === 1 && !paths[0])) {
+    return null;
+  }
+  return paths[0].trim() || null;
+}

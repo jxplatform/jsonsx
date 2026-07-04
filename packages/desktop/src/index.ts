@@ -1,7 +1,7 @@
 import Electrobun from "electrobun/bun";
-import { setFileDialog } from "./project-session";
+import { setDirectoryDialog, setFileDialog } from "./project-session";
 import { setNotifyWebview, startBackgroundChecks } from "./updater";
-import { init as initUtils, openFileDialog } from "./utils";
+import { init as initUtils, openDirectoryDialog, openFileDialog } from "./utils";
 import { handleAiApi } from "@jxsuite/server/ai-api";
 import { installApplicationMenu } from "./menu";
 import {
@@ -20,6 +20,7 @@ import {
 async function main() {
   await initUtils();
   setFileDialog(openFileDialog);
+  setDirectoryDialog(openDirectoryDialog);
 
   // AI HTTP server (SSE streaming requires HTTP). A single shared server: AI sessions are id-keyed
   // And process-global, so the server resolves requests by id and needs no fixed project root

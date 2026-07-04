@@ -23,9 +23,11 @@
   },
   "dependencies": {
     "@jxsuite/compiler": "workspace:^",
+    "@jxsuite/create": "workspace:^",
     "@jxsuite/parser": "workspace:^",
     "@jxsuite/schema": "workspace:^",
     "@jxsuite/server": "workspace:^",
+    "@jxsuite/starters": "workspace:^",
     "@jxsuite/studio": "workspace:^",
     "dbus-ts": "^0.0.7",
     "electrobun": "latest",

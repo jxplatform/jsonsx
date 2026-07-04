@@ -515,6 +515,10 @@ export function createDesktopPlatform() {
       }>;
     },
 
+    async listStarters() {
+      return rpc.request.listStarters();
+    },
+
     updater: {
       applyUpdate: () => rpc.request.updaterApplyUpdate(),
       checkForUpdate: () => rpc.request.updaterCheckForUpdate(),
