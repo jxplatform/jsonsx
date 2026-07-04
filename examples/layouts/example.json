@@ -1,5 +1,5 @@
 {
-  "$layout": "./base.json",
+  "$layout": "./layouts/base.json",
   "tagName": "div",
   "style": {
     "display": "flex",
@@ -38,7 +38,9 @@
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/counter" },
+              "attributes": {
+                "href": "/basics/counter"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -49,7 +51,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/computed" },
+              "attributes": {
+                "href": "/basics/computed"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -60,7 +64,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/list" },
+              "attributes": {
+                "href": "/basics/list"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -71,7 +77,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/fetch" },
+              "attributes": {
+                "href": "/basics/fetch"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -82,7 +90,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/switch" },
+              "attributes": {
+                "href": "/basics/switch"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -93,7 +103,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/form" },
+              "attributes": {
+                "href": "/basics/form"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -104,7 +116,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/responsive" },
+              "attributes": {
+                "href": "/basics/responsive"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -115,7 +129,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/basics/todo" },
+              "attributes": {
+                "href": "/basics/todo"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -138,11 +154,17 @@
         },
         {
           "tagName": "nav",
-          "style": { "display": "flex", "flexDirection": "column", "gap": "0.25rem" },
+          "style": {
+            "display": "flex",
+            "flexDirection": "column",
+            "gap": "0.25rem"
+          },
           "children": [
             {
               "tagName": "a",
-              "attributes": { "href": "/advanced/custom-elements" },
+              "attributes": {
+                "href": "/advanced/custom-elements"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -153,7 +175,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/advanced/markdown-blog" },
+              "attributes": {
+                "href": "/advanced/markdown-blog"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -164,7 +188,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/advanced/markdown-todo" },
+              "attributes": {
+                "href": "/advanced/markdown-todo"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -175,7 +201,9 @@
             },
             {
               "tagName": "a",
-              "attributes": { "href": "/advanced/shoelace" },
+              "attributes": {
+                "href": "/advanced/shoelace"
+              },
               "style": {
                 "color": "#333",
                 "textDecoration": "none",
@@ -190,8 +218,15 @@
     },
     {
       "tagName": "div",
-      "style": { "flex": "1", "minWidth": "0" },
-      "children": [{ "tagName": "slot" }]
+      "style": {
+        "flex": "1",
+        "minWidth": "0"
+      },
+      "children": [
+        {
+          "tagName": "slot"
+        }
+      ]
     }
   ]
 }

@@ -7,8 +7,9 @@
     "--lg": "(min-width: 1024px)",
     "--dark": "(prefers-color-scheme: dark)"
   },
-  "tagName": "div",
+  "tagName": "responsive-card",
   "style": {
+    "display": "block",
     "fontFamily": "system-ui, sans-serif",
     "padding": "1rem",
     "maxWidth": "100%",

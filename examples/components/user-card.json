@@ -37,8 +37,9 @@
     }
   },
 
-  "tagName": "div",
+  "tagName": "user-card",
   "style": {
+    "display": "block",
     "fontFamily": "system-ui, sans-serif",
     "background": "#f8f9fa",
     "minHeight": "100vh",

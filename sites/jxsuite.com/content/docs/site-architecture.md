@@ -41,32 +41,37 @@ Every `.json` file in `pages/` becomes a route automatically:
 
 ## Layouts
 
-Layouts use HTML `<slot>` elements to mark where page content is injected:
+Layouts use HTML `<slot>` elements to mark where page content is injected. Components are
+registered via `$elements` (paths relative to the layout file) and used by tag name:
 
 ```json
 {
+  "$elements": [
+    { "$ref": "../components/site-header.json" },
+    { "$ref": "../components/site-footer.json" }
+  ],
   "tagName": "html",
   "children": [
     {
       "tagName": "body",
       "children": [
-        { "$ref": "../components/header.json" },
+        { "tagName": "site-header" },
         {
           "tagName": "main",
           "children": [{ "tagName": "slot" }]
         },
-        { "$ref": "../components/footer.json" }
+        { "tagName": "site-footer" }
       ]
     }
   ]
 }
 ```
 
-Pages declare their layout with `$layout`:
+Pages declare their layout with `$layout` — the path is resolved from the **project root**:
 
 ```json
 {
-  "$layout": "../layouts/base.json",
+  "$layout": "./layouts/base.json",
   "children": [{ "tagName": "h1", "textContent": "About Us" }]
 }
 ```

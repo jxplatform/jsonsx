@@ -1,5 +1,14 @@
 {
   "title": "Switch — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/router.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "router-demo"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/router.json"
+    }
+  ]
 }

@@ -1,5 +1,14 @@
 {
   "title": "Form — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/contact-form.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "contact-form"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/contact-form.json"
+    }
+  ]
 }

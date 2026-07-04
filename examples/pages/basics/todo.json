@@ -1,5 +1,14 @@
 {
   "title": "Todo — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/todo-app.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "todo-app"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/todo-app.json"
+    }
+  ]
 }

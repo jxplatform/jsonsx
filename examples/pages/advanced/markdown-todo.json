@@ -1,5 +1,14 @@
 {
   "title": "Markdown Todo — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/todo-app.md" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "markdown-todo-app"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/todo-app.md"
+    }
+  ]
 }

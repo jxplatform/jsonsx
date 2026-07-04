@@ -1,5 +1,14 @@
 {
   "title": "Fetch — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/fetch-demo.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "fetch-demo"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/fetch-demo.json"
+    }
+  ]
 }

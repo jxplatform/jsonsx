@@ -184,10 +184,16 @@ Reference a function from state:
 ]
 ```
 
-### `$props` (passing data to child components)
+### Passing data to child components
+
+Register the component in `$elements` (path relative to the current file), then use it by tag
+name with `props.*` attributes — there is no `$ref`-in-`children` transclusion:
 
 ```json
-{ "$ref": "./user-card.json", "$props": { "user": { "$ref": "#/state/currentUser" } } }
+{
+  "$elements": [{ "$ref": "./components/user-card.json" }],
+  "children": [{ "tagName": "user-card", "attributes": { "props.name": "Ada" } }]
+}
 ```
 
 ---

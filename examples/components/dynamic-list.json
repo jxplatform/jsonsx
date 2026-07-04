@@ -20,8 +20,9 @@
     "updateText": { "$prototype": "Function", "$src": "./dynamic-list.js" }
   },
 
-  "tagName": "div",
+  "tagName": "dynamic-list",
   "style": {
+    "display": "block",
     "fontFamily": "system-ui, sans-serif",
     "background": "#f8f9fa",
     "minHeight": "100vh",

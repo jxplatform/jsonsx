@@ -1,5 +1,14 @@
 {
   "title": "Custom Elements — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/task-manager.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "task-manager"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/task-manager.json"
+    }
+  ]
 }

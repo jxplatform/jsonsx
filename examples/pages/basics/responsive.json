@@ -1,5 +1,14 @@
 {
   "title": "Responsive — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/responsive-card.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "responsive-card"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/responsive-card.json"
+    }
+  ]
 }

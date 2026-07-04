@@ -1,6 +1,6 @@
 {
   "title": "Shoelace — Jx Examples",
-  "$layout": "../../layouts/example.json",
+  "$layout": "./layouts/example.json",
   "$head": [
     {
       "tagName": "link",
@@ -22,7 +22,9 @@
   "children": [
     {
       "tagName": "div",
-      "style": { "maxWidth": "640px" },
+      "style": {
+        "maxWidth": "640px"
+      },
       "children": [
         {
           "tagName": "h1",
@@ -30,12 +32,21 @@
         },
         {
           "tagName": "sl-card",
-          "style": { "marginBottom": "1rem" },
+          "style": {
+            "marginBottom": "1rem"
+          },
           "children": [
             {
               "tagName": "div",
-              "attributes": { "slot": "header" },
-              "children": [{ "tagName": "strong", "textContent": "Welcome" }]
+              "attributes": {
+                "slot": "header"
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "textContent": "Welcome"
+                }
+              ]
             },
             {
               "tagName": "p",
@@ -43,21 +54,32 @@
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "gap": "0.5rem", "marginTop": "1rem" },
+              "style": {
+                "display": "flex",
+                "gap": "0.5rem",
+                "marginTop": "1rem"
+              },
               "children": [
                 {
                   "tagName": "sl-button",
-                  "attributes": { "variant": "primary" },
+                  "attributes": {
+                    "variant": "primary"
+                  },
                   "textContent": "Primary"
                 },
                 {
                   "tagName": "sl-button",
-                  "attributes": { "variant": "success" },
+                  "attributes": {
+                    "variant": "success"
+                  },
                   "textContent": "Success"
                 },
                 {
                   "tagName": "sl-button",
-                  "attributes": { "variant": "neutral", "outline": "" },
+                  "attributes": {
+                    "variant": "neutral",
+                    "outline": ""
+                  },
                   "textContent": "Outline"
                 }
               ]
@@ -66,20 +88,36 @@
         },
         {
           "tagName": "sl-card",
-          "style": { "marginBottom": "1rem" },
+          "style": {
+            "marginBottom": "1rem"
+          },
           "children": [
             {
               "tagName": "div",
-              "attributes": { "slot": "header" },
-              "children": [{ "tagName": "strong", "textContent": "Form Elements" }]
+              "attributes": {
+                "slot": "header"
+              },
+              "children": [
+                {
+                  "tagName": "strong",
+                  "textContent": "Form Elements"
+                }
+              ]
             },
             {
               "tagName": "div",
-              "style": { "display": "flex", "flexDirection": "column", "gap": "1rem" },
+              "style": {
+                "display": "flex",
+                "flexDirection": "column",
+                "gap": "1rem"
+              },
               "children": [
                 {
                   "tagName": "sl-input",
-                  "attributes": { "label": "Name", "placeholder": "Enter your name" }
+                  "attributes": {
+                    "label": "Name",
+                    "placeholder": "Enter your name"
+                  }
                 },
                 {
                   "tagName": "sl-textarea",
@@ -89,10 +127,16 @@
                     "rows": "3"
                   }
                 },
-                { "tagName": "sl-switch", "textContent": "Enable notifications" },
+                {
+                  "tagName": "sl-switch",
+                  "textContent": "Enable notifications"
+                },
                 {
                   "tagName": "sl-button",
-                  "attributes": { "variant": "primary", "type": "submit" },
+                  "attributes": {
+                    "variant": "primary",
+                    "type": "submit"
+                  },
                   "textContent": "Submit"
                 }
               ]
@@ -101,9 +145,18 @@
         },
         {
           "tagName": "sl-alert",
-          "attributes": { "variant": "primary", "open": "" },
+          "attributes": {
+            "variant": "primary",
+            "open": ""
+          },
           "children": [
-            { "tagName": "sl-icon", "attributes": { "slot": "icon", "name": "info-circle" } },
+            {
+              "tagName": "sl-icon",
+              "attributes": {
+                "slot": "icon",
+                "name": "info-circle"
+              }
+            },
             {
               "tagName": "span",
               "textContent": "This is a Shoelace alert component rendered by the Jx runtime."

@@ -1,5 +1,14 @@
 {
   "title": "List — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/dynamic-list.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "dynamic-list"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/dynamic-list.json"
+    }
+  ]
 }

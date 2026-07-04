@@ -1,7 +1,7 @@
 ---
 $schema: https://jxsuite.com/schema/v1
 $id: TodoApp
-tagName: todo-app
+tagName: markdown-todo-app
 $media:
   --md: "(min-width: 768px)"
   --dark: "(prefers-color-scheme: dark)"

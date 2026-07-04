@@ -1,5 +1,14 @@
 {
   "title": "Computed — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/user-card.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "user-card"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/user-card.json"
+    }
+  ]
 }

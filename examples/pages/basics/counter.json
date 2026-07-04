@@ -1,5 +1,14 @@
 {
   "title": "Counter — Jx Examples",
-  "$layout": "../../layouts/example.json",
-  "children": [{ "$ref": "../../components/counter.json" }]
+  "$layout": "./layouts/example.json",
+  "children": [
+    {
+      "tagName": "my-counter"
+    }
+  ],
+  "$elements": [
+    {
+      "$ref": "../../components/counter.json"
+    }
+  ]
 }
