@@ -18,17 +18,31 @@ breakpoint canvas + CSS inspector rather than resolved text).
 ## Usage
 
 ```bash
-bun run screenshots                 # regenerate every shot
+bun run screenshots                 # regenerate, keeping visually-identical shots byte-for-byte
 bun run screenshots --only hero     # one shot (comma-separate for several)
 bun run screenshots --headed        # visible browser + 15s linger, for tuning
+bun run screenshots --force         # overwrite every shot, skipping the visual-diff check
 bun run screenshots --manifest x.json
 CHROMIUM_BIN=/path/to/chromium bun run screenshots   # explicit browser binary
 ```
 
 Requires a system Chromium/Chrome (`CHROMIUM_BIN`, else `chromium`/`google-chrome`/… on PATH).
 No browser is downloaded — this is what makes the runner work on NixOS and plain CI alike.
-Screenshots are **committed to git**; regenerate them wholesale from one machine when Studio's UI
-changes, and don't pixel-diff across machines (font rasterization differs per environment).
+
+## Change detection
+
+Screenshots are **committed to git**, so re-running shouldn't churn them. Before overwriting a shot,
+the runner captures to a buffer and compares it to the committed PNG with a tolerant **visual diff**
+— both are decoded and downscaled to a 32×32 thumbnail in the (already-running) browser and compared
+as mean per-channel difference; a shot whose diff is ≤ 1% keeps its old bytes (logged `— kept`),
+anything larger is rewritten (logged `updated (Δ…%)`). Same-machine re-renders are deterministic
+(the freeze/srgb/hinting measures below make them byte-identical → `Δ0.00%`), so a no-op run leaves
+`git status` clean; only shots that actually changed are touched. `--force` skips the check.
+
+Two caveats carry over: **regenerate wholesale from one machine** when Studio's UI changes (a
+different machine's font rasterization diffs past the threshold and rewrites everything), and the
+`git-panel` shot reflects the repo's live Source Control state, so it legitimately updates whenever
+your working tree differs.
 
 ## Shot schema
 

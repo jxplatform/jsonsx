@@ -22,6 +22,7 @@ const repoRoot = resolve(import.meta.dir, "../..");
 function parseArgs(argv: string[]) {
   const only = new Set<string>();
   let headed = false;
+  let force = false;
   let manifestPath = resolve(import.meta.dir, "manifest.json");
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i]!;
@@ -36,6 +37,8 @@ function parseArgs(argv: string[]) {
       }
     } else if (arg === "--headed") {
       headed = true;
+    } else if (arg === "--force") {
+      force = true;
     } else if (arg === "--manifest") {
       i += 1;
       const value = argv[i];
@@ -44,13 +47,13 @@ function parseArgs(argv: string[]) {
       }
       manifestPath = resolve(process.cwd(), value);
     } else {
-      throw new Error(`unknown argument "${arg}" (expected --only, --headed, --manifest)`);
+      throw new Error(`unknown argument "${arg}" (expected --only, --headed, --force, --manifest)`);
     }
   }
-  return { headed, manifestPath, only };
+  return { force, headed, manifestPath, only };
 }
 
-const { headed, manifestPath, only } = parseArgs(process.argv.slice(2));
+const { force, headed, manifestPath, only } = parseArgs(process.argv.slice(2));
 const manifest = validateManifest(await Bun.file(manifestPath).json());
 
 const shots = manifest.shots.filter((shot) => only.size === 0 || only.has(shot.name));
@@ -74,16 +77,14 @@ try {
     const resolved = resolveShot(manifest, shot);
     const page = await browser.newPage();
     try {
-      const written = await executeShot(page, resolved, {
+      await executeShot(page, resolved, {
+        force,
         log: console.log,
         outDir,
         repoRoot,
         serverUrl: server.url,
         studioPath: manifest.server.studioPath,
       });
-      for (const file of written) {
-        console.log(`[shot:${shot.name}] wrote ${file}`);
-      }
     } catch (error) {
       failed += 1;
       console.error(`[shot:${shot.name}] FAILED:`, error instanceof Error ? error.message : error);

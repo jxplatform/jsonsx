@@ -3,9 +3,19 @@
  * readiness, drive UI state through window.__jxAutomation, and capture a PNG.
  */
 
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import type { Frame, Page } from "puppeteer-core";
 import type { ClipSpec, ResolvedShot, ShotAction, WaitCondition } from "./types";
+
+/**
+ * A re-render that's visually indistinguishable from the committed PNG keeps the old bytes, so the
+ * checked-in screenshots don't churn in git on every run. The diff is the mean per-channel
+ * difference of a 32×32 downscale, in [0,1]: same-machine re-runs sit near zero; a real content
+ * change (or cross-machine font rasterization) blows well past this. Bump with `--force`.
+ */
+const DIFF_THRESHOLD = 0.01;
 
 declare global {
   interface Window {
@@ -171,6 +181,78 @@ export interface ShotContext {
   repoRoot: string;
   serverUrl: string;
   studioPath: string;
+  /** Overwrite every shot regardless of the visual-diff check (for a wholesale re-baseline). */
+  force: boolean;
+}
+
+/**
+ * Normalized visual difference in [0,1] between two PNG buffers. Both are decoded and downscaled to
+ * a 32×32 thumbnail in the (already-running) browser — no native image deps, since Sharp is
+ * unavailable on some hosts — and compared as mean per-channel absolute difference. Downscaling
+ * averages away sub-pixel anti-aliasing jitter, so the metric tracks perceived change.
+ */
+async function visualDiff(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  return page.evaluate(
+    async (aB64, bB64) => {
+      const N = 32;
+      const thumb = async (b64: string): Promise<Uint8ClampedArray> => {
+        const img = new Image();
+        await new Promise<void>((res, rej) => {
+          img.addEventListener("load", () => res());
+          img.addEventListener("error", () => rej(new Error("decode failed")));
+          img.src = `data:image/png;base64,${b64}`;
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = N;
+        canvas.height = N;
+        const c2d = canvas.getContext("2d");
+        if (!c2d) {
+          throw new Error("no 2d context");
+        }
+        c2d.drawImage(img, 0, 0, N, N);
+        return c2d.getImageData(0, 0, N, N).data;
+      };
+      const [pa, pb] = await Promise.all([thumb(aB64), thumb(bB64)]);
+      let sum = 0;
+      for (let i = 0; i < pa.length; i += 1) {
+        sum += Math.abs((pa[i] ?? 0) - (pb[i] ?? 0));
+      }
+      return sum / (pa.length * 255);
+    },
+    a.toString("base64"),
+    b.toString("base64"),
+  );
+}
+
+/**
+ * Write `buffer` to `outPath`, but skip the write when it's visually indistinguishable from the
+ * existing PNG (unless `ctx.force`), so committed screenshots don't churn. Logs the outcome.
+ */
+async function writeIfChanged(
+  page: Page,
+  outPath: string,
+  buffer: Buffer,
+  ctx: ShotContext,
+  shotName: string,
+): Promise<void> {
+  const name = basename(outPath);
+  if (!ctx.force && existsSync(outPath)) {
+    try {
+      const diff = await visualDiff(page, buffer, await readFile(outPath));
+      const pct = `Δ${(diff * 100).toFixed(2)}%`;
+      if (diff <= DIFF_THRESHOLD) {
+        ctx.log(`[shot:${shotName}] ${name} unchanged (${pct}) — kept`);
+        return;
+      }
+      await writeFile(outPath, buffer);
+      ctx.log(`[shot:${shotName}] ${name} updated (${pct})`);
+      return;
+    } catch {
+      // Any decode/read failure → fall through to an unconditional write.
+    }
+  }
+  await writeFile(outPath, buffer);
+  ctx.log(`[shot:${shotName}] ${name} written (${ctx.force ? "forced" : "new"})`);
 }
 
 async function captureVariant(
@@ -184,10 +266,8 @@ async function captureVariant(
   }
   const clip = await resolveClip(page, shot.clip);
   const outPath = join(ctx.outDir, fileName);
-  await page.screenshot({
-    ...(clip ? { clip } : { fullPage: true }),
-    path: outPath as `${string}.png`,
-  });
+  const buffer = Buffer.from(await page.screenshot(clip ? { clip } : { fullPage: true }));
+  await writeIfChanged(page, outPath, buffer, ctx, shot.name);
   return outPath;
 }
 
@@ -237,8 +317,8 @@ async function captureRegions(page: Page, shot: ResolvedShot, ctx: ShotContext):
     await runWait(page, { frames: 1, type: "settle" });
     const clip = await resolveRegionClip(page, region);
     const outPath = join(ctx.outDir, `${region.name}.png`);
-    await page.screenshot({ clip, path: outPath as `${string}.png` });
-    ctx.log(`[shot:${shot.name}] region → ${outPath}`);
+    const buffer = Buffer.from(await page.screenshot({ clip }));
+    await writeIfChanged(page, outPath, buffer, ctx, shot.name);
     written.push(outPath);
   }
   return written;
