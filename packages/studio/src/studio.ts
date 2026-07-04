@@ -90,6 +90,7 @@ import { defBadgeLabel, defCategory, renderSignalsTemplate } from "./panels/sign
 import { loadComponentRegistry } from "./files/components";
 import { ensureDependenciesInstalled } from "./packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "./packages/jxsuite-update";
+import { autoSyncProjectOnOpen } from "./packages/pull-package-sync";
 
 import { html, render as litRender } from "lit-html";
 
@@ -619,6 +620,7 @@ if (_projectParam) {
             selectedPath: siteCtx.fileRelPath || null,
           });
 
+          await autoSyncProjectOnOpen();
           await ensureDependenciesInstalled();
           await loadComponentRegistry();
 
@@ -787,6 +789,7 @@ async function openRecentProject(root: string) {
       selectedPath: null,
     });
 
+    await autoSyncProjectOnOpen();
     await ensureDependenciesInstalled();
     await loadDirectory(".");
     await loadComponentRegistry();

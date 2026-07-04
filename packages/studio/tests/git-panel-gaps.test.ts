@@ -72,6 +72,19 @@ void mock.module("../src/github/github-publish.js", () => ({
   },
 }));
 
+let pullSyncCalls = 0;
+let pullSyncImpl: () => Promise<void> = async () => {};
+
+void mock.module("../src/packages/pull-package-sync.js", () => ({
+  autoSyncProjectOnOpen: async () => {},
+  isAutomatedPackageDiff: () => false,
+  planPackageDiscard: async () => ({ automated: true, discard: [], removeUntracked: [] }),
+  pullWithPackageSync: () => {
+    pullSyncCalls += 1;
+    return pullSyncImpl();
+  },
+}));
+
 const { setProjectState } = (await import("../src/state.js")) as any;
 const { cleanupGitPanel, cloneRepository, refreshGitStatus, renderGitPanel } =
   await import("../src/panels/git-panel.js");
@@ -178,6 +191,8 @@ beforeEach(() => {
   dialogHosts = [];
   viewObj.leftTab = "git";
   mockPlatform = freshPlatform();
+  pullSyncCalls = 0;
+  pullSyncImpl = async () => {};
   setProjectState({ name: "proj" });
   cleanupGitPanel();
 });
@@ -390,9 +405,24 @@ describe("sync bar actions", () => {
     await flush();
     const names = callNames();
     expect(names).toContain("gitFetch");
-    expect(names).toContain("gitPull");
     expect(names).toContain("gitPush");
+    // Pull goes through the package-aware orchestrator, not a raw platform gitPull.
+    expect(pullSyncCalls).toBe(1);
+    expect(names).not.toContain("gitPull");
     expect(names.filter((n) => n === "gitStatus").length).toBe(3);
+  });
+
+  test("failing pull records error and stops loading", async () => {
+    seedRepoUi();
+    pullSyncImpl = async () => {
+      throw new Error("pull broke");
+    };
+    const div = renderPanel();
+    click(div.querySelector('[title^="Pull"]'));
+    await flush();
+    expect(pullSyncCalls).toBe(1);
+    expect(String(ui.gitError)).toContain("pull broke");
+    expect(ui.gitLoading).toBe(false);
   });
 
   test("failing git action records error and stops loading", async () => {

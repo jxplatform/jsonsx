@@ -30,6 +30,13 @@ void mock.module("../src/panels/statusbar.js", () => ({
   statusMessage: () => {},
 }));
 
+void mock.module("../src/packages/pull-package-sync.js", () => ({
+  autoSyncProjectOnOpen: async () => {},
+  isAutomatedPackageDiff: () => false,
+  planPackageDiscard: async () => ({ automated: true, discard: [], removeUntracked: [] }),
+  pullWithPackageSync: async () => {},
+}));
+
 const { setProjectState } = (await import("../src/state.js")) as any;
 const { renderGitPanel, platformSupportsClone } = await import("../src/panels/git-panel.js");
 

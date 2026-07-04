@@ -18,6 +18,7 @@ import { statusMessage } from "../panels/statusbar";
 import { loadComponentRegistry } from "./components";
 import { ensureDependenciesInstalled } from "../packages/ensure-deps";
 import { maybePromptJxsuiteUpdate } from "../packages/jxsuite-update";
+import { autoSyncProjectOnOpen } from "../packages/pull-package-sync";
 import { markLocalMutation } from "./fs-events";
 import {
   draggable,
@@ -97,6 +98,7 @@ export async function loadProject() {
 
     if (info.isSiteProject) {
       addRecentProject(requireProjectState().name, meta.root);
+      await autoSyncProjectOnOpen();
       await ensureDependenciesInstalled();
       await loadDirectory(".");
       await loadComponentRegistry();
@@ -155,6 +157,7 @@ export async function openProject({
       selectedPath: null,
     });
 
+    await autoSyncProjectOnOpen();
     await ensureDependenciesInstalled();
     await loadDirectory(".");
     await loadComponentRegistry();

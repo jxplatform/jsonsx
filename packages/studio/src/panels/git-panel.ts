@@ -23,6 +23,7 @@ import { view } from "../view";
 import { showConfirmDialog, showDialog } from "../ui/layers";
 import { statusMessage } from "./statusbar";
 import { publishToGithub } from "../github/github-publish";
+import { pullWithPackageSync } from "../packages/pull-package-sync";
 
 interface GitLogEntry {
   hash: string;
@@ -133,6 +134,20 @@ async function gitAction(action: string, body?: unknown) {
   updateUi("gitError", null);
   try {
     await plat[action]!(body);
+    await refreshGitStatus();
+  } catch (error) {
+    updateUi("gitError", errorMessage(error));
+    updateUi("gitLoading", false);
+    renderOnly("leftPanel");
+  }
+}
+
+/** Pull via the package-aware orchestrator; same loading/error contract as gitAction. */
+async function doPull() {
+  updateUi("gitLoading", true);
+  updateUi("gitError", null);
+  try {
+    await pullWithPackageSync();
     await refreshGitStatus();
   } catch (error) {
     updateUi("gitError", errorMessage(error));
@@ -315,7 +330,7 @@ export function renderGitPanel(
             </sp-action-button>
             <sp-action-button
               title="Pull${status?.behind ? ` (${status.behind} behind)` : ""}"
-              @click=${() => gitAction("gitPull")}
+              @click=${() => void doPull()}
               ?disabled=${loading}
             >
               <sp-icon-arrow-down slot="icon" size="xs"></sp-icon-arrow-down>
