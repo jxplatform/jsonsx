@@ -2161,6 +2161,21 @@ export async function defineElement(source: string | JxDocument, baseUrl?: strin
         delete this.dataset.jxProps;
       }
 
+      // Read literal `props.*` attributes (JSON-authored instances pass props this way; the
+      // Compiler lifts them into $props at build, and this is the live-render mirror). String
+      // Values only — HTML lowercases attribute names, so state keys must be lowercase to match.
+      // Collect first: removing while iterating the live NamedNodeMap skips entries.
+      const propAttrNames = this.getAttributeNames().filter(
+        (name) => name.startsWith("props.") && name.length > "props.".length,
+      );
+      for (const name of propAttrNames) {
+        const key = name.slice("props.".length);
+        if (key in (def.state ?? {})) {
+          state[key] = this.getAttribute(name);
+          this.removeAttribute(name);
+        }
+      }
+
       // Merge $props set as JS properties by parent before connection
       for (const key of Object.keys(def.state ?? {})) {
         if (key in this && (this as Record<string, unknown>)[key] !== undefined) {
