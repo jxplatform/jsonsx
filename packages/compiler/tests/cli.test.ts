@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
 const CLI_PATH = resolve(import.meta.dir, "../bin/jx.js");
-const FIXTURE_SITE = resolve(import.meta.dir, "../../../sites/jxsuite.com");
+const FIXTURE_SITE = resolve(import.meta.dir, "../../../examples");
 
 describe("jx cli", () => {
   test("runs under bun", async () => {

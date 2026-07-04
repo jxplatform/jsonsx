@@ -136,6 +136,13 @@
               export STATE_DIR="''${TMPDIR:-/tmp}/jx-state"
               export PATH="$PWD/node_modules/.bin:$PATH"
 
+              # Prebuilt native npm addons (e.g. sharp's @img/sharp-linux-x64)
+              # ship generic Linux binaries that dlopen() libstdc++.so.6 at
+              # runtime — NixOS has no FHS-standard location for it. Without
+              # this, sharp fails with ERR_DLOPEN_FAILED and image
+              # optimization breaks in `jx build`.
+              export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
+
               if [ -f "$PWD/.env" ]; then
                 set -a; source "$PWD/.env"; set +a
               fi
