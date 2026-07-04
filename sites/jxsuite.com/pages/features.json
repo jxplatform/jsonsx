@@ -11,9 +11,15 @@
     }
   ],
   "$elements": [
-    { "$ref": "../components/section-label.json" },
-    { "$ref": "../components/check-item.json" },
-    { "$ref": "../components/cta-button.json" }
+    {
+      "$ref": "../components/section-label.json"
+    },
+    {
+      "$ref": "../components/check-item.json"
+    },
+    {
+      "$ref": "../components/cta-button.json"
+    }
   ],
   "tagName": "div",
   "children": [
@@ -27,11 +33,16 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "800px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "section-label",
-              "attributes": { "props.text": "Features" }
+              "attributes": {
+                "props.text": "Features"
+              }
             },
             {
               "tagName": "h1",
@@ -83,7 +94,9 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Pillar 01 — CMS" }
+                  "attributes": {
+                    "props.text": "Pillar 01 — CMS"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -108,7 +121,11 @@
                 },
                 {
                   "tagName": "div",
-                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
                   "children": [
                     {
                       "tagName": "check-item",
@@ -118,15 +135,21 @@
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Content collections with frontmatter schemas" }
+                      "attributes": {
+                        "props.text": "Content collections with frontmatter schemas"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Dynamic routes from file system structure" }
+                      "attributes": {
+                        "props.text": "Dynamic routes from file system structure"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Git history is your audit trail and rollback" }
+                      "attributes": {
+                        "props.text": "Git history is your audit trail and rollback"
+                      }
                     },
                     {
                       "tagName": "check-item",
@@ -195,7 +218,9 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Pillar 02 — Framework" }
+                  "attributes": {
+                    "props.text": "Pillar 02 — Framework"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -220,19 +245,29 @@
                 },
                 {
                   "tagName": "div",
-                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
                   "children": [
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Signals-based reactivity (TC39 aligned)" }
+                      "attributes": {
+                        "props.text": "Signals-based reactivity (TC39 aligned)"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Compiles to standard Web Components" }
+                      "attributes": {
+                        "props.text": "Compiles to standard Web Components"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Template literal bindings — no JSX, no DSL" }
+                      "attributes": {
+                        "props.text": "Template literal bindings — no JSX, no DSL"
+                      }
                     },
                     {
                       "tagName": "check-item",
@@ -277,7 +312,9 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Pillar 03 — Visual Composer" }
+                  "attributes": {
+                    "props.text": "Pillar 03 — Visual Composer"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -302,15 +339,23 @@
                 },
                 {
                   "tagName": "div",
-                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
                   "children": [
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Visual canvas with live component rendering" }
+                      "attributes": {
+                        "props.text": "Visual canvas with live component rendering"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Property inspector with full CSS editing" }
+                      "attributes": {
+                        "props.text": "Property inspector with full CSS editing"
+                      }
                     },
                     {
                       "tagName": "check-item",
@@ -320,11 +365,15 @@
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Responsive breakpoint preview" }
+                      "attributes": {
+                        "props.text": "Responsive breakpoint preview"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Script editor for event handlers and logic" }
+                      "attributes": {
+                        "props.text": "Script editor for event handlers and logic"
+                      }
                     }
                   ]
                 }
@@ -334,9 +383,9 @@
               "tagName": "img",
               "attributes": {
                 "src": "/screenshots/mode-design.png",
-                "alt": "Jx Studio design mode — layers panel, responsive canvas, and style inspector",
+                "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
                 "width": "3840",
-                "height": "2400",
+                "height": "2000",
                 "loading": "lazy",
                 "decoding": "async"
               },
@@ -390,7 +439,9 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Pillar 04 — Static Generator" }
+                  "attributes": {
+                    "props.text": "Pillar 04 — Static Generator"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -415,19 +466,29 @@
                 },
                 {
                   "tagName": "div",
-                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
                   "children": [
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Sub-second builds for typical sites" }
+                      "attributes": {
+                        "props.text": "Sub-second builds for typical sites"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Automatic image optimization (WebP, AVIF)" }
+                      "attributes": {
+                        "props.text": "Automatic image optimization (WebP, AVIF)"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "100/100 Lighthouse scores by default" }
+                      "attributes": {
+                        "props.text": "100/100 Lighthouse scores by default"
+                      }
                     },
                     {
                       "tagName": "check-item",
@@ -437,7 +498,9 @@
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "No PHP, no Node server, no containers" }
+                      "attributes": {
+                        "props.text": "No PHP, no Node server, no containers"
+                      }
                     }
                   ]
                 }
@@ -464,7 +527,9 @@
           "children": [
             {
               "tagName": "section-label",
-              "attributes": { "props.text": "What You Can Build" }
+              "attributes": {
+                "props.text": "What You Can Build"
+              }
             },
             {
               "tagName": "h2",
@@ -587,7 +652,10 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "560px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "h2",

@@ -107,6 +107,10 @@ async function runAction(page: Page, action: ShotAction): Promise<void> {
       await hook(page, "editFunction", action.path, action.eventKey);
       return;
     }
+    case "openBrowse": {
+      await hook(page, "openBrowse");
+      return;
+    }
     case "select": {
       await hook(page, "select", action.path);
       return;

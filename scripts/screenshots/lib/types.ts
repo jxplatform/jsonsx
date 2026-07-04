@@ -22,6 +22,7 @@ export type WaitCondition =
 export type ShotAction =
   | { defName: string; do: "editDef" }
   | { do: "editFunction"; eventKey: string; path: (string | number)[] }
+  | { do: "openBrowse" }
   | { do: "select"; path: (string | number)[] | null }
   | { do: "setActivity"; value: string }
   | { do: "setCanvasMode"; value: string }
@@ -86,6 +87,7 @@ const ACTION_KINDS = new Set([
   "click",
   "editDef",
   "editFunction",
+  "openBrowse",
   "select",
   "setActivity",
   "setCanvasMode",

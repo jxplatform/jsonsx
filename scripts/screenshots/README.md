@@ -41,6 +41,7 @@ support), waits for the canvas iframe to ack `renderComplete`, then applies acti
     { "do": "select", "path": ["children", 0] }, // select a node by JxPath
     { "do": "setRightTab", "value": "style" }, // properties|events|style
     { "do": "editDef", "defName": "addItem" }, // open Monaco on a state function
+    { "do": "openBrowse" }, // open the Manage Files modal
     { "do": "setZoom", "value": 0.9 },
     { "do": "setStatus", "value": "Ready" }, // normalize the status bar text
   ],

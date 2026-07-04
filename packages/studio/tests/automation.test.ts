@@ -11,6 +11,7 @@ const { activeTab, closeAllTabs } = await import("../src/workspace/workspace");
 const { updateCanvas } = await import("../src/store");
 
 function makeDeps(): AutomationDeps & {
+  openBrowseModal: ReturnType<typeof mock>;
   render: ReturnType<typeof mock>;
   renderActivityBar: ReturnType<typeof mock>;
   setCanvasMode: ReturnType<typeof mock>;
@@ -18,6 +19,7 @@ function makeDeps(): AutomationDeps & {
 } {
   return {
     getCanvasMode: () => "design",
+    openBrowseModal: mock(() => {}),
     render: mock(() => {}),
     renderActivityBar: mock(() => {}),
     setCanvasMode: mock(() => {}),
@@ -132,6 +134,12 @@ describe("createAutomationApi", () => {
     api.editDef("addItem");
     const ui = activeTab.value?.session.ui as unknown as Record<string, unknown>;
     expect(ui.editingFunction).toEqual({ defName: "addItem", type: "def" });
+  });
+
+  test("openBrowse delegates to the browse modal opener", () => {
+    const deps = makeDeps();
+    createAutomationApi(deps).openBrowse();
+    expect(deps.openBrowseModal).toHaveBeenCalledTimes(1);
   });
 
   test("setStatus delegates to statusMessage", () => {

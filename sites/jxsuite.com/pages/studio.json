@@ -11,9 +11,15 @@
     }
   ],
   "$elements": [
-    { "$ref": "../components/section-label.json" },
-    { "$ref": "../components/check-item.json" },
-    { "$ref": "../components/cta-button.json" }
+    {
+      "$ref": "../components/section-label.json"
+    },
+    {
+      "$ref": "../components/check-item.json"
+    },
+    {
+      "$ref": "../components/cta-button.json"
+    }
   ],
   "tagName": "div",
   "children": [
@@ -27,11 +33,16 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "800px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "800px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "section-label",
-              "attributes": { "props.text": "Jx Studio" }
+              "attributes": {
+                "props.text": "Jx Studio"
+              }
             },
             {
               "tagName": "h1",
@@ -90,15 +101,23 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "var(--max-width)", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "var(--max-width)",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "div",
-              "style": { "textAlign": "center", "marginBottom": "3rem" },
+              "style": {
+                "textAlign": "center",
+                "marginBottom": "3rem"
+              },
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Four Modes" }
+                  "attributes": {
+                    "props.text": "Four Modes"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -145,9 +164,9 @@
                       "tagName": "img",
                       "attributes": {
                         "src": "/screenshots/mode-manage.png",
-                        "alt": "Jx Studio manage mode — project file explorer beside a live page preview",
+                        "alt": "Jx Studio manage mode — Manage Files modal with live previews of every project file",
                         "width": "3840",
-                        "height": "2400",
+                        "height": "2000",
                         "loading": "lazy",
                         "decoding": "async"
                       },
@@ -218,9 +237,9 @@
                       "tagName": "img",
                       "attributes": {
                         "src": "/screenshots/mode-edit.png",
-                        "alt": "Jx Studio edit mode — WYSIWYG markdown authoring with live document structure",
+                        "alt": "Jx Studio edit mode — WYSIWYG markdown authoring in the Jx examples project",
                         "width": "3840",
-                        "height": "2400",
+                        "height": "2000",
                         "loading": "lazy",
                         "decoding": "async"
                       },
@@ -291,9 +310,9 @@
                       "tagName": "img",
                       "attributes": {
                         "src": "/screenshots/mode-design.png",
-                        "alt": "Jx Studio design mode — selected section with layers panel and full style inspector",
+                        "alt": "Jx Studio design mode — one component rendered across four responsive breakpoint canvases",
                         "width": "3840",
-                        "height": "2400",
+                        "height": "2000",
                         "loading": "lazy",
                         "decoding": "async"
                       },
@@ -365,8 +384,8 @@
                       "attributes": {
                         "src": "/screenshots/mode-script.png",
                         "alt": "Jx Studio script mode — Monaco editor open on a component state function",
-                        "width": "2880",
-                        "height": "1800",
+                        "width": "3840",
+                        "height": "2000",
                         "loading": "lazy",
                         "decoding": "async"
                       },
@@ -451,7 +470,9 @@
               "children": [
                 {
                   "tagName": "section-label",
-                  "attributes": { "props.text": "Philosophy" }
+                  "attributes": {
+                    "props.text": "Philosophy"
+                  }
                 },
                 {
                   "tagName": "h2",
@@ -476,7 +497,11 @@
                 },
                 {
                   "tagName": "div",
-                  "style": { "display": "flex", "flexDirection": "column", "gap": "0.75rem" },
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "gap": "0.75rem"
+                  },
                   "children": [
                     {
                       "tagName": "check-item",
@@ -486,11 +511,15 @@
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Saves standard JSON — readable by any tool" }
+                      "attributes": {
+                        "props.text": "Saves standard JSON — readable by any tool"
+                      }
                     },
                     {
                       "tagName": "check-item",
-                      "attributes": { "props.text": "Works offline — no cloud dependency" }
+                      "attributes": {
+                        "props.text": "Works offline — no cloud dependency"
+                      }
                     },
                     {
                       "tagName": "check-item",
@@ -592,7 +621,10 @@
       "children": [
         {
           "tagName": "div",
-          "style": { "maxWidth": "560px", "margin": "0 auto" },
+          "style": {
+            "maxWidth": "560px",
+            "margin": "0 auto"
+          },
           "children": [
             {
               "tagName": "h2",

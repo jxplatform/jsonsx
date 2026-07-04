@@ -14,9 +14,10 @@ import { activeTab, workspace } from "../workspace/workspace";
 import { applyPanelCollapse, view } from "../view";
 import type { JxPath } from "../state";
 
-/** Callbacks that live module-local to studio.ts and can't be imported here. */
+/** Callbacks injected from studio.ts (module-local helpers or imports kept out of this module). */
 export interface AutomationDeps {
   getCanvasMode: () => string;
+  openBrowseModal: () => void;
   render: () => void;
   renderActivityBar: () => void;
   setCanvasMode: (mode: string) => void;
@@ -26,6 +27,7 @@ export interface AutomationDeps {
 export interface AutomationApi {
   editDef: (defName: string) => void;
   editFunction: (path: JxPath, eventKey: string) => void;
+  openBrowse: () => void;
   getState: () => {
     activeTabId: string | null;
     canvasMode: string;
@@ -56,6 +58,9 @@ export function createAutomationApi(deps: AutomationDeps): AutomationApi {
     editFunction(path: JxPath, eventKey: string) {
       updateUi("editingFunction", { eventKey, path, type: "event" });
       deps.render();
+    },
+    openBrowse() {
+      deps.openBrowseModal();
     },
     getState() {
       return {

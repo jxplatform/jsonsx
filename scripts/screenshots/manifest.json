@@ -5,8 +5,8 @@
     "studioPath": "/packages/studio/index.html"
   },
   "defaults": {
-    "project": "sites/jxsuite.com",
-    "viewport": { "width": 1920, "height": 1200 },
+    "project": "examples",
+    "viewport": { "width": 1920, "height": 1000 },
     "deviceScaleFactor": 2,
     "theme": "dark",
     "clip": { "selector": "#app" },
@@ -15,7 +15,9 @@
   "shots": [
     {
       "name": "hero",
+      "project": "sites/jxsuite.com",
       "file": "pages/index.md",
+      "viewport": { "width": 1920, "height": 1200 },
       "canvasMode": "preview",
       "actions": [
         { "do": "setActivity", "value": "layers" },
@@ -26,16 +28,22 @@
     },
     {
       "name": "mode-manage",
-      "file": "pages/index.md",
+      "file": "pages/index.json",
       "canvasMode": "preview",
       "actions": [
         { "do": "setActivity", "value": "files" },
-        { "do": "setStatus", "value": "Ready" }
+        { "do": "setStatus", "value": "Ready" },
+        { "do": "openBrowse" }
+      ],
+      "waitFor": [
+        { "type": "selector", "selector": ".browse-modal" },
+        { "type": "fonts" },
+        { "type": "settle", "frames": 4 }
       ]
     },
     {
       "name": "mode-edit",
-      "file": "content/docs/getting-started.md",
+      "file": "content/posts/getting-started.md",
       "canvasMode": "edit",
       "actions": [
         { "do": "setActivity", "value": "files" },
@@ -44,11 +52,11 @@
     },
     {
       "name": "mode-design",
-      "file": "pages/features.json",
+      "file": "components/responsive-card.json",
       "canvasMode": "design",
       "actions": [
         { "do": "setActivity", "value": "layers" },
-        { "do": "setZoom", "value": 1 },
+        { "do": "setZoom", "value": 0.45 },
         { "do": "select", "path": ["children", 0] },
         { "do": "setRightTab", "value": "style" },
         { "do": "setStatus", "value": "Ready" }
@@ -56,9 +64,7 @@
     },
     {
       "name": "mode-script",
-      "project": "examples",
       "file": "components/todo-app.json",
-      "viewport": { "width": 1440, "height": 900 },
       "canvasMode": "design",
       "actions": [
         { "do": "setActivity", "value": "state" },

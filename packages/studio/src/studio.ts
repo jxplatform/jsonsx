@@ -81,6 +81,7 @@ import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
 import { installAutomationHook } from "./services/automation";
+import { openBrowseModal } from "./browse/browse-modal";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
@@ -348,6 +349,7 @@ if (!hasPlatform()) {
 // Navigation, so the gated hook must install before the async deep-link project load below.
 installAutomationHook({
   getCanvasMode,
+  openBrowseModal,
   render,
   renderActivityBar,
   setCanvasMode,
