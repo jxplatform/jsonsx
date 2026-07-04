@@ -11,6 +11,7 @@
   "style": {
     "display": "flex",
     "flexDirection": "column",
+    "minWidth": "0",
     "borderRadius": "var(--radius-lg)",
     "border": "1px solid var(--color-border)",
     "backgroundColor": "var(--color-bg-surface)",
@@ -31,6 +32,7 @@
       "style": {
         "display": "block",
         "width": "100%",
+        "maxWidth": "100%",
         "height": "auto",
         "borderBottom": "1px solid var(--color-border)"
       }

@@ -35,7 +35,7 @@ Twelve production-ready sites across the industries people actually build for. P
 ::::::
 
 ::::::gallery{style.padding="clamp(2rem, 5vw, 4rem) clamp(1rem, 3vw, 2rem) clamp(4rem, 8vw, 6rem)"}
-:::::div{style.maxWidth="var(--max-width)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="repeat(auto-fill, minmax(320px, 1fr))" style.gap="1.5rem"}
+:::::div{style.maxWidth="var(--max-width, 1200px)" style.margin="0 auto" style.display="grid" style.gridTemplateColumns="repeat(auto-fit, minmax(min(320px, 100%), 1fr))" style.gap="1.5rem"}
 ::starter-card{props.name="Bistro & Café" props.industry="Restaurant & Food" props.tagline="A menu-driven site for a restaurant, café, or bakery." props.image="/starters/restaurant.jpg" props.accent="#b45309" props.slug="restaurant"}
 
 ::starter-card{props.name="Summit Heating & Cooling" props.industry="Home Services & Trades" props.tagline="Reliable HVAC repair and installation, backed by 24/7 service." props.image="/starters/home-services.jpg" props.accent="#ea580c" props.slug="home-services"}
