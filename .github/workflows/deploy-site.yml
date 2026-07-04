@@ -3,11 +3,11 @@ name: Deploy jxsuite.com
 on:
   push:
     branches: [main]
+    # Only auto-deploy when the site's own files change. A schema/compiler/runtime
+    # change that alters the rendered output won't trigger this — redeploy manually
+    # via workflow_dispatch when a core-package change needs to reach the site.
     paths:
       - "sites/jxsuite.com/**"
-      - "packages/schema/**"
-      - "packages/compiler/**"
-      - "packages/runtime/**"
   workflow_dispatch:
 
 permissions:
