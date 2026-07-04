@@ -15,7 +15,6 @@ import { join } from "node:path";
 
 const SITES_DIR = join(import.meta.dirname, "..", "sites");
 const CREDITS_PATH = join(import.meta.dirname, "..", "CREDITS.md");
-const REGISTRY_PATH = join(import.meta.dirname, "..", "registry.json");
 const PEXELS_API = "https://api.pexels.com/v1";
 
 export interface ImageSpec {
@@ -149,7 +148,6 @@ async function main(): Promise<void> {
   await mkdir(imagesDir, { recursive: true });
 
   const credits: string[] = [];
-  let thumbnailPhoto: PexelsPhoto | null = null;
 
   for (const spec of manifest.images) {
     let photo: PexelsPhoto;
@@ -165,9 +163,6 @@ async function main(): Promise<void> {
     }
     await download(sizedUrl(photo, spec.orientation), join(imagesDir, `${spec.role}.jpg`));
     credits.push(creditLine(spec.role, photo));
-    if (spec.role === manifest.thumbnail) {
-      thumbnailPhoto = photo;
-    }
     console.log(`✓ ${spec.role} (photo ${photo.id})`);
   }
 
@@ -179,23 +174,7 @@ async function main(): Promise<void> {
   const block = `## ${siteId}\n\n${credits.join("\n")}`;
   await writeFile(CREDITS_PATH, upsertCreditsBlock(existingCredits, siteId, block));
 
-  // Regenerate the registry thumbnail (small cropped crop → data URI).
-  if (thumbnailPhoto) {
-    const thumbRes = await fetch(sizedUrl(thumbnailPhoto, "landscape", { h: 320, w: 480 }));
-    const b64 = Buffer.from(await thumbRes.arrayBuffer()).toString("base64");
-    const dataUri = `data:image/jpeg;base64,${b64}`;
-    const registry = JSON.parse(await readFile(REGISTRY_PATH, "utf8")) as {
-      id: string;
-      thumbnail: string;
-    }[];
-    const entry = registry.find((r) => r.id === siteId);
-    if (entry) {
-      entry.thumbnail = dataUri;
-      await writeFile(REGISTRY_PATH, `${JSON.stringify(registry, null, 2)}\n`);
-      console.log("✓ registry thumbnail updated");
-    }
-  }
-
+  // Registry thumbnails are rendered homepage screenshots — see scripts/screenshots/thumbnails.ts.
   console.log(`\nDone: ${manifest.images.length} photos → ${imagesDir}`);
 }
 

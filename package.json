@@ -37,6 +37,7 @@
     "postinstall": "node -e \"if(!process.env.CI)require('child_process').execSync('bun2nix -o bun.nix',{stdio:'ignore'})\" || true",
     "prepare": "husky",
     "screenshots": "bun scripts/screenshots/run.ts",
+    "screenshots:thumbnails": "bun scripts/screenshots/thumbnails.ts",
     "test": "bun test --isolate",
     "test:workspaces": "bun run --workspaces test --isolate",
     "test:coverage": "bun test --isolate --coverage",
