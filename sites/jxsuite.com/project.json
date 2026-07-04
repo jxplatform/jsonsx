@@ -19,6 +19,8 @@
     "lazyLoad": true
   },
   "imports": {
+    "ContentCollection": "@jxsuite/parser/ContentCollection.class.json",
+    "ContentEntry": "@jxsuite/parser/ContentEntry.class.json",
     "Markdown": "@jxsuite/parser/Markdown.class.json",
     "MarkdownCollection": "@jxsuite/parser/MarkdownCollection.class.json"
   },
