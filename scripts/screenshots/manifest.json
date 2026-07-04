@@ -1,0 +1,75 @@
+{
+  "outDir": "sites/jxsuite.com/public/screenshots",
+  "server": {
+    "url": "http://localhost:3000",
+    "studioPath": "/packages/studio/index.html"
+  },
+  "defaults": {
+    "project": "sites/jxsuite.com",
+    "viewport": { "width": 1920, "height": 1200 },
+    "deviceScaleFactor": 2,
+    "theme": "dark",
+    "clip": { "selector": "#app" },
+    "waitFor": [{ "type": "canvasReady" }, { "type": "fonts" }, { "type": "settle", "frames": 2 }]
+  },
+  "shots": [
+    {
+      "name": "hero",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        { "do": "setActivity", "value": "layers" },
+        { "do": "select", "path": ["children", 0, "children", 0, "children", 1] },
+        { "do": "setRightTab", "value": "properties" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "mode-manage",
+      "file": "pages/index.md",
+      "canvasMode": "preview",
+      "actions": [
+        { "do": "setActivity", "value": "files" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "mode-edit",
+      "file": "content/docs/getting-started.md",
+      "canvasMode": "edit",
+      "actions": [
+        { "do": "setActivity", "value": "files" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "mode-design",
+      "file": "pages/features.json",
+      "canvasMode": "design",
+      "actions": [
+        { "do": "setActivity", "value": "layers" },
+        { "do": "setZoom", "value": 1 },
+        { "do": "select", "path": ["children", 0] },
+        { "do": "setRightTab", "value": "style" },
+        { "do": "setStatus", "value": "Ready" }
+      ]
+    },
+    {
+      "name": "mode-script",
+      "project": "examples",
+      "file": "components/todo-app.json",
+      "viewport": { "width": 1440, "height": 900 },
+      "canvasMode": "design",
+      "actions": [
+        { "do": "setActivity", "value": "state" },
+        { "do": "editDef", "defName": "addItem" },
+        { "do": "setStatus", "value": "Ready" }
+      ],
+      "waitFor": [
+        { "type": "selector", "selector": ".monaco-editor .view-lines" },
+        { "type": "fonts" },
+        { "type": "settle", "frames": 2 }
+      ]
+    }
+  ]
+}

@@ -80,6 +80,7 @@ import { startFsSync } from "./files/fs-events";
 import { renderImportsTemplate } from "./panels/imports-panel";
 import { renderHeadTemplate } from "./panels/head-panel";
 import { exportCemManifest as _exportCemManifest } from "./services/cem-export";
+import { installAutomationHook } from "./services/automation";
 
 import { getPlatform, hasPlatform, registerPlatform } from "./platform";
 import { parseMediaEntries } from "./utils/canvas-media";
@@ -342,6 +343,16 @@ initCssData(webdata);
 if (!hasPlatform()) {
   registerPlatform(createDevServerPlatform());
 }
+
+// Screenshot/automation runners (scripts/screenshots/) await window.__jxAutomation right after
+// Navigation, so the gated hook must install before the async deep-link project load below.
+installAutomationHook({
+  getCanvasMode,
+  render,
+  renderActivityBar,
+  setCanvasMode,
+  statusMessage,
+});
 
 mountResizeEdges();
 

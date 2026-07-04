@@ -331,20 +331,22 @@
               ]
             },
             {
-              "tagName": "div",
-              "style": {
-                "backgroundColor": "var(--color-bg-secondary)",
-                "border": "1px solid var(--color-border)",
-                "borderRadius": "var(--radius-lg)",
-                "aspectRatio": "16/10",
-                "display": "flex",
-                "alignItems": "center",
-                "justifyContent": "center",
-                "color": "var(--color-text-muted)",
-                "fontFamily": "var(--font-mono)",
-                "fontSize": "0.8125rem"
+              "tagName": "img",
+              "attributes": {
+                "src": "/screenshots/mode-design.png",
+                "alt": "Jx Studio design mode — layers panel, responsive canvas, and style inspector",
+                "width": "3840",
+                "height": "2400",
+                "loading": "lazy",
+                "decoding": "async"
               },
-              "textContent": "[ Jx Studio Screenshot ]"
+              "style": {
+                "display": "block",
+                "width": "100%",
+                "height": "auto",
+                "border": "1px solid var(--color-border)",
+                "borderRadius": "var(--radius-lg)"
+              }
             }
           ]
         }

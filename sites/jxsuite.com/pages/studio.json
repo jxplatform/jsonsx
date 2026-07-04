@@ -12,7 +12,6 @@
   ],
   "$elements": [
     { "$ref": "../components/section-label.json" },
-    { "$ref": "../components/mode-card.json" },
     { "$ref": "../components/check-item.json" },
     { "$ref": "../components/cta-button.json" }
   ],
@@ -58,22 +57,25 @@
               "textContent": "Design components on a canvas. Edit content inline. Write event handlers. Everything saves to plain JSON files — the same files your compiler reads, your git tracks, and your team reviews."
             },
             {
-              "tagName": "div",
+              "tagName": "img",
+              "attributes": {
+                "src": "/screenshots/hero.png",
+                "alt": "Jx Studio editing the jxsuite.com homepage — layers panel, live canvas, and element inspector",
+                "width": "3840",
+                "height": "2400",
+                "loading": "eager",
+                "decoding": "async"
+              },
               "style": {
-                "backgroundColor": "var(--color-bg-secondary)",
+                "display": "block",
+                "width": "100%",
+                "height": "auto",
+                "maxWidth": "960px",
+                "margin": "0 auto",
                 "border": "1px solid var(--color-border)",
                 "borderRadius": "var(--radius-lg)",
-                "aspectRatio": "16/9",
-                "display": "flex",
-                "alignItems": "center",
-                "justifyContent": "center",
-                "color": "var(--color-text-muted)",
-                "fontFamily": "var(--font-mono)",
-                "fontSize": "0.8125rem",
-                "maxWidth": "900px",
-                "margin": "0 auto"
-              },
-              "textContent": "[ Jx Studio Interface ]"
+                "boxShadow": "0 24px 64px rgba(0, 0, 0, 0.45)"
+              }
             }
           ]
         }
@@ -124,41 +126,301 @@
               "tagName": "div",
               "style": {
                 "display": "grid",
-                "gridTemplateColumns": "repeat(auto-fit, minmax(260px, 1fr))",
-                "gap": "1rem"
+                "gridTemplateColumns": "repeat(auto-fit, minmax(min(420px, 100%), 1fr))",
+                "gap": "1.5rem"
               },
               "children": [
                 {
-                  "tagName": "mode-card",
-                  "attributes": {
-                    "props.number": "Mode 01",
-                    "props.name": "Manage",
-                    "props.description": "Project explorer, content collections, and file operations. Create pages, organize assets, manage your content — the CMS layer without the CMS."
-                  }
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "borderRadius": "var(--radius-lg)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "overflow": "hidden"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "/screenshots/mode-manage.png",
+                        "alt": "Jx Studio manage mode — project file explorer beside a live page preview",
+                        "width": "3840",
+                        "height": "2400",
+                        "loading": "lazy",
+                        "decoding": "async"
+                      },
+                      "style": {
+                        "display": "block",
+                        "width": "100%",
+                        "height": "auto",
+                        "borderBottom": "1px solid var(--color-border)"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "0.75rem",
+                        "padding": "1.5rem"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "letterSpacing": "0.1em",
+                            "textTransform": "uppercase",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Mode 01"
+                        },
+                        {
+                          "tagName": "h3",
+                          "style": {
+                            "fontSize": "1.125rem",
+                            "fontWeight": "700",
+                            "letterSpacing": "-0.02em",
+                            "margin": "0",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "Manage"
+                        },
+                        {
+                          "tagName": "p",
+                          "style": {
+                            "fontSize": "0.875rem",
+                            "lineHeight": "1.6",
+                            "color": "var(--color-text-secondary)",
+                            "margin": "0"
+                          },
+                          "textContent": "Project explorer, content collections, and file operations. Create pages, organize assets, manage your content — the CMS layer without the CMS."
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
-                  "tagName": "mode-card",
-                  "attributes": {
-                    "props.number": "Mode 02",
-                    "props.name": "Edit",
-                    "props.description": "Click any text, type. Slash commands for blocks. Frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as Markdown."
-                  }
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "borderRadius": "var(--radius-lg)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "overflow": "hidden"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "/screenshots/mode-edit.png",
+                        "alt": "Jx Studio edit mode — WYSIWYG markdown authoring with live document structure",
+                        "width": "3840",
+                        "height": "2400",
+                        "loading": "lazy",
+                        "decoding": "async"
+                      },
+                      "style": {
+                        "display": "block",
+                        "width": "100%",
+                        "height": "auto",
+                        "borderBottom": "1px solid var(--color-border)"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "0.75rem",
+                        "padding": "1.5rem"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "letterSpacing": "0.1em",
+                            "textTransform": "uppercase",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Mode 02"
+                        },
+                        {
+                          "tagName": "h3",
+                          "style": {
+                            "fontSize": "1.125rem",
+                            "fontWeight": "700",
+                            "letterSpacing": "-0.02em",
+                            "margin": "0",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "Edit"
+                        },
+                        {
+                          "tagName": "p",
+                          "style": {
+                            "fontSize": "0.875rem",
+                            "lineHeight": "1.6",
+                            "color": "var(--color-text-secondary)",
+                            "margin": "0"
+                          },
+                          "textContent": "Click any text, type. Slash commands for blocks. Frontmatter forms on the side. WYSIWYG content authoring that feels like Notion — saves as Markdown."
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
-                  "tagName": "mode-card",
-                  "attributes": {
-                    "props.number": "Mode 03",
-                    "props.name": "Design",
-                    "props.description": "Visual canvas with live rendering. Edit CSS properties, responsive breakpoints, hover states, and design tokens. Everything you'd do in DevTools — but persistent."
-                  }
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "borderRadius": "var(--radius-lg)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "overflow": "hidden"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "/screenshots/mode-design.png",
+                        "alt": "Jx Studio design mode — selected section with layers panel and full style inspector",
+                        "width": "3840",
+                        "height": "2400",
+                        "loading": "lazy",
+                        "decoding": "async"
+                      },
+                      "style": {
+                        "display": "block",
+                        "width": "100%",
+                        "height": "auto",
+                        "borderBottom": "1px solid var(--color-border)"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "0.75rem",
+                        "padding": "1.5rem"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "letterSpacing": "0.1em",
+                            "textTransform": "uppercase",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Mode 03"
+                        },
+                        {
+                          "tagName": "h3",
+                          "style": {
+                            "fontSize": "1.125rem",
+                            "fontWeight": "700",
+                            "letterSpacing": "-0.02em",
+                            "margin": "0",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "Design"
+                        },
+                        {
+                          "tagName": "p",
+                          "style": {
+                            "fontSize": "0.875rem",
+                            "lineHeight": "1.6",
+                            "color": "var(--color-text-secondary)",
+                            "margin": "0"
+                          },
+                          "textContent": "Visual canvas with live rendering. Edit CSS properties, responsive breakpoints, hover states, and design tokens. Everything you'd do in DevTools — but persistent."
+                        }
+                      ]
+                    }
+                  ]
                 },
                 {
-                  "tagName": "mode-card",
-                  "attributes": {
-                    "props.number": "Mode 04",
-                    "props.name": "Script",
-                    "props.description": "Monaco-powered code editor for event handlers, computed state, and API integrations. When a client asks for 'one little interactive thing' — you stop saying no."
-                  }
+                  "tagName": "div",
+                  "style": {
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "borderRadius": "var(--radius-lg)",
+                    "border": "1px solid var(--color-border)",
+                    "backgroundColor": "var(--color-bg-surface)",
+                    "overflow": "hidden"
+                  },
+                  "children": [
+                    {
+                      "tagName": "img",
+                      "attributes": {
+                        "src": "/screenshots/mode-script.png",
+                        "alt": "Jx Studio script mode — Monaco editor open on a component state function",
+                        "width": "2880",
+                        "height": "1800",
+                        "loading": "lazy",
+                        "decoding": "async"
+                      },
+                      "style": {
+                        "display": "block",
+                        "width": "100%",
+                        "height": "auto",
+                        "borderBottom": "1px solid var(--color-border)"
+                      }
+                    },
+                    {
+                      "tagName": "div",
+                      "style": {
+                        "display": "flex",
+                        "flexDirection": "column",
+                        "gap": "0.75rem",
+                        "padding": "1.5rem"
+                      },
+                      "children": [
+                        {
+                          "tagName": "div",
+                          "style": {
+                            "fontFamily": "var(--font-mono)",
+                            "fontSize": "0.6875rem",
+                            "letterSpacing": "0.1em",
+                            "textTransform": "uppercase",
+                            "color": "var(--color-accent)"
+                          },
+                          "textContent": "Mode 04"
+                        },
+                        {
+                          "tagName": "h3",
+                          "style": {
+                            "fontSize": "1.125rem",
+                            "fontWeight": "700",
+                            "letterSpacing": "-0.02em",
+                            "margin": "0",
+                            "color": "var(--color-text-primary)"
+                          },
+                          "textContent": "Script"
+                        },
+                        {
+                          "tagName": "p",
+                          "style": {
+                            "fontSize": "0.875rem",
+                            "lineHeight": "1.6",
+                            "color": "var(--color-text-secondary)",
+                            "margin": "0"
+                          },
+                          "textContent": "Monaco-powered code editor for event handlers, computed state, and API integrations. When a client asks for 'one little interactive thing' — you stop saying no."
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
