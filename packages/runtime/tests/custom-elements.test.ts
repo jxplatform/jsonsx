@@ -69,6 +69,50 @@ describe("Custom Elements", () => {
     el.remove();
   });
 
+  test("props.* attributes override state defaults and are stripped", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      children: [{ tagName: "span", textContent: "${state.label}" }],
+      state: { label: "default", other: "untouched" },
+      tagName: tag,
+    });
+
+    const el = document.createElement(tag);
+    el.setAttribute("props.label", "From attribute");
+    el.setAttribute("props.unknown", "ignored");
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect((el.querySelector("span") as HTMLElement).textContent).toBe("From attribute");
+    // Lifted prop attributes don't leak into the DOM; unknown keys stay untouched
+    expect(el.hasAttribute("props.label")).toBe(false);
+    expect(el.hasAttribute("props.unknown")).toBe(true);
+    expect((el as any).other).toBe("untouched");
+    el.remove();
+  });
+
+  test("explicit $props JS property wins over a props.* attribute", async () => {
+    const tag = uniqueTag();
+    await defineElement({
+      children: [{ tagName: "span", textContent: "${state.label}" }],
+      state: { label: "default" },
+      tagName: tag,
+    });
+
+    const el = document.createElement(tag);
+    el.setAttribute("props.label", "attribute");
+    (el as any).label = "js property";
+    document.body.append(el);
+    await new Promise((r) => {
+      setTimeout(r, 100);
+    });
+
+    expect((el.querySelector("span") as HTMLElement).textContent).toBe("js property");
+    el.remove();
+  });
+
   test("lifecycle hooks (onMount)", async () => {
     const tag = uniqueTag();
     await defineElement({

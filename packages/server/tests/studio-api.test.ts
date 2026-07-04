@@ -866,6 +866,31 @@ describe("resolve-site", () => {
     expect(data.projectConfig.name).toBe("Test Site");
   });
 
+  test("accepts the project directory itself and targets its project.json", async () => {
+    const dirPath = resolve(FIXTURES, "my-site");
+    const url = new URL(
+      `http://localhost/__studio/resolve-site?path=${encodeURIComponent(dirPath)}`,
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
+    expect(data.sitePath).toBe(dirPath);
+    expect(data.fileRelPath).toBe("project.json");
+    expect(data.projectConfig.name).toBe("Test Site");
+  });
+
+  test("accepts a subdirectory and walks up to the project root", async () => {
+    const dirPath = resolve(FIXTURES, "my-site/pages");
+    const url = new URL(
+      `http://localhost/__studio/resolve-site?path=${encodeURIComponent(dirPath)}`,
+    );
+    const req = new Request(url, { method: "GET" });
+    const res = await callApi(req, url, FIXTURES);
+    const data = await res.json();
+    expect(data.sitePath).toBe(resolve(FIXTURES, "my-site"));
+    expect(data.fileRelPath).toBe("pages/project.json");
+  });
+
   test("returns null when no project.json found", async () => {
     const filePath = "/tmp/no-project-here/somefile.json";
     const url = new URL(

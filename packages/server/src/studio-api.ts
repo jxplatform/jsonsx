@@ -331,9 +331,21 @@ export async function handleStudioApi(
       return Response.json({ error: "Missing path param" }, { status: 400 });
     }
     try {
-      // Walk up from file's directory looking for project.json
-      const absFile = expandTilde(filePath);
-      let dir = dirname(absFile);
+      // Walk up looking for project.json. Accept a directory (e.g. the project root itself, as
+      // Deep links like ?project=/abs/my-site pass) by starting the walk AT the directory and
+      // Treating its project.json as the target file, so callers land on the home page.
+      let absFile = expandTilde(filePath);
+      let dir: string;
+      let isDir = false;
+      try {
+        isDir = statSync(absFile).isDirectory();
+      } catch {}
+      if (isDir) {
+        dir = absFile;
+        absFile = resolve(absFile, "project.json");
+      } else {
+        dir = dirname(absFile);
+      }
       while (dir) {
         const candidate = resolve(dir, "project.json");
         if (existsSync(candidate)) {

@@ -193,9 +193,7 @@ export async function executeShot(
   });
   await page.emulateMediaFeatures([{ name: "prefers-reduced-motion", value: "reduce" }]);
 
-  // Resolve-site walks UP from dirname(path) looking for project.json, so the deep link must
-  // Point at a file inside the project — its project.json — not the project directory itself.
-  const projectAbs = resolve(ctx.repoRoot, shot.project, "project.json");
+  const projectAbs = resolve(ctx.repoRoot, shot.project);
   const params = new URLSearchParams({
     automation: "1",
     file: shot.file,
