@@ -957,6 +957,27 @@ function expandComponents(
 
   const def = componentDefs.get(node.tagName as string);
   if (def) {
+    // JSON-authored instances pass props as literal `props.*` attribute keys (markdown directives
+    // Are normalized to $props by the parser's expandDotPaths, but JSON is parsed verbatim).
+    // Lift them into $props so the pre-render sees them, and strip them from attributes so they
+    // Don't leak into the emitted HTML. Values stay raw strings — no coercion, matching the
+    // Markdown path and the runtime's $props semantics. Explicit $props wins on key conflicts.
+    if (node.attributes) {
+      let lifted: NonNullable<JxElement["$props"]> | null = null;
+      for (const [key, value] of Object.entries(node.attributes)) {
+        if (key.startsWith("props.") && key.length > "props.".length) {
+          lifted ??= {};
+          // JxAttributeValue is JSON-representable (primitives or a $ref object), so the
+          // Narrowing to JsonValue is sound.
+          lifted[key.slice("props.".length)] = value as JsonValue;
+          delete node.attributes[key];
+        }
+      }
+      if (lifted) {
+        node.$props = { ...lifted, ...node.$props };
+      }
+    }
+
     const slotContent =
       Array.isArray(node.children) && node.children.length > 0
         ? node.children

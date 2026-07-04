@@ -721,6 +721,70 @@ describe("buildSite — component CSS generation", () => {
   });
 });
 
+// ── JSON-authored props.* attributes on component instances ─────────────────
+
+describe("buildSite — props.* attributes lift into $props for static render", () => {
+  const PROPS_TMP = resolve(import.meta.dir, "__test-site-props-attrs__");
+
+  beforeAll(() => {
+    rmSync(PROPS_TMP, { force: true, recursive: true });
+    mkdirSync(PROPS_TMP, { recursive: true });
+    writeFileSync(
+      resolve(PROPS_TMP, "project.json"),
+      JSON.stringify({ build: { outDir: "./dist" }, name: "Props Test" }),
+      "utf8",
+    );
+    mkdirSync(resolve(PROPS_TMP, "pages"), { recursive: true });
+    writeFileSync(
+      resolve(PROPS_TMP, "pages/index.json"),
+      JSON.stringify({
+        children: [
+          {
+            attributes: { id: "first", "props.label": "Go" },
+            tagName: "tag-chip",
+          },
+          {
+            $props: { label: "Explicit wins" },
+            attributes: { "props.label": "Attribute loses" },
+            tagName: "tag-chip",
+          },
+        ],
+        title: "Home",
+      }),
+      "utf8",
+    );
+    mkdirSync(resolve(PROPS_TMP, "components"), { recursive: true });
+    // Fully static component (no handlers/$prototype/$ref) — ships no JS, so the build-time
+    // Render is the only place props can be applied.
+    writeFileSync(
+      resolve(PROPS_TMP, "components/tag-chip.json"),
+      JSON.stringify({
+        children: [{ tagName: "span", textContent: "${state.label}" }],
+        state: { label: { default: "Default" } },
+        tagName: "tag-chip",
+      }),
+      "utf8",
+    );
+  });
+
+  afterAll(() => {
+    rmSync(PROPS_TMP, { force: true, recursive: true });
+  });
+
+  it("renders the interior with props.* values and does not leak the attributes", async () => {
+    await buildSite(PROPS_TMP, { clean: true });
+    const html = readFileSync(resolve(PROPS_TMP, "dist/index.html"), "utf8");
+    expect(html).toContain(">Go</span>");
+    expect(html).not.toContain("props.label");
+    expect(html).not.toContain(">Default</span>");
+    // Non-prop attributes survive the lift
+    expect(html).toContain('id="first"');
+    // Explicit $props takes precedence over a conflicting props.* attribute
+    expect(html).toContain(">Explicit wins</span>");
+    expect(html).not.toContain(">Attribute loses</span>");
+  });
+});
+
 // ── Component compilation error handling ─────────────────────────────────────
 
 describe("buildSite — component compilation errors", () => {
