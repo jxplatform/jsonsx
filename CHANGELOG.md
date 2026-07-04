@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.35.0](https://github.com/jxsuite/jx/compare/v0.34.0...v0.35.0) (2026-07-04)
+
+
+### Features
+
+* automated screenshot framework ([0f8c972](https://github.com/jxsuite/jx/commit/0f8c9721e97bdeeb5c883d86a0f175393718b71e))
+* **desktop:** wire up the "new project" feature ([5f9fec3](https://github.com/jxsuite/jx/commit/5f9fec325269ebada329f383825f096db657610f))
+* **starters:** init starter sites ([1f883b5](https://github.com/jxsuite/jx/commit/1f883b526ea91ae935de76932283302d0720f104))
+* **studio:** auto-sync and package conflict resolution ([5fb5fe4](https://github.com/jxsuite/jx/commit/5fb5fe42466a6f2bd9b6cabad2047daf18febf80))
+* use site screenshots for template selector ([ba49dfa](https://github.com/jxsuite/jx/commit/ba49dfa9fec9c705bee3e87126acfefe197bcc74))
+
+
+### Bug Fixes
+
+* **compiler:** proper handling of default content ([9970382](https://github.com/jxsuite/jx/commit/997038254e8247b963d22631117fb3639cdc1f6d))
+* **runtime:** proper handling of default content ([73ddb02](https://github.com/jxsuite/jx/commit/73ddb02eed74c69587739eb8f257736e30001158))
+* **studio:** proper handling of relative component references ([eb20e2f](https://github.com/jxsuite/jx/commit/eb20e2f5ad5b8c27888f3b52d2ca76a24c5afb19))
+
 ## [0.34.0](https://github.com/jxsuite/jx/compare/v0.33.0...v0.34.0) (2026-07-03)
 
 

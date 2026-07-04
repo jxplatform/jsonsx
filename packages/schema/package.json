@@ -41,7 +41,7 @@
     "upgrade": "bunx npm-check-updates -u && bun install"
   },
   "type": "module",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "devDependencies": {
     "json-schema-to-ts": "^3.1.1"
   }
