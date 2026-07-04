@@ -23,16 +23,15 @@
       "attributes": {
         "src": "${state.image}",
         "alt": "Preview of the ${state.name} starter site",
-        "width": "1600",
-        "height": "1000",
+        "width": "1280",
+        "height": "800",
         "loading": "lazy",
         "decoding": "async"
       },
       "style": {
         "display": "block",
         "width": "100%",
-        "aspectRatio": "16 / 10",
-        "objectFit": "cover",
+        "height": "auto",
         "borderBottom": "1px solid var(--color-border)"
       }
     },
@@ -82,13 +81,13 @@
           "style": {
             "fontFamily": "var(--font-mono)",
             "fontSize": "0.75rem",
+            "lineHeight": "1.5",
             "color": "var(--color-text-muted)",
             "backgroundColor": "var(--color-bg-primary)",
             "border": "1px solid var(--color-border)",
             "borderRadius": "var(--radius)",
             "padding": "0.4rem 0.6rem",
-            "overflowX": "auto",
-            "whiteSpace": "nowrap"
+            "wordBreak": "break-word"
           },
           "textContent": "bun create @jxsuite my-site --template ${state.slug}"
         }
