@@ -18,6 +18,9 @@
     ".": "./index.ts",
     "./registry.json": "./registry.json"
   },
+  "publishConfig": {
+    "provenance": true
+  },
   "scripts": {
     "test": "bun test --isolate",
     "test:coverage": "bun test --isolate --coverage"
